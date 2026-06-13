@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import { isEquipmentNode } from '@/types/hierarchy'
+import { getNodeTipo } from '@/types/hierarchy'
 import { logger } from '@/lib/logger'
 
 export interface GlobalEquipmentResult {
@@ -67,8 +67,8 @@ export function useGlobalEquipmentSearch(searchQuery: string, minChars = 2) {
         snap.forEach(doc => {
           const d = doc.data()
           const codigo = d.codigo ?? ''
-          // Solo equipos: código numérico o vacío (no áreas alfanuméricas)
-          if (!isEquipmentNode(codigo) && codigo !== '') return
+          // Solo equipos (tipoNodo persistido, con fallback al código): no áreas
+          if (getNodeTipo({ codigo, tipoNodo: d.tipoNodo }) !== 'equipo') return
 
           results.push({
             id: doc.id,

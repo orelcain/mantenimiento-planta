@@ -41,11 +41,15 @@ export const HIERARCHY_LEVEL_NAMES: Record<HierarchyLevel, string> = {
   [HierarchyLevel.ELEMENTO]: 'Elemento',
 }
 
+// Tipo de nodo en la jerarquía SAP: área (ubicación técnica) o equipo
+export type HierarchyNodeTipo = 'area' | 'equipo'
+
 // Estructura base de un nodo jerárquico
 export interface HierarchyNode {
   id: string
   nombre: string
   codigo: string // Código único alfanumérico (ej: "PROD-001", "ALM-002")
+  tipoNodo?: HierarchyNodeTipo // Etiqueta persistida (Fase 1 normalización); si falta, se deriva del código
   nivel: HierarchyLevel
   parentId: string | null // null para nivel 1 (empresa)
   path: string[] // Array de IDs desde raíz hasta este nodo (ej: ["empresa-1", "area-2", "sistema-3"])
@@ -195,6 +199,20 @@ export function generateHierarchyCode(
 // Determina si un nodo es equipo (código SAP numérico) vs área (código alfanumérico)
 export function isEquipmentNode(codigo: string): boolean {
   return /^\d+$/.test(codigo)
+}
+
+// Deriva el tipo de nodo desde el código: numérico → equipo; alfanumérico → área;
+// sin código → equipo (los nodos sin código de la jerarquía son cintas/impresoras
+// aceptadas como equipo, ej. "CINTA FISHKEN", "IMPRESORA VIDEOJET").
+export function deriveNodeTipo(codigo: string | undefined): HierarchyNodeTipo {
+  const c = (codigo ?? '').trim()
+  if (!c) return 'equipo'
+  return isEquipmentNode(c) ? 'equipo' : 'area'
+}
+
+// Tipo efectivo de un nodo: usa el campo persistido `tipoNodo` y cae al código si falta
+export function getNodeTipo(node: Pick<HierarchyNode, 'codigo' | 'tipoNodo'>): HierarchyNodeTipo {
+  return node.tipoNodo ?? deriveNodeTipo(node.codigo)
 }
 
 // Constantes de validación

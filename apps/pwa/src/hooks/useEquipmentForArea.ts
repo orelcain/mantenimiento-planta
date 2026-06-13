@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
-import { HierarchyNode, HierarchyLevel, isEquipmentNode } from '@/types/hierarchy'
+import { HierarchyNode, HierarchyLevel, getNodeTipo } from '@/types/hierarchy'
 
 export interface EquipmentDisplayNode {
   id: string
@@ -79,8 +79,8 @@ export function useEquipmentForArea(areaNodeId: string | null, refreshKey = 0) {
           ...d.data(),
         } as HierarchyNode))
 
-        // 2. Filtrar equipos (código numérico)
-        const topEquipment = children.filter(n => isEquipmentNode(n.codigo) || !n.codigo)
+        // 2. Filtrar equipos (tipoNodo persistido, con fallback al código)
+        const topEquipment = children.filter(n => getNodeTipo(n) === 'equipo')
 
         // 3. Para cada equipo, cargar sub-equipos (hijos con código numérico)
         const equipWithChildren: EquipmentDisplayNode[] = await Promise.all(
@@ -99,7 +99,7 @@ export function useEquipmentForArea(areaNodeId: string | null, refreshKey = 0) {
 
             // Recursivo 1 nivel más: sub-sub-equipos
             const subEquipment: EquipmentDisplayNode[] = await Promise.all(
-              subNodes.filter(n => isEquipmentNode(n.codigo) || !n.codigo).map(async (sub): Promise<EquipmentDisplayNode> => {
+              subNodes.filter(n => getNodeTipo(n) === 'equipo').map(async (sub): Promise<EquipmentDisplayNode> => {
                 const subSubQ = query(
                   hierarchyRef,
                   where('parentId', '==', sub.id),
@@ -122,7 +122,7 @@ export function useEquipmentForArea(areaNodeId: string | null, refreshKey = 0) {
                   path: sub.path,
                   linkedMachineId: (sub as HierarchyNode & { linkedMachineId?: string }).linkedMachineId,
                   oculto: (sub as any).oculto ?? false,
-                  children: subSubNodes.filter(n => isEquipmentNode(n.codigo) || !n.codigo).map(ssn => ({
+                  children: subSubNodes.filter(n => getNodeTipo(n) === 'equipo').map(ssn => ({
                     id: ssn.id,
                     nombre: ssn.nombre,
                     alias: (ssn as any).alias,

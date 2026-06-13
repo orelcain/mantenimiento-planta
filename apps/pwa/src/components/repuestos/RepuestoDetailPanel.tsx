@@ -7,10 +7,12 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen, FileSearch, Star, ListPlus, FolderOpen } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
+import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
+import { CLASE_LABEL } from '@/types/repuestos'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 
@@ -24,6 +26,10 @@ interface RepuestoDetailPanelProps {
   onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
   /** Abrir el modal de solicitud prellenado con este repuesto (Fase 6). */
   onSolicitar?: (item: AreaRepuestoRow) => void
+  /** Asignar un código SAP a una pieza de despiece (sin SAP → ordenable). */
+  onAssignSap?: () => void
+  /** Asignar/añadir un equipo donde se usa el material (N:M). */
+  onAssignEquipo?: () => void
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   /** ¿el usuario es admin? Habilita editar/renombrar/reubicar/eliminar. */
   isAdmin?: boolean
@@ -33,8 +39,6 @@ interface RepuestoDetailPanelProps {
   onEditRepuesto?: () => void
   /** Eliminar (soft delete → papelera). Solo admin. */
   onDeleteRepuesto?: () => void
-  /** Reubicar a otra máquina. Solo admin. */
-  onRelocate?: () => void
   /** Ver/editar ficha técnica. */
   onSpecs?: () => void
   /** Ver fotos (reales + de manual). */
@@ -43,10 +47,6 @@ interface RepuestoDetailPanelProps {
   onGallery?: () => void
   /** Ver vínculos al manual. */
   onManual?: () => void
-  /** Buscar el código de fabricante dentro del PDF del manual (ManualSearchModal). */
-  onManualSearch?: () => void
-  /** Ver/subir/gestionar los PDFs del equipo (MachineManualPanel). */
-  onMachineManuals?: () => void
   /** ¿el repuesto está en favoritos? */
   isFavorite?: boolean
   /** Alternar favorito. */
@@ -102,7 +102,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual, onManualSearch, onMachineManuals, isFavorite, onToggleFavorite, onAddToList }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onGallery, onManual, isFavorite, onToggleFavorite, onAddToList }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -126,6 +126,10 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
 
   const bodegaDocId = item?.bodegaId
   const sap = item?.codigoSAP ?? ''
+
+  // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
+  const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
+  const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
   useEffect(() => { setEditLoc(false) }, [sap])
@@ -152,7 +156,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
 
   if (!item) return null
 
-  const photo = item.fotos?.[0]
+  // Fotos de bodega (del físico) primero; si no hay, las del catálogo (manual/galería)
+  const allPhotos = [...(item.fotos ?? []), ...(item.fotosCatalogo ?? [])]
+  const photo = allPhotos[0]
   const ultimo = movs && movs.length > 0 ? movs[0] : null
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
 
@@ -183,7 +189,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         <div className="mb-3 flex justify-center">
           {photo ? (
             <button
-              onClick={() => setLightbox(item.fotos ?? null)}
+              onClick={() => setLightbox(allPhotos.length ? allPhotos : null)}
               className="overflow-hidden rounded-lg border border-border transition hover:ring-2 hover:ring-primary"
             >
               <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
@@ -208,39 +214,49 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         ) : (
           <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
         )}
-        <div className="mb-3 mt-1 flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">SAP</span>
-          <span className="font-mono text-sm text-foreground">{sap || '-'}</span>
-          {sap && (
-            <button onClick={copySap} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Copiar SAP">
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
+        <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
+          {item.clase && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CLASE_LABEL[item.clase]}</span>
+          )}
+          {sap ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">SAP</span>
+              <span className="font-mono text-sm text-foreground">{sap}</span>
+              <button onClick={copySap} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Copiar SAP">
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </span>
+          ) : (
+            <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">sin SAP · pieza de despiece</span>
           )}
         </div>
 
-        {/* Acción: solicitar repuesto */}
-        {onSolicitar && (
-          <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
-            <Plus className="h-4 w-4" /> Solicitar repuesto
-          </Button>
+        {/* Acción: solicitar repuesto — solo con SAP (lo ordenable). Sin SAP no se puede pedir. */}
+        {sap ? (
+          onSolicitar && (
+            <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
+              <Plus className="h-4 w-4" /> Solicitar repuesto
+            </Button>
+          )
+        ) : (
+          <div className="mb-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2">
+            <p className="text-[11px] text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
+            {onAssignSap && (
+              <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
+                <Plus className="h-4 w-4" /> Asignar código SAP
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Acciones de consulta (todos los usuarios) */}
-        {(onSpecs || onPhotos || onGallery || onManual || onMachineManuals) && (
+        {(onSpecs || onPhotos || onGallery || onManual) && (
           <div className="mb-3 grid grid-cols-4 gap-1.5">
             {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} />}
             {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} />}
             {onGallery && <ActionBtn icon={Images} label="Galería" onClick={onGallery} />}
             {onManual && <ActionBtn icon={BookOpen} label="Manual" onClick={onManual} />}
-            {onMachineManuals && <ActionBtn icon={FolderOpen} label="PDFs equipo" onClick={onMachineManuals} />}
           </div>
-        )}
-
-        {/* Buscar código de fabricante dentro del PDF del manual de la máquina */}
-        {onManualSearch && (
-          <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onManualSearch}>
-            <FileSearch className="h-4 w-4" /> Buscar en manual
-          </Button>
         )}
 
         {/* Agregar a lista de favoritos con nombre */}
@@ -251,17 +267,79 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         )}
 
         {/* Acciones de edición (solo admin) */}
-        {isAdmin && (onEditRepuesto || onRelocate || onDeleteRepuesto) && (
-          <div className="mb-3 grid grid-cols-3 gap-1.5">
+        {isAdmin && (onEditRepuesto || onDeleteRepuesto) && (
+          <div className="mb-3 grid grid-cols-2 gap-1.5">
             {onEditRepuesto && <ActionBtn icon={SquarePen} label="Editar" onClick={onEditRepuesto} />}
-            {onRelocate && <ActionBtn icon={ArrowRightLeft} label="Reubicar" onClick={onRelocate} />}
             {onDeleteRepuesto && <ActionBtn icon={Trash2} label="Eliminar" onClick={onDeleteRepuesto} danger />}
           </div>
         )}
 
+        {/* Dónde se usa — N:M (todos los equipos donde sirve el material) */}
+        <div className="border-y border-border/60 py-2">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            {equiposReales.length > 0 ? `Dónde se usa · ${equiposReales.length} ${equiposReales.length === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
+          </div>
+          {equiposReales.length > 0 ? (
+            <div className="space-y-1">
+              {equiposReales.slice(0, 6).map((e) => (
+                <div key={e.machineId} className="truncate rounded-md bg-muted/40 px-2 py-1 text-[12.5px] text-foreground" title={e.machineName}>
+                  {e.machineName}
+                </div>
+              ))}
+              {equiposReales.length > 6 && (
+                <div className="px-2 text-[11px] text-muted-foreground">y {equiposReales.length - 6} más…</div>
+              )}
+              {onAssignEquipo && (
+                <button onClick={onAssignEquipo} className="mt-0.5 inline-flex items-center gap-1 px-1 text-[11px] text-primary hover:underline">
+                  <Plus className="h-3 w-3" /> Agregar equipo
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              <p className="text-[12.5px] text-muted-foreground">Insumo/herramienta sin equipo fijo — disponible para toda la planta.</p>
+              {onAssignEquipo && (
+                <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignEquipo}>
+                  <Plus className="h-4 w-4" /> Asignar a un equipo
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Manuales del equipo (heredados de los equipos donde se usa) */}
+        {(manualesHeredados.length > 0 || manualesLoading) && (
+          <div className="border-b border-border/60 py-2">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <BookOpen className="h-3.5 w-3.5" />
+              Manuales del equipo
+              {manualesHeredados.length > 0 && <span className="font-normal">({manualesHeredados.length})</span>}
+            </div>
+            {manualesLoading ? (
+              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
+            ) : (
+              <div className="space-y-1">
+                {manualesHeredados.map((m) => (
+                  <a
+                    key={m.id}
+                    href={m.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1.5 text-[12.5px] text-foreground transition hover:bg-muted/50 hover:text-primary"
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate" title={m.titulo}>{m.titulo}</span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Campos */}
-        <div className="divide-y divide-border/60 border-y border-border/60">
-          <Field label="Equipo" value={item.equipos[0]?.machineName ?? '-'} />
+        <div className="divide-y divide-border/60 border-b border-border/60">
           <Field label="Área" value={areaName} />
           <Field label="Tipo" value={item.tipo?.trim() || 'Sin clasificar'} />
           <Field label="Fabricante" value={item.codigoFabricante ?? '-'} />

@@ -206,7 +206,10 @@ function exportCsv(items: BodegaMergedItem[]) {
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   const [searchQuery, setSearchQuery] = useState('')
-  const [stockFilter, setStockFilter] = useState<StockFilter>('todos')
+  // Default 'configurados': tras unificar el maestro (Fase 6) "Con SAP" pasó de
+  // 759 a 3.778 ítems (mayoría sin stock). El gestor de bodega quiere ver primero
+  // su inventario real (los que tienen registro de bodega); el resto, a un clic.
+  const [stockFilter, setStockFilter] = useState<StockFilter>('configurados')
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
@@ -293,8 +296,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         </button>
       </div>
 
-      {/* Panel de alertas */}
-      {stats.alertas.length > 0 && stockFilter === 'todos' && !searchQuery && (
+      {/* Panel de alertas — visible en las vistas de resumen (todos/configurados) */}
+      {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (
         <AlertPanel alertas={stats.alertas} onFilter={(f: StockFilter) => setStockFilter(f)} />
       )}
 

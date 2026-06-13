@@ -11,22 +11,19 @@
  *  - Fase 6: "+ Solicitar repuesto".
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, X, Settings2, ArrowRightLeft, MoreVertical } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
-import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
-import { AssetDetailPanel } from '@/components/repuestos/AssetDetailPanel'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
 import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
-import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
 import { getTrashCount } from '@/services/auditLog'
-import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
@@ -35,39 +32,27 @@ import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hook
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
 import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
-import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useToast } from '@/hooks/useToast'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
-import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
-import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
-import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
-import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
-import { MachineManager } from '@/components/repuestos/MachineManager'
-import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
-import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
+import { CLASE_LABEL, type Machine, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
-type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'machineManual' | 'relocate' | 'delete'
+// Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
+// (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
+// equipo (eran machine-bound) reimplementados sobre el modelo plano.
+type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'delete'
 type SortCol = 'codigoSAP' | 'textoBreve' | 'equipo' | 'stock' | 'tipo'
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
 
 const STORAGE_KEY = 'repuestos-nav-node' // compartido con EquipmentNavigator
-
-/** Foto principal (primero) de un asset. */
-function thumbOf(asset: PlantAsset): string | undefined {
-  const imgs = (asset.imagenes ?? []).slice().sort(
-    (a, b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0) || (a.orden ?? 0) - (b.orden ?? 0),
-  )
-  return imgs[0]?.url || undefined
-}
 
 /** Etiqueta de tipo de repuesto (texto libre del catálogo); vacío → "Sin clasificar". */
 const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
@@ -97,28 +82,26 @@ interface RepuestosAreaHubProps {
 
 export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAreaHubProps = {}) {
   const { areaTree, findNode, getNodePath, expandNode } = useHierarchyAreaTree()
-  const { assets, loading: assetsLoading, updateAsset, addImagen, deleteImagen } = usePlantAssets()
 
-  // Las máquinas con repuestos están archivadas (activa=false); el catálogo se arma
-  // desde el equipment cache (mismo patrón que Buscador/Bodega), no desde useActiveMachines.
+  // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
+  // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
   const { loading: eqLoading } = useGlobalEquipmentSearch('', 999)
   const { isUnder, loading: pathsLoading } = useHierarchyPaths()
 
-  // machines[] + machineId→Set(ancestros) desde el equipment cache (cada equipo trae path).
+  // "machines" = nodos-equipo de hierarchy (modelo plano: r.equipos[] = nodeIds).
+  // machineAreas: nodeId → Set(ancestros) para pertenencia a áreas (cada nodo trae path).
   const { machines, machineAreas } = useMemo(() => {
     const eq = getGlobalEquipmentCache() || []
     const machinesMap = new Map<string, Machine>()
     const areas = new Map<string, Set<string>>()
     for (const e of eq) {
-      if (!e.linkedMachineId || e.oculto) continue
-      if (!machinesMap.has(e.linkedMachineId)) {
-        machinesMap.set(e.linkedMachineId, {
-          id: e.linkedMachineId, nombre: e.nombre, marca: '', modelo: '',
-          activa: true, color: '#6b7280', orden: 0, createdAt: new Date(),
-        } as Machine)
-      }
-      let set = areas.get(e.linkedMachineId)
-      if (!set) { set = new Set<string>(); areas.set(e.linkedMachineId, set) }
+      if (e.oculto) continue
+      machinesMap.set(e.id, {
+        id: e.id, nombre: e.alias || e.nombre || e.id, marca: '', modelo: '',
+        activa: true, color: '#6b7280', orden: 0, createdAt: new Date(),
+      } as Machine)
+      let set = areas.get(e.id)
+      if (!set) { set = new Set<string>(); areas.set(e.id, set) }
       for (const a of e.path) set.add(a)
       set.add(e.id)
       if (e.parentId) set.add(e.parentId)
@@ -157,8 +140,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   })
   const [showingAll, setShowingAll] = useState(false)
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({})
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
-  const [showDetail, setShowDetail] = useState(false)
   // Equipo seleccionado desde el sidebar / chips de favoritos (clave = linkedMachineId || nodeId) para resaltarlo.
   const [selectedEquipKey, setSelectedEquipKey] = useState<string | null>(null)
   // Nombre del equipo seleccionado, para mostrarlo como título (en vez del área).
@@ -171,12 +152,29 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [repEquipoFilter, setRepEquipoFilter] = useState<string>('all')
   const [repStockFilter, setRepStockFilter] = useState<StockFilter>('all')
   const [repTipoFilter, setRepTipoFilter] = useState<string>('all')
+  const [repClaseFilter, setRepClaseFilter] = useState<string>('all')
   const [repPage, setRepPage] = useState(0)
   const [repPageSize, setRepPageSize] = useState(25)
 
   // Repuesto seleccionado → panel lateral de detalle
   // Selección por rowKey estable (NO codigoSAP: vacío en repuestos sin SAP → colisiona).
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
+
+
+  // Lightbox de fotos desde la miniatura de la fila (sin pasar por el detalle)
+  const [rowLightbox, setRowLightbox] = useState<string[] | null>(null)
+  // rowKey cuyo SAP se acaba de copiar (feedback ✓ en la fila)
+  const [copiedSapKey, setCopiedSapKey] = useState<string | null>(null)
+  const copySapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const copySapFromRow = useCallback((rowKey: string, sap: string) => {
+    if (!sap) return
+    navigator.clipboard?.writeText(sap).then(() => {
+      setCopiedSapKey(rowKey)
+      if (copySapTimer.current) clearTimeout(copySapTimer.current)
+      copySapTimer.current = setTimeout(() => setCopiedSapKey(null), 1500)
+    }).catch(() => {})
+  }, [])
+  useEffect(() => () => { if (copySapTimer.current) clearTimeout(copySapTimer.current) }, [])
 
   // ── Solicitudes de repuesto (Fase 6) ──
   const user = useAuthStore((s) => s.user)
@@ -202,11 +200,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
   // ── Herramientas admin (gestión de catálogo) ──
   const isAdmin = useIsAdmin()
-  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [auditLogOpen, setAuditLogOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashCount, setTrashCount] = useState(0)
-  const [machineManagerOpen, setMachineManagerOpen] = useState(false) // G4: CRUD máquinas manuales
   const [adminMenuOpen, setAdminMenuOpen] = useState(false) // overflow herramientas admin (móvil)
 
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
@@ -218,24 +214,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [createTargetMachine, setCreateTargetMachine] = useState<Machine | null>(null)
   const [createPicker, setCreatePicker] = useState(false)
   const [savingRep, setSavingRep] = useState(false)
-  // Reubicación: useRepuestos se liga a la máquina ORIGEN del repuesto elegido.
-  const relocateMachineId = actionTarget?.kind === 'relocate' ? actionTarget.source.machineId : null
-  const { relocateRepuesto } = useRepuestos(relocateMachineId)
+  // Asignar SAP a una pieza de despiece (sin SAP → ordenable). Fase 6.
+  const [asignarSapOpen, setAsignarSapOpen] = useState(false)
+  const [asignarSapValue, setAsignarSapValue] = useState('')
+  const [asignarSapSaving, setAsignarSapSaving] = useState(false)
+  // Asignar/añadir un equipo donde se usa el material (N:M). Fase 6.
+  const [asignarEquipoOpen, setAsignarEquipoOpen] = useState(false)
+  const [asignarEquipoQuery, setAsignarEquipoQuery] = useState('')
+  const [asignarEquipoSaving, setAsignarEquipoSaving] = useState(false)
 
-  // ── Importar / Exportar (Wave 3) ──
-  const [importPicker, setImportPicker] = useState(false)
-  const [importTargetMachine, setImportTargetMachine] = useState<Machine | null>(null)
-  const [importOpen, setImportOpen] = useState(false)
+  // ── Exportar (Wave 3) ──
   const [exportOpen, setExportOpen] = useState(false)
-  // importCatalogoDesdeExcel se liga a la máquina destino elegida del área.
-  const { importCatalogoDesdeExcel } = useRepuestos(importTargetMachine?.id ?? null)
-
-  // ── Reubicación masiva (G3, Wave 2) ──
-  const [bulkPicker, setBulkPicker] = useState(false)
-  const [bulkSourceMachine, setBulkSourceMachine] = useState<Machine | null>(null)
-  const [bulkOpen, setBulkOpen] = useState(false)
-  // repuestos + bulkRelocateRepuestos se ligan a la máquina ORIGEN elegida.
-  const { repuestos: bulkSourceRepuestos, bulkRelocateRepuestos } = useRepuestos(bulkSourceMachine?.id ?? null)
 
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
@@ -413,15 +402,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       setShowingAll(true)
       setSelectedAreaId(null)
     }
-    const m = machines.find((x) => x.id === favKey || (!!e?.linkedMachineId && x.id === e.linkedMachineId))
+    const m = machines.find((x) => x.id === (e?.id ?? favKey))
     setRepEquipoFilter(m ? m.nombre : 'all')
-    // Clave = id del NODO del equipo (para resaltarlo en el sidebar y reducir los M/B a ese equipo).
+    // Clave = id del NODO del equipo (para resaltarlo en el sidebar).
     setSelectedEquipKey(e?.id ?? favKey)
-    // machineId/nodeId real del equipo (= clave de r.equipos[].machineId) para acotar repuestos.
-    setSelectedEquipMachineId(favKey)
+    // Identidad del equipo en el modelo plano = nodeId (clave de r.equipos[].machineId).
+    // favKey puede ser un linkedMachineId legacy (favoritos viejos) → traducir al nodo.
+    setSelectedEquipMachineId(e?.id ?? favKey)
     setSelectedEquipName(displayName || (e as { alias?: string } | undefined)?.alias || e?.nombre || (m ? m.nombre : favKey))
     setSelectedRowKey(null)
-    setSelectedAssetId(null)
     setSidebarMobileOpen(false)
   }, [machines, getNodePath])
   useEffect(() => {
@@ -447,19 +436,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     } catch { /* noop */ }
   }, [selectedAreaId])
 
-  const linkedAssets = useMemo(() => assets.filter((a) => a.hierarchyNodeId), [assets])
-
-  // Conteo recursivo de M/B por nodeId (por ancestría, robusto) — para badges del sidebar
-  const assetCountByNode = useMemo(() => {
-    const out: Record<string, number> = {}
-    const visit = (node: AreaTreeNode) => {
-      out[node.id] = linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, node.id)).length
-      node.children.forEach(visit)
-    }
-    areaTree.forEach(visit)
-    return out
-  }, [areaTree, linkedAssets, isUnder])
-
   // Conteo de repuestos por nodeId (badge "N rep" del sidebar). Una pasada sobre
   // los items: cada repuesto cuenta en todas las áreas ancestras de sus equipos
   // (misma lógica que machineInArea → coincide con areaRepuestos.length del área).
@@ -481,29 +457,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [selectedAreaId, findNode],
   )
 
-  // Motores/bombas del alcance: si hay un equipo seleccionado, solo los de ese equipo
-  // (por ancestría del nodo); si no, los del área seleccionada.
-  const areaAssets = useMemo(() => {
-    // Un equipo enfocado SIEMPRE reduce los M/B a ese equipo, incluso si showingAll
-    // está activo (evita mostrar los M/B de toda la planta con un equipo enfocado).
-    if (selectedEquipKey) return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedEquipKey))
-    if (showingAll) return linkedAssets
-    if (!selectedAreaId) return []
-    return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedAreaId))
-  }, [linkedAssets, showingAll, selectedEquipKey, selectedAreaId, isUnder])
-
-  // Búsqueda global: motores/bombas que matchean la query (equipo/modelo/SAP/marca/componente)
-  const filteredAssets = useMemo(() => {
-    const q = normalizeForSearch(repQuery)
-    if (!q) return areaAssets
-    return areaAssets.filter((a) =>
-      normalizeForSearch(a.equipo).includes(q) ||
-      normalizeForSearch(a.modeloTipo ?? '').includes(q) ||
-      normalizeForSearch(a.codigoSAP ?? '').includes(q) ||
-      normalizeForSearch(a.marca ?? '').includes(q) ||
-      normalizeForSearch(a.componente ?? '').includes(q),
-    )
-  }, [areaAssets, repQuery])
+  // (Fase 4 normalización) La sección "Motores y bombas" desapareció: los motores/
+  // bombas físicos del levantamiento ahora son REPUESTOS de la colección plana
+  // (con marca/modelo/foto) y aparecen en la tabla como cualquier otro repuesto.
 
   // "Buscar similar" desde otras vistas → cargar query en la búsqueda global del hub
   useEffect(() => {
@@ -584,6 +540,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
   }, [scopedRepuestos])
 
+  // Opciones del filtro "Clase" (repuesto/insumo/herramienta/…) con conteo.
+  const claseOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of scopedRepuestos) {
+      const c = r.clase || 'repuesto'
+      counts.set(c, (counts.get(c) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+  }, [scopedRepuestos])
+
   // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
   const solicitarOptions = useMemo<RepuestoLite[]>(
     () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })),
@@ -600,22 +568,43 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       res = res.filter((r) => ids.has(r.rowKey))
     }
     if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
+    if (repClaseFilter !== 'all') res = res.filter((r) => (r.clase || 'repuesto') === repClaseFilter)
     if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
-    const q = normalizeForSearch(repQuery)
-    if (q) {
-      res = res.filter((r) =>
-        normalizeForSearch(r.codigoSAP).includes(q) ||
-        normalizeForSearch(r.textoBreve).includes(q) ||
-        normalizeForSearch(r.codigoFabricante).includes(q) ||
-        normalizeForSearch(r.alias ?? '').includes(q) ||
-        r.equipos.some((e) => normalizeForSearch(e.machineName).includes(q)),
-      )
+    // Multi-término con AND sobre el haystack unido: permite "máquina + pieza"
+    // ("baader casquillo", "gea sello") — el flujo natural del usuario en planta.
+    const terms = normalizeForSearch(repQuery).split(/\s+/).filter(Boolean)
+    if (terms.length) {
+      res = res.filter((r) => {
+        const hay = normalizeForSearch(
+          [
+            r.codigoSAP,
+            r.textoBreve,
+            r.codigoFabricante,
+            r.alias ?? '',
+            r.marca ?? '',
+            r.modeloTipo ?? '',
+            r.descripcion ?? '',
+            tipoLabelOf(r.tipo),
+            ...r.equipos.map((e) => e.machineName),
+          ].join(' '),
+        )
+        return terms.every((t) => hay.includes(t))
+      })
     }
     return res
-  }, [scopedRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repTipoFilter, repQuery])
+  }, [scopedRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repFavOnly, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repFavOnly, listFilter, repPageSize])
+
+  // Si la búsqueda/filtros dejan fuera al repuesto seleccionado, cerrar el panel
+  // de detalle: evita que quede "pegado" mostrando un repuesto que ya no está
+  // en los resultados (p.ej. buscar otra pieza con el panel abierto).
+  useEffect(() => {
+    if (selectedRowKey && !filteredRep.some((r) => r.rowKey === selectedRowKey)) {
+      setSelectedRowKey(null)
+    }
+  }, [filteredRep, selectedRowKey])
 
   // Los tipos dependen del área → al cambiar de área el filtro de tipo vuelve a "Todos"
   useEffect(() => { setRepTipoFilter('all') }, [selectedAreaId, showingAll])
@@ -649,7 +638,34 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   )
 
   const sortedRep = useMemo(() => {
-    if (!repSortColumn) return filteredRep
+    // Tiering SAP-first (modelo unificado): los materiales con código SAP
+    // (ordenables, en bodega) van primero; las piezas de despiece sin SAP, después.
+    // Partición estable → conserva el orden interno (relevancia/alfabético).
+    const tierFirst = (arr: AreaRepuestoRow[]): AreaRepuestoRow[] => {
+      const con: AreaRepuestoRow[] = [], sin: AreaRepuestoRow[] = []
+      for (const r of arr) (r.codigoSAP ? con : sin).push(r)
+      return sin.length ? [...con, ...sin] : con
+    }
+    // Sin sort manual de columna pero CON búsqueda activa → ordenar por relevancia:
+    // SAP exacto > SAP empieza-con > nombre contiene todos los términos > resto.
+    // Así el match directo de un código nunca queda enterrado en la paginación.
+    if (!repSortColumn) {
+      const q = normalizeForSearch(repQuery)
+      const terms = q.split(/\s+/).filter(Boolean)
+      if (!terms.length) return tierFirst(filteredRep)
+      const score = (r: AreaRepuestoRow): number => {
+        const sap = normalizeForSearch(r.codigoSAP)
+        if (sap && sap === q) return 0
+        if (sap && sap.startsWith(q)) return 1
+        const nombre = normalizeForSearch(`${r.textoBreve} ${r.alias ?? ''}`)
+        if (terms.every((t) => nombre.includes(t))) return 2
+        return 3
+      }
+      return tierFirst([...filteredRep].sort((a, b) => {
+        const d = score(a) - score(b)
+        return d !== 0 ? d : a.textoBreve.localeCompare(b.textoBreve, 'es')
+      }))
+    }
     const dir = repSortDir === 'asc' ? 1 : -1
     const val = (r: AreaRepuestoRow): string | number => {
       switch (repSortColumn) {
@@ -665,7 +681,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
       return String(va).localeCompare(String(vb), 'es') * dir
     })
-  }, [filteredRep, repSortColumn, repSortDir])
+  }, [filteredRep, repSortColumn, repSortDir, repQuery])
 
   const totalPages = Math.max(1, Math.ceil(sortedRep.length / repPageSize))
   const page = Math.min(repPage, totalPages - 1)
@@ -740,31 +756,33 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   //  varios equipos). La fuente real son los `allRepuestos` de useGlobalSearch.
   // ══════════════════════════════════════════════════════════════════
 
-  // Set de machineIds reales → distingue colección `machines/` vs `hierarchy/`.
-  const machineIdSet = useMemo(() => new Set(machines.map((m) => m.id)), [machines])
-  const colPathOf = useCallback(
-    (mId: string) => (machineIdSet.has(mId) ? `machines/${mId}/repuestos` : `hierarchy/${mId}/repuestos`),
-    [machineIdSet],
-  )
+  // Modelo plano: todos los repuestos viven en la colección top-level `repuestos`.
+  const colPathOf = useCallback((_mId: string) => 'repuestos', [])
 
-  // Resuelve los docs Repuesto subyacentes a una fila (mismo criterio de clave que useBodega).
+  // Resuelve los docs Repuesto subyacentes a una fila (mismo criterio de clave que
+  // useBodega). En el modelo plano un doc aparece una vez por equipo → dedup por id
+  // (las acciones se aplican UNA vez al doc, no por equipo).
   const resolveSources = useCallback(
     (row: AreaRepuestoRow): GlobalSearchResult[] => {
+      const dedupById = (arr: GlobalSearchResult[]): GlobalSearchResult[] => {
+        const seen = new Set<string>()
+        return arr.filter((r) => (seen.has(r.repuesto.id) ? false : (seen.add(r.repuesto.id), true)))
+      }
       const sap = (row.codigoSAP || '').trim()
-      if (sap) return allRepuestos.filter((r) => (r.repuesto.codigoSAP || '').trim() === sap)
+      if (sap) return dedupById(allRepuestos.filter((r) => (r.repuesto.codigoSAP || '').trim() === sap))
       const fab = (row.codigoFabricante || '').trim()
       if (fab) {
-        return allRepuestos.filter(
+        return dedupById(allRepuestos.filter(
           (r) => !(r.repuesto.codigoSAP || '').trim() && (r.repuesto.codigoFabricante || '').trim() === fab,
-        )
+        ))
       }
-      return allRepuestos.filter(
+      return dedupById(allRepuestos.filter(
         (r) =>
           !(r.repuesto.codigoSAP || '').trim() &&
           !(r.repuesto.codigoFabricante || '').trim() &&
           r.repuesto.textoBreve === row.textoBreve &&
           row.equipos.some((e) => e.machineId === r.machineId),
-      )
+      ))
     },
     [allRepuestos],
   )
@@ -808,6 +826,70 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       await refreshCatalog()
     },
     [selectedRep, resolveSources, crudUpdate, colPathOf, refreshCatalog],
+  )
+
+  // Asignar código SAP a una pieza de despiece (sin SAP). Si el SAP ya existe en
+  // el maestro → fusiona (une equipos) y borra el despiece; si no, lo vuelve
+  // ordenable seteando codigoSAP/tieneSap en el mismo doc.
+  const handleAsignarSap = useCallback(
+    async (sapRaw: string) => {
+      if (!selectedRep) return
+      const sap = sapRaw.trim()
+      if (!/^\d{6,}$/.test(sap)) {
+        toast({ variant: 'destructive', title: 'Código SAP inválido', description: 'Debe ser numérico de 6 o más dígitos.' })
+        return
+      }
+      const src = resolveSources(selectedRep)[0]
+      if (!src) { toast({ variant: 'destructive', title: 'No se encontró la pieza base' }); return }
+      setAsignarSapSaving(true)
+      try {
+        const despiece = src.repuesto
+        const target = allRepuestos.find((r) => (r.repuesto.codigoSAP || '').trim() === sap && r.repuesto.id !== despiece.id)?.repuesto
+        if (target) {
+          const equipos = [...new Set([...(target.equipos || []), ...(despiece.equipos || [])])]
+          const equiposCodigos = [...new Set([...(target.equiposCodigos || []), ...(despiece.equiposCodigos || [])])]
+          await crudUpdate('repuestos', target.id, { equipos, equiposCodigos }, target)
+          await crudDelete('repuestos', despiece.id)
+          toast({ title: 'Fusionado con material existente', description: `Ahora SAP ${sap} · ${equipos.length} equipos.`, variant: 'success' })
+        } else {
+          await crudUpdate('repuestos', despiece.id, { codigoSAP: sap, tieneSap: true }, despiece)
+          toast({ title: 'Código SAP asignado', description: `${sap} — ya es ordenable.`, variant: 'success' })
+        }
+        setAsignarSapOpen(false)
+        setSelectedRowKey(null)
+        await refreshCatalog()
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'No se pudo asignar el SAP', description: e instanceof Error ? e.message : '' })
+      } finally {
+        setAsignarSapSaving(false)
+      }
+    },
+    [selectedRep, resolveSources, allRepuestos, crudUpdate, crudDelete, refreshCatalog, toast],
+  )
+
+  // Asignar/añadir un equipo (nodo de jerarquía) donde se usa el material (N:M).
+  const handleAsignarEquipo = useCallback(
+    async (node: { id: string; nombre: string; alias?: string; codigo?: string }) => {
+      if (!selectedRep) return
+      const src = resolveSources(selectedRep)[0]
+      if (!src) { toast({ variant: 'destructive', title: 'No se encontró la pieza base' }); return }
+      const rep = src.repuesto
+      if ((rep.equipos || []).includes(node.id)) { toast({ title: 'Ya está asignado a ese equipo' }); return }
+      setAsignarEquipoSaving(true)
+      try {
+        const equipos = [...(rep.equipos || []), node.id]
+        const equiposCodigos = [...(rep.equiposCodigos || []), (node.codigo || '').trim() || `s/c:${node.nombre}`]
+        await crudUpdate('repuestos', rep.id, { equipos, equiposCodigos }, rep)
+        toast({ title: 'Equipo asignado', description: node.alias || node.nombre, variant: 'success' })
+        setAsignarEquipoOpen(false)
+        await refreshCatalog()
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'No se pudo asignar el equipo', description: e instanceof Error ? e.message : '' })
+      } finally {
+        setAsignarEquipoSaving(false)
+      }
+    },
+    [selectedRep, resolveSources, crudUpdate, refreshCatalog, toast],
   )
 
   // Editar (form completo) → solo el equipo elegido.
@@ -898,7 +980,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       if (!createTargetMachine) return
       setSavingRep(true)
       try {
-        await crudCreate(`machines/${createTargetMachine.id}/repuestos`, payload)
+        // Modelo plano: el repuesto nace asociado al nodo-equipo elegido (equipos:[nodeId]).
+        const node = (getGlobalEquipmentCache() || []).find((e) => e.id === createTargetMachine.id)
+        await crudCreate('repuestos', payload, {
+          equipos: [createTargetMachine.id],
+          equiposCodigos: [node?.codigo || `s/c:${createTargetMachine.nombre}`],
+          parentRepuestoId: null,
+          origen: { tipo: 'manual' },
+        })
         toast({ title: 'Repuesto creado', variant: 'success' })
         setCreateOpen(false)
         await refreshCatalog()
@@ -919,51 +1008,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [actionMachineId, machines],
   )
 
-  // ── Importar Excel: elige equipo destino del área (o directo si hay uno) ──
-  const startImport = useCallback(() => {
-    if (areaMachines.length === 0) {
-      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'La importación carga repuestos en un equipo del área.' })
-      return
-    }
-    if (areaMachines.length === 1 && areaMachines[0]) {
-      setImportTargetMachine(areaMachines[0])
-      setImportOpen(true)
-    } else {
-      setImportPicker(true)
-    }
-  }, [areaMachines, toast])
-
-  // Reubicación masiva: elige equipo ORIGEN del área (o directo si hay uno)
-  const startBulkRelocate = useCallback(() => {
-    if (areaMachines.length === 0) {
-      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'La reubicación masiva mueve repuestos de un equipo del área a otro.' })
-      return
-    }
-    if (areaMachines.length === 1 && areaMachines[0]) {
-      setBulkSourceMachine(areaMachines[0])
-      setBulkOpen(true)
-    } else {
-      setBulkPicker(true)
-    }
-  }, [areaMachines, toast])
-
-  const handleImportSuccess = useCallback(async (message: string) => {
-    toast({ title: 'Importación exitosa', description: message, variant: 'success' })
-    setImportOpen(false)
-    await refreshCatalog()
-  }, [toast, refreshCatalog])
-
-  const handleImportError = useCallback((message: string) => {
-    toast({ variant: 'destructive', title: 'Error al importar', description: message })
-  }, [toast])
-
   // ── Exportar: docs Repuesto del área (resueltos desde allRepuestos) ──
   // keyOfDoc replica la clave del merge de useBodega → para mapear doc ↔ fila visible.
-  const keyOfDoc = useCallback((rep: { codigoSAP?: string; codigoFabricante?: string; id: string }, machineId: string) => {
+  const keyOfDoc = useCallback((rep: { codigoSAP?: string; codigoFabricante?: string; id: string }) => {
     const sap = (rep.codigoSAP || '').trim()
     if (sap) return sap
     const fab = (rep.codigoFabricante || '').trim()
-    return fab ? `fab:${fab}` : `id:${machineId}:${rep.id}`
+    return fab ? `fab:${fab}` : `id:${rep.id}`
   }, [])
   const areaDocs = useMemo(
     () => allRepuestos.filter((r) => showingAll || (!!selectedAreaId && machineInArea(r.machineId, selectedAreaId))),
@@ -972,7 +1023,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const exportRepuestos = useMemo(() => areaDocs.map((r) => r.repuesto), [areaDocs])
   const exportFiltered = useMemo(() => {
     const visibleKeys = new Set(filteredRep.map((row) => row.rowKey))
-    return areaDocs.filter((r) => visibleKeys.has(keyOfDoc(r.repuesto, r.machineId))).map((r) => r.repuesto)
+    return areaDocs.filter((r) => visibleKeys.has(keyOfDoc(r.repuesto))).map((r) => r.repuesto)
   }, [areaDocs, filteredRep, keyOfDoc])
 
   const repuestosBusy = !repuestosLoaded || repuestosLoading || bodegaLoading || pathsLoading || eqLoading
@@ -996,7 +1047,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     setSelectedEquipMachineId(null)
     setSelectedEquipName('')
     setSelectedRowKey(null)
-    setSelectedAssetId(null)
     // Abrir ancestros para contexto
     setOpenNodes((prev) => {
       const next = { ...prev }
@@ -1023,23 +1073,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   }, [])
 
 
-  const selectedAsset = useMemo(
-    () => assets.find((a) => a.id === selectedAssetId) ?? null,
-    [assets, selectedAssetId],
-  )
-
   // Si hay un equipo seleccionado, el título es el equipo (no el área); el área baja al breadcrumb.
   const title = selectedEquipKey
     ? (selectedEquipName || 'Equipo')
     : (showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área'))
 
   // Herramientas admin de catálogo — compartidas entre toolbar desktop y overflow móvil.
+  // (Fase 4) Importar / duplicados / gestor de máquinas quedaron fuera: eran
+  // machine-bound; se reimplementan sobre la colección plana en Fase 5.
   const adminTools = isAdmin
     ? [
-        { key: 'manage', icon: Settings2, label: 'Gestionar equipos', onClick: () => setMachineManagerOpen(true) },
-        { key: 'import', icon: Upload, label: 'Importar Excel', onClick: startImport },
         { key: 'export', icon: Download, label: 'Exportar reporte', onClick: () => setExportOpen(true) },
-        { key: 'dup', icon: GitMerge, label: 'Escáner de duplicados', onClick: () => setDuplicatesOpen(true) },
         { key: 'audit', icon: History, label: 'Historial de cambios', onClick: () => setAuditLogOpen(true) },
         { key: 'trash', icon: Trash2, label: 'Papelera', onClick: () => setTrashOpen(true), badge: trashCount },
       ]
@@ -1052,7 +1096,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       <AreaSidebar
         selectedAreaId={selectedAreaId}
         onSelectArea={handleSelectArea}
-        assetCountByNode={assetCountByNode}
+        assetCountByNode={{}}
         repCountByNode={repCountByNode}
         favoriteAreaIds={favoriteAreaIds}
         onToggleAreaFav={toggleAreaFav}
@@ -1284,11 +1328,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <Plus className="h-4 w-4" /> Repuesto
                 </Button>
               )}
-              {isAdmin && (selectedAreaId || showingAll) && (
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={startBulkRelocate} title="Reubicar varios repuestos de un equipo a otro">
-                  <ArrowRightLeft className="h-4 w-4" /> Reubicar lote
-                </Button>
-              )}
             </div>
           </div>
 
@@ -1317,84 +1356,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             </div>
           )}
 
-          {/* Motores/Bombas del área — se muestran automáticamente cuando el área/equipo seleccionado tiene M/B */}
-          {filteredAssets.length > 0 && (
-          <section className="mb-6">
-            <div className="mb-2 flex items-center gap-2">
-              <Cog className="h-4 w-4 text-cyan-500" />
-              <h2 className="text-sm font-semibold text-foreground">Motores y bombas del área</h2>
-              <span className="text-xs text-muted-foreground tabular-nums">({filteredAssets.length})</span>
-            </div>
-
-            {assetsLoading ? (
-              <div className="rounded-lg border border-border py-8 text-center text-sm text-muted-foreground">Cargando…</div>
-            ) : filteredAssets.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                {repQuery.trim()
-                  ? 'Ningún motor/bomba coincide con la búsqueda.'
-                  : selectedAreaId ? 'Esta área no tiene motores/bombas registrados.' : 'Selecciona un área en la izquierda.'}
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-border bg-muted/40 text-left">
-                    <tr>
-                      <th className="w-14 px-3 py-2 text-center font-semibold">Foto</th>
-                      <th className="px-3 py-2 font-semibold">Equipo</th>
-                      <th className="px-3 py-2 font-semibold">Tipo</th>
-                      <th className="hidden px-3 py-2 font-semibold md:table-cell">Modelo</th>
-                      <th className="hidden px-3 py-2 font-semibold md:table-cell">SAP</th>
-                      <th className="w-10 px-3 py-2" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredAssets.map((a) => {
-                      const thumb = thumbOf(a)
-                      return (
-                        <tr
-                          key={a.id}
-                          onClick={() => { setSelectedAssetId(a.id); setSelectedRowKey(null) }}
-                          className={[
-                            'cursor-pointer transition-colors',
-                            selectedAssetId === a.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
-                          ].join(' ')}
-                        >
-                          <td className="px-3 py-2">
-                            {thumb ? (
-                              <img src={thumb} alt={a.equipo} loading="lazy" className="mx-auto h-10 w-10 rounded-md border border-border object-cover" />
-                            ) : (
-                              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground/50">
-                                <ImageOff className="h-4 w-4" />
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 font-medium text-foreground">
-                            {a.equipo || '-'}
-                            {/* En móvil, modelo + SAP van como subtítulo (columnas ocultas) */}
-                            {(a.modeloTipo || a.codigoSAP) && (
-                              <div className="mt-0.5 font-mono text-[10px] font-normal text-muted-foreground md:hidden">
-                                {[a.modeloTipo, a.codigoSAP].filter(Boolean).join(' · ')}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant={a.tipo === 'motor' ? 'default' : 'secondary'}>
-                              {a.tipo === 'motor' ? 'Motor' : 'Bomba'}
-                            </Badge>
-                          </td>
-                          <td className="hidden px-3 py-2 font-mono text-xs text-foreground md:table-cell">{a.modeloTipo || '-'}</td>
-                          <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">{a.codigoSAP || <span className="text-muted-foreground">-</span>}</td>
-                          <td className="px-3 py-2 text-muted-foreground"><ChevronRight className="h-4 w-4" /></td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-          )}
-
+          {/* (Fase 4 normalización) La sección "Motores y bombas del área" se eliminó:
+              los motores/bombas físicos ahora son repuestos de la colección plana y
+              aparecen en la tabla de abajo con su marca/modelo/foto. */}
 
           {/* Tabla de repuestos del área (catálogo + bodega) */}
           <section>
@@ -1418,8 +1382,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   {equipoOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={repClaseFilter} onValueChange={setRepClaseFilter}>
+                <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Todas las clases" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las clases</SelectItem>
+                  {claseOptions.map((c) => <SelectItem key={c.value} value={c.value}>{CLASE_LABEL[c.value as keyof typeof CLASE_LABEL] ?? c.value} ({c.count})</SelectItem>)}
+                </SelectContent>
+              </Select>
               <Select value={repTipoFilter} onValueChange={setRepTipoFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los tipos</SelectItem>
                   {tipoOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.value} ({t.count})</SelectItem>)}
@@ -1482,6 +1453,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <table className="w-full text-sm">
                     <thead className="border-b border-border bg-muted/40 text-left">
                       <tr>
+                        <th className="w-12 px-2 py-2" aria-label="Foto" />
                         {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
@@ -1491,26 +1463,94 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {pagedRep.map((r) => {
+                      {pagedRep.map((r, idx) => {
                         const meta = STOCK_META[r.stockStatus]
-                        const equipo = r.equipos[0]?.machineName ?? '-'
-                        const extra = r.equipos.length > 1 ? ` +${r.equipos.length - 1}` : ''
+                        // Transversal = material sin nodo-equipo real (insumo/herramienta del maestro).
+                        const esTransversal = !r.equipos.some((e) => e.machineId)
+                        const equipo = esTransversal ? 'Transversal' : (r.equipos[0]?.machineName ?? '-')
+                        const extra = !esTransversal && r.equipos.length > 1 ? ` +${r.equipos.length - 1}` : ''
                         const isSel = selectedRowKey === r.rowKey
+                        // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
+                        const fotos = [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])]
+                        // Divisor de tier: primera fila sin SAP (despiece) tras las con-SAP.
+                        const showDespieceDivider = !r.codigoSAP && (idx === 0 || !!pagedRep[idx - 1]?.codigoSAP)
                         return (
+                          <Fragment key={r.rowKey}>
+                          {showDespieceDivider && (
+                            <tr className="bg-muted/30">
+                              <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Piezas de despiece · sin código SAP
+                              </td>
+                            </tr>
+                          )}
                           <tr
-                            key={r.rowKey}
-                            onClick={() => { setSelectedRowKey(r.rowKey); setSelectedAssetId(null) }}
+                            onClick={() => setSelectedRowKey(r.rowKey)}
                             className={[
                               'cursor-pointer transition-colors',
                               isSel ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
                             ].join(' ')}
                           >
-                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">{r.codigoSAP || '-'}</td>
+                            <td className="px-2 py-1.5">
+                              {fotos.length > 0 && fotos[0] ? (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setRowLightbox(fotos) }}
+                                  className="group relative block h-9 w-9 overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60"
+                                  title="Ver fotos"
+                                  aria-label="Ver fotos del repuesto"
+                                >
+                                  <img src={fotos[0]} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110" />
+                                  {fotos.length > 1 && (
+                                    <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-0.5 text-[8px] font-bold text-white">+{fotos.length - 1}</span>
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-border" title="Sin foto">
+                                  <ImageOff className="h-3.5 w-3.5 text-muted-foreground/30" />
+                                </div>
+                              )}
+                            </td>
+                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">
+                              {r.codigoSAP ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {r.codigoSAP}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); copySapFromRow(r.rowKey, r.codigoSAP) }}
+                                    className="rounded p-0.5 text-muted-foreground/40 transition hover:text-primary"
+                                    title="Copiar SAP"
+                                    aria-label="Copiar código SAP"
+                                  >
+                                    {copiedSapKey === r.rowKey ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                                  </button>
+                                </span>
+                              ) : '-'}
+                            </td>
                             <td className="px-3 py-2">
-                              <div className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</div>
+                              <div className="flex items-center gap-2">
+                                {r.clase && (
+                                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground" title="Clase de material">
+                                    {CLASE_LABEL[r.clase]}
+                                  </span>
+                                )}
+                                <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
+                                {!r.codigoSAP && (
+                                  <span className="shrink-0 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400" title="Pieza de despiece — sin código SAP">
+                                    sin SAP
+                                  </span>
+                                )}
+                              </div>
                               {/* En móvil, SAP + equipo + tipo van como subtítulo (columnas ocultas) */}
                               <div className="mt-0.5 text-[10px] text-muted-foreground md:hidden">
-                                {r.codigoSAP && <span className="font-mono text-muted-foreground/80">{r.codigoSAP} · </span>}
+                                {r.codigoSAP && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); copySapFromRow(r.rowKey, r.codigoSAP) }}
+                                    className="inline-flex items-center gap-0.5 font-mono text-muted-foreground/80 active:text-primary"
+                                    aria-label="Copiar código SAP"
+                                  >
+                                    {r.codigoSAP}
+                                    {copiedSapKey === r.rowKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 opacity-50" />}
+                                    <span> · </span>
+                                  </button>
+                                )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
                               </div>
                             </td>
@@ -1539,6 +1579,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                               </div>
                             </td>
                           </tr>
+                          </Fragment>
                         )
                       })}
                     </tbody>
@@ -1574,6 +1615,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 </div>
               </div>
             )}
+
+            {/* Panel "Insumos que coinciden" ELIMINADO (Fase 6): los insumos
+                ahora viven en el maestro `repuestos` y aparecen en la tabla
+                principal con su badge de clase. Evita resultados duplicados. */}
           </section>
         </div>
       </div>
@@ -1587,42 +1632,21 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
           onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })}
+          onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
+          onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
           isAdmin={isAdmin}
           onRename={isAdmin ? handleRenameRep : undefined}
           onEditRepuesto={isAdmin ? () => startAction('edit') : undefined}
           onDeleteRepuesto={isAdmin ? () => startAction('delete') : undefined}
-          onRelocate={isAdmin ? () => startAction('relocate') : undefined}
           onSpecs={() => startAction('specs')}
           onPhotos={() => startAction('photos')}
           onGallery={() => startAction('gallery')}
           onManual={() => startAction('manual')}
-          onManualSearch={() => startAction('manualSearch')}
-          onMachineManuals={() => startAction('machineManual')}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
         />
       )}
-
-      {/* Panel lateral de detalle del motor/bomba (no modal; edición vía modal) */}
-      {!selectedRep && selectedAsset && (
-        <AssetDetailPanel
-          asset={selectedAsset}
-          areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
-          onClose={() => setSelectedAssetId(null)}
-          onEdit={() => setShowDetail(true)}
-        />
-      )}
-
-      {/* Edición motor/bomba (modal editable existente, abierto desde el panel) */}
-      <AssetDetailModal
-        asset={selectedAsset}
-        open={showDetail}
-        onOpenChange={setShowDetail}
-        onUpdate={updateAsset}
-        onAddImage={addImagen}
-        onDeleteImage={deleteImagen}
-      />
 
       {/* Solicitar repuesto (Fase 6) */}
       <SolicitarRepuestoModal
@@ -1640,22 +1664,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onAvanzar={avanzarEstado}
       />
 
-      {/* Herramientas admin de catálogo (rescatadas de "Por equipo") */}
+      {/* Herramientas admin de catálogo */}
       {isAdmin && (
         <>
-          <DuplicatesModal open={duplicatesOpen} onOpenChange={setDuplicatesOpen} machines={machines} onDone={() => { invalidateGlobalRepuestosCache(); loadAll() }} />
           <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
           <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
-          {/* G4: gestor de máquinas manuales (CRUD + asignar área) */}
-          <Dialog open={machineManagerOpen} onOpenChange={setMachineManagerOpen}>
-            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-base">Gestionar equipos</DialogTitle>
-                <DialogDescription>Crear, editar, archivar o eliminar máquinas manuales y asignarles área.</DialogDescription>
-              </DialogHeader>
-              <MachineManager onCreated={() => { invalidateGlobalRepuestosCache(); loadAll() }} />
-            </DialogContent>
-          </Dialog>
         </>
       )}
 
@@ -1705,72 +1718,65 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         </DialogContent>
       </Dialog>
 
-      {/* Selector de equipo destino para "Importar Excel" */}
-      <Dialog open={importPicker} onOpenChange={(o) => !o && setImportPicker(false)}>
+      {/* Asignar código SAP a una pieza de despiece (sin SAP → ordenable) */}
+      <Dialog open={asignarSapOpen} onOpenChange={(o) => !o && setAsignarSapOpen(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">¿A qué equipo importar?</DialogTitle>
-            <DialogDescription>Los repuestos del Excel se cargarán en el equipo seleccionado del área.</DialogDescription>
+            <DialogTitle className="text-base">Asignar código SAP</DialogTitle>
+            <DialogDescription>
+              Esta pieza de despiece no tiene SAP. Asígnale su código para volverla ordenable. Si el SAP ya existe en el catálogo, se fusiona con ese material (se unen sus equipos).
+            </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
-            {areaMachines.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setImportTargetMachine(m); setImportPicker(false); setImportOpen(true) }}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
-              >
-                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
-                <span className="truncate">{m.nombre || m.id}</span>
-              </button>
-            ))}
-          </div>
+          <form onSubmit={(e) => { e.preventDefault(); handleAsignarSap(asignarSapValue) }} className="space-y-3">
+            <Input
+              value={asignarSapValue}
+              onChange={(e) => setAsignarSapValue(e.target.value.replace(/\D/g, ''))}
+              placeholder="Código SAP (ej. 3300128967)"
+              inputMode="numeric"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setAsignarSapOpen(false)} disabled={asignarSapSaving}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={asignarSapSaving || !/^\d{6,}$/.test(asignarSapValue.trim())}>
+                {asignarSapSaving ? 'Asignando…' : 'Asignar'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
-      {/* Selector de equipo ORIGEN para "Reubicar lote" (G3) */}
-      <Dialog open={bulkPicker} onOpenChange={(o) => !o && setBulkPicker(false)}>
+      {/* Asignar/añadir equipo (nodo de jerarquía) donde se usa el material — N:M */}
+      <Dialog open={asignarEquipoOpen} onOpenChange={(o) => !o && setAsignarEquipoOpen(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">¿Desde qué equipo?</DialogTitle>
-            <DialogDescription>Elige el equipo de origen; luego seleccionas qué repuestos mover y a qué equipo destino.</DialogDescription>
+            <DialogTitle className="text-base">Asignar a un equipo</DialogTitle>
+            <DialogDescription>Elige el equipo de la planta donde se usa este material. Puedes agregar varios (un material sirve a N equipos).</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
-            {areaMachines.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setBulkSourceMachine(m); setBulkPicker(false); setBulkOpen(true) }}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
-              >
-                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
-                <span className="truncate">{m.nombre || m.id}</span>
-              </button>
-            ))}
+          <Input value={asignarEquipoQuery} onChange={(e) => setAsignarEquipoQuery(e.target.value)} placeholder="Buscar equipo…" autoFocus />
+          <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">
+            {(() => {
+              const already = new Set((selectedRep?.equipos || []).map((e) => e.machineId))
+              const q = normalizeForSearch(asignarEquipoQuery)
+              const cands = (getGlobalEquipmentCache() || [])
+                .filter((e) => !already.has(e.id) && (!q || normalizeForSearch(`${e.nombre} ${e.alias ?? ''} ${e.codigo ?? ''}`).includes(q)))
+                .slice(0, 50)
+              if (!cands.length) return <p className="px-1 py-2 text-xs text-muted-foreground">Sin equipos que coincidan.</p>
+              return cands.map((e) => (
+                <button
+                  key={e.id}
+                  disabled={asignarEquipoSaving}
+                  onClick={() => handleAsignarEquipo(e)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted/40 hover:border-primary/40 disabled:opacity-50"
+                >
+                  <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                  <span className="min-w-0 flex-1 truncate">{e.alias || e.nombre}</span>
+                  {e.codigo && <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{e.codigo}</span>}
+                </button>
+              ))
+            })()}
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Reubicación masiva (mueve repuestos de bulkSourceMachine a otro equipo) */}
-      {bulkSourceMachine && (
-        <BulkRelocateModal
-          open={bulkOpen}
-          onOpenChange={(o) => { setBulkOpen(o); if (!o) setBulkSourceMachine(null) }}
-          repuestos={bulkSourceRepuestos}
-          currentMachine={bulkSourceMachine}
-          machines={machines}
-          onBulkRelocate={bulkRelocateRepuestos}
-          onSuccess={() => { setBulkOpen(false); setBulkSourceMachine(null); invalidateGlobalRepuestosCache(); loadAll() }}
-        />
-      )}
-
-      {/* Importar Excel (carga en machines/{importTargetMachine}/repuestos) */}
-      <ImportRepuestosModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onSuccess={handleImportSuccess}
-        onError={handleImportError}
-        machineName={importTargetMachine?.nombre ?? ''}
-        importCatalogoDesdeExcel={importCatalogoDesdeExcel}
-      />
 
       {/* Exportar reporte (docs del área; respeta filtros visibles) */}
       <ExportReportModal
@@ -1874,6 +1880,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
           machineId={actionMachineId}
+          machineName={actionTarget.source.machineName}
           onSave={handleSaveGallery}
           readOnly={!isAdmin}
         />
@@ -1890,6 +1897,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           isAdmin={isAdmin}
           machineId={actionMachineId}
           repuestoId={actionRep.id}
+          machineName={actionTarget.source.machineName}
+          codigoSAP={actionRep.codigoSAP}
           onSaveFotos={isAdmin ? handleSaveFotosReales : undefined}
         />
       )}
@@ -1901,48 +1910,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
         />
-      )}
-
-      {/* Buscar código de fabricante dentro del PDF del manual de la máquina */}
-      {actionTarget?.kind === 'manualSearch' && actionRep && actionMachine && (
-        <ManualSearchModal
-          open
-          onOpenChange={(o) => !o && setActionTarget(null)}
-          machine={actionMachine}
-          repuesto={actionRep}
-          initialVinculo={actionRep.vinculosManual?.find((v) => v.machineId === actionMachineId) ?? actionRep.vinculosManual?.[0]}
-          isAdmin={isAdmin}
-        />
-      )}
-
-      {/* Reubicar */}
-      {actionTarget?.kind === 'relocate' && actionRep && actionMachine && (
-        <RelocateRepuestoModal
-          open
-          onOpenChange={(o) => !o && setActionTarget(null)}
-          repuesto={actionRep}
-          currentMachine={actionMachine}
-          machines={machines}
-          onRelocate={relocateRepuesto}
-          onSuccess={() => {
-            setActionTarget(null)
-            toast({ title: 'Repuesto reubicado', description: 'El repuesto fue movido a la nueva máquina.' })
-            invalidateGlobalRepuestosCache(); loadAll()
-          }}
-        />
-      )}
-
-      {/* Manuales PDF del equipo (MachineManualPanel) */}
-      {actionTarget?.kind === 'machineManual' && actionMachine && (
-        <Dialog open onOpenChange={(o) => !o && setActionTarget(null)}>
-          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base">Manuales — {actionMachine.nombre}</DialogTitle>
-              <DialogDescription>PDFs del equipo: subir, ver y gestionar manuales técnicos.</DialogDescription>
-            </DialogHeader>
-            <MachineManualPanel machine={actionMachine} />
-          </DialogContent>
-        </Dialog>
       )}
 
       {/* Confirmar eliminación */}
@@ -1995,6 +1962,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox de fotos abierto desde la miniatura de una fila */}
+      {rowLightbox && <ImageLightbox photos={rowLightbox} onClose={() => setRowLightbox(null)} />}
 
     </div>
   )

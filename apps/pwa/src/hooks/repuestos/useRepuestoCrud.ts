@@ -56,9 +56,11 @@ export function useRepuestoCrud() {
   }, [])
 
   // ── Crear ──
+  /** `extra`: campos adicionales del modelo plano (equipos, equiposCodigos, parentRepuestoId…). */
   const createRepuesto = useCallback(async (
     colPath: string,
     data: RepuestoFormData,
+    extra?: Record<string, unknown>,
   ): Promise<string> => {
     const newRepuesto = {
       codigoSAP: data.codigoSAP,
@@ -73,6 +75,7 @@ export function useRepuestoCrud() {
       vinculosManual: [],
       imagenesManual: [],
       fotosReales: [],
+      ...(extra || {}),
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     }

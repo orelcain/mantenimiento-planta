@@ -1553,6 +1553,7 @@ export function RepuestosDashboard({
           onOpenChange={(open) => !open && setGalleryTarget(null)}
           repuesto={galleryTarget}
           machineId={currentMachine?.id}
+          machineName={currentMachine?.nombre}
           onSave={handleSaveGallery}
           readOnly={!isAdmin}
         />

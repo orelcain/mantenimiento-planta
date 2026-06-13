@@ -25,6 +25,9 @@ export interface ImagenRepuesto {
   qualityFinal?: number;
   width?: number;
   height?: number;
+
+  /** Trazabilidad: quién subió la foto (nombre del usuario). */
+  subidaPor?: string;
 }
 
 /**
@@ -103,9 +106,53 @@ export interface Repuesto {
   /** Cantidad mínima de stock — alerta si stockFisico < stockMinimo */
   stockMinimo?: number;
 
+  // ── Colección plana `repuestos` (normalización 2026-06, modelo N:M) ──
+  /** nodeIds de `hierarchy` donde sirve este repuesto (un SAP = un doc = un stock) */
+  equipos?: string[];
+  /** Códigos SAP de esos nodos (denormalizado, para búsqueda/legibilidad) */
+  equiposCodigos?: string[];
+  /** Sub-repuestos: docId del repuesto padre en la colección plana */
+  parentRepuestoId?: string | null;
+  /** Marca física (repuestos migrados desde plantAssets: motores/bombas) */
+  marca?: string;
+  /** Modelo/tipo físico (ej. RNYM08-1320B-30) */
+  modeloTipo?: string;
+
+  // ── Maestro unificado de materiales (Fase 6, 2026-06) ──
+  /** Clasificación del material (deriva de familia SAP; equipo-bound → 'repuesto') */
+  clase?: MaterialClase;
+  /** ¿tiene código SAP real? (derivado — tier 1 ordenable vs tier 2 despiece) */
+  tieneSap?: boolean;
+  /** Familia / sub-familia SAP (del maestro absorbido de insumos) */
+  familia?: string;
+  subFamilia?: string;
+  /** Unidad de medida SAP (UN, pza, etc.) */
+  unidad?: string;
+  /** Manuales/datasheets propios del material (además de los heredados del equipo) */
+  manualesPropios?: { titulo: string; url: string }[];
+
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** Clase de material en el maestro unificado (repuesto·insumo·herramienta·…). */
+export type MaterialClase =
+  | 'repuesto'
+  | 'insumo'
+  | 'herramienta'
+  | 'quimico'
+  | 'lubricante'
+  | 'refrigeracion';
+
+/** Etiqueta legible + estilo de cada clase, para badges en la UI. */
+export const CLASE_LABEL: Record<MaterialClase, string> = {
+  repuesto: 'Repuesto',
+  insumo: 'Insumo',
+  herramienta: 'Herramienta',
+  quimico: 'Químico',
+  lubricante: 'Lubricante',
+  refrigeracion: 'Refrigeración',
+};
 
 /**
  * Categoría de máquinas (ahora con soporte para jerarquías)
@@ -185,6 +232,8 @@ export interface MachineImage {
   size?: number; // bytes
   format?: string;
   dimensions?: { width: number; height: number };
+  /** Trazabilidad: quién subió la imagen (nombre del usuario). */
+  uploadedBy?: string;
 }
 
 /**
