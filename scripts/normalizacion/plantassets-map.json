@@ -1,0 +1,687 @@
+{
+  "_meta": {
+    "proposito": "Mapa FINAL plantAsset(levantamiento) → nodo(s) hierarchy para 03-plantassets-to-repuestos.js. Decidido con el usuario el 2026-06-11 (20 preguntas, todas resueltas).",
+    "notacion": "destinos: códigos de nodo, o 'id:<docId>' para nodos sin código. Dedup por SAP en la migración (un SAP = un doc con equipos de la unión).",
+    "esquemaA": "Los 61 asset-720XXXXXX (copias lista SAP, sin datos) NO se migran; se eliminan con plantAssets en Fase 5 (aprobado).",
+    "aliasNodos": [
+      {
+        "codigo": "720004420",
+        "alias": "Cinta Desperdicio Baader 200",
+        "motivo": "la conocen por ambos nombres (Q12)"
+      },
+      {
+        "codigo": "720004418",
+        "alias": "Cinta Pimponeo / Cinta Filete",
+        "motivo": "esquelone=pimponeo=filete (Q13); reemplaza alias viejo 'CINTA DESPERDICIO BAADER 200' (aprobado 2026-06-11)",
+        "force": true
+      }
+    ],
+    "fecha": "2026-06-11"
+  },
+  "resumen": {
+    "assetsLevantamiento": 73,
+    "mapeados": 72,
+    "pendientes": 1
+  },
+  "assets": [
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-flujo-sistema-1-bomba",
+      "equipo": "Acopio Yal — Bomba de Flujo Sistema 1 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3300098754",
+      "destinos": [
+        "720004347"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-flujo-sistema-1-motor",
+      "equipo": "Acopio Yal — Bomba de Flujo Sistema 1 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004348"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-flujo-sistema-2-bomba",
+      "equipo": "Acopio Yal — Bomba de Flujo Sistema 2 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3100024865",
+      "destinos": [
+        "720004362"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-flujo-sistema-2-motor",
+      "equipo": "Acopio Yal — Bomba de Flujo Sistema 2 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004363"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-1-bomba",
+      "equipo": "Acopio Yal — Bomba de Vacío N°1 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004341"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-1-motor",
+      "equipo": "Acopio Yal — Bomba de Vacío N°1 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004342"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-2-bomba",
+      "equipo": "Acopio Yal — Bomba de Vacío N°2 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004343"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-2-motor",
+      "equipo": "Acopio Yal — Bomba de Vacío N°2 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004344"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-3-bomba",
+      "equipo": "Acopio Yal — Bomba de Vacío N°3 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004356"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-de-vacio-n-3-motor",
+      "equipo": "Acopio Yal — Bomba de Vacío N°3 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004357"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-refrigeracion-para-bombas-de-vacio-bomba",
+      "equipo": "Acopio Yal — Bomba Refrigeración para Bombas de Vacío (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3300108790",
+      "destinos": [
+        "720004370"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-bomba-refrigeracion-para-bombas-de-vacio-motor",
+      "equipo": "Acopio Yal — Bomba Refrigeración para Bombas de Vacío (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004370"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-compresor-de-aire-n-1",
+      "equipo": "Acopio Yal — Compresor de Aire N°1",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004351"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-acopio-yal-compresor-de-aire-n-2",
+      "equipo": "Acopio Yal — Compresor de Aire N°2",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004366"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-baader-142-conjunto-repaso-viseras-bomba",
+      "equipo": "Baader 142 — Conjunto Repaso Viseras (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004443",
+        "720004449",
+        "720004455"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-baader-142-conjunto-repaso-viseras-motor-electrico",
+      "equipo": "Baader 142 — Conjunto Repaso Viseras (Motor Eléctrico)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004443",
+        "720004449",
+        "720004455"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-baader-142-n-1-motor-cinta-prismas-salida",
+      "equipo": "Baader 142 N°1 — Motor cinta prismas salida",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004441"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-contingencia-emisario-riles-bomba",
+      "equipo": "Bomba Contingencia Emisario Riles (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3300098751",
+      "destinos": [
+        "720004582"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-contingencia-emisario-riles-motor",
+      "equipo": "Bomba Contingencia Emisario Riles (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004582"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-saturacion-daf-bomba",
+      "equipo": "Bomba de Saturación DAF (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004573"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-saturacion-daf-motor",
+      "equipo": "Bomba de Saturación DAF (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004573"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-1-repaso-manual-salida-baader-142-bomba",
+      "equipo": "Bomba de Vacío N°1 — Repaso Manual Salida Baader 142 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004445"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-1-repaso-manual-salida-baader-142-motor",
+      "equipo": "Bomba de Vacío N°1 — Repaso Manual Salida Baader 142 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004446"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-1-tolvas-de-vacio-riles-bomba",
+      "equipo": "Bomba de Vacío N°1 — Tolvas de Vacío Riles (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720012955"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-1-tolvas-de-vacio-riles-motor",
+      "equipo": "Bomba de Vacío N°1 — Tolvas de Vacío Riles (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720012955"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-2-repaso-manual-salida-baader-142-bomba",
+      "equipo": "Bomba de Vacío N°2 — Repaso Manual Salida Baader 142 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720012708"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-2-repaso-manual-salida-baader-142-motor",
+      "equipo": "Bomba de Vacío N°2 — Repaso Manual Salida Baader 142 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720012708"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-2-tolvas-de-vacio-riles-bomba",
+      "equipo": "Bomba de Vacío N°2 — Tolvas de Vacío Riles (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720012956"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-2-tolvas-de-vacio-riles-motor",
+      "equipo": "Bomba de Vacío N°2 — Tolvas de Vacío Riles (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720012956"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-3-baader-3-antigua-bomba",
+      "equipo": "Bomba de Vacío N°3 — Baader 3 Antigua (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720012709"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-3-baader-3-antigua-motor",
+      "equipo": "Bomba de Vacío N°3 — Baader 3 Antigua (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720012709"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-3-tolvas-de-vacio-riles-bomba",
+      "equipo": "Bomba de Vacío N°3 — Tolvas de Vacío Riles (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720012957"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-de-vacio-n-3-tolvas-de-vacio-riles-motor",
+      "equipo": "Bomba de Vacío N°3 — Tolvas de Vacío Riles (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720012957"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-pasillo-agua-sangre-riles-n-1-bomba",
+      "equipo": "Bomba Pasillo Agua Sangre Riles N°1 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3300098751",
+      "destinos": [
+        "720004551"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-pasillo-agua-sangre-riles-n-1-motor",
+      "equipo": "Bomba Pasillo Agua Sangre Riles N°1 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004551"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-pasillo-agua-sangre-riles-n-2-bomba",
+      "equipo": "Bomba Pasillo Agua Sangre Riles N°2 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3300098751",
+      "destinos": [
+        "720004552"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-pasillo-agua-sangre-riles-n-2-motor",
+      "equipo": "Bomba Pasillo Agua Sangre Riles N°2 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004552"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-red-de-incendio-n-1-bomba",
+      "equipo": "Bomba Red de Incendio N°1 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004483"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bomba-red-de-incendio-n-1-motor",
+      "equipo": "Bomba Red de Incendio N°1 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004484"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bombas-agua-mar-conjunto-n-1-bomba",
+      "equipo": "Bombas Agua Mar — Conjunto N°1 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3100024866",
+      "destinos": [
+        "720011724"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bombas-agua-mar-conjunto-n-1-motor",
+      "equipo": "Bombas Agua Mar — Conjunto N°1 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720011724"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bombas-agua-mar-conjunto-n-2-bomba",
+      "equipo": "Bombas Agua Mar — Conjunto N°2 (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": "3100024866",
+      "destinos": [
+        "720011725"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-bombas-agua-mar-conjunto-n-2-motor",
+      "equipo": "Bombas Agua Mar — Conjunto N°2 (Motor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720011725"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-caldera-planta",
+      "equipo": "Caldera Planta",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004547"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-chiller-moto-reductor",
+      "equipo": "Chiller — Moto Reductor",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004402"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-chiller-recirculado-bomba",
+      "equipo": "Chiller — Recirculado (Bomba)",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004402"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-chiller-recirculado-motor-electrico",
+      "equipo": "Chiller — Recirculado (Motor Eléctrico)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004402"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-aceleracion-1-grader-moto-tambor",
+      "equipo": "Cinta Aceleración 1 Grader (Moto Tambor)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004467"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-aceleracion-2-grader",
+      "equipo": "Cinta Aceleración 2 Grader",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004469"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-azul-larga-marel",
+      "equipo": "Cinta Azul Larga Marel",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004438"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-flippers-clasificado-grader",
+      "equipo": "Cinta Flippers Clasificado Grader",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004472"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-transversal-salida-baader-142-motor-anterior-sew-respaldo",
+      "equipo": "Cinta Transversal Salida Baader 142 (motor anterior SEW — respaldo)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720011723"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-z-lado-marel-cuello-de-cisnes",
+      "equipo": "Cinta Z lado Marel (Cuello de Cisnes)",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "id:9h3iV6tcNP9PkFQLVOic"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-cinta-zeta-grader",
+      "equipo": "Cinta Zeta Grader",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004465"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-compresor-de-aire-planta-n-1",
+      "equipo": "Compresor de Aire Planta N°1",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004476"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-compresor-de-aire-planta-n-2",
+      "equipo": "Compresor de Aire Planta N°2",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004477"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-desangrador-moto-reductor",
+      "equipo": "Desangrador — Moto-Reductor",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004409"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-empacadora-e-pack-fishken",
+      "equipo": "Empacadora E-Pack Fishken",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004590"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-enzunchadora-n-1",
+      "equipo": "Enzunchadora N°1",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004592"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-glaceador-automatico",
+      "equipo": "Glaceador Automático",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004591"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-retorno-agua-descarga-camiones-bomba",
+      "equipo": "Retorno Agua Descarga Camiones — Bomba",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004396"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-retorno-agua-descarga-camiones-motor-electrico",
+      "equipo": "Retorno Agua Descarga Camiones — Motor Eléctrico",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004397"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-sistema-succion-de-peces-fishtank-bomba",
+      "equipo": "Sistema Succión de Peces (Fishtank) — Bomba",
+      "tipo": "bomba",
+      "codigoSAP": null,
+      "destinos": [
+        "720004394"
+      ]
+    },
+    {
+      "plantAssetId": "asset-lev-sistema-succion-de-peces-fishtank-motor-electrico",
+      "equipo": "Sistema Succión de Peces (Fishtank) — Motor Eléctrico",
+      "tipo": "motor",
+      "codigoSAP": null,
+      "destinos": [
+        "720004395"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-alimentacion-baader-142",
+      "equipo": "Cinta alimentación Baader 142",
+      "tipo": "motor",
+      "codigoSAP": "3300124071",
+      "destinos": [
+        "720004438"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-alimentacion-gea",
+      "equipo": "Cinta alimentación Gea",
+      "tipo": "motor",
+      "codigoSAP": "3300124070",
+      "destinos": [
+        "id:Py3b6p0SGugVt8gLcBeo"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-curva",
+      "equipo": "Cinta curva",
+      "tipo": "motor",
+      "codigoSAP": "3300124073",
+      "destinos": [
+        "720012999"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-desperdicio-baader-200",
+      "equipo": "Cinta desperdicio Baader 200",
+      "tipo": "motor",
+      "codigoSAP": "3300124073",
+      "destinos": [
+        "720004420"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-desperdicio-filete",
+      "equipo": "Cinta desperdicio filete",
+      "tipo": "motor",
+      "codigoSAP": "3300124073",
+      "destinos": [
+        "id:l2sWVfnJchXTTrM62nE7"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-filete",
+      "equipo": "Cinta filete",
+      "tipo": "motor",
+      "codigoSAP": "3300124073",
+      "destinos": [
+        "720004418"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-transversal-baader-142",
+      "equipo": "Cinta transversal Baader 142",
+      "tipo": "motor",
+      "codigoSAP": "3300124073",
+      "destinos": [
+        "720011723"
+      ]
+    },
+    {
+      "plantAssetId": "asset-sumitomo-cinta-z-elevadora-hg",
+      "equipo": "Cinta Z elevadora HG",
+      "tipo": "motor",
+      "codigoSAP": "3300124072",
+      "destinos": [
+        "id:9h3iV6tcNP9PkFQLVOic"
+      ]
+    }
+  ],
+  "pendientes": [
+    {
+      "plantAssetId": "asset-lev-acopio-yal-compresor-de-aire-n-3",
+      "equipo": "Acopio Yal — Compresor de Aire N°3",
+      "nota": "compresor N°3 ya no existe físicamente"
+    }
+  ]
+}

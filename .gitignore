@@ -95,3 +95,6 @@ _claude_ai_upload/
 /output/
 __pycache__/
 *.pyc
+
+# Reportes de migración con data de planta (no versionar)
+scripts/normalizacion/*-report.json

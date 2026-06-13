@@ -1,0 +1,104 @@
+{
+  "_meta": {
+    "proposito": "Mapa machine→nodo(s) SAP para la migración (Fase 3). COMPLETADO con el usuario el 2026-06-11.",
+    "modelo": "Un repuesto (por código SAP) se ASOCIA a TODAS las instancias del modelo donde sirve (relación N:M). No se duplica; un SAP = un repuesto = un stock. 'destinoNodos' = lista de códigos de equipo SAP a los que queda vinculado.",
+    "nodos_sin_codigo": "<NOMBRE> = nodo existente en hierarchy sin código SAP (aceptado como equipo válido; completar código luego).",
+    "pendiente_menor": "RESUELTOS 2026-06-10 (aprobado por el usuario): Cinta Elevadora 1 Cuello Cisnes → nodo homónimo sin código; Bomba caseta agua mar 40/26 → BOMBAS AGUA MAR N1+N2 (N:M)."
+  },
+
+  "mapa": [
+    {
+      "machine": "Baader 142", "repuestos": 1803,
+      "destinoNodos": ["720004441","720004447","720004453","720004247","720004252","720004258"],
+      "detalle": "6 evisceradoras Baader 142 (N1/N2/N3 Chonchi + N1/N2/N3 Yal) — repuestos comunes al modelo"
+    },
+    {
+      "machine": "Knuro", "repuestos": 156,
+      "destinoNodos": ["720013107","720013108","720013109","720013104","720013105","720013106"],
+      "detalle": "6 Knuro (N1/N2/N3 Chonchi + Yal)"
+    },
+    {
+      "machine": "Baader 200", "repuestos": 1515,
+      "destinoNodos": ["720004417"],
+      "detalle": "Baader 200 (única)"
+    },
+    {
+      "machine": "GEA V2", "repuestos": 572,
+      "destinoNodos": ["720012997"],
+      "detalle": "Termoformadora GEA"
+    },
+    {
+      "machine": "Marel Filete", "repuestos": 257,
+      "destinoNodos": ["720012998"],
+      "detalle": "Balanza dinámica Marel (Sellado)"
+    },
+    {
+      "machine": "Marel Eviscerado", "repuestos": 127,
+      "destinoNodos": ["720004435"],
+      "detalle": "Balanza pesaje Marel (Eviscerado)"
+    },
+    {
+      "machine": "Marel HG", "repuestos": 26,
+      "destinoNodos": ["720004435"],
+      "detalle": "Misma Balanza pesaje Marel que Marel Eviscerado (repuestos se combinan, dedup por SAP)"
+    },
+    {
+      "machine": "Grader", "repuestos": 99,
+      "destinoNodos": ["720004462"],
+      "detalle": "Conj. balanza estática Static Grader"
+    },
+    {
+      "machine": "Impresora Videojet", "repuestos": 70,
+      "destinoNodos": ["<IMPRESORA VIDEOJET>"],
+      "detalle": "Nodo sin código, bajo Termoformadora GEA (Sellado)"
+    },
+    {
+      "machine": "Garibaldi", "repuestos": 37,
+      "destinoNodos": ["720004592","720004593","720003516"],
+      "detalle": "3 enzunchadoras TP6000 (Empaque) — marca Garibaldi"
+    },
+    {
+      "machine": "Detector de Metales", "repuestos": 33,
+      "destinoNodos": ["720012954"],
+      "detalle": "Detector de metales (Empaque)"
+    },
+    {
+      "machine": "Fishken", "repuestos": 14,
+      "destinoNodos": ["<CINTA FISHKEN>"],
+      "detalle": "Nodo sin código, bajo Empacadora E-PACK (Empaque)"
+    },
+    {
+      "machine": "Cinta Elevadora 1 Cuello Cisnes", "repuestos": 1,
+      "destinoNodos": ["<CINTA ELEVADORA 1 CUELLO CISNES>"],
+      "detalle": "Nodo sin código (id 9h3iV6tcNP9PkFQLVOic), bajo SACRIFICIO — match exacto por nombre"
+    },
+    {
+      "machine": "Bomba caseta agua mar 40/26", "repuestos": 1,
+      "destinoNodos": ["720011724","720011725"],
+      "detalle": "BOMBA AGUA MAR 1 y 2 (CASETA AGUA MAR, bajo Acopio) — corregido 2026-06-11 (antes 720004478/480 de Patio y Serv. Ext.); repuesto común al modelo 40/26 (N:M)"
+    },
+    {
+      "machine": "Multivac (huérfana)", "repuestos": 11,
+      "destinoNodos": ["720012997"],
+      "detalle": "Subcolección huérfana machines/multivac (doc padre borrado): 11 orings → TERMOFORMADORA GEA (aprobado 2026-06-11)"
+    },
+    {
+      "machine": "Motor Cinta fishken (huérfano)", "repuestos": 1,
+      "destinoNodos": ["<CINTA FISHKEN>"],
+      "detalle": "Subcolección huérfana machines/SW2RNI1RCdqSQbslwnKZ: 1 motor sin SAP → CINTA FISHKEN (aprobado 2026-06-11)"
+    }
+  ],
+
+  "huerfanos_sin_asignar": {
+    "ruta": "machines/sin-asignar/repuestos",
+    "docs": 855,
+    "decision": "NO migrar a repuestos (son insumos/herramientas 3100…). 121 que faltan en `insumos` se agregan ahí (05-sin-asignar-insumos.js); los 855 se eliminan con machines en Fase 5. Backup en machines__repuestos_huerfanos.json. Aprobado 2026-06-11."
+  },
+
+  "resumen": {
+    "maquinas_con_repuestos": 14,
+    "repuestos_cubiertos": 4711,
+    "repuestos_pendientes_menores": 0,
+    "nota": "22 máquinas restantes tienen 0 repuestos (ruido, se eliminan en limpieza)."
+  }
+}
