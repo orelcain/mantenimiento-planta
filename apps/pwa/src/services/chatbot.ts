@@ -12,7 +12,6 @@ import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import { buildAriaContext } from './aria/contextEngine'
 import { buildSituationalContextBlock } from './aria/situationalContext'
 import type { Incident } from '@/types'
-import type { Machine, Repuesto } from '@/types/repuestos'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 export interface ChatMessage {
@@ -1316,6 +1315,31 @@ async function fetchClimaPuertoSummary(): Promise<string> {
   }
 }
 
+/**
+ * Resumen de materiales (repuestos/insumos/herramientas) para ARIA.
+ *
+ * MAESTRO UNIFICADO (normalización 2026-06): lee la colección plana `repuestos`
+ * (un doc por material, equipos:[nodeIds] N:M con `hierarchy`) + nombres de
+ * equipo desde `hierarchy` + stock desde `bodega` (por SAP). Reemplaza la
+ * iteración legacy de `machines/*&#47;repuestos` (datos pre-migración, sin
+ * insumos/herramientas ni N:M). Mantiene la detección de equipo, fuzzy + sinónimos.
+ */
+interface MaestroMat {
+  id: string
+  textoBreve: string
+  descripcion: string
+  sap: string
+  fab: string
+  alias: string
+  clase: string
+  marca: string
+  modeloTipo: string
+  equipos: string[]
+  equiposCodigos: string[]
+  valorUnitario: number
+  tieneSap: boolean
+}
+
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
   // #2 — Cache semántico: normaliza query para reutilizar resultados
   const cacheKey = normalizeCacheKey('repuestos', userQuery)
@@ -1323,268 +1347,202 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
   if (cached) return cached
 
   try {
-    const machinesSnap = await getDocs(collection(db, 'machines'))
-    const machines = machinesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Machine[]
+    // Maestro unificado + nombres de equipo (hierarchy) + stock (bodega), en paralelo
+    const [hierSnap, repSnap, bodegaSnap] = await Promise.all([
+      getDocs(collection(db, 'hierarchy')),
+      getDocs(collection(db, 'repuestos')),
+      getDocs(collection(db, 'bodega')),
+    ])
 
-    let totalRepuestos = 0
-    let valorTotal = 0
-    const repuestosByMachine: string[] = []
-    
-    // Extraer solo los términos significativos del query (sin stop words, sin puntuación, con corrección de typos)
+    // nodeId → nombre del equipo; lista de nodos-equipo para detección
+    const nodeName = new Map<string, string>()
+    const equipoNodes: { id: string; norm: string }[] = []
+    hierSnap.docs.forEach((d) => {
+      const n = d.data() as Record<string, unknown>
+      const label = String(n.alias || n.nombre || d.id)
+      nodeName.set(d.id, label)
+      if (n.tipoNodo === 'equipo') equipoNodes.push({ id: d.id, norm: normalizeText(label) })
+    })
+
+    // SAP → stock y ubicación en bodega
+    const stockBySap = new Map<string, number>()
+    const ubicBySap = new Map<string, string>()
+    bodegaSnap.docs.forEach((d) => {
+      const b = d.data() as Record<string, unknown>
+      const sap = String(b.codigoSAP || d.id).trim()
+      stockBySap.set(sap, Number(b.stockActual ?? 0))
+      if (b.ubicacionBodega) ubicBySap.set(sap, String(b.ubicacionBodega))
+    })
+
+    // Materiales del maestro
+    const materials: MaestroMat[] = repSnap.docs.map((d) => {
+      const r = d.data() as Record<string, any>
+      const sap = String(r.codigoSAP || '').trim()
+      return {
+        id: d.id,
+        textoBreve: r.textoBreve || r.descripcion || '(sin nombre)',
+        descripcion: r.descripcion || '',
+        sap,
+        fab: r.codigoFabricante || r.codigoBaader || '',
+        alias: r.alias || '',
+        clase: r.clase || 'repuesto',
+        marca: r.marca || '',
+        modeloTipo: r.modeloTipo || '',
+        equipos: Array.isArray(r.equipos) ? r.equipos.filter(Boolean) : [],
+        equiposCodigos: Array.isArray(r.equiposCodigos) ? r.equiposCodigos.filter(Boolean) : [],
+        valorUnitario: r.valorUnitario ?? 0,
+        tieneSap: /^\d{6,}$/.test(sap),
+      }
+    })
+
+    // ── Helpers de stock / formato ──
+    const stockOf = (m: MaestroMat) => (m.tieneSap ? stockBySap.get(m.sap) || 0 : 0)
+    const tier = (m: MaestroMat) => (m.tieneSap && stockOf(m) > 0 ? 2 : m.tieneSap ? 1 : 0)
+    const equiposLabel = (m: MaestroMat) => {
+      const firstId = m.equipos[0]
+      if (!firstId) return 'Transversal'
+      const first = nodeName.get(firstId) || firstId
+      return m.equipos.length === 1 ? first : `${first} +${m.equipos.length - 1}`
+    }
+    const fmtRow = (m: MaestroMat, prefix = '  ✓') => {
+      const stockNote = !m.tieneSap
+        ? ' [SIN SAP - despiece]'
+        : stockOf(m) === 0
+          ? ' [SIN STOCK]'
+          : ` [${stockOf(m)} en stock]`
+      const ubic = m.tieneSap && ubicBySap.get(m.sap) ? ` | Ubic: ${ubicBySap.get(m.sap)}` : ''
+      const desc = m.descripcion && m.descripcion !== m.textoBreve ? ` | ${m.descripcion.slice(0, 50)}` : ''
+      return `${prefix} ${m.textoBreve}${desc} | SAP: ${m.sap || 'sin'} | Fab: ${m.fab || '—'} | Clase: ${m.clase} | Equipo: ${equiposLabel(m)}${stockNote}${ubic}`
+    }
+    const haystackOf = (m: MaestroMat) =>
+      normalizeText(
+        `${m.textoBreve} ${m.descripcion} ${m.sap} ${m.fab} ${m.alias} ${m.marca} ${m.modeloTipo} ${m.clase} ${m.equiposCodigos.join(' ')} ${m.equipos.map((id) => nodeName.get(id) || '').join(' ')}`,
+      )
+
+    // ── Estadísticas del maestro ──
+    const total = materials.length
+    const conSap = materials.filter((m) => m.tieneSap).length
+    const conStock = materials.filter((m) => tier(m) === 2).length
+    const porClase = new Map<string, number>()
+    for (const m of materials) porClase.set(m.clase, (porClase.get(m.clase) || 0) + 1)
+
+    // ── Términos de búsqueda ──
     const { terms: searchTerms, corrections } = extractSearchTerms(userQuery)
-
-    // ─── DETECCIÓN DE MÁQUINAS EN EL QUERY ────────────────────────────
-    // Si el usuario dice "motores de la grader", detectamos "grader" como máquina
-    // y buscamos solo en los repuestos de esa máquina, con los términos restantes.
-    // IMPORTANTE: No matchear máquinas por palabras genéricas de componentes
-    // (ej: "motor", "bomba", "sensor") porque eso causa falsos positivos
-    // como "Motor bomba caseta agua mar" matcheando por "motor".
     const normalizedQuery = normalizeText(userQuery)
-    const matchedMachineIds = new Set<string>()
-    const machineTermsToRemove = new Set<string>()
 
-    // Palabras que son nombres de COMPONENTES, no identificadores de máquinas.
-    // Si un nombre de máquina contiene SOLO este tipo de palabras, no debe matchear por palabra individual.
+    // ─── DETECCIÓN DE EQUIPO EN EL QUERY (sobre nodos de `hierarchy`) ──
+    // "motores de la grader" → detecta el nodo "grader" y filtra sus materiales.
+    // No matchea por palabras genéricas de componente (motor/bomba/…) → falsos positivos.
     const COMPONENT_WORDS = new Set([
       'motor', 'bomba', 'sensor', 'filtro', 'correa', 'sello', 'válvula', 'valvula',
       'reductor', 'engranaje', 'cadena', 'eje', 'cuchillo', 'soporte', 'rodamiento',
       'cilindro', 'actuador', 'variador', 'placa', 'cinta', 'polea', 'piñon', 'pinon',
       'compresor', 'ventilador', 'generador', 'transformador', 'interruptor',
     ])
-
-    for (const machine of machines) {
-      const normName = normalizeText(machine.nombre)
-      const normMarca = normalizeText(machine.marca || '')
-      const normModelo = normalizeText(machine.modelo || '')
-      const nameWords = normName.split(/\s+/).filter(w => w.length > 2)
-
-      // Verificar si el nombre COMPLETO aparece en el query
-      if (normalizedQuery.includes(normName)) {
-        matchedMachineIds.add(machine.id)
-        nameWords.forEach(w => machineTermsToRemove.add(w))
+    const matchedNodeIds = new Set<string>()
+    const equipoTermsToRemove = new Set<string>()
+    for (const node of equipoNodes) {
+      if (!node.norm) continue
+      const nameWords = node.norm.split(/\s+/).filter((w) => w.length > 2)
+      if (node.norm.length >= 4 && normalizedQuery.includes(node.norm)) {
+        // nombre COMPLETO del equipo aparece en el query
+        matchedNodeIds.add(node.id)
+        nameWords.forEach((w) => { if (!COMPONENT_WORDS.has(w)) equipoTermsToRemove.add(w) })
       } else {
-        // Buscar por palabras individuales del nombre de la máquina (ej. "grader", "baader", "marel")
-        // PERO ignorar palabras genéricas de componentes para evitar falsos positivos
         for (const word of nameWords) {
-          if (normalizedQuery.includes(word) && word.length >= 4 && !COMPONENT_WORDS.has(word)) {
-            matchedMachineIds.add(machine.id)
-            machineTermsToRemove.add(word)
+          if (word.length >= 4 && !COMPONENT_WORDS.has(word) && searchTerms.includes(word) && normalizedQuery.includes(word)) {
+            matchedNodeIds.add(node.id)
+            equipoTermsToRemove.add(word)
           }
-        }
-        // También por marca o modelo
-        if (normMarca.length >= 3 && normalizedQuery.includes(normMarca)) {
-          matchedMachineIds.add(machine.id)
-          machineTermsToRemove.add(normMarca)
-        }
-        if (normModelo.length >= 3 && normalizedQuery.includes(normModelo)) {
-          matchedMachineIds.add(machine.id)
-          machineTermsToRemove.add(normModelo)
         }
       }
     }
 
-    // Separar términos de búsqueda: quitar los que referencian la máquina
-    const componentTerms = matchedMachineIds.size > 0
-      ? searchTerms.filter(t => !machineTermsToRemove.has(t) && t !== 'maquina' && t !== 'maquinas')
+    const componentTerms = matchedNodeIds.size > 0
+      ? searchTerms.filter((t) => !equipoTermsToRemove.has(t) && !['maquina', 'maquinas', 'equipo', 'equipos'].includes(t))
       : searchTerms
     const expandedTerms = componentTerms.length > 0 ? expandWithSynonyms(componentTerms) : []
-    const matchedRepuestos: string[] = []
+    const listAllForEquipo = matchedNodeIds.size > 0 && componentTerms.length === 0
+    const inEquipoScope = (m: MaestroMat) => matchedNodeIds.size === 0 || m.equipos.some((id) => matchedNodeIds.has(id))
 
-    // Si se detectó una máquina pero no quedaron términos de componente,
-    // listar los repuestos de esa máquina (hasta 40)
-    const listAllForMachine = matchedMachineIds.size > 0 && componentTerms.length === 0
-    // Cache de repuestos por máquina (para safety-net posterior)
-    const repsByMachineCache = new Map<string, Repuesto[]>()
+    logger.info(`Chatbot repuestos(maestro): raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → equipo=[${[...matchedNodeIds].map((id) => nodeName.get(id) || id).join(', ')}] → comp=[${componentTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''}`)
 
-    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → machine filter=[${[...matchedMachineIds].join(', ')}] → component terms=[${componentTerms.join(', ')}] → expanded=[${expandedTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''}`)
-
-    for (const machine of machines) {
-      const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
-      const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
-      totalRepuestos += reps.length
-
-      const machineTotal = reps.reduce((sum, r) => sum + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 1), 0)
-      valorTotal += machineTotal
-      repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString('es-CL')})`)
-
-      // Si hay filtro de máquina y esta no es la indicada, saltar búsqueda de coincidencias
-      if (matchedMachineIds.size > 0 && !matchedMachineIds.has(machine.id)) continue
-
-      // Guardar en cache para safety-net
-      repsByMachineCache.set(machine.id, reps)
-
-
-      // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
-      if (listAllForMachine) {
-        reps.forEach(r => {
-          const cant = r.cantidadPorMaquina ?? 0
-          const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
-          matchedRepuestos.push(
-            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}`
-          )
-        })
-        continue
-      }
-
-      // Buscar repuestos que coincidan con los términos de búsqueda de componente
-      if (expandedTerms.length > 0) {
-        reps.forEach(r => {
-          const text = normalizeText(
-            `${r.textoBreve || ''} ${r.descripcion || ''} ${r.codigoSAP || ''} ${r.codigoFabricante || ''} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
-          )
-
-          // #1 — Búsqueda fuzzy: match parcial + tolerancia a errores + sinónimos
-          const matchedTerms = componentTerms.filter(term => {
-            // Fuzzy match directo del término (incluye Levenshtein + substring parcial)
-            if (fuzzyMatch(text, term)) return true
-            // Búsqueda por sinónimos DIRECTOS con fuzzy
-            // Solo acepta términos que estén en el MISMO grupo de sinónimos que el term original
-            return expandedTerms.some(et => {
-              if (et === term) return false
-              const isSynonym = SYNONYM_MAP_ENTRIES.some(([, syns]) => {
-                const normSyns = syns.map(s => normalizeText(s))
-                const termInGroup = normSyns.includes(term)
-                const etInGroup = normSyns.includes(et)
-                return termInGroup && etInGroup
-              })
-              return isSynonym && fuzzyMatch(text, et)
-            })
+    // ── Matching sobre el maestro ──
+    const matched: MaestroMat[] = []
+    for (const m of materials) {
+      if (!inEquipoScope(m)) continue
+      if (listAllForEquipo) { matched.push(m); continue }
+      if (componentTerms.length === 0) continue
+      const text = haystackOf(m)
+      const allMatch = componentTerms.every((term) => {
+        if (fuzzyMatch(text, term)) return true
+        // Sinónimos del MISMO grupo (evita falsos positivos entre grupos)
+        return expandedTerms.some((et) => {
+          if (et === term) return false
+          const isSynonym = SYNONYM_MAP_ENTRIES.some(([, syns]) => {
+            const ns = syns.map((s) => normalizeText(s))
+            return ns.includes(term) && ns.includes(et)
           })
-          
-          if (matchedTerms.length >= componentTerms.length) {
-            const cant = r.cantidadPorMaquina ?? 0
-            const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
-            const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
-            const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
-            matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}${ubic}`
-            )
-          } else {
-            // Log para debugging: por qué no matchó
-            logger.info(`Chatbot: NO match "${r.textoBreve}" text="${text.slice(0, 80)}" terms=[${componentTerms}] matched=[${matchedTerms}]`)
-          }
+          return isSynonym && fuzzyMatch(text, et)
         })
-      }
+      })
+      if (allMatch) matched.push(m)
     }
+    // Orden: con stock primero, luego con SAP, luego despiece
+    matched.sort((a, b) => tier(b) - tier(a))
 
-    // ─── SAFETY NET: si hubo matches parciales, hacer búsqueda simple como respaldo ──
-    // Detecta si el fuzzy matching perdió resultados que un simple includes() encontraría
-    if (matchedMachineIds.size > 0 && componentTerms.length > 0) {
-      const matchedSAPs = new Set(matchedRepuestos.map(m => {
-        const sapMatch = m.match(/SAP: (\S+)/)
-        return sapMatch?.[1] || ''
-      }).filter(Boolean))
-
-      for (const machine of machines) {
-        if (!matchedMachineIds.has(machine.id)) continue
-        const reps = repsByMachineCache.get(machine.id) || []
-        for (const r of reps) {
-          if (matchedSAPs.has(r.codigoSAP)) continue
-          const breveLower = normalizeText(r.textoBreve || '')
-          const matchesSimple = componentTerms.some(term => breveLower.includes(term))
-          if (matchesSimple) {
-            const cant = r.cantidadPorMaquina ?? 0
-            const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
-            const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
-            const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
-            matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}${ubic}`
-            )
-          }
-        }
-      }
-    }
-
-    logger.info(`Chatbot repuestos: ${matchedRepuestos.length} matches found for component=[${componentTerms}] in machines=[${[...matchedMachineIds]}]`)
-
-    const lines = [
-      `REPUESTOS (total: ${totalRepuestos}, valor inventario: $${Math.round(valorTotal).toLocaleString('es-CL')}):`,
-      `Máquinas con repuestos: ${machines.length}`,
-      ...repuestosByMachine,
+    // ── Salida ──
+    const claseStr = [...porClase.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')
+    const lines: string[] = [
+      `MATERIALES (maestro unificado: ${total} — ${conSap} con código SAP/ordenables, ${conStock} con stock en bodega):`,
+      `Por clase: ${claseStr}`,
     ]
+    if (corrections.length > 0) lines.push(`(Corrección automática: ${corrections.join(', ')})`)
 
-    if (corrections.length > 0) {
-      lines.push(`(Corrección automática: ${corrections.join(', ')})`)
-    }
+    const equipoNames = [...matchedNodeIds].map((id) => nodeName.get(id) || id).join(', ')
 
-    if (matchedMachineIds.size > 0 && matchedRepuestos.length > 0) {
-      const machineNames = machines.filter(m => matchedMachineIds.has(m.id)).map(m => m.nombre).join(', ')
-      const searchLabel = componentTerms.length > 0
-        ? `"${componentTerms.join(' ')}" en ${machineNames}`
-        : `todos los repuestos de ${machineNames}`
-      const withStock = matchedRepuestos.filter(r => r.includes('en stock]')).length
-      const noStock = matchedRepuestos.filter(r => r.includes('SIN STOCK')).length
-      lines.push('', `COINCIDENCIAS con ${searchLabel} — TOTAL: ${matchedRepuestos.length} encontrados (${withStock} con stock, ${noStock} sin stock):`)
-      lines.push(`⚠️ ARIA: Debes listar TODOS los ${matchedRepuestos.length} repuestos encontrados abajo, tanto los que tienen stock como los que NO tienen. NO omitas ninguno.`)
-      lines.push(...matchedRepuestos.slice(0, 40))
-      if (matchedRepuestos.length > 40) {
-        lines.push(`... y ${matchedRepuestos.length - 40} más`)
-      }
-    } else if (matchedRepuestos.length > 0) {
-      const withStock = matchedRepuestos.filter(r => r.includes('en stock]')).length
-      const noStock = matchedRepuestos.filter(r => r.includes('SIN STOCK')).length
-      lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" — TOTAL: ${matchedRepuestos.length} encontrados (${withStock} con stock, ${noStock} sin stock):`)
-      lines.push(`⚠️ ARIA: Debes listar TODOS los ${matchedRepuestos.length} repuestos. NO omitas ninguno.`)
-      lines.push(...matchedRepuestos.slice(0, 30))
-      if (matchedRepuestos.length > 30) {
-        lines.push(`... y ${matchedRepuestos.length - 30} más`)
-      }
+    if (matched.length > 0) {
+      const conStockN = matched.filter((m) => tier(m) === 2).length
+      const sinSapN = matched.filter((m) => !m.tieneSap).length
+      const label = matchedNodeIds.size > 0
+        ? (componentTerms.length > 0 ? `"${componentTerms.join(' ')}" en ${equipoNames}` : `todos los materiales de ${equipoNames}`)
+        : `"${searchTerms.join(' ')}"`
+      lines.push('', `COINCIDENCIAS con ${label} — TOTAL: ${matched.length} (${conStockN} con stock, ${sinSapN} sin SAP/despiece):`)
+      lines.push(`⚠️ ARIA: lista TODOS los materiales de abajo (con stock, sin stock y despiece). NO omitas ninguno. Los "despiece/sin SAP" no se pueden pedir hasta asignarles un SAP.`)
+      const LIMIT = 40
+      lines.push(...matched.slice(0, LIMIT).map((m) => fmtRow(m)))
+      if (matched.length > LIMIT) lines.push(`... y ${matched.length - LIMIT} más`)
     } else if (searchTerms.length > 0) {
-      // ─── FALLBACK INTELIGENTE: si hay máquina detectada y 0 matches, listar TODOS ──
-      if (matchedMachineIds.size > 0 && componentTerms.length > 0) {
-        const machineNames = machines.filter(m => matchedMachineIds.has(m.id)).map(m => m.nombre).join(', ')
-        lines.push('', `No se encontraron repuestos con "${componentTerms.join(' ')}" exacto en ${machineNames}.`)
-        lines.push(`Mostrando TODOS los repuestos de ${machineNames} para que puedas identificar el componente:`)
-        lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
-        lines.push('')
+      // 0 coincidencias estrictas → búsqueda flexible GLOBAL (sin scope de equipo).
+      // Recupera los casos donde la detección de equipo consumió términos que en
+      // realidad describen el material ("aceite hidraulico", "sello mecanico"): los
+      // nombres de equipos de planta contienen esas palabras, pero el usuario busca
+      // el consumible. Ranking por nº de términos que matchean, luego por stock.
+      const allTerms = [...new Set([...searchTerms, ...expandedTerms])]
+      const wide = materials
+        .map((m) => {
+          const text = haystackOf(m)
+          return { m, hits: allTerms.filter((t) => fuzzyMatch(text, t)).length }
+        })
+        .filter((x) => x.hits > 0)
+        .sort((a, b) => (b.hits - a.hits) || (tier(b.m) - tier(a.m)))
+        .slice(0, 30)
+        .map((x) => x.m)
 
-        // Listar TODOS los repuestos de las máquinas detectadas para que el LLM razone
-        let fallbackCount = 0
-        for (const machine of machines) {
-          if (!matchedMachineIds.has(machine.id)) continue
-          const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
-          const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
-          for (const r of reps) {
-            if (fallbackCount >= 60) {
-              lines.push(`  ... y más repuestos (total: ${reps.length})`)
-              break
-            }
-            lines.push(
-              `  • [${machine.nombre}] ${r.textoBreve} | ${r.descripcion || ''} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${r.cantidadPorMaquina ?? 0} | $${r.valorUnitario ?? 0}`
-            )
-            fallbackCount++
-          }
-        }
-        lines.push('')
-        lines.push(`INSTRUCCIÓN: Analiza esta lista y busca repuestos que podrían ser "${componentTerms.join(' ')}" aunque el nombre no contenga exactamente esa palabra. Los motores pueden aparecer como "drum motor", "moto-reductor", "interroll", "motriz", etc.`)
+      if (wide.length > 0) {
+        lines.push('', `No hubo coincidencia exacta de todos los términos. COINCIDENCIAS AMPLIADAS (${wide.length}, búsqueda flexible):`)
+        lines.push(`⚠️ ARIA: estos son los más parecidos a "${searchTerms.join(' ')}". Lístalos todos.`)
+        lines.push(...wide.map((m) => fmtRow(m)))
+      } else if (matchedNodeIds.size > 0) {
+        // Equipo detectado pero ningún material matchea → listar sus materiales para razonar
+        const ofEquipo = materials.filter((m) => m.equipos.some((id) => matchedNodeIds.has(id)))
+        lines.push('', `No se encontró "${componentTerms.join(' ')}" en ${equipoNames}. Materiales del equipo (${ofEquipo.length}) para identificar el componente:`)
+        lines.push(...ofEquipo.slice(0, 60).map((m) => fmtRow(m, '  •')))
+        if (ofEquipo.length > 60) lines.push(`  ... y ${ofEquipo.length - 60} más (total: ${ofEquipo.length})`)
       } else {
-        // #3 — FALLBACK AUTO-EXPAND: sin máquina específica y 0 matches → buscar en TODAS las máquinas con fuzzy
-        lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
-        lines.push(`Buscando con coincidencia ampliada en TODAS las máquinas...`)
-        lines.push('')
-        
-        let fallbackMatches = 0
-        for (const machine of machines) {
-          const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
-          const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
-          for (const r of reps) {
-            const rText = normalizeText(`${r.textoBreve || ''} ${r.descripcion || ''} ${r.codigoSAP || ''} ${r.codigoFabricante || ''} ${r.nombreManual || ''}`)
-            const anyTermMatch = searchTerms.some(t => fuzzyMatch(rText, t)) || expandedTerms.some(t => fuzzyMatch(rText, t))
-            if (anyTermMatch && fallbackMatches < 30) {
-              const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
-              lines.push(`  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${r.cantidadPorMaquina ?? 0} | $${r.valorUnitario ?? 0}${stockNote}`)
-              fallbackMatches++
-            }
-          }
-        }
-
-        if (fallbackMatches > 0) {
-          lines.splice(lines.length - fallbackMatches, 0, `COINCIDENCIAS AMPLIADAS (${fallbackMatches} encontrados con búsqueda flexible):`)
-        } else {
-          lines.push(`No se encontraron resultados ni con búsqueda ampliada.`)
-          lines.push(`(Se buscó: ${[...new Set([...searchTerms, ...expandedTerms.slice(0, 10)])].join(', ')})`)
-          lines.push(`Sugerencia: intenta buscar por código SAP, fabricante o nombre técnico exacto.`)
-        }
+        lines.push('', `No se encontraron materiales para "${searchTerms.join(' ')}".`)
+        lines.push(`(Se buscó: ${[...new Set([...searchTerms, ...expandedTerms.slice(0, 10)])].join(', ')})`)
+        lines.push(`Sugerencia: busca por código SAP, fabricante, marca o nombre técnico exacto.`)
       }
     }
 
