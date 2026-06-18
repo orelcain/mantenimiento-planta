@@ -1,8 +1,9 @@
 /**
  * useBodega — Hook para gestión de bodega de repuestos
  *
- * Solo repuestos con código SAP.
- * Combina catálogo (machines/{id}/repuestos) con colección bodega/{codigoSAP}.
+ * Combina el catálogo del maestro `repuestos` (vía useGlobalSearch → `catalogRepuestos`)
+ * con la colección `bodega/{codigoSAP}` (stock overlay). El stock solo se engancha
+ * cuando el material tiene SAP.
  *
  * Colecciones Firestore:
  *  - bodega/{codigoSAP}              → stock, ubicación, proveedor, mínimos

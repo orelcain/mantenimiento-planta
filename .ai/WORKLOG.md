@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-18 · claude · Review UX "buscar repuesto" + limpieza menor
+
+- Review como usuario (código + datos): el flujo buscar→encontrar→ubicar está COMPLETO. Fila de resultados: foto, SAP (copiar), nombre, badge de clase, tipo, equipo (N:M con +N), stock con semáforo. Ficha (`RepuestoDetailPanel`): "Dónde se usa · N equipos" (todos los N:M), manuales heredados, stock disp/mín/máx, **Bodega + Ubicación editable inline** (pasillo/estante/nivel), movimientos. Diseño sólido; lo que falta es DATO, no código.
+- Datos verificados (solo-lectura): `bodega`=189 con **0 ubicaciones registradas** (1 con pasillo) → "ubicable" físico aún no existe como dato (captura pendiente de Orel). `repuestos.tipo` 59% poblado con categorías útiles (TORNILLERÍA/SOPORTE/CASQUILLO/EJE…) → NO es ruido, se conserva. Fotos: solo 64/7657.
+- Limpieza menor (in-scope, segura): borrado `ImageGallery.tsx` (huérfano, cero imports; quita un consumidor de MachineContext), corregido comentario obsoleto de `useBodega` (decía que leía `machines/{id}/repuestos`; lee el maestro), reemplazado `pages/repuestos/README.md` (era guía de migración obsoleta con archivos borrados) por uno breve y actual.
+- NO tocado a propósito: refactor de `MachineProvider`/`CategoryManager` (último lector de `machines`) — vive en Settings, fuera del módulo de repuestos; su cleanup es separado y con riesgo en otra feature.
+- Verificación: `tsc`=0, `eslint`=0. Preview: módulo OK en /repuestos.
+- Archivos: `useBodega.ts` (comentario), `pages/repuestos/README.md` (reescrito), `ImageGallery.tsx` (borrado).
+- Estado: HECHO. Módulo de repuestos funcionalmente completo y limpio. Lo pendiente es captura de datos (ubicaciones bodega + fotos) y, aparte, Fase 5 deletes + cleanup de CategoryManager/machines.
+
 ## 2026-06-18 · claude · Retiro de página /insumos (redundante con el maestro)
 
 - Decisión de Orel: retirar `/insumos`. Datos (solo-lectura): `insumos`=3552, 294 con stockFisico (del import Excel), **0 con metadata de conteo** (stockContadoEn/Por/historial) → el editor de stock de la página NUNCA se usó; última actualización 2026-06-11 = la migración (no actividad de usuario). La página leía la colección legacy `insumos` (respaldo congelado) y permitía editar stock que el maestro NO ve (dead-end). Insumos ya unificados en el maestro (buscables en Repuestos/Bodega).
