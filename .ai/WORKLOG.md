@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-18 · claude · Retiro de página /insumos (redundante con el maestro)
+
+- Decisión de Orel: retirar `/insumos`. Datos (solo-lectura): `insumos`=3552, 294 con stockFisico (del import Excel), **0 con metadata de conteo** (stockContadoEn/Por/historial) → el editor de stock de la página NUNCA se usó; última actualización 2026-06-11 = la migración (no actividad de usuario). La página leía la colección legacy `insumos` (respaldo congelado) y permitía editar stock que el maestro NO ve (dead-end). Insumos ya unificados en el maestro (buscables en Repuestos/Bodega).
+- Hecho: quitada ruta `/insumos` + lazy import (App.tsx), enlace del home móvil (MobileHomeGrid) y del editor de sidebar (SidebarEditorPage). Borrados `pages/insumos/InsumosPage.tsx`, `components/insumos/InsumoDetailModal.tsx`, `types/insumos.ts` (huérfanos).
+- **`insumos` ya NO tiene lectores vivos en el código** (verificado por grep) → colección LIBRE para borrar en Fase 5 (con backup). NOTA: puede quedar algún enlace `/insumos` en un sidebar guardado en Firestore (dato, no código) → quedaría como link muerto que redirige al default; inofensivo.
+- Verificación: `tsc`=0, `eslint`=0 (App/MobileHomeGrid/SidebarEditorPage). Preview: navegar a `/insumos` ya no monta la página (redirige al default, sin crash); `/repuestos` sigue OK (Áreas+Bodega, búsqueda). Persisten los avisos HMR de Vite por archivos borrados (cosméticos, se limpian al reiniciar el dev server).
+- Archivos: `App.tsx`, `components/home/MobileHomeGrid.tsx`, `pages/SidebarEditorPage.tsx` (M) + 3 borrados.
+- Estado: HECHO. Bloqueos Fase 5 restantes: `machines` (MachineProvider/CategoryManager), `plantAssets` (MapaPlantaPage).
+
 ## 2026-06-17 · claude · Test funcional en vivo + retiro de pestaña Mapas
 
 - Test funcional (preview logueado, código de D: confirmado servido): búsqueda Áreas ("sumitomo"→4 N:M), ficha (Dónde se usa + Solicitar), **Solicitar end-to-end** (crear→reglas OK→lista→avance Pendiente→Aprobada; dato de prueba borrado con script admin), Bodega (188/3777 + alertas), **chatbot ARIA** ("guantes"→29 insumos con SAP, antes invisibles). Sin errores de consola.
