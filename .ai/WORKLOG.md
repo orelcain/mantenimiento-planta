@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-18 · claude · Foco SAP por defecto en pestaña Áreas
+
+- Pregunta de Orel: por qué Áreas muestra ~7.441 si el foco son los SAP. Correcto: el hub mostraba el maestro completo (con + sin SAP) con "Repuestos totales" de cabecera, diluyendo el foco.
+- Hecho en `RepuestosAreaHub`: estado `repSoloSap` (default ON). Se separó `filteredBase` (todos los filtros menos SAP) de `filteredRep` (aplica el foco SAP) + `despieceOcultos` (cuenta el despiece sin SAP oculto). Interruptor "Solo con SAP" en la barra de filtros (muestra "+N despiece" cuando oculta). KPI grande: "Repuestos totales" → **"Repuestos con SAP"** (hint "+N despiece sin SAP"). El despiece sin SAP (capa de identificación) queda a un clic.
+- Verificado en preview (build limpio): "casquillo" con foco ON → 73 con-SAP, 0 despiece visible, toggle "+88 despiece"; al apagar → total 161 (suma los 88). tsc=0, eslint=0. (Durante los edits hubo un ReferenceError `filteredRep` TRANSITORIO de HMR por el rename intermedio; desaparece en build limpio, código actual correcto.)
+- Sobre la pestaña **Bodega**: se justifica — es la vista SAP-only (su hook: "Solo repuestos con código SAP") = inventario/reposición; hoy está vacía de datos (0 con stock) pero conceptualmente es la cara de stock. Se mantiene.
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
+- Estado: HECHO.
+
 ## 2026-06-18 · claude · Review UX "buscar repuesto" + limpieza menor
 
 - Review como usuario (código + datos): el flujo buscar→encontrar→ubicar está COMPLETO. Fila de resultados: foto, SAP (copiar), nombre, badge de clase, tipo, equipo (N:M con +N), stock con semáforo. Ficha (`RepuestoDetailPanel`): "Dónde se usa · N equipos" (todos los N:M), manuales heredados, stock disp/mín/máx, **Bodega + Ubicación editable inline** (pasillo/estante/nivel), movimientos. Diseño sólido; lo que falta es DATO, no código.

@@ -153,6 +153,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [repStockFilter, setRepStockFilter] = useState<StockFilter>('all')
   const [repTipoFilter, setRepTipoFilter] = useState<string>('all')
   const [repClaseFilter, setRepClaseFilter] = useState<string>('all')
+  // Foco SAP: por defecto solo se muestran los materiales con código SAP (los
+  // ordenables / que se usan en el sistema). El despiece sin SAP (capa de
+  // referencia) queda detrás de este interruptor.
+  const [repSoloSap, setRepSoloSap] = useState(true)
   const [repPage, setRepPage] = useState(0)
   const [repPageSize, setRepPageSize] = useState(25)
 
@@ -559,7 +563,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   )
 
   // Filtrado (buscar + stock + tipo + fav) sobre el alcance ya reducido por equipo.
-  const filteredRep = useMemo(() => {
+  // NOTA: NO incluye el foco SAP — eso se aplica después, para poder contar el
+  // despiece oculto y mostrarlo en el interruptor.
+  const filteredBase = useMemo(() => {
     let res = scopedRepuestos
     if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
     if (listFilter !== 'all') {
@@ -594,8 +600,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     return res
   }, [scopedRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
+  // Foco SAP: oculta el despiece sin código SAP (default). El conteo de lo oculto
+  // alimenta el interruptor "ver despiece".
+  const filteredRep = useMemo(
+    () => (repSoloSap ? filteredBase.filter((r) => !!r.codigoSAP) : filteredBase),
+    [filteredBase, repSoloSap],
+  )
+  const despieceOcultos = useMemo(
+    () => (repSoloSap ? filteredBase.reduce((n, r) => n + (r.codigoSAP ? 0 : 1), 0) : 0),
+    [filteredBase, repSoloSap],
+  )
+
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repFavOnly, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, listFilter, repPageSize])
 
   // Si la búsqueda/filtros dejan fuera al repuesto seleccionado, cerrar el panel
   // de detalle: evita que quede "pegado" mostrando un repuesto que ya no está
@@ -1333,7 +1350,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
           {/* KPIs */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.total} label="Repuestos totales" accent="text-primary" bar="border-l-primary" hint={repuestosBusy ? undefined : `${stockKpis.configurados} con stock`} />
+            <KpiCard value={repuestosBusy ? '…' : catalogStats.conSAP} label="Repuestos con SAP" accent="text-primary" bar="border-l-primary" hint={repuestosBusy ? undefined : `+${catalogStats.sinSAP} despiece sin SAP`} />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" accent="text-emerald-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}%`} bar="border-l-emerald-500" />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} bar="border-l-amber-500" />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} bar="border-l-red-500" />
@@ -1407,6 +1424,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 </SelectContent>
               </Select>
               </div>
+              <Button
+                variant={repSoloSap ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setRepSoloSap((v) => !v)}
+                title={repSoloSap
+                  ? 'Mostrando solo materiales con código SAP (los ordenables). Clic para incluir las piezas de despiece sin SAP.'
+                  : 'Incluyendo piezas de despiece sin SAP. Clic para enfocar solo en los que tienen SAP.'}
+              >
+                Solo con SAP
+                {repSoloSap && despieceOcultos > 0 && <span className="tabular-nums opacity-70">+{despieceOcultos} despiece</span>}
+              </Button>
               <Button
                 variant={repFavOnly ? 'default' : 'outline'}
                 size="sm"
