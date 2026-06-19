@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-19 · claude · Cotejo Excel↔app + IMPORT único de stock/ubicación a bodega
+
+- Cotejo máquina-por-máquina (`scripts/cotejo-excel-maestro.js`, solo-lectura) de `INVENTARIO/Maestro_Repuestos_Completo_v3.xlsx` vs maestro: **100% de los SAP del Excel están en la app** (Baader142→EVISCERADORA BAADER 142, Baader200→B200, Grader→GRADER, Garibaldi→ENZUNCHADORA N1, Knuro→KNURO N1, M.Eviscerado→**MAREL HG**, M.Filete→MAREL FILETE, GEA→TERMOFORMADORA GEA, Fishken→CINTA FISHKEN; Det.Metales/Videojet sin SAP). Mapeo correcto. (Aclaración: MAREL HG = máquina de eviscerado Marel, distinta del GRADER; en un test previo confundí ambos.)
+- HALLAZGO: el stock+ubicación SÍ existía en los Excel y NUNCA se había importado a `bodega` (estaba vacía: 0 stock, 0 ubic). Fuente elegida: `STOCK ALMACENES.xlsx` (centro AI04/Chonchi, actualizado 2026-06-19) hojas "inventario 2026" (SAP/cantidad/ubicación/equipo) + "Clasificacion" (ubicación fallback).
+- IMPORT ÚNICO aplicado: `scripts/import-stock-bodega.js --write` (dry-run primero; backup de bodega en `backups/bodega-pre-import-*.json`). Resultado: **bodega 189 → 2.170 docs · 1.627 con stock · 1.938 con ubicación**. Solo SAP del maestro (13 fuera-de-maestro omitidos); idempotente; preserva min/unidad de los 186 ya configurados. Verificado en Firestore (BUJE INOX 3300133492 = stock 10, ubic C-31, = Excel) y EN VIVO en la app (ficha muestra DISPONIBLE 10 / UBICACIÓN C-31 / equipo GRADER; KPI "Stock disponible" pasó de 0 a 2.108 / 97%).
+- Pendiente (pedido por Orel): es importación ÚNICA → de aquí en más se gestiona en la app; **retirar la opción de importar Excel de la UI** (`ImportRepuestosModal`/flujo de carga) para que la fuente de verdad sea la app.
+- Archivos: `scripts/cotejo-excel-maestro.js`, `scripts/import-stock-bodega.js` (nuevos). Datos: colección `bodega` poblada (no es git).
+- Estado: cotejo + import HECHOS y verificados. Sigue: retirar UI de import Excel; opcional listar los 13 SAP fuera-de-maestro.
+
 ## 2026-06-18 · claude · Rediseño tarjetas KPI de stock (look profesional)
 
 - Pedido de Orel: tarjetas de stock más profesionales. Rediseñado `KpiCard` en `RepuestosAreaHub`: de borde-izquierdo plano a tarjeta con **chip de ícono** (Package/PackageCheck/PackageMinus/PackageX) con tinte + ring por estado, número grande tracking-tight, label, hint, y gradiente sutil de fondo por tono (primary/emerald/amber/red). Mapa `KPI_TONE`. Las 4 tarjetas (Repuestos con SAP / Stock disponible / Stock bajo / Sin stock) pasan `icon`+`tone` en vez de `accent`+`bar`.
