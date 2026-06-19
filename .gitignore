@@ -88,3 +88,13 @@ _claude_ai_upload/
 # Fotos locales de los motores Sumitomo (seed) — se suben a Storage, no al repo
 /scripts/sumitomo-photos/*
 !/scripts/sumitomo-photos/README.md
+
+# Backups / artefactos locales de migración y diagnóstico (no versionar)
+*.bak-reconstruido
+/backups/
+/output/
+__pycache__/
+*.pyc
+
+# Reportes de migración con data de planta (no versionar)
+scripts/normalizacion/*-report.json

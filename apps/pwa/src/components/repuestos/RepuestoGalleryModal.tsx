@@ -13,9 +13,11 @@ import {
   Dialog, DialogContent, DialogTitle, Button, Badge,
 } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
 import type { Repuesto, MachineImage } from '@/types/repuestos'
 import { useStorage } from '@/hooks/repuestos/useStorage'
 import { useToast } from '@/hooks/useToast'
+import { useAuthStore } from '@/store/authStore'
 import { logger } from '@/lib/logger'
 
 // ─── Props ──────────────────────────────────────────────────
@@ -25,6 +27,8 @@ interface RepuestoGalleryModalProps {
   onOpenChange: (open: boolean) => void
   repuesto: Repuesto | null
   machineId?: string
+  /** Nombre legible de la máquina/equipo — se muestra al confirmar el destino. */
+  machineName?: string
   readOnly?: boolean
   onSave?: (repuestoId: string, gallery: MachineImage[]) => Promise<void>
 }
@@ -45,6 +49,7 @@ export function RepuestoGalleryModal({
   onOpenChange,
   repuesto,
   machineId,
+  machineName,
   readOnly = false,
   onSave,
 }: RepuestoGalleryModalProps) {
@@ -54,6 +59,11 @@ export function RepuestoGalleryModal({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { uploadImage, uploading } = useStorage(machineId || null)
+  const user = useAuthStore((s) => s.user)
+
+  // Archivo seleccionado pendiente de confirmación de destino (no subido aún)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (open && repuesto) {
@@ -61,7 +71,8 @@ export function RepuestoGalleryModal({
     }
   }, [open, repuesto])
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Selección: NO sube todavía — pide confirmar el destino primero
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !repuesto) return
     const file = e.target.files[0]
     if (!file) return
@@ -71,8 +82,23 @@ export function RepuestoGalleryModal({
       return
     }
 
+    setPendingFile(file)
+    setPendingPreview(URL.createObjectURL(file))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const clearPending = () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+    setPendingPreview(null)
+    setPendingFile(null)
+  }
+
+  // Upload (tras confirmar destino)
+  const handleConfirmUpload = async () => {
+    if (!pendingFile || !repuesto) return
     try {
-      const uploadedImg = await uploadImage(file, repuesto.id, 'real')
+      const uploadedImg = await uploadImage(pendingFile, repuesto.id, 'real')
+      const uploadedBy = user ? `${user.nombre} ${user.apellido}`.trim() : ''
       const newItem: MachineImage = {
         id: uploadedImg.id,
         url: uploadedImg.url,
@@ -85,14 +111,14 @@ export function RepuestoGalleryModal({
           uploadedImg.width && uploadedImg.height
             ? { width: uploadedImg.width, height: uploadedImg.height }
             : undefined,
+        ...(uploadedBy ? { uploadedBy } : {}),
       }
       setGallery((prev) => [newItem, ...prev])
       toast({ title: 'Imagen subida', description: 'La imagen se agregó a la galería' })
+      clearPending()
     } catch (err) {
       logger.error('Error subiendo imagen a galería', err instanceof Error ? err : new Error(String(err)))
       toast({ title: 'Error subiendo imagen', description: 'Intente nuevamente', variant: 'destructive' })
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -267,6 +293,18 @@ export function RepuestoGalleryModal({
         onClose={() => setLightboxIndex(null)}
       />
     )}
+
+    {/* Confirmar destino antes de subir (evita fotos en el repuesto equivocado) */}
+    <ConfirmUploadDialog
+      open={!!pendingFile}
+      previews={pendingPreview ? [pendingPreview] : []}
+      repuestoName={repuesto.textoBreve || 'Repuesto sin nombre'}
+      machineName={machineName}
+      codigoSAP={repuesto.codigoSAP}
+      uploading={uploading}
+      onConfirm={handleConfirmUpload}
+      onCancel={clearPending}
+    />
     </>
   )
 }

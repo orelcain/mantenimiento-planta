@@ -19,7 +19,7 @@ import {
   HierarchyNode,
   HierarchyNodeWithChildren,
   HierarchyLevel,
-  isEquipmentNode,
+  getNodeTipo,
 } from '@/types/hierarchy'
 
 // Equipo SAP que cuelga de un área en el sidebar. Puede tener sub-equipos anidados.
@@ -49,9 +49,9 @@ const areaChildrenCache = new Map<string, { nodes: HierarchyNode[]; equipCount: 
 const CACHE_TTL = 5 * 60 * 1000
 
 function isAreaNode(node: HierarchyNode): boolean {
-  // Áreas tienen código alfanumérico no vacío (ej: "PROD-001")
-  // Equipos tienen código numérico (ej: "720004316") o vacío
-  return !!node.codigo && !isEquipmentNode(node.codigo)
+  // Usa tipoNodo persistido (Fase 1 normalización) con fallback al código:
+  // áreas = código alfanumérico; equipos = código numérico o vacío
+  return getNodeTipo(node) === 'area'
 }
 
 /** Carga los hijos (sub-equipos) de una lista de nodos equipo, con caché por nodo. */
@@ -80,7 +80,7 @@ function buildAreaTree(nodes: HierarchyNode[]): AreaTreeNode[] {
 
   // Contar equipos por parentId
   for (const n of nodes) {
-    if (isEquipmentNode(n.codigo) && n.parentId) {
+    if (getNodeTipo(n) === 'equipo' && n.parentId) {
       equipmentByParent.set(n.parentId, (equipmentByParent.get(n.parentId) || 0) + 1)
     }
   }
@@ -243,7 +243,7 @@ export function useHierarchyAreaTree() {
       } as HierarchyNode))
 
       // Contar equipos
-      const equipCount = childNodes.filter(n => isEquipmentNode(n.codigo)).length
+      const equipCount = childNodes.filter(n => getNodeTipo(n) === 'equipo').length
 
       // Cachear
       areaChildrenCache.set(nodeId, { nodes: childNodes, equipCount, ts: Date.now() })
@@ -267,7 +267,7 @@ export function useHierarchyAreaTree() {
             id: d.id,
             ...d.data(),
           } as HierarchyNode))
-          const gcEquipCount = gcNodes.filter(n => isEquipmentNode(n.codigo)).length
+          const gcEquipCount = gcNodes.filter(n => getNodeTipo(n) === 'equipo').length
           areaChildrenCache.set(child.id, { nodes: gcNodes, equipCount: gcEquipCount, ts: Date.now() })
           return gcNodes
         })

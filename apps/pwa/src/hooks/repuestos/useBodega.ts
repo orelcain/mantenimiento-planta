@@ -1,8 +1,9 @@
 /**
  * useBodega — Hook para gestión de bodega de repuestos
  *
- * Solo repuestos con código SAP.
- * Combina catálogo (machines/{id}/repuestos) con colección bodega/{codigoSAP}.
+ * Combina el catálogo del maestro `repuestos` (vía useGlobalSearch → `catalogRepuestos`)
+ * con la colección `bodega/{codigoSAP}` (stock overlay). El stock solo se engancha
+ * cuando el material tiene SAP.
  *
  * Colecciones Firestore:
  *  - bodega/{codigoSAP}              → stock, ubicación, proveedor, mínimos
@@ -29,6 +30,7 @@ import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
+import type { MaterialClase } from '@/types/repuestos'
 
 // ══════════════════════════════════════════════
 //  TIPOS
@@ -66,6 +68,17 @@ export interface BodegaMergedItem {
   textoBreve: string
   alias?: string
   tipo?: string
+  /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
+  clase?: MaterialClase
+  /** ¿tiene SAP real? tier 1 (ordenable) vs tier 2 (despiece) */
+  tieneSap?: boolean
+  /** Familia SAP (para agrupar transversales sin equipo) */
+  familia?: string
+  /** Marca física (motores/bombas migrados de plantAssets) — buscable */
+  marca?: string
+  /** Modelo/tipo físico (ej. RNYM08-1320B-30) — buscable */
+  modeloTipo?: string
+  descripcion?: string
   valorUnitario: number
   equipos: { machineId: string; machineName: string }[]
   bodegaId?: string
@@ -85,6 +98,10 @@ export interface BodegaMergedItem {
   categoria?: 'A' | 'B' | 'C'
   observaciones?: string
   fotos?: string[]
+  /** Fotos del catálogo (fotosReales > imagenesManual > gallery del doc Repuesto).
+   *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
+   *  bodega no tenga foto propia. */
+  fotosCatalogo?: string[]
   isWatched?: boolean
 }
 
@@ -286,16 +303,29 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   const allItems = useMemo((): BodegaMergedItem[] => {
     const byKey = new Map<string, BodegaMergedItem>()
 
+    // Fotos del doc de catálogo, priorizando foto real sobre captura del manual.
+    const catalogPhotosOf = (rep: GlobalSearchResult['repuesto']): string[] =>
+      [...(rep.fotosReales || []), ...(rep.imagenesManual || []), ...(rep.gallery || [])]
+        .map(i => i.url)
+        .filter(Boolean)
+
     for (const r of catalogRepuestos) {
       const rep = r.repuesto
       const sap = (rep.codigoSAP || '').trim()
       const fab = (rep.codigoFabricante || '').trim()
-      const key = sap || (fab ? `fab:${fab}` : `id:${r.machineId}:${rep.id}`)
+      // Colección plana: rep.id es globalmente único (un doc puede venir N veces,
+      // una por equipo) → la clave id NO incluye machineId para reagrupar el doc.
+      const key = sap || (fab ? `fab:${fab}` : `id:${rep.id}`)
 
       const existing = byKey.get(key)
       if (existing) {
         if (!existing.equipos.find(e => e.machineId === r.machineId)) {
           existing.equipos.push({ machineId: r.machineId, machineName: r.machineName })
+        }
+        // Si el doc ya fusionado no aportó fotos, tomar las de este duplicado.
+        if (!existing.fotosCatalogo?.length) {
+          const dupPhotos = catalogPhotosOf(rep)
+          if (dupPhotos.length) existing.fotosCatalogo = dupPhotos
         }
         continue
       }
@@ -308,6 +338,12 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         textoBreve: rep.textoBreve || rep.descripcion || '',
         alias: rep.alias,
         tipo: rep.tipo,
+        clase: rep.clase,
+        tieneSap: rep.tieneSap ?? !!sap,
+        familia: rep.familia,
+        marca: rep.marca,
+        modeloTipo: rep.modeloTipo,
+        descripcion: rep.descripcion,
         valorUnitario: rep.valorUnitario || 0,
         equipos: [{ machineId: r.machineId, machineName: r.machineName }],
         bodegaId: overlay?.id,
@@ -326,6 +362,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
         fotos: overlay?.fotos,
+        fotosCatalogo: (() => { const p = catalogPhotosOf(rep); return p.length ? p : undefined })(),
         isWatched: sap ? watchlist.has(sap) : false,
       })
     }

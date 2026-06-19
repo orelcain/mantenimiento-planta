@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AquaChile - Repuestos</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061521;
+      --nav: #071827;
+      --panel: #0b2133;
+      --panel2: #0d263b;
+      --line: #1f3a50;
+      --line2: rgba(125, 161, 190, .18);
+      --text: #e8f0f7;
+      --muted: #8fa6ba;
+      --blue: #1687d9;
+      --blue2: #2ea8ff;
+      --green: #55d26f;
+      --amber: #ffae2f;
+      --red: #ff4f5b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 75% -10%, rgba(22,135,217,.22), transparent 34%),
+        linear-gradient(180deg, #061521, #04111b 72%);
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 216px minmax(0, 1fr) 356px;
+      grid-template-rows: 64px minmax(0, 1fr);
+      border: 1px solid rgba(46,168,255,.12);
+    }
+    .top {
+      grid-column: 1 / 4;
+      display: grid;
+      grid-template-columns: 216px minmax(0, 1fr) 360px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: rgba(4, 17, 27, .78);
+      backdrop-filter: blur(12px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      height: 100%;
+      border-right: 1px solid var(--line);
+    }
+    .brand-name {
+      font-family: Georgia, serif;
+      font-size: 19px;
+      letter-spacing: .03em;
+    }
+    .brand-mark {
+      width: 26px;
+      height: 26px;
+      clip-path: polygon(0 10%, 100% 50%, 0 90%, 28% 50%);
+      background: repeating-linear-gradient(90deg, #dceefb 0 4px, transparent 4px 8px);
+      opacity: .9;
+    }
+    .top-mid {
+      display: grid;
+      grid-template-columns: 150px minmax(240px, 520px) 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 0 22px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1;
+    }
+    .global-search {
+      position: relative;
+    }
+    .global-search input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #3a5368;
+      border-radius: 5px;
+      background: rgba(2, 13, 22, .55);
+      color: var(--text);
+      outline: 0;
+      padding: 0 82px 0 40px;
+      font-size: 14px;
+    }
+    .global-search:before {
+      content: "⌕";
+      position: absolute;
+      left: 16px;
+      top: 10px;
+      color: var(--muted);
+    }
+    .global-search span {
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+    }
+    .top-actions {
+      grid-column: 3;
+      justify-self: end;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding-right: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .avatar {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--blue);
+      border-radius: 50%;
+      color: var(--blue2);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .side {
+      grid-column: 1;
+      grid-row: 2;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 48px 1fr 66px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(9,30,47,.96), rgba(5,20,32,.96));
+    }
+    .side-head, .detail-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .area-list {
+      overflow: auto;
+      padding: 6px;
+    }
+    .area-item {
+      width: 100%;
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid transparent;
+      border-bottom-color: var(--line2);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+    }
+    .area-item.active {
+      background: linear-gradient(90deg, rgba(22,135,217,.45), rgba(22,135,217,.14));
+      border-color: rgba(46,168,255,.55);
+      box-shadow: inset 3px 0 0 var(--blue2);
+    }
+    .area-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #31506a;
+      border-radius: 5px;
+      color: #b7c8d7;
+      font-size: 16px;
+    }
+    .area-title {
+      font-size: 14px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .area-sub {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .side-bottom {
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .ghost {
+      width: 100%;
+      height: 40px;
+      border: 1px solid #496377;
+      border-radius: 5px;
+      color: var(--text);
+      background: rgba(255,255,255,.02);
+      font-weight: 800;
+    }
+
+    .main {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 66px auto auto 1fr 60px;
+      background: rgba(5, 18, 29, .78);
+    }
+    .main-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .main-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 0 8px;
+      color: var(--muted);
+      background: rgba(255,255,255,.03);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .primary {
+      height: 38px;
+      border: 1px solid var(--blue);
+      border-radius: 5px;
+      background: linear-gradient(180deg, #1597ee, #117dcc);
+      color: white;
+      padding: 0 10px;
+      width: 164px;
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 8px;
+      padding: 14px 22px 10px;
+    }
+    .kpi {
+      min-height: 76px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: linear-gradient(180deg, rgba(15,42,64,.95), rgba(8,28,45,.95));
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .kpi-ico {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid #294d67;
+      color: var(--blue2);
+      background: rgba(22,135,217,.08);
+      font-size: 18px;
+    }
+    .kpi span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+    .kpi strong {
+      margin-top: 5px;
+      display: inline-block;
+      font-size: 22px;
+      line-height: 1;
+    }
+    .kpi em {
+      margin-left: 8px;
+      color: var(--muted);
+      font-style: normal;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .green { color: var(--green) !important; }
+    .amber { color: var(--amber) !important; }
+    .red { color: var(--red) !important; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 190px 180px 92px;
+      gap: 8px;
+      padding: 6px 22px 16px;
+    }
+    .filters input, .filters select {
+      height: 38px;
+      border: 1px solid #39536a;
+      border-radius: 5px;
+      background: rgba(2,13,22,.45);
+      color: var(--text);
+      outline: 0;
+      padding: 0 12px;
+    }
+    .filter-btn {
+      height: 38px;
+      border: 1px solid #39536a;
+      border-radius: 5px;
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .table-wrap {
+      min-height: 0;
+      overflow: auto;
+      padding: 0 22px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #061521;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      text-align: left;
+      padding: 12px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--line2);
+      background: rgba(10, 34, 52, .72);
+      vertical-align: middle;
+    }
+    tr.active td {
+      background: linear-gradient(90deg, rgba(22,135,217,.42), rgba(22,135,217,.18));
+      border-top: 1px solid var(--blue2);
+      border-bottom: 1px solid var(--blue2);
+    }
+    tr.active td:first-child {
+      border-left: 1px solid var(--blue2);
+      border-radius: 5px 0 0 5px;
+    }
+    tr.active td:last-child {
+      border-right: 1px solid var(--blue2);
+      border-radius: 0 5px 5px 0;
+    }
+    .sap {
+      font-family: "IBM Plex Mono", Consolas, monospace;
+      color: #cfe7fb;
+      white-space: nowrap;
+    }
+    .part-name {
+      font-weight: 800;
+      line-height: 1.25;
+      text-transform: uppercase;
+    }
+    .stock {
+      display: grid;
+      gap: 3px;
+    }
+    .stock b {
+      font-size: 15px;
+    }
+    .stock small, .muted {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      display: inline-block;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    .dot.low { background: var(--amber); }
+    .dot.out { background: var(--red); }
+    .arrow {
+      color: #cfe7fb;
+      text-align: right;
+      font-size: 20px;
+    }
+    .pager {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 0 22px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pages {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .page-dot {
+      min-width: 28px;
+      height: 28px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+    }
+    .page-dot.active {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+    }
+
+    .detail {
+      grid-column: 3;
+      grid-row: 2;
+      min-height: 0;
+      border-left: 1px solid var(--line);
+      background: #071827;
+      display: grid;
+      grid-template-rows: 48px 1fr;
+    }
+    .detail-head button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 22px;
+    }
+    .detail-body {
+      overflow: auto;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+    .photo {
+      height: 128px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(46,168,255,.17), transparent 48%),
+        linear-gradient(180deg, rgba(15,42,64,.78), rgba(5,18,29,.85));
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .photo img {
+      max-width: 86%;
+      max-height: 118px;
+      object-fit: contain;
+      filter: drop-shadow(0 20px 18px rgba(0,0,0,.45));
+    }
+    .detail h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+      text-transform: uppercase;
+    }
+    .field {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .field span { color: var(--muted); text-transform: uppercase; font-size: 11px; }
+    .field b { font-weight: 700; }
+    .stock-box {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      display: grid;
+      grid-template-columns: 1.25fr .8fr .8fr;
+      background: rgba(255,255,255,.02);
+    }
+    .stock-box div {
+      padding: 11px 12px;
+      border-right: 1px solid var(--line2);
+    }
+    .stock-box div:last-child { border-right: 0; }
+    .stock-box span {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .stock-box strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 24px;
+      line-height: 1;
+    }
+    .detail-action {
+      height: 42px;
+      border: 1px solid #39536a;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      font-weight: 800;
+    }
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: var(--blue);
+      color: white;
+      padding: 11px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 800;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: .18s ease;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; }
+      .top { grid-column: 1; grid-template-columns: 1fr; }
+      .brand { display: none; }
+      .top-mid { grid-template-columns: 1fr; padding: 14px; }
+      .top-actions { display: none; }
+      .side, .main, .detail { grid-column: 1; grid-row: auto; }
+      .side { grid-template-rows: 42px auto; border-right: 0; }
+      .area-list { display: flex; overflow-x: auto; gap: 6px; }
+      .area-item { min-width: 220px; }
+      .side-bottom { display: none; }
+      .detail { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 720px) {
+      .kpis { grid-template-columns: 1fr 1fr; padding: 12px; }
+      .filters { grid-template-columns: 1fr; padding: 8px 12px 12px; }
+      .table-wrap { padding: 0 12px; }
+      .pager { grid-template-columns: 1fr; gap: 10px; padding: 12px; }
+      th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <div class="brand-name">AquaChile</div>
+        <div class="brand-mark"></div>
+      </div>
+      <div class="top-mid">
+        <h1>Repuestos</h1>
+        <label class="global-search">
+          <input id="globalSearch" placeholder="Buscar SAP, repuesto, equipo o fabricante...">
+          <span>Ctrl + K</span>
+        </label>
+      </div>
+      <div class="top-actions">
+        <span>Bodega⌄</span>
+        <span>⌂</span>
+        <span>♢</span>
+        <span class="avatar">MM</span>
+        <span>Matías⌄</span>
+      </div>
+    </header>
+
+    <aside class="side">
+      <div class="side-head"><span>Areas</span><span>⌄</span></div>
+      <div class="area-list" id="areaList"></div>
+      <div class="side-bottom"><button class="ghost" id="allAreasBtn">☰ Ver todas las áreas</button></div>
+    </aside>
+
+    <main class="main">
+      <div class="main-head">
+        <div class="main-title"><span id="areaTitle">Eviscerado HG</span><span class="pill" id="areaEquipCount">48 equipos</span></div>
+        <button class="primary" id="requestBtn">+ Solicitar repuesto</button>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="filters">
+        <input id="localSearch" placeholder="⌕  Buscar en repuestos...">
+        <select id="equipmentSelect"></select>
+        <select id="stockSelect">
+          <option value="all">Stock: Todos</option>
+          <option value="ok">Stock: Disponible</option>
+          <option value="low">Stock: Bajo</option>
+          <option value="out">Stock: Sin stock</option>
+        </select>
+        <button class="filter-btn" id="clearBtn">Filtros</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SAP</th><th>Repuesto</th><th>Equipo</th><th>Stock</th><th>Bodega</th><th></th></tr></thead>
+          <tbody id="partsTable"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="resultCount">Mostrando 1 a 8</span>
+        <div class="pages"><span>«</span><span class="page-dot active">1</span><span class="page-dot">2</span><span class="page-dot">3</span><span>...</span><span class="page-dot">16</span><span>»</span></div>
+        <span style="justify-self:end">8 por página ⌄</span>
+      </div>
+    </main>
+
+    <aside class="detail">
+      <div class="detail-head"><span>Detalle del repuesto</span><button>×</button></div>
+      <div class="detail-body" id="detailBody"></div>
+    </aside>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const areas = [
+      { id: 'eviscerado', icon: '⌁', name: 'Eviscerado HG', count: 48, sub: '48 equipos', equipment: [
+        { id: 'baader142', name: 'Baader 142 - Fileteadora', parts: ['10027923','10015678','3300012407','3300128967','Pendiente-34970060','3300124071'] },
+        { id: 'grader', name: 'Marel Static Grader', parts: ['10019234','3300033462','3300100491','3300100752','3300100815','3300102586','3300103110','3300103286','3300103458'] },
+        { id: 'fishken', name: 'Empacadora Fishken', parts: ['3100024236','3100061329','3300044579','3300097661','3300119348','3300119350','3300119351'] }
+      ]},
+      { id: 'baader142area', icon: '▧', name: 'Baader 142', count: 33, sub: '33 equipos', equipment: [
+        { id: 'baader142-only', name: 'Baader 142 - Fileteadora', parts: ['10027923','10015678','3300012407','3300128967','Pendiente-34970060','3300124071'] }
+      ]},
+      { id: 'marel', icon: '▧', name: 'Marel Static Grader', count: 18, sub: '18 equipos', equipment: [
+        { id: 'grader-only', name: 'Marel Static Grader', parts: ['10019234','3300033462','3300100491','3300100752','3300100815','3300102586','3300103110','3300103286','3300103458'] }
+      ]},
+      { id: 'baader200', icon: '▧', name: 'Baader 200', count: 27, sub: '27 equipos', equipment: [
+        { id: 'baader200-eq', name: 'Baader 200 - Cabezal', parts: ['1009876','3300011657','3300011719','3300011720','3300011766'] }
+      ]},
+      { id: 'sumitomo', icon: '⚙', name: 'Sumitomo', count: 12, sub: '12 equipos', equipment: [
+        { id: 'sumitomo-eq', name: 'Sumitomo - Reductor', parts: ['10011223','3300124070','3300124071','3300124072','3300124073'] }
+      ]},
+      { id: 'servicios', icon: '⌬', name: 'Servicios', count: 22, sub: '22 equipos', equipment: [
+        { id: 'serv-eq', name: 'Servicios Generales', parts: ['3300124070','3300124073','3300011657'] }
+      ]},
+      { id: 'bombas', icon: '◎', name: 'Sala de Bombas', count: 14, sub: '14 equipos', equipment: [
+        { id: 'bombas-eq', name: 'Bombas / Vacio', parts: ['3300011657','3300011719','3300011720'] }
+      ]},
+      { id: 'riles', icon: '◉', name: 'Planta de Riles', count: 9, sub: '9 equipos', equipment: [
+        { id: 'riles-eq', name: 'Riles', parts: ['3300011766','3300124073'] }
+      ]}
+    ];
+    const parts = {
+      '10027923': { sap:'10027923', text:'SWITCH INDUSTRIAL 5 BOCAS FISHKEN', fab:'Fishken', category:'Eléctrico', unit:'Unidad', machine:'Baader 142 - Fileteadora', area:'Eviscerado HG', stock:12, min:3, max:20, bodega:'Bodega Principal', location:'Pasillo A / Estante 03 / Nivel 2', updated:'30/05/2026 09:15', source:'fishken_catalogo_de_repuestos_7_7_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '10015678': { sap:'10015678', text:'FUSIBLE 2A 250V 5x20', fab:'Marel', category:'Eléctrico', unit:'Unidad', machine:'Baader 142 - Fileteadora', area:'Eviscerado HG', stock:3, min:5, max:25, bodega:'Bodega Eléctrica', location:'Tableros / Fusibles', updated:'29/05/2026 16:40', source:'catálogo eléctrico planta', img:'assets/repuesto-switch-industrial.png' },
+      '10019234': { sap:'10019234', text:'SENSOR FOTOELÉCTRICO M18', fab:'Marel', category:'Sensor', unit:'Unidad', machine:'Marel Static Grader', area:'Eviscerado HG', stock:0, min:2, max:8, bodega:'-', location:'Sin stock', updated:'28/05/2026 10:22', source:'grader_catalogo_de_repuestos_25_25_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '10014567': { sap:'10014567', text:'CORREA DENTADA 5M 25', fab:'Baader', category:'Mecánico', unit:'Unidad', machine:'Baader 142 - Transportador', area:'Eviscerado HG', stock:8, min:4, max:16, bodega:'Bodega Principal', location:'Correas / Línea HG', updated:'30/05/2026 08:12', source:'levantamiento v2.1.1.1', img:'assets/repuesto-switch-industrial.png' },
+      '1009876': { sap:'1009876', text:'RODAMIENTO 6205 ZZ', fab:'SKF', category:'Mecánico', unit:'Unidad', machine:'Baader 200 - Cabezal', area:'Baader 200', stock:15, min:6, max:30, bodega:'Bodega Principal', location:'Rodamientos', updated:'27/05/2026 12:02', source:'baader_200_catalogo_de_repuestos_202_202_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '10011223': { sap:'10011223', text:'RETÉN 35x52x7', fab:'Sumitomo', category:'Mecánico', unit:'Unidad', machine:'Sumitomo - Reductor', area:'Eviscerado HG', stock:2, min:4, max:12, bodega:'Bodega Mecánica', location:'Retenes', updated:'26/05/2026 15:30', source:'scripts/seed-sumitomo-motors.js', img:'assets/repuesto-switch-industrial.png' },
+      '10022111': { sap:'10022111', text:'CONTACTOR 24V DC 9A', fab:'Schneider', category:'Eléctrico', unit:'Unidad', machine:'Baader 142 - Tablero', area:'Eviscerado HG', stock:6, min:2, max:10, bodega:'Bodega Eléctrica', location:'Contactores', updated:'25/05/2026 14:18', source:'catálogo eléctrico planta', img:'assets/repuesto-switch-industrial.png' },
+      '10033455': { sap:'10033455', text:'VÁLVULA NEUMÁTICA 5/2 1/4\"', fab:'Festo', category:'Neumático', unit:'Unidad', machine:'Baader 51 - Desollador', area:'Eviscerado HG', stock:4, min:2, max:10, bodega:'Bodega Neumática', location:'Válvulas', updated:'23/05/2026 11:44', source:'levantamiento v2.1.1.1', img:'assets/repuesto-switch-industrial.png' },
+      '3300012407': { sap:'3300012407', text:'RESORTE MEDIDOR DE LARGO', fab:'38010321', category:'Mecánico', unit:'Unidad', machine:'Baader 142 - Fileteadora', area:'Eviscerado HG', stock:1, min:2, max:6, bodega:'Bodega Principal', location:'Pasillo A / Estante 03', updated:'30/05/2026 09:15', source:'baader_142_catalogo_de_repuestos_3_3_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3300128967': { sap:'3300128967', text:'PIEZAS ADICIONALES 1420000118', fab:'1420000118', category:'Mecánico', unit:'Unidad', machine:'Baader 142 - Fileteadora', area:'Eviscerado HG', stock:0, min:1, max:3, bodega:'-', location:'Sin ubicación', updated:'30/05/2026 09:15', source:'baader_142_catalogo_de_repuestos_3_3_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      'Pendiente-34970060': { sap:'Pendiente', text:'VÁLVULA MAGNÉTICA, 2-2 VÍAS', fab:'34970060', category:'Neumático', unit:'Unidad', machine:'Baader 142 - Fileteadora', area:'Eviscerado HG', stock:0, min:1, max:4, bodega:'Bodega Neumática', location:'Pendiente codificación SAP', updated:'30/05/2026 09:15', source:'baader_142_catalogo_de_repuestos_3_3_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3100024236': { sap:'3100024236', text:'SWITCH INDUSTRIAL 5 BOCAS FISHKEN', fab:'pendiente', category:'Eléctrico', unit:'Unidad', machine:'Empacadora Fishken', area:'Eviscerado HG', stock:1, min:1, max:4, bodega:'Bodega Eléctrica', location:'Comunicaciones', updated:'29/05/2026 10:20', source:'fishken_catalogo_de_repuestos_7_7_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3100061329': { sap:'3100061329', text:'CABLE AXT100-DS25', fab:'pendiente', category:'Eléctrico', unit:'Unidad', machine:'Empacadora Fishken', area:'Eviscerado HG', stock:2, min:1, max:6, bodega:'Bodega Eléctrica', location:'Cables industriales', updated:'29/05/2026 10:20', source:'fishken_catalogo_de_repuestos_7_7_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3300033462': { sap:'3300033462', text:'SENSOR EMISOR CINTA Z - T18SP6DQ', fab:'pendiente', category:'Sensor', unit:'Unidad', machine:'Marel Static Grader', area:'Eviscerado HG', stock:2, min:1, max:6, bodega:'Bodega Eléctrica', location:'Gaveta sensores', updated:'29/05/2026 10:20', source:'grader_catalogo_de_repuestos_25_25_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3300100491': { sap:'3300100491', text:'BOTON AZUL MARELEC STATIC GRADER P/N G48', fab:'pendiente', category:'Eléctrico', unit:'Unidad', machine:'Marel Static Grader', area:'Eviscerado HG', stock:0, min:2, max:8, bodega:'Bodega Eléctrica', location:'Tableros / Pulsadores', updated:'29/05/2026 10:20', source:'grader_catalogo_de_repuestos_25_25_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3300100752': { sap:'3300100752', text:'CELDA CARGA AK300 MARELEC STATIC GRADER', fab:'pendiente', category:'Instrumentación', unit:'Unidad', machine:'Marel Static Grader', area:'Eviscerado HG', stock:1, min:1, max:4, bodega:'Bodega Eléctrica', location:'Instrumentación', updated:'29/05/2026 10:20', source:'grader_catalogo_de_repuestos_25_25_excel_solicitud.xlsx', img:'assets/repuesto-switch-industrial.png' },
+      '3300124070': { sap:'3300124070', text:'MOTOR REDUCTOR RNYMS05-1320C-30', fab:'RNYMS05-1320C-30', category:'Motor', unit:'Unidad', machine:'Cinta alimentación Gea', area:'Servicios', stock:1, min:1, max:2, bodega:'Bodega Motores', location:'Sumitomo', updated:'28/05/2026 18:00', source:'scripts/seed-sumitomo-motors.js', img:'assets/repuesto-switch-industrial.png' },
+      '3300124071': { sap:'3300124071', text:'MOTOR REDUCTOR MOD RNYM1 207RPM', fab:'RNYM1-1320A-7', category:'Motor', unit:'Unidad', machine:'Cinta alimentación Baader 142', area:'Eviscerado HG', stock:1, min:1, max:2, bodega:'Bodega Motores', location:'Sumitomo', updated:'28/05/2026 18:00', source:'scripts/seed-sumitomo-motors.js', img:'assets/repuesto-switch-industrial.png' },
+      '3300124073': { sap:'3300124073', text:'MOTOR REDUCTOR MOD RNYM08 48,3 RPM', fab:'RNYM08-1320B-30', category:'Motor', unit:'Unidad', machine:'Cintas transversales / desperdicio', area:'Eviscerado HG', stock:1, min:2, max:3, bodega:'Bodega Motores', location:'Sumitomo', updated:'28/05/2026 18:00', source:'scripts/seed-sumitomo-motors.js', img:'assets/repuesto-switch-industrial.png' }
+    };
+    const state = { area:'eviscerado', equipment:'all', stock:'all', query:'', selected:'10027923' };
+    const $ = id => document.getElementById(id);
+    const allParts = () => Object.values(parts);
+    const keyOf = p => Object.keys(parts).find(k => parts[k] === p);
+    const area = () => areas.find(a => a.id === state.area) || areas[0];
+    const areaParts = a => a.equipment.flatMap(e => e.parts).map(k => parts[k]).filter(Boolean);
+    const out = p => p.stock <= 0;
+    const low = p => p.stock > 0 && p.stock < p.min;
+    const ok = p => p.stock >= p.min;
+    const norm = s => String(s || '').toLowerCase();
+    function filtered() {
+      let list = state.query ? allParts() : areaParts(area());
+      if (state.equipment !== 'all' && !state.query) {
+        const eq = area().equipment.find(e => e.id === state.equipment);
+        list = eq ? eq.parts.map(k => parts[k]).filter(Boolean) : list;
+      }
+      if (state.query) list = list.filter(p => norm([p.sap,p.text,p.machine,p.fab,p.bodega].join(' ')).includes(norm(state.query)));
+      if (state.stock === 'ok') list = list.filter(ok);
+      if (state.stock === 'low') list = list.filter(low);
+      if (state.stock === 'out') list = list.filter(out);
+      return list;
+    }
+    function renderAreas() {
+      $('areaList').innerHTML = areas.map(a => `<button class="area-item ${a.id===state.area?'active':''}" data-area="${a.id}">
+        <span class="area-icon">${a.icon}</span><span><span class="area-title">${a.name}</span><span class="area-sub">${a.sub}</span></span>
+      </button>`).join('');
+      document.querySelectorAll('[data-area]').forEach(b => b.onclick = () => {
+        state.area = b.dataset.area; state.equipment = 'all'; state.stock = 'all'; state.query = ''; $('globalSearch').value = '';
+        state.selected = keyOf(areaParts(area())[0]); render();
+      });
+    }
+    function renderHead() {
+      $('areaTitle').textContent = area().name;
+      $('areaEquipCount').textContent = `${area().count} equipos`;
+      const list = state.query ? filtered() : areaParts(area());
+      const total = list.length;
+      const avail = list.filter(ok).length;
+      const lows = list.filter(low).length;
+      const outs = list.filter(out).length;
+      $('kpis').innerHTML = [
+        ['▧','REPUESTOS TOTALES', total, ''],
+        ['✓','STOCK DISPONIBLE', avail, 'green'],
+        ['△','STOCK BAJO', lows, 'amber'],
+        ['−','SIN STOCK', outs, 'red']
+      ].map(([i,l,v,c]) => `<div class="kpi"><div class="kpi-ico ${c}">${i}</div><div><span>${l}</span><strong>${v}</strong><em class="${c}">${total ? Math.round(v/total*100) : 0}%</em></div></div>`).join('');
+      $('equipmentSelect').innerHTML = '<option value="all">Todos los equipos</option>' + area().equipment.map(e => `<option value="${e.id}" ${state.equipment===e.id?'selected':''}>${e.name}</option>`).join('');
+      $('stockSelect').value = state.stock;
+    }
+    function renderTable() {
+      const list = filtered();
+      if (!list.some(p => keyOf(p) === state.selected) && list[0]) state.selected = keyOf(list[0]);
+      $('resultCount').textContent = `Mostrando 1 a ${Math.min(8,list.length)} de ${list.length || 0} repuestos`;
+      $('partsTable').innerHTML = list.map(p => {
+        const k = keyOf(p); const cls = out(p) ? 'out' : low(p) ? 'low' : ''; const label = out(p) ? 'Sin stock' : low(p) ? 'Bajo' : 'Disponible';
+        return `<tr class="${k===state.selected?'active':''}" data-part="${k}">
+          <td class="sap">${p.sap}</td><td><div class="part-name">${p.text}</div></td><td>${p.machine}</td>
+          <td><div class="stock"><b><i class="dot ${cls}"></i>${p.stock}</b><small>${label}</small></div></td>
+          <td>${p.bodega}</td><td class="arrow">›</td></tr>`;
+      }).join('') || '<tr><td colspan="6" class="muted">Sin resultados.</td></tr>';
+      document.querySelectorAll('[data-part]').forEach(r => r.onclick = () => { state.selected = r.dataset.part; renderTable(); renderDetail(); });
+    }
+    function renderDetail() {
+      const p = parts[state.selected] || filtered()[0] || allParts()[0];
+      $('detailBody').innerHTML = `<div class="photo"><img src="${p.img}" alt="${p.text}"></div>
+        <div><h2>${p.text}</h2></div>
+        <div class="field"><span>SAP</span><b class="sap">${p.sap}</b></div>
+        <div class="field"><span>Equipo</span><b>${p.machine}</b></div>
+        <div class="field"><span>Área</span><b>${p.area}</b></div>
+        <div class="field"><span>Categoría</span><b>${p.category}</b></div>
+        <div class="field"><span>Fabricante</span><b>${p.fab}</b></div>
+        <div class="field"><span>Unidad</span><b>${p.unit}</b></div>
+        <div class="stock-box"><div><span>Stock disponible</span><strong class="${out(p)?'red':low(p)?'amber':'green'}">${p.stock}</strong></div><div><span>Mínimo</span><strong>${p.min}</strong></div><div><span>Máximo</span><strong>${p.max}</strong></div></div>
+        <div class="field"><span>Bodega</span><b>${p.bodega}</b></div>
+        <div class="field"><span>Ubicación</span><b>${p.location}</b></div>
+        <div class="field"><span>Actualización</span><b>${p.updated}</b></div>
+        <button class="detail-action" id="movesBtn">ↄ Ver movimientos</button>`;
+      $('movesBtn').onclick = () => toast('Movimientos de bodega · acción simulada');
+    }
+    function toast(t) { $('toast').textContent = t; $('toast').classList.add('show'); clearTimeout(window.tt); window.tt=setTimeout(()=>$('toast').classList.remove('show'),1500); }
+    function render(){ renderAreas(); renderHead(); renderTable(); renderDetail(); }
+    $('globalSearch').oninput = e => { state.query = e.target.value; const first = filtered()[0]; if(first) state.selected = keyOf(first); renderHead(); renderTable(); renderDetail(); };
+    $('localSearch').oninput = e => { state.query = e.target.value; $('globalSearch').value = e.target.value; const first = filtered()[0]; if(first) state.selected = keyOf(first); renderHead(); renderTable(); renderDetail(); };
+    $('equipmentSelect').onchange = e => { state.equipment = e.target.value; const first = filtered()[0]; if(first) state.selected = keyOf(first); renderHead(); renderTable(); renderDetail(); };
+    $('stockSelect').onchange = e => { state.stock = e.target.value; const first = filtered()[0]; if(first) state.selected = keyOf(first); renderHead(); renderTable(); renderDetail(); };
+    $('clearBtn').onclick = () => { state.query=''; state.stock='all'; state.equipment='all'; $('globalSearch').value=''; $('localSearch').value=''; render(); };
+    $('requestBtn').onclick = () => toast('Solicitud de repuesto · acción simulada');
+    $('allAreasBtn').onclick = () => toast('Vista de todas las áreas · acción simulada');
+    document.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); $('globalSearch').focus(); } });
+    render();
+  </script>
+</body>
+</html>

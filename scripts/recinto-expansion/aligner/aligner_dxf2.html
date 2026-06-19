@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Aligner DXF v2 · 3+ puntos correspondientes</title>
+<style>
+  :root{--bg:#0c1620;--fg:#e6edf3;--muted:#94a3b8;--aqua:#2E75B6;--aquaBright:#5aa6e8;--accent:#ff6b6b;--border:#1f2933;--good:#22c55e}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif;height:100%;overflow:hidden}
+  header{position:fixed;top:0;left:0;right:0;height:56px;background:#0a1320;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 14px;z-index:20}
+  header .badge{background:var(--aqua);color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  header h1{font-size:13px;margin:0;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  header .hint{color:var(--muted);font-size:11px;max-width:520px;line-height:1.4}
+  header .actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+  header button{background:#1a2532;color:var(--fg);border:1px solid var(--border);padding:7px 11px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+  header button.primary{background:var(--aqua);border-color:var(--aqua)}
+  header button.danger{background:#b91c1c;border-color:#b91c1c}
+  header button:hover{background:#243245}
+
+  main{position:fixed;top:56px;left:0;right:280px;bottom:240px;display:flex;gap:4px}
+  .pane{flex:1;min-width:0;background:#050a10;border:1px solid var(--border);position:relative;overflow:hidden}
+  .pane-title{position:absolute;top:8px;left:8px;z-index:5;background:rgba(0,0,0,.7);color:var(--fg);padding:4px 10px;border-radius:4px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+  .pane-coords{position:absolute;bottom:8px;left:8px;z-index:5;background:rgba(0,0,0,.7);color:var(--muted);padding:4px 10px;border-radius:4px;font-family:ui-monospace,Menlo,monospace;font-size:11px}
+  .viewport{position:absolute;inset:0;overflow:hidden;cursor:crosshair;user-select:none}
+  .viewport.panning{cursor:grabbing}
+  .stage{position:absolute;top:0;left:0;transform-origin:0 0}
+  .stage img{display:block;pointer-events:none;-webkit-user-drag:none}
+  .stage svg.dxf{display:block;pointer-events:none;overflow:visible}
+  .stage svg.dxf .layer path,.stage svg.dxf .layer polyline,.stage svg.dxf .layer line{fill:none}
+  .overlay{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .overlay .marker{position:absolute;transform:translate(-50%,-50%);pointer-events:none;width:24px;height:24px}
+  .overlay .marker .ring{position:absolute;inset:0;border:2px solid var(--accent);border-radius:50%;box-sizing:border-box;box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+  .overlay .marker .dot{position:absolute;left:50%;top:50%;width:4px;height:4px;background:var(--accent);border-radius:50%;transform:translate(-50%,-50%)}
+  .overlay .marker .lbl{position:absolute;left:26px;top:-4px;background:var(--accent);color:#fff;font-size:12px;font-weight:700;padding:1px 6px;border-radius:3px;font-family:ui-monospace,monospace;white-space:nowrap}
+
+  aside{position:fixed;top:56px;right:0;width:280px;bottom:240px;background:#0a1320;border-left:1px solid var(--border);overflow:auto}
+  aside h3{margin:12px 14px 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .layers{padding:0 14px 8px}
+  .layer-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-family:ui-monospace,monospace;font-size:11px}
+  .layer-row input[type=checkbox]{accent-color:var(--aquaBright);cursor:pointer}
+  .layer-row .sw{width:14px;height:14px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.1)}
+  .layer-row .nm{color:var(--fg);cursor:pointer;flex:1}
+  .layer-row .cnt{color:var(--muted);font-size:9.5px}
+  .actions-layers{padding:0 14px 8px;display:flex;gap:6px}
+  .actions-layers button{flex:1;background:#1a2532;color:var(--muted);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+
+  footer{position:fixed;bottom:0;left:0;right:0;height:240px;background:#0a1320;border-top:1px solid var(--border);display:flex;gap:8px;padding:12px}
+  .points{flex:1.1;background:#050a10;border:1px solid var(--border);border-radius:4px;padding:8px;overflow:auto}
+  .points h3{margin:0 0 6px 0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .points table{width:100%;border-collapse:collapse;font-family:ui-monospace,monospace;font-size:11px}
+  .points th{text-align:left;color:var(--muted);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--border)}
+  .points td{padding:3px 6px;border-bottom:1px solid #0e1822}
+  .points td.idx{color:var(--accent);font-weight:700;cursor:pointer}
+  .points td.missing{color:#475569;font-style:italic}
+  .points td .del{cursor:pointer;color:#475569;font-size:11px}
+  .points td .del:hover{color:var(--accent)}
+  .points .hint{margin-top:8px;font-size:11px;color:var(--muted)}
+  .json-out{flex:1;background:#050a10;border:1px solid var(--border);border-radius:4px;padding:8px;display:flex;flex-direction:column}
+  .json-out h3{margin:0 0 6px 0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .json-out h3 .lsq{font-weight:400;color:var(--good);text-transform:none;letter-spacing:0;font-size:10px;font-family:ui-monospace,monospace}
+  .json-out h3 .lsq.bad{color:var(--accent)}
+  .json-out textarea{flex:1;background:#020608;color:var(--good);border:1px solid var(--border);border-radius:3px;padding:6px;font-family:ui-monospace,monospace;font-size:10px;resize:none}
+  .ok-strip{padding:4px 8px;background:#133a1f;color:var(--good);border:1px solid #166534;border-radius:3px;font-size:11px;margin-top:6px;display:none}
+  .ok-strip.show{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">DXF v2</span>
+  <h1>Aligner DXF · marcar 3-6 puntos correspondientes</h1>
+  <span class="hint">Rueda=zoom · Click der=pan · Click izq=marca punto activo · Teclas 1-6=cambia activo. Marcá las MISMAS esquinas en los 2 paneles (mín 3 pares).</span>
+  <div class="actions">
+    <button id="btnFit">Fit ambos</button>
+    <button id="btnSync" class="primary">Sync zoom: ON</button>
+    <button id="btnClear" class="danger">Limpiar</button>
+    <button id="btnCopy" class="primary">Copiar matriz</button>
+  </div>
+</header>
+
+<main>
+  <div class="pane" id="paneD">
+    <div class="pane-title">DXF (vectorial) &middot; <span id="bbD">—</span></div>
+    <div class="pane-coords" id="coordsD">dxf: (—, —)</div>
+    <div class="viewport" data-pane="dxf">
+      <div class="stage" id="stageD"><svg class="dxf" id="dxfSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="overlay" id="overlayD"></div>
+    </div>
+  </div>
+  <div class="pane" id="paneR">
+    <div class="pane-title">RECINTO RASTER &middot; <span id="bbR">—</span> px (display)</div>
+    <div class="pane-coords" id="coordsR">red: (—, —)</div>
+    <div class="viewport" data-pane="recinto">
+      <div class="stage" id="stageR"><img id="imgR" alt="recinto"></div>
+      <div class="overlay" id="overlayR"></div>
+    </div>
+  </div>
+</main>
+
+<aside>
+  <h3>Capas DXF visibles</h3>
+  <div class="actions-layers">
+    <button id="layAll">Todas</button>
+    <button id="layNone">Ninguna</button>
+    <button id="layMurosOnly">Solo muros</button>
+  </div>
+  <div class="layers" id="layers"></div>
+</aside>
+
+<footer>
+  <div class="points">
+    <h3>Pares de puntos (clic <span style="color:var(--accent)">#</span> para activar · Activo: <span id="activeIdx" style="color:var(--accent);font-weight:700">1</span>)</h3>
+    <table id="ptsTable">
+      <thead><tr><th>#</th><th>DXF (x, y)</th><th>Recinto reducido px (x, y)</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="hint">Sugerencia: 3-4 esquinas de muros exteriores reconocibles. LSQ se calcula automáticamente con &ge;3 pares completos.</div>
+  </div>
+  <div class="json-out">
+    <h3><span>Matriz JSON (DXF &rarr; recinto reducido + compuesta &rarr; plano-base)</span> <span id="lsqStat" class="lsq">esperando pares</span></h3>
+    <textarea id="jsonOut" readonly></textarea>
+    <div class="ok-strip" id="okStrip">Copiado al clipboard.</div>
+  </div>
+</footer>
+
+<script>
+// ============================================================================
+// Constantes
+// ============================================================================
+const LAYERS=['023_MUROS_2','AGUA','A_PV','BARRERA','BENCINA','CAMARA','CAMINO','CERCO','CIMENTACION','DIBUJO','ESCALERA','ESTANQUE-AGUA','GENERADOR','LOTEA','MURO','PLANTA','VENTANAS'];
+const LAYER_COLORS={'023_MUROS_2':'#94a3b8','MURO':'#cbd5e1','AGUA':'#0cffff','A_PV':'#5aa6e8','BARRERA':'#f59e0b','BENCINA':'#fb923c','CAMARA':'#a78bfa','CAMINO':'#fbbf24','CERCO':'#84cc16','CIMENTACION':'#fb7185','DIBUJO':'#94a3b8','ESCALERA':'#22d3ee','ESTANQUE-AGUA':'#06b6d4','GENERADOR':'#ef4444','LOTEA':'#a8a29e','PLANTA':'#10b981','VENTANAS':'#e879f9'};
+
+// Matriz recinto REDUCIDO (8000x5659) -> plano-base (6272x3600), precalculada.
+// = M_recinto_original_a_plano (transform.json) × S(18725/8000 = 2.340625)
+// Resultado coincide con la matriz que el embed ya usa para el #recinto.
+const M_RED_TO_PLANO={a:1.359377,b:1.169251*2.340625,c:-1.167934*2.340625,d:1.363547,e:-12569.7458,f:6323.2850};
+// Nota: en transform.json los coefs estan como (a=0.58, b=1.169, c=-1.168, d=0.58, e=-12569.75, f=6323.29) para coords ORIGINALES (18725x13245)
+// Multiplicar a,b,c,d por k=2.340625 para que tomen coords REDUCIDAS (8000x5659).
+M_RED_TO_PLANO.a=0.5807752*2.340625;
+M_RED_TO_PLANO.b=1.1692508*2.340625;
+M_RED_TO_PLANO.c=-1.1679342*2.340625;
+M_RED_TO_PLANO.d=0.5825567*2.340625;
+// (Da aprox {1.3594, 2.7368, -2.7337, 1.3635, -12569.75, 6323.29} — coincide con embed line 89)
+
+// ============================================================================
+// Estado
+// ============================================================================
+let meta=null;
+const MAX_PTS=6;
+const state={
+  active:1,
+  points:Array.from({length:MAX_PTS},()=>({dxf:null,recinto:null})),
+  panes:{},
+  layers:{}, // {name: {features, bbox, count, color, visible}}
+  dxfBBox:null, // [xmin,ymin,xmax,ymax] global
+  syncZoom:true, // espejar zoom entre paneles
+};
+
+// ============================================================================
+// Utilidades
+// ============================================================================
+function coordsBboxRec(c,bb){
+  if(!c)return;
+  if(typeof c[0]==='number'){bb[0]=Math.min(bb[0],c[0]);bb[1]=Math.min(bb[1],c[1]);bb[2]=Math.max(bb[2],c[0]);bb[3]=Math.max(bb[3],c[1]);return;}
+  for(const x of c)coordsBboxRec(x,bb);
+}
+function pathDFromGeom(g){
+  let d='';const ln=(L)=>{L.forEach((p,i)=>{d+=(i===0?'M':'L')+p[0].toFixed(3)+' '+p[1].toFixed(3)+' ';});};
+  if(g.type==='LineString')ln(g.coordinates);
+  else if(g.type==='MultiLineString')g.coordinates.forEach(ln);
+  else if(g.type==='Polygon')g.coordinates.forEach(r=>{ln(r);d+='Z ';});
+  else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>p.forEach(r=>{ln(r);d+='Z ';}));
+  else if(g.type==='Point'){const r=0.2;d+=`M${g.coordinates[0]-r} ${g.coordinates[1]} a ${r} ${r} 0 1 0 ${2*r} 0 a ${r} ${r} 0 1 0 -${2*r} 0 `;}
+  return d;
+}
+
+// ============================================================================
+// Carga GeoJSONs y build SVG
+// ============================================================================
+async function loadAllLayers(){
+  const overall=[Infinity,Infinity,-Infinity,-Infinity];
+  for(const lyr of LAYERS){
+    try{
+      const r=await fetch(`geojsons/${lyr}.geojson`);
+      if(!r.ok)continue;
+      const gj=await r.json();
+      const bb=[Infinity,Infinity,-Infinity,-Infinity];
+      const paths=[];
+      for(const ft of gj.features){
+        coordsBboxRec(ft.geometry?.coordinates,bb);
+        paths.push(pathDFromGeom(ft.geometry));
+      }
+      state.layers[lyr]={paths,bbox:bb,count:gj.features.length,color:LAYER_COLORS[lyr]||'#999',visible:true};
+      for(let i=0;i<4;i++)overall[i]=i<2?Math.min(overall[i],bb[i]):Math.max(overall[i],bb[i]);
+    }catch(e){console.warn('skip',lyr,e);}
+  }
+  state.dxfBBox=overall;
+  const [xmin,ymin,xmax,ymax]=overall;
+  const w=xmax-xmin,h=ymax-ymin;
+  document.getElementById('bbD').textContent=`(${xmin.toFixed(1)},${ymin.toFixed(1)}) → (${xmax.toFixed(1)},${ymax.toFixed(1)}) · ${w.toFixed(1)}×${h.toFixed(1)} unid`;
+  // Importante: el viewBox usa Y "hacia abajo" en SVG, pero DXF tiene Y "hacia arriba".
+  // Para mostrar el DXF en orientacion natural, hacemos flip vertical via viewBox negativo:
+  // usamos un viewBox espejado en Y para que aumentar y_dxf vaya HACIA ARRIBA en pantalla.
+  const dxf=document.getElementById('dxfSvg');
+  dxf.setAttribute('viewBox',`${xmin} ${-ymax} ${w} ${h}`);
+  dxf.style.width=w+'px';dxf.style.height=h+'px';
+  // Flip Y: el DXF tiene Y hacia arriba (valores negativos), SVG tiene Y hacia abajo.
+  // Con viewBox.y = -ymax y altura = ymax-ymin, basta scale(1,-1) para que un punto
+  // (x, y_dxf) caiga en y_svg = -y_dxf ∈ [-ymax, -ymin] (positivos, dentro del viewBox).
+  let html=`<g transform="scale(1 -1)">`;
+  for(const [lyr,d] of Object.entries(state.layers)){
+    html+=`<g class="layer layer-${lyr}" data-layer="${lyr}" stroke="${d.color}" stroke-width="0.7">`;
+    d.paths.forEach(pd=>{if(pd)html+=`<path d="${pd}"/>`;});
+    html+=`</g>`;
+  }
+  html+=`</g>`;
+  dxf.innerHTML=html;
+  renderLayersList();
+}
+
+function renderLayersList(){
+  const c=document.getElementById('layers');c.innerHTML='';
+  for(const [lyr,d] of Object.entries(state.layers)){
+    const row=document.createElement('div');row.className='layer-row';
+    row.innerHTML=`<input type="checkbox" ${d.visible?'checked':''}><div class="sw" style="background:${d.color}"></div><span class="nm">${lyr}</span><span class="cnt">${d.count}</span>`;
+    row.querySelector('input').onchange=(e)=>{d.visible=e.target.checked;const g=document.querySelector(`.layer-${lyr}`);if(g)g.style.display=d.visible?'':'none';};
+    row.querySelector('.nm').onclick=()=>row.querySelector('input').click();
+    c.appendChild(row);
+  }
+}
+function setLayersVisible(filter){
+  for(const [lyr,d] of Object.entries(state.layers)){
+    d.visible=filter(lyr);
+    const g=document.querySelector(`.layer-${lyr}`);if(g)g.style.display=d.visible?'':'none';
+  }
+  renderLayersList();
+}
+
+// ============================================================================
+// Paneles (zoom + pan + click)
+// ============================================================================
+function makePane(key,contentEl,stageEl,viewportEl,coordsEl,natW,natH,toDataCoords,overlayEl){
+  const ps={key,contentEl,stageEl,viewportEl,coordsEl,natW,natH,toDataCoords,overlayEl,scale:1,tx:0,ty:0};
+  const STROKE_PX=0.8;
+  const apply=()=>{
+    stageEl.style.transform=`translate(${ps.tx}px,${ps.ty}px) scale(${ps.scale})`;
+    if(key==='dxf'){
+      const sw=(STROKE_PX/ps.scale).toFixed(4);
+      stageEl.querySelectorAll('.layer').forEach(g=>g.setAttribute('stroke-width',sw));
+    }
+    // Reposicionar markers en el overlay (coords pantalla = dx*scale + tx)
+    renderMarkers(key);
+  };
+  ps.apply=apply;
+  ps.fit=()=>{const r=viewportEl.getBoundingClientRect();const sx=r.width/natW,sy=r.height/natH;ps.scale=Math.min(sx,sy)*0.95;ps.tx=(r.width-natW*ps.scale)/2;ps.ty=(r.height-natH*ps.scale)/2;apply();};
+
+  viewportEl.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const r=viewportEl.getBoundingClientRect();
+    const mx=e.clientX-r.left,my=e.clientY-r.top;
+    const f=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.02,Math.min(key==='dxf'?500:50,ps.scale*f));
+    ps.tx=mx-(mx-ps.tx)*(ns/ps.scale);ps.ty=my-(my-ps.ty)*(ns/ps.scale);ps.scale=ns;apply();
+    // Espejo: aplicar el MISMO factor f al otro pane, anclado al centro del otro viewport (pan se mantiene relativo).
+    const otherKey=key==='dxf'?'recinto':'dxf';
+    const other=state.panes[otherKey];
+    if(other&&state.syncZoom){
+      const r2=other.viewportEl.getBoundingClientRect();
+      const cx=r2.width/2,cy=r2.height/2;
+      const ns2=Math.max(0.02,Math.min(50,other.scale*f));
+      other.tx=cx-(cx-other.tx)*(ns2/other.scale);
+      other.ty=cy-(cy-other.ty)*(ns2/other.scale);
+      other.scale=ns2;other.apply();
+    }
+  },{passive:false});
+
+  let dragging=false,lx=0,ly=0;
+  viewportEl.addEventListener('mousedown',e=>{
+    if(e.button===2||e.button===1){e.preventDefault();dragging=true;lx=e.clientX;ly=e.clientY;viewportEl.classList.add('panning');}
+    else if(e.button===0){
+      const r=viewportEl.getBoundingClientRect();
+      const mx=e.clientX-r.left,my=e.clientY-r.top;
+      const dx=(mx-ps.tx)/ps.scale,dy=(my-ps.ty)/ps.scale;
+      if(dx<0||dy<0||dx>natW||dy>natH)return;
+      const data=toDataCoords(dx,dy);
+      setPoint(ps.key,state.active,data,{dx,dy});
+    }
+  });
+  window.addEventListener('mousemove',e=>{if(dragging){ps.tx+=e.clientX-lx;ps.ty+=e.clientY-ly;lx=e.clientX;ly=e.clientY;apply();}});
+  window.addEventListener('mouseup',()=>{if(dragging){dragging=false;viewportEl.classList.remove('panning');}});
+  viewportEl.addEventListener('contextmenu',e=>e.preventDefault());
+  viewportEl.addEventListener('mousemove',e=>{
+    const r=viewportEl.getBoundingClientRect();
+    const mx=e.clientX-r.left,my=e.clientY-r.top;
+    const dx=(mx-ps.tx)/ps.scale,dy=(my-ps.ty)/ps.scale;
+    const data=toDataCoords(dx,dy);
+    coordsEl.textContent=`${key==='dxf'?'dxf':'red'}: (${data.x.toFixed(key==='dxf'?2:0)}, ${data.y.toFixed(key==='dxf'?2:0)})`;
+  });
+  return ps;
+}
+
+function setPoint(paneKey,idx,data,disp){
+  state.points[idx-1][paneKey]={x:data.x,y:data.y,dx:disp.dx,dy:disp.dy};
+  renderMarkers(paneKey);renderTable();solveAndRender();
+  const cur=state.points[idx-1];
+  if(cur.dxf&&cur.recinto&&idx<MAX_PTS){state.active=idx+1;document.getElementById('activeIdx').textContent=state.active;}
+}
+
+function renderMarkers(paneKey){
+  const ps=state.panes[paneKey];if(!ps||!ps.overlayEl)return;
+  ps.overlayEl.innerHTML='';
+  state.points.forEach((p,i)=>{
+    const pt=p[paneKey];if(!pt)return;
+    const screenX=pt.dx*ps.scale+ps.tx;
+    const screenY=pt.dy*ps.scale+ps.ty;
+    const el=document.createElement('div');el.className='marker';
+    el.style.left=screenX+'px';el.style.top=screenY+'px';
+    el.innerHTML=`<div class="ring"></div><div class="dot"></div><div class="lbl">${i+1}</div>`;
+    ps.overlayEl.appendChild(el);
+  });
+}
+
+function renderTable(){
+  const tb=document.querySelector('#ptsTable tbody');tb.innerHTML='';
+  state.points.forEach((p,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="idx" data-i="${i+1}">${i+1}</td>${
+      p.dxf?`<td>(${p.dxf.x.toFixed(2)}, ${p.dxf.y.toFixed(2)})</td>`:`<td class="missing">—</td>`
+    }${
+      p.recinto?`<td>(${p.recinto.x.toFixed(0)}, ${p.recinto.y.toFixed(0)})</td>`:`<td class="missing">—</td>`
+    }<td><span class="del" data-i="${i+1}">[X]</span></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('.idx').forEach(t=>t.onclick=()=>{state.active=+t.dataset.i;document.getElementById('activeIdx').textContent=state.active;});
+  tb.querySelectorAll('.del').forEach(t=>t.onclick=()=>{const i=+t.dataset.i-1;state.points[i]={dxf:null,recinto:null};renderMarkers('dxf');renderMarkers('recinto');renderTable();solveAndRender();});
+}
+
+// ============================================================================
+// LSQ solver (afín 2D, N>=3 correspondencias)
+// ============================================================================
+// Resuelve: X = a*x + b*y + e, Y = c*x + d*y + f
+// Sistema desacoplado: A·[a,b,e]^T = X, A·[c,d,f]^T = Y, donde A=[xi,yi,1]
+// Para N>3: pseudo-inversa (A^T A)^-1 A^T (3x3 Gauss-Jordan).
+function solve3x3(M,b){
+  // Resuelve M·x = b para M 3x3, b 3-vector. Devuelve x o null si singular.
+  const A=M.map((r,i)=>[...r,b[i]]);
+  for(let col=0;col<3;col++){
+    let mx=col;for(let r=col+1;r<3;r++)if(Math.abs(A[r][col])>Math.abs(A[mx][col]))mx=r;
+    if(Math.abs(A[mx][col])<1e-10)return null;
+    [A[col],A[mx]]=[A[mx],A[col]];
+    for(let r=0;r<3;r++){if(r===col)continue;const f=A[r][col]/A[col][col];for(let c=col;c<4;c++)A[r][c]-=f*A[col][c];}
+  }
+  return [A[0][3]/A[0][0],A[1][3]/A[1][1],A[2][3]/A[2][2]];
+}
+function lsqAffine(pairs){
+  // pairs: [{dxf:{x,y}, recinto:{x,y}}, ...] N>=3
+  const N=pairs.length;
+  // Normal equations: AtA · θ = At · b
+  const AtA=[[0,0,0],[0,0,0],[0,0,0]];
+  const AtbX=[0,0,0],AtbY=[0,0,0];
+  for(const p of pairs){
+    const x=p.dxf.x,y=p.dxf.y,X=p.recinto.x,Y=p.recinto.y;
+    AtA[0][0]+=x*x;AtA[0][1]+=x*y;AtA[0][2]+=x;
+    AtA[1][0]+=y*x;AtA[1][1]+=y*y;AtA[1][2]+=y;
+    AtA[2][0]+=x;  AtA[2][1]+=y;  AtA[2][2]+=1;
+    AtbX[0]+=x*X;AtbX[1]+=y*X;AtbX[2]+=X;
+    AtbY[0]+=x*Y;AtbY[1]+=y*Y;AtbY[2]+=Y;
+  }
+  const [a,b,e]=solve3x3(AtA.map(r=>[...r]),AtbX)||[NaN,NaN,NaN];
+  const [c,d,f]=solve3x3(AtA.map(r=>[...r]),AtbY)||[NaN,NaN,NaN];
+  // Residuos
+  const res=pairs.map(p=>{
+    const xp=a*p.dxf.x+b*p.dxf.y+e,yp=c*p.dxf.x+d*p.dxf.y+f;
+    const ex=xp-p.recinto.x,ey=yp-p.recinto.y;
+    return Math.sqrt(ex*ex+ey*ey);
+  });
+  const rms=Math.sqrt(res.reduce((s,v)=>s+v*v,0)/res.length);
+  return {a,b,c,d,e,f,residuals:res,rms,max:Math.max(...res)};
+}
+
+function composeMatrix(A,B){
+  // M_final = A · B (matrices afines 3x3 representadas como {a,b,c,d,e,f})
+  // [A.a A.b A.e]   [B.a B.b B.e]
+  // [A.c A.d A.f] × [B.c B.d B.f]
+  // [0   0   1  ]   [0   0   1  ]
+  return {
+    a:A.a*B.a+A.b*B.c,
+    b:A.a*B.b+A.b*B.d,
+    c:A.c*B.a+A.d*B.c,
+    d:A.c*B.b+A.d*B.d,
+    e:A.a*B.e+A.b*B.f+A.e,
+    f:A.c*B.e+A.d*B.f+A.f,
+  };
+}
+
+function solveAndRender(){
+  const pairs=state.points.filter(p=>p.dxf&&p.recinto);
+  const stat=document.getElementById('lsqStat');
+  if(pairs.length<3){
+    stat.textContent=`esperando pares (${pairs.length}/3 mín)`;stat.className='lsq bad';
+    document.getElementById('jsonOut').value=JSON.stringify({pairs:pairs.length,need:3-pairs.length},null,2);
+    return;
+  }
+  const M=lsqAffine(pairs);
+  const Mfinal=composeMatrix(M_RED_TO_PLANO,{a:M.a,b:M.b,c:M.c,d:M.d,e:M.e,f:M.f});
+  stat.textContent=`RMS ${M.rms.toFixed(2)} px (max ${M.max.toFixed(2)}) · ${pairs.length} pares`;
+  stat.className=M.rms<5?'lsq':'lsq bad';
+  const payload={
+    generated_at:new Date().toISOString(),
+    pairs:pairs.length,
+    M_dxf_to_recinto_reducido:{a:+M.a.toFixed(6),b:+M.b.toFixed(6),c:+M.c.toFixed(6),d:+M.d.toFixed(6),e:+M.e.toFixed(3),f:+M.f.toFixed(3)},
+    M_dxf_to_plano_base:{a:+Mfinal.a.toFixed(6),b:+Mfinal.b.toFixed(6),c:+Mfinal.c.toFixed(6),d:+Mfinal.d.toFixed(6),e:+Mfinal.e.toFixed(3),f:+Mfinal.f.toFixed(3)},
+    css_transform_for_embed:`matrix(${Mfinal.a.toFixed(6)}, ${Mfinal.c.toFixed(6)}, ${Mfinal.b.toFixed(6)}, ${Mfinal.d.toFixed(6)}, ${Mfinal.e.toFixed(3)}, ${Mfinal.f.toFixed(3)})`,
+    residuals_px:M.residuals.map(v=>+v.toFixed(2)),
+    rms:+M.rms.toFixed(3),
+    max:+M.max.toFixed(3),
+    note:'M_dxf_to_plano_base aplicable directamente como CSS transform al <svg id="vectors"> dentro del #world del embed.',
+  };
+  document.getElementById('jsonOut').value=JSON.stringify(payload,null,2);
+}
+
+// ============================================================================
+// Click-to-data en cada panel
+// ============================================================================
+function dxfToData(dx,dy){
+  // dx,dy son px del SVG (con viewBox = bbox y width/height = bbox dims).
+  // El SVG tiene transform interno scale(1,-1) translate(0, -(ymin+ymax)) para flip Y.
+  // pero dx,dy aqui son coords del SVG ANTES de ese transform (es decir, en el sistema mostrado).
+  // Para convertir a coords DXF reales: x_dxf = xmin + dx; y_dxf = ymax - dy (porque flipeamos Y al mostrar)
+  const [xmin,ymin,xmax,ymax]=state.dxfBBox;
+  return {x:xmin+dx,y:ymax-dy};
+}
+function recintoToData(dx,dy){
+  // dx,dy son px del display 4000x2829. recinto reducido = display * 2 (8000x5659).
+  return {x:dx*2,y:dy*2};
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+async function main(){
+  meta=await fetch('meta.json').then(r=>r.json());
+  const imgR=document.getElementById('imgR');imgR.src='imgs/'+meta.recinto.filename;
+  document.getElementById('bbR').textContent=`${meta.recinto.display_w}×${meta.recinto.display_h}`;
+  await new Promise(r=>imgR.onload=r);
+  await loadAllLayers();
+  const [xmin,ymin,xmax,ymax]=state.dxfBBox;
+  const wD=xmax-xmin,hD=ymax-ymin;
+  state.panes.dxf=makePane('dxf',document.getElementById('dxfSvg'),document.getElementById('stageD'),document.querySelector('[data-pane="dxf"]'),document.getElementById('coordsD'),wD,hD,dxfToData,document.getElementById('overlayD'));
+  state.panes.recinto=makePane('recinto',imgR,document.getElementById('stageR'),document.querySelector('[data-pane="recinto"]'),document.getElementById('coordsR'),imgR.naturalWidth,imgR.naturalHeight,recintoToData,document.getElementById('overlayR'));
+  state.panes.dxf.fit();
+  state.panes.recinto.fit();
+  renderTable();solveAndRender();
+}
+
+document.getElementById('btnFit').onclick=()=>{state.panes.dxf.fit();state.panes.recinto.fit();};
+document.getElementById('btnSync').onclick=()=>{state.syncZoom=!state.syncZoom;document.getElementById('btnSync').textContent='Sync zoom: '+(state.syncZoom?'ON':'OFF');document.getElementById('btnSync').className=state.syncZoom?'primary':'';};
+document.getElementById('btnClear').onclick=()=>{state.points=Array.from({length:MAX_PTS},()=>({dxf:null,recinto:null}));state.active=1;document.getElementById('activeIdx').textContent='1';renderMarkers('dxf');renderMarkers('recinto');renderTable();solveAndRender();};
+document.getElementById('btnCopy').onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('jsonOut').value);const s=document.getElementById('okStrip');s.classList.add('show');setTimeout(()=>s.classList.remove('show'),1500);}catch(e){alert('No se pudo copiar. Seleccioná el JSON manualmente.');}};
+document.getElementById('layAll').onclick=()=>setLayersVisible(()=>true);
+document.getElementById('layNone').onclick=()=>setLayersVisible(()=>false);
+document.getElementById('layMurosOnly').onclick=()=>setLayersVisible(l=>['MURO','023_MUROS_2','CIMENTACION','PLANTA'].includes(l));
+window.addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='6'){state.active=+e.key;document.getElementById('activeIdx').textContent=state.active;}});
+
+main();
+</script>
+</body>
+</html>

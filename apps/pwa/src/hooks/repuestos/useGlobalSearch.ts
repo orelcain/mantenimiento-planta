@@ -1,11 +1,14 @@
 /**
- * useGlobalSearch v3.0 — Optimizado para mobile
+ * useGlobalSearch v4.0 — Colección plana `repuestos` (normalización 2026-06)
  *
- * Cambios respecto a v2:
- *  - Promise.all: carga TODAS las máquinas en paralelo (~6s vs 60s+)
- *  - Caché a nivel módulo: sobrevive mount/unmount de tabs (5 min TTL)
- *  - Progreso: reporta máquinas cargadas / total
- *  - Hierarchy nodes en paralelo también
+ * El catálogo vive en la colección top-level `repuestos`: un doc por repuesto
+ * (docId = código SAP si existe), con `equipos: [nodeIds de hierarchy]` (N:M).
+ * La carga pasa de iterar machines/*&#47;repuestos + 702 subcolecciones a DOS
+ * queries: hierarchy (nombres) + repuestos (docs).
+ *
+ * Compatibilidad: se emite un GlobalSearchResult por (doc × equipo), donde
+ * `machineId` = nodeId de hierarchy y `machineName` = alias || nombre del nodo.
+ * El mismo doc Repuesto (misma id) se comparte entre sus equipos.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
@@ -16,7 +19,9 @@ import type { Repuesto, Machine } from '@/types/repuestos'
 
 export interface GlobalSearchResult {
   repuesto: Repuesto
+  /** nodeId del equipo en `hierarchy` (antes: id de machines). */
   machineId: string
+  /** alias || nombre del nodo-equipo. */
   machineName: string
 }
 
@@ -126,8 +131,9 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   const descripcion = normalizeText(rep.descripcion || '')
   const ubicacion = normalizeText(rep.ubicacionEnPlanta || '')
   const machineName = normalizeText(result.machineName || '')
+  const marca = normalizeText(`${rep.marca || ''} ${rep.modeloTipo || ''}`)
 
-  const searchable = `${name} ${alias} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName}`.trim()
+  const searchable = `${name} ${alias} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName} ${marca}`.trim()
   const words = searchable.split(' ').filter(Boolean)
 
   const uniqueTokens = [...new Set(tokens.filter(Boolean))]
@@ -172,24 +178,19 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   return score
 }
 
-// ── Helper: parsear docs de Firestore a Repuesto ──────────────────
+// ── Helper: parsear un doc de la colección plana a Repuesto ───────
 
-function parseRepuestoDocs(
-  docs: { id: string; data: () => any }[],
-  machineId: string,
-  machineName: string,
-): GlobalSearchResult[] {
-  return docs.map(docSnap => {
-    const data = docSnap.data()
-    const rep: Repuesto = {
-      id: docSnap.id,
-      ...data,
-      codigoFabricante: data.codigoFabricante || data.codigoBaader || '',
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-    } as Repuesto
-    return { repuesto: rep, machineId, machineName }
-  })
+function parseRepuestoDoc(docSnap: { id: string; data: () => any }): Repuesto {
+  const data = docSnap.data()
+  return {
+    id: docSnap.id,
+    ...data,
+    // En la colección plana codigoSAP es null para repuestos sin SAP → '' para la UI
+    codigoSAP: data.codigoSAP || '',
+    codigoFabricante: data.codigoFabricante || data.codigoBaader || '',
+    createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+  } as Repuesto
 }
 
 // ── Hook principal ────────────────────────────────────────────────
@@ -214,11 +215,12 @@ export function useGlobalSearch(machines: Machine[]) {
   }, [machines])
 
   /**
-   * Carga todos los repuestos de todas las máquinas EN PARALELO.
-   * Usa Promise.all para lanzar todas las queries simultáneamente.
+   * Carga el catálogo completo desde la colección plana `repuestos` (2 queries:
+   * hierarchy para nombres de nodos + repuestos). Emite un resultado por
+   * (doc × equipo) para mantener el contrato de las vistas existentes.
    */
   const loadAll = useCallback(async () => {
-    if (loadingRef.current || machines.length === 0) return
+    if (loadingRef.current) return
 
     // Verificar caché primero
     const cached = getGlobalRepuestosCache()
@@ -233,56 +235,30 @@ export function useGlobalSearch(machines: Machine[]) {
     setError(null)
 
     try {
-      const activeMachines = machines.filter(m => m.activa)
-      const total = activeMachines.length
-      let loadedCount = 0
+      setProgress({ loaded: 0, total: 2, phase: 'hierarchy' })
+      const [hierSnap, repSnap] = await Promise.all([
+        getDocs(query(collection(db, 'hierarchy'), where('activo', '==', true))),
+        getDocs(collection(db, 'repuestos')),
+      ])
+      setProgress({ loaded: 1, total: 2, phase: 'machines' })
 
-      setProgress({ loaded: 0, total, phase: 'machines' })
-
-      // ── FASE 1: Cargar TODAS las máquinas en PARALELO ──
-      const machinePromises = activeMachines.map(async (machine) => {
-        const machineCol = collection(db, `machines/${machine.id}/repuestos`)
-        const snapshot = await getDocs(machineCol)
-        loadedCount++
-        setProgress({ loaded: loadedCount, total, phase: 'machines' })
-        return parseRepuestoDocs(snapshot.docs, machine.id, machine.nombre || machine.id)
+      const nodeName = new Map<string, string>()
+      hierSnap.docs.forEach((d) => {
+        const n = d.data()
+        nodeName.set(d.id, (n.alias || n.nombre || d.id) as string)
       })
 
-      const machineResults = await Promise.all(machinePromises)
-      const results: GlobalSearchResult[] = machineResults.flat()
-
-      // ── FASE 2: Cargar repuestos de jerarquía en PARALELO ──
-      try {
-        setProgress({ loaded: 0, total: 0, phase: 'hierarchy' })
-        const hierQ = query(collection(db, 'hierarchy'), where('activo', '==', true))
-        const hierSnap = await getDocs(hierQ)
-
-        const hierPromises = hierSnap.docs.map(async (nodeDoc) => {
-          const nodeData = nodeDoc.data()
-          const repCol = collection(db, `hierarchy/${nodeDoc.id}/repuestos`)
-          const repSnap = await getDocs(repCol)
-          if (repSnap.empty) return []
-          return parseRepuestoDocs(repSnap.docs, nodeDoc.id, nodeData.nombre || nodeDoc.id)
-        })
-
-        const hierResults = await Promise.all(hierPromises)
-
-        // Deduplicar contra máquinas (usar Set para O(1) lookup)
-        const existingKeys = new Set(
-          results.map(r => `${r.repuesto.codigoSAP}|${r.repuesto.codigoFabricante}|${r.repuesto.textoBreve}`)
-        )
-
-        for (const nodeResults of hierResults) {
-          for (const nr of nodeResults) {
-            const key = `${nr.repuesto.codigoSAP}|${nr.repuesto.codigoFabricante}|${nr.repuesto.textoBreve}`
-            if (!existingKeys.has(key)) {
-              results.push(nr)
-              existingKeys.add(key)
-            }
-          }
+      const results: GlobalSearchResult[] = []
+      for (const docSnap of repSnap.docs) {
+        const rep = parseRepuestoDoc(docSnap)
+        const equipos = Array.isArray(rep.equipos) ? rep.equipos : []
+        if (equipos.length === 0) {
+          results.push({ repuesto: rep, machineId: '', machineName: 'Sin equipo' })
+          continue
         }
-      } catch (err) {
-        logger.warn('Error cargando repuestos de jerarquía')
+        for (const nodeId of equipos) {
+          results.push({ repuesto: rep, machineId: nodeId, machineName: nodeName.get(nodeId) || nodeId })
+        }
       }
 
       // Guardar en caché módulo
@@ -291,15 +267,15 @@ export function useGlobalSearch(machines: Machine[]) {
 
       setAllRepuestos(results)
       setLoaded(true)
-      setProgress({ loaded: total, total, phase: 'done' })
+      setProgress({ loaded: 2, total: 2, phase: 'done' })
     } catch (err) {
       logger.error('Error en búsqueda global', err instanceof Error ? err : new Error(String(err)))
-      setError('Error al buscar en todas las máquinas')
+      setError('Error al cargar el catálogo de repuestos')
     } finally {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [machines])
+  }, [])
 
   /** Filtra los resultados cargados por query de texto */
   const search = useCallback(

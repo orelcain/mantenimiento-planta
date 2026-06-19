@@ -876,6 +876,24 @@ service cloud.firestore {
       }
     }
 
+    // ============================================
+    // REPUESTOS — Colección plana normalizada (N:M, 2026-06)
+    // Un doc por repuesto (docId = SAP si existe); `equipos:[nodeIds de hierarchy]`.
+    // Reemplaza machines/{id}/repuestos y hierarchy/{id}/repuestos (Fases 2-3).
+    // ============================================
+    match /repuestos/{repuestoId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isSupervisor();
+
+      // Historial de cambios por repuesto
+      match /historial/{historialId} {
+        allow read: if isAuthenticated();
+        allow create: if isTechnician();
+        allow update, delete: if isAdmin();
+      }
+    }
+
     // Compatibilidad legacy (Baader 200)
     match /repuestosBaader200/{repuestoId} {
       allow read: if isAuthenticated();

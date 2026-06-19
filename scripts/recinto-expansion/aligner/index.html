@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recinto Aligner · Fase 1</title>
+<style>
+  :root {
+    --bg: #0c1620;
+    --fg: #e6edf3;
+    --muted: #94a3b8;
+    --aqua: #2E75B6;
+    --accent: #ff6b6b;
+    --border: #1f2933;
+    --good: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; height: 100%; overflow: hidden; }
+  header {
+    position: fixed; top: 0; left: 0; right: 0; height: 56px;
+    background: #0a1320; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; padding: 0 16px;
+    z-index: 10;
+  }
+  header h1 { font-size: 14px; margin: 0; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  header .badge { background: var(--aqua); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  header .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  header button { background: #1a2532; color: var(--fg); border: 1px solid var(--border); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  header button:hover { background: #243245; }
+  header button.primary { background: var(--aqua); border-color: var(--aqua); }
+  header button.danger { background: #b91c1c; border-color: #b91c1c; }
+  header .hint { color: var(--muted); font-size: 12px; }
+
+  main {
+    position: fixed; top: 56px; left: 0; right: 0; bottom: 220px;
+    display: flex; gap: 4px;
+  }
+  .pane { flex: 1; min-width: 0; background: #050a10; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .pane-title { position: absolute; top: 8px; left: 8px; z-index: 5; background: rgba(0,0,0,0.6); color: var(--fg); padding: 4px 8px; border-radius: 4px; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .pane-coords { position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0,0,0,0.7); color: var(--muted); padding: 4px 10px; border-radius: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; }
+
+  .viewport { position: absolute; inset: 0; overflow: hidden; cursor: crosshair; user-select: none; }
+  .viewport.panning { cursor: grabbing; }
+  .stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .stage img { display: block; pointer-events: none; -webkit-user-drag: none; }
+  .stage .marker { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+  .stage .marker .ring { width: 24px; height: 24px; border: 2px solid var(--accent); border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
+  .stage .marker .dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; transform: translate(-50%, -50%); }
+  .stage .marker .lbl { position: absolute; left: 14px; top: -10px; background: var(--accent); color: white; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, monospace; }
+
+  footer {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 220px;
+    background: #0a1320; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; padding: 12px;
+  }
+  .points {
+    flex: 1; background: #050a10; border: 1px solid var(--border); border-radius: 4px; padding: 8px;
+    overflow: auto;
+  }
+  .points h3 { margin: 0 0 6px 0; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .points table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 12px; }
+  .points th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  .points td { padding: 4px 8px; border-bottom: 1px solid #0e1822; }
+  .points td.idx { color: var(--accent); font-weight: 700; }
+  .points td.missing { color: #475569; font-style: italic; }
+  .json-out { flex: 1; background: #050a10; border: 1px solid var(--border); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; }
+  .json-out h3 { margin: 0 0 6px 0; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .json-out textarea { flex: 1; background: #020608; color: var(--good); border: 1px solid var(--border); border-radius: 3px; padding: 6px; font-family: ui-monospace, monospace; font-size: 11px; resize: none; }
+  .ok-strip { padding: 4px 8px; background: #133a1f; color: var(--good); border: 1px solid #166534; border-radius: 3px; font-size: 11px; margin-top: 6px; display: none; }
+  .ok-strip.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">Fase 1</span>
+  <h1>Recinto Aligner · identificar 4 esquinas correspondientes</h1>
+  <div class="actions">
+    <span class="hint">Rueda = zoom · Click izq = marca · Click der = arrastra · Tecla 1-4 = activar punto</span>
+    <button id="btnReset">Reset zoom ambos</button>
+    <button id="btnClear" class="danger">Limpiar puntos</button>
+    <button id="btnExport" class="primary">Exportar JSON</button>
+  </div>
+</header>
+
+<main>
+  <div class="pane" id="paneR">
+    <div class="pane-title">RECINTO COMPLETO &middot; orig <span id="dimR"></span></div>
+    <div class="pane-coords" id="coordsR">orig: (—, —)</div>
+    <div class="viewport" data-pane="recinto">
+      <div class="stage" id="stageR"><img id="imgR" alt="recinto"></div>
+    </div>
+  </div>
+  <div class="pane" id="paneP">
+    <div class="pane-title">PLANO-BASE (HIDR&Aacute;ULICO) &middot; orig <span id="dimP"></span></div>
+    <div class="pane-coords" id="coordsP">orig: (—, —)</div>
+    <div class="viewport" data-pane="plano">
+      <div class="stage" id="stageP"><img id="imgP" alt="plano"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="points">
+    <h3>Puntos seleccionados (orig px)</h3>
+    <table id="ptsTable">
+      <thead><tr><th>#</th><th>Recinto (x, y)</th><th>Plano-base (x, y)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div style="margin-top:8px; font-size:11px; color: var(--muted);">
+      Activo: <span id="activeIdx" style="color: var(--accent); font-weight:700;">1</span>
+      &nbsp;&middot;&nbsp; Sugerencia: 4 esquinas exteriores del cuerpo principal del edificio (NW, NE, SE, SW).
+    </div>
+  </div>
+  <div class="json-out">
+    <h3>JSON export</h3>
+    <textarea id="jsonOut" readonly></textarea>
+    <div class="ok-strip" id="okStrip">Copiado al clipboard.</div>
+  </div>
+</footer>
+
+<script>
+let meta = null;
+const state = {
+  active: 1,
+  // points[i] = { recinto: {x,y}|null, plano: {x,y}|null }
+  points: [
+    { recinto: null, plano: null },
+    { recinto: null, plano: null },
+    { recinto: null, plano: null },
+    { recinto: null, plano: null },
+  ],
+  panes: {}, // { recinto: paneState, plano: paneState }
+};
+
+function makePane(key, imgEl, stageEl, viewportEl, dimEl, coordsEl) {
+  const ps = { key, imgEl, stageEl, viewportEl, dimEl, coordsEl, scale: 1, tx: 0, ty: 0 };
+
+  function apply() {
+    stageEl.style.transform = `translate(${ps.tx}px, ${ps.ty}px) scale(${ps.scale})`;
+  }
+  function fit() {
+    const rect = viewportEl.getBoundingClientRect();
+    const sx = rect.width / ps.imgEl.naturalWidth;
+    const sy = rect.height / ps.imgEl.naturalHeight;
+    ps.scale = Math.min(sx, sy);
+    ps.tx = (rect.width - ps.imgEl.naturalWidth * ps.scale) / 2;
+    ps.ty = (rect.height - ps.imgEl.naturalHeight * ps.scale) / 2;
+    apply();
+  }
+  ps.fit = fit;
+  ps.apply = apply;
+
+  // wheel zoom anchored at pointer
+  viewportEl.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = viewportEl.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const newScale = Math.max(0.05, Math.min(20, ps.scale * factor));
+    // keep point under cursor stable
+    ps.tx = mx - (mx - ps.tx) * (newScale / ps.scale);
+    ps.ty = my - (my - ps.ty) * (newScale / ps.scale);
+    ps.scale = newScale;
+    apply();
+  }, { passive: false });
+
+  // right-click drag = pan
+  let dragging = false, lastX = 0, lastY = 0;
+  viewportEl.addEventListener("mousedown", (e) => {
+    if (e.button === 2 || e.button === 1) {
+      e.preventDefault();
+      dragging = true;
+      lastX = e.clientX; lastY = e.clientY;
+      viewportEl.classList.add("panning");
+    } else if (e.button === 0) {
+      // click izquierdo = marca punto
+      const rect = viewportEl.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      // de viewport a coords del display (img naturalWidth/Height)
+      const dx = (mx - ps.tx) / ps.scale;
+      const dy = (my - ps.ty) / ps.scale;
+      if (dx < 0 || dy < 0 || dx > ps.imgEl.naturalWidth || dy > ps.imgEl.naturalHeight) return;
+      // a coords del ORIGINAL
+      const sc = meta[ps.key].scale_display_to_orig;
+      const ox = dx * sc;
+      const oy = dy * sc;
+      setPoint(ps.key, state.active, ox, oy, dx, dy);
+    }
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (dragging) {
+      ps.tx += (e.clientX - lastX);
+      ps.ty += (e.clientY - lastY);
+      lastX = e.clientX; lastY = e.clientY;
+      apply();
+    }
+  });
+  window.addEventListener("mouseup", () => {
+    if (dragging) { dragging = false; viewportEl.classList.remove("panning"); }
+  });
+  viewportEl.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // pointer move → show original coords
+  viewportEl.addEventListener("mousemove", (e) => {
+    const rect = viewportEl.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const dx = (mx - ps.tx) / ps.scale;
+    const dy = (my - ps.ty) / ps.scale;
+    const sc = meta[ps.key].scale_display_to_orig;
+    coordsEl.textContent = `orig: (${Math.round(dx*sc)}, ${Math.round(dy*sc)})`;
+  });
+
+  return ps;
+}
+
+function setPoint(paneKey, idx, ox, oy, dx, dy) {
+  state.points[idx-1][paneKey] = { x: Math.round(ox), y: Math.round(oy), dx, dy };
+  renderMarkers(paneKey);
+  renderTable();
+  renderJSON();
+  // auto-advance al siguiente punto si los 2 paneles tienen el punto actual
+  const cur = state.points[idx-1];
+  if (cur.recinto && cur.plano && idx < 4) {
+    state.active = idx + 1;
+    document.getElementById("activeIdx").textContent = state.active;
+  }
+}
+
+function renderMarkers(paneKey) {
+  const ps = state.panes[paneKey];
+  // limpiar marcadores previos en el stage
+  ps.stageEl.querySelectorAll(".marker").forEach(m => m.remove());
+  state.points.forEach((p, i) => {
+    const pt = p[paneKey];
+    if (!pt) return;
+    const el = document.createElement("div");
+    el.className = "marker";
+    el.style.left = pt.dx + "px";
+    el.style.top = pt.dy + "px";
+    el.innerHTML = `<div class="ring"></div><div class="dot"></div><div class="lbl">${i+1}</div>`;
+    ps.stageEl.appendChild(el);
+  });
+}
+
+function renderTable() {
+  const tbody = document.querySelector("#ptsTable tbody");
+  tbody.innerHTML = "";
+  state.points.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    const tdI = document.createElement("td"); tdI.className = "idx"; tdI.textContent = i+1;
+    const tdR = document.createElement("td");
+    const tdP = document.createElement("td");
+    if (p.recinto) { tdR.textContent = `(${p.recinto.x}, ${p.recinto.y})`; } else { tdR.className = "missing"; tdR.textContent = "—"; }
+    if (p.plano) { tdP.textContent = `(${p.plano.x}, ${p.plano.y})`; } else { tdP.className = "missing"; tdP.textContent = "—"; }
+    tr.appendChild(tdI); tr.appendChild(tdR); tr.appendChild(tdP);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderJSON() {
+  const payload = {
+    generated_at: new Date().toISOString(),
+    note: "Fase 1 — 4 puntos correspondientes para georreferenciar recinto -> plano-base",
+    sources: meta,
+    points: state.points.map((p, i) => ({
+      idx: i+1,
+      recinto: p.recinto ? { x: p.recinto.x, y: p.recinto.y } : null,
+      plano:   p.plano   ? { x: p.plano.x,   y: p.plano.y   } : null,
+    })),
+  };
+  document.getElementById("jsonOut").value = JSON.stringify(payload, null, 2);
+}
+
+document.getElementById("btnReset").onclick = () => {
+  state.panes.recinto.fit();
+  state.panes.plano.fit();
+};
+document.getElementById("btnClear").onclick = () => {
+  state.points = state.points.map(() => ({ recinto: null, plano: null }));
+  state.active = 1;
+  document.getElementById("activeIdx").textContent = "1";
+  renderMarkers("recinto"); renderMarkers("plano");
+  renderTable(); renderJSON();
+};
+document.getElementById("btnExport").onclick = async () => {
+  renderJSON();
+  try {
+    await navigator.clipboard.writeText(document.getElementById("jsonOut").value);
+    const s = document.getElementById("okStrip");
+    s.classList.add("show");
+    setTimeout(() => s.classList.remove("show"), 1500);
+  } catch (e) { alert("No se pudo copiar (clipboard bloqueado). Selecciona el JSON manualmente."); }
+};
+window.addEventListener("keydown", (e) => {
+  if (e.key >= "1" && e.key <= "4") {
+    state.active = parseInt(e.key);
+    document.getElementById("activeIdx").textContent = state.active;
+  }
+});
+
+async function main() {
+  meta = await fetch("meta.json").then(r => r.json());
+  const imgR = document.getElementById("imgR"); imgR.src = "imgs/" + meta.recinto.filename;
+  const imgP = document.getElementById("imgP"); imgP.src = "imgs/" + meta.plano.filename;
+  document.getElementById("dimR").textContent = `${meta.recinto.orig_w}x${meta.recinto.orig_h}`;
+  document.getElementById("dimP").textContent = `${meta.plano.orig_w}x${meta.plano.orig_h}`;
+  await Promise.all([
+    new Promise(r => imgR.onload = r),
+    new Promise(r => imgP.onload = r),
+  ]);
+  state.panes.recinto = makePane("recinto", imgR, document.getElementById("stageR"), document.querySelector('[data-pane="recinto"]'), document.getElementById("dimR"), document.getElementById("coordsR"));
+  state.panes.plano = makePane("plano", imgP, document.getElementById("stageP"), document.querySelector('[data-pane="plano"]'), document.getElementById("dimP"), document.getElementById("coordsP"));
+  state.panes.recinto.fit();
+  state.panes.plano.fit();
+  renderTable(); renderJSON();
+}
+main();
+</script>
+</body>
+</html>

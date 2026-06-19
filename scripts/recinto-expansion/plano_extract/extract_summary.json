@@ -1,0 +1,118 @@
+{
+  "pdf": "C:\\Users\\pc hp\\OneDrive\\ANTARFOOD\\Mapas\\PLANOS AGUAS\\AQUA014-HID-PL-015_C1.pdf",
+  "page_size_pt": [
+    2384.0,
+    1684.0
+  ],
+  "n_drawings": 82099,
+  "n_segments": 410134,
+  "ocg_layers": [
+    {
+      "name": "0",
+      "on": 1
+    },
+    {
+      "name": "0_Planta",
+      "on": 1
+    },
+    {
+      "name": "AR-TEXTO",
+      "on": 1
+    },
+    {
+      "name": "DEFPOINT",
+      "on": 1
+    },
+    {
+      "name": "DIBUJO",
+      "on": 1
+    },
+    {
+      "name": "EQP-Equipos - Situacion Proyectada (Trabajo3)$0$Meson Prolijado filetes$0$Visible (ANSI)",
+      "on": 1
+    },
+    {
+      "name": "EQP-Equipos - Situacion Proyectada (Trabajo3)$0$Visible (ANSI)",
+      "on": 1
+    },
+    {
+      "name": "G-FORMATO",
+      "on": 1
+    },
+    {
+      "name": "HID-ADUCCIÓN AGUA DULCE",
+      "on": 1
+    },
+    {
+      "name": "HID-DISTRIBUCIÓN AGUA DULCE",
+      "on": 1
+    },
+    {
+      "name": "M-Formato",
+      "on": 1
+    },
+    {
+      "name": "M-TEXTO",
+      "on": 1
+    },
+    {
+      "name": "PDF_0",
+      "on": 1
+    },
+    {
+      "name": "PDF_CERCO METALICO",
+      "on": 1
+    },
+    {
+      "name": "PDF_EDIFICACION",
+      "on": 1
+    },
+    {
+      "name": "PDF_LINEAS",
+      "on": 1
+    },
+    {
+      "name": "PDF_MURO",
+      "on": 1
+    },
+    {
+      "name": "PDF_SEÑALETICA",
+      "on": 1
+    },
+    {
+      "name": "PDF_SOLERA VIA",
+      "on": 1
+    },
+    {
+      "name": "PDF_TEXTO 2",
+      "on": 1
+    },
+    {
+      "name": "SLD-0",
+      "on": 1
+    }
+  ],
+  "by_layer_counts": {
+    "0": 68038,
+    "DIBUJO": 120,
+    "<none>": 1,
+    "EQP-Equipos - Situacion Proyectada (Trabajo3)$0$Meson Prolijado filetes$0$Visible (ANSI)": 4060,
+    "EQP-Equipos - Situacion Proyectada (Trabajo3)$0$Visible (ANSI)": 1740,
+    "SLD-0": 4,
+    "PDF_EDIFICACION": 8,
+    "PDF_LINEAS": 111,
+    "PDF_SOLERA VIA": 5,
+    "PDF_0": 224,
+    "PDF_MURO": 2,
+    "PDF_SEÑALETICA": 3,
+    "PDF_CERCO METALICO": 37,
+    "PDF_TEXTO 2": 48,
+    "0_Planta": 1,
+    "AR-TEXTO": 2048,
+    "M-TEXTO": 208,
+    "M-Formato": 5416,
+    "HID-DISTRIBUCIÓN AGUA DULCE": 10,
+    "HID-ADUCCIÓN AGUA DULCE": 14,
+    "DEFPOINT": 1
+  }
+}

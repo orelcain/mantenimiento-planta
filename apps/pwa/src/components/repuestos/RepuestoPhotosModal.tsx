@@ -16,8 +16,10 @@ import {
 } from '@/components/ui'
 import { Button } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
 import { uploadRepuestoFoto, deleteRepuestoFoto } from '@/services/storage'
 import { generateId } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
 
 interface RepuestoPhotosModalProps {
   open: boolean
@@ -31,6 +33,10 @@ interface RepuestoPhotosModalProps {
   machineId?: string
   /** repuestoId del doc — requerido para el path de Storage cuando isAdmin. */
   repuestoId?: string
+  /** Nombre legible de la máquina/equipo — se muestra al confirmar el destino. */
+  machineName?: string
+  /** Código SAP del repuesto — se muestra al confirmar el destino. */
+  codigoSAP?: string
   /**
    * Callback para persistir el array actualizado de fotosReales en Firestore.
    * El modal no escribe directamente: delega al hub que tiene colPathOf.
@@ -47,6 +53,8 @@ export function RepuestoPhotosModal({
   isAdmin,
   machineId,
   repuestoId,
+  machineName,
+  codigoSAP,
   onSaveFotos,
 }: RepuestoPhotosModalProps) {
   // Estado local de fotos reales (para reflejar cambios sin esperar reload global)
@@ -62,20 +70,43 @@ export function RepuestoPhotosModal({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const user = useAuthStore((s) => s.user)
+
+  // Archivos seleccionados pendientes de confirmación de destino (no subidos aún)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
 
   const allPhotos = [...fotosReales, ...imagenesManual]
   const allPhotoUrls = allPhotos.map((p) => p.url).filter((u): u is string => !!u)
 
   const canEdit = !!(isAdmin && machineId && repuestoId && onSaveFotos)
 
-  // ── Upload ──
+  // ── Selección: NO sube todavía — pide confirmar el destino primero ──
   const handleFiles = useCallback(
-    async (files: FileList | null) => {
-      if (!files || !canEdit) return
+    (files: FileList | null) => {
+      if (!files || files.length === 0 || !canEdit) return
+      const arr = Array.from(files)
+      setPendingFiles(arr)
+      setPendingPreviews(arr.map((f) => URL.createObjectURL(f)))
+      if (inputRef.current) inputRef.current.value = ''
+    },
+    [canEdit],
+  )
+
+  const clearPending = useCallback(() => {
+    setPendingPreviews((prev) => { prev.forEach((u) => URL.revokeObjectURL(u)); return [] })
+    setPendingFiles([])
+  }, [])
+
+  // ── Upload (tras confirmar destino) ──
+  const handleConfirmUpload = useCallback(
+    async () => {
+      if (pendingFiles.length === 0 || !canEdit) return
       setUploading(true)
       try {
+        const subidaPor = user ? `${user.nombre} ${user.apellido}`.trim() : ''
         const nuevas: ImagenRepuesto[] = []
-        for (const file of Array.from(files)) {
+        for (const file of pendingFiles) {
           const url = await uploadRepuestoFoto(machineId!, repuestoId!, file)
           nuevas.push({
             id: generateId(),
@@ -86,17 +117,19 @@ export function RepuestoPhotosModal({
             tipo: 'real',
             createdAt: new Date(),
             formatFinal: 'webp',
+            // Firestore no admite undefined → solo incluir si hay usuario
+            ...(subidaPor ? { subidaPor } : {}),
           })
         }
         const updated = [...fotosReales, ...nuevas]
         await onSaveFotos!(updated)
         setFotosReales(updated)
+        clearPending()
       } finally {
         setUploading(false)
-        if (inputRef.current) inputRef.current.value = ''
       }
     },
-    [canEdit, fotosReales, machineId, repuestoId, onSaveFotos],
+    [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending],
   )
 
   // ── Delete ──
@@ -303,6 +336,18 @@ export function RepuestoPhotosModal({
           onClose={() => setLightboxIndex(null)}
         />
       )}
+
+      {/* Confirmar destino antes de subir (evita fotos en el repuesto equivocado) */}
+      <ConfirmUploadDialog
+        open={pendingFiles.length > 0}
+        previews={pendingPreviews}
+        repuestoName={repuestoName}
+        machineName={machineName}
+        codigoSAP={codigoSAP}
+        uploading={uploading}
+        onConfirm={handleConfirmUpload}
+        onCancel={clearPending}
+      />
     </>
   )
 }

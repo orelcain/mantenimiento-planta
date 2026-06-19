@@ -12,19 +12,18 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Package, Map, LayoutGrid } from 'lucide-react'
+import { Package, LayoutGrid } from 'lucide-react'
 import { BodegaView } from './BodegaView'
-import { CatalogoBases } from './CatalogoBases'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 
-type Tab = 'areas' | 'bodega' | 'bases'
+type Tab = 'areas' | 'bodega'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    if (saved === 'areas' || saved === 'bodega' || saved === 'bases') return saved
+    if (saved === 'areas' || saved === 'bodega') return saved
   } catch { /* noop */ }
   return 'areas'
 }
@@ -39,7 +38,6 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'areas',  label: 'Áreas',  mobileLabel: 'Áreas',  icon: LayoutGrid },
-  { id: 'bases',  label: 'Mapas',  mobileLabel: 'Mapas',  icon: Map        },
   { id: 'bodega', label: 'Bodega', mobileLabel: 'Bodega', icon: Package    },
 ]
 
@@ -113,12 +111,6 @@ export function RepuestosPage() {
         <div className={activeTab === 'areas' ? 'h-full' : 'hidden'}>
           {mountedTabs.has('areas') && (
             <RepuestosAreaHub initialQuery={jumpQuery} onQueryConsumed={handleQueryConsumed} />
-          )}
-        </div>
-
-        <div className={activeTab === 'bases' ? '' : 'hidden'}>
-          {mountedTabs.has('bases') && (
-            <CatalogoBases />
           )}
         </div>
 
