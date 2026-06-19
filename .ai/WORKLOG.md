@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-18 · claude · Carga rápida de stock + ubicación (poblar datos)
+
+- Problema raíz detectado en tests: el flujo está completo pero los DATOS están vacíos (0/189 con stock, 0 ubicaciones). Poblar abriendo 188 fichas una por una es inviable.
+- Hecho: nuevo `components/repuestos/CargaRapidaModal.tsx` — modal de carga ítem por ítem: una fila por material con-SAP con inputs inline (stock · pasillo · estante · nivel), guardado on-blur o Enter (Enter salta a la fila siguiente). Filtro "Solo faltantes" (default) + buscador. Cap de render a 150 filas (los configurados/en-bodega primero) para performance; el resto se acota con el buscador. Reusa `saveStock` de useBodega (upsert en `bodega/{sap}`, preserva stockMinimo/unidad). Enganchado en `BodegaView` (StockTab): botón "Carga rápida" (ámbar, junto a Lote/Config) + estado `showCargaRapida`.
+- Verificado en preview (build limpio): botón abre el modal, lista 150 filas + nota "Mostrando 150 de 3777", filtro/buscador OK. Guardado probado end-to-end: escribir pasillo "ZZTEST" + Enter → "1 guardado"; confirmado en Firestore (`bodega/3300100657` pasillo=ZZTEST, mín/unidad preservados) y **revertido** con script admin. Sin errores de consola. tsc=0, eslint=0.
+- Nota: el `onBlur` real (usuario hace clic/tab fuera) guarda; en el test el evento blur sintético no gatilla el onBlur de React, por eso se verificó vía Enter (mismo saveRow).
+- Archivos: `components/repuestos/CargaRapidaModal.tsx` (nuevo), `pages/repuestos/BodegaView.tsx` (botón+estado+render+import).
+- Estado: HECHO. Ahora Orel puede poblar stock+ubicación rápido → "ubicable" pasa de promesa a realidad cuando cargue los datos.
+
 ## 2026-06-18 · claude · Foco SAP por defecto en pestaña Áreas
 
 - Pregunta de Orel: por qué Áreas muestra ~7.441 si el foco son los SAP. Correcto: el hub mostraba el maestro completo (con + sin SAP) con "Repuestos totales" de cabecera, diluyendo el foco.

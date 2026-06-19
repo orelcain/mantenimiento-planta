@@ -26,6 +26,7 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { useBodega } from '@/hooks/repuestos/useBodega'
+import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
 import type {
   BodegaMergedItem, BodegaStockData, MovimientoBodega,
   InventarioSesion, InventarioConteo,
@@ -214,6 +215,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
   const [showBulkConfig, setShowBulkConfig] = useState(false)
+  const [showCargaRapida, setShowCargaRapida] = useState(false)
   const [showBatchMov, setShowBatchMov] = useState(false)
   const [drawerItem, setDrawerItem] = useState<BodegaMergedItem | null>(null)
   const [sortField, setSortField] = useState<SortField>('nombre')
@@ -286,6 +288,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         <button onClick={() => setShowBatchMov(true)} title="Movimiento en lote" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 text-emerald-400 transition-colors shrink-0">
           <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lote</span>
         </button>
+        <button onClick={() => setShowCargaRapida(true)} title="Carga rápida de stock y ubicación, ítem por ítem" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 text-amber-400 transition-colors shrink-0">
+          <MapPin className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Carga rápida</span>
+        </button>
         {stats.sinConfig > 0 && (
           <button onClick={() => setShowBulkConfig(true)} title="Configurar múltiples" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary transition-colors shrink-0">
             <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config.</span>
@@ -331,6 +336,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
+      {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
       {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
     </>
