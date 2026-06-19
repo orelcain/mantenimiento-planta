@@ -13,6 +13,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-18 · claude · Rediseño tarjetas KPI de stock (look profesional)
+
+- Pedido de Orel: tarjetas de stock más profesionales. Rediseñado `KpiCard` en `RepuestosAreaHub`: de borde-izquierdo plano a tarjeta con **chip de ícono** (Package/PackageCheck/PackageMinus/PackageX) con tinte + ring por estado, número grande tracking-tight, label, hint, y gradiente sutil de fondo por tono (primary/emerald/amber/red). Mapa `KPI_TONE`. Las 4 tarjetas (Repuestos con SAP / Stock disponible / Stock bajo / Sin stock) pasan `icon`+`tone` en vez de `accent`+`bar`.
+- Verificado en preview (build limpio, PLANTA CHONCHI): 753 con SAP / 187 sin stock, tarjetas con íconos y tintes correctos. tsc=0, eslint=0. (Hubo un TypeError `glow` TRANSITORIO de HMR por el rename intermedio; build limpio sin error.)
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
+- Estado: HECHO. Pendiente opcional: aplicar el mismo estilo a la tarjeta de stock de la ficha (Disponible/Mín/Máx) para coherencia.
+
 ## 2026-06-18 · claude · Carga rápida de stock + ubicación (poblar datos)
 
 - Problema raíz detectado en tests: el flujo está completo pero los DATOS están vacíos (0/189 con stock, 0 ubicaciones). Poblar abriendo 188 fichas una por una es inviable.

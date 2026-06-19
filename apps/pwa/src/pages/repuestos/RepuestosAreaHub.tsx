@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -64,12 +64,33 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
 }
 
-function KpiCard({ value, label, accent, hint, bar }: { value: string | number; label: string; accent: string; hint?: string; bar?: string }) {
+type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
+
+const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
+  primary: { text: 'text-primary',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
+  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/10',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
+  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/10',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
+  red:     { text: 'text-red-500',      chip: 'bg-red-500/10',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
+}
+
+function KpiCard({ value, label, hint, icon: Icon, tone }: {
+  value: string | number; label: string; hint?: string; icon: typeof Package; tone: KpiTone
+}) {
+  const t = KPI_TONE[tone]
   return (
-    <div className={['rounded-xl border border-l-4 border-border bg-card px-3 py-2.5 sm:px-4 sm:py-3', bar].filter(Boolean).join(' ')}>
-      <div className={['text-xl font-bold tabular-nums sm:text-2xl', accent].join(' ')}>{value}</div>
-      <div className="text-[11px] text-muted-foreground sm:text-xs">{label}</div>
-      {hint && <div className="mt-0.5 text-[10px] text-muted-foreground/60">{hint}</div>}
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/15 sm:p-4">
+      {/* tinte sutil de estado */}
+      <div className={['pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent', t.glow].join(' ')} />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={['text-2xl font-bold leading-none tracking-tight tabular-nums sm:text-[27px]', t.text].join(' ')}>{value}</div>
+          <div className="mt-1.5 truncate text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</div>
+        </div>
+        <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset', t.chip, t.ring].join(' ')}>
+          <Icon className={['h-[18px] w-[18px]', t.text].join(' ')} strokeWidth={2.25} />
+        </div>
+      </div>
+      {hint && <div className="relative mt-2.5 text-[10px] font-medium text-muted-foreground/70">{hint}</div>}
     </div>
   )
 }
@@ -1350,10 +1371,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
           {/* KPIs */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard value={repuestosBusy ? '…' : catalogStats.conSAP} label="Repuestos con SAP" accent="text-primary" bar="border-l-primary" hint={repuestosBusy ? undefined : `+${catalogStats.sinSAP} despiece sin SAP`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" accent="text-emerald-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}%`} bar="border-l-emerald-500" />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} bar="border-l-amber-500" />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} bar="border-l-red-500" />
+            <KpiCard value={repuestosBusy ? '…' : catalogStats.conSAP} label="Repuestos con SAP" icon={Package} tone="primary" hint={repuestosBusy ? undefined : `+${catalogStats.sinSAP} despiece sin SAP`} />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" icon={PackageCheck} tone="emerald" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}% del stock`} />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" icon={PackageMinus} tone="amber" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}% del stock`} />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" icon={PackageX} tone="red" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}% del stock`} />
           </div>
 
           {/* KPIs de catálogo (cobertura) */}
