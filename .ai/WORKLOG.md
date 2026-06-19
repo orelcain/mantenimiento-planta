@@ -13,6 +13,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-19 · claude · DEPLOY a producción (PR #77 → main)
+
+- Mergeado `chore/ai-coordination` → `main` vía PR #77 (build CI pass; mergeable CLEAN). Sincronizada main (2 commits: daily-sync version.ts + nanobanana) antes del merge. `pnpm build` local = exit 0.
+- Deploy disparado y **COMPLETADO con éxito**: workflow "Deploy PWA" = success, "Deploy Firestore Rules" = success. Todo el trabajo de la sesión está LIVE: chatbot→maestro, foco SAP, tarjetas KPI pro, carga rápida, retiro de Mapas/insumos/import-UI, limpieza de ~26 archivos legacy. La bodega ya estaba poblada (import a Firestore, independiente del deploy de código).
+- Pendientes abiertos (no bloquean): 12 SAP del Excel fuera del maestro (5 son materiales reales: AUTOMATICO 2P 6A, FOCO LED 100W, CUCHILLO FROSTS 351P, PATA REGULADORA D65, EMPAQUETADURA SILICONA); 22 vulnerabilidades dependabot en el repo; Fase 5 deletes de colecciones legacy (insumos ya libre; machines/plantAssets aún con lectores).
+- Estado: DEPLOY HECHO. Módulo de repuestos en producción con datos reales.
+
 ## 2026-06-19 · claude · Cotejo Excel↔app + IMPORT único de stock/ubicación a bodega
 
 - Cotejo máquina-por-máquina (`scripts/cotejo-excel-maestro.js`, solo-lectura) de `INVENTARIO/Maestro_Repuestos_Completo_v3.xlsx` vs maestro: **100% de los SAP del Excel están en la app** (Baader142→EVISCERADORA BAADER 142, Baader200→B200, Grader→GRADER, Garibaldi→ENZUNCHADORA N1, Knuro→KNURO N1, M.Eviscerado→**MAREL HG**, M.Filete→MAREL FILETE, GEA→TERMOFORMADORA GEA, Fishken→CINTA FISHKEN; Det.Metales/Videojet sin SAP). Mapeo correcto. (Aclaración: MAREL HG = máquina de eviscerado Marel, distinta del GRADER; en un test previo confundí ambos.)
