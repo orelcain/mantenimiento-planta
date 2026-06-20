@@ -7,7 +7,7 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import {
-  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes,
+  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes, HeartPulse, ShieldCheck,
 } from 'lucide-react'
 
 export type LearningSection = 'manual' | 'procedures' | 'flows' | 'diagnosis'
@@ -34,6 +34,7 @@ export interface LearningMachine {
 /** Areas de la planta (para agrupacion en el hub) */
 export const LEARNING_AREAS = [
   'Planta Principal',
+  'Capacitacion / Normativa',
 ] as const
 
 /** Maquinas favoritas del modulo repuestos — prioridad alta para documentacion */
@@ -118,6 +119,24 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     icon: Boxes,
     color: '#ff66aa',
     sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+  },
+  {
+    slug: 'rescate-svb',
+    name: 'Rescate Electrico y SVB',
+    area: 'Capacitacion / Normativa',
+    description: 'Curso NFPA 70E: rescate electrico y soporte vital basico (SVB). Peligros electricos, 5 Reglas de Oro, control de hemorragias, RCP 30:2 y evaluacion ABCDE.',
+    icon: HeartPulse,
+    color: '#f43f5e',
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
+  },
+  {
+    slug: 'nfpa-70b',
+    name: 'NFPA 70B - Mantenimiento Electrico',
+    area: 'Capacitacion / Normativa',
+    description: 'Norma NFPA 70B 2023: mantenimiento del equipo electrico. MEP, 4 pilares, criticidad y riesgo, tipos de mantenimiento, pruebas (termografia, puesta a tierra) y mejora continua (PHVA).',
+    icon: ShieldCheck,
+    color: '#f59e0b',
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
 ]
 
