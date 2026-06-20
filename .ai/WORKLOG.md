@@ -13,6 +13,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Mejoras UX sidebar/buscador/favoritos + DEPLOY (PR #78)
+
+- Pedido de Orel (varias mejoras UX): (1) **buscador unificado** — había 2 inputs atados al mismo `repQuery` (header=global, fila-de-filtros=acotado al scope, confuso); se quitó el de la fila de filtros. (2) **Sidebar ancho ajustable** por drag del borde derecho (persistido en `repuestos-area-sidebar-width`). (3) **Botón "contraer todo"** en header del sidebar (icono ChevronsDownUp → `collapseAllNodes`). (4) **Recuerda expansión** del árbol entre recargas (`repuestos-open-nodes` + efecto en AreaSidebar que re-expande/carga los nodos restaurados). (5) **Favoritos drag-and-drop** (HTML5 dataTransfer + grip) reemplaza las flechas ↑↓ (`reorderEquipInList`).
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`, `apps/pwa/src/components/repuestos/AreaSidebar.tsx`.
+- Verificado en preview (en vivo): 1 buscador; resize 288→408px persiste tras reload; contraer-todo colapsa; DnD reordena (EVISCERADORA↔posición) y restaura; expansión recordada tras reload. tsc+eslint+CI build limpios.
+- **DEPLOY: PR #78 mergeado → "Deploy PWA" = success.** Live en producción.
+
 ## 2026-06-19 · claude · DEPLOY a producción (PR #77 → main)
 
 - Mergeado `chore/ai-coordination` → `main` vía PR #77 (build CI pass; mergeable CLEAN). Sincronizada main (2 commits: daily-sync version.ts + nanobanana) antes del merge. `pnpm build` local = exit 0.
