@@ -7,8 +7,8 @@
  *
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
-import { useMemo, useState } from 'react'
-import { ChevronRight, ChevronsLeft, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronRight, ChevronsLeft, ChevronsDownUp, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 
 /** Un equipo (hoja) es favorito si su clave (linkedMachineId || nodeId) está en el set. */
@@ -51,6 +51,8 @@ interface AreaSidebarProps {
   onToggleEquipFav?: (leaf: EquipmentLeaf) => void
   openNodes: Record<string, boolean>
   onToggleNode: (id: string) => void
+  /** Contraer todas las ramas del árbol de un golpe. */
+  onCollapseAll?: () => void
   onShowAll: () => void
   showingAll: boolean
   /** Móvil: el sidebar es un drawer; controlado desde el hub. */
@@ -281,10 +283,41 @@ function AreaRow({
 
 export function AreaSidebar({
   selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, equipFavKeys, onToggleEquipFav, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
-  favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
+  favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onCollapseAll, onShowAll, showingAll,
   mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
   const { areaTree, loading, expandNode } = useHierarchyAreaTree()
+
+  // ── Ancho ajustable (desktop): se arrastra el borde derecho, se recuerda. ──
+  const MIN_W = 220, MAX_W = 560
+  const [width, setWidth] = useState<number>(() => {
+    try { const s = Number(localStorage.getItem('repuestos-area-sidebar-width')); return s >= MIN_W && s <= MAX_W ? s : 288 } catch { return 288 }
+  })
+  const [resizing, setResizing] = useState(false)
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setResizing(true)
+    const startX = e.clientX, startW = width
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.min(MAX_W, Math.max(MIN_W, startW + (ev.clientX - startX)))
+      setWidth(w)
+    }
+    const onUp = () => {
+      setResizing(false)
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setWidth((w) => { try { localStorage.setItem('repuestos-area-sidebar-width', String(w)) } catch { /* noop */ } return w })
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [width])
+  // Al restaurar ramas abiertas (persistidas), cargar sus hijos en este árbol.
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current || areaTree.length === 0) return
+    restoredRef.current = true
+    Object.entries(openNodes).forEach(([id, open]) => { if (open) expandNode(id) })
+  }, [areaTree, openNodes, expandNode])
 
   // Esta instancia del hook tiene su PROPIO allNodes (separado del hub). Al abrir un nodo,
   // cargar sus hijos/sub-equipos en ESTE árbol (la caché por nodeId es compartida → barato),
@@ -317,16 +350,26 @@ export function AreaSidebar({
         <div className="fixed inset-0 z-30 bg-black/50 sm:hidden" onClick={onMobileClose} aria-hidden />
       )}
       <aside
+        style={{ ['--sidebar-w' as string]: `${width}px` } as React.CSSProperties}
         className={[
-          // Móvil: fondo OPACO (drawer sobre el contenido); desktop: sutil translúcido.
-          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card sm:bg-card/40',
+          // Móvil: ancho fijo w-72 (drawer). Desktop: ancho ajustable vía CSS var.
+          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card sm:w-[var(--sidebar-w)] sm:bg-card/40',
           // Base (móvil): drawer fijo deslizable
           'fixed inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
-          // Desktop: estático, siempre visible (oculto si está contraído)
-          collapsed ? 'sm:hidden' : 'sm:static sm:z-auto sm:translate-x-0 sm:shadow-none',
+          // Desktop: en flujo (relative para anclar el handle), siempre visible (oculto si está contraído)
+          collapsed ? 'sm:hidden' : 'sm:relative sm:z-auto sm:translate-x-0 sm:shadow-none',
         ].join(' ')}
       >
+        {/* Handle de redimensionado (solo desktop) */}
+        {!collapsed && (
+          <div
+            onMouseDown={startResize}
+            className={['absolute right-0 top-0 z-20 hidden h-full w-1.5 cursor-col-resize transition-colors sm:block', resizing ? 'bg-primary/50' : 'hover:bg-primary/30'].join(' ')}
+            title="Arrastra para ajustar el ancho"
+            aria-hidden
+          />
+        )}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Áreas</span>
         <div className="flex items-center gap-1">
@@ -338,6 +381,11 @@ export function AreaSidebar({
               aria-label="Solo favoritos"
             >
               <Star className={['h-4 w-4', favoritesOnly ? 'fill-current' : ''].join(' ')} />
+            </button>
+          )}
+          {onCollapseAll && (
+            <button onClick={onCollapseAll} className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Contraer todas las ramas" aria-label="Contraer todo">
+              <ChevronsDownUp className="h-4 w-4" />
             </button>
           )}
           {onToggleCollapse && (
