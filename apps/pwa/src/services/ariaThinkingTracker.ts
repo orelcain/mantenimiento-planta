@@ -20,6 +20,12 @@ export interface AriaConfig {
   thinkingBudget: number
   /** Overrides por usuario: userId → límite diario personalizado */
   userLimits: Record<string, number>
+  /** Voz TTS del navegador (voiceURI de SpeechSynthesisVoice) */
+  voiceURI?: string
+  /** Nombre legible de la voz seleccionada (para mostrar en el panel) */
+  voiceName?: string
+  /** Velocidad de lectura en voz alta (0.5–2.0; default 1.0) */
+  speechRate?: number
   updatedAt?: unknown
   updatedBy?: string
 }
@@ -77,11 +83,17 @@ export async function getAriaConfig(): Promise<AriaConfig> {
     
     if (snap.exists()) {
       const data = snap.data() as AriaConfig
-      configCache = {
+      const cfg: AriaConfig = {
         dailyThinkingLimit: data.dailyThinkingLimit ?? DEFAULT_DAILY_LIMIT,
         thinkingBudget: data.thinkingBudget ?? DEFAULT_THINKING_BUDGET,
         userLimits: data.userLimits ?? {},
       }
+      // Campos de voz (opcionales): solo se incluyen si existen, para no
+      // arrastrar `undefined` a Firestore al volver a guardar.
+      if (data.voiceURI !== undefined) cfg.voiceURI = data.voiceURI
+      if (data.voiceName !== undefined) cfg.voiceName = data.voiceName
+      if (data.speechRate !== undefined) cfg.speechRate = data.speechRate
+      configCache = cfg
     } else {
       configCache = {
         dailyThinkingLimit: DEFAULT_DAILY_LIMIT,
@@ -108,12 +120,14 @@ export async function saveAriaConfig(
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, CONFIG_DOC)
     const current = await getAriaConfig()
-    const merged = {
+    const merged: Record<string, unknown> = {
       ...current,
       ...config,
       updatedAt: serverTimestamp(),
       updatedBy,
     }
+    // Firestore rechaza `undefined`: lo eliminamos antes de escribir.
+    Object.keys(merged).forEach((k) => merged[k] === undefined && delete merged[k])
     await setDoc(docRef, merged)
     configCache = { ...current, ...config }
     configCacheTime = Date.now()

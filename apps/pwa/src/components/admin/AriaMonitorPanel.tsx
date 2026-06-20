@@ -18,7 +18,8 @@ import {
   Badge,
   Spinner,
 } from '@/components/ui'
-import { Brain, Save, RefreshCw, Users, BarChart3, Settings2, AlertTriangle } from 'lucide-react'
+import { Brain, Save, RefreshCw, Users, BarChart3, Settings2, AlertTriangle, Volume2, Play } from 'lucide-react'
+import { setVoicePref, getSpanishVoices, pickDefaultFemaleVoice, getPiperVoices, getGoogleVoices, speakWith, stopSpeaking } from '@/lib/ariaVoice'
 import { 
   getAriaConfig,
   saveAriaConfig,
@@ -45,6 +46,47 @@ export function AriaMonitorPanel() {
   const [history, setHistory] = useState<DailyUsageSummary[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [piperVoices, setPiperVoices] = useState<{ uri: string; label: string }[]>([])
+  const [gcloudVoices, setGcloudVoices] = useState<{ uri: string; label: string }[]>([])
+
+  // Cargar voces en español del navegador/SO (se cargan async)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    const load = () => setVoices(getSpanishVoices()) // solo femeninas (ARIA es mujer)
+    load()
+    window.speechSynthesis.onvoiceschanged = load
+    return () => { window.speechSynthesis.onvoiceschanged = null }
+  }, [])
+
+  // Cargar voces Piper del servidor local (si está corriendo)
+  useEffect(() => {
+    getPiperVoices().then(setPiperVoices)
+    return () => stopSpeaking()
+  }, [])
+
+  // Cargar voces Google Cloud TTS (si la API/clave están habilitadas)
+  useEffect(() => {
+    getGoogleVoices().then(setGcloudVoices)
+  }, [])
+
+  // Asegura una voz femenina seleccionada una vez cargadas voces + config
+  useEffect(() => {
+    if (voices.length > 0 && !config.voiceURI) {
+      const def = pickDefaultFemaleVoice()
+      if (def) {
+        setConfig(prev => prev.voiceURI ? prev : { ...prev, voiceURI: def.voiceURI, voiceName: def.name })
+      }
+    }
+  }, [voices, config.voiceURI])
+
+  const handleTestVoice = () => {
+    speakWith(
+      'Hola, soy ARIA. Así sueno con esta voz y velocidad.',
+      config.voiceURI,
+      config.speechRate ?? 1.0,
+    )
+  }
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -75,6 +117,8 @@ export function AriaMonitorPanel() {
     setIsSaving(true)
     try {
       await saveAriaConfig(config, currentUser.id)
+      // Aplica la voz al instante en esta sesión (ChatBot la usará al leer)
+      setVoicePref({ voiceURI: config.voiceURI, rate: config.speechRate ?? 1.0 })
       toast({ title: 'Guardado', description: 'Configuración de ARIA actualizada' })
     } catch {
       toast({ title: 'Error', description: 'No se pudo guardar la configuración', variant: 'destructive' })
@@ -177,6 +221,120 @@ export function AriaMonitorPanel() {
             <Button onClick={handleSaveConfig} disabled={isSaving} className="gap-2">
               <Save className="h-4 w-4" />
               {isSaving ? 'Guardando...' : 'Guardar Configuración'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Voz del asistente (TTS) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Volume2 className="h-4 w-4" />
+            Voz del Asistente
+            <span className="text-xs text-muted-foreground font-normal ml-2">
+              (lectura en voz alta del chat)
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {voices.length === 0 && piperVoices.length === 0 && gcloudVoices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Este navegador no reporta voces en español. Se usará la voz por
+              defecto del sistema (es-CL).
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">
+                  Voz (del navegador / Windows)
+                </label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={config.voiceURI ?? ''}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    const uri = e.target.value
+                    // La voz puede venir de cualquiera de los 3 motores.
+                    const browser = voices.find((x) => x.voiceURI === uri)
+                    const other = [...gcloudVoices, ...piperVoices].find((x) => x.uri === uri)
+                    setConfig(prev => ({
+                      ...prev,
+                      voiceURI: uri || undefined,
+                      voiceName: browser?.name ?? other?.label,
+                    }))
+                  }}
+                >
+                  <option value="">Voz femenina por defecto</option>
+                  {gcloudVoices.length > 0 && (
+                    <optgroup label="Google Cloud (neuronal — todos los usuarios)">
+                      {gcloudVoices.map((v) => (
+                        <option key={v.uri} value={v.uri}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {voices.some((v) => v.localService) && (
+                    <optgroup label="Instaladas (suenan en este equipo)">
+                      {voices.filter((v) => v.localService).map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {voices.some((v) => !v.localService) && (
+                    <optgroup label="Online — requieren Edge o instalarlas en Windows">
+                      {voices.filter((v) => !v.localService).map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {piperVoices.length > 0 && (
+                    <optgroup label="Piper local (servidor)">
+                      {piperVoices.map((v) => (
+                        <option key={v.uri} value={v.uri}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Solo voces femeninas (ARIA es mujer). Las Piper requieren el servidor local activo.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">
+                  Velocidad: {(config.speechRate ?? 1.0).toFixed(2)}x
+                </label>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={2}
+                  step={0.05}
+                  value={config.speechRate ?? 1.0}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setConfig(prev => ({ ...prev, speechRate: parseFloat(e.target.value) }))
+                  }
+                  className="w-full accent-purple-500"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  1.0 = normal · menor = más pausada · mayor = más rápida
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-between items-center">
+            <Button variant="outline" size="sm" onClick={handleTestVoice} className="gap-2">
+              <Play className="h-4 w-4" />
+              Probar voz
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={isSaving} size="sm" className="gap-2">
+              <Save className="h-4 w-4" />
+              {isSaving ? 'Guardando...' : 'Guardar Voz'}
             </Button>
           </div>
         </CardContent>

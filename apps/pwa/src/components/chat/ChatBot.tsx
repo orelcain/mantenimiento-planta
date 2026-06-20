@@ -10,6 +10,7 @@ import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
+import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
@@ -294,28 +295,25 @@ function MessageBubble({
     }).catch(() => { /* ignore */ })
   }
 
-  // #3 — TTS: leer respuesta en voz alta
+  // #3 — TTS: leer respuesta en voz alta (motor navegador o Piper, según config)
   const handleSpeak = () => {
-    if (!('speechSynthesis' in window)) return
     if (isSpeaking) {
-      window.speechSynthesis.cancel()
+      stopSpeaking()
       setIsSpeaking(false)
       return
     }
     const plainText = msg.content.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '').replace(/\[\[.*?\]\]/g, '')
-    const utterance = new SpeechSynthesisUtterance(plainText)
-    utterance.lang = 'es-CL'
-    utterance.rate = 1.0
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
-    window.speechSynthesis.speak(utterance)
     setIsSpeaking(true)
+    speak(plainText, {
+      onend: () => setIsSpeaking(false),
+      onerror: () => setIsSpeaking(false),
+    })
   }
 
   // Cleanup TTS on unmount
   useEffect(() => {
     return () => {
-      if (isSpeaking) window.speechSynthesis.cancel()
+      if (isSpeaking) stopSpeaking()
     }
   }, [isSpeaking])
 
@@ -1029,6 +1027,11 @@ export function ChatBot() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading, streamingContent])
+
+  // Cargar preferencia de voz (definida en Configuración → ARIA)
+  useEffect(() => {
+    loadVoicePref()
+  }, [])
 
   // Focus input al abrir
   useEffect(() => {
