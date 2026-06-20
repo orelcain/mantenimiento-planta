@@ -34,7 +34,7 @@ cuantificar/demostrar/optimizar ese valor, replantearlo para que sí lo haga. Me
 - `hierarchy` (702 nodos) = jerarquía SAP, fuente de verdad de equipos/áreas. Campo `tipoNodo` ('area'|'equipo').
 - `bodega` (≈188) = stock por SAP (overlay en runtime; no se guarda en el doc del material).
 - `manuales` (colección plana N:M) = PDFs por equipo; un material hereda los de sus `equipos`.
-- LEGACY a eliminar (Fase 5 limpieza, con backup): `machines`, `plantAssets`, `insumos` (ya absorbido), subcolecciones huérfanas, `repuestosBaader200`.
+- LEGACY **ELIMINADO** (Fase 5, 2026-06-20, backup `backups/fase5-2026-06-20T17-25-56/`): `machines`, `plantAssets`, `insumos`, `repuestosBaader200`, subcolecciones huérfanas y `hierarchy/*/repuestos` → todas en 0. Maestro/bodega/hierarchy intactos.
 - Scripts de migración idempotentes (dry-run primero): `scripts/normalizacion/00..09`. Backup en `backups/normalizacion-2026-06-10T23-53-21/`.
 
 ## UI repuestos (apps/pwa/src/pages/repuestos, hooks/repuestos)
@@ -119,4 +119,11 @@ decide cuando la segunda planta sea real.
 
 ## Pendientes mayores
 
-Ver `TASKS.md`. Resumen: solicitar-a-bodega end-to-end, chatbot ARIA in-app → leer el maestro (hoy lee `machines/*/repuestos` viejo), Mapas (`CatalogoBases`) → maestro, Fase 5 limpieza de colecciones legacy.
+Ver `TASKS.md`. Resumen: solicitar-a-bodega end-to-end.
+
+Los otros tres que figuraban acá ya están cerrados (verificado contra el código y la base el 2026-08-01):
+**Fase 5** se ejecutó el 2026-06-20 (ver arriba, colecciones legacy en 0); el **chatbot ARIA** ya no lee
+`machines/*/repuestos` — no queda ninguna lectura de la colección `machines` en `apps/pwa/src`, solo un
+comentario histórico en `services/aria/tools/repuestos.ts`; y **Mapas (`CatalogoBases`)** ya no existe en
+el código. Pendiente menor que sí sigue vivo: `EquipoPlacementTool` + `equipoToPlaceId` inertes en
+`PlantaLeafletEditable.tsx`.

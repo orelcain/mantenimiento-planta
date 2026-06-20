@@ -369,9 +369,15 @@ Bloques temáticos. Cada uno resume varias entradas; el detalle está en git.
 - **Tableros / Unifilares (NFPA 70B)**: levantamiento con Excel + formulario en la PWA, realineado de
   "módulo suelto" a parte del expediente del equipo, y reconciliación en PR #91.
 - **Dependabot**: las 23 alertas resueltas (bumps + overrides).
-- **Fase 5 de limpieza**: retirada de features legacy (`machines` / `plantAssets`) con sus scripts de
-  borrado, barrido de código muerto, chatbot ARIA in-app apuntando al maestro unificado, y retiro de
-  `/insumos` y de la pestaña Mapas.
+- **Fase 5 de limpieza — CERRADA el 2026-06-20**: retirada de features legacy (`machines` /
+  `plantAssets`) con sus scripts de borrado, barrido de código muerto, chatbot ARIA in-app apuntando
+  al maestro unificado, y retiro de `/insumos` y de la pestaña Mapas. El borrado **se ejecutó**:
+  `11-delete-legacy.js --write` borró 9.303 docs (backup en `backups/fase5-2026-06-20T17-25-56/`) y
+  se verificó en vivo que `insumos`/`machines`/`plantAssets`/`repuestosBaader200`/`hierarchy/*/repuestos`
+  quedaran en **0**, con maestro (7657) / bodega (2170) / hierarchy (702) intactos.
+  Pendiente menor que quedó suelto: `EquipoPlacementTool` en `PlantaLeafletEditable.tsx` quedó inerte
+  (su trigger se fue con el panel "Equipos SAP") → limpiar como código muerto junto con los campos
+  `equipoToPlaceId` del store.
 - **Repuestos**: pulido (ubicación en la fila, composición por clase), mejoras de sidebar/buscador/
   favoritos (#78), rediseño de las tarjetas KPI de stock, carga rápida de stock+ubicación, cotejo
   Excel↔app con import único a bodega, y foco SAP por defecto en la pestaña Áreas.
