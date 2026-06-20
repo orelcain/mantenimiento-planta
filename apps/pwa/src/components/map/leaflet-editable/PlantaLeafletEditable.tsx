@@ -1045,56 +1045,6 @@ function AlignGrillaController({ view }: { view: MapView }) {
   return null
 }
 
-// ─── Colocación de Equipos SAP en el mapa ─────────────────────────────────────
-/**
- * EquipoPlacementTool — cuando equipoToPlaceId está seteado, el próximo clic
- * en el mapa crea un elemento tipo='equipo' con meta.plantAssetId.
- * Esc cancela sin colocar nada.
- */
-function EquipoPlacementTool({ view }: { view: MapView }) {
-  const map               = useMap()
-  const equipoToPlaceId   = useMapaLeafletStore((s) => s.equipoToPlaceId)
-  const setEquipoToPlaceId = useMapaLeafletStore((s) => s.setEquipoToPlaceId)
-  const snap              = snapFor(view)
-
-  useEffect(() => {
-    if (!map || !equipoToPlaceId) return
-    const container = map.getContainer()
-    container.style.cursor = 'crosshair'
-
-    const onClick = (e: L.LeafletMouseEvent) => {
-      L.DomEvent.stopPropagation(e)
-      const cs: [number, number] = [snap(e.latlng.lat), snap(e.latlng.lng)]
-      const { addElemento, setSelectedId } = useMapaLeafletStore.getState()
-      const id = addElemento({
-        tipo: 'equipo', nombre: '', categoria: 'otros', estado: 'operativo',
-        mapView: view.name, punto: cs,
-        meta: { plantAssetId: equipoToPlaceId },
-      })
-      setSelectedId(id)
-      setEquipoToPlaceId(null)
-      container.style.cursor = ''
-    }
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setEquipoToPlaceId(null)
-        container.style.cursor = ''
-      }
-    }
-
-    map.on('click', onClick as any)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      map.off('click', onClick as any)
-      document.removeEventListener('keydown', onKeyDown)
-      container.style.cursor = ''
-    }
-  }, [map, equipoToPlaceId, snap, view.name, setEquipoToPlaceId])
-
-  return null
-}
-
 // ─── Texto libre: clic en mapa → popup con input → crea elemento tipo=texto ──
 function TextPlacementTool({ view }: { view: MapView }) {
   const map                 = useMap()
@@ -1780,7 +1730,6 @@ function MapContents({ view }: { view: MapView }) {
       <BoxSelect view={view} />
       <MeasureTool view={view} />
       <AlignGrillaController view={view} />
-      <EquipoPlacementTool view={view} />
       <TextPlacementTool view={view} />
       <DrawAreaTooltip />
       <CenterOnSelected />
@@ -1975,8 +1924,6 @@ export function PlantaLeafletEditable() {
   const grillaVisible      = useMapaLeafletStore((s) => s.grillaVisible)
   const textPlacementMode  = useMapaLeafletStore((s) => s.textPlacementMode)
   const setTextPlacementMode = useMapaLeafletStore((s) => s.setTextPlacementMode)
-  const equipoToPlaceId    = useMapaLeafletStore((s) => s.equipoToPlaceId)
-  const setEquipoToPlaceId = useMapaLeafletStore((s) => s.setEquipoToPlaceId)
   const view = MAP_VIEWS[currentView]
 
   // Listener nativo (no React sintético) con passive:false para detener la
@@ -2042,19 +1989,6 @@ export function PlantaLeafletEditable() {
         </div>
       )}
 
-      {/* Overlay: modo colocación de equipo SAP */}
-      {equipoToPlaceId && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1200] pointer-events-none">
-          <div className="pointer-events-auto bg-gray-900/97 border border-blue-500/60 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-sm">
-            <span className="text-[11px] font-bold text-blue-300 uppercase tracking-widest">Colocar Equipo</span>
-            <span className="text-[10px] text-gray-400">Clic en el mapa para posicionar · Esc cancela</span>
-            <button
-              className="text-[9px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
-              onClick={() => setEquipoToPlaceId(null)}
-            >✕</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
