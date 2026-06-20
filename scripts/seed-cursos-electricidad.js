@@ -421,6 +421,84 @@ const M2_DIAGNOSIS = [
   },
 ];
 
+const M2_QUIZ = [
+  {
+    id: 'm2-q-rcp',
+    question: '¿Cual es la relacion correcta de compresiones y ventilaciones en la RCP de un adulto?',
+    options: ['15:1', '30:2', '5:1', '20:2'],
+    correctIndex: 1,
+    explanation: '30 compresiones por 2 ventilaciones, comprimiendo 1/3 del torax. Es la pregunta estrella del examen.',
+  },
+  {
+    id: 'm2-q-efecto-grave',
+    question: '¿Cual es el efecto mas grave de la corriente sobre el cuerpo?',
+    options: ['Tetanizacion', 'Quemaduras', 'Fibrilacion ventricular', 'Asfixia'],
+    correctIndex: 2,
+    explanation: 'La fibrilacion ventricular (arritmia) es la lesion mas grave para la recuperacion.',
+  },
+  {
+    id: 'm2-q-arco',
+    question: '¿En que dos fenomenos se descompone el arco electrico?',
+    options: ['Relampago de arco y rafaga/explosion', 'Chispa y humo', 'Calor y luz', 'Cortocircuito y sobrecarga'],
+    correctIndex: 0,
+    explanation: 'Relampago de arco (arc flash) + rafaga/explosion de arco (onda expansiva).',
+  },
+  {
+    id: 'm2-q-energia',
+    question: '¿Cual es la energia incidente minima para una quemadura de 2° grado?',
+    options: ['0,5 cal/cm²', '1,2 cal/cm²', '12 cal/cm²', '40 cal/cm²'],
+    correctIndex: 1,
+    explanation: '1,2 cal/cm² (como la llama de un encendedor a 1 cm durante ~2 s).',
+  },
+  {
+    id: 'm2-q-reglas-oro',
+    question: '¿Cual es el orden correcto de las 5 Reglas de Oro?',
+    options: [
+      'Bloquear, cortar, senalizar, verificar, tierra',
+      'Corte visible, bloquear, verificar ausencia de tension, puesta a tierra, senalizar',
+      'Verificar, cortar, tierra, bloquear, senalizar',
+      'Senalizar, cortar, bloquear, tierra, verificar',
+    ],
+    correctIndex: 1,
+    explanation: '1) corte visible, 2) bloquear, 3) verificar ausencia de tension, 4) puesta a tierra y cortocircuito, 5) delimitar/senalizar.',
+  },
+  {
+    id: 'm2-q-hemorragia',
+    question: '¿Cual es la hemorragia mas grave segun el vaso afectado?',
+    options: ['Capilar', 'Venosa', 'Arterial', 'Exteriorizada'],
+    correctIndex: 2,
+    explanation: 'La arterial: sangre roja rutilante que sale a chorro intermitente.',
+  },
+  {
+    id: 'm2-q-control-hemorragia',
+    question: '¿Cual es el primer paso para controlar una hemorragia externa?',
+    options: ['Aplicar torniquete', 'Presion directa con aposito', 'Elevar la extremidad', 'Dar agua a la victima'],
+    correctIndex: 1,
+    explanation: 'Presion directa con aposito. El torniquete es el ultimo recurso.',
+  },
+  {
+    id: 'm2-q-abcde',
+    question: 'En el ABCDE, ¿que corresponde a la letra C?',
+    options: ['Cabeza', 'Circulacion + control de hemorragias', 'Columna cervical', 'Conciencia'],
+    correctIndex: 1,
+    explanation: 'C = circulacion + control de hemorragias.',
+  },
+  {
+    id: 'm2-q-tiempo',
+    question: '¿A los cuantos minutos comienza el dano cerebral en un paro?',
+    options: ['1 minuto', '4 minutos', '10 minutos', '30 minutos'],
+    correctIndex: 1,
+    explanation: 'El dano cerebral empieza a los 4 minutos; 0% de supervivencia si la RCP parte despues de 12 min.',
+  },
+  {
+    id: 'm2-q-reentrenamiento',
+    question: '¿Cada cuanto se hace el reentrenamiento de rescate y liberacion de contacto?',
+    options: ['Mensual', 'Anual', 'Cada 3 anos', 'Cada 5 anos'],
+    correctIndex: 1,
+    explanation: 'Rescate y liberacion de contacto: anual. La seguridad electrica (NFPA 70E): cada 3 anos.',
+  },
+];
+
 // ════════════════════════════════════════════════════════════════════════════
 // MODULO 3 — NFPA 70B, Mantenimiento del Equipo Electrico (slug nfpa-70b)
 // ════════════════════════════════════════════════════════════════════════════
@@ -733,13 +811,91 @@ const M3_DIAGNOSIS = [
   },
 ];
 
+const M3_QUIZ = [
+  {
+    id: 'm3-q-autoridad',
+    question: '¿Quien es la autoridad competente en Chile segun la NFPA 70B?',
+    options: ['El CDEC', 'La SEC', 'El INN', 'La mutualidad'],
+    correctIndex: 1,
+    explanation: 'La SEC (Superintendencia de Electricidad y Combustibles). Pregunta confirmada de examen.',
+  },
+  {
+    id: 'm3-q-edicion',
+    question: '¿De que ano es la edicion vigente de la NFPA 70B?',
+    options: ['2018', '2021', '2023', '2024'],
+    correctIndex: 2,
+    explanation: 'Edicion 2023 (Nivel 1).',
+  },
+  {
+    id: 'm3-q-pilares',
+    question: '¿Cuales son los 4 pilares de la norma?',
+    options: [
+      'Seguridad, Gestion de Mantenimiento, Procedimientos por equipo, Analisis de la informacion',
+      'Generacion, Transmision, Distribucion, Consumo',
+      'Preventivo, Predictivo, Correctivo, Sistematico',
+      'Personas, Procesos, Tecnologia, Datos',
+    ],
+    correctIndex: 0,
+    explanation: '1) Seguridad a las Personas, 2) Gestion de Mantenimiento, 3) Procedimientos especificos por equipo, 4) Analisis de la informacion.',
+  },
+  {
+    id: 'm3-q-estadistica',
+    question: '¿Que porcentaje de los equipos falla en algun momento por falta de mantenimiento?',
+    options: ['20%', '50%', '80%', '95%'],
+    correctIndex: 2,
+    explanation: 'El 80% (estadistica internacional).',
+  },
+  {
+    id: 'm3-q-media-tension',
+    question: '¿Hasta que tension se considera Media Tension?',
+    options: ['Hasta 1 kV', 'Hasta 23 kV', 'Hasta 230 kV', 'Hasta 500 kV'],
+    correctIndex: 1,
+    explanation: 'Media: mayor a 1 kV hasta 23 kV. Baja menor o igual a 1 kV; Alta mayor a 23 kV hasta 230 kV.',
+  },
+  {
+    id: 'm3-q-riesgo',
+    question: '¿Como se calcula el riesgo?',
+    options: ['Probabilidad + Consecuencia', 'Probabilidad x Consecuencia', 'Consecuencia / Probabilidad', 'Frecuencia x Tiempo'],
+    correctIndex: 1,
+    explanation: 'Riesgo = Probabilidad de falla x Consecuencia de la falla.',
+  },
+  {
+    id: 'm3-q-tipos',
+    question: '¿Cuales son los 3 tipos de mantenimiento?',
+    options: ['Preventivo, Sistematico, Predictivo', 'Manual, Automatico, Mixto', 'Diario, Semanal, Anual', 'Interno, Externo, Mixto'],
+    correctIndex: 0,
+    explanation: 'Preventivo, Sistematico (por frecuencia) y Predictivo (por condicion).',
+  },
+  {
+    id: 'm3-q-telurometro',
+    question: '¿Que instrumento mide la resistencia de puesta a tierra?',
+    options: ['Megohmetro (megger)', 'Telurometro', 'Multimetro', 'Osciloscopio'],
+    correctIndex: 1,
+    explanation: 'El telurometro. El megger mide aislacion (no confundir).',
+  },
+  {
+    id: 'm3-q-ciclo',
+    question: '¿Cual es el rango tipico del ciclo de pruebas?',
+    options: ['1 a 7 dias', '1 a 4 semanas', '6 meses a 3 anos', '5 a 10 anos'],
+    correctIndex: 2,
+    explanation: 'De 6 meses a 3 anos segun uso y condiciones.',
+  },
+  {
+    id: 'm3-q-desenergizado',
+    question: '¿Como debe estar el equipo para inspeccion, prueba o reparacion?',
+    options: ['Energizado a media carga', 'Energizado en vacio', 'Desenergizado', 'En cortocircuito'],
+    correctIndex: 2,
+    explanation: 'Desenergizado.',
+  },
+];
+
 // ════════════════════════════════════════════════════════════════════════════
 // ENSAMBLAJE
 // ════════════════════════════════════════════════════════════════════════════
 
 const MODULES = [
-  { slug: 'rescate-svb', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS },
-  { slug: 'nfpa-70b', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS },
+  { slug: 'rescate-svb', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS, quiz: M2_QUIZ },
+  { slug: 'nfpa-70b', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS, quiz: M3_QUIZ },
 ];
 
 function buildDocs(mod) {
@@ -784,7 +940,21 @@ function buildDocs(mod) {
       updatedAt: BASE - i * 1000,
     },
   }));
-  return { manual, procedures, flows, diagnosis };
+  // quiz: ordenado por `order` asc (mismo criterio que el manual)
+  const quiz = (mod.quiz || []).map((qz, i) => ({
+    id: qz.id,
+    data: {
+      id: qz.id,
+      question: qz.question,
+      options: qz.options,
+      correctIndex: qz.correctIndex,
+      explanation: qz.explanation,
+      order: i + 1,
+      createdAt: BASE,
+      updatedAt: BASE,
+    },
+  }));
+  return { manual, procedures, flows, diagnosis, quiz };
 }
 
 // ── Init Firebase Admin ──
@@ -831,7 +1001,8 @@ async function main() {
     const p = await seedSection(mod.slug, 'procedures', docs.procedures);
     const f = await seedSection(mod.slug, 'flows', docs.flows);
     const d = await seedSection(mod.slug, 'diagnosis', docs.diagnosis);
-    console.log(`   manual: ${m}  ·  procedimientos: ${p}  ·  flujos: ${f}  ·  diagnostico: ${d}`);
+    const q = await seedSection(mod.slug, 'quiz', docs.quiz);
+    console.log(`   manual: ${m}  ·  procedimientos: ${p}  ·  flujos: ${f}  ·  diagnostico: ${d}  ·  examen: ${q}`);
   }
 
   console.log('\n' + '-'.repeat(64));
