@@ -10,7 +10,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ClipboardCheck, ShieldCheck, Activity,
-  ZoomIn, ZoomOut, RotateCcw, X,
+  ZoomIn, ZoomOut, RotateCcw, X, GraduationCap,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
@@ -20,16 +20,25 @@ import {
   listManualSections,
   listFlows,
   listDiagnosis,
+  listQuiz,
   type Procedure,
   type ManualSection,
   type Flow,
   type DiagnosisEntry,
+  type QuizQuestion,
 } from '@/services/learningContent'
 import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
+import { QuizView } from '@/components/learning/QuizView'
+
+/** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
+const COURSE_AREA = 'Capacitacion / Normativa'
+
+/** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
+type TabId = LearningSection | 'casos' | 'quiz'
 
 interface TabDef {
-  id: LearningSection
+  id: TabId
   label: string
   shortLabel: string
   icon: React.ElementType
@@ -67,18 +76,52 @@ const TABS: TabDef[] = [
   },
 ]
 
+/** Set de pestanas para temas de curso (area "Capacitacion / Normativa"). */
+const COURSE_TABS: TabDef[] = [
+  {
+    id: 'manual',
+    label: 'Lecciones',
+    shortLabel: 'Lecciones',
+    icon: BookOpen,
+    description: 'Teoria del curso, ordenada por unidades.',
+  },
+  {
+    id: 'procedures',
+    label: 'Practica',
+    shortLabel: 'Practica',
+    icon: ListChecks,
+    description: 'Procedimientos paso a paso para aplicar lo aprendido.',
+  },
+  {
+    id: 'casos',
+    label: 'Casos',
+    shortLabel: 'Casos',
+    icon: GitBranch,
+    description: 'Que hacer en cada situacion: flujos y señal → accion.',
+  },
+  {
+    id: 'quiz',
+    label: 'Examen',
+    shortLabel: 'Examen',
+    icon: GraduationCap,
+    description: 'Autoevaluacion tipo prueba con explicacion.',
+  },
+]
+
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<LearningSection>('manual')
+  const [activeTab, setActiveTab] = useState<TabId>('manual')
   const [procedures, setProcedures] = useState<Procedure[]>([])
   const [manualSections, setManualSections] = useState<ManualSection[]>([])
   const [flows, setFlows] = useState<Flow[]>([])
   const [diagnosis, setDiagnosis] = useState<DiagnosisEntry[]>([])
+  const [quiz, setQuiz] = useState<QuizQuestion[]>([])
   const [loadingTab, setLoadingTab] = useState(false)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
+  const isCourse = !!machine && machine.area === COURSE_AREA
 
   // Cargar contenido de Firestore segun tab activo
   useEffect(() => {
@@ -86,24 +129,24 @@ export function MachineLearningPage() {
     let cancelled = false
     setLoadingTab(true)
 
-    const loader =
-      activeTab === 'procedures'
-        ? listProcedures(machine.slug).then(list => {
-            if (!cancelled) setProcedures(list)
-          })
-        : activeTab === 'manual'
-        ? listManualSections(machine.slug).then(list => {
-            if (!cancelled) setManualSections(list)
-          })
-        : activeTab === 'flows'
-        ? listFlows(machine.slug).then(list => {
-            if (!cancelled) setFlows(list)
-          })
-        : listDiagnosis(machine.slug).then(list => {
-            if (!cancelled) setDiagnosis(list)
-          })
+    const loaders: Promise<unknown>[] = []
+    if (activeTab === 'procedures') {
+      loaders.push(listProcedures(machine.slug).then(list => { if (!cancelled) setProcedures(list) }))
+    } else if (activeTab === 'manual') {
+      loaders.push(listManualSections(machine.slug).then(list => { if (!cancelled) setManualSections(list) }))
+    } else if (activeTab === 'flows') {
+      loaders.push(listFlows(machine.slug).then(list => { if (!cancelled) setFlows(list) }))
+    } else if (activeTab === 'diagnosis') {
+      loaders.push(listDiagnosis(machine.slug).then(list => { if (!cancelled) setDiagnosis(list) }))
+    } else if (activeTab === 'casos') {
+      // Casos (curso) = flujos + diagnostico juntos
+      loaders.push(listFlows(machine.slug).then(list => { if (!cancelled) setFlows(list) }))
+      loaders.push(listDiagnosis(machine.slug).then(list => { if (!cancelled) setDiagnosis(list) }))
+    } else if (activeTab === 'quiz') {
+      loaders.push(listQuiz(machine.slug).then(list => { if (!cancelled) setQuiz(list) }))
+    }
 
-    loader
+    Promise.all(loaders)
       .catch(() => {
         // En silencio: mantiene empty state
       })
@@ -126,18 +169,20 @@ export function MachineLearningPage() {
   }
 
   const Icon = machine.icon
-  const activeTabData = TABS.find(t => t.id === activeTab)!
+  const tabs = isCourse ? COURSE_TABS : TABS
+  const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
   const ActiveIcon = activeTabData.icon
-  // Habilitado si hay items reales en Firestore para ese tab
-  const activeCount =
-    activeTab === 'procedures'
-      ? procedures.length
-      : activeTab === 'manual'
-      ? manualSections.length
-      : activeTab === 'flows'
-      ? flows.length
-      : diagnosis.length
-  const sectionEnabled = activeCount > 0 || machine.sections[activeTab]
+  // Conteo de items reales por pestana (casos = flujos + diagnostico)
+  const countFor = (id: TabId): number =>
+    id === 'procedures' ? procedures.length
+    : id === 'manual' ? manualSections.length
+    : id === 'flows' ? flows.length
+    : id === 'diagnosis' ? diagnosis.length
+    : id === 'casos' ? flows.length + diagnosis.length
+    : id === 'quiz' ? quiz.length
+    : 0
+  const activeCount = countFor(activeTab)
+  const sectionEnabled = activeCount > 0 || (!isCourse && machine.sections[activeTab as LearningSection])
   const isAdmin = user?.rol === 'admin'
 
   // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
@@ -194,7 +239,7 @@ export function MachineLearningPage() {
                       className="rounded px-2 py-1 text-[10px] font-bold uppercase"
                       style={{ color: machine.color, background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
                     >
-                      Dossier tecnico
+                      {isCourse ? 'Curso' : 'Dossier tecnico'}
                     </span>
                     <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
                       {machine.area}
@@ -208,10 +253,21 @@ export function MachineLearningPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2 sm:mt-6">
-                <MachineMetric icon={BookOpen} label="Manual" enabled={machine.sections.manual} color={machine.color} tone="blue" />
-                <MachineMetric icon={ClipboardCheck} label="Proced." enabled={machine.sections.procedures} color="#22c55e" tone="green" />
-                <MachineMetric icon={GitBranch} label="Flujos" enabled={machine.sections.flows} color="#eab308" tone="amber" />
-                <MachineMetric icon={Activity} label="Diagnostico" enabled={machine.sections.diagnosis} color="#f97316" tone="orange" />
+                {isCourse ? (
+                  <>
+                    <MachineMetric icon={BookOpen} label="Lecciones" enabled color={machine.color} tone="blue" />
+                    <MachineMetric icon={ClipboardCheck} label="Practica" enabled color="#22c55e" tone="green" />
+                    <MachineMetric icon={GitBranch} label="Casos" enabled color="#eab308" tone="amber" />
+                    <MachineMetric icon={GraduationCap} label="Examen" enabled color="#f97316" tone="orange" />
+                  </>
+                ) : (
+                  <>
+                    <MachineMetric icon={BookOpen} label="Manual" enabled={machine.sections.manual} color={machine.color} tone="blue" />
+                    <MachineMetric icon={ClipboardCheck} label="Proced." enabled={machine.sections.procedures} color="#22c55e" tone="green" />
+                    <MachineMetric icon={GitBranch} label="Flujos" enabled={machine.sections.flows} color="#eab308" tone="amber" />
+                    <MachineMetric icon={Activity} label="Diagnostico" enabled={machine.sections.diagnosis} color="#f97316" tone="orange" />
+                  </>
+                )}
               </div>
             </div>
 
@@ -222,19 +278,31 @@ export function MachineLearningPage() {
               <div className="flex items-center gap-2 mb-4">
                 <Gauge className="h-4 w-4" style={{ color: machine.color }} />
                 <h2 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
-                  Lectura rapida
+                  {isCourse ? 'Sobre el curso' : 'Lectura rapida'}
                 </h2>
               </div>
               <div className="space-y-3">
-                <DossierRow label="Uso" value="Consulta en terreno" />
-                <DossierRow label="Contenido" value="Ajustes, fallas y referencias" />
-                <DossierRow label="Formato" value="Editable desde admin" />
+                {isCourse ? (
+                  <>
+                    <DossierRow label="Tipo" value="Curso / Normativa" />
+                    <DossierRow label="Contenido" value="Lecciones, practica, casos y examen" />
+                    <DossierRow label="Acceso" value="Libre, sin login" />
+                  </>
+                ) : (
+                  <>
+                    <DossierRow label="Uso" value="Consulta en terreno" />
+                    <DossierRow label="Contenido" value="Ajustes, fallas y referencias" />
+                    <DossierRow label="Formato" value="Editable desde admin" />
+                  </>
+                )}
               </div>
               <div className="mt-5 rounded-md p-3" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.28)' }}>
                 <div className="flex gap-2">
                   <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#eab308' }} />
                   <p className="text-xs leading-relaxed" style={{ color: LC.inkMid }}>
-                    Prioriza medidas, tolerancias y acciones verificables antes de intervenir el equipo.
+                    {isCourse
+                      ? 'Material de estudio destilado de la clase. Para la prueba, repasa la pestana Examen.'
+                      : 'Prioriza medidas, tolerancias y acciones verificables antes de intervenir el equipo.'}
                   </p>
                 </div>
               </div>
@@ -249,18 +317,11 @@ export function MachineLearningPage() {
           className="grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-lg backdrop-blur"
           style={{ background: LC.border, border: `1px solid ${LC.border}` }}
         >
-          {TABS.map(tab => {
+          {tabs.map(tab => {
             const TabIcon = tab.icon
             const isActive = activeTab === tab.id
-            const tabCount =
-              tab.id === 'procedures'
-                ? procedures.length
-                : tab.id === 'manual'
-                ? manualSections.length
-                : tab.id === 'flows'
-                ? flows.length
-                : diagnosis.length
-            const hasContent = tabCount > 0 || machine.sections[tab.id]
+            const tabCount = countFor(tab.id)
+            const hasContent = tabCount > 0 || (!isCourse && machine.sections[tab.id as LearningSection])
             return (
               <button
                 key={tab.id}
@@ -321,11 +382,27 @@ export function MachineLearningPage() {
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
           <ProceduresList procedures={procedures} color={machine.color} />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} />
+          <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} />
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} color={machine.color} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
           <DiagnosisList entries={diagnosis} color={machine.color} />
+        ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
+          <div className="space-y-6">
+            {flows.length > 0 && <FlowDiagramViewer flows={flows} color={machine.color} />}
+            {diagnosis.length > 0 && (
+              <div className="space-y-3">
+                {flows.length > 0 && (
+                  <h3 className="pt-1 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.inkLo }}>
+                    Señal → accion
+                  </h3>
+                )}
+                <DiagnosisList entries={diagnosis} color={machine.color} />
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'quiz' && quiz.length > 0 ? (
+          <QuizView questions={quiz} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -475,17 +552,20 @@ function ManualList({
   color,
   machineSlug,
   canEdit,
+  isCourse = false,
 }: {
   sections: ManualSection[]
   color: string
   machineSlug: string
   canEdit: boolean
+  isCourse?: boolean
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const activeSection = sections.find(section => section.id === activeId) ?? sections[0]
   const activeIndex = Math.max(0, sections.findIndex(section => section.id === activeSection?.id))
-  const compactNavigator = sections.length > 6
+  // En cursos forzamos lista plana (las lecciones no agrupan por familia de maquina).
+  const compactNavigator = sections.length > 6 && !isCourse
   const sectionGroups = compactNavigator ? groupManualSections(sections) : []
   const activeGroup = sectionGroups.find(group => group.sections.some(section => section.id === activeSection?.id)) ?? sectionGroups[0]
 
@@ -517,7 +597,7 @@ function ManualList({
         <div className="flex items-center gap-2 px-1 pb-2">
           <BookOpen className="h-4 w-4" style={{ color }} />
           <h3 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
-            Secciones del manual
+            {isCourse ? 'Lecciones del curso' : 'Secciones del manual'}
           </h3>
         </div>
         {compactNavigator ? (
@@ -680,7 +760,7 @@ function ManualList({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
-                Manual tecnico
+                {isCourse ? 'Leccion' : 'Manual tecnico'}
               </p>
               <h3 className="mt-1 text-lg font-semibold leading-tight text-[#e9eef3]">{activeSection.title}</h3>
               {blocks.description && (

@@ -75,7 +75,21 @@ export interface DiagnosisEntry {
   updatedAt: number
 }
 
-export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis'
+/** Pregunta de autoevaluación (pestaña "Examen" en temas de curso). */
+export interface QuizQuestion {
+  id: string
+  question: string
+  options: string[]
+  /** Índice (0-based) de la opción correcta dentro de `options`. */
+  correctIndex: number
+  /** Explicación que se muestra al responder. */
+  explanation: string
+  order: number
+  createdAt: number
+  updatedAt: number
+}
+
+export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz'
 
 // ─────────────────────────────────────────────────────────────
 // PATHS HELPERS
@@ -497,6 +511,32 @@ export async function deleteDiagnosis(machineSlug: string, id: string): Promise<
     return
   }
   await deleteDoc(sectionDoc(machineSlug, 'diagnosis', id))
+}
+
+// ─────────────────────────────────────────────────────────────
+// QUIZ (pestaña "Examen" de los temas de curso)
+// ─────────────────────────────────────────────────────────────
+
+export async function listQuiz(machineSlug: string): Promise<QuizQuestion[]> {
+  const q = query(sectionCollection(machineSlug, 'quiz'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as QuizQuestion), id: d.id }))
+}
+
+export async function saveQuiz(
+  machineSlug: string,
+  question: Omit<QuizQuestion, 'createdAt' | 'updatedAt'> & { createdAt?: number }
+): Promise<void> {
+  const now = Date.now()
+  await setDoc(sectionDoc(machineSlug, 'quiz', question.id), {
+    ...question,
+    createdAt: question.createdAt || now,
+    updatedAt: now,
+  })
+}
+
+export async function deleteQuiz(machineSlug: string, id: string): Promise<void> {
+  await deleteDoc(sectionDoc(machineSlug, 'quiz', id))
 }
 
 // ─────────────────────────────────────────────────────────────
