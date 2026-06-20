@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Pulido repuestos: ubicación en fila + composición por clase (+ validación solicitar)
+
+- Pedido de Orel (3 mejoras del módulo):
+  1. **Ubicación de bodega en la fila** de Áreas (`RepuestosAreaHub`): nueva línea con `MapPin` + `ubicacionBodega` bajo el stock (y en el subtítulo móvil) → el técnico ve DÓNDE está el repuesto sin abrir la ficha. Verificado en vivo: BUJE INOX 3300133492 → C-31.
+  2. **Composición por clase en el header**: `catalogStats.clases` (desglose por `clase` del alcance) + línea de chips clickeables que aplican el filtro de clase. Verificado: Repuesto 5557·Insumo 1494·Refrigeración 154·Químico 127·Herramienta 107·Lubricante 2.
+  3. **Solicitar a bodega end-to-end**: revisado — el flujo ya estaba COMPLETO y cableado (`useSolicitudes` crear/listar/avanzar + `SolicitarRepuestoModal` + `SolicitudesPanel` con avance Pendiente→Aprobada→Entregada + badge pendientes). Verificado en vivo: panel abre y lista (1 entregada en prod). Sin cambios de código.
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx` (import MapPin/MaterialClase, ubicación en fila, claseCount en catalogStats, línea de composición).
+- Verificación: tsc limpio, eslint 0 errores, build success, **preview en vivo** (sirve D:).
+- Estado: HECHO (en `chore/ai-coordination`, pendiente PR+deploy).
+
 ## 2026-06-20 · claude · Fase 5 — retirada de features legacy (machines/plantAssets) + scripts de borrado
 
 - Decisión de Orel (2 preguntas): retirar el tab "Categorías" (CategoryManager) y la capa "Equipos SAP" del editor de mapa, para liberar `machines` y `plantAssets`.
