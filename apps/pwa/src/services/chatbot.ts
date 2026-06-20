@@ -1331,6 +1331,7 @@ interface MaestroMat {
   sap: string
   fab: string
   alias: string
+  nombresComunes: string
   clase: string
   marca: string
   modeloTipo: string
@@ -1385,6 +1386,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
         sap,
         fab: r.codigoFabricante || r.codigoBaader || '',
         alias: r.alias || '',
+        nombresComunes: Array.isArray(r.nombresComunes) ? r.nombresComunes.join(' ') : (r.nombresComunes || ''),
         clase: r.clase || 'repuesto',
         marca: r.marca || '',
         modeloTipo: r.modeloTipo || '',
@@ -1416,7 +1418,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     }
     const haystackOf = (m: MaestroMat) =>
       normalizeText(
-        `${m.textoBreve} ${m.descripcion} ${m.sap} ${m.fab} ${m.alias} ${m.marca} ${m.modeloTipo} ${m.clase} ${m.equiposCodigos.join(' ')} ${m.equipos.map((id) => nodeName.get(id) || '').join(' ')}`,
+        `${m.textoBreve} ${m.descripcion} ${m.sap} ${m.fab} ${m.alias} ${m.nombresComunes} ${m.marca} ${m.modeloTipo} ${m.clase} ${m.equiposCodigos.join(' ')} ${m.equipos.map((id) => nodeName.get(id) || '').join(' ')}`,
       )
 
     // ── Estadísticas del maestro ──
