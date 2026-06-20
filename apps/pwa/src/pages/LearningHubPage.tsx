@@ -21,12 +21,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import { InfoTooltip } from '@/components/ui'
 import {
   groupMachinesByArea,
+  isCourseMachine,
   type LearningMachine,
 } from '@/data/learningMachines'
 import {
@@ -577,10 +578,23 @@ function MachineCard({
 }) {
   const Icon = machine.icon
   const ready = hasAnyContent(machine, meta)
-  const sectionFlags = meta
-    ? { manual: meta.manual > 0 || machine.sections.manual, procedures: meta.procedures > 0, flows: meta.flows > 0, diagnosis: meta.diagnosis > 0 }
-    : machine.sections
-  const enabledCount = Object.values(sectionFlags).filter(Boolean).length
+  const course = isCourseMachine(machine)
+  // Badges: por curso (Lecciones/Practica/Casos/Examen) o por maquina (Manual/Proc/Flujos/Diag)
+  const badges = course
+    ? [
+        { short: 'Lecciones', icon: FileText, count: meta?.manual ?? 0, tooltip: 'Teoria del curso, por unidades' },
+        { short: 'Practica', icon: ListChecks, count: meta?.procedures ?? 0, tooltip: 'Procedimientos paso a paso' },
+        { short: 'Casos', icon: Workflow, count: (meta?.flows ?? 0) + (meta?.diagnosis ?? 0), tooltip: 'Que hacer en cada situacion' },
+        { short: 'Examen', icon: GraduationCap, count: meta?.quiz ?? 0, tooltip: 'Autoevaluacion tipo prueba' },
+      ].map(b => ({ ...b, enabled: b.count > 0 }))
+    : SECTION_META.map(s => ({
+        short: s.short,
+        icon: s.icon,
+        tooltip: s.tooltip,
+        count: meta?.[s.key] ?? 0,
+        enabled: meta ? (meta[s.key] > 0 || machine.sections[s.key]) : machine.sections[s.key],
+      }))
+  const enabledCount = badges.filter(b => b.enabled).length
   const isNew = ready && meta?.lastUpdatedAt != null && (Date.now() - meta.lastUpdatedAt) < NEW_WINDOW_MS
 
   // Color de identidad de la máquina (atenuado si está en preparación)
@@ -603,9 +617,18 @@ function MachineCard({
           {/* Fila de estado (deja espacio a la derecha para la estrella) */}
           <div className="flex items-center gap-2 mb-3 pr-8 min-h-[20px]">
             {ready ? (
-              <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: accent }}>
-                {enabledCount}/4 secciones
-              </span>
+              course ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide font-bold" style={{ color: accent }}>
+                  <span className="rounded px-1.5 py-0.5" style={{ background: `${accent}1f`, border: `1px solid ${accent}45` }}>
+                    Modulo {machine.modulo ?? '—'}
+                  </span>
+                  {machine.nivel != null && <span style={{ color: C.inkLo }}>Nivel {machine.nivel}</span>}
+                </span>
+              ) : (
+                <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: accent }}>
+                  {enabledCount}/4 secciones
+                </span>
+              )
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                 style={{ background: C.prepSoft, color: C.prep, border: `1px solid ${C.prep}40` }}>
@@ -631,17 +654,15 @@ function MachineCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
-            {SECTION_META.map(s => {
-              const enabled = sectionFlags[s.key]
-              const count = meta?.[s.key]
-              const SIcon = s.icon
+            {badges.map((b, i) => {
+              const SIcon = b.icon
               return (
-                <span key={s.key} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold"
-                  style={{ background: enabled ? C.aquaSoft : 'transparent', color: enabled ? C.aquaLight : C.inkGhost, border: `1px solid ${enabled ? C.borderHi : C.border}`, opacity: enabled ? 1 : 0.7 }}>
+                <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold"
+                  style={{ background: b.enabled ? C.aquaSoft : 'transparent', color: b.enabled ? C.aquaLight : C.inkGhost, border: `1px solid ${b.enabled ? C.borderHi : C.border}`, opacity: b.enabled ? 1 : 0.7 }}>
                   <SIcon className="h-3 w-3" />
-                  {s.short}
-                  {count !== undefined && count > 0 && <span className="tabular-nums">· {count > 9 ? '9+' : count}</span>}
-                  <InfoTooltip text={s.tooltip} iconSize={9} position="top" />
+                  {b.short}
+                  {b.count > 0 && <span className="tabular-nums">· {b.count > 9 ? '9+' : b.count}</span>}
+                  <InfoTooltip text={b.tooltip} iconSize={9} position="top" />
                 </span>
               )
             })}

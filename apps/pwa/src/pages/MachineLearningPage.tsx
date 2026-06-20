@@ -239,10 +239,12 @@ export function MachineLearningPage() {
                       className="rounded px-2 py-1 text-[10px] font-bold uppercase"
                       style={{ color: machine.color, background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
                     >
-                      {isCourse ? 'Curso' : 'Dossier tecnico'}
+                      {isCourse
+                        ? `Modulo ${machine.modulo ?? '—'}${machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}`
+                        : 'Dossier tecnico'}
                     </span>
                     <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
-                      {machine.area}
+                      {isCourse ? (machine.programa ?? machine.area) : machine.area}
                     </span>
                   </div>
                   <h1 className="text-[1.7rem] sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>

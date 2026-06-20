@@ -548,6 +548,8 @@ export interface MachineContentCounts {
   procedures: number
   flows: number
   diagnosis: number
+  /** Solo aplica a temas de curso (pestana Examen). */
+  quiz?: number
 }
 
 /** Obtiene conteo de items por seccion para una maquina */
@@ -557,17 +559,19 @@ export async function getMachineContentCounts(
   if (machineSlug === B200_LEARNING_SLUG) return getB200ContentCounts()
   if (machineSlug === B142_LEARNING_SLUG) return getB142ContentCounts()
 
-  const [manual, procedures, flows, diagnosis] = await Promise.all([
+  const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
     getDocs(sectionCollection(machineSlug, 'manual')),
     getDocs(sectionCollection(machineSlug, 'procedures')),
     getDocs(sectionCollection(machineSlug, 'flows')),
     getDocs(sectionCollection(machineSlug, 'diagnosis')),
+    getDocs(sectionCollection(machineSlug, 'quiz')),
   ])
   return {
     manual: manual.size,
     procedures: procedures.size,
     flows: flows.size,
     diagnosis: diagnosis.size,
+    quiz: quiz.size,
   }
 }
 
@@ -589,14 +593,15 @@ export async function getMachineContentMeta(
     return { ...getB142ContentCounts(), lastUpdatedAt: B142_CONTENT_UPDATED_AT }
   }
 
-  const [manual, procedures, flows, diagnosis] = await Promise.all([
+  const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
     getDocs(sectionCollection(machineSlug, 'manual')),
     getDocs(sectionCollection(machineSlug, 'procedures')),
     getDocs(sectionCollection(machineSlug, 'flows')),
     getDocs(sectionCollection(machineSlug, 'diagnosis')),
+    getDocs(sectionCollection(machineSlug, 'quiz')),
   ])
   let lastUpdatedAt: number | null = null
-  for (const snap of [manual, procedures, flows, diagnosis]) {
+  for (const snap of [manual, procedures, flows, diagnosis, quiz]) {
     for (const d of snap.docs) {
       const u = (d.data() as { updatedAt?: number }).updatedAt
       if (typeof u === 'number' && (lastUpdatedAt === null || u > lastUpdatedAt)) lastUpdatedAt = u
@@ -607,6 +612,7 @@ export async function getMachineContentMeta(
     procedures: procedures.size,
     flows: flows.size,
     diagnosis: diagnosis.size,
+    quiz: quiz.size,
     lastUpdatedAt,
   }
 }

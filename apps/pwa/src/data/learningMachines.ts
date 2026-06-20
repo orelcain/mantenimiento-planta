@@ -29,12 +29,27 @@ export interface LearningMachine {
   /** Ruta custom si la maquina tiene su propia pagina (ej: Baader 200) */
   customRoute?: string
   sections: LearningMachineSections
+  // ── Solo para temas de curso (area CAPACITACION_AREA) ──
+  /** Programa/serie al que pertenece el curso (ej: "Programa Electricidad - Mantenimiento Industrial"). */
+  programa?: string
+  /** Numero de modulo dentro del programa (ordena las tarjetas). */
+  modulo?: number
+  /** Nivel del programa (ej: 1). */
+  nivel?: number
+}
+
+/** Area del catalogo cuyos temas son CURSOS (no maquinas): set de pestanas y UI distintos. */
+export const CAPACITACION_AREA = 'Capacitacion / Normativa'
+
+/** True si el tema es un curso (vive en el area de capacitacion). */
+export function isCourseMachine(machine: Pick<LearningMachine, 'area'>): boolean {
+  return machine.area === CAPACITACION_AREA
 }
 
 /** Areas de la planta (para agrupacion en el hub) */
 export const LEARNING_AREAS = [
   'Planta Principal',
-  'Capacitacion / Normativa',
+  CAPACITACION_AREA,
 ] as const
 
 /** Maquinas favoritas del modulo repuestos — prioridad alta para documentacion */
@@ -123,7 +138,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   {
     slug: 'rescate-svb',
     name: 'Rescate Electrico y SVB',
-    area: 'Capacitacion / Normativa',
+    area: CAPACITACION_AREA,
+    programa: 'Programa Electricidad - Mantenimiento Industrial',
+    modulo: 2,
+    nivel: 1,
     description: 'Curso NFPA 70E: rescate electrico y soporte vital basico (SVB). Peligros electricos, 5 Reglas de Oro, control de hemorragias, RCP 30:2 y evaluacion ABCDE.',
     icon: HeartPulse,
     color: '#f43f5e',
@@ -132,7 +150,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
   {
     slug: 'nfpa-70b',
     name: 'NFPA 70B - Mantenimiento Electrico',
-    area: 'Capacitacion / Normativa',
+    area: CAPACITACION_AREA,
+    programa: 'Programa Electricidad - Mantenimiento Industrial',
+    modulo: 3,
+    nivel: 1,
     description: 'Norma NFPA 70B 2023: mantenimiento del equipo electrico. MEP, 4 pilares, criticidad y riesgo, tipos de mantenimiento, pruebas (termografia, puesta a tierra) y mejora continua (PHVA).',
     icon: ShieldCheck,
     color: '#f59e0b',
@@ -147,11 +168,16 @@ export function findMachineBySlug(slug: string): LearningMachine | undefined {
 
 /** Agrupa maquinas por area */
 export function groupMachinesByArea(): Record<string, LearningMachine[]> {
-  return LEARNING_MACHINES.reduce<Record<string, LearningMachine[]>>((acc, machine) => {
+  const grouped = LEARNING_MACHINES.reduce<Record<string, LearningMachine[]>>((acc, machine) => {
     if (!acc[machine.area]) acc[machine.area] = []
     acc[machine.area]!.push(machine)
     return acc
   }, {})
+  // Cursos: ordenar por numero de modulo dentro del programa
+  if (grouped[CAPACITACION_AREA]) {
+    grouped[CAPACITACION_AREA]!.sort((a, b) => (a.modulo ?? 99) - (b.modulo ?? 99))
+  }
+  return grouped
 }
 
 /** Cuenta secciones habilitadas de una maquina */
