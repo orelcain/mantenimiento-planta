@@ -24,8 +24,10 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
   - Extra detectado al regenerar functions: **form-data <2.5.6** (high, fuera de la lista dependabot) → `npm audit fix --package-lock-only`.
 - Archivos: `package.json` (overrides pnpm), `apps/pwa/package.json`, `functions/package.json`, `pnpm-lock.yaml`, `functions/package-lock.json`.
 - Verificación: pnpm install OK (sin ERR_SSL); lockfile con versiones parcheadas confirmadas; `pnpm exec tsc --noEmit` limpio; `eslint . --max-warnings 30` = 0 errores / 23 warnings preexistentes; `pnpm build` = success; functions `npm audit` = **0 vulnerabilidades**.
-- Estado: EN REVISIÓN (rama `chore/ai-coordination`, PR abierto). **Merge a main pendiente del OK de Orel.**
-- Sigue: confirmar en GitHub que dependabot cierra las 23 al mergear; Fase 5 deletes legacy.
+- **DEPLOY: PR #79 mergeado → "Deploy PWA" + "Deploy Firebase Functions" = success.** Las 23 quedaron FIXED en dependabot.
+- **2ª pasada (mismo día):** al re-escanear el árbol nuevo, dependabot destapó 6 alertas distintas (antes no reportadas) en `pnpm-lock.yaml`: form-data (high)→`>=2.5.6` (4.0.6), ws (high)→`>=8.21.0`, vite (high+med, devDep directa)→`^6.4.3`, js-yaml (med)→`>=4.2.0`, @babel/core (low)→`>=7.29.6` (8.0.1). vite bump directo; resto overrides pnpm. tsc+eslint+build OK.
+- Estado: HECHO (1ª pasada LIVE). 2ª pasada en `chore/ai-coordination` → PR #80.
+- Sigue: confirmar que las 6 cierran al mergear; Fase 5 deletes legacy.
 
 ## 2026-06-20 · claude · Mejoras UX sidebar/buscador/favoritos + DEPLOY (PR #78)
 
