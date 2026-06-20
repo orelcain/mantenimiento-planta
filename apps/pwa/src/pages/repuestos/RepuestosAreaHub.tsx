@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -160,7 +160,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
   })
   const [showingAll, setShowingAll] = useState(false)
-  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({})
+  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>(() => {
+    try { const s = localStorage.getItem('repuestos-open-nodes'); return s ? (JSON.parse(s) as Record<string, boolean>) : {} } catch { return {} }
+  })
+  // Recordar la posición del árbol entre recargas (solo las ramas abiertas).
+  useEffect(() => {
+    try {
+      const open = Object.fromEntries(Object.entries(openNodes).filter(([, v]) => v))
+      localStorage.setItem('repuestos-open-nodes', JSON.stringify(open))
+    } catch { /* noop */ }
+  }, [openNodes])
+  // Contraer todo el árbol de un golpe.
+  const collapseAllNodes = useCallback(() => setOpenNodes({}), [])
   // Equipo seleccionado desde el sidebar / chips de favoritos (clave = linkedMachineId || nodeId) para resaltarlo.
   const [selectedEquipKey, setSelectedEquipKey] = useState<string | null>(null)
   // Nombre del equipo seleccionado, para mostrarlo como título (en vez del área).
@@ -358,16 +369,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const removeEquipFromList = useCallback((listName: string, machineId: string) => {
     persistEquipLists(equipFavLists.map((l) => l.name === listName ? { ...l, machineIds: l.machineIds.filter((id) => id !== machineId) } : l).filter((l) => l.machineIds.length > 0))
   }, [equipFavLists, persistEquipLists])
-  const moveEquipInList = useCallback((listName: string, idx: number, dir: 'up' | 'down') => {
-    const swap = dir === 'up' ? idx - 1 : idx + 1
+  // Reordenar por drag-and-drop: mueve el item de `from` a la posición `to`.
+  const reorderEquipInList = useCallback((listName: string, from: number, to: number) => {
+    if (from === to) return
     persistEquipLists(equipFavLists.map((l) => {
       if (l.name !== listName) return l
-      if (swap < 0 || swap >= l.machineIds.length) return l
+      if (from < 0 || from >= l.machineIds.length || to < 0 || to >= l.machineIds.length) return l
       const ids = [...l.machineIds]
-      const tmp = ids[idx]!; ids[idx] = ids[swap]!; ids[swap] = tmp
+      const [moved] = ids.splice(from, 1)
+      ids.splice(to, 0, moved!)
       return { ...l, machineIds: ids }
     }))
   }, [equipFavLists, persistEquipLists])
+  const [dragFav, setDragFav] = useState<{ list: string; idx: number } | null>(null)
 
   // Áreas favoritas (estrella en el árbol) — compartido con "Por equipo" (localStorage).
   const [favoriteAreaIds, setFavoriteAreaIds] = useState<Set<string>>(() => {
@@ -1142,6 +1156,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onToggleFavoritesOnly={() => setAreaFavOnly((v) => !v)}
         openNodes={openNodes}
         onToggleNode={handleToggleNode}
+        onCollapseAll={collapseAllNodes}
         onShowAll={handleShowAll}
         showingAll={showingAll}
         mobileOpen={sidebarMobileOpen}
@@ -1294,8 +1309,32 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                         </div>
                         {!closed && (
                           <div className="mt-1.5 flex flex-wrap gap-1.5 pl-5">
-                            {list.machineIds.map((id, idx) => (
-                              <span key={id} className="group inline-flex items-center overflow-hidden rounded-full border border-border bg-background">
+                            {list.machineIds.map((id, idx) => {
+                              const dragging = dragFav?.list === list.name && dragFav.idx === idx
+                              return (
+                              <span
+                                key={id}
+                                draggable={isAdmin}
+                                onDragStart={(e) => { if (!isAdmin) return; e.dataTransfer.setData('text/plain', JSON.stringify({ list: list.name, idx })); e.dataTransfer.effectAllowed = 'move'; setDragFav({ list: list.name, idx }) }}
+                                onDragOver={(e) => { if (dragFav?.list === list.name) e.preventDefault() }}
+                                onDrop={(e) => {
+                                  e.preventDefault()
+                                  let from = dragFav?.list === list.name ? dragFav.idx : -1
+                                  try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d && d.list === list.name) from = d.idx } catch { /* noop */ }
+                                  if (from >= 0) reorderEquipInList(list.name, from, idx)
+                                  setDragFav(null)
+                                }}
+                                onDragEnd={() => setDragFav(null)}
+                                className={[
+                                  'group inline-flex items-center overflow-hidden rounded-full border border-border bg-background transition',
+                                  isAdmin ? 'cursor-grab active:cursor-grabbing' : '',
+                                  dragging ? 'opacity-40 ring-1 ring-primary' : '',
+                                ].join(' ')}
+                                title={isAdmin ? 'Arrastra para reordenar' : undefined}
+                              >
+                                {isAdmin && (
+                                  <GripVertical className="ml-1 h-3 w-3 shrink-0 text-muted-foreground/30 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" />
+                                )}
                                 <button
                                   onClick={() => handleFavEquipClick(id, list.machineNames?.[id] || equipNameMap.get(id))}
                                   className="px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:bg-primary/10 hover:text-primary"
@@ -1303,14 +1342,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
                                 </button>
                                 {isAdmin && (
-                                  <span className="inline-flex items-center pr-1 [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:inline-flex">
-                                    <button onClick={() => moveEquipInList(list.name, idx, 'up')} disabled={idx === 0} title="Subir" className="px-0.5 text-muted-foreground/50 hover:text-primary disabled:opacity-20"><ChevronUp className="h-3 w-3" /></button>
-                                    <button onClick={() => moveEquipInList(list.name, idx, 'down')} disabled={idx === list.machineIds.length - 1} title="Bajar" className="px-0.5 text-muted-foreground/50 hover:text-primary disabled:opacity-20"><ChevronDown className="h-3 w-3" /></button>
-                                    <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="px-0.5 text-muted-foreground/50 hover:text-red-400"><X className="h-3 w-3" /></button>
-                                  </span>
+                                  <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="pl-0.5 pr-1.5 text-muted-foreground/40 transition hover:text-red-400 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"><X className="h-3 w-3" /></button>
                                 )}
                               </span>
-                            ))}
+                            )})}
                           </div>
                         )}
                       </div>
@@ -1400,17 +1435,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
           {/* Tabla de repuestos del área (catálogo + bodega) */}
           <section>
-            {/* Filtros */}
+            {/* Filtros (la búsqueda vive en la barra superior — global, sticky) */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[200px] flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={repQuery}
-                  onChange={(e) => setRepQuery(e.target.value)}
-                  placeholder="Buscar en repuestos…"
-                  className="pl-9"
-                />
-              </div>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
               <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}>
