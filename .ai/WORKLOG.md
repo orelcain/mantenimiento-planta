@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Fase 5 — retirada de features legacy (machines/plantAssets) + scripts de borrado
+
+- Decisión de Orel (2 preguntas): retirar el tab "Categorías" (CategoryManager) y la capa "Equipos SAP" del editor de mapa, para liberar `machines` y `plantAssets`.
+- Verificación de lectores vivos contra código actual: `machines`←`useMachines`→`MachineProvider`(raíz, **contexto sin consumidores reales**)+`CategoryManager`(Settings); `plantAssets`←`usePlantAssets`→`PanelCapasYZonas`(único lector); `insumos`/`repuestosBaader200` sin lectores.
+- Código retirado: quitado `MachineProvider` de `App.tsx` (era peso muerto: cargaba `machines` en cada arranque, nadie leía el contexto); quitado tab "Categorías"+`<CategoryManager/>` de `SettingsPage`; quitada la sección "Equipos SAP" de `PanelCapasYZonas`. Borrados 5 archivos: `MachineContext.tsx`, `useMachines.ts`, `useLinkMachine.ts`(ya muerto), `CategoryManager.tsx`, `usePlantAssets.ts`. (NO se tocó `useMachineCategories`/`machineCategories` — lo usa aún `CategorySelector`, fuera de scope.)
+- Scripts nuevos (solo-lectura / con gate): `scripts/normalizacion/10-backup-fase5.js` (backup eficiente) y `11-delete-legacy.js` (dry-run por defecto; `--write` exige backup fase5-*).
+- **Backup hecho** (`backups/fase5-2026-06-20T17-25-56/`): insumos 3552 · machines 36(+6 padres fantasma) · machines/*/repuestos 5578 (incl. huérfanas sin-asignar/multivac/SW2RNI) · plantAssets 134 · repuestosBaader200 0 · hierarchy/*/repuestos 3. ≈9.300 docs.
+- Verificación código: `tsc --noEmit` limpio, `eslint` archivos tocados limpio, `pnpm build` success. **Verificado en preview en vivo (sirve D:): app monta sin crashear tras quitar provider raíz; Settings ya sin tab "Categorías".**
+- Estado: EN REVISIÓN. Orden: PR+merge+deploy del código → recién entonces `11-delete-legacy.js --write` (para que producción no lea colecciones borradas). **Borrado de datos PENDIENTE hasta deploy.**
+
 ## 2026-06-20 · claude · Dependabot: resueltas las 23 alertas (bumps + overrides)
 
 - Pedido de Orel: mitigar las vulnerabilidades dependabot del repo. Inventario real vía `gh api .../dependabot/alerts` = **23 abiertas** (10 high / 9 med / 4 low) en 4 paquetes: dompurify ×8, protobufjs ×6, @grpc/grpc-js ×6, react-router ×3.

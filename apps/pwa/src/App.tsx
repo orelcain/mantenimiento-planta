@@ -7,7 +7,6 @@ import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { RequireReAuth } from '@/components/auth/RequireReAuth'
 import { HelpProvider } from '@/components/help'
-import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
@@ -234,8 +233,7 @@ export function App() {
   }, [setUser, setLoading, loadPermissions, clearPermissions])
 
   return (
-    <MachineProvider>
-      <HelpProvider>
+    <HelpProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Toaster />
           <ErrorBoundary>
@@ -705,7 +703,6 @@ export function App() {
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
-      </HelpProvider>
-    </MachineProvider>
+    </HelpProvider>
   )
 }

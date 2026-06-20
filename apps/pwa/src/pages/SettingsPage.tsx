@@ -64,13 +64,12 @@ import { initializeHierarchySystem, isHierarchyInitialized } from '../services/h
 import { getHmiTooltipPwd, saveHmiTooltipPwd } from '@/services/hmiKnuro'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { ProcessNotificationsPanel } from '@/components/settings/ProcessNotificationsPanel'
-import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { PermissionsPage } from '@/pages/admin/PermissionsPage'
 import { AriaMonitorPanel } from '@/components/admin/AriaMonitorPanel'
 import { MissionControlPanel } from '@/components/admin/MissionControlPanel'
 import { Brain, Satellite } from 'lucide-react'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'permissions' | 'aria' | 'mission' | 'system'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'permissions' | 'aria' | 'mission' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -92,7 +91,6 @@ export function SettingsPage() {
     { id: 'permissions' as const, label: 'Permisos', icon: Shield },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
-    { id: 'categories' as const, label: 'Categorías', icon: Database },
     { id: 'aria' as const, label: 'ARIA', icon: Brain },
     { id: 'mission' as const, label: 'Mission Control', icon: Satellite },
     { id: 'system' as const, label: 'Sistema', icon: Wrench },
@@ -133,7 +131,6 @@ export function SettingsPage() {
       {isAdmin && activeTab === 'permissions' && <PermissionsPage isEmbedded={true} />}
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
-      {isAdmin && activeTab === 'categories' && <CategoryManager />}
       {isAdmin && activeTab === 'aria' && <AriaMonitorPanel />}
       {isAdmin && activeTab === 'mission' && <MissionControlPanel />}
       {isAdmin && activeTab === 'system' && <SystemSettings />}
