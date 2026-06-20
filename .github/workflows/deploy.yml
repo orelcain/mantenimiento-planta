@@ -63,6 +63,8 @@ jobs:
           # AI (Cloud Functions son el canal principal, keys como fallback)
           VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          # Google Cloud Text-to-Speech (voz de ARIA) — clave dedicada solo-TTS
+          VITE_GOOGLE_TTS_API_KEY: ${{ secrets.VITE_GOOGLE_TTS_API_KEY }}
         run: pnpm build
 
       - name: Include Chonchi weather demo
