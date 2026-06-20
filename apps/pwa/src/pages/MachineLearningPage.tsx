@@ -390,15 +390,28 @@ export function MachineLearningPage() {
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
           <DiagnosisList entries={diagnosis} color={machine.color} />
         ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
-          <div className="space-y-6">
-            {flows.length > 0 && <FlowDiagramViewer flows={flows} color={machine.color} />}
+          <div className="space-y-8">
+            {flows.length > 0 && (
+              <div className="space-y-3">
+                <CasosSectionHeader
+                  icon={GitBranch}
+                  color={machine.color}
+                  badge="Señal → accion"
+                  title="¿Que hago cuando…?"
+                  subtitle="Flujo de reaccion paso a paso. Toca cada nodo para ver la instruccion completa."
+                />
+                <FlowDiagramViewer flows={flows} color={machine.color} />
+              </div>
+            )}
             {diagnosis.length > 0 && (
               <div className="space-y-3">
-                {flows.length > 0 && (
-                  <h3 className="pt-1 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.inkLo }}>
-                    Señal → accion
-                  </h3>
-                )}
+                <CasosSectionHeader
+                  icon={Activity}
+                  color={machine.color}
+                  badge="Diagnostico"
+                  title="Casos"
+                  subtitle="Sintoma → causa probable → solucion. Toca un caso para abrirlo."
+                />
                 <DiagnosisList entries={diagnosis} color={machine.color} />
               </div>
             )}
@@ -1212,6 +1225,46 @@ function ImageLightbox({
   )
 }
 
+
+/** Cabecera de sub-seccion dentro de la pestana "Casos" (distingue flujos de diagnostico). */
+function CasosSectionHeader({
+  icon: Icon,
+  color,
+  badge,
+  title,
+  subtitle,
+}: {
+  icon: React.ElementType
+  color: string
+  badge: string
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        style={{ background: `${color}16`, border: `1px solid ${color}33` }}
+      >
+        <Icon className="h-4 w-4" style={{ color }} />
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-base font-semibold text-[#e9eef3]">{title}</h3>
+          <span
+            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+            style={{ background: `${color}16`, color, border: `1px solid ${color}30` }}
+          >
+            {badge}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs leading-relaxed" style={{ color: LC.inkLo }}>
+          {subtitle}
+        </p>
+      </div>
+    </div>
+  )
+}
 
 function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: string }) {
   // Acordeón: una fila abierta a la vez. Arranca con la primera abierta.
