@@ -890,10 +890,400 @@ const M3_QUIZ = [
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
+// MODULO 1 — NFPA 70E, Seguridad Electrica en Lugares de Trabajo (slug seguridad-electrica)
+// ════════════════════════════════════════════════════════════════════════════
+
+const M1_MANUAL = [
+  {
+    id: 'm1-01-marco-nfpa70e',
+    title: 'Marco y estructura de la NFPA 70E',
+    intro: 'Objetivo: identificar los aspectos de la NFPA 70E 2024 y los requisitos de un Programa de Seguridad Electrica (PSE). Este modulo es el cimiento del programa: la seguridad electrica antes de rescatar (Modulo 2) o mantener (Modulo 3).',
+    clave: [
+      'NFPA 70E = Norma para la Seguridad Electrica en Lugares de Trabajo, edicion 2024 (espanol). Proposito: proveer un area de trabajo segura frente a los riesgos del uso de la electricidad.',
+      'La NFPA (National Fire Protection Association, EE.UU.) es la autoridad mundial en seguridad contra incendios y electrica.',
+      'Estructura: Articulo 90 (introduccion); Capitulo 1 - Practicas de trabajo (Art 100 Definiciones, Art 110 Requisitos generales, Art 120 Condicion de trabajo segura, Art 130 Trabajos con peligros); Capitulo 2 - Mantenimiento; Capitulo 3 - Equipos especiales; Anexos A a S (informativos, no obligatorios).',
+      'En Chile la fiscaliza la SEC (Superintendencia de Electricidad y Combustibles); se incorporo via DS N°8 (RIC, reemplazo la NCh 4/2003) y DS N°109 (MT/AT).',
+      'Niveles de tension: Baja (BT) menor o igual a 1 kV; Media (MT) mayor a 1 kV hasta 23 kV; Alta (AT) mayor a 23 kV hasta 230 kV.',
+    ],
+    terreno: [
+      'Persona Calificada = demostro habilidades + capacitacion en seguridad para identificar y evitar peligros. Persona No Calificada = todas las demas.',
+      'Anexos utiles: C (limites de aproximacion), D (calculo de energia incidente), E (Programa de Seguridad Electrica), G (ejemplo de Bloqueo/Etiquetado), H (seleccion de EPP), Q (desempeno/error humano).',
+      'Autochequeo: ¿que articulo define la condicion de trabajo electricamente segura? ¿quien fiscaliza en Chile?',
+    ],
+  },
+  {
+    id: 'm1-02-tres-peligros',
+    title: 'Peligros electricos: los tres grandes',
+    intro: 'Objetivo: reconocer los 3 peligros que define la NFPA 70E y por que las lesiones electricas son tan graves.',
+    medidas: [
+      'Triangulo de seguridad: general = 1 fatalidad cada 300 lesiones; ELECTRICO = 1 fatalidad cada 10 lesiones',
+      'Referencia: ~8.000 lesiones por contacto electrico al ano',
+      '98% de las fatalidades electricas laborales son por choque electrico',
+      'Mas del 40% de las fatalidades involucran contacto con lineas electricas',
+    ],
+    clave: [
+      'Los 3 peligros NFPA 70E: choque electrico (corriente por el cuerpo), relampago de arco / arc flash (calor y luz), rafaga / explosion de arco / arc blast (onda de presion).',
+      'Peligro electrico = condicion donde el contacto o falla de equipos puede causar choque, quemadura por relampago de arco, quemadura termica o lesion por rafaga.',
+      'Las lesiones electricas tienen una tasa de fatalidad mucho mayor que la mayoria de las otras lesiones.',
+    ],
+    terreno: [
+      'Estadistica del curso: en lugares de trabajo, casi todos los dias se electrocuta una persona.',
+      'Autochequeo: ¿cuales son los 3 peligros que define la norma? ¿que proporcion tiene el triangulo de seguridad electrico?',
+    ],
+  },
+  {
+    id: 'm1-03-choque-cuerpo',
+    title: 'Choque electrico: como afecta al cuerpo',
+    intro: 'Objetivo: entender que determina la gravedad de un choque y leer la tabla de efectos de la corriente.',
+    medidas: [
+      'Resistencia del cuerpo humano (mano a mano): ~2.000 ohms',
+      'Contacto a 380 V: I = 380/2000 = 190 mA. Contacto a 220 V: I = 220/2000 = 110 mA',
+      '0-3 mA: umbral de percepcion',
+      '3-10 mA: no poder soltarse (tetanizacion del brazo)',
+      '10-30 mA: paralisis respiratoria (frecuentemente fatal)',
+      '30-75 mA: umbral de fibrilacion',
+      '75-250 mA: fibrilacion ventricular (fatalidad esperada)',
+    ],
+    clave: [
+      'Parametros que influyen: intensidad de corriente, tiempo de exposicion, trayectoria por el cuerpo, naturaleza (CA/CC), resistencia del cuerpo y tension aplicada.',
+      'Lesiones del choque: fibrilacion ventricular (la mas grave), tetanizacion ("queda pegado"), paro respiratorio y quemaduras.',
+      'Ley de Ohm: I = V / R. A menor resistencia (piel humeda, mayor area de contacto) circula mas corriente.',
+    ],
+    terreno: [
+      'El tiempo importa tanto como la corriente: la fibrilacion depende de intensidad x tiempo (curva IEC 479 / NTP 400).',
+      'Autochequeo: ¿que resistencia de cuerpo usa la norma? ¿a partir de que corriente hay paralisis respiratoria?',
+    ],
+  },
+  {
+    id: 'm1-04-arco-causas',
+    title: 'Arco electrico: caracteristicas y causas',
+    intro: 'Objetivo: entender que es el arco electrico, su energia destructiva y por que falla.',
+    medidas: [
+      'Temperatura del arco: 2.000 a 20.000 °C (funde cualquier material)',
+      'El cobre se expande 67.000 veces al pasar de solido a vapor; proyecta metal fundido a mas de 1.120 km/h',
+      'El arco puede encender la ropa hasta a 3 m del punto de falla',
+      'Categorias de EPP por energia incidente: Cat 1 = 4 cal/cm² · Cat 2 = 8 · Cat 3 = 25 · Cat 4 = 40 cal/cm²',
+    ],
+    clave: [
+      'El arco es el flujo de corriente por el aire entre conductores (fase-fase, fase-neutro o fase-tierra). Libera calor radiante, luz intensa y grandes presiones.',
+      'Se descompone en relampago de arco (arc flash) + rafaga de arco (arc blast).',
+      'Causas de falla de arco: sobretensiones, mecanicas (animales, objetos), evolutivas (debilitamiento del aislamiento, condensacion, puntos calientes por conexiones flojas) y operacionales (error de maniobra, contacto accidental, contaminacion, corrosion, falta de mantenimiento).',
+    ],
+    terreno: [
+      'Falla evolutiva tipica: energizar una instalacion tras varios dias de parada -> condensacion sobre el aislamiento -> arco.',
+      'Una conexion floja o un borne aflojado genera un punto caliente que puede evolucionar a una falla trifasica.',
+      'Autochequeo: ¿en cuanto se expande el cobre? ¿cuantas cal/cm² es la Categoria 2 de EPP?',
+    ],
+  },
+  {
+    id: 'm1-05-cinco-reglas-oro',
+    title: 'Las 5 Reglas de Oro (condicion de trabajo segura)',
+    intro: 'Objetivo: establecer una condicion de trabajo SIN energia (Art 120). Lo mas seguro es trabajar desenergizado; las 5 Reglas de Oro son el corazon del trabajo electrico seguro.',
+    clave: [
+      'Las 5 Reglas de Oro, en orden: 1) Desconectar con corte visible o efectivo todas las fuentes de tension; 2) Prevenir cualquier realimentacion (enclavar/bloquear) + tarjeta "PELIGRO NO OPERAR"; 3) Verificar ausencia de tension; 4) Poner a tierra y en cortocircuito; 5) Delimitar y senalizar la zona.',
+      'Una instalacion DESCONECTADA no es lo mismo que SEGURA: hasta cumplir las 5 reglas, cualquier intervencion se considera trabajo con tension.',
+      '3a Regla: verificar el detector antes y despues, en cada conductor; durante la verificacion la instalacion se considera con tension (usar EPP).',
+      '4a Regla: partir por el punto de conexion a tierra; pinzas con buen contacto; evitar superficies pintadas.',
+    ],
+    terreno: [
+      'Corte visible se logra: viendo abiertas las cuchillas del desconectador, retirando el interruptor de su celda, o retirando fusibles/puentes.',
+      'Autochequeo: ¿cual es el orden de las 5 Reglas? ¿una instalacion desconectada ya es segura para intervenir?',
+    ],
+  },
+  {
+    id: 'm1-06-loto',
+    title: 'Bloqueo y Etiquetado (LOTO)',
+    intro: 'Objetivo: aplicar el Programa de Bloqueo/Etiquetado para que nadie reenergice el equipo mientras se trabaja (Anexo G).',
+    clave: [
+      'LOTO = Lock Out / Tag Out (Bloqueo / Etiquetado): garantiza que los dispositivos de corte queden inmovilizados y senalizados.',
+      'Bloqueo: inmovilizar el mando con candado/cerradura, o impedir el funcionamiento (retirar fusibles de control), o colocar un elemento aislante.',
+      'Etiquetado: tarjeta "PELIGRO NO OPERAR" + tarjeta que identifica a quien bloquea (nombre, RUT, foto).',
+      'Cada persona que interviene coloca su propio candado; nadie retira el candado de otro.',
+    ],
+    terreno: [
+      'La senalizacion es la proteccion minima cuando no se puede inmovilizar materialmente el aparato de corte.',
+      'Autochequeo: ¿que dice la tarjeta de bloqueo? ¿quien puede retirar tu candado?',
+    ],
+  },
+  {
+    id: 'm1-07-fronteras-epp',
+    title: 'Fronteras de aproximacion y EPP',
+    intro: 'Objetivo: respetar las distancias de seguridad y elegir el EPP correcto cuando hay partes energizadas expuestas.',
+    medidas: [
+      'Frontera de Aproximacion Limitada (FAL) tipica en BT (50-750 V): ~3,1 m con conductor movil',
+      'Frontera de Aproximacion Restringida (FAR) en 151-750 V: ~0,3 m',
+      'Categorias de EPP: Cat 1 = 4 cal/cm² · Cat 2 = 8 · Cat 3 = 25 · Cat 4 = 40 cal/cm²',
+      'Pruebas de guantes aislantes: cada 6 meses; mantas y mangas: cada 12 meses',
+    ],
+    clave: [
+      'Frontera de Aproximacion Limitada (FAL): solo la cruza personal calificado.',
+      'Frontera de Aproximacion Restringida (FAR): mayor riesgo de arco; bajo ninguna circunstancia una persona no calificada la cruza, ni siquiera escoltada.',
+      'El EPP se elige por la energia incidente (cal/cm²) esperada -> categoria de ropa arco-resistente (AR). ATPV = Valor de Proteccion Termica del Arco (cal/cm², bordado en la prenda).',
+      'EPP / ESE: guantes aislantes, careta AR, ropa AR, pasamontanas, pertigas.',
+    ],
+    terreno: [
+      'El EPP es el ULTIMO recurso de la jerarquia de control: primero se elimina o controla el peligro.',
+      'Autochequeo: ¿quien puede cruzar la frontera limitada? ¿cuantas cal/cm² es la Categoria 4?',
+    ],
+  },
+  {
+    id: 'm1-08-riesgos-jerarquia',
+    title: 'Evaluacion de riesgos y jerarquia de control',
+    intro: 'Objetivo: evaluar el riesgo electrico (choque y arco) y aplicar la jerarquia de control para reducirlo.',
+    clave: [
+      'La evaluacion de riesgo de CHOQUE determina la tension a la que estara expuesto el personal, las fronteras y el EPP necesario.',
+      'La evaluacion de riesgo de ARCO determina la energia incidente y el limite de relampago de arco.',
+      'Jerarquia de control de riesgos (de mas a menos efectiva): 1) Eliminacion, 2) Sustitucion, 3) Controles de ingenieria, 4) Avisos / advertencias, 5) Controles administrativos, 6) EPP.',
+      'Permiso de Trabajo Electrico Energizado: solo cuando desenergizar no es factible o aumenta el riesgo; requiere justificacion, analisis y autorizacion (Anexo J).',
+    ],
+    terreno: [
+      'Anexo Q (Error Humano): el factor humano es clave; usar herramientas de desempeno humano para reducir errores.',
+      'Autochequeo: ¿cual es el primer nivel de la jerarquia de control? ¿cuando se permite trabajo energizado?',
+    ],
+  },
+  {
+    id: 'm1-09-autoevaluacion',
+    title: 'Autoevaluacion — foco',
+    intro: 'Repasa estas preguntas clave del modulo de seguridad electrica. Las respuestas estan en las lecciones anteriores.',
+    clave: [
+      'Norma del modulo -> NFPA 70E 2024 (seguridad electrica en lugares de trabajo).',
+      'Los 3 peligros -> choque, relampago de arco, rafaga de arco.',
+      'Resistencia del cuerpo (norma) -> ~2.000 ohms.',
+      'Corriente con paralisis respiratoria -> 10-30 mA.',
+      'Efecto mas grave de la corriente -> fibrilacion ventricular.',
+      'Temperatura del arco -> 2.000 a 20.000 °C.',
+      'Expansion del cobre -> 67.000 veces.',
+      'Orden de las 5 Reglas de Oro -> desconectar, prevenir realimentacion, verificar ausencia, poner a tierra, senalizar.',
+      'Quien cruza la frontera restringida -> nadie no calificado (ni escoltado).',
+      'Primer nivel de la jerarquia de control -> eliminacion.',
+      'Autoridad en Chile -> SEC.',
+    ],
+    terreno: [
+      'El examen apunta fuerte a las 5 Reglas, las fronteras, la tabla de efectos de la corriente y la jerarquia de control.',
+    ],
+  },
+  {
+    id: 'm1-10-glosario',
+    title: 'Glosario de siglas y terminos',
+    intro: 'Terminos clave del modulo.',
+    clave: [
+      'NFPA 70E = Seguridad Electrica en Lugares de Trabajo. PSE = Programa de Seguridad Electrica. LOTO = Bloqueo/Etiquetado.',
+      'FAL = Frontera de Aproximacion Limitada. FAR = Frontera de Aproximacion Restringida.',
+      'EPP = Equipo de Proteccion Personal. ESE = Elementos de Seguridad Electrica. AR = Arco-Resistente. ATPV = Valor de Proteccion Termica del Arco (cal/cm²). FR = Resistente a la Llama.',
+      'BT/MT/AT = Baja (<=1 kV) / Media (>1-23 kV) / Alta (>23-230 kV) Tension.',
+      'SEC = Superintendencia de Electricidad y Combustibles. RIC = Reglamento de Instalaciones de Consumo.',
+      'Energia incidente = energia (cal/cm²) entregada sobre una superficie a una distancia dada por un arco. Persona Calificada / No Calificada.',
+    ],
+  },
+];
+
+const M1_PROCEDURES = [
+  {
+    id: 'm1-proc-condicion-segura',
+    title: 'Establecer condicion de trabajo electricamente segura (5 Reglas de Oro)',
+    description: 'Secuencia para trabajar SIN energia. En orden, sin saltarse pasos.',
+    steps: [
+      'Desconectar con corte visible o efectivo todas las fuentes de tension.',
+      'Prevenir realimentacion: enclavar/bloquear + tarjeta "PELIGRO NO OPERAR".',
+      'Verificar ausencia de tension (detector probado antes y despues, en cada conductor).',
+      'Poner a tierra y en cortocircuito, partiendo por el punto de conexion a tierra.',
+      'Delimitar y senalizar la zona de trabajo.',
+    ],
+  },
+  {
+    id: 'm1-proc-loto',
+    title: 'Bloqueo y Etiquetado (LOTO)',
+    description: 'Asegurar que nadie reenergice el equipo mientras se trabaja.',
+    steps: [
+      'Identifica TODAS las fuentes de energia del equipo (electrica y almacenada).',
+      'Apaga / desconecta por el procedimiento normal.',
+      'Aisla y bloquea cada dispositivo de corte con tu propio candado.',
+      'Coloca la tarjeta "PELIGRO NO OPERAR" con tu identificacion (nombre, RUT, foto).',
+      'Verifica ausencia de tension y descarga la energia almacenada.',
+      'Al terminar, retira SOLO tu propio candado.',
+    ],
+  },
+  {
+    id: 'm1-proc-verificar-tension',
+    title: 'Verificar ausencia de tension',
+    description: 'La 3a Regla de Oro hecha bien: el detector se prueba antes y despues.',
+    steps: [
+      'Ponte el EPP (guantes aislantes): la instalacion se considera con tension.',
+      'Prueba el detector en una fuente conocida CON tension.',
+      'Mide en cada conductor (todas las fases y el neutro).',
+      'Vuelve a probar el detector en la fuente conocida (confirma que sigue funcionando).',
+      'Recien ahi declara ausencia de tension.',
+    ],
+  },
+  {
+    id: 'm1-proc-epp-arco',
+    title: 'Seleccionar EPP por categoria de arco',
+    description: 'Elegir la ropa arco-resistente segun la energia incidente.',
+    steps: [
+      'Determina la energia incidente esperada (cal/cm²) del punto de trabajo.',
+      'Ubica la categoria: Cat 1 = 4 · Cat 2 = 8 · Cat 3 = 25 · Cat 4 = 40 cal/cm².',
+      'Elige ropa AR cuyo ATPV sea igual o mayor a esa energia.',
+      'Completa con careta AR, guantes aislantes y pasamontanas.',
+      'Verifica la vigencia de las pruebas (guantes cada 6 meses).',
+    ],
+  },
+];
+
+const M1_FLOWS = [
+  {
+    id: 'm1-flow-intervenir',
+    title: 'Voy a intervenir un equipo electrico',
+    trigger: 'Necesitas trabajar en un equipo o circuito electrico.',
+    actions: [
+      'Primero intenta desenergizar: es lo mas seguro.',
+      'Aplica las 5 Reglas de Oro.',
+      'Bloquea y etiqueta (LOTO) con tu candado.',
+      'Verifica ausencia de tension antes de tocar.',
+      'Si NO se puede desenergizar, tramita un Permiso de Trabajo Energizado.',
+    ],
+  },
+  {
+    id: 'm1-flow-punto-caliente',
+    title: 'Detecto un punto caliente o conexion floja',
+    trigger: 'Termografia o inspeccion muestra un punto caliente / conexion floja.',
+    actions: [
+      'No lo intervengas energizado.',
+      'Programa la correccion con el equipo desenergizado.',
+      'Reaprieta o repara la conexion.',
+      'Es una causa evolutiva de arco: registra y da seguimiento.',
+    ],
+  },
+  {
+    id: 'm1-flow-no-calificado',
+    title: 'Una persona no calificada se acerca a zona energizada',
+    trigger: 'Alguien sin calificacion se aproxima a partes energizadas expuestas.',
+    actions: [
+      'Detenlo antes de la Frontera de Aproximacion Limitada.',
+      'Solo personal calificado cruza la FAL.',
+      'Nadie no calificado cruza la Frontera Restringida, ni escoltado.',
+      'Senaliza y delimita la zona.',
+    ],
+  },
+];
+
+const M1_DIAGNOSIS = [
+  {
+    id: 'm1-dx-paralisis',
+    title: 'Corriente de 10-30 mA por el cuerpo',
+    symptom: 'Una persona recibe entre 10 y 30 mA: dificultad para respirar / paralisis respiratoria.',
+    possibleCauses: [
+      'Paso de corriente por el torax',
+      'Tetanizacion de los musculos respiratorios',
+    ],
+    solution: 'Corta la energia o separa a la victima con un elemento aislante seco, llama a emergencia (131) e inicia SVB/RCP si no respira. Recuerda: 10-30 mA es frecuentemente fatal.',
+  },
+  {
+    id: 'm1-dx-arco-parada',
+    title: 'Arco al energizar tras una parada larga',
+    symptom: 'Al reenergizar un equipo despues de varios dias detenido, se produce una falla de arco.',
+    possibleCauses: [
+      'Condensacion sobre el aislamiento',
+      'Debilitamiento evolutivo del aislamiento',
+      'Contaminacion / polvo en superficies aislantes',
+    ],
+    solution: 'Antes de reenergizar tras una parada larga, inspecciona y seca; usa termografia para detectar puntos calientes. Es una falla evolutiva: el mantenimiento preventivo la previene.',
+  },
+  {
+    id: 'm1-dx-contacto-linea',
+    title: 'Contacto con linea energizada',
+    symptom: 'Un trabajador hace contacto con una linea o parte energizada expuesta.',
+    possibleCauses: [
+      'No se establecio condicion de trabajo segura',
+      'Cruce de frontera sin EPP / sin calificacion',
+    ],
+    solution: 'No toques a la victima mientras este energizada: corta la energia o separala con un aislante seco. Luego evalua y aplica SVB. Se previene aplicando las 5 Reglas de Oro y respetando las fronteras.',
+  },
+];
+
+const M1_QUIZ = [
+  {
+    id: 'm1-q-peligros',
+    question: '¿Cuantos peligros electricos define la NFPA 70E y cuales son?',
+    options: ['Uno: el choque', 'Dos: choque y arco', 'Tres: choque, relampago de arco y rafaga de arco', 'Cuatro: choque, arco, incendio y explosion'],
+    correctIndex: 2,
+    explanation: 'Tres: choque electrico, relampago de arco (arc flash) y rafaga de arco (arc blast).',
+  },
+  {
+    id: 'm1-q-resistencia',
+    question: 'Segun la norma, ¿que resistencia se considera para el cuerpo humano (mano a mano)?',
+    options: ['200 ohms', '2.000 ohms', '20.000 ohms', '200.000 ohms'],
+    correctIndex: 1,
+    explanation: '~2.000 ohms. A 220 V eso da ~110 mA; a 380 V, ~190 mA.',
+  },
+  {
+    id: 'm1-q-paralisis',
+    question: '¿A partir de que rango de corriente hay paralisis respiratoria?',
+    options: ['0-3 mA', '3-10 mA', '10-30 mA', 'mayor a 5 A'],
+    correctIndex: 2,
+    explanation: '10-30 mA: paralisis respiratoria, frecuentemente fatal.',
+  },
+  {
+    id: 'm1-q-reglas-oro',
+    question: '¿Cual es el orden correcto de las 5 Reglas de Oro?',
+    options: [
+      'Verificar, desconectar, tierra, bloquear, senalizar',
+      'Desconectar, prevenir realimentacion, verificar ausencia de tension, poner a tierra, senalizar',
+      'Bloquear, senalizar, desconectar, tierra, verificar',
+      'Desconectar, verificar, senalizar, tierra, bloquear',
+    ],
+    correctIndex: 1,
+    explanation: '1) desconectar (corte visible), 2) prevenir realimentacion (bloquear), 3) verificar ausencia de tension, 4) poner a tierra y cortocircuito, 5) senalizar.',
+  },
+  {
+    id: 'm1-q-desconectada',
+    question: 'Una instalacion DESCONECTADA, ¿ya es segura para intervenir?',
+    options: ['Si, basta con desconectar', 'No: hasta cumplir las 5 Reglas se considera trabajo con tension', 'Solo si es de baja tension', 'Solo si esta senalizada'],
+    correctIndex: 1,
+    explanation: 'Desconectada no es segura: hasta completar las 5 Reglas de Oro, cualquier intervencion se considera trabajo con tension.',
+  },
+  {
+    id: 'm1-q-far',
+    question: 'La Frontera de Aproximacion Restringida (FAR)...',
+    options: ['La puede cruzar cualquiera', 'Solo la cruza personal no calificado', 'Bajo ninguna circunstancia la cruza una persona no calificada, ni escoltada', 'Solo se aplica en alta tension'],
+    correctIndex: 2,
+    explanation: 'La FAR no la cruza una persona no calificada bajo ninguna circunstancia, ni escoltada. La Frontera Limitada solo la cruza personal calificado.',
+  },
+  {
+    id: 'm1-q-categoria',
+    question: '¿Cuantas cal/cm² corresponden a la Categoria 2 de EPP?',
+    options: ['4 cal/cm²', '8 cal/cm²', '25 cal/cm²', '40 cal/cm²'],
+    correctIndex: 1,
+    explanation: 'Cat 1 = 4 · Cat 2 = 8 · Cat 3 = 25 · Cat 4 = 40 cal/cm². El EPP se elige por la energia incidente esperada.',
+  },
+  {
+    id: 'm1-q-jerarquia',
+    question: '¿Cual es el primer (mas efectivo) nivel de la jerarquia de control de riesgos?',
+    options: ['EPP', 'Controles administrativos', 'Eliminacion del peligro', 'Senalizacion'],
+    correctIndex: 2,
+    explanation: 'Jerarquia: Eliminacion > Sustitucion > Controles de ingenieria > Avisos > Controles administrativos > EPP. El EPP es el ultimo recurso.',
+  },
+  {
+    id: 'm1-q-cobre',
+    question: '¿Cuanto se expande el cobre al pasar de solido a vapor en una rafaga de arco?',
+    options: ['67 veces', '6.700 veces', '67.000 veces', '670.000 veces'],
+    correctIndex: 2,
+    explanation: '67.000 veces; proyecta metal fundido a mas de 1.120 km/h.',
+  },
+  {
+    id: 'm1-q-loto',
+    question: 'La tarjeta de bloqueo "PELIGRO NO OPERAR"...',
+    options: ['La puede retirar cualquier supervisor', 'Solo la retira quien la coloco (su propio candado)', 'Se retira al final del turno automaticamente', 'No es obligatoria'],
+    correctIndex: 1,
+    explanation: 'Cada persona coloca su propio candado y tarjeta; nadie retira el candado de otro. La tarjeta identifica a quien bloquea.',
+  },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
 // ENSAMBLAJE
 // ════════════════════════════════════════════════════════════════════════════
 
 const MODULES = [
+  { slug: 'seguridad-electrica', name: 'Seguridad Electrica (NFPA 70E)', manual: M1_MANUAL, procedures: M1_PROCEDURES, flows: M1_FLOWS, diagnosis: M1_DIAGNOSIS, quiz: M1_QUIZ },
   { slug: 'rescate-svb', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS, quiz: M2_QUIZ },
   { slug: 'nfpa-70b', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS, quiz: M3_QUIZ },
 ];
