@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
@@ -967,6 +967,12 @@ export function ChatBot() {
   const inputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
+  // Modo conversación (manos libres): escucha → envía → habla → vuelve a escuchar
+  const [convoMode, setConvoMode] = useState(false)
+  const convoModeRef = useRef(false)
+  useEffect(() => { convoModeRef.current = convoMode }, [convoMode])
+  const prevLoadingRef = useRef(false)
+
   // ─── Chat width (resizable) ──────────────────────────────
   const MIN_WIDTH = 380
   const MAX_WIDTH = 900
@@ -1040,12 +1046,48 @@ export function ChatBot() {
     }
   }, [isOpen])
 
-  // Llenar input cuando termina la transcripción de voz
+  // Llenar input cuando termina la transcripción de voz.
+  // En modo conversación, en vez de llenar el input, ENVÍA directo.
   useEffect(() => {
     if (transcript && !isListening) {
-      setInput(prev => prev ? `${prev} ${transcript}` : transcript)
+      if (convoModeRef.current) {
+        const t = transcript.trim()
+        if (t) sendMessage(resolveSlashCommand(t))
+      } else {
+        setInput(prev => prev ? `${prev} ${transcript}` : transcript)
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript, isListening])
+
+  // Modo conversación: al terminar la respuesta, leerla en voz alta y volver a escuchar
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current
+    prevLoadingRef.current = isLoading
+    if (!convoModeRef.current || !wasLoading || isLoading) return
+    const last = messages[messages.length - 1]
+    const text = last && last.role === 'assistant' ? last.content : ''
+    const plain = text
+      .replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '')
+      .replace(/\[\[.*?\]\]/g, '').replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '')
+    const relisten = () => { if (convoModeRef.current) startListening() }
+    if (plain.trim()) {
+      speak(plain, { onend: relisten, onerror: relisten })
+    } else {
+      relisten()
+    }
+  }, [isLoading, messages, startListening])
+
+  const toggleConvo = () => {
+    if (convoMode) {
+      setConvoMode(false)
+      stopListening()
+      stopSpeaking()
+    } else {
+      setConvoMode(true)
+      startListening()
+    }
+  }
 
   // Cleanup previews on unmount
   useEffect(() => {
@@ -1605,6 +1647,21 @@ export function ChatBot() {
                 onChange={handlePhotoSelect}
                 className="hidden"
               />
+
+              {/* Modo conversación manos libres */}
+              {voiceSupported && (
+                <button
+                  onClick={toggleConvo}
+                  className={`p-2 rounded-lg transition-colors ${
+                    convoMode
+                      ? 'bg-primary text-primary-foreground animate-pulse'
+                      : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                  }`}
+                  title={convoMode ? 'Salir del modo conversación' : 'Modo conversación (manos libres)'}
+                >
+                  <Headphones className="w-4 h-4" />
+                </button>
+              )}
 
               {/* Botón de voz */}
               {voiceSupported && (
