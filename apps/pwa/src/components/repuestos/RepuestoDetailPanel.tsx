@@ -6,7 +6,7 @@
  * tarjeta de stock (Disponible/Mínimo/Máximo) · Bodega · Ubicación ·
  * última actualización (último movimiento) · Ver movimientos.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
 import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
@@ -112,6 +112,32 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const [locForm, setLocForm] = useState<UbicacionEstructurada>({})
   const [savingLoc, setSavingLoc] = useState(false)
 
+  // ── Ancho redimensionable del panel (desktop) ──
+  const [width, setWidth] = useState<number>(() => {
+    try { const w = parseInt(localStorage.getItem('repuestos-detail-width') || '', 10); if (w >= 300 && w <= 760) return w } catch { /* noop */ }
+    return 360
+  })
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(min-width: 640px)')
+    const on = () => setIsDesktop(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  const startResize = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    const startX = e.clientX, startW = width; let latest = startW
+    const move = (ev: globalThis.MouseEvent) => { latest = Math.min(760, Math.max(300, startW + (startX - ev.clientX))); setWidth(latest) }
+    const up = () => {
+      document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up)
+      document.body.style.cursor = ''; document.body.style.userSelect = ''
+      try { localStorage.setItem('repuestos-detail-width', String(latest)) } catch { /* noop */ }
+    }
+    document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up)
+  }, [width])
+
   const startEditLoc = useCallback(() => {
     setLocForm({ pasillo: item?.pasillo ?? '', estante: item?.estante ?? '', nivel: item?.nivel ?? '' })
     setEditLoc(true)
@@ -163,7 +189,17 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
 
   return (
-    <aside className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-[340px] sm:shrink-0 sm:bg-card/40">
+    <aside
+      style={isDesktop ? { width } : undefined}
+      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:bg-card/40 relative"
+    >
+      {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
+      <div
+        onMouseDown={startResize}
+        className="absolute left-0 top-0 z-10 hidden h-full w-1.5 cursor-col-resize bg-transparent transition-colors hover:bg-primary/40 sm:block"
+        title="Arrastra para ajustar el ancho"
+        aria-label="Ajustar ancho del panel"
+      />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del repuesto</span>

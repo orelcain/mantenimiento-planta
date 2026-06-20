@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -41,7 +41,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
-import { CLASE_LABEL, type Machine, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
+import { CLASE_LABEL, type MaterialClase, type Machine, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -545,18 +545,25 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     let conSAP = 0
     let valor = 0
     const tipos = new Set<string>()
+    const claseCount = new Map<MaterialClase, number>()
     for (const r of scopedRepuestos) {
       if (r.codigoSAP) conSAP++
       tipos.add(tipoLabelOf(r.tipo))
       valor += (r.costoCompra ?? r.valorUnitario ?? 0) * (r.stockActual || 0)
+      if (r.clase) claseCount.set(r.clase, (claseCount.get(r.clase) ?? 0) + 1)
     }
     const total = scopedRepuestos.length
+    // Desglose por clase, ordenado por frecuencia (para la línea de composición del header)
+    const clases = [...claseCount.entries()]
+      .map(([clase, count]) => ({ clase, count }))
+      .sort((a, b) => b.count - a.count)
     return {
       conSAP,
       sinSAP: total - conSAP,
       pctSAP: total > 0 ? Math.round((conSAP / total) * 100) : 0,
       tipos: tipos.size,
       valor,
+      clases,
     }
   }, [scopedRepuestos])
 
@@ -622,6 +629,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             r.textoBreve,
             r.codigoFabricante,
             r.alias ?? '',
+            (r.nombresComunes ?? []).join(' '),
             r.marca ?? '',
             r.modeloTipo ?? '',
             r.descripcion ?? '',
@@ -709,7 +717,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         const sap = normalizeForSearch(r.codigoSAP)
         if (sap && sap === q) return 0
         if (sap && sap.startsWith(q)) return 1
-        const nombre = normalizeForSearch(`${r.textoBreve} ${r.alias ?? ''}`)
+        const nombre = normalizeForSearch(`${r.textoBreve} ${r.alias ?? ''} ${(r.nombresComunes ?? []).join(' ')}`)
         if (terms.every((t) => nombre.includes(t))) return 2
         return 3
       }
@@ -878,6 +886,31 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       await refreshCatalog()
     },
     [selectedRep, resolveSources, crudUpdate, colPathOf, refreshCatalog],
+  )
+
+  // ── Nombres comunes (apodos): edición inline en la tabla ──
+  const [editApodosKey, setEditApodosKey] = useState<string | null>(null)
+  const [editApodosVal, setEditApodosVal] = useState('')
+  const [savingApodos, setSavingApodos] = useState(false)
+  const saveApodos = useCallback(
+    async (row: AreaRepuestoRow) => {
+      const arr = editApodosVal.split(',').map((s) => s.trim()).filter(Boolean)
+      setSavingApodos(true)
+      try {
+        const sources = resolveSources(row)
+        for (const s of sources) {
+          await crudUpdate(colPathOf(s.machineId), s.repuesto.id, { nombresComunes: arr }, s.repuesto)
+        }
+        await refreshCatalog()
+        toast({ title: 'Nombres comunes guardados' })
+      } catch {
+        toast({ variant: 'destructive', title: 'No se pudo guardar', description: 'Reintenta en un momento.' })
+      } finally {
+        setSavingApodos(false)
+        setEditApodosKey(null)
+      }
+    },
+    [editApodosVal, resolveSources, crudUpdate, colPathOf, refreshCatalog, toast],
   )
 
   // Asignar código SAP a una pieza de despiece (sin SAP). Si el SAP ya existe en
@@ -1429,6 +1462,31 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             </div>
           )}
 
+          {/* Composición por clase (clic = filtra por esa clase) */}
+          {!repuestosBusy && catalogStats.clases.length > 1 && (
+            <div className="mb-6 -mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">Composición:</span>
+              {catalogStats.clases.map(({ clase, count }) => {
+                const active = repClaseFilter === clase
+                return (
+                  <button
+                    key={clase}
+                    onClick={() => setRepClaseFilter(active ? 'all' : clase)}
+                    className={[
+                      'rounded-full px-2 py-0.5 text-[11px] font-medium transition',
+                      active
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    ].join(' ')}
+                    title={`Filtrar por ${CLASE_LABEL[clase]}`}
+                  >
+                    {CLASE_LABEL[clase]} <span className="tabular-nums opacity-70">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {/* (Fase 4 normalización) La sección "Motores y bombas del área" se eliminó:
               los motores/bombas físicos ahora son repuestos de la colección plana y
               aparecen en la tabla de abajo con su marca/modelo/foto. */}
@@ -1532,6 +1590,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                         <th className="w-12 px-2 py-2" aria-label="Foto" />
                         {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
+                        <th className="hidden px-3 py-2 font-semibold lg:table-cell">Nombre común</th>
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
@@ -1554,7 +1613,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                           <Fragment key={r.rowKey}>
                           {showDespieceDivider && (
                             <tr className="bg-muted/30">
-                              <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -1628,7 +1687,40 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   </button>
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
+                                {r.ubicacionBodega && <span> · 📍 {r.ubicacionBodega}</span>}
                               </div>
+                            </td>
+                            <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                              {editApodosKey === r.rowKey ? (
+                                <input
+                                  autoFocus
+                                  value={editApodosVal}
+                                  onChange={(e) => setEditApodosVal(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveApodos(r)
+                                    else if (e.key === 'Escape') setEditApodosKey(null)
+                                  }}
+                                  onBlur={() => saveApodos(r)}
+                                  disabled={savingApodos}
+                                  placeholder="apodos, separados por coma"
+                                  className="w-full rounded border border-primary/50 bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!isAdmin) return
+                                    setEditApodosVal((r.nombresComunes ?? []).join(', '))
+                                    setEditApodosKey(r.rowKey)
+                                  }}
+                                  className="block w-full max-w-[220px] truncate text-left text-muted-foreground transition hover:text-foreground"
+                                  title={isAdmin ? 'Editar nombres comunes' : ((r.nombresComunes ?? []).join(', '))}
+                                >
+                                  {(r.nombresComunes && r.nombresComunes.length)
+                                    ? r.nombresComunes.join(', ')
+                                    : (isAdmin ? <span className="italic text-muted-foreground/40">+ agregar apodos</span> : '—')}
+                                </button>
+                              )}
                             </td>
                             <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
                             <td className="px-3 py-2">
@@ -1637,6 +1729,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                 <span className="tabular-nums font-medium">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
                                 <span className={['text-[10px]', meta.text].join(' ')}>{meta.label}</span>
                               </div>
+                              {r.ubicacionBodega && (
+                                <div className="mt-0.5 flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Ubicación en bodega">
+                                  <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="font-mono">{r.ubicacionBodega}</span>
+                                </div>
+                              )}
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>

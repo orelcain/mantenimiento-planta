@@ -67,6 +67,7 @@ export interface BodegaMergedItem {
   codigoFabricante: string
   textoBreve: string
   alias?: string
+  nombresComunes?: string[]
   tipo?: string
   /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
   clase?: MaterialClase
@@ -337,6 +338,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         codigoFabricante: rep.codigoFabricante || '',
         textoBreve: rep.textoBreve || rep.descripcion || '',
         alias: rep.alias,
+        nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
         tipo: rep.tipo,
         clase: rep.clase,
         tieneSap: rep.tieneSap ?? !!sap,

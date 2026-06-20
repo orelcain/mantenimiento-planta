@@ -66,6 +66,8 @@ export interface Repuesto {
   descripcion: string;
   /** Alias común — nombre con el que los técnicos conocen la pieza */
   alias?: string;
+  /** Nombres comunes / apodos por los que los técnicos buscan la pieza */
+  nombresComunes?: string[];
   nombreManual?: string; // Nombre según el manual del fabricante
   codigoFabricante: string; // o código del fabricante
   
