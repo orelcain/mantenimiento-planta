@@ -197,11 +197,6 @@ interface MapaLeafletState {
   alignGrillaMode: boolean
   setAlignGrillaMode: (v: boolean) => void
 
-  // ── Equipos SAP placement (efímero — no persiste) ─────────────────────────
-  /** ID del PlantAsset que el usuario quiere colocar en el mapa */
-  equipoToPlaceId: string | null
-  setEquipoToPlaceId: (id: string | null) => void
-
   // ── Texto libre placement (efímero — no persiste) ─────────────────────────
   /** Activo: próximo clic en el mapa abre popup para ingresar texto */
   textPlacementMode: boolean
@@ -249,8 +244,6 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       // Efímeros — no persisten
       alignGrillaMode: false,
       setAlignGrillaMode: (v) => set({ alignGrillaMode: v }),
-      equipoToPlaceId: null,
-      setEquipoToPlaceId: (id) => set({ equipoToPlaceId: id }),
       textPlacementMode: false,
       setTextPlacementMode: (v) => set({ textPlacementMode: v }),
 
