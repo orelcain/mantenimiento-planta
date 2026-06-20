@@ -13,6 +13,27 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Dependabot: resueltas las 23 alertas (bumps + overrides)
+
+- Pedido de Orel: mitigar las vulnerabilidades dependabot del repo. Inventario real vía `gh api .../dependabot/alerts` = **23 abiertas** (10 high / 9 med / 4 low) en 4 paquetes: dompurify ×8, protobufjs ×6, @grpc/grpc-js ×6, react-router ×3.
+- Fixes (bumps directos + overrides para transitivas):
+  - **dompurify** (directa, PWA): `^3.4.0`→`^3.4.11` (resuelve 3.4.11).
+  - **react-router-dom** (directa, PWA): `^7.12.0`→`^7.15.1` (resuelve 7.18.0).
+  - **protobufjs** (transitiva): override raíz `>=8.0.2`→`>=8.6.0` y functions `>=7.5.8`→`>=8.6.0` (resuelve 8.6.4).
+  - **@grpc/grpc-js** (transitiva): nuevo override `>=1.14.4` en raíz y functions (resuelve 1.14.4).
+  - Extra detectado al regenerar functions: **form-data <2.5.6** (high, fuera de la lista dependabot) → `npm audit fix --package-lock-only`.
+- Archivos: `package.json` (overrides pnpm), `apps/pwa/package.json`, `functions/package.json`, `pnpm-lock.yaml`, `functions/package-lock.json`.
+- Verificación: pnpm install OK (sin ERR_SSL); lockfile con versiones parcheadas confirmadas; `pnpm exec tsc --noEmit` limpio; `eslint . --max-warnings 30` = 0 errores / 23 warnings preexistentes; `pnpm build` = success; functions `npm audit` = **0 vulnerabilidades**.
+- Estado: EN REVISIÓN (rama `chore/ai-coordination`, PR abierto). **Merge a main pendiente del OK de Orel.**
+- Sigue: confirmar en GitHub que dependabot cierra las 23 al mergear; Fase 5 deletes legacy.
+
+## 2026-06-20 · claude · Mejoras UX sidebar/buscador/favoritos + DEPLOY (PR #78)
+
+- Pedido de Orel (varias mejoras UX): (1) **buscador unificado** — había 2 inputs atados al mismo `repQuery` (header=global, fila-de-filtros=acotado al scope, confuso); se quitó el de la fila de filtros. (2) **Sidebar ancho ajustable** por drag del borde derecho (persistido en `repuestos-area-sidebar-width`). (3) **Botón "contraer todo"** en header del sidebar (icono ChevronsDownUp → `collapseAllNodes`). (4) **Recuerda expansión** del árbol entre recargas (`repuestos-open-nodes` + efecto en AreaSidebar que re-expande/carga los nodos restaurados). (5) **Favoritos drag-and-drop** (HTML5 dataTransfer + grip) reemplaza las flechas ↑↓ (`reorderEquipInList`).
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`, `apps/pwa/src/components/repuestos/AreaSidebar.tsx`.
+- Verificado en preview (en vivo): 1 buscador; resize 288→408px persiste tras reload; contraer-todo colapsa; DnD reordena (EVISCERADORA↔posición) y restaura; expansión recordada tras reload. tsc+eslint+CI build limpios.
+- **DEPLOY: PR #78 mergeado → "Deploy PWA" = success.** Live en producción.
+
 ## 2026-06-19 · claude · DEPLOY a producción (PR #77 → main)
 
 - Mergeado `chore/ai-coordination` → `main` vía PR #77 (build CI pass; mergeable CLEAN). Sincronizada main (2 commits: daily-sync version.ts + nanobanana) antes del merge. `pnpm build` local = exit 0.
