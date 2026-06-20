@@ -136,6 +136,18 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     sections: { manual: false, procedures: false, flows: false, diagnosis: false },
   },
   {
+    slug: 'seguridad-electrica',
+    name: 'Seguridad Electrica (NFPA 70E)',
+    area: CAPACITACION_AREA,
+    programa: 'Programa Electricidad - Mantenimiento Industrial',
+    modulo: 1,
+    nivel: 1,
+    description: 'Curso NFPA 70E 2024: seguridad electrica en lugares de trabajo. Los 3 peligros (choque, arco, rafaga), efectos de la corriente, 5 Reglas de Oro, bloqueo/etiquetado (LOTO), fronteras de aproximacion, EPP y jerarquia de control.',
+    icon: Zap,
+    color: '#3b82f6',
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
+  },
+  {
     slug: 'rescate-svb',
     name: 'Rescate Electrico y SVB',
     area: CAPACITACION_AREA,
