@@ -339,7 +339,7 @@ export function CentroTecnicoDocumentalPage() {
           <h1 className="text-xl font-bold flex items-center gap-2">
             <FolderArchive className="h-5 w-5" /> Centro Técnico Documental
           </h1>
-          <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
+          <p className="text-sm text-muted-foreground">Expediente documental por equipo · placa, documentos y criticidad</p>
         </div>
         <div className="relative">
           <input
@@ -364,7 +364,7 @@ export function CentroTecnicoDocumentalPage() {
                   }}
                   disabled={visibles.length === 0}
                 >
-                  Exportar programa (Excel)
+                  Exportar listado (Excel)
                 </button>
                 {canEditEquipment && (
                   <>
@@ -396,7 +396,7 @@ export function CentroTecnicoDocumentalPage() {
       </div>
 
       {/* KPIs = filtros rápidos (click para filtrar) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {kpiFiltros.map((k) => {
           const active = filtro === k.key
           return (
@@ -437,12 +437,6 @@ export function CentroTecnicoDocumentalPage() {
             className={`text-xs px-3 py-1.5 border-l ${vista === 'tarjetas' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
           >
             Tarjetas
-          </button>
-          <button
-            onClick={() => setVista('agenda')}
-            className={`text-xs px-3 py-1.5 border-l ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
-          >
-            Agenda
           </button>
         </div>
         <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</label>
@@ -528,8 +522,7 @@ export function CentroTecnicoDocumentalPage() {
           className="text-xs border rounded-md px-2 py-1.5 bg-background"
           aria-label="Ordenar por"
         >
-          <option value="criticidad">Criticidad y condición</option>
-          <option value="proxima">Próxima inspección</option>
+          <option value="criticidad">Criticidad</option>
           <option value="ficha">Ficha (menos completa)</option>
           <option value="area">Sección y línea</option>
           <option value="nombre">Nombre</option>
@@ -1705,7 +1698,6 @@ function CtdEquipoCard({
   const crit = CRIT[e.criticidad]
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
-  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
   const pct = completitud(e)
   const foto = e.photos?.[0]
   return (
@@ -1738,13 +1730,7 @@ function CtdEquipoCard({
           <OtBadge ot={ot} />
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
-            {dias !== null
-              ? `vencida ${dias} d`
-              : e.fichaTecnica?.proximaInspeccion
-                ? new Date(e.fichaTecnica.proximaInspeccion).toLocaleDateString()
-                : 'sin fecha'}
-          </span>
+          <span className="text-muted-foreground">Ficha</span>
           <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
         </div>
       </CardContent>
@@ -1770,8 +1756,6 @@ function CtdEquipoRow({
   const crit = CRIT[e.criticidad]
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
-  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
-  const prox = e.fichaTecnica?.proximaInspeccion
   const pct = completitud(e)
   const foto = e.photos?.[0]
   return (
@@ -1825,9 +1809,6 @@ function CtdEquipoRow({
         <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
         <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
         <span className="w-12 text-right"><OtBadge ot={ot} /></span>
-        <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-          {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
-        </span>
         <button
           className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
           title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}

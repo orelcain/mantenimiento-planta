@@ -238,14 +238,14 @@ export function useCtdEquipos(favorites: Set<string>) {
     return groups
   }, [visibles])
 
+  // KPIs enfocados en el ALMACÉN documental (foco: qué hay y qué falta documentar).
+  // Las superficies de programa —condición 🔴, inspección vencida, OT— quedan
+  // acalladas; su lógica (kpis.cond3/vencidas/otAbiertas/otVencidas, filtros) sigue
+  // disponible en el hook por si se reactiva en los críticos.
   const kpiFiltros: { key: Filtro; label: string; n: number; cls?: string }[] = [
     { key: 'todos', label: 'Equipos', n: kpis.total },
     { key: 'A', label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
-    { key: 'cond3', label: 'Condición 🔴', n: kpis.cond3, cls: 'text-red-600' },
-    { key: 'vencida', label: 'Inspección vencida', n: kpis.vencidas, cls: 'text-amber-600' },
     { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
-    { key: 'otAbiertas', label: '🔧 OT abiertas', n: kpis.otAbiertas, cls: 'text-blue-600' },
-    { key: 'otVencidas', label: '🔧 OT vencidas', n: kpis.otVencidas, cls: 'text-red-600' },
     { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
   ]
 
