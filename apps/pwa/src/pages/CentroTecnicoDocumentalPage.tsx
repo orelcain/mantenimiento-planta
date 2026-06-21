@@ -1,12 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Download, FolderArchive, Image as ImageIcon, MapPin, QrCode, Star, X, Zap } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Check,
+  ChevronRight,
+  Download,
+  Edit2,
+  FolderArchive,
+  Image as ImageIcon,
+  MapPin,
+  Pencil,
+  Plus,
+  QrCode,
+  Star,
+  Trash2,
+  X,
+  Zap,
+} from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import * as XLSX from 'xlsx'
-import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
-import { getEquipments } from '@/services/equipment'
+import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
+import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { useAppStore, useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
+import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
+import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
+import { usePermissions } from '@/hooks/usePermissions'
+import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { logger } from '@/lib/logger'
@@ -16,10 +35,10 @@ import type { Equipment, FichaTecnica, Incident } from '@/types'
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
  *
  * Vista a nivel programa sobre la colección `equipment`: KPIs, filtros y tabla.
- * El expediente del equipo (Información, Ficha NFPA 70B, Tablero, Fotos, QR) se
- * abre EN SITIO en un panel del propio CTD —reusando `FichaTecnicaNFPA70B` y
- * `TableroExpediente`—, sin saltar a la página de Equipos. Lee del store global
- * para que las ediciones de ficha se reflejen al instante. No duplica datos.
+ * El expediente del equipo (Información editable, Ficha NFPA 70B, Tablero,
+ * Fotos con subida/borrado, Notas, QR) se abre EN SITIO en un panel del propio
+ * CTD —reusando `EquipmentForm`, `FichaTecnicaNFPA70B` y `TableroExpediente`—,
+ * sin saltar a la página de Equipos. Lee del store global. No duplica datos.
  * Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
  */
 
@@ -82,7 +101,9 @@ type EstadoFiltro = 'all' | Equipment['estado']
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
   const { equipment, setEquipment } = useAppStore()
+  const { canEditEquipment } = usePermissions()
   const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
+  const { notesFor, addNote, editNote, deleteNote } = useEquipmentNotes(user?.id)
 
   const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
@@ -94,6 +115,8 @@ export function CentroTecnicoDocumentalPage() {
   const [detailTab, setDetailTab] = useState('info')
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -143,6 +166,40 @@ export function CentroTecnicoDocumentalPage() {
     setDetailTab(tab)
     setDetailId(id)
     setLightbox(null)
+  }
+
+  async function reload() {
+    const fresh = await getEquipments()
+    setEquipment(fresh)
+  }
+
+  async function handlePhotoUpload(files: FileList | null) {
+    if (!files || files.length === 0 || !detailEquipment || !canEditEquipment) return
+    setPhotoUploading(true)
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file) await addEquipmentPhoto(detailEquipment.id, file)
+      }
+      await reload()
+    } catch (e: unknown) {
+      logger.error('Photo upload failed (CTD)', e instanceof Error ? e : new Error('Error al subir fotos'))
+      alert('No se pudieron subir las fotos. Intenta de nuevo.')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
+  async function handlePhotoDelete(photoUrl: string) {
+    if (!detailEquipment || !canEditEquipment) return
+    if (!window.confirm('¿Eliminar esta foto?')) return
+    try {
+      await removeEquipmentPhoto(detailEquipment.id, photoUrl)
+      await reload()
+    } catch (e: unknown) {
+      logger.error('Photo delete failed (CTD)', e instanceof Error ? e : new Error('Error al eliminar foto'))
+      alert('No se pudo eliminar la foto. Intenta de nuevo.')
+    }
   }
 
   const kpis = useMemo(() => {
@@ -427,8 +484,8 @@ export function CentroTecnicoDocumentalPage() {
       </Card>
 
       <p className="text-[11px] text-muted-foreground">
-        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, QR) se abre aquí mismo, sin salir del CTD. “Ficha %” =
-        completitud de la placa. Los favoritos se comparten con la página de Equipos.
+        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre aquí mismo, sin salir del CTD. “Ficha
+        %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
 
       {/* Expediente en sitio */}
@@ -442,6 +499,27 @@ export function CentroTecnicoDocumentalPage() {
           onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
           onClose={() => setDetailId(null)}
           onLightbox={setLightbox}
+          canEdit={canEditEquipment}
+          onEdit={() => setEditingEquipment(detailEquipment)}
+          photoUploading={photoUploading}
+          onPhotoUpload={handlePhotoUpload}
+          onPhotoDelete={handlePhotoDelete}
+          notes={notesFor(detailEquipment.id)}
+          onAddNote={(text) => addNote(detailEquipment.id, text)}
+          onEditNote={(noteId, text) => editNote(detailEquipment.id, noteId, text)}
+          onDeleteNote={(noteId) => deleteNote(detailEquipment.id, noteId)}
+        />
+      )}
+
+      {/* Editor de datos básicos (reusa el form de Equipos) */}
+      {editingEquipment && (
+        <EquipmentForm
+          equipment={editingEquipment}
+          onClose={() => setEditingEquipment(null)}
+          onSuccess={async () => {
+            await reload()
+            setEditingEquipment(null)
+          }}
         />
       )}
 
@@ -469,6 +547,15 @@ function ExpedienteDialog({
   onToggleFavorite,
   onClose,
   onLightbox,
+  canEdit,
+  onEdit,
+  photoUploading,
+  onPhotoUpload,
+  onPhotoDelete,
+  notes,
+  onAddNote,
+  onEditNote,
+  onDeleteNote,
 }: {
   equipment: Equipment
   incidents: Incident[]
@@ -478,10 +565,24 @@ function ExpedienteDialog({
   onToggleFavorite: () => void
   onClose: () => void
   onLightbox: (url: string) => void
+  canEdit: boolean
+  onEdit: () => void
+  photoUploading: boolean
+  onPhotoUpload: (files: FileList | null) => void
+  onPhotoDelete: (photoUrl: string) => void
+  notes: EquipmentNote[]
+  onAddNote: (text: string) => void
+  onEditNote: (noteId: string, text: string) => void
+  onDeleteNote: (noteId: string) => void
 }) {
   const crit = CRIT[equipment.criticidad]
   const est = ESTADO[equipment.estado]
   const ubicacion = equipment.hierarchyPath || equipment.zoneId
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [newNoteText, setNewNoteText] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingNoteText, setEditingNoteText] = useState('')
 
   return (
     <div
@@ -517,9 +618,16 @@ function ExpedienteDialog({
                 )}
               </div>
             </div>
-            <button onClick={onClose} aria-label="Cerrar" className="shrink-0 p-1 -m-1 text-muted-foreground hover:text-foreground">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={onEdit}>
+                  <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar
+                </Button>
+              )}
+              <button onClick={onClose} aria-label="Cerrar" className="p-1 -m-1 text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <Tabs value={tab} onValueChange={onTabChange}>
@@ -528,6 +636,7 @@ function ExpedienteDialog({
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
+              <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
               <TabsTrigger value="qr">QR</TabsTrigger>
             </TabsList>
 
@@ -568,27 +677,161 @@ function ExpedienteDialog({
 
             <TabsContent value="fotos">
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-4 space-y-4">
+                  {canEdit && (
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Galería de fotos</h3>
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => onPhotoUpload(e.target.files)}
+                          disabled={photoUploading}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={photoUploading}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {photoUploading ? 'Subiendo…' : 'Agregar fotos'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {equipment.photos && equipment.photos.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {equipment.photos.map((url, idx) => (
-                        <button
-                          key={url}
-                          className="aspect-square rounded-lg overflow-hidden border"
-                          onClick={() => onLightbox(url)}
-                          title="Ampliar"
-                        >
-                          <img src={url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" />
-                        </button>
+                        <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border">
+                          <img
+                            src={url}
+                            alt={`Foto ${idx + 1}`}
+                            className="h-full w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => onLightbox(url)}
+                            loading="lazy"
+                          />
+                          {canEdit && (
+                            <button
+                              className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Eliminar foto"
+                              aria-label="Eliminar foto"
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                onPhotoDelete(url)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
                       <p>Sin fotos</p>
-                      <p className="text-sm">Las fotos se agregan desde la página de Equipos.</p>
+                      {!canEdit && <p className="text-sm">Las fotos se agregan con permisos de edición.</p>}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="notas">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-start gap-2">
+                    <Textarea
+                      value={newNoteText}
+                      onChange={(e) => setNewNoteText(e.target.value)}
+                      placeholder="Agregar una nota…"
+                      rows={2}
+                      className="flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onAddNote(newNoteText)
+                        setNewNoteText('')
+                      }}
+                      disabled={!newNoteText.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Agregar
+                    </Button>
+                  </div>
+
+                  {notes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">Sin notas todavía.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {notes.map((n) => (
+                        <div key={n.id} className="rounded-lg border p-3">
+                          {editingNoteId === n.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={editingNoteText}
+                                onChange={(e) => setEditingNoteText(e.target.value)}
+                                rows={2}
+                              />
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => setEditingNoteId(null)}>
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    onEditNote(n.id, editingNoteText)
+                                    setEditingNoteId(null)
+                                  }}
+                                  disabled={!editingNoteText.trim()}
+                                >
+                                  <Check className="h-4 w-4 mr-1" /> Guardar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm whitespace-pre-wrap break-words">{n.text}</div>
+                                <div className="text-[11px] text-muted-foreground mt-1">
+                                  {new Date(n.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <button
+                                  className="p-1 text-muted-foreground hover:text-foreground"
+                                  title="Editar nota"
+                                  aria-label="Editar nota"
+                                  onClick={() => {
+                                    setEditingNoteId(n.id)
+                                    setEditingNoteText(n.text)
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  className="p-1 text-muted-foreground hover:text-destructive"
+                                  title="Eliminar nota"
+                                  aria-label="Eliminar nota"
+                                  onClick={() => onDeleteNote(n.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Las notas se guardan en este dispositivo (por usuario) y se comparten con la página de Equipos.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
