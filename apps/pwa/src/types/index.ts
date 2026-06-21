@@ -121,6 +121,21 @@ export interface FichaTecnica {
   proximaInspeccion?: string // ISO date (YYYY-MM-DD)
 }
 
+// Historial de mantenimiento NFPA 70B (colección plana `maintenanceLog`)
+export interface MaintenanceLogEntry {
+  id: string
+  equipmentId: string
+  hierarchyNodeId?: string
+  fecha: Date
+  tipo: 'preventivo' | 'correctivo' | 'predictivo' | 'inspeccion' | 'termografia' | 'medicion'
+  tecnico?: string
+  hallazgo: string
+  severidad: 'verde' | 'amarillo' | 'rojo' // = condición 1/2/3 (Cap. 9)
+  incidenciaId?: string
+  proximaInspeccion?: string // ISO date
+  createdAt: Date
+}
+
 // Umbrales predictivos configurables
 export interface PredictiveThresholds {
   tempWarnLow: number

@@ -536,6 +536,24 @@ service cloud.firestore {
     }
 
     // ============================================
+    // MAINTENANCE LOG — Historial NFPA 70B por equipo (Centro Técnico Documental)
+    // Una entrada por evento, referenciada al equipo por equipmentId.
+    // ============================================
+    match /maintenanceLog/{entryId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.equipmentId is string
+        && request.resource.data.equipmentId.size() > 0
+        && request.resource.data.tipo in ['preventivo', 'correctivo', 'predictivo', 'inspeccion', 'termografia', 'medicion']
+        && request.resource.data.severidad in ['verde', 'amarillo', 'rojo']
+        && request.resource.data.hallazgo is string
+        && request.resource.data.hallazgo.size() >= 1;
+      allow update: if isTechnician() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // TAREAS PREVENTIVAS - Validación de mantenimiento
     // ============================================
     match /preventiveTasks/{taskId} {

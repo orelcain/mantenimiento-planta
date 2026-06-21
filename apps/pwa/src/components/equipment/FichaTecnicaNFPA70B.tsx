@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { BookOpen, Check, ClipboardList, FileText, Gauge, Info, Pencil, X } from 'lucide-react'
-import { Badge, Button, Card, CardContent, Input, Label } from '@/components/ui'
+import { BookOpen, Check, ClipboardList, FileText, Gauge, Info, Pencil, Plus, X } from 'lucide-react'
+import { Badge, Button, Card, CardContent, Input, Label, Textarea } from '@/components/ui'
 import { getEquipments, updateEquipment } from '@/services/equipment'
+import { addMaintenanceLogEntry, getMaintenanceLog } from '@/services/maintenanceLog'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica } from '@/types'
+import type { Equipment, FichaTecnica, MaintenanceLogEntry } from '@/types'
 
 /**
  * Ficha Técnica NFPA 70B — v2 (lectura + captura de placa).
@@ -29,6 +30,44 @@ const CONDICION: Record<1 | 2 | 3, { emoji: string; label: string }> = {
   2: { emoji: '🟡', label: 'Condición 2 · con desvíos' },
   3: { emoji: '🔴', label: 'Condición 3 · acción requerida' },
 }
+
+const SEVERIDAD: Record<MaintenanceLogEntry['severidad'], string> = {
+  verde: '🟢',
+  amarillo: '🟡',
+  rojo: '🔴',
+}
+
+const TIPOS: { value: MaintenanceLogEntry['tipo']; label: string }[] = [
+  { value: 'inspeccion', label: 'Inspección' },
+  { value: 'termografia', label: 'Termografía' },
+  { value: 'medicion', label: 'Medición' },
+  { value: 'preventivo', label: 'Preventivo' },
+  { value: 'correctivo', label: 'Correctivo' },
+  { value: 'predictivo', label: 'Predictivo' },
+]
+
+type EntryDraft = {
+  tipo: MaintenanceLogEntry['tipo']
+  severidad: MaintenanceLogEntry['severidad']
+  fecha: string
+  tecnico: string
+  hallazgo: string
+}
+
+function emptyDraft(): EntryDraft {
+  return {
+    tipo: 'inspeccion',
+    severidad: 'verde',
+    fecha: new Date().toISOString().slice(0, 10),
+    tecnico: '',
+    hallazgo: '',
+  }
+}
+
+const TIPO_LABEL = Object.fromEntries(TIPOS.map((t) => [t.value, t.label])) as Record<
+  MaintenanceLogEntry['tipo'],
+  string
+>
 
 function SectionTitle({
   icon: Icon,
@@ -113,6 +152,55 @@ export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
   function handleCancel() {
     setFicha(equipment.fichaTecnica ?? {})
     setEditing(false)
+  }
+
+  // Historial de mantenimiento (maintenanceLog)
+  const [log, setLog] = useState<MaintenanceLogEntry[]>([])
+  const [loadingLog, setLoadingLog] = useState(false)
+  const [addingEntry, setAddingEntry] = useState(false)
+  const [savingEntry, setSavingEntry] = useState(false)
+  const [draft, setDraft] = useState<EntryDraft>(emptyDraft())
+
+  useEffect(() => {
+    let alive = true
+    setLoadingLog(true)
+    getMaintenanceLog(equipment.id)
+      .then((rows) => {
+        if (alive) setLog(rows)
+      })
+      .catch((err) =>
+        logger.error('Error cargando historial NFPA 70B', err instanceof Error ? err : new Error(String(err))),
+      )
+      .finally(() => {
+        if (alive) setLoadingLog(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  async function handleAddEntry() {
+    if (!draft.hallazgo.trim()) return
+    setSavingEntry(true)
+    try {
+      await addMaintenanceLogEntry({
+        equipmentId: equipment.id,
+        hierarchyNodeId: equipment.hierarchyNodeId,
+        fecha: new Date(draft.fecha),
+        tipo: draft.tipo,
+        tecnico: draft.tecnico.trim() || undefined,
+        hallazgo: draft.hallazgo.trim(),
+        severidad: draft.severidad,
+      })
+      const rows = await getMaintenanceLog(equipment.id)
+      setLog(rows)
+      setDraft(emptyDraft())
+      setAddingEntry(false)
+    } catch (err) {
+      logger.error('Error registrando evento NFPA 70B', err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSavingEntry(false)
+    }
   }
 
   return (
@@ -270,23 +358,118 @@ export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
         </CardContent>
       </Card>
 
-      {/* Historial — maintenanceLog (v3) */}
+      {/* Historial — maintenanceLog */}
       <Card>
-        <CardContent className="p-4 space-y-2">
-          <SectionTitle icon={ClipboardList} hint="la historia del equipo">
-            Historial de mantenimiento
-          </SectionTitle>
-          <p className="text-sm text-muted-foreground italic">
-            Sin registros aún. Se poblará automáticamente desde incidencias y termografías (v3).
-          </p>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <SectionTitle icon={ClipboardList} hint="la historia del equipo">
+              Historial de mantenimiento
+            </SectionTitle>
+            {!addingEntry && (
+              <Button variant="outline" size="sm" onClick={() => setAddingEntry(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar evento
+              </Button>
+            )}
+          </div>
+
+          {addingEntry && (
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="grid md:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Tipo</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={draft.tipo}
+                    onChange={(e) => setDraft((d) => ({ ...d, tipo: e.target.value as MaintenanceLogEntry['tipo'] }))}
+                  >
+                    {TIPOS.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs">Fecha</Label>
+                  <Input type="date" value={draft.fecha} onChange={(e) => setDraft((d) => ({ ...d, fecha: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs">Técnico</Label>
+                  <Input value={draft.tecnico} onChange={(e) => setDraft((d) => ({ ...d, tecnico: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Condición / severidad</Label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {(['verde', 'amarillo', 'rojo'] as const).map((s) => (
+                    <Button
+                      key={s}
+                      type="button"
+                      variant={draft.severidad === s ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDraft((d) => ({ ...d, severidad: s }))}
+                    >
+                      {SEVERIDAD[s]} {s}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Hallazgo</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="Qué se observó / midió / reparó…"
+                  value={draft.hallazgo}
+                  onChange={(e) => setDraft((d) => ({ ...d, hallazgo: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={handleAddEntry} disabled={savingEntry || !draft.hallazgo.trim()}>
+                  <Check className="h-3.5 w-3.5 mr-1.5" /> {savingEntry ? 'Guardando…' : 'Guardar evento'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setAddingEntry(false)
+                    setDraft(emptyDraft())
+                  }}
+                  disabled={savingEntry}
+                >
+                  <X className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {loadingLog ? (
+            <p className="text-sm text-muted-foreground italic">Cargando historial…</p>
+          ) : log.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">
+              Sin registros aún. Registra el primer evento o conéctalo a incidencias (próximo paso).
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {log.map((e) => (
+                <div key={e.id} className="flex items-start gap-3 py-2 border-t first:border-t-0">
+                  <span className="text-sm leading-5">{SEVERIDAD[e.severidad]}</span>
+                  <span className="text-xs text-muted-foreground min-w-[88px]">{e.fecha.toLocaleDateString()}</span>
+                  <span className="text-sm">
+                    <span className="font-semibold">{TIPO_LABEL[e.tipo]}</span>
+                    {e.tecnico ? ` · ${e.tecnico}` : ''} — {e.hallazgo}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
-          Estructura según NFPA 70B (§2.2 placa · §2.4 + Cap. 9 criticidad/condición). El historial
-          automático llega en la v3.
+          Estructura según NFPA 70B (§2.2 placa · §2.4 + Cap. 9 criticidad/condición · historial).
+          El auto-registro desde incidencias/termografías es el próximo paso.
         </span>
       </div>
     </div>
