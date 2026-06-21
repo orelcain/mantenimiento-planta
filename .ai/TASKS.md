@@ -19,6 +19,20 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [ ] **Fase 5 — borrado de colecciones (BLOQUEADO, orden estricto)** — NO se puede borrar `machines`/`plantAssets`/`insumos` mientras haya lectores vivos. Estado de bloqueos: `insumos` ← **LIBRE ✅** (página `/insumos` retirada; 0 lectores vivos) → listo para borrar con backup. `machines` ← ya NO lo lee el chatbot (migrado ✅) ni `aria/tools/repuestos.ts` (usa cache del maestro); SOLO queda `useMachines` vía `MachineProvider` (raíz App.tsx) + `CategoryManager` (SettingsPage) → migrar/retirar eso. `plantAssets` ← pestaña Mapas retirada ✅ pero AÚN lo lee `MapaPlantaPage`/`PanelCapasYZonas` (mapa leaflet, feature aparte) → decidir esa página. Recién con los 3 liberados: backup + dry-run + borrar `machines`/`plantAssets`/`insumos`/subcolecciones huérfanas/`repuestosBaader200` + barrer 2º nivel de código muerto. Dueño: —
 - [ ] **Sub-repuestos en la ficha** (`parentMaterialId`, aún sin datos). Dueño: —
 
+## TODO — Centro Técnico Documental (NFPA 70B)
+
+> Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`. Aún SIN codear.
+> Decisiones cerradas: **enriquecer el módulo Equipos** (`/equipment`, NO módulo aparte); ficha =
+> **campo dedicado `fichaTecnica`** en el registro `equipment`, hereda repuestos/manuales del nodo
+> `hierarchy` vía `hierarchyNodeId`; `maintenanceLog` = **colección plana** con `equipmentId` (necesita
+> regla en `firestore.rules` → pedir OK a Orel); criticidad = NFPA 70B §2.4 + **condición 1/2/3** (semáforo
+> 🟢🟡🔴); próxima inspección = **criticidad × condición** (Cap. 9 / Tabla 9.2.2). Piloto: motor
+> `720004608` + bomba `720004607` (NH₃) — verificar que existen como registros `equipment`.
+
+- [ ] **v1 — ficha solo-lectura** en `EquipmentPage`: placa (vacía aún) + documentos heredados + criticidad + historial. No requiere regla nueva ni datos nuevos. Dueño: —
+- [ ] **v2 — edición de `fichaTecnica`** (escribe en `equipment`, ya tiene regla de write). Cargar placa real del piloto. Dueño: —
+- [ ] **v3 — `maintenanceLog`** + auto-registro desde `incidents`/termografías + cálculo de próxima inspección. Requiere regla nueva en `firestore.rules`. Dueño: —
+
 ## Backlog general / futuro
 
 - [ ] ARIA local (Ollama): definir cómo consulta el maestro (export Firestore o API solo-lectura).
