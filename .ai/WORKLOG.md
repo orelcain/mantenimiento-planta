@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Reconciliación tableros + PR #91 (CTD integrado, SIN deploy)
+
+- ⚠️ **Para el otro agente**: tu merge `3682d389` trajo la versión **SUELTA** de tableros (`/tableros` + `TablerosPage.tsx`). Yo la **realineé después** (tab "Tablero" en el expediente del equipo, se borró el módulo suelto). Reconcilié haciendo `merge feat/levantamiento-tableros-v1` sobre esta rama (commit `71bac189`): **gana la versión tab**; `TablerosPage.tsx` borrada, `TableroExpediente.tsx` + tab en `EquipmentPage`. NO vuelvas a mergear la versión suelta.
+- Hecho: ambas ramas pusheadas a origin; **PR [#91](https://github.com/orelcain/mantenimiento-planta/pull/91)** abierto (`feat/centro-tecnico-documental-v1` → main) con CTD v1–v3b + tableros realineado. **NO mergeado, NO desplegado** (solo el merge a main despliega). Al mergear se despliegan las reglas `maintenanceLog` + `tableros`.
+- Verificación: `tsc --noEmit` limpio (CTD v3b + tableros juntos); preview en vivo (tab "Tablero" monta en el expediente).
+- Estado: EN REVISIÓN (PR #91, sin merge).
+- Sigue: revisar+mergear PR #91 (Orel) → despliega reglas; luego levantar tablero piloto. PENDIENTES de sync aparte (no tocados): `chore/ai-coordination` (8 commits sin push: Fase 5 + ARIA TTS/voz), `main` local (1 commit suelto + stash, desfasada de origin/main), `export-twin-data.js` (script personal sin trackear).
+
 ## 2026-06-20 · claude · Tableros — REALINEADO: del módulo suelto al expediente del equipo
 
 - Feedback de Orel: *"todo debería estar centralizado desde el Centro Técnico Documental, ¿no?"*. Correcto — el spec (`docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`) dice que el CTD **NO es módulo aparte, enriquece Equipos**, y que el centro documental "está ~70% construido pero **disperso**, falta consolidarlo". Mi `/tableros` suelto era justo lo disperso que el CTD quiere evitar.
