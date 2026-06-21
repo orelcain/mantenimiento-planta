@@ -536,6 +536,49 @@ service cloud.firestore {
     }
 
     // ============================================
+    // MAINTENANCE LOG — Historial NFPA 70B por equipo (Centro Técnico Documental)
+    // Una entrada por evento, referenciada al equipo por equipmentId.
+    // ============================================
+    match /maintenanceLog/{entryId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.equipmentId is string
+        && request.resource.data.equipmentId.size() > 0
+        && request.resource.data.tipo in ['preventivo', 'correctivo', 'predictivo', 'inspeccion', 'termografia', 'medicion']
+        && request.resource.data.severidad in ['verde', 'amarillo', 'rojo']
+        && request.resource.data.hallazgo is string
+        && request.resource.data.hallazgo.size() >= 1;
+      allow update: if isTechnician() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // TABLEROS — Levantamiento eléctrico / unifilares (Centro Técnico Documental, NFPA 70B)
+    // Un doc por tablero; circuitos y revisiones como arrays. Revisión 0 = as-found.
+    // Ver docs/LEVANTAMIENTO_TABLEROS.md.
+    // ============================================
+    match /tableros/{tableroId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.tag is string
+        && request.resource.data.tag.size() >= 1
+        && request.resource.data.tag.size() <= 50
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 1
+        && request.resource.data.tipo is string
+        && request.resource.data.condicionGeneral in [1, 2, 3]
+        && request.resource.data.circuitos is list
+        && request.resource.data.revisiones is list;
+      allow update: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.circuitos is list
+        && request.resource.data.revisiones is list;
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // TAREAS PREVENTIVAS - Validación de mantenimiento
     // ============================================
     match /preventiveTasks/{taskId} {

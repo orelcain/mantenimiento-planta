@@ -13,6 +13,42 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Reconciliación tableros + PR #91 (CTD integrado, SIN deploy)
+
+- ⚠️ **Para el otro agente**: tu merge `3682d389` trajo la versión **SUELTA** de tableros (`/tableros` + `TablerosPage.tsx`). Yo la **realineé después** (tab "Tablero" en el expediente del equipo, se borró el módulo suelto). Reconcilié haciendo `merge feat/levantamiento-tableros-v1` sobre esta rama (commit `71bac189`): **gana la versión tab**; `TablerosPage.tsx` borrada, `TableroExpediente.tsx` + tab en `EquipmentPage`. NO vuelvas a mergear la versión suelta.
+- Hecho: ambas ramas pusheadas a origin; **PR [#91](https://github.com/orelcain/mantenimiento-planta/pull/91)** abierto (`feat/centro-tecnico-documental-v1` → main) con CTD v1–v3b + tableros realineado. **NO mergeado, NO desplegado** (solo el merge a main despliega). Al mergear se despliegan las reglas `maintenanceLog` + `tableros`.
+- Verificación: `tsc --noEmit` limpio (CTD v3b + tableros juntos); preview en vivo (tab "Tablero" monta en el expediente).
+- Estado: EN REVISIÓN (PR #91, sin merge).
+- Sigue: revisar+mergear PR #91 (Orel) → despliega reglas; luego levantar tablero piloto. PENDIENTES de sync aparte (no tocados): `chore/ai-coordination` (8 commits sin push: Fase 5 + ARIA TTS/voz), `main` local (1 commit suelto + stash, desfasada de origin/main), `export-twin-data.js` (script personal sin trackear).
+
+## 2026-06-20 · claude · Tableros — REALINEADO: del módulo suelto al expediente del equipo
+
+- Feedback de Orel: *"todo debería estar centralizado desde el Centro Técnico Documental, ¿no?"*. Correcto — el spec (`docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`) dice que el CTD **NO es módulo aparte, enriquece Equipos**, y que el centro documental "está ~70% construido pero **disperso**, falta consolidarlo". Mi `/tableros` suelto era justo lo disperso que el CTD quiere evitar.
+- Decisión (Orel): el **tablero ES un equipo** y su levantamiento/unifilar vive como **sección del expediente del equipo**, no como módulo.
+- Hecho: quitado el módulo suelto (ruta `/tableros` en App.tsx, nav "Tableros" + import Zap en MainLayout, borrado `pages/TablerosPage.tsx`). Nuevo `components/equipment/TableroExpediente.tsx` (sección lectura/edición + circuitos + Excel) montado como **tab "Tablero"** en el detalle de equipo (`EquipmentPage.tsx`, junto a "Ficha NFPA 70B"). Servicio reescrito: doc `tableros/{equipmentId}` (1:1), `getTableroByEquipment` + `saveTableroForEquipment` (alta = Revisión 0 as-found; edición opcional agrega revisión "cambio"). `types/tableros.ts` + `equipmentId`. **NO se tocó `FichaTecnicaNFPA70B.tsx`** (lo trabaja otro agente) — solo se sumó un tab hermano.
+- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sesión admin)**: abrí un equipo → tab "Tablero" monta el expediente con empty-state + Levantar/Plantilla/Importar + "se guardará como Revisión 0 (as-found)". Lectura da `permission-denied` (regla `tableros` sin desplegar — esperado). Nota: tras borrar `TablerosPage.tsx` Vite tira `Failed to reload TablerosPage.tsx` por HMR (ruido del dev server, no afecta build/tsc).
+- Estado: EN REVISIÓN (rama sin push/merge; commit `046df802`).
+- Sigue: PR+merge → desplegar reglas; levantar tablero piloto; **filtro "Tableros" en Equipos** (ver todos); fotos a Storage; `cargaNombre`→`cargaNodeId`.
+
+## 2026-06-20 · claude · Tableros / Unifilares (NFPA 70B) v1 — levantamiento (Excel + form PWA)
+
+- Pedido de Orel: cubrir **unifilares de tableros desde la PWA**. Decisión: **"primero el dato" (Fase 0)** — levantamiento estructurado antes de dibujar. El levantamiento inicial se guarda como **Revisión 0 (as-found)** → nace el histórico de cambios que hoy no existe. Spec/protocolo en OneDrive: `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. (Fluyo NO es la herramienta del unifilar: es para arquitectura de software, sin símbolos eléctricos.)
+- Hecho: colección `tableros` (circuitos+revisiones como arrays en el doc, <1MB de sobra). **Ambas vías de captura**: **Excel** (descargar plantilla + importar, SheetJS ya estaba en deps) y **form nativo** en `/tableros` (lista + stats + formulario + editor de circuitos + condición 1·2·3 NFPA 70B).
+- Archivos (rama `feat/levantamiento-tableros-v1`, commit `91ad1367`): `apps/pwa/src/types/tableros.ts`, `apps/pwa/src/services/tableros.ts`, `apps/pwa/src/services/tablerosExcel.ts`, `apps/pwa/src/pages/TablerosPage.tsx`, `apps/pwa/src/App.tsx` (ruta `/tableros` lazy), `apps/pwa/src/components/layout/MainLayout.tsx` (nav "Tableros", grupo Equipamiento, `inDevelopment` igual que Equipos), `firestore.rules` (colección `tableros`: read activeUser / create+update technician / delete admin).
+- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sirve D:, sesión admin)**: `/tableros` monta, header/stats/empty-state OK, "Plantilla Excel" genera sin throw, form "Nuevo levantamiento" abre y renderiza completo. ⚠️ Lecturas/escrituras dan `permission-denied` porque la **regla `tableros` aún NO está desplegada** en el proyecto vivo (esperado).
+- Estado: EN REVISIÓN (rama sin push/merge). Diff aislado a 7 archivos (no se tocó `.ai/` en el commit de código; este worklog va aparte).
+- Sigue: PR+merge → **desplegar `firestore.rules`** (`deploy-firestore-rules.yml` al mergear, o `firebase deploy --only firestore:rules`) → recién entonces lee/escribe. Luego: levantar tablero piloto (CCM motor 720004608 / bomba 720004607), fotos a Storage (no cableado en v1), enlazar `cargaNombre`→`cargaNodeId` de `hierarchy`, y el render del unifilar sobre el dato.
+
+## 2026-06-20 · claude · Pulido repuestos: ubicación en fila + composición por clase (+ validación solicitar)
+
+- Pedido de Orel (3 mejoras del módulo):
+  1. **Ubicación de bodega en la fila** de Áreas (`RepuestosAreaHub`): nueva línea con `MapPin` + `ubicacionBodega` bajo el stock (y en el subtítulo móvil) → el técnico ve DÓNDE está el repuesto sin abrir la ficha. Verificado en vivo: BUJE INOX 3300133492 → C-31.
+  2. **Composición por clase en el header**: `catalogStats.clases` (desglose por `clase` del alcance) + línea de chips clickeables que aplican el filtro de clase. Verificado: Repuesto 5557·Insumo 1494·Refrigeración 154·Químico 127·Herramienta 107·Lubricante 2.
+  3. **Solicitar a bodega end-to-end**: revisado — el flujo ya estaba COMPLETO y cableado (`useSolicitudes` crear/listar/avanzar + `SolicitarRepuestoModal` + `SolicitudesPanel` con avance Pendiente→Aprobada→Entregada + badge pendientes). Verificado en vivo: panel abre y lista (1 entregada en prod). Sin cambios de código.
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx` (import MapPin/MaterialClase, ubicación en fila, claseCount en catalogStats, línea de composición).
+- Verificación: tsc limpio, eslint 0 errores, build success, **preview en vivo** (sirve D:).
+- Estado: HECHO (en `chore/ai-coordination`, pendiente PR+deploy).
+
 ## 2026-06-20 · claude · Fase 5 — retirada de features legacy (machines/plantAssets) + scripts de borrado
 
 - Decisión de Orel (2 preguntas): retirar el tab "Categorías" (CategoryManager) y la capa "Equipos SAP" del editor de mapa, para liberar `machines` y `plantAssets`.

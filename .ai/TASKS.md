@@ -19,6 +19,38 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [ ] **Fase 5 — borrado de colecciones (BLOQUEADO, orden estricto)** — NO se puede borrar `machines`/`plantAssets`/`insumos` mientras haya lectores vivos. Estado de bloqueos: `insumos` ← **LIBRE ✅** (página `/insumos` retirada; 0 lectores vivos) → listo para borrar con backup. `machines` ← ya NO lo lee el chatbot (migrado ✅) ni `aria/tools/repuestos.ts` (usa cache del maestro); SOLO queda `useMachines` vía `MachineProvider` (raíz App.tsx) + `CategoryManager` (SettingsPage) → migrar/retirar eso. `plantAssets` ← pestaña Mapas retirada ✅ pero AÚN lo lee `MapaPlantaPage`/`PanelCapasYZonas` (mapa leaflet, feature aparte) → decidir esa página. Recién con los 3 liberados: backup + dry-run + borrar `machines`/`plantAssets`/`insumos`/subcolecciones huérfanas/`repuestosBaader200` + barrer 2º nivel de código muerto. Dueño: —
 - [ ] **Sub-repuestos en la ficha** (`parentMaterialId`, aún sin datos). Dueño: —
 
+## TODO — Centro Técnico Documental (NFPA 70B)
+
+> Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
+> **v1+v2+v3+v3b codeadas en rama `feat/centro-tecnico-documental-v1` (sin push, sin merge). tsc+eslint limpios.**
+> Regla `maintenanceLog` ya en `firestore.rules` (se despliega sola al mergear vía `deploy-firestore-rules.yml`).
+> Decisiones cerradas: **enriquecer el módulo Equipos** (`/equipment`, NO módulo aparte); ficha =
+> **campo dedicado `fichaTecnica`** en el registro `equipment`, hereda repuestos/manuales del nodo
+> `hierarchy` vía `hierarchyNodeId`; `maintenanceLog` = **colección plana** con `equipmentId` (necesita
+> regla en `firestore.rules` → pedir OK a Orel); criticidad = NFPA 70B §2.4 + **condición 1/2/3** (semáforo
+> 🟢🟡🔴); próxima inspección = **criticidad × condición** (Cap. 9 / Tabla 9.2.2). Piloto: motor
+> `720004608` + bomba `720004607` (NH₃) — verificar que existen como registros `equipment`.
+
+- [x] **v1 — ficha solo-lectura** en `EquipmentPage`: pestaña "Ficha NFPA 70B" con placa + documentos heredados + criticidad + historial. (claude, 2026-06-20, rama `feat/centro-tecnico-documental-v1`)
+- [x] **v2 — edición de `fichaTecnica`** — editor inline (placa eléctrica + condición 1/2/3 + vida útil/frecuencia/próxima inspección), guarda en `equipment.fichaTecnica` vía `updateEquipment`. tsc+eslint limpios. Falta cargar la placa real del piloto en la app. (claude, 2026-06-20)
+- [x] **v3 — `maintenanceLog`** — colección plana + regla Firestore (read activeUser / create technician) + servicio `getMaintenanceLog`/`addMaintenanceLogEntry` + UI: timeline 🟢🟡🔴 y formulario "Registrar evento" en la ficha. (claude, 2026-06-20)
+- [x] **v3b — incidencias en el timeline (auto)** — read-merge: las incidencias del equipo (`equipmentId`) aparecen en el historial junto a las entradas manuales, prioridad→semáforo; sin duplicar datos. (claude, 2026-06-20, worktree por colisión)
+- [ ] **v3c — próxima inspección automática** — calcular fecha sugerida = criticidad × condición (Cap. 9 / Tabla 9.2.2). Opcional: que termografías escriban entrada en `maintenanceLog`. Dueño: —
+- [ ] **Merge a main** — revisar rama `feat/centro-tecnico-documental-v1`, push + PR. Al mergear se despliega la regla `maintenanceLog`. Dueño: Orel
+
+## TODO — Tableros / Unifilares (NFPA 70B)
+
+> Fase 0 "el dato primero" (decisión Orel 2026-06-20): levantamiento estructurado de tableros como base
+> para unifilares + histórico de cambios. Protocolo/ficha en OneDrive:
+> `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. Fluyo NO es la herramienta del unifilar
+> (es para arquitectura de software). El levantamiento inicial se guarda como **Revisión 0 (as-found)**.
+
+- [x] **v1 — levantamiento (Excel + form) → REALINEADO al expediente** — el tablero ES un equipo; el levantamiento/unifilar vive como **tab "Tablero" dentro del expediente del equipo** (`EquipmentPage`, junto a la Ficha NFPA 70B), **NO como módulo `/tableros` suelto** (consistente con "el Centro Técnico Documental enriquece Equipos, no es módulo aparte"). Doc `tableros/{equipmentId}` (1:1). Archivos: `types/tableros.ts`, `services/tableros.ts` (`getTableroByEquipment`/`saveTableroForEquipment`, alta = Revisión 0 as-found), `services/tablerosExcel.ts` (plantilla descargar/importar, SheetJS), `components/equipment/TableroExpediente.tsx`, tab en `EquipmentPage.tsx`, regla `tableros` en `firestore.rules`. Se quitó ruta/nav/`TablerosPage.tsx`. **tsc limpio; preview en vivo OK** (tab "Tablero" monta en el expediente; lectura da `permission-denied` hasta desplegar reglas). (claude, 2026-06-20, rama `feat/levantamiento-tableros-v1`, commits `91ad1367`→`046df802`, sin push)
+- [ ] **Merge + deploy reglas** — push+PR de `feat/levantamiento-tableros-v1`; al mergear se despliega la regla `tableros` (o `firebase deploy --only firestore:rules`). **Sin esto el tab da permission-denied.** Dueño: Orel
+- [ ] **Levantar tablero piloto** — CCM que alimenta motor 720004608 + bomba 720004607. Dueño: —
+- [ ] **Filtro "Tableros" en Equipos** — "ver todos los tableros" = filtro en `/equipment` (equipos con doc en `tableros`). Aún no hecho. Dueño: —
+- [ ] **v2** — fotos a Storage (no cableado en v1) · enlazar `cargaNombre`→`cargaNodeId` de `hierarchy` · render del unifilar sobre el dato levantado. Dueño: —
+
 ## Backlog general / futuro
 
 - [ ] ARIA local (Ollama): definir cómo consulta el maestro (export Firestore o API solo-lectura).

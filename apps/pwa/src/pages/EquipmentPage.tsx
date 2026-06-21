@@ -58,6 +58,8 @@ import { updateEquipmentSchema } from '@/lib/validation'
 import { formatRelativeTime, generateId } from '@/lib/utils'
 import { debounce } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
+import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
+import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { usePermissions } from '@/hooks/usePermissions'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { TelemetryChart } from '@/components/equipment/TelemetryChart'
@@ -1964,6 +1966,8 @@ function EquipmentDetailDialog({
         <Tabs defaultValue="info">
           <TabsList>
             <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
+            <TabsTrigger value="tablero">Tablero</TabsTrigger>
             <TabsTrigger value="photos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
             <TabsTrigger value="history">Historial ({incidents.length})</TabsTrigger>
             <TabsTrigger value="notes">Notas ({notes.length})</TabsTrigger>
@@ -1995,6 +1999,14 @@ function EquipmentDetailDialog({
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="ficha">
+            <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
+          </TabsContent>
+
+          <TabsContent value="tablero">
+            <TableroExpediente equipment={equipment} />
           </TabsContent>
 
           <TabsContent value="photos">

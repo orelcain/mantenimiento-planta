@@ -39,6 +39,20 @@ Estado canónico del proyecto. Actualizar cuando haya una decisión estable.
 - NO tocar `firestore.rules` / `functions/` / `firebase.json` salvo pedido explícito (proyecto Firebase compartido).
 - Detalle fino de la normalización en la memoria de Claude del proyecto (`.claude/projects/.../memory/`).
 
+## Centro Técnico Documental (NFPA 70B) — diseño aprobado 2026-06-20
+
+- **NO es módulo nuevo:** se enriquece el módulo Equipos existente (`/equipment`, `EquipmentPage`,
+  que ya tiene `criticidad`+fotos+QR+incidencias). Distinto de `/aprendizaje` (formación). Es el
+  **expediente por equipo** según NFPA 70B. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`. **AÚN sin codear.**
+- Ficha en el registro `equipment`; hereda repuestos (`repuestos` N:M) y manuales (`manuales` N:M) del
+  nodo `hierarchy` vía `hierarchyNodeId`. **NO sobre `plantAssets`** (legacy). Falta: datos de placa,
+  condición 1/2/3 e historial.
+- Decisiones: `fichaTecnica` = campo dedicado tipado en `equipment`; `maintenanceLog` = colección plana
+  con `equipmentId` (necesita regla nueva en `firestore.rules` → pedir OK); criticidad = NFPA 70B §2.4
+  (amenaza a personal/propiedad/producto) + **condición 1/2/3 = semáforo 🟢🟡🔴** (Cap. 9); próxima
+  inspección = criticidad × condición (Tabla 9.2.2). Piloto: motor `720004608` + bomba `720004607` (NH₃)
+  — verificar que existen como registros `equipment`.
+
 ## Pendientes mayores
 
 Ver `TASKS.md`. Resumen: solicitar-a-bodega end-to-end, chatbot ARIA in-app → leer el maestro (hoy lee `machines/*/repuestos` viejo), Mapas (`CatalogoBases`) → maestro, Fase 5 limpieza de colecciones legacy.
