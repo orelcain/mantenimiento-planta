@@ -1749,8 +1749,8 @@ function CtdEquipoRow({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{e.nombre}</div>
-        <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        <div className="text-xs font-medium truncate">{e.nombre}</div>
+        <div className="text-[10px] text-muted-foreground font-mono truncate">{e.codigo}</div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
           {cond ? <span>{COND_EMOJI[cond]}</span> : null}
