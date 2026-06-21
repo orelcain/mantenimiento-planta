@@ -122,6 +122,25 @@ export interface FichaTecnica {
   proximaInspeccion?: string // ISO date (YYYY-MM-DD)
 }
 
+// Orden de trabajo (colección plana `workOrders`) — Centro Técnico Documental
+export interface WorkOrder {
+  id: string
+  equipmentId: string
+  hierarchyNodeId?: string
+  titulo: string
+  descripcion?: string
+  tipo: 'correctivo' | 'preventivo' | 'predictivo' | 'inspeccion' | 'mejora'
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
+  estado: 'abierta' | 'en_proceso' | 'cerrada' | 'cancelada'
+  asignadoA?: string // nombre del técnico responsable
+  fechaProgramada?: string // ISO date (YYYY-MM-DD)
+  fechaCierre?: string // ISO date
+  costo?: number
+  notaCierre?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 // Historial de mantenimiento NFPA 70B (colección plana `maintenanceLog`)
 export interface MaintenanceLogEntry {
   id: string

@@ -25,6 +25,7 @@ import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, T
 import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
+import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAppStore, useAuthStore } from '@/store'
@@ -39,7 +40,7 @@ import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
+import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -65,6 +66,26 @@ const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
 }
 
 const COND_EMOJI: Record<1 | 2 | 3, string> = { 1: '🟢', 2: '🟡', 3: '🔴' }
+
+const WO_ESTADO: Record<WorkOrder['estado'], { label: string; cls: string }> = {
+  abierta: { label: 'Abierta', cls: 'border-blue-500 text-blue-600' },
+  en_proceso: { label: 'En proceso', cls: 'border-amber-500 text-amber-600' },
+  cerrada: { label: 'Cerrada', cls: 'border-emerald-500 text-emerald-600' },
+  cancelada: { label: 'Cancelada', cls: 'border-border text-muted-foreground' },
+}
+const WO_PRIORIDAD: Record<WorkOrder['prioridad'], { label: string; cls: string }> = {
+  critica: { label: 'Crítica', cls: 'text-red-600' },
+  alta: { label: 'Alta', cls: 'text-amber-600' },
+  media: { label: 'Media', cls: 'text-muted-foreground' },
+  baja: { label: 'Baja', cls: 'text-muted-foreground' },
+}
+const WO_TIPOS: { value: WorkOrder['tipo']; label: string }[] = [
+  { value: 'correctivo', label: 'Correctivo' },
+  { value: 'preventivo', label: 'Preventivo' },
+  { value: 'predictivo', label: 'Predictivo' },
+  { value: 'inspeccion', label: 'Inspección' },
+  { value: 'mejora', label: 'Mejora' },
+]
 
 const PLACA_FIELDS: (keyof FichaTecnica)[] = [
   'potenciaKw',
@@ -1008,6 +1029,77 @@ function ExpedienteDialog({
   const { manuales, loading: manualesLoading } = useManualesDeEquipos(nodeIds)
   const { repuestos, loading: repuestosLoading } = useRepuestosDeEquipo(equipment.hierarchyNodeId)
 
+  // Órdenes de trabajo del equipo
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
+  const [woLoading, setWoLoading] = useState(false)
+  const [woForm, setWoForm] = useState(false)
+  const [woSaving, setWoSaving] = useState(false)
+  const [woDraft, setWoDraft] = useState<{
+    titulo: string
+    tipo: WorkOrder['tipo']
+    prioridad: WorkOrder['prioridad']
+    asignadoA: string
+    fechaProgramada: string
+    descripcion: string
+  }>({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+
+  useEffect(() => {
+    let alive = true
+    setWoLoading(true)
+    getWorkOrders(equipment.id)
+      .then((rows) => {
+        if (alive) setWorkOrders(rows)
+      })
+      .catch((err) => {
+        if (alive) setWorkOrders([])
+        logger.error('Error cargando órdenes de trabajo', err instanceof Error ? err : new Error(String(err)))
+      })
+      .finally(() => {
+        if (alive) setWoLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  async function crearOT() {
+    if (!woDraft.titulo.trim()) return
+    setWoSaving(true)
+    try {
+      await createWorkOrder({
+        equipmentId: equipment.id,
+        hierarchyNodeId: equipment.hierarchyNodeId,
+        titulo: woDraft.titulo.trim(),
+        descripcion: woDraft.descripcion.trim() || undefined,
+        tipo: woDraft.tipo,
+        prioridad: woDraft.prioridad,
+        estado: 'abierta',
+        asignadoA: woDraft.asignadoA.trim() || undefined,
+        fechaProgramada: woDraft.fechaProgramada || undefined,
+      })
+      setWorkOrders(await getWorkOrders(equipment.id))
+      setWoForm(false)
+      setWoDraft({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+    } catch (err) {
+      logger.error('Error creando OT', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo crear la orden de trabajo.')
+    } finally {
+      setWoSaving(false)
+    }
+  }
+
+  async function cambiarEstadoOT(wo: WorkOrder, estado: WorkOrder['estado']) {
+    try {
+      const patch: Partial<WorkOrder> = { estado }
+      if (estado === 'cerrada') patch.fechaCierre = new Date().toISOString().slice(0, 10)
+      await updateWorkOrder(wo.id, patch)
+      setWorkOrders(await getWorkOrders(equipment.id))
+    } catch (err) {
+      logger.error('Error actualizando OT', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo actualizar la orden de trabajo.')
+    }
+  }
+
   const [newNoteText, setNewNoteText] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
@@ -1067,6 +1159,7 @@ function ExpedienteDialog({
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
               <TabsTrigger value="recursos">Recursos</TabsTrigger>
+              <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
               <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
               <TabsTrigger value="qr">QR</TabsTrigger>
@@ -1253,6 +1346,138 @@ function ExpedienteDialog({
                   Repuestos y documentos se heredan del nodo de jerarquía del equipo (maestro N:M).
                 </p>
               </div>
+            </TabsContent>
+
+            <TabsContent value="trabajos">
+              <Card>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold">
+                      Órdenes de trabajo{' '}
+                      {workOrders.length > 0 && (
+                        <span className="text-xs font-normal text-muted-foreground">({workOrders.length})</span>
+                      )}
+                    </div>
+                    {canEdit && !woForm && (
+                      <Button variant="outline" size="sm" onClick={() => setWoForm(true)}>
+                        <Plus className="h-3.5 w-3.5 mr-1.5" /> Nueva OT
+                      </Button>
+                    )}
+                  </div>
+
+                  {woForm && (
+                    <div className="rounded-lg border p-3 space-y-3">
+                      <Input
+                        placeholder="Título de la OT…"
+                        value={woDraft.titulo}
+                        onChange={(e) => setWoDraft((d) => ({ ...d, titulo: e.target.value }))}
+                      />
+                      <div className="grid md:grid-cols-3 gap-2">
+                        <select
+                          className="text-sm border rounded-md px-2 py-1.5 bg-background"
+                          value={woDraft.tipo}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, tipo: e.target.value as WorkOrder['tipo'] }))}
+                        >
+                          {WO_TIPOS.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className="text-sm border rounded-md px-2 py-1.5 bg-background"
+                          value={woDraft.prioridad}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, prioridad: e.target.value as WorkOrder['prioridad'] }))}
+                        >
+                          <option value="baja">Prioridad baja</option>
+                          <option value="media">Prioridad media</option>
+                          <option value="alta">Prioridad alta</option>
+                          <option value="critica">Prioridad crítica</option>
+                        </select>
+                        <Input
+                          type="date"
+                          value={woDraft.fechaProgramada}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, fechaProgramada: e.target.value }))}
+                        />
+                      </div>
+                      <Input
+                        placeholder="Asignado a (técnico)…"
+                        value={woDraft.asignadoA}
+                        onChange={(e) => setWoDraft((d) => ({ ...d, asignadoA: e.target.value }))}
+                      />
+                      <Textarea
+                        rows={2}
+                        placeholder="Descripción…"
+                        value={woDraft.descripcion}
+                        onChange={(e) => setWoDraft((d) => ({ ...d, descripcion: e.target.value }))}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={crearOT} disabled={woSaving || !woDraft.titulo.trim()}>
+                          <Check className="h-3.5 w-3.5 mr-1.5" /> {woSaving ? 'Guardando…' : 'Crear OT'}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setWoForm(false)} disabled={woSaving}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {woLoading ? (
+                    <p className="text-sm text-muted-foreground italic">Cargando…</p>
+                  ) : workOrders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">Sin órdenes de trabajo.</p>
+                  ) : (
+                    <div className="divide-y">
+                      {workOrders.map((wo) => {
+                        const we = WO_ESTADO[wo.estado]
+                        const wp = WO_PRIORIDAD[wo.prioridad]
+                        return (
+                          <div key={wo.id} className="py-2.5 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm">{wo.titulo}</div>
+                                {wo.descripcion && (
+                                  <div className="text-xs text-muted-foreground whitespace-pre-wrap">{wo.descripcion}</div>
+                                )}
+                              </div>
+                              <Badge variant="outline" className={`${we.cls} text-xs shrink-0`}>
+                                {we.label}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                              <span>{WO_TIPOS.find((t) => t.value === wo.tipo)?.label ?? wo.tipo}</span>
+                              <span className={wp.cls}>● {wp.label}</span>
+                              {wo.asignadoA && <span>👤 {wo.asignadoA}</span>}
+                              {wo.fechaProgramada && <span>📅 {new Date(wo.fechaProgramada).toLocaleDateString()}</span>}
+                              {wo.fechaCierre && <span>✓ {new Date(wo.fechaCierre).toLocaleDateString()}</span>}
+                            </div>
+                            {canEdit && wo.estado !== 'cerrada' && wo.estado !== 'cancelada' && (
+                              <div className="flex items-center gap-1 pt-0.5">
+                                {wo.estado === 'abierta' && (
+                                  <Button variant="ghost" size="sm" onClick={() => cambiarEstadoOT(wo, 'en_proceso')}>
+                                    Tomar
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="sm" onClick={() => cambiarEstadoOT(wo, 'cerrada')}>
+                                  Cerrar
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-muted-foreground"
+                                  onClick={() => cambiarEstadoOT(wo, 'cancelada')}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="fotos">

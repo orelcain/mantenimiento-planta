@@ -554,6 +554,24 @@ service cloud.firestore {
     }
 
     // ============================================
+    // WORK ORDERS — Órdenes de trabajo por equipo (Centro Técnico Documental)
+    // Colección plana; un doc por OT, referenciada por equipmentId.
+    // ============================================
+    match /workOrders/{woId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.equipmentId is string
+        && request.resource.data.equipmentId.size() > 0
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() >= 1
+        && request.resource.data.tipo in ['correctivo', 'preventivo', 'predictivo', 'inspeccion', 'mejora']
+        && request.resource.data.estado in ['abierta', 'en_proceso', 'cerrada', 'cancelada'];
+      allow update: if isTechnician() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // TABLEROS — Levantamiento eléctrico / unifilares (Centro Técnico Documental, NFPA 70B)
     // Un doc por tablero; circuitos y revisiones como arrays. Revisión 0 = as-found.
     // Ver docs/LEVANTAMIENTO_TABLEROS.md.
