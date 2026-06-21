@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Check,
   ChevronRight,
@@ -105,14 +106,17 @@ export function CentroTecnicoDocumentalPage() {
   const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
   const { notesFor, addNote, editNote, deleteNote } = useEquipmentNotes(user?.id)
 
+  const [searchParams, setSearchParams] = useSearchParams()
+
   const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
   const [q, setQ] = useState('')
 
-  // Expediente en sitio (sin salto a Equipos)
-  const [detailId, setDetailId] = useState<string | null>(null)
-  const [detailTab, setDetailTab] = useState('info')
+  // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
+  // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
+  const detailId = searchParams.get('eq')
+  const detailTab = searchParams.get('tab') ?? 'info'
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -163,10 +167,48 @@ export function CentroTecnicoDocumentalPage() {
   }, [detailId])
 
   function openExpediente(id: string, tab: string = 'info') {
-    setDetailTab(tab)
-    setDetailId(id)
+    const p = new URLSearchParams(searchParams)
+    p.set('eq', id)
+    p.set('tab', tab)
+    setSearchParams(p)
     setLightbox(null)
   }
+
+  function setDetailTab(tab: string) {
+    const p = new URLSearchParams(searchParams)
+    p.set('tab', tab)
+    setSearchParams(p, { replace: true })
+  }
+
+  function closeExpediente() {
+    const p = new URLSearchParams(searchParams)
+    p.delete('eq')
+    p.delete('tab')
+    setSearchParams(p)
+  }
+
+  // Bloquear scroll de fondo + cerrar con Esc mientras hay un panel abierto.
+  useEffect(() => {
+    if (!detailId && !lightbox && !editingEquipment) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || editingEquipment) return // el form (Radix) maneja su Esc
+      if (lightbox) {
+        setLightbox(null)
+      } else if (detailId) {
+        const p = new URLSearchParams(searchParams)
+        p.delete('eq')
+        p.delete('tab')
+        setSearchParams(p)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [detailId, lightbox, editingEquipment, searchParams, setSearchParams])
 
   async function reload() {
     const fresh = await getEquipments()
@@ -262,6 +304,13 @@ export function CentroTecnicoDocumentalPage() {
     { key: 'en_mantenimiento', label: ESTADO.en_mantenimiento.label },
     { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
   ]
+
+  const filtrosActivos = filtro !== 'todos' || estadoFiltro !== 'all' || q.trim() !== ''
+  function limpiarFiltros() {
+    setFiltro('todos')
+    setEstadoFiltro('all')
+    setQ('')
+  }
 
   // Exporta el programa (filtro actual) a Excel — handoff de auditoría NFPA 70B.
   function exportarExcel() {
@@ -365,6 +414,18 @@ export function CentroTecnicoDocumentalPage() {
             {c.label}
           </button>
         ))}
+      </div>
+
+      {/* Conteo + limpiar filtros */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {loading ? 'Cargando…' : `Mostrando ${visibles.length} de ${kpis.total} equipos`}
+        </span>
+        {filtrosActivos && (
+          <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {/* Tabla */}
@@ -497,7 +558,7 @@ export function CentroTecnicoDocumentalPage() {
           onTabChange={setDetailTab}
           isFavorite={favorites.has(detailEquipment.id)}
           onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
-          onClose={() => setDetailId(null)}
+          onClose={closeExpediente}
           onLightbox={setLightbox}
           canEdit={canEditEquipment}
           onEdit={() => setEditingEquipment(detailEquipment)}
