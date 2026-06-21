@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-21 · claude · CTD órdenes de trabajo — Camino B (PR #98, DESPLEGADO + reglas)
+
+- **PR #98 MERGEADO** (`d1120891`): 4.ª dimensión de gestión de activos = **órdenes de trabajo**.
+  - Tipo `WorkOrder` + colección plana **`workOrders`** (1 doc por OT, `equipmentId`).
+  - **`firestore.rules`: regla nueva `workOrders`** (read activeUser / create+update technician / delete admin, patrón `maintenanceLog`). **DESPLEGADA** vía `deploy-firestore-rules.yml` al mergear (run success). Aprobado por Orel (Camino B).
+  - `services/workOrders.ts`: `getWorkOrders` / `createWorkOrder` / `updateWorkOrder`.
+  - Pestaña **"Trabajos"** en el expediente: alta (título/tipo/prioridad/asignado/fecha/descripción) + lista con badges estado/prioridad + acciones Tomar/Cerrar/Cancelar (cierre fija `fechaCierre`). Gated por `canEditEquipment`.
+- Verificación: tsc + eslint limpios; CI verde; PWA + reglas desplegadas OK.
+- Estado: HECHO / DESPLEGADO.
+- Sigue (opcional): integrar OT abiertas/vencidas en la Agenda y KPIs de programa; costo acumulado por activo (TCO); notificaciones.
+
 ## 2026-06-21 · claude · CTD gestión de activos v1 (PR #97, DESPLEGADO)
 
 - **PR #97 MERGEADO** (`3929719d`): 3 dimensiones de gestión de activos, todo lectura sobre datos existentes:

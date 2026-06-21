@@ -44,7 +44,8 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [x] **CTD: traer de Equipos** (PR #95, DESPLEGADO 2026-06-21) — anotar fotos (`PhotoAnnotationEditor`), vista Tarjetas (3er modo), copiar códigos del set filtrado. (claude)
 - [x] **CTD: repasada de flujo** (PR #96, DESPLEGADO 2026-06-21) — KPIs clicables=filtros (sin chips duplicados), barra única (Estado→select), menú "Datos", CTA "Registrar" en vencidas, debounce búsqueda, dedupe, extracción `CtdEquipoRow`/`CtdEquipoCard`. (claude)
 - [x] **CTD gestión de activos v1** (PR #97, DESPLEGADO 2026-06-21) — ciclo de vida (antigüedad/vida/% consumido/reemplazo), confiabilidad (fallas/MTTR/MTBF/disponibilidad de incidencias) y pestaña Recursos (repuestos N:M + documentos heredados). (claude)
-- [ ] **CTD órdenes de trabajo (Camino B)** — colección `workOrders` nueva (Orel aprobó; necesita `firestore.rules`): OT por equipo (asignar/fecha/estado/prioridad/repuestos/costo/cierre) + pestaña "Trabajos" + integración Agenda. EN CURSO (claude). Dueño merge+deploy reglas: Orel
+- [x] **CTD órdenes de trabajo (Camino B)** (PR #98, DESPLEGADO 2026-06-21 + reglas) — colección `workOrders` + regla Firestore (desplegada) + servicio + pestaña "Trabajos" en el expediente (alta + estados Tomar/Cerrar/Cancelar). (claude)
+- [ ] **CTD OT — siguientes** (opcional): integrar OT abiertas/vencidas en la Agenda y KPIs de programa; costo acumulado por activo (TCO); notificaciones de vencidas. Dueño: —
 - [ ] **Cargar placa real del piloto** — motor `720004608` + bomba `720004607` (NH₃): capturar placa eléctrica + condición y validar el flujo completo en vivo. Dueño: Orel
 - [ ] **Fijar `tipo` a ~45 equipos sin match** del backfill (Baader/Knuro/climatización/tableros abreviados) a mano en la ficha. Dueño: —
 
