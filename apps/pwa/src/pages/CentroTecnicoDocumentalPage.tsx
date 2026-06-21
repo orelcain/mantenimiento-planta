@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, FolderArchive } from 'lucide-react'
-import { Badge, Button, Card, CardContent } from '@/components/ui'
+import { Badge, Button, Card, CardContent, Input } from '@/components/ui'
 import { getEquipments } from '@/services/equipment'
 import { logger } from '@/lib/logger'
 import type { Equipment, FichaTecnica } from '@/types'
@@ -64,6 +64,7 @@ export function CentroTecnicoDocumentalPage() {
   const [equipos, setEquipos] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [q, setQ] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -97,7 +98,9 @@ export function CentroTecnicoDocumentalPage() {
   }, [equipos])
 
   const visibles = useMemo(() => {
+    const term = q.trim().toLowerCase()
     const rows = equipos.filter((e) => {
+      if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
@@ -118,7 +121,7 @@ export function CentroTecnicoDocumentalPage() {
       if (c !== 0) return c
       return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
     })
-  }, [equipos, filtro])
+  }, [equipos, filtro, q])
 
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
@@ -154,6 +157,14 @@ export function CentroTecnicoDocumentalPage() {
           </Card>
         ))}
       </div>
+
+      {/* Búsqueda */}
+      <Input
+        placeholder="Buscar equipo por nombre o código…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        className="max-w-sm"
+      />
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
@@ -198,7 +209,7 @@ export function CentroTecnicoDocumentalPage() {
                   <div
                     key={e.id}
                     className="grid grid-cols-2 md:grid-cols-[1fr_90px_90px_140px_70px_80px] gap-2 px-4 py-3 items-center text-sm hover:bg-muted/40 cursor-pointer"
-                    onClick={() => navigate(`/equipment?id=${e.id}`)}
+                    onClick={() => navigate(`/equipment?abrir=${e.id}&tab=ficha`)}
                   >
                     <div className="col-span-2 md:col-span-1">
                       <div className="font-medium">{e.nombre}</div>
