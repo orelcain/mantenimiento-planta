@@ -13,6 +13,7 @@ import {
   QrCode,
   Star,
   Trash2,
+  Upload,
   X,
   Zap,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
 import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
+import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { useAppStore, useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
@@ -175,6 +177,8 @@ export function CentroTecnicoDocumentalPage() {
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const [importingPlaca, setImportingPlaca] = useState(false)
+  const placaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let alive = true
@@ -295,6 +299,24 @@ export function CentroTecnicoDocumentalPage() {
     } catch (e: unknown) {
       logger.error('Photo delete failed (CTD)', e instanceof Error ? e : new Error('Error al eliminar foto'))
       alert('No se pudo eliminar la foto. Intenta de nuevo.')
+    }
+  }
+
+  async function handleImportPlaca(file: File | null) {
+    if (!file) return
+    setImportingPlaca(true)
+    try {
+      const r = await importarPlacaExcel(file, equipos)
+      await reload()
+      alert(
+        `Placa importada: ${r.actualizados} actualizados · ${r.sinCambios} sin cambios · ${r.sinMatch.length} sin match (de ${r.total} filas).`,
+      )
+    } catch (e: unknown) {
+      logger.error('Error importando placa (CTD)', e instanceof Error ? e : new Error('Error al importar placa'))
+      alert('No se pudo importar el Excel de placa. Revisa que tenga la columna "Código" y el formato de la plantilla.')
+    } finally {
+      setImportingPlaca(false)
+      if (placaInputRef.current) placaInputRef.current.value = ''
     }
   }
 
@@ -504,9 +526,28 @@ export function CentroTecnicoDocumentalPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
-          <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canEditEquipment && (
+            <>
+              <input
+                ref={placaInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => handleImportPlaca(e.target.files?.[0] ?? null)}
+              />
+              <Button variant="outline" size="sm" onClick={() => descargarPlantillaPlaca(equipos)} disabled={loading}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> Plantilla placa
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => placaInputRef.current?.click()} disabled={importingPlaca || loading}>
+                <Upload className="h-3.5 w-3.5 mr-1.5" /> {importingPlaca ? 'Importando…' : 'Importar placa'}
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
