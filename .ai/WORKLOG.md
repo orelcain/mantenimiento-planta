@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-21 · claude · CTD gestión de activos v1 (PR #97, DESPLEGADO)
+
+- **PR #97 MERGEADO** (`3929719d`): 3 dimensiones de gestión de activos, todo lectura sobre datos existentes:
+  - **Ciclo de vida** (pestaña Información): antigüedad (`fechaInstalacion`), vida útil, % de vida consumida (barra+semáforo) y fecha estimada de reemplazo.
+  - **Confiabilidad** (Información): n.º de fallas, MTTR, MTBF, disponibilidad calculados de las incidencias correctivas del equipo (helper `confiabilidad()`).
+  - **Pestaña "Recursos"**: repuestos del equipo (maestro N:M, nuevo hook `useRepuestosDeEquipo` → `repuestos` where `equipos array-contains nodeId`) + documentos heredados (`useManualesDeEquipos`).
+- Archivos: `pages/CentroTecnicoDocumentalPage.tsx`, `hooks/repuestos/useRepuestosDeEquipo.ts` (nuevo).
+- Verificación: tsc + eslint limpios; CI verde. Sin reglas → solo redeploy PWA.
+- Estado: HECHO / DESPLEGADO.
+- Sigue: **Órdenes de trabajo (Camino B)** — Orel aprobó colección `workOrders` nueva (necesita `firestore.rules`); en curso.
+
 ## 2026-06-21 · claude · CTD: traer de Equipos + repasada de flujo (PR #95 + #96, DESPLEGADO)
 
 - **PR #95 MERGEADO** (`c201da6f`): trae de Equipos al expediente del CTD →
