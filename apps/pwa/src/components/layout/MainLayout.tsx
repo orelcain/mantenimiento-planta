@@ -92,7 +92,6 @@ const navGroups: NavGroup[] = [
     id: 'equipamiento', label: 'Equipamiento',
     items: [
       { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos', inDevelopment: true },
-      { name: 'Centro Técnico Documental', href: '/centro-tecnico-documental', icon: FolderArchive },
       { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
       { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores', inDevelopment: true },
       { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores', inDevelopment: true },
@@ -114,6 +113,7 @@ const navGroups: NavGroup[] = [
     id: 'aprendizaje', label: 'Aprendizaje',
     items: [
       { name: 'Centro de Aprendizaje', href: '/aprendizaje', icon: GraduationCap },
+      { name: 'Centro Técnico Documental', href: '/centro-tecnico-documental', icon: FolderArchive },
     ],
   },
   {
