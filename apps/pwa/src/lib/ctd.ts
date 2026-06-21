@@ -110,6 +110,13 @@ export function qrUrl(equipmentId: string): string {
   return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
 }
 
+const CLP = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
+/** Formatea un costo en pesos chilenos (— si no hay valor). */
+export function formatCosto(n: number | undefined | null): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return CLP.format(n)
+}
+
 /** Segmentos de la ruta jerárquica del equipo (sin vacíos).
  *  Forma real: "Aquachile… > PLANTA > SECCIÓN > LÍNEA > … > Equipo". */
 export function pathParts(eq: Equipment): string[] {

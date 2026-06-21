@@ -55,6 +55,7 @@ import {
   completitud,
   confiabilidad,
   diasVencida,
+  formatCosto,
   lineaDe,
   qrUrl,
   seccionDe,
@@ -770,8 +771,13 @@ function ExpedienteDialog({
     prioridad: WorkOrder['prioridad']
     asignadoA: string
     fechaProgramada: string
+    costo: string
     descripcion: string
-  }>({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+  }>({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', costo: '', descripcion: '' })
+
+  // Costo total de mantenimiento del equipo (TCO) = suma de costos de sus OT.
+  const tco = workOrders.reduce((s, wo) => s + (wo.costo ?? 0), 0)
+  const otConCosto = workOrders.filter((wo) => typeof wo.costo === 'number').length
 
   useEffect(() => {
     let alive = true
@@ -796,6 +802,7 @@ function ExpedienteDialog({
     if (!woDraft.titulo.trim()) return
     setWoSaving(true)
     try {
+      const costoNum = woDraft.costo.trim() ? Number(woDraft.costo) : undefined
       await createWorkOrder({
         equipmentId: equipment.id,
         hierarchyNodeId: equipment.hierarchyNodeId,
@@ -806,10 +813,11 @@ function ExpedienteDialog({
         estado: 'abierta',
         asignadoA: woDraft.asignadoA.trim() || undefined,
         fechaProgramada: woDraft.fechaProgramada || undefined,
+        costo: costoNum != null && Number.isFinite(costoNum) ? costoNum : undefined,
       })
       setWorkOrders(await getWorkOrders(equipment.id))
       setWoForm(false)
-      setWoDraft({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+      setWoDraft({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', costo: '', descripcion: '' })
     } catch (err) {
       logger.error('Error creando OT', err instanceof Error ? err : new Error(String(err)))
       alert('No se pudo crear la orden de trabajo.')
@@ -821,7 +829,15 @@ function ExpedienteDialog({
   async function cambiarEstadoOT(wo: WorkOrder, estado: WorkOrder['estado']) {
     try {
       const patch: Partial<WorkOrder> = { estado }
-      if (estado === 'cerrada') patch.fechaCierre = new Date().toISOString().slice(0, 10)
+      if (estado === 'cerrada') {
+        patch.fechaCierre = new Date().toISOString().slice(0, 10)
+        // Capturar/confirmar el costo al cerrar (alimenta el TCO del activo).
+        const ingresado = window.prompt('Costo de esta OT (opcional, solo número):', wo.costo != null ? String(wo.costo) : '')
+        if (ingresado !== null && ingresado.trim() !== '') {
+          const n = Number(ingresado)
+          if (Number.isFinite(n)) patch.costo = n
+        }
+      }
       await updateWorkOrder(wo.id, patch)
       setWorkOrders(await getWorkOrders(equipment.id))
     } catch (err) {
@@ -1001,6 +1017,35 @@ function ExpedienteDialog({
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Costo de mantenimiento (TCO) — suma de costos de las OT del equipo */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-2">
+                      Costo de mantenimiento (TCO){' '}
+                      <span className="text-[11px] font-normal text-muted-foreground">(según OT con costo)</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground text-xs">Costo acumulado</div>
+                        <div className="font-medium">{formatCosto(tco)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">OT con costo</div>
+                        <div className="font-medium">
+                          {otConCosto} / {workOrders.length}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Costo promedio</div>
+                        <div className="font-medium">{otConCosto > 0 ? formatCosto(tco / otConCosto) : '—'}</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      El costo se captura al crear o cerrar una orden de trabajo (pestaña Trabajos).
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 
@@ -1085,7 +1130,9 @@ function ExpedienteDialog({
                     <div className="text-sm font-semibold">
                       Órdenes de trabajo{' '}
                       {workOrders.length > 0 && (
-                        <span className="text-xs font-normal text-muted-foreground">({workOrders.length})</span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          ({workOrders.length}){tco > 0 ? ` · TCO ${formatCosto(tco)}` : ''}
+                        </span>
                       )}
                     </div>
                     {canEdit && !woForm && (
@@ -1130,11 +1177,21 @@ function ExpedienteDialog({
                           onChange={(e) => setWoDraft((d) => ({ ...d, fechaProgramada: e.target.value }))}
                         />
                       </div>
-                      <Input
-                        placeholder="Asignado a (técnico)…"
-                        value={woDraft.asignadoA}
-                        onChange={(e) => setWoDraft((d) => ({ ...d, asignadoA: e.target.value }))}
-                      />
+                      <div className="grid md:grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Asignado a (técnico)…"
+                          value={woDraft.asignadoA}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, asignadoA: e.target.value }))}
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          inputMode="numeric"
+                          placeholder="Costo (CLP, opcional)…"
+                          value={woDraft.costo}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, costo: e.target.value }))}
+                        />
+                      </div>
                       <Textarea
                         rows={2}
                         placeholder="Descripción…"
@@ -1180,6 +1237,7 @@ function ExpedienteDialog({
                               {wo.asignadoA && <span>👤 {wo.asignadoA}</span>}
                               {wo.fechaProgramada && <span>📅 {new Date(wo.fechaProgramada).toLocaleDateString()}</span>}
                               {wo.fechaCierre && <span>✓ {new Date(wo.fechaCierre).toLocaleDateString()}</span>}
+                              {typeof wo.costo === 'number' && <span>💲 {formatCosto(wo.costo)}</span>}
                             </div>
                             {canEdit && wo.estado !== 'cerrada' && wo.estado !== 'cancelada' && (
                               <div className="flex items-center gap-1 pt-0.5">
