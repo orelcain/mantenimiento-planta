@@ -115,6 +115,36 @@ const ITEMS_PER_PAGE = 50
 type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
 type EstadoFiltro = 'all' | Equipment['estado']
 type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
+type Vista = 'lista' | 'agenda'
+
+/** Fecha de próxima inspección en ms (Infinity si no hay / inválida) — para ordenar. */
+function proximaMs(eq: Equipment): number {
+  const iso = eq.fichaTecnica?.proximaInspeccion
+  const t = iso ? new Date(iso).getTime() : NaN
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
+}
+
+type Bucket = 'vencidas' | 'd30' | 'd60' | 'd90' | 'futuro' | 'sin'
+const BUCKETS: { key: Bucket; label: string }[] = [
+  { key: 'vencidas', label: 'Vencidas' },
+  { key: 'd30', label: 'Próximos 30 días' },
+  { key: 'd60', label: '31–60 días' },
+  { key: 'd90', label: '61–90 días' },
+  { key: 'futuro', label: 'Más de 90 días' },
+  { key: 'sin', label: 'Sin fecha de inspección' },
+]
+function bucketDe(eq: Equipment): Bucket {
+  const iso = eq.fichaTecnica?.proximaInspeccion
+  if (!iso) return 'sin'
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return 'sin'
+  const dias = Math.floor((t - startOfToday()) / 86400000)
+  if (dias < 0) return 'vencidas'
+  if (dias <= 30) return 'd30'
+  if (dias <= 60) return 'd60'
+  if (dias <= 90) return 'd90'
+  return 'futuro'
+}
 
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
@@ -133,6 +163,7 @@ export function CentroTecnicoDocumentalPage() {
   const [tipoFiltro, setTipoFiltro] = useState<string>('all')
   const [orden, setOrden] = useState<OrdenCampo>('criticidad')
   const [compact, setCompact] = useState(false)
+  const [vista, setVista] = useState<Vista>('lista')
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
 
@@ -388,6 +419,14 @@ export function CentroTecnicoDocumentalPage() {
     setLineaFiltro('all')
   }, [seccionFiltro])
 
+  // Agenda: agrupa los equipos filtrados por ventana de próxima inspección.
+  const agenda = useMemo(() => {
+    const groups: Record<Bucket, Equipment[]> = { vencidas: [], d30: [], d60: [], d90: [], futuro: [], sin: [] }
+    for (const e of visibles) groups[bucketDe(e)].push(e)
+    for (const k of Object.keys(groups) as Bucket[]) groups[k].sort((a, b) => proximaMs(a) - proximaMs(b))
+    return groups
+  }, [visibles])
+
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
     { key: 'favoritos', label: `★ Favoritos (${kpis.favs})` },
@@ -527,8 +566,22 @@ export function CentroTecnicoDocumentalPage() {
         ))}
       </div>
 
-      {/* Sección · Línea · Tipo · Orden · Densidad */}
+      {/* Vista · Sección · Línea · Tipo · Orden · Densidad */}
       <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border overflow-hidden mr-1">
+          <button
+            onClick={() => setVista('lista')}
+            className={`text-xs px-3 py-1.5 ${vista === 'lista' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+          >
+            Lista
+          </button>
+          <button
+            onClick={() => setVista('agenda')}
+            className={`text-xs px-3 py-1.5 ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+          >
+            Agenda
+          </button>
+        </div>
         <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
         <select
           value={seccionFiltro}
@@ -613,8 +666,12 @@ export function CentroTecnicoDocumentalPage() {
         )}
       </div>
 
-      {/* Tabla */}
-      <Card>
+      {/* Agenda de inspecciones (vista agenda) */}
+      {vista === 'agenda' && <AgendaInspecciones groups={agenda} onOpen={(id) => openExpediente(id, 'ficha')} />}
+
+      {/* Tabla (vista lista) */}
+      {vista === 'lista' && (
+        <Card>
         <CardContent className="p-0">
           {loading ? (
             <p className="p-4 text-sm text-muted-foreground italic">Cargando equipos…</p>
@@ -745,9 +802,10 @@ export function CentroTecnicoDocumentalPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
-      {!loading && totalPages > 1 && (
+      {vista === 'lista' && !loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             Anterior
@@ -1135,6 +1193,66 @@ function ExpedienteDialog({
           </Tabs>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function AgendaInspecciones({
+  groups,
+  onOpen,
+}: {
+  groups: Record<Bucket, Equipment[]>
+  onOpen: (id: string) => void
+}) {
+  const total = BUCKETS.reduce((n, b) => n + groups[b.key].length, 0)
+  if (total === 0) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</CardContent>
+      </Card>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      {BUCKETS.map((b) => {
+        const items = groups[b.key]
+        if (items.length === 0) return null
+        const danger = b.key === 'vencidas'
+        return (
+          <Card key={b.key}>
+            <CardContent className="p-0">
+              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-red-600' : ''}`}>
+                <span>{b.label}</span>
+                <span className="text-xs text-muted-foreground">{items.length}</span>
+              </div>
+              <div className="divide-y border-t">
+                {items.map((e) => {
+                  const crit = CRIT[e.criticidad]
+                  const cond = e.fichaTecnica?.condicion
+                  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+                  const prox = e.fichaTecnica?.proximaInspeccion
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => onOpen(e.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40"
+                    >
+                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+                      <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : '—'}</span>
+                      <span className="flex-1 min-w-0 truncate">
+                        {e.nombre} <span className="text-[11px] text-muted-foreground font-mono">· {e.codigo}</span>
+                      </span>
+                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                        {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
