@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Download, FolderArchive, Image as ImageIcon, QrCode, Star, X, Zap } from 'lucide-react'
+import { ChevronRight, Download, FolderArchive, Image as ImageIcon, MapPin, QrCode, Star, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import * as XLSX from 'xlsx'
-import { Badge, Button, Card, CardContent, Input } from '@/components/ui'
+import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { getEquipments } from '@/services/equipment'
-import { useAuthStore } from '@/store'
+import { getIncidents } from '@/services/incidents'
+import { useAppStore, useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
+import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
+import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica } from '@/types'
+import type { Equipment, FichaTecnica, Incident } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
  *
- * Vista a nivel programa sobre la colección `equipment`: KPIs (criticidad,
- * condición, inspecciones vencidas, fichas incompletas), filtros (criticidad/
- * condición/vencida/incompleta, estado, favoritos) y tabla de equipos que entra
- * al expediente. Reúne lo útil de Equipos (favoritos compartidos, filtro por
- * estado, foto/QR, acceso directo a la pestaña Tablero) sin duplicar datos.
+ * Vista a nivel programa sobre la colección `equipment`: KPIs, filtros y tabla.
+ * El expediente del equipo (Información, Ficha NFPA 70B, Tablero, Fotos, QR) se
+ * abre EN SITIO en un panel del propio CTD —reusando `FichaTecnicaNFPA70B` y
+ * `TableroExpediente`—, sin saltar a la página de Equipos. Lee del store global
+ * para que las ediciones de ficha se reflejen al instante. No duplica datos.
  * Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
  */
 
@@ -78,22 +80,26 @@ type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
 type EstadoFiltro = 'all' | Equipment['estado']
 
 export function CentroTecnicoDocumentalPage() {
-  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const { equipment, setEquipment } = useAppStore()
   const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
 
-  const [equipos, setEquipos] = useState<Equipment[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
   const [q, setQ] = useState('')
-  const [qrEquipo, setQrEquipo] = useState<Equipment | null>(null)
+
+  // Expediente en sitio (sin salto a Equipos)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState('info')
+  const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
     getEquipments()
       .then((rows) => {
-        if (alive) setEquipos(rows.filter((e) => !e.deleted))
+        if (alive) setEquipment(rows)
       })
       .catch((err) =>
         logger.error('Error cargando equipos (Centro Técnico Documental)', err instanceof Error ? err : new Error(String(err))),
@@ -104,7 +110,40 @@ export function CentroTecnicoDocumentalPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [setEquipment])
+
+  const equipos = useMemo(() => equipment.filter((e) => !e.deleted), [equipment])
+
+  const detailEquipment = useMemo(
+    () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
+    [detailId, equipos],
+  )
+
+  // Cargar incidencias del equipo abierto (para la timeline de la Ficha)
+  useEffect(() => {
+    if (!detailId) {
+      setDetailIncidents([])
+      return
+    }
+    let alive = true
+    getIncidents({ equipmentId: detailId, limit: 50 })
+      .then((rows) => {
+        if (alive) setDetailIncidents(rows)
+      })
+      .catch((err) => {
+        logger.error('Error cargando incidencias del expediente', err instanceof Error ? err : new Error(String(err)))
+        if (alive) setDetailIncidents([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [detailId])
+
+  function openExpediente(id: string, tab: string = 'info') {
+    setDetailTab(tab)
+    setDetailId(id)
+    setLightbox(null)
+  }
 
   const kpis = useMemo(() => {
     let critA = 0
@@ -293,7 +332,7 @@ export function CentroTecnicoDocumentalPage() {
                   <div
                     key={e.id}
                     className="flex items-center gap-3 px-3 py-3 hover:bg-muted/40 cursor-pointer"
-                    onClick={() => navigate(`/equipment?abrir=${e.id}&tab=ficha`)}
+                    onClick={() => openExpediente(e.id, 'info')}
                   >
                     {/* Favorito */}
                     <button
@@ -349,7 +388,7 @@ export function CentroTecnicoDocumentalPage() {
                         className="text-primary hidden sm:inline-flex"
                         onClick={(ev) => {
                           ev.stopPropagation()
-                          navigate(`/equipment?abrir=${e.id}&tab=ficha`)
+                          openExpediente(e.id, 'info')
                         }}
                       >
                         Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
@@ -361,7 +400,7 @@ export function CentroTecnicoDocumentalPage() {
                         aria-label="Abrir Tablero del equipo"
                         onClick={(ev) => {
                           ev.stopPropagation()
-                          navigate(`/equipment?abrir=${e.id}&tab=tablero`)
+                          openExpediente(e.id, 'tablero')
                         }}
                       >
                         <Zap className="h-4 w-4" />
@@ -373,7 +412,7 @@ export function CentroTecnicoDocumentalPage() {
                         aria-label="Ver código QR"
                         onClick={(ev) => {
                           ev.stopPropagation()
-                          setQrEquipo(e)
+                          openExpediente(e.id, 'qr')
                         }}
                       >
                         <QrCode className="h-4 w-4" />
@@ -388,37 +427,184 @@ export function CentroTecnicoDocumentalPage() {
       </Card>
 
       <p className="text-[11px] text-muted-foreground">
-        “Abrir” lleva al expediente del equipo → pestaña <strong>Ficha NFPA 70B</strong>; el rayo abre la pestaña{' '}
-        <strong>Tablero</strong>. “Ficha %” = completitud de la placa. Los favoritos se comparten con la página de Equipos.
+        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, QR) se abre aquí mismo, sin salir del CTD. “Ficha %” =
+        completitud de la placa. Los favoritos se comparten con la página de Equipos.
       </p>
 
-      {/* Modal QR */}
-      {qrEquipo && (
+      {/* Expediente en sitio */}
+      {detailEquipment && (
+        <ExpedienteDialog
+          equipment={detailEquipment}
+          incidents={detailIncidents}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+          isFavorite={favorites.has(detailEquipment.id)}
+          onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
+          onClose={() => setDetailId(null)}
+          onLightbox={setLightbox}
+        />
+      )}
+
+      {/* Lightbox de fotos (por encima del expediente) */}
+      {lightbox && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setQrEquipo(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
           role="dialog"
           aria-modal="true"
         >
-          <Card className="w-full max-w-xs" onClick={(ev) => ev.stopPropagation()}>
-            <CardContent className="p-5 space-y-3 text-center">
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-left">
-                  <div className="text-sm font-semibold">Código QR</div>
-                  <div className="text-xs text-muted-foreground">{qrEquipo.nombre}</div>
-                </div>
-                <button onClick={() => setQrEquipo(null)} aria-label="Cerrar" className="p-1 -m-1 text-muted-foreground hover:text-foreground">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex justify-center">
-                <QRCodeSVG value={qrUrl(qrEquipo.id)} size={196} data-qr={qrEquipo.id} />
-              </div>
-              <div className="text-[11px] text-muted-foreground font-mono break-all">{qrEquipo.codigo}</div>
-            </CardContent>
-          </Card>
+          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded" />
         </div>
       )}
+    </div>
+  )
+}
+
+function ExpedienteDialog({
+  equipment,
+  incidents,
+  tab,
+  onTabChange,
+  isFavorite,
+  onToggleFavorite,
+  onClose,
+  onLightbox,
+}: {
+  equipment: Equipment
+  incidents: Incident[]
+  tab: string
+  onTabChange: (tab: string) => void
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onClose: () => void
+  onLightbox: (url: string) => void
+}) {
+  const crit = CRIT[equipment.criticidad]
+  const est = ESTADO[equipment.estado]
+  const ubicacion = equipment.hierarchyPath || equipment.zoneId
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <Card className="my-4 w-full max-w-3xl" onClick={(ev) => ev.stopPropagation()}>
+        <CardContent className="p-4 md:p-5 space-y-4">
+          {/* Encabezado */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onToggleFavorite}
+                  title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                  aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                  className="shrink-0 p-0.5"
+                >
+                  <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+                </button>
+                <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
+              </div>
+              <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className={`${crit.cls} text-xs`}>Criticidad {crit.nivel}</Badge>
+                <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+                {ubicacion && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" /> <span className="line-clamp-1">{ubicacion}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar" className="shrink-0 p-1 -m-1 text-muted-foreground hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <Tabs value={tab} onValueChange={onTabChange}>
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="info">Información</TabsTrigger>
+              <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
+              <TabsTrigger value="tablero">Tablero</TabsTrigger>
+              <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
+              <TabsTrigger value="qr">QR</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="info">
+              <Card>
+                <CardContent className="p-4 grid md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Marca</div>
+                    <div className="font-medium">{equipment.marca || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Modelo</div>
+                    <div className="font-medium">{equipment.modelo || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Número de serie</div>
+                    <div className="font-medium">{equipment.numeroSerie || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Estado</div>
+                    <div className="font-medium">{est.label}</div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-sm text-muted-foreground">Descripción</div>
+                    <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '—'}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="ficha">
+              <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
+            </TabsContent>
+
+            <TabsContent value="tablero">
+              <TableroExpediente equipment={equipment} />
+            </TabsContent>
+
+            <TabsContent value="fotos">
+              <Card>
+                <CardContent className="p-4">
+                  {equipment.photos && equipment.photos.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {equipment.photos.map((url, idx) => (
+                        <button
+                          key={url}
+                          className="aspect-square rounded-lg overflow-hidden border"
+                          onClick={() => onLightbox(url)}
+                          title="Ampliar"
+                        >
+                          <img src={url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Sin fotos</p>
+                      <p className="text-sm">Las fotos se agregan desde la página de Equipos.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="qr">
+              <Card>
+                <CardContent className="p-6 flex flex-col items-center gap-3">
+                  <div className="text-sm font-medium">Código QR del equipo</div>
+                  <QRCodeSVG value={qrUrl(equipment.id)} size={200} data-qr={equipment.id} />
+                  <div className="text-xs text-muted-foreground font-mono break-all text-center">{equipment.codigo}</div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }
