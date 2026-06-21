@@ -683,6 +683,111 @@ export function CentroTecnicoDocumentalPage() {
   )
 }
 
+const SEV_VAL: Record<MaintenanceLogEntry['severidad'], number> = { verde: 1, amarillo: 2, rojo: 3 }
+const SEV_HEX: Record<MaintenanceLogEntry['severidad'], string> = { verde: '#10b981', amarillo: '#f59e0b', rojo: '#ef4444' }
+const SEV_LABEL: Record<MaintenanceLogEntry['severidad'], string> = {
+  verde: 'Condición 1',
+  amarillo: 'Condición 2',
+  rojo: 'Condición 3',
+}
+
+/** Tendencia de la condición (severidad del historial) + trazabilidad de cambios. */
+function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; equipment: Equipment }) {
+  // Serie cronológica ascendente (el historial llega en orden descendente).
+  const serie = useMemo(() => [...log].sort((a, b) => a.fecha.getTime() - b.fecha.getTime()), [log])
+
+  // Trazabilidad: puntos donde la condición (severidad) cambia respecto al anterior.
+  const cambios = useMemo(() => {
+    const out: { fecha: Date; from: MaintenanceLogEntry['severidad']; to: MaintenanceLogEntry['severidad'] }[] = []
+    for (let i = 1; i < serie.length; i++) {
+      const prev = serie[i - 1]
+      const cur = serie[i]
+      if (prev && cur && prev.severidad !== cur.severidad) out.push({ fecha: cur.fecha, from: prev.severidad, to: cur.severidad })
+    }
+    return out.reverse()
+  }, [serie])
+
+  const W = 300
+  const H = 60
+  const P = 8
+  const puntos = serie.map((e, i) => {
+    const x = serie.length <= 1 ? W / 2 : P + (i / (serie.length - 1)) * (W - 2 * P)
+    const y = H - P - ((SEV_VAL[e.severidad] - 1) / 2) * (H - 2 * P)
+    return { x, y, sev: e.severidad, fecha: e.fecha }
+  })
+  const polyline = puntos.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const primero = puntos[0]
+  const ultimo = puntos[puntos.length - 1]
+  const condActual = equipment.fichaTecnica?.condicion
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Tendencia de condición{' '}
+            <span className="text-[11px] font-normal text-muted-foreground">(historial NFPA 70B)</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Actual: {condActual ? `${COND_EMOJI[condActual]} Cond. ${condActual}` : '—'}
+          </div>
+        </div>
+
+        {serie.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground italic">
+            Sin historial para calcular la tendencia. Registra inspecciones en la Ficha NFPA 70B.
+          </p>
+        ) : (
+          <>
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+              className="mt-3 w-full h-16 text-muted-foreground"
+              role="img"
+              aria-label="Tendencia de condición"
+            >
+              {[1, 2, 3].map((v) => {
+                const y = H - P - ((v - 1) / 2) * (H - 2 * P)
+                return <line key={v} x1={0} x2={W} y1={y} y2={y} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1} />
+              })}
+              {puntos.length > 1 && (
+                <polyline points={polyline} fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5} />
+              )}
+              {puntos.map((p, i) => (
+                <circle key={`${p.fecha.getTime()}-${i}`} cx={p.x} cy={p.y} r={3} fill={SEV_HEX[p.sev]} />
+              ))}
+            </svg>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{primero ? primero.fecha.toLocaleDateString() : ''}</span>
+              <span>🟢 mejor · 🔴 peor · {serie.length} registro(s)</span>
+              <span>{ultimo ? ultimo.fecha.toLocaleDateString() : ''}</span>
+            </div>
+          </>
+        )}
+
+        <div className="mt-3 border-t pt-2">
+          <div className="text-xs font-medium mb-1">Trazabilidad de cambios</div>
+          {cambios.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">Sin cambios de condición registrados.</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {cambios.slice(0, 6).map((c, i) => (
+                <li key={`${c.fecha.getTime()}-${i}`} className="text-[11px] text-muted-foreground">
+                  {c.fecha.toLocaleDateString()} · {SEV_LABEL[c.from]} →{' '}
+                  <span className="font-medium text-foreground">{SEV_LABEL[c.to]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Última actualización de la ficha: {equipment.updatedAt ? new Date(equipment.updatedAt).toLocaleString() : '—'}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 /** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
 function OtBadge({ ot }: { ot?: OtCount }) {
   if (!ot || ot.abiertas === 0) return null
@@ -1046,6 +1151,8 @@ function ExpedienteDialog({
                     </p>
                   </CardContent>
                 </Card>
+
+                <TendenciaCondicion log={log} equipment={equipment} />
               </div>
             </TabsContent>
 
