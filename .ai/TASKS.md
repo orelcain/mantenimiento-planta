@@ -38,6 +38,18 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [ ] **v3c — próxima inspección automática** — calcular fecha sugerida = criticidad × condición (Cap. 9 / Tabla 9.2.2). Opcional: que termografías escriban entrada en `maintenanceLog`. Dueño: —
 - [ ] **Merge a main** — revisar rama `feat/centro-tecnico-documental-v1`, push + PR. Al mergear se despliega la regla `maintenanceLog`. Dueño: Orel
 
+## TODO — Tableros / Unifilares (NFPA 70B)
+
+> Fase 0 "el dato primero" (decisión Orel 2026-06-20): levantamiento estructurado de tableros como base
+> para unifilares + histórico de cambios. Protocolo/ficha en OneDrive:
+> `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. Fluyo NO es la herramienta del unifilar
+> (es para arquitectura de software). El levantamiento inicial se guarda como **Revisión 0 (as-found)**.
+
+- [x] **v1 — levantamiento (Excel + form PWA)** — colección `tableros` (circuitos+revisiones como arrays; el alta siembra Revisión 0), `services/tableros.ts` + `services/tablerosExcel.ts` (plantilla descargar/importar con SheetJS), `pages/TablerosPage.tsx`, ruta `/tableros`, nav "Tableros" (grupo Equipamiento), regla `tableros` en `firestore.rules`. **tsc limpio; preview en vivo OK** (UI monta, Excel genera, form abre) — pero lecturas/escrituras dan `permission-denied` hasta desplegar reglas. (claude, 2026-06-20, rama `feat/levantamiento-tableros-v1`, commit `91ad1367`, sin push)
+- [ ] **Merge + deploy reglas** — push+PR de `feat/levantamiento-tableros-v1`; al mergear se despliega la regla `tableros` (o `firebase deploy --only firestore:rules`). **Sin esto la página da permission-denied.** Dueño: Orel
+- [ ] **Levantar tablero piloto** — CCM que alimenta motor 720004608 + bomba 720004607. Dueño: —
+- [ ] **v2** — fotos a Storage (no cableado en v1) · enlazar `cargaNombre`→`cargaNodeId` de `hierarchy` · render del unifilar sobre el dato levantado. Dueño: —
+
 ## Backlog general / futuro
 
 - [ ] ARIA local (Ollama): definir cómo consulta el maestro (export Firestore o API solo-lectura).

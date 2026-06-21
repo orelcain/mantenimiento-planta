@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Tableros / Unifilares (NFPA 70B) v1 — levantamiento (Excel + form PWA)
+
+- Pedido de Orel: cubrir **unifilares de tableros desde la PWA**. Decisión: **"primero el dato" (Fase 0)** — levantamiento estructurado antes de dibujar. El levantamiento inicial se guarda como **Revisión 0 (as-found)** → nace el histórico de cambios que hoy no existe. Spec/protocolo en OneDrive: `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. (Fluyo NO es la herramienta del unifilar: es para arquitectura de software, sin símbolos eléctricos.)
+- Hecho: colección `tableros` (circuitos+revisiones como arrays en el doc, <1MB de sobra). **Ambas vías de captura**: **Excel** (descargar plantilla + importar, SheetJS ya estaba en deps) y **form nativo** en `/tableros` (lista + stats + formulario + editor de circuitos + condición 1·2·3 NFPA 70B).
+- Archivos (rama `feat/levantamiento-tableros-v1`, commit `91ad1367`): `apps/pwa/src/types/tableros.ts`, `apps/pwa/src/services/tableros.ts`, `apps/pwa/src/services/tablerosExcel.ts`, `apps/pwa/src/pages/TablerosPage.tsx`, `apps/pwa/src/App.tsx` (ruta `/tableros` lazy), `apps/pwa/src/components/layout/MainLayout.tsx` (nav "Tableros", grupo Equipamiento, `inDevelopment` igual que Equipos), `firestore.rules` (colección `tableros`: read activeUser / create+update technician / delete admin).
+- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sirve D:, sesión admin)**: `/tableros` monta, header/stats/empty-state OK, "Plantilla Excel" genera sin throw, form "Nuevo levantamiento" abre y renderiza completo. ⚠️ Lecturas/escrituras dan `permission-denied` porque la **regla `tableros` aún NO está desplegada** en el proyecto vivo (esperado).
+- Estado: EN REVISIÓN (rama sin push/merge). Diff aislado a 7 archivos (no se tocó `.ai/` en el commit de código; este worklog va aparte).
+- Sigue: PR+merge → **desplegar `firestore.rules`** (`deploy-firestore-rules.yml` al mergear, o `firebase deploy --only firestore:rules`) → recién entonces lee/escribe. Luego: levantar tablero piloto (CCM motor 720004608 / bomba 720004607), fotos a Storage (no cableado en v1), enlazar `cargaNombre`→`cargaNodeId` de `hierarchy`, y el render del unifilar sobre el dato.
+
 ## 2026-06-20 · claude · Pulido repuestos: ubicación en fila + composición por clase (+ validación solicitar)
 
 - Pedido de Orel (3 mejoras del módulo):
