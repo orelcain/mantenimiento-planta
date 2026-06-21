@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-21 · claude · CTD "programa vivo" (PR #94, DESPLEGADO)
+
+- **PR #94 MERGEADO** (`7388c4a6`) — el CTD pasa de catálogo a programa NFPA 70B que maneja el ciclo:
+  1. **Cerrar el ciclo de inspección** (`FichaTecnicaNFPA70B.handleAddEntry`): al registrar un evento de tipo inspección/termografía/medición/preventivo/predictivo, la severidad → condición observada (verde/amarillo/rojo = 1/2/3) y se reprograma `proximaInspeccion` = fecha + `intervaloInspeccionDias`(criticidad × condición). Antes solo guardaba la entrada sin avanzar la próxima.
+  2. **Agenda de inspecciones** (CTD): toggle Lista/Agenda; agrupa los equipos filtrados por ventana (Vencidas/30/60/90/+90/Sin fecha), ordenadas por fecha.
+  3. **Carga masiva de placa por Excel**: `services/equipmentFichaExcel.ts` (`descargarPlantillaPlaca`/`importarPlacaExcel`, match por Código, MERGEA solo celdas con valor) + botones Plantilla/Importar en el encabezado (canEditEquipment).
+  4. **Reporte PDF por equipo**: `services/equipmentReportPdf.ts` (jsPDF + jspdf-autotable) con datos generales + placa + programa de inspección + historial (maintenanceLog + incidencias); botón "PDF" en el expediente. El CTD ahora carga también el `maintenanceLog` del equipo abierto.
+- Archivos: `components/equipment/FichaTecnicaNFPA70B.tsx`, `pages/CentroTecnicoDocumentalPage.tsx`, `services/equipmentFichaExcel.ts` (nuevo), `services/equipmentReportPdf.ts` (nuevo).
+- Verificación: `tsc --noEmit` + `eslint` limpios en cada commit; CI build verde en #94. Sin reglas Firestore nuevas → solo redeploy PWA. Navegador NO verificable (login Google) → Orel prueba en vivo.
+- Estado: HECHO / DESPLEGADO.
+- Sigue: probar en vivo (registrar inspección reprograma; agenda; importar placa; PDF). Pendientes previos siguen (placa del piloto; ~45 equipos sin `tipo`).
+
 ## 2026-06-21 · claude · CTD → expediente autosuficiente (PR #92 + #93, DESPLEGADO)
 
 - **PR #92 MERGEADO** (`b919dbd1`): portada CTD `/centro-tecnico-documental` (KPIs + buscador + v3c próxima-inspección auto criticidad×condición + export Excel). Solo redeploy PWA.
