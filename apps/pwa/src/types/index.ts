@@ -98,8 +98,27 @@ export interface Equipment {
   photoURL?: string // @deprecated - usar photos[]
   photos?: string[] // URLs de Firebase Storage para fotos de referencia del equipo
   predictiveThresholds?: PredictiveThresholds
+  // Ficha técnica NFPA 70B (Centro Técnico Documental) — ver docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md
+  fichaTecnica?: FichaTecnica
   createdAt: Date
   updatedAt: Date
+}
+
+// Ficha técnica NFPA 70B: datos de placa eléctrica + RCM (Cap. 9)
+export interface FichaTecnica {
+  // Placa eléctrica
+  potenciaKw?: number
+  voltajeV?: number
+  corrienteA?: number
+  rpm?: number
+  factorServicio?: number
+  claseAislamiento?: string
+  gradoIP?: string
+  // RCM / NFPA 70B Cap. 9
+  condicion?: 1 | 2 | 3 // 1=🟢 como nuevo · 2=🟡 con desvíos · 3=🔴 acción requerida
+  vidaUtilAnios?: number
+  frecuenciaInspeccionDias?: number
+  proximaInspeccion?: string // ISO date (YYYY-MM-DD)
 }
 
 // Umbrales predictivos configurables
