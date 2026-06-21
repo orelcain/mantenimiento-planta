@@ -22,7 +22,7 @@ No tomes una tarea que ya está EN CURSO por otro.
 ## TODO — Centro Técnico Documental (NFPA 70B)
 
 > Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
-> **v1+v2+v3 codeadas en rama `feat/centro-tecnico-documental-v1` (sin push, sin merge). tsc+eslint limpios.**
+> **v1+v2+v3+v3b codeadas en rama `feat/centro-tecnico-documental-v1` (sin push, sin merge). tsc+eslint limpios.**
 > Regla `maintenanceLog` ya en `firestore.rules` (se despliega sola al mergear vía `deploy-firestore-rules.yml`).
 > Decisiones cerradas: **enriquecer el módulo Equipos** (`/equipment`, NO módulo aparte); ficha =
 > **campo dedicado `fichaTecnica`** en el registro `equipment`, hereda repuestos/manuales del nodo
@@ -34,7 +34,8 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [x] **v1 — ficha solo-lectura** en `EquipmentPage`: pestaña "Ficha NFPA 70B" con placa + documentos heredados + criticidad + historial. (claude, 2026-06-20, rama `feat/centro-tecnico-documental-v1`)
 - [x] **v2 — edición de `fichaTecnica`** — editor inline (placa eléctrica + condición 1/2/3 + vida útil/frecuencia/próxima inspección), guarda en `equipment.fichaTecnica` vía `updateEquipment`. tsc+eslint limpios. Falta cargar la placa real del piloto en la app. (claude, 2026-06-20)
 - [x] **v3 — `maintenanceLog`** — colección plana + regla Firestore (read activeUser / create technician) + servicio `getMaintenanceLog`/`addMaintenanceLogEntry` + UI: timeline 🟢🟡🔴 y formulario "Registrar evento" en la ficha. (claude, 2026-06-20)
-- [ ] **v3b — auto-registro** — que `incidents` y termografías escriban en `maintenanceLog` automáticamente; y cálculo de próxima inspección = criticidad × condición. Dueño: —
+- [x] **v3b — incidencias en el timeline (auto)** — read-merge: las incidencias del equipo (`equipmentId`) aparecen en el historial junto a las entradas manuales, prioridad→semáforo; sin duplicar datos. (claude, 2026-06-20, worktree por colisión)
+- [ ] **v3c — próxima inspección automática** — calcular fecha sugerida = criticidad × condición (Cap. 9 / Tabla 9.2.2). Opcional: que termografías escriban entrada en `maintenanceLog`. Dueño: —
 - [ ] **Merge a main** — revisar rama `feat/centro-tecnico-documental-v1`, push + PR. Al mergear se despliega la regla `maintenanceLog`. Dueño: Orel
 
 ## Backlog general / futuro
