@@ -6,7 +6,7 @@ import { getEquipments, updateEquipment } from '@/services/equipment'
 import { addMaintenanceLogEntry, getMaintenanceLog } from '@/services/maintenanceLog'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, MaintenanceLogEntry } from '@/types'
+import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
 /**
  * Ficha Técnica NFPA 70B — v2 (lectura + captura de placa).
@@ -69,6 +69,30 @@ const TIPO_LABEL = Object.fromEntries(TIPOS.map((t) => [t.value, t.label])) as R
   string
 >
 
+// Prioridad de incidencia → semáforo de condición (Cap. 9)
+const PRIORIDAD_SEV: Record<string, MaintenanceLogEntry['severidad']> = {
+  critica: 'rojo',
+  alta: 'rojo',
+  media: 'amarillo',
+  baja: 'verde',
+}
+
+type TimelineRow = {
+  key: string
+  fecha: Date
+  tipoLabel: string
+  severidad: MaintenanceLogEntry['severidad']
+  texto: string
+  source: 'log' | 'incidencia'
+}
+
+function asDate(v: unknown): Date {
+  if (v instanceof Date) return v
+  const maybe = v as { toDate?: () => Date } | null
+  if (maybe && typeof maybe.toDate === 'function') return maybe.toDate()
+  return new Date()
+}
+
 function SectionTitle({
   icon: Icon,
   children,
@@ -110,7 +134,13 @@ function clean(ficha: FichaTecnica): FichaTecnica {
   return out as FichaTecnica
 }
 
-export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
+export function FichaTecnicaNFPA70B({
+  equipment,
+  incidents = [],
+}: {
+  equipment: Equipment
+  incidents?: Incident[]
+}) {
   const { setEquipment } = useAppStore()
   const [ficha, setFicha] = useState<FichaTecnica>(equipment.fichaTecnica ?? {})
   const [editing, setEditing] = useState(false)
@@ -202,6 +232,26 @@ export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
       setSavingEntry(false)
     }
   }
+
+  // Timeline unificado: historial manual (maintenanceLog) + incidencias del equipo
+  const timeline: TimelineRow[] = [
+    ...log.map((e) => ({
+      key: `log-${e.id}`,
+      fecha: e.fecha,
+      tipoLabel: TIPO_LABEL[e.tipo],
+      severidad: e.severidad,
+      texto: `${e.tecnico ? `${e.tecnico} — ` : ''}${e.hallazgo}`,
+      source: 'log' as const,
+    })),
+    ...incidents.map((i) => ({
+      key: `inc-${i.id}`,
+      fecha: asDate(i.createdAt),
+      tipoLabel: 'Incidencia',
+      severidad: PRIORIDAD_SEV[i.prioridad] ?? 'amarillo',
+      texto: i.titulo,
+      source: 'incidencia' as const,
+    })),
+  ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
 
   return (
     <div className="space-y-3">
@@ -442,21 +492,25 @@ export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
             </div>
           )}
 
-          {loadingLog ? (
+          {loadingLog && timeline.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">Cargando historial…</p>
-          ) : log.length === 0 ? (
+          ) : timeline.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
-              Sin registros aún. Registra el primer evento o conéctalo a incidencias (próximo paso).
+              Sin registros aún. Registra el primer evento; las incidencias del equipo aparecen aquí automáticamente.
             </p>
           ) : (
             <div className="space-y-1">
-              {log.map((e) => (
-                <div key={e.id} className="flex items-start gap-3 py-2 border-t first:border-t-0">
+              {timeline.map((e) => (
+                <div key={e.key} className="flex items-start gap-3 py-2 border-t first:border-t-0">
                   <span className="text-sm leading-5">{SEVERIDAD[e.severidad]}</span>
                   <span className="text-xs text-muted-foreground min-w-[88px]">{e.fecha.toLocaleDateString()}</span>
                   <span className="text-sm">
-                    <span className="font-semibold">{TIPO_LABEL[e.tipo]}</span>
-                    {e.tecnico ? ` · ${e.tecnico}` : ''} — {e.hallazgo}
+                    <span className="font-semibold">{e.tipoLabel}</span>
+                    {e.source === 'incidencia' && (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground"> · incidencia</span>
+                    )}
+                    {' — '}
+                    {e.texto}
                   </span>
                 </div>
               ))}
@@ -468,8 +522,8 @@ export function FichaTecnicaNFPA70B({ equipment }: { equipment: Equipment }) {
       <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
-          Estructura según NFPA 70B (§2.2 placa · §2.4 + Cap. 9 criticidad/condición · historial).
-          El auto-registro desde incidencias/termografías es el próximo paso.
+          Estructura según NFPA 70B (§2.2 placa · §2.4 + Cap. 9 criticidad/condición · historial). Las
+          incidencias del equipo aparecen en el timeline automáticamente.
         </span>
       </div>
     </div>

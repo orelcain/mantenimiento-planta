@@ -2000,7 +2000,7 @@ function EquipmentDetailDialog({
           </TabsContent>
 
           <TabsContent value="ficha">
-            <FichaTecnicaNFPA70B equipment={equipment} />
+            <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
           </TabsContent>
 
           <TabsContent value="photos">
