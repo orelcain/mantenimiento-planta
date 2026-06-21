@@ -1,25 +1,58 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Download, FolderArchive } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  Check,
+  ChevronRight,
+  Download,
+  Edit2,
+  FolderArchive,
+  Image as ImageIcon,
+  MapPin,
+  Pencil,
+  Plus,
+  QrCode,
+  Star,
+  Trash2,
+  X,
+  Zap,
+} from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import * as XLSX from 'xlsx'
-import { Badge, Button, Card, CardContent, Input } from '@/components/ui'
-import { getEquipments } from '@/services/equipment'
+import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
+import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
+import { getIncidents } from '@/services/incidents'
+import { useAppStore, useAuthStore } from '@/store'
+import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
+import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
+import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
+import { usePermissions } from '@/hooks/usePermissions'
+import { EquipmentForm } from '@/components/equipment/EquipmentForm'
+import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
+import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica } from '@/types'
+import type { Equipment, FichaTecnica, Incident } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
  *
- * Vista de SOLO LECTURA y a nivel programa sobre la colección `equipment`:
- * KPIs (criticidad, condición, inspecciones vencidas, fichas incompletas) y
- * tabla de equipos que entra al expediente (pestaña Ficha NFPA 70B).
- * No duplica datos. Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
+ * Vista a nivel programa sobre la colección `equipment`: KPIs, filtros y tabla.
+ * El expediente del equipo (Información editable, Ficha NFPA 70B, Tablero,
+ * Fotos con subida/borrado, Notas, QR) se abre EN SITIO en un panel del propio
+ * CTD —reusando `EquipmentForm`, `FichaTecnicaNFPA70B` y `TableroExpediente`—,
+ * sin saltar a la página de Equipos. Lee del store global. No duplica datos.
+ * Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
  */
 
 const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string }> = {
   alta: { nivel: 'A', cls: 'border-red-500 text-red-600' },
   media: { nivel: 'B', cls: 'border-amber-500 text-amber-600' },
   baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
+}
+
+const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
+  operativo: { label: 'Operativo', cls: 'border-emerald-500 text-emerald-600' },
+  en_mantenimiento: { label: 'En mantención', cls: 'border-amber-500 text-amber-600' },
+  fuera_servicio: { label: 'Fuera de servicio', cls: 'border-red-500 text-red-600' },
 }
 
 const COND_EMOJI: Record<1 | 2 | 3, string> = { 1: '🟢', 2: '🟡', 3: '🔴' }
@@ -58,20 +91,65 @@ function diasVencida(iso?: string): number | null {
   return diff > 0 ? Math.floor(diff / 86400000) : null
 }
 
-type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta'
+/** URL pública del equipo para el código QR (misma convención que EquipmentPage). */
+function qrUrl(equipmentId: string): string {
+  return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
+}
+
+/** Segmentos de la ruta jerárquica del equipo (sin vacíos).
+ *  Forma real: "Aquachile… > PLANTA > SECCIÓN > LÍNEA > … > Equipo". */
+function pathParts(eq: Equipment): string[] {
+  return (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+}
+/** Sección = nivel 2 (PROCESO, FRIGORIFICO, EXTERIORES, PLANTA RILES…). */
+function seccionDe(eq: Equipment): string | null {
+  return pathParts(eq)[2] ?? null
+}
+/** Línea = nivel 3 (TUNELES, EMPAQUE, EVISCERADO, CAMARAS…). */
+function lineaDe(eq: Equipment): string | null {
+  return pathParts(eq)[3] ?? null
+}
+
+const ITEMS_PER_PAGE = 50
+
+type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
+type EstadoFiltro = 'all' | Equipment['estado']
+type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
 
 export function CentroTecnicoDocumentalPage() {
-  const navigate = useNavigate()
-  const [equipos, setEquipos] = useState<Equipment[]>([])
-  const [loading, setLoading] = useState(true)
+  const user = useAuthStore((s) => s.user)
+  const { equipment, setEquipment } = useAppStore()
+  const { canEditEquipment } = usePermissions()
+  const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
+  const { notesFor, addNote, editNote, deleteNote } = useEquipmentNotes(user?.id)
+
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
+  const [seccionFiltro, setSeccionFiltro] = useState<string>('all')
+  const [lineaFiltro, setLineaFiltro] = useState<string>('all')
+  const [tipoFiltro, setTipoFiltro] = useState<string>('all')
+  const [orden, setOrden] = useState<OrdenCampo>('criticidad')
+  const [compact, setCompact] = useState(false)
+  const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
+
+  // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
+  // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
+  const detailId = searchParams.get('eq')
+  const detailTab = searchParams.get('tab') ?? 'info'
+  const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
+  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
 
   useEffect(() => {
     let alive = true
     getEquipments()
       .then((rows) => {
-        if (alive) setEquipos(rows.filter((e) => !e.deleted))
+        if (alive) setEquipment(rows)
       })
       .catch((err) =>
         logger.error('Error cargando equipos (Centro Técnico Documental)', err instanceof Error ? err : new Error(String(err))),
@@ -82,26 +160,166 @@ export function CentroTecnicoDocumentalPage() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [setEquipment])
+
+  const equipos = useMemo(() => equipment.filter((e) => !e.deleted), [equipment])
+
+  const detailEquipment = useMemo(
+    () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
+    [detailId, equipos],
+  )
+
+  // Cargar incidencias del equipo abierto (para la timeline de la Ficha)
+  useEffect(() => {
+    if (!detailId) {
+      setDetailIncidents([])
+      return
+    }
+    let alive = true
+    getIncidents({ equipmentId: detailId, limit: 50 })
+      .then((rows) => {
+        if (alive) setDetailIncidents(rows)
+      })
+      .catch((err) => {
+        logger.error('Error cargando incidencias del expediente', err instanceof Error ? err : new Error(String(err)))
+        if (alive) setDetailIncidents([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [detailId])
+
+  function openExpediente(id: string, tab: string = 'info') {
+    const p = new URLSearchParams(searchParams)
+    p.set('eq', id)
+    p.set('tab', tab)
+    setSearchParams(p)
+    setLightbox(null)
+  }
+
+  function setDetailTab(tab: string) {
+    const p = new URLSearchParams(searchParams)
+    p.set('tab', tab)
+    setSearchParams(p, { replace: true })
+  }
+
+  function closeExpediente() {
+    const p = new URLSearchParams(searchParams)
+    p.delete('eq')
+    p.delete('tab')
+    setSearchParams(p)
+  }
+
+  // Bloquear scroll de fondo + cerrar con Esc mientras hay un panel abierto.
+  useEffect(() => {
+    if (!detailId && !lightbox && !editingEquipment) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || editingEquipment) return // el form (Radix) maneja su Esc
+      if (lightbox) {
+        setLightbox(null)
+      } else if (detailId) {
+        const p = new URLSearchParams(searchParams)
+        p.delete('eq')
+        p.delete('tab')
+        setSearchParams(p)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [detailId, lightbox, editingEquipment, searchParams, setSearchParams])
+
+  async function reload() {
+    const fresh = await getEquipments()
+    setEquipment(fresh)
+  }
+
+  async function handlePhotoUpload(files: FileList | null) {
+    if (!files || files.length === 0 || !detailEquipment || !canEditEquipment) return
+    setPhotoUploading(true)
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file) await addEquipmentPhoto(detailEquipment.id, file)
+      }
+      await reload()
+    } catch (e: unknown) {
+      logger.error('Photo upload failed (CTD)', e instanceof Error ? e : new Error('Error al subir fotos'))
+      alert('No se pudieron subir las fotos. Intenta de nuevo.')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
+  async function handlePhotoDelete(photoUrl: string) {
+    if (!detailEquipment || !canEditEquipment) return
+    if (!window.confirm('¿Eliminar esta foto?')) return
+    try {
+      await removeEquipmentPhoto(detailEquipment.id, photoUrl)
+      await reload()
+    } catch (e: unknown) {
+      logger.error('Photo delete failed (CTD)', e instanceof Error ? e : new Error('Error al eliminar foto'))
+      alert('No se pudo eliminar la foto. Intenta de nuevo.')
+    }
+  }
 
   const kpis = useMemo(() => {
     let critA = 0
     let cond3 = 0
     let vencidas = 0
     let incompletas = 0
+    let favs = 0
     for (const e of equipos) {
       if (e.criticidad === 'alta') critA++
       if (e.fichaTecnica?.condicion === 3) cond3++
       if (diasVencida(e.fichaTecnica?.proximaInspeccion) !== null) vencidas++
       if (completitud(e) < 100) incompletas++
+      if (favorites.has(e.id)) favs++
     }
-    return { total: equipos.length, critA, cond3, vencidas, incompletas }
+    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
+  }, [equipos, favorites])
+
+  const secciones = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      const s = seccionDe(e)
+      if (s) set.add(s)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos])
+
+  // Líneas dependientes de la sección elegida (cascada).
+  const lineas = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) continue
+      const l = lineaDe(e)
+      if (l) set.add(l)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos, seccionFiltro])
+
+  const tipos = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      const t = e.tipo?.trim()
+      if (t) set.add(t)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
   }, [equipos])
 
   const visibles = useMemo(() => {
     const term = q.trim().toLowerCase()
     const rows = equipos.filter((e) => {
       if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
+      if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
+      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
+      if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false
+      if (tipoFiltro !== 'all' && (e.tipo ?? '') !== tipoFiltro) return false
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
@@ -111,26 +329,96 @@ export function CentroTecnicoDocumentalPage() {
           return diasVencida(e.fichaTecnica?.proximaInspeccion) !== null
         case 'incompleta':
           return completitud(e) < 100
+        case 'favoritos':
+          return favorites.has(e.id)
         default:
           return true
       }
     })
-    // Orden: criticidad (A>B>C), luego condición peor primero
     const critRank: Record<Equipment['criticidad'], number> = { alta: 0, media: 1, baja: 2 }
-    return rows.sort((a, b) => {
-      const c = critRank[a.criticidad] - critRank[b.criticidad]
-      if (c !== 0) return c
-      return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
-    })
-  }, [equipos, filtro, q])
+    const proxMs = (e: Equipment) => {
+      const iso = e.fichaTecnica?.proximaInspeccion
+      const t = iso ? new Date(iso).getTime() : NaN
+      return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
+    }
+    const sorted = [...rows]
+    switch (orden) {
+      case 'proxima':
+        sorted.sort((a, b) => proxMs(a) - proxMs(b))
+        break
+      case 'ficha':
+        sorted.sort((a, b) => completitud(a) - completitud(b))
+        break
+      case 'area':
+        sorted.sort(
+          (a, b) =>
+            (seccionDe(a) ?? '').localeCompare(seccionDe(b) ?? '', 'es') ||
+            (lineaDe(a) ?? '').localeCompare(lineaDe(b) ?? '', 'es') ||
+            a.nombre.localeCompare(b.nombre, 'es'),
+        )
+        break
+      case 'nombre':
+        sorted.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+        break
+      default:
+        // criticidad (A>B>C), luego condición peor primero
+        sorted.sort((a, b) => {
+          const c = critRank[a.criticidad] - critRank[b.criticidad]
+          if (c !== 0) return c
+          return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
+        })
+    }
+    return sorted
+  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q, favorites])
+
+  const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
+  const pageSafe = Math.min(page, totalPages)
+  const paginated = useMemo(
+    () => visibles.slice((pageSafe - 1) * ITEMS_PER_PAGE, pageSafe * ITEMS_PER_PAGE),
+    [visibles, pageSafe],
+  )
+
+  // Volver a la página 1 cuando cambian filtros/orden/búsqueda
+  useEffect(() => {
+    setPage(1)
+  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q])
+
+  // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
+  useEffect(() => {
+    setLineaFiltro('all')
+  }, [seccionFiltro])
 
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
+    { key: 'favoritos', label: `★ Favoritos (${kpis.favs})` },
     { key: 'A', label: `Criticidad A (${kpis.critA})` },
     { key: 'cond3', label: `Condición 🔴 (${kpis.cond3})` },
     { key: 'vencida', label: `Inspección vencida (${kpis.vencidas})` },
     { key: 'incompleta', label: `Ficha incompleta (${kpis.incompletas})` },
   ]
+
+  const estadoChips: { key: EstadoFiltro; label: string }[] = [
+    { key: 'all', label: 'Todos los estados' },
+    { key: 'operativo', label: ESTADO.operativo.label },
+    { key: 'en_mantenimiento', label: ESTADO.en_mantenimiento.label },
+    { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
+  ]
+
+  const filtrosActivos =
+    filtro !== 'todos' ||
+    estadoFiltro !== 'all' ||
+    seccionFiltro !== 'all' ||
+    lineaFiltro !== 'all' ||
+    tipoFiltro !== 'all' ||
+    q.trim() !== ''
+  function limpiarFiltros() {
+    setFiltro('todos')
+    setEstadoFiltro('all')
+    setSeccionFiltro('all')
+    setLineaFiltro('all')
+    setTipoFiltro('all')
+    setQ('')
+  }
 
   // Exporta el programa (filtro actual) a Excel — handoff de auditoría NFPA 70B.
   function exportarExcel() {
@@ -140,9 +428,13 @@ export function CentroTecnicoDocumentalPage() {
         'Código': e.codigo,
         'Equipo': e.nombre,
         'Ubicación': e.hierarchyPath ?? e.zoneId ?? '',
+        'Sección': seccionDe(e) ?? '',
+        'Línea': lineaDe(e) ?? '',
+        'Tipo': e.tipo ?? '',
+        'Favorito': favorites.has(e.id) ? 'Sí' : 'No',
         'Criticidad': CRIT[e.criticidad].nivel,
         'Condición': e.fichaTecnica?.condicion ?? '',
-        'Estado': e.estado,
+        'Estado': ESTADO[e.estado].label,
         'Vida útil (años)': e.fichaTecnica?.vidaUtilAnios ?? '',
         'Frecuencia (días)': e.fichaTecnica?.frecuenciaInspeccionDias ?? '',
         'Próx. inspección': e.fichaTecnica?.proximaInspeccion ?? '',
@@ -204,7 +496,7 @@ export function CentroTecnicoDocumentalPage() {
         className="max-w-sm"
       />
 
-      {/* Filtros */}
+      {/* Filtros NFPA 70B + favoritos */}
       <div className="flex flex-wrap gap-2">
         {chips.map((c) => (
           <button
@@ -219,6 +511,108 @@ export function CentroTecnicoDocumentalPage() {
         ))}
       </div>
 
+      {/* Filtro por estado */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</span>
+        {estadoChips.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setEstadoFiltro(c.key)}
+            className={`text-xs px-3 py-1.5 rounded-full border ${
+              estadoFiltro === c.key ? 'border-primary text-primary font-semibold' : 'border-border text-muted-foreground'
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sección · Línea · Tipo · Orden · Densidad */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
+        <select
+          value={seccionFiltro}
+          onChange={(e) => setSeccionFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          aria-label="Filtrar por sección"
+        >
+          <option value="all">Todas ({secciones.length})</option>
+          {secciones.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Línea</label>
+        <select
+          value={lineaFiltro}
+          onChange={(e) => setLineaFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px] disabled:opacity-50"
+          aria-label="Filtrar por línea"
+          disabled={lineas.length === 0}
+        >
+          <option value="all">Todas ({lineas.length})</option>
+          {lineas.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</label>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[180px] disabled:opacity-50"
+          aria-label="Filtrar por tipo"
+          disabled={tipos.length === 0}
+        >
+          <option value="all">{tipos.length === 0 ? 'Sin tipos aún' : `Todos (${tipos.length})`}</option>
+          {tipos.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+
+        <label className="ml-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ordenar</label>
+        <select
+          value={orden}
+          onChange={(e) => setOrden(e.target.value as OrdenCampo)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background"
+          aria-label="Ordenar por"
+        >
+          <option value="criticidad">Criticidad y condición</option>
+          <option value="proxima">Próxima inspección</option>
+          <option value="ficha">Ficha (menos completa)</option>
+          <option value="area">Sección y línea</option>
+          <option value="nombre">Nombre</option>
+        </select>
+
+        <Button variant={compact ? 'default' : 'outline'} size="sm" className="ml-auto" onClick={() => setCompact((v) => !v)}>
+          {compact ? 'Vista normal' : 'Vista compacta'}
+        </Button>
+      </div>
+
+      {/* Conteo + limpiar filtros */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {loading
+            ? 'Cargando…'
+            : visibles.length === 0
+              ? 'Sin resultados'
+              : `Mostrando ${(pageSafe - 1) * ITEMS_PER_PAGE + 1}–${Math.min(pageSafe * ITEMS_PER_PAGE, visibles.length)} de ${visibles.length}${
+                  visibles.length !== kpis.total ? ` (${kpis.total} en total)` : ''
+                }`}
+        </span>
+        {filtrosActivos && (
+          <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+            Limpiar filtros
+          </Button>
+        )}
+      </div>
+
       {/* Tabla */}
       <Card>
         <CardContent className="p-0">
@@ -228,44 +622,121 @@ export function CentroTecnicoDocumentalPage() {
             <p className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
           ) : (
             <div className="divide-y">
-              {/* encabezado */}
-              <div className="hidden md:grid grid-cols-[1fr_90px_90px_140px_70px_80px] gap-2 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <div>Equipo</div>
-                <div>Criticidad</div>
-                <div>Condición</div>
-                <div>Próx. inspección</div>
-                <div>Ficha</div>
-                <div></div>
-              </div>
-              {visibles.map((e) => {
+              {paginated.map((e) => {
                 const crit = CRIT[e.criticidad]
+                const est = ESTADO[e.estado]
                 const cond = e.fichaTecnica?.condicion
                 const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
                 const prox = e.fichaTecnica?.proximaInspeccion
                 const pct = completitud(e)
+                const foto = e.photos?.[0]
+                const isFav = favorites.has(e.id)
                 return (
                   <div
                     key={e.id}
-                    className="grid grid-cols-2 md:grid-cols-[1fr_90px_90px_140px_70px_80px] gap-2 px-4 py-3 items-center text-sm hover:bg-muted/40 cursor-pointer"
-                    onClick={() => navigate(`/equipment?abrir=${e.id}&tab=ficha`)}
+                    className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
+                    onClick={() => openExpediente(e.id, 'info')}
                   >
-                    <div className="col-span-2 md:col-span-1">
-                      <div className="font-medium">{e.nombre}</div>
-                      <div className="text-[11px] text-muted-foreground font-mono">{e.codigo}</div>
+                    {/* Favorito */}
+                    <button
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        toggleFavorite(e.id)
+                      }}
+                      title={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                      aria-label={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                      className="shrink-0 p-1 -m-1"
+                    >
+                      <Star className={`h-4 w-4 ${isFav ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+                    </button>
+
+                    {/* Foto */}
+                    <div className={`shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
+                      {foto ? (
+                        <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </div>
-                    <div>
-                      <Badge variant="outline" className={`${crit.cls} text-xs`}>
-                        {crit.nivel}
-                      </Badge>
+
+                    {/* Nombre + código */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{e.nombre}</div>
+                      <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+                      {/* Meta compacta en móvil */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
+                        <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
+                        {cond ? <span>{COND_EMOJI[cond]}</span> : null}
+                        <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
+                        <button
+                          className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
+                          title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            openExpediente(e.id, 'ficha')
+                          }}
+                        >
+                          {pct > 0 ? `${pct}%` : 'Completar ficha'}
+                        </button>
+                      </div>
                     </div>
-                    <div>{cond ? `${COND_EMOJI[cond]} ${cond}` : <span className="text-muted-foreground">—</span>}</div>
-                    <div className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
-                      {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
+
+                    {/* Meta en escritorio */}
+                    <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
+                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+                      <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
+                      <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+                      <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                        {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
+                      </span>
+                      <button
+                        className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
+                        title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openExpediente(e.id, 'ficha')
+                        }}
+                      >
+                        {pct > 0 ? `${pct}%` : 'Completar'}
+                      </button>
                     </div>
-                    <div className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</div>
-                    <div className="hidden md:flex justify-end">
-                      <Button variant="ghost" size="sm" className="text-primary">
+
+                    {/* Acciones */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary hidden sm:inline-flex"
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openExpediente(e.id, 'info')
+                        }}
+                      >
                         Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Abrir Tablero del equipo"
+                        aria-label="Abrir Tablero del equipo"
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openExpediente(e.id, 'tablero')
+                        }}
+                      >
+                        <Zap className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Ver código QR"
+                        aria-label="Ver código QR"
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openExpediente(e.id, 'qr')
+                        }}
+                      >
+                        <QrCode className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -276,10 +747,394 @@ export function CentroTecnicoDocumentalPage() {
         </CardContent>
       </Card>
 
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            Anterior
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Página {pageSafe} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pageSafe >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Siguiente
+          </Button>
+        </div>
+      )}
+
       <p className="text-[11px] text-muted-foreground">
-        Solo lectura sobre los equipos existentes (no duplica datos). “Abrir” lleva al expediente del equipo →
-        pestaña <strong>Ficha NFPA 70B</strong>. “Ficha %” = completitud de la placa.
+        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre aquí mismo, sin salir del CTD. “Ficha
+        %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
+
+      {/* Expediente en sitio */}
+      {detailEquipment && (
+        <ExpedienteDialog
+          equipment={detailEquipment}
+          incidents={detailIncidents}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+          isFavorite={favorites.has(detailEquipment.id)}
+          onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
+          onClose={closeExpediente}
+          onLightbox={setLightbox}
+          canEdit={canEditEquipment}
+          onEdit={() => setEditingEquipment(detailEquipment)}
+          photoUploading={photoUploading}
+          onPhotoUpload={handlePhotoUpload}
+          onPhotoDelete={handlePhotoDelete}
+          notes={notesFor(detailEquipment.id)}
+          onAddNote={(text) => addNote(detailEquipment.id, text)}
+          onEditNote={(noteId, text) => editNote(detailEquipment.id, noteId, text)}
+          onDeleteNote={(noteId) => deleteNote(detailEquipment.id, noteId)}
+        />
+      )}
+
+      {/* Editor de datos básicos (reusa el form de Equipos) */}
+      {editingEquipment && (
+        <EquipmentForm
+          equipment={editingEquipment}
+          onClose={() => setEditingEquipment(null)}
+          onSuccess={async () => {
+            await reload()
+            setEditingEquipment(null)
+          }}
+        />
+      )}
+
+      {/* Lightbox de fotos (por encima del expediente) */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ExpedienteDialog({
+  equipment,
+  incidents,
+  tab,
+  onTabChange,
+  isFavorite,
+  onToggleFavorite,
+  onClose,
+  onLightbox,
+  canEdit,
+  onEdit,
+  photoUploading,
+  onPhotoUpload,
+  onPhotoDelete,
+  notes,
+  onAddNote,
+  onEditNote,
+  onDeleteNote,
+}: {
+  equipment: Equipment
+  incidents: Incident[]
+  tab: string
+  onTabChange: (tab: string) => void
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onClose: () => void
+  onLightbox: (url: string) => void
+  canEdit: boolean
+  onEdit: () => void
+  photoUploading: boolean
+  onPhotoUpload: (files: FileList | null) => void
+  onPhotoDelete: (photoUrl: string) => void
+  notes: EquipmentNote[]
+  onAddNote: (text: string) => void
+  onEditNote: (noteId: string, text: string) => void
+  onDeleteNote: (noteId: string) => void
+}) {
+  const crit = CRIT[equipment.criticidad]
+  const est = ESTADO[equipment.estado]
+  const ubicacion = equipment.hierarchyPath || equipment.zoneId
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [newNoteText, setNewNoteText] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingNoteText, setEditingNoteText] = useState('')
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <Card className="my-4 w-full max-w-3xl" onClick={(ev) => ev.stopPropagation()}>
+        <CardContent className="p-4 md:p-5 space-y-4">
+          {/* Encabezado */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onToggleFavorite}
+                  title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                  aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                  className="shrink-0 p-0.5"
+                >
+                  <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+                </button>
+                <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
+              </div>
+              <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className={`${crit.cls} text-xs`}>Criticidad {crit.nivel}</Badge>
+                <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+                {ubicacion && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" /> <span className="line-clamp-1">{ubicacion}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {canEdit && (
+                <Button variant="outline" size="sm" onClick={onEdit}>
+                  <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar
+                </Button>
+              )}
+              <button onClick={onClose} aria-label="Cerrar" className="p-1 -m-1 text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <Tabs value={tab} onValueChange={onTabChange}>
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="info">Información</TabsTrigger>
+              <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
+              <TabsTrigger value="tablero">Tablero</TabsTrigger>
+              <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
+              <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
+              <TabsTrigger value="qr">QR</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="info">
+              <Card>
+                <CardContent className="p-4 grid md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Marca</div>
+                    <div className="font-medium">{equipment.marca || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Modelo</div>
+                    <div className="font-medium">{equipment.modelo || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Número de serie</div>
+                    <div className="font-medium">{equipment.numeroSerie || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Tipo</div>
+                    <div className="font-medium">{equipment.tipo || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Estado</div>
+                    <div className="font-medium">{est.label}</div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-sm text-muted-foreground">Descripción</div>
+                    <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '—'}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="ficha">
+              <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
+            </TabsContent>
+
+            <TabsContent value="tablero">
+              <TableroExpediente equipment={equipment} />
+            </TabsContent>
+
+            <TabsContent value="fotos">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  {canEdit && (
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Galería de fotos</h3>
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => onPhotoUpload(e.target.files)}
+                          disabled={photoUploading}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={photoUploading}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {photoUploading ? 'Subiendo…' : 'Agregar fotos'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {equipment.photos && equipment.photos.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {equipment.photos.map((url, idx) => (
+                        <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border">
+                          <img
+                            src={url}
+                            alt={`Foto ${idx + 1}`}
+                            className="h-full w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => onLightbox(url)}
+                            loading="lazy"
+                          />
+                          {canEdit && (
+                            <button
+                              className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Eliminar foto"
+                              aria-label="Eliminar foto"
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                onPhotoDelete(url)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Sin fotos</p>
+                      {!canEdit && <p className="text-sm">Las fotos se agregan con permisos de edición.</p>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="notas">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-start gap-2">
+                    <Textarea
+                      value={newNoteText}
+                      onChange={(e) => setNewNoteText(e.target.value)}
+                      placeholder="Agregar una nota…"
+                      rows={2}
+                      className="flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onAddNote(newNoteText)
+                        setNewNoteText('')
+                      }}
+                      disabled={!newNoteText.trim()}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Agregar
+                    </Button>
+                  </div>
+
+                  {notes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">Sin notas todavía.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {notes.map((n) => (
+                        <div key={n.id} className="rounded-lg border p-3">
+                          {editingNoteId === n.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={editingNoteText}
+                                onChange={(e) => setEditingNoteText(e.target.value)}
+                                rows={2}
+                              />
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => setEditingNoteId(null)}>
+                                  Cancelar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    onEditNote(n.id, editingNoteText)
+                                    setEditingNoteId(null)
+                                  }}
+                                  disabled={!editingNoteText.trim()}
+                                >
+                                  <Check className="h-4 w-4 mr-1" /> Guardar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm whitespace-pre-wrap break-words">{n.text}</div>
+                                <div className="text-[11px] text-muted-foreground mt-1">
+                                  {new Date(n.createdAt).toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <button
+                                  className="p-1 text-muted-foreground hover:text-foreground"
+                                  title="Editar nota"
+                                  aria-label="Editar nota"
+                                  onClick={() => {
+                                    setEditingNoteId(n.id)
+                                    setEditingNoteText(n.text)
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  className="p-1 text-muted-foreground hover:text-destructive"
+                                  title="Eliminar nota"
+                                  aria-label="Eliminar nota"
+                                  onClick={() => onDeleteNote(n.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Las notas se guardan en este dispositivo (por usuario) y se comparten con la página de Equipos.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="qr">
+              <Card>
+                <CardContent className="p-6 flex flex-col items-center gap-3">
+                  <div className="text-sm font-medium">Código QR del equipo</div>
+                  <QRCodeSVG value={qrUrl(equipment.id)} size={200} data-qr={equipment.id} />
+                  <div className="text-xs text-muted-foreground font-mono break-all text-center">{equipment.codigo}</div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   )
 }

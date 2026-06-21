@@ -262,6 +262,7 @@ const equipmentBaseSchema = z.object({
   marca: z.string().max(50).optional(),
   modelo: z.string().max(50).optional(),
   numeroSerie: z.string().max(50).optional(),
+  tipo: z.string().max(50).optional(),
   // Ubicación (nuevo): jerarquía
   hierarchyNodeId: z.string().optional(),
   hierarchyPath: z.string().max(500).optional(),
