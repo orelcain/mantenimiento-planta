@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Check,
+  ChevronDown,
   ChevronRight,
   Copy,
   Download,
@@ -14,7 +15,6 @@ import {
   QrCode,
   Star,
   Trash2,
-  Upload,
   X,
   Zap,
 } from 'lucide-react'
@@ -186,6 +186,7 @@ export function CentroTecnicoDocumentalPage() {
   const [importingPlaca, setImportingPlaca] = useState(false)
   const placaInputRef = useRef<HTMLInputElement>(null)
   const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
+  const [datosMenu, setDatosMenu] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -572,27 +573,57 @@ export function CentroTecnicoDocumentalPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {canEditEquipment && (
+        <div className="relative">
+          <input
+            ref={placaInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => handleImportPlaca(e.target.files?.[0] ?? null)}
+          />
+          <Button variant="outline" size="sm" onClick={() => setDatosMenu((v) => !v)} disabled={loading}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Datos <ChevronDown className="h-3.5 w-3.5 ml-1" />
+          </Button>
+          {datosMenu && (
             <>
-              <input
-                ref={placaInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={(e) => handleImportPlaca(e.target.files?.[0] ?? null)}
-              />
-              <Button variant="outline" size="sm" onClick={() => descargarPlantillaPlaca(equipos)} disabled={loading}>
-                <Download className="h-3.5 w-3.5 mr-1.5" /> Plantilla placa
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => placaInputRef.current?.click()} disabled={importingPlaca || loading}>
-                <Upload className="h-3.5 w-3.5 mr-1.5" /> {importingPlaca ? 'Importando…' : 'Importar placa'}
-              </Button>
+              <div className="fixed inset-0 z-10" onClick={() => setDatosMenu(false)} />
+              <div className="absolute right-0 mt-1 z-20 w-56 rounded-md border bg-background shadow-md p-1 text-sm">
+                <button
+                  className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60 disabled:opacity-50"
+                  onClick={() => {
+                    setDatosMenu(false)
+                    exportarExcel()
+                  }}
+                  disabled={visibles.length === 0}
+                >
+                  Exportar programa (Excel)
+                </button>
+                {canEditEquipment && (
+                  <>
+                    <button
+                      className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60"
+                      onClick={() => {
+                        setDatosMenu(false)
+                        descargarPlantillaPlaca(equipos)
+                      }}
+                    >
+                      Descargar plantilla de placa
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60 disabled:opacity-50"
+                      onClick={() => {
+                        setDatosMenu(false)
+                        placaInputRef.current?.click()
+                      }}
+                      disabled={importingPlaca}
+                    >
+                      {importingPlaca ? 'Importando…' : 'Importar placa (Excel)'}
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           )}
-          <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
-            <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
-          </Button>
         </div>
       </div>
 
@@ -1412,10 +1443,15 @@ function AgendaInspecciones({
                   const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
                   const prox = e.fichaTecnica?.proximaInspeccion
                   return (
-                    <button
+                    <div
                       key={e.id}
                       onClick={() => onOpen(e.id)}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') onOpen(e.id)
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40 cursor-pointer"
                     >
                       <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
                       <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : '—'}</span>
@@ -1425,7 +1461,12 @@ function AgendaInspecciones({
                       <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
-                    </button>
+                      {danger && (
+                        <span className="text-[11px] font-medium text-primary shrink-0 inline-flex items-center">
+                          Registrar <ChevronRight className="h-3 w-3" />
+                        </span>
+                      )}
+                    </div>
                   )
                 })}
               </div>
