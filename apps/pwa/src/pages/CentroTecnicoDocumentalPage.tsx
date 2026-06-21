@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -35,6 +36,8 @@ import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
+import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
+import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
 import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
@@ -95,6 +98,35 @@ function diasVencida(iso?: string): number | null {
   if (Number.isNaN(t)) return null
   const diff = startOfToday() - t
   return diff > 0 ? Math.floor(diff / 86400000) : null
+}
+
+/** Años transcurridos desde una fecha (null si no hay/ inválida). */
+function aniosDesde(d?: Date | string): number | null {
+  if (!d) return null
+  const t = new Date(d).getTime()
+  if (Number.isNaN(t)) return null
+  return (Date.now() - t) / (365.25 * 86400000)
+}
+
+/** Métricas de confiabilidad de un equipo a partir de sus incidencias. */
+function confiabilidad(incidents: Incident[]): {
+  fallas: number
+  mttrHoras: number | null
+  mtbfDias: number | null
+  disponibilidad: number | null
+} {
+  const correctivos = incidents.filter((i) => i.tipo === 'correctivo')
+  const fallas = correctivos.length
+  const conTiempo = correctivos.filter((i) => typeof i.tiempoResolucionMinutos === 'number')
+  const downtimeMin = conTiempo.reduce((s, i) => s + (i.tiempoResolucionMinutos ?? 0), 0)
+  const mttrHoras = conTiempo.length > 0 ? downtimeMin / conTiempo.length / 60 : null
+  // Ventana = desde la incidencia más antigua cargada hasta hoy.
+  const fechas = incidents.map((i) => new Date(i.createdAt).getTime()).filter((t) => !Number.isNaN(t))
+  const desde = fechas.length ? Math.min(...fechas) : null
+  const ventanaMin = desde ? (Date.now() - desde) / 60000 : null
+  const mtbfDias = ventanaMin && fallas > 0 ? ventanaMin / fallas / 1440 : null
+  const disponibilidad = ventanaMin && ventanaMin > 0 ? Math.max(0, ((ventanaMin - downtimeMin) / ventanaMin) * 100) : null
+  return { fallas, mttrHoras, mtbfDias, disponibilidad }
 }
 
 /** URL pública del equipo para el código QR (misma convención que EquipmentPage). */
@@ -961,6 +993,21 @@ function ExpedienteDialog({
   const ubicacion = equipment.hierarchyPath || equipment.zoneId
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Ciclo de vida + confiabilidad (datos ya existentes)
+  const edad = aniosDesde(equipment.fechaInstalacion)
+  const vidaUtil = equipment.fichaTecnica?.vidaUtilAnios
+  const pctVida = edad != null && vidaUtil ? Math.min(100, Math.round((edad / vidaUtil) * 100)) : null
+  const reemplazo =
+    equipment.fechaInstalacion && vidaUtil
+      ? new Date(new Date(equipment.fechaInstalacion).getTime() + vidaUtil * 365.25 * 86400000)
+      : null
+  const rel = confiabilidad(incidents)
+
+  // Repuestos + documentos heredados del nodo de jerarquía (maestro N:M)
+  const nodeIds = equipment.hierarchyNodeId ? [equipment.hierarchyNodeId] : []
+  const { manuales, loading: manualesLoading } = useManualesDeEquipos(nodeIds)
+  const { repuestos, loading: repuestosLoading } = useRepuestosDeEquipo(equipment.hierarchyNodeId)
+
   const [newNoteText, setNewNoteText] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
@@ -1019,40 +1066,119 @@ function ExpedienteDialog({
               <TabsTrigger value="info">Información</TabsTrigger>
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
+              <TabsTrigger value="recursos">Recursos</TabsTrigger>
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
               <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
               <TabsTrigger value="qr">QR</TabsTrigger>
             </TabsList>
 
             <TabsContent value="info">
-              <Card>
-                <CardContent className="p-4 grid md:grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Marca</div>
-                    <div className="font-medium">{equipment.marca || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Modelo</div>
-                    <div className="font-medium">{equipment.modelo || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Número de serie</div>
-                    <div className="font-medium">{equipment.numeroSerie || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Tipo</div>
-                    <div className="font-medium">{equipment.tipo || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Estado</div>
-                    <div className="font-medium">{est.label}</div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <div className="text-sm text-muted-foreground">Descripción</div>
-                    <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '—'}</div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-3">
+                <Card>
+                  <CardContent className="p-4 grid md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Marca</div>
+                      <div className="font-medium">{equipment.marca || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Modelo</div>
+                      <div className="font-medium">{equipment.modelo || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Número de serie</div>
+                      <div className="font-medium">{equipment.numeroSerie || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Tipo</div>
+                      <div className="font-medium">{equipment.tipo || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Estado</div>
+                      <div className="font-medium">{est.label}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-sm text-muted-foreground">Descripción</div>
+                      <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '—'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Ciclo de vida */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-2">Ciclo de vida</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground text-xs">Antigüedad</div>
+                        <div className="font-medium">{edad != null ? `${edad.toFixed(1)} años` : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Vida útil</div>
+                        <div className="font-medium">{vidaUtil != null ? `${vidaUtil} años` : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Vida consumida</div>
+                        <div
+                          className={`font-medium ${
+                            pctVida != null && pctVida >= 100
+                              ? 'text-red-600'
+                              : pctVida != null && pctVida >= 70
+                                ? 'text-amber-600'
+                                : ''
+                          }`}
+                        >
+                          {pctVida != null ? `${pctVida}%` : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Reemplazo estimado</div>
+                        <div className="font-medium">{reemplazo ? reemplazo.toLocaleDateString() : '—'}</div>
+                      </div>
+                    </div>
+                    {pctVida != null && (
+                      <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full ${pctVida >= 100 ? 'bg-red-500' : pctVida >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                          style={{ width: `${Math.min(100, pctVida)}%` }}
+                        />
+                      </div>
+                    )}
+                    {edad == null || vidaUtil == null ? (
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Requiere fecha de instalación y vida útil (en la Ficha) para el cálculo.
+                      </p>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                {/* Confiabilidad */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-2">
+                      Confiabilidad{' '}
+                      <span className="text-[11px] font-normal text-muted-foreground">(según historial cargado)</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground text-xs">N.º de fallas</div>
+                        <div className="font-medium">{rel.fallas}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">MTTR</div>
+                        <div className="font-medium">{rel.mttrHoras != null ? `${rel.mttrHoras.toFixed(1)} h` : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">MTBF</div>
+                        <div className="font-medium">{rel.mtbfDias != null ? `${rel.mtbfDias.toFixed(0)} d` : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Disponibilidad</div>
+                        <div className="font-medium">{rel.disponibilidad != null ? `${rel.disponibilidad.toFixed(1)}%` : '—'}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="ficha">
@@ -1061,6 +1187,72 @@ function ExpedienteDialog({
 
             <TabsContent value="tablero">
               <TableroExpediente equipment={equipment} />
+            </TabsContent>
+
+            <TabsContent value="recursos">
+              <div className="space-y-3">
+                <Card>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="text-sm font-semibold">
+                      Repuestos del equipo{' '}
+                      {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
+                    </div>
+                    {repuestosLoading ? (
+                      <p className="text-sm text-muted-foreground italic">Cargando…</p>
+                    ) : repuestos.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic">
+                        Sin repuestos vinculados{equipment.hierarchyNodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
+                      </p>
+                    ) : (
+                      <div className="divide-y">
+                        {repuestos.map((r) => (
+                          <div key={r.id} className="py-2 flex items-center gap-3 text-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-28 shrink-0">{r.codigoSAP || '—'}</span>
+                            <span className="flex-1 min-w-0 truncate">
+                              {r.nombre}
+                              {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
+                            </span>
+                            {typeof r.stockFisico === 'number' && (
+                              <span className="text-xs text-muted-foreground shrink-0">stock {r.stockFisico}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="text-sm font-semibold">
+                      Documentos (manuales · planos · certificados){' '}
+                      {manuales.length > 0 && <span className="text-xs font-normal text-muted-foreground">({manuales.length})</span>}
+                    </div>
+                    {manualesLoading ? (
+                      <p className="text-sm text-muted-foreground italic">Cargando…</p>
+                    ) : manuales.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic">Sin documentos heredados.</p>
+                    ) : (
+                      <div className="divide-y">
+                        {manuales.map((m) => (
+                          <a
+                            key={m.id}
+                            href={m.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="py-2 flex items-center gap-2 text-sm text-primary hover:underline"
+                          >
+                            <BookOpen className="h-4 w-4 shrink-0" /> <span className="flex-1 min-w-0 truncate">{m.titulo}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                <p className="text-[11px] text-muted-foreground">
+                  Repuestos y documentos se heredan del nodo de jerarquía del equipo (maestro N:M).
+                </p>
+              </div>
             </TabsContent>
 
             <TabsContent value="fotos">
