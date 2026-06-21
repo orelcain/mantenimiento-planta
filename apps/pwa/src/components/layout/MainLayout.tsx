@@ -30,6 +30,7 @@ import {
   Upload,
   History,
   Shield,
+  FolderArchive,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -91,6 +92,7 @@ const navGroups: NavGroup[] = [
     id: 'equipamiento', label: 'Equipamiento',
     items: [
       { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos', inDevelopment: true },
+      { name: 'Centro Técnico Documental', href: '/centro-tecnico-documental', icon: FolderArchive },
       { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
       { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores', inDevelopment: true },
       { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores', inDevelopment: true },

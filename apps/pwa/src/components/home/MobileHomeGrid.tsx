@@ -110,6 +110,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',             icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',    icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
         { id: 'sensores',  label: 'Sensores',      sublabel: 'Monitor real',       icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
+        { id: 'ctd',       label: 'Centro Téc. Documental', sublabel: 'Programa EMP · NFPA 70B', icon: ClipboardList, href: '/centro-tecnico-documental', color: 'purple' },
       ],
     },
     {

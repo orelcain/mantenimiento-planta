@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -182,6 +182,8 @@ export function EquipmentPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const [detailEquipment, setDetailEquipment] = useState<Equipment | null>(null)
+  const [detailTab, setDetailTab] = useState('info')
+  const abrirHandledRef = useRef<string | null>(null)
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
 
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
@@ -241,6 +243,19 @@ export function EquipmentPage() {
       setFilterSelectedIds(new Set())
     }
   }, [searchParams])
+
+  // Abrir el expediente directamente desde la URL: /equipment?abrir=<id>&tab=ficha
+  useEffect(() => {
+    const abrir = searchParams.get('abrir')
+    if (!abrir || abrirHandledRef.current === abrir || equipment.length === 0) return
+    const eq = equipment.find((e) => e.id === abrir)
+    if (eq) {
+      abrirHandledRef.current = abrir
+      setDetailEquipment(eq)
+      setDetailTab(searchParams.get('tab') ?? 'info')
+      setNewNoteText('')
+    }
+  }, [searchParams, equipment])
 
   useEffect(() => {
     debouncedSetSearch(searchQuery)
@@ -814,8 +829,9 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
     }
   }, [detailEquipment])
 
-  const openDetail = (eq: Equipment) => {
+  const openDetail = (eq: Equipment, tab: string = 'info') => {
     setDetailEquipment(eq)
+    setDetailTab(tab)
     setNewNoteText('')
   }
 
@@ -1269,6 +1285,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
       {detailEquipment && (
         <EquipmentDetailDialog
           equipment={detailEquipment}
+          initialTab={detailTab}
           favorite={favorites.has(detailEquipment.id)}
           incidents={detailIncidents}
           incidentsLoading={detailIncidentsLoading}
@@ -1892,8 +1909,10 @@ function EquipmentDetailDialog({
   onPhotoSelect,
   onEditPhoto,
   onClose,
+  initialTab,
 }: {
   equipment: Equipment
+  initialTab?: string
   favorite: boolean
   incidents: Incident[]
   incidentsLoading: boolean
@@ -1963,7 +1982,7 @@ function EquipmentDetailDialog({
           </div>
         )}
 
-        <Tabs defaultValue="info">
+        <Tabs defaultValue={initialTab ?? 'info'}>
           <TabsList>
             <TabsTrigger value="info">Información</TabsTrigger>
             <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>

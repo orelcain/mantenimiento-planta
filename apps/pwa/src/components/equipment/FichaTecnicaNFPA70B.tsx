@@ -93,6 +93,14 @@ function asDate(v: unknown): Date {
   return new Date()
 }
 
+// NFPA 70B Cap. 9 / §2.11: intervalo base por criticidad (6 m – 3 a) × factor por condición.
+const INTERVALO_BASE: Record<Equipment['criticidad'], number> = { alta: 180, media: 365, baja: 1095 }
+const FACTOR_COND: Record<1 | 2 | 3, number> = { 1: 1.5, 2: 1, 3: 0.5 }
+
+function intervaloInspeccionDias(criticidad: Equipment['criticidad'], condicion?: 1 | 2 | 3): number {
+  return Math.round(INTERVALO_BASE[criticidad] * (condicion ? FACTOR_COND[condicion] : 1))
+}
+
 function SectionTitle({
   icon: Icon,
   children,
@@ -253,6 +261,27 @@ export function FichaTecnicaNFPA70B({
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
 
+  // v3c — Próxima inspección sugerida (NFPA 70B Cap. 9): criticidad × condición desde la última fecha.
+  const refFecha = log[0]?.fecha ?? (equipment.fechaInstalacion ? new Date(equipment.fechaInstalacion) : new Date())
+  const sugeridaDias = intervaloInspeccionDias(equipment.criticidad, ficha.condicion)
+  const sugeridaFecha = new Date(refFecha.getTime() + sugeridaDias * 86400000)
+  const sugeridaISO = sugeridaFecha.toISOString().slice(0, 10)
+
+  async function aplicarSugerida() {
+    setSaving(true)
+    try {
+      const cleaned = clean({ ...ficha, frecuenciaInspeccionDias: sugeridaDias, proximaInspeccion: sugeridaISO })
+      await updateEquipment(equipment.id, { fichaTecnica: cleaned })
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+      setFicha(cleaned)
+    } catch (err) {
+      logger.error('Error aplicando próxima inspección sugerida', err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       {/* Datos de placa — NFPA 70B §2.2 */}
@@ -378,6 +407,19 @@ export function FichaTecnicaNFPA70B({
               <Field label="Vida útil estimada" value={ficha.vidaUtilAnios != null ? `${ficha.vidaUtilAnios} años` : undefined} />
               <Field label="Próxima inspección" value={proxima} />
               <Field label="Frecuencia" value={ficha.frecuenciaInspeccionDias != null ? `${ficha.frecuenciaInspeccionDias} días` : undefined} />
+            </div>
+          )}
+
+          {!editing && (
+            <div className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-dashed p-2.5">
+              <span className="text-xs text-muted-foreground">
+                💡 Próxima inspección sugerida (Cap. 9):{' '}
+                <span className="font-medium text-foreground">{sugeridaFecha.toLocaleDateString()}</span> — criticidad{' '}
+                {crit.nivel} × condición {ficha.condicion ?? '—'} → {sugeridaDias} d desde {refFecha.toLocaleDateString()}
+              </span>
+              <Button size="sm" variant="outline" onClick={aplicarSugerida} disabled={saving}>
+                Usar sugerida
+              </Button>
             </div>
           )}
 
