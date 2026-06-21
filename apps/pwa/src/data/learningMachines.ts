@@ -144,7 +144,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     nivel: 1,
     description: 'Curso NFPA 70E 2024: seguridad electrica en lugares de trabajo. Los 3 peligros (choque, arco, rafaga), efectos de la corriente, 5 Reglas de Oro, bloqueo/etiquetado (LOTO), fronteras de aproximacion, EPP y jerarquia de control.',
     icon: Zap,
-    color: '#3b82f6',
+    color: '#3b6fa8',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
@@ -156,7 +156,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     nivel: 1,
     description: 'Curso NFPA 70E: rescate electrico y soporte vital basico (SVB). Peligros electricos, 5 Reglas de Oro, control de hemorragias, RCP 30:2 y evaluacion ABCDE.',
     icon: HeartPulse,
-    color: '#f43f5e',
+    color: '#b14a5a',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
@@ -168,7 +168,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     nivel: 1,
     description: 'Norma NFPA 70B 2023: mantenimiento del equipo electrico. MEP, 4 pilares, criticidad y riesgo, tipos de mantenimiento, pruebas (termografia, puesta a tierra) y mejora continua (PHVA).',
     icon: ShieldCheck,
-    color: '#f59e0b',
+    color: '#bf8b3e',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
 ]
