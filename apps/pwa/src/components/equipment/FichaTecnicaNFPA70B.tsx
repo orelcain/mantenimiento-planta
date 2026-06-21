@@ -6,7 +6,8 @@ import { getEquipments, updateEquipment } from '@/services/equipment'
 import { addMaintenanceLogEntry, getMaintenanceLog } from '@/services/maintenanceLog'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
+import { FAMILIA_LABEL, checklistDe, familiaDe } from '@/lib/nfpa70b'
+import type { ChecklistResultado, Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
 /**
  * Ficha Técnica NFPA 70B — v2 (lectura + captura de placa).
@@ -52,17 +53,26 @@ type EntryDraft = {
   fecha: string
   tecnico: string
   hallazgo: string
+  checklist: ChecklistResultado[]
 }
 
-function emptyDraft(): EntryDraft {
+function emptyDraft(equipment: Pick<Equipment, 'nombre' | 'tipo'>): EntryDraft {
   return {
     tipo: 'inspeccion',
     severidad: 'verde',
     fecha: new Date().toISOString().slice(0, 10),
     tecnico: '',
     hallazgo: '',
+    // Protocolo de inspección por familia (NFPA 70B); default "no evaluado".
+    checklist: checklistDe(equipment).map((t) => ({ id: t.id, tarea: t.tarea, estado: 'na' as const })),
   }
 }
+
+const CHK_ESTADO: { value: ChecklistResultado['estado']; label: string; on: string }[] = [
+  { value: 'ok', label: '✓', on: 'bg-emerald-500 text-white' },
+  { value: 'obs', label: '⚠', on: 'bg-amber-500 text-white' },
+  { value: 'na', label: '–', on: 'bg-muted text-foreground' },
+]
 
 const TIPO_LABEL = Object.fromEntries(TIPOS.map((t) => [t.value, t.label])) as Record<
   MaintenanceLogEntry['tipo'],
@@ -84,6 +94,7 @@ type TimelineRow = {
   severidad: MaintenanceLogEntry['severidad']
   texto: string
   source: 'log' | 'incidencia'
+  checklist?: ChecklistResultado[]
 }
 
 function asDate(v: unknown): Date {
@@ -197,7 +208,11 @@ export function FichaTecnicaNFPA70B({
   const [loadingLog, setLoadingLog] = useState(false)
   const [addingEntry, setAddingEntry] = useState(false)
   const [savingEntry, setSavingEntry] = useState(false)
-  const [draft, setDraft] = useState<EntryDraft>(emptyDraft())
+  const [draft, setDraft] = useState<EntryDraft>(() => emptyDraft(equipment))
+
+  function setChkItem(i: number, patch: Partial<ChecklistResultado>) {
+    setDraft((d) => ({ ...d, checklist: d.checklist.map((t, j) => (j === i ? { ...t, ...patch } : t)) }))
+  }
 
   useEffect(() => {
     let alive = true
@@ -234,6 +249,9 @@ export function FichaTecnicaNFPA70B({
         ? new Date(fechaEvento.getTime() + intervalo * 86400000).toISOString().slice(0, 10)
         : undefined
 
+      // Solo se guardan las tareas evaluadas (estado ≠ no-evaluado) o con medición.
+      const checklist = draft.checklist.filter((t) => t.estado !== 'na' || (t.valor && t.valor.trim()))
+
       await addMaintenanceLogEntry({
         equipmentId: equipment.id,
         hierarchyNodeId: equipment.hierarchyNodeId,
@@ -243,6 +261,7 @@ export function FichaTecnicaNFPA70B({
         hallazgo: draft.hallazgo.trim(),
         severidad: draft.severidad,
         proximaInspeccion: proximaISO,
+        checklist: checklist.length > 0 ? checklist : undefined,
       })
 
       // Si fue una inspección, actualizar la ficha (condición + próxima inspección).
@@ -263,7 +282,7 @@ export function FichaTecnicaNFPA70B({
         const fresh = await getEquipments()
         setEquipment(fresh)
       }
-      setDraft(emptyDraft())
+      setDraft(emptyDraft(equipment))
       setAddingEntry(false)
     } catch (err) {
       logger.error('Error registrando evento NFPA 70B', err instanceof Error ? err : new Error(String(err)))
@@ -281,6 +300,7 @@ export function FichaTecnicaNFPA70B({
       severidad: e.severidad,
       texto: `${e.tecnico ? `${e.tecnico} — ` : ''}${e.hallazgo}`,
       source: 'log' as const,
+      checklist: e.checklist,
     })),
     ...incidents.map((i) => ({
       key: `inc-${i.id}`,
@@ -538,6 +558,41 @@ export function FichaTecnicaNFPA70B({
                 </div>
               </div>
               <div>
+                <Label className="text-xs">Protocolo de inspección · {FAMILIA_LABEL[familiaDe(equipment)]}</Label>
+                <div className="mt-1 space-y-1">
+                  {draft.checklist.map((t, i) => (
+                    <div key={t.id} className="flex items-center gap-2">
+                      <span className="flex-1 min-w-0 text-xs truncate" title={t.tarea}>
+                        {t.tarea}
+                      </span>
+                      <Input
+                        className="h-7 w-20 text-xs"
+                        placeholder="valor"
+                        value={t.valor ?? ''}
+                        onChange={(e) => setChkItem(i, { valor: e.target.value })}
+                      />
+                      <div className="inline-flex rounded-md border overflow-hidden shrink-0">
+                        {CHK_ESTADO.map((st) => (
+                          <button
+                            key={st.value}
+                            type="button"
+                            onClick={() => setChkItem(i, { estado: st.value })}
+                            className={`px-2 py-1 text-[11px] ${t.estado === st.value ? st.on : 'bg-background text-muted-foreground'}`}
+                            title={st.value === 'ok' ? 'Conforme' : st.value === 'obs' ? 'Observación' : 'No evaluado'}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Marca cada tarea (✓ conforme · ⚠ observación · – no evaluado) y anota la medición. Solo se guardan las
+                  evaluadas.
+                </p>
+              </div>
+              <div>
                 <Label className="text-xs">Hallazgo</Label>
                 <Textarea
                   rows={2}
@@ -560,7 +615,7 @@ export function FichaTecnicaNFPA70B({
                   variant="ghost"
                   onClick={() => {
                     setAddingEntry(false)
-                    setDraft(emptyDraft())
+                    setDraft(emptyDraft(equipment))
                   }}
                   disabled={savingEntry}
                 >
@@ -589,6 +644,11 @@ export function FichaTecnicaNFPA70B({
                     )}
                     {' — '}
                     {e.texto}
+                    {e.checklist && e.checklist.length > 0 && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        · {e.checklist.filter((t) => t.estado === 'ok').length}✓ {e.checklist.filter((t) => t.estado === 'obs').length}⚠
+                      </span>
+                    )}
                   </span>
                 </div>
               ))}

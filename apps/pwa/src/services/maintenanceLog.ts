@@ -43,6 +43,7 @@ export async function getMaintenanceLog(equipmentId: string): Promise<Maintenanc
       severidad: (data.severidad as MaintenanceLogEntry['severidad']) ?? 'verde',
       incidenciaId: data.incidenciaId as string | undefined,
       proximaInspeccion: data.proximaInspeccion as string | undefined,
+      checklist: Array.isArray(data.checklist) ? (data.checklist as MaintenanceLogEntry['checklist']) : undefined,
       createdAt: toDate(data.createdAt),
     }
   })
@@ -66,5 +67,11 @@ export async function addMaintenanceLogEntry(
   if (entry.tecnico) payload.tecnico = entry.tecnico
   if (entry.incidenciaId) payload.incidenciaId = entry.incidenciaId
   if (entry.proximaInspeccion) payload.proximaInspeccion = entry.proximaInspeccion
+  if (entry.checklist && entry.checklist.length > 0) {
+    // Saneado: Firestore no acepta `undefined` (omitir `valor` si no hay).
+    payload.checklist = entry.checklist.map((t) =>
+      t.valor != null && t.valor !== '' ? { id: t.id, tarea: t.tarea, estado: t.estado, valor: t.valor } : { id: t.id, tarea: t.tarea, estado: t.estado },
+    )
+  }
   await setDoc(doc(db, COLLECTION, id), payload)
 }

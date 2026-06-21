@@ -141,6 +141,14 @@ export interface WorkOrder {
   updatedAt: Date
 }
 
+// Resultado de una tarea del protocolo de inspección NFPA 70B (por familia)
+export interface ChecklistResultado {
+  id: string
+  tarea: string
+  estado: 'ok' | 'obs' | 'na' // ok=conforme · obs=observación · na=no evaluado
+  valor?: string // medición opcional (A, MΩ, °C, mm/s…)
+}
+
 // Historial de mantenimiento NFPA 70B (colección plana `maintenanceLog`)
 export interface MaintenanceLogEntry {
   id: string
@@ -153,6 +161,7 @@ export interface MaintenanceLogEntry {
   severidad: 'verde' | 'amarillo' | 'rojo' // = condición 1/2/3 (Cap. 9)
   incidenciaId?: string
   proximaInspeccion?: string // ISO date
+  checklist?: ChecklistResultado[] // resultados del protocolo de inspección por familia
   createdAt: Date
 }
 
