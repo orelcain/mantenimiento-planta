@@ -16,6 +16,7 @@ import {
   QrCode,
   Star,
   Trash2,
+  Wrench,
   X,
   Zap,
 } from 'lucide-react'
@@ -58,7 +59,7 @@ import {
   qrUrl,
   seccionDe,
 } from '@/lib/ctd'
-import type { Bucket, EstadoFiltro, OrdenCampo } from '@/lib/ctd'
+import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
 import type { Equipment, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
 
 /**
@@ -104,6 +105,7 @@ export function CentroTecnicoDocumentalPage() {
     setQ,
     equipos,
     kpis,
+    otByEquipo,
     secciones,
     lineas,
     tipos,
@@ -389,7 +391,7 @@ export function CentroTecnicoDocumentalPage() {
       </div>
 
       {/* KPIs = filtros rápidos (click para filtrar) */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
         {kpiFiltros.map((k) => {
           const active = filtro === k.key
           return (
@@ -547,7 +549,9 @@ export function CentroTecnicoDocumentalPage() {
       </div>
 
       {/* Agenda de inspecciones (vista agenda) */}
-      {vista === 'agenda' && <AgendaInspecciones groups={agenda} onOpen={(id) => openExpediente(id, 'ficha')} />}
+      {vista === 'agenda' && (
+        <AgendaInspecciones groups={agenda} otByEquipo={otByEquipo} onOpen={(id) => openExpediente(id, 'ficha')} />
+      )}
 
       {/* Tarjetas (vista tarjetas) */}
       {vista === 'tarjetas' &&
@@ -561,6 +565,7 @@ export function CentroTecnicoDocumentalPage() {
               <CtdEquipoCard
                 key={e.id}
                 equipment={e}
+                ot={otByEquipo.get(e.id)}
                 isFavorite={favorites.has(e.id)}
                 onToggleFavorite={() => toggleFavorite(e.id)}
                 onOpen={(tab) => openExpediente(e.id, tab)}
@@ -583,6 +588,7 @@ export function CentroTecnicoDocumentalPage() {
                 <CtdEquipoRow
                   key={e.id}
                   equipment={e}
+                  ot={otByEquipo.get(e.id)}
                   compact={compact}
                   isFavorite={favorites.has(e.id)}
                   onToggleFavorite={() => toggleFavorite(e.id)}
@@ -673,6 +679,22 @@ export function CentroTecnicoDocumentalPage() {
         <PhotoAnnotationEditor photoUrl={editingPhoto} onSave={handleAnnotatedSave} onClose={() => setEditingPhoto(null)} />
       )}
     </div>
+  )
+}
+
+/** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
+function OtBadge({ ot }: { ot?: OtCount }) {
+  if (!ot || ot.abiertas === 0) return null
+  const danger = ot.vencidas > 0
+  return (
+    <span
+      title={`${ot.abiertas} OT abierta(s)${ot.vencidas > 0 ? ` · ${ot.vencidas} vencida(s)` : ''}`}
+      className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
+    >
+      <Wrench className="h-3 w-3" />
+      {ot.abiertas}
+      {ot.vencidas > 0 ? `·${ot.vencidas}!` : ''}
+    </span>
   )
 }
 
@@ -1380,9 +1402,11 @@ function ExpedienteDialog({
 
 function AgendaInspecciones({
   groups,
+  otByEquipo,
   onOpen,
 }: {
   groups: Record<Bucket, Equipment[]>
+  otByEquipo: Map<string, OtCount>
   onOpen: (id: string) => void
 }) {
   const total = BUCKETS.reduce((n, b) => n + groups[b.key].length, 0)
@@ -1428,6 +1452,7 @@ function AgendaInspecciones({
                       <span className="flex-1 min-w-0 truncate">
                         {e.nombre} <span className="text-[11px] text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
+                      <OtBadge ot={otByEquipo.get(e.id)} />
                       <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
@@ -1450,11 +1475,13 @@ function AgendaInspecciones({
 
 function CtdEquipoCard({
   equipment: e,
+  ot,
   isFavorite,
   onToggleFavorite,
   onOpen,
 }: {
   equipment: Equipment
+  ot?: OtCount
   isFavorite: boolean
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
@@ -1492,6 +1519,7 @@ function CtdEquipoCard({
           <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
           {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
           <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+          <OtBadge ot={ot} />
         </div>
         <div className="flex items-center justify-between text-[11px]">
           <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
@@ -1510,12 +1538,14 @@ function CtdEquipoCard({
 
 function CtdEquipoRow({
   equipment: e,
+  ot,
   compact,
   isFavorite,
   onToggleFavorite,
   onOpen,
 }: {
   equipment: Equipment
+  ot?: OtCount
   compact: boolean
   isFavorite: boolean
   onToggleFavorite: () => void
@@ -1560,6 +1590,7 @@ function CtdEquipoRow({
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
           {cond ? <span>{COND_EMOJI[cond]}</span> : null}
           <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
+          <OtBadge ot={ot} />
           <button
             className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
             title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
@@ -1577,6 +1608,7 @@ function CtdEquipoRow({
         <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
         <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
         <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+        <span className="w-12 text-right"><OtBadge ot={ot} /></span>
         <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
           {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
         </span>

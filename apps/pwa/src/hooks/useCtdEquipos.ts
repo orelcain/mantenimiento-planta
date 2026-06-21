@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getEquipments } from '@/services/equipment'
+import { getOpenWorkOrders } from '@/services/workOrders'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
 import {
@@ -7,12 +8,13 @@ import {
   ITEMS_PER_PAGE,
   bucketDe,
   completitud,
+  contarOtPorEquipo,
   diasVencida,
   lineaDe,
   proximaMs,
   seccionDe,
 } from '@/lib/ctd'
-import type { Bucket, EstadoFiltro, Filtro, OrdenCampo, Vista } from '@/lib/ctd'
+import type { Bucket, EstadoFiltro, Filtro, OrdenCampo, OtCount, Vista } from '@/lib/ctd'
 import type { Equipment } from '@/types'
 
 /**
@@ -40,6 +42,8 @@ export function useCtdEquipos(favorites: Set<string>) {
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [debouncedQ, setDebouncedQ] = useState('')
+  // OT abiertas/vencidas por equipo (nivel programa) — para KPIs, filtros y badges.
+  const [otByEquipo, setOtByEquipo] = useState<Map<string, OtCount>>(() => new Map())
 
   useEffect(() => {
     let alive = true
@@ -58,6 +62,22 @@ export function useCtdEquipos(favorites: Set<string>) {
     }
   }, [setEquipment])
 
+  // Carga las OT abiertas de toda la planta (1 query) → conteo por equipo.
+  useEffect(() => {
+    let alive = true
+    getOpenWorkOrders()
+      .then((rows) => {
+        if (alive) setOtByEquipo(contarOtPorEquipo(rows))
+      })
+      .catch((err) => {
+        logger.error('Error cargando OT abiertas (CTD)', err instanceof Error ? err : new Error(String(err)))
+        if (alive) setOtByEquipo(new Map())
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   async function reload() {
     const fresh = await getEquipments()
     setEquipment(fresh)
@@ -71,15 +91,20 @@ export function useCtdEquipos(favorites: Set<string>) {
     let vencidas = 0
     let incompletas = 0
     let favs = 0
+    let otAbiertas = 0
+    let otVencidas = 0
     for (const e of equipos) {
       if (e.criticidad === 'alta') critA++
       if (e.fichaTecnica?.condicion === 3) cond3++
       if (diasVencida(e.fichaTecnica?.proximaInspeccion) !== null) vencidas++
       if (completitud(e) < 100) incompletas++
       if (favorites.has(e.id)) favs++
+      const ot = otByEquipo.get(e.id)
+      if (ot && ot.abiertas > 0) otAbiertas++
+      if (ot && ot.vencidas > 0) otVencidas++
     }
-    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
-  }, [equipos, favorites])
+    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs, otAbiertas, otVencidas }
+  }, [equipos, favorites, otByEquipo])
 
   const secciones = useMemo(() => {
     const set = new Set<string>()
@@ -129,6 +154,10 @@ export function useCtdEquipos(favorites: Set<string>) {
           return completitud(e) < 100
         case 'favoritos':
           return favorites.has(e.id)
+        case 'otAbiertas':
+          return (otByEquipo.get(e.id)?.abiertas ?? 0) > 0
+        case 'otVencidas':
+          return (otByEquipo.get(e.id)?.vencidas ?? 0) > 0
         default:
           return true
       }
@@ -162,7 +191,7 @@ export function useCtdEquipos(favorites: Set<string>) {
         })
     }
     return sorted
-  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites])
+  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites, otByEquipo])
 
   const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
   const pageSafe = Math.min(page, totalPages)
@@ -201,6 +230,8 @@ export function useCtdEquipos(favorites: Set<string>) {
     { key: 'cond3', label: 'Condición 🔴', n: kpis.cond3, cls: 'text-red-600' },
     { key: 'vencida', label: 'Inspección vencida', n: kpis.vencidas, cls: 'text-amber-600' },
     { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
+    { key: 'otAbiertas', label: '🔧 OT abiertas', n: kpis.otAbiertas, cls: 'text-blue-600' },
+    { key: 'otVencidas', label: '🔧 OT vencidas', n: kpis.otVencidas, cls: 'text-red-600' },
     { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
   ]
 
@@ -253,6 +284,7 @@ export function useCtdEquipos(favorites: Set<string>) {
     // derivados
     equipos,
     kpis,
+    otByEquipo,
     secciones,
     lineas,
     tipos,
