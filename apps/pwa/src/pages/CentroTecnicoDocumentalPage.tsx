@@ -22,17 +22,18 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
-import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
+import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
-import { useAppStore, useAuthStore } from '@/store'
+import { useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
 import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useCtdEquipos } from '@/hooks/useCtdEquipos'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
@@ -40,7 +41,25 @@ import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
+import {
+  BUCKETS,
+  COND_EMOJI,
+  CRIT,
+  ESTADO,
+  ITEMS_PER_PAGE,
+  WO_ESTADO,
+  WO_PRIORIDAD,
+  WO_TIPOS,
+  aniosDesde,
+  completitud,
+  confiabilidad,
+  diasVencida,
+  lineaDe,
+  qrUrl,
+  seccionDe,
+} from '@/lib/ctd'
+import type { Bucket, EstadoFiltro, OrdenCampo } from '@/lib/ctd'
+import type { Equipment, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -53,179 +72,54 @@ import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry, WorkOrder 
  * Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
  */
 
-const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string }> = {
-  alta: { nivel: 'A', cls: 'border-red-500 text-red-600' },
-  media: { nivel: 'B', cls: 'border-amber-500 text-amber-600' },
-  baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
-}
-
-const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
-  operativo: { label: 'Operativo', cls: 'border-emerald-500 text-emerald-600' },
-  en_mantenimiento: { label: 'En mantención', cls: 'border-amber-500 text-amber-600' },
-  fuera_servicio: { label: 'Fuera de servicio', cls: 'border-red-500 text-red-600' },
-}
-
-const COND_EMOJI: Record<1 | 2 | 3, string> = { 1: '🟢', 2: '🟡', 3: '🔴' }
-
-const WO_ESTADO: Record<WorkOrder['estado'], { label: string; cls: string }> = {
-  abierta: { label: 'Abierta', cls: 'border-blue-500 text-blue-600' },
-  en_proceso: { label: 'En proceso', cls: 'border-amber-500 text-amber-600' },
-  cerrada: { label: 'Cerrada', cls: 'border-emerald-500 text-emerald-600' },
-  cancelada: { label: 'Cancelada', cls: 'border-border text-muted-foreground' },
-}
-const WO_PRIORIDAD: Record<WorkOrder['prioridad'], { label: string; cls: string }> = {
-  critica: { label: 'Crítica', cls: 'text-red-600' },
-  alta: { label: 'Alta', cls: 'text-amber-600' },
-  media: { label: 'Media', cls: 'text-muted-foreground' },
-  baja: { label: 'Baja', cls: 'text-muted-foreground' },
-}
-const WO_TIPOS: { value: WorkOrder['tipo']; label: string }[] = [
-  { value: 'correctivo', label: 'Correctivo' },
-  { value: 'preventivo', label: 'Preventivo' },
-  { value: 'predictivo', label: 'Predictivo' },
-  { value: 'inspeccion', label: 'Inspección' },
-  { value: 'mejora', label: 'Mejora' },
-]
-
-const PLACA_FIELDS: (keyof FichaTecnica)[] = [
-  'potenciaKw',
-  'voltajeV',
-  'corrienteA',
-  'rpm',
-  'factorServicio',
-  'claseAislamiento',
-  'gradoIP',
-]
-
-function completitud(eq: Equipment): number {
-  const ft = eq.fichaTecnica
-  if (!ft) return 0
-  const filled = PLACA_FIELDS.filter((k) => {
-    const v = ft[k]
-    return v !== undefined && v !== null && v !== ''
-  }).length
-  return Math.round((filled / PLACA_FIELDS.length) * 100)
-}
-
-function startOfToday(): number {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-
-function diasVencida(iso?: string): number | null {
-  if (!iso) return null
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return null
-  const diff = startOfToday() - t
-  return diff > 0 ? Math.floor(diff / 86400000) : null
-}
-
-/** Años transcurridos desde una fecha (null si no hay/ inválida). */
-function aniosDesde(d?: Date | string): number | null {
-  if (!d) return null
-  const t = new Date(d).getTime()
-  if (Number.isNaN(t)) return null
-  return (Date.now() - t) / (365.25 * 86400000)
-}
-
-/** Métricas de confiabilidad de un equipo a partir de sus incidencias. */
-function confiabilidad(incidents: Incident[]): {
-  fallas: number
-  mttrHoras: number | null
-  mtbfDias: number | null
-  disponibilidad: number | null
-} {
-  const correctivos = incidents.filter((i) => i.tipo === 'correctivo')
-  const fallas = correctivos.length
-  const conTiempo = correctivos.filter((i) => typeof i.tiempoResolucionMinutos === 'number')
-  const downtimeMin = conTiempo.reduce((s, i) => s + (i.tiempoResolucionMinutos ?? 0), 0)
-  const mttrHoras = conTiempo.length > 0 ? downtimeMin / conTiempo.length / 60 : null
-  // Ventana = desde la incidencia más antigua cargada hasta hoy.
-  const fechas = incidents.map((i) => new Date(i.createdAt).getTime()).filter((t) => !Number.isNaN(t))
-  const desde = fechas.length ? Math.min(...fechas) : null
-  const ventanaMin = desde ? (Date.now() - desde) / 60000 : null
-  const mtbfDias = ventanaMin && fallas > 0 ? ventanaMin / fallas / 1440 : null
-  const disponibilidad = ventanaMin && ventanaMin > 0 ? Math.max(0, ((ventanaMin - downtimeMin) / ventanaMin) * 100) : null
-  return { fallas, mttrHoras, mtbfDias, disponibilidad }
-}
-
-/** URL pública del equipo para el código QR (misma convención que EquipmentPage). */
-function qrUrl(equipmentId: string): string {
-  return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
-}
-
-/** Segmentos de la ruta jerárquica del equipo (sin vacíos).
- *  Forma real: "Aquachile… > PLANTA > SECCIÓN > LÍNEA > … > Equipo". */
-function pathParts(eq: Equipment): string[] {
-  return (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
-}
-/** Sección = nivel 2 (PROCESO, FRIGORIFICO, EXTERIORES, PLANTA RILES…). */
-function seccionDe(eq: Equipment): string | null {
-  return pathParts(eq)[2] ?? null
-}
-/** Línea = nivel 3 (TUNELES, EMPAQUE, EVISCERADO, CAMARAS…). */
-function lineaDe(eq: Equipment): string | null {
-  return pathParts(eq)[3] ?? null
-}
-
-const ITEMS_PER_PAGE = 50
-
-type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
-type EstadoFiltro = 'all' | Equipment['estado']
-type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
-type Vista = 'lista' | 'agenda' | 'tarjetas'
-
-/** Fecha de próxima inspección en ms (Infinity si no hay / inválida) — para ordenar. */
-function proximaMs(eq: Equipment): number {
-  const iso = eq.fichaTecnica?.proximaInspeccion
-  const t = iso ? new Date(iso).getTime() : NaN
-  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
-}
-
-type Bucket = 'vencidas' | 'd30' | 'd60' | 'd90' | 'futuro' | 'sin'
-const BUCKETS: { key: Bucket; label: string }[] = [
-  { key: 'vencidas', label: 'Vencidas' },
-  { key: 'd30', label: 'Próximos 30 días' },
-  { key: 'd60', label: '31–60 días' },
-  { key: 'd90', label: '61–90 días' },
-  { key: 'futuro', label: 'Más de 90 días' },
-  { key: 'sin', label: 'Sin fecha de inspección' },
-]
-function bucketDe(eq: Equipment): Bucket {
-  const iso = eq.fichaTecnica?.proximaInspeccion
-  if (!iso) return 'sin'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return 'sin'
-  const dias = Math.floor((t - startOfToday()) / 86400000)
-  if (dias < 0) return 'vencidas'
-  if (dias <= 30) return 'd30'
-  if (dias <= 60) return 'd60'
-  if (dias <= 90) return 'd90'
-  return 'futuro'
-}
-
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
-  const { equipment, setEquipment } = useAppStore()
   const { canEditEquipment } = usePermissions()
   const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
   const { notesFor, addNote, editNote, deleteNote } = useEquipmentNotes(user?.id)
 
-  const [searchParams, setSearchParams] = useSearchParams()
+  // Estado y derivaciones del listado a nivel programa (carga, filtros, KPIs,
+  // búsqueda, orden, paginación, agenda) viven en el hook; el expediente del
+  // equipo abierto se queda en la página.
+  const {
+    loading,
+    filtro,
+    setFiltro,
+    estadoFiltro,
+    setEstadoFiltro,
+    seccionFiltro,
+    setSeccionFiltro,
+    lineaFiltro,
+    setLineaFiltro,
+    tipoFiltro,
+    setTipoFiltro,
+    orden,
+    setOrden,
+    compact,
+    setCompact,
+    vista,
+    setVista,
+    setPage,
+    q,
+    setQ,
+    equipos,
+    kpis,
+    secciones,
+    lineas,
+    tipos,
+    visibles,
+    totalPages,
+    pageSafe,
+    paginated,
+    agenda,
+    kpiFiltros,
+    estadoChips,
+    filtrosActivos,
+    limpiarFiltros,
+    reload,
+  } = useCtdEquipos(favorites)
 
-  const [loading, setLoading] = useState(() => equipment.length === 0)
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
-  const [seccionFiltro, setSeccionFiltro] = useState<string>('all')
-  const [lineaFiltro, setLineaFiltro] = useState<string>('all')
-  const [tipoFiltro, setTipoFiltro] = useState<string>('all')
-  const [orden, setOrden] = useState<OrdenCampo>('criticidad')
-  const [compact, setCompact] = useState(false)
-  const [vista, setVista] = useState<Vista>('lista')
-  const [page, setPage] = useState(1)
-  const [q, setQ] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
   // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
@@ -240,25 +134,6 @@ export function CentroTecnicoDocumentalPage() {
   const placaInputRef = useRef<HTMLInputElement>(null)
   const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
   const [datosMenu, setDatosMenu] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    getEquipments()
-      .then((rows) => {
-        if (alive) setEquipment(rows)
-      })
-      .catch((err) =>
-        logger.error('Error cargando equipos (Centro Técnico Documental)', err instanceof Error ? err : new Error(String(err))),
-      )
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [setEquipment])
-
-  const equipos = useMemo(() => equipment.filter((e) => !e.deleted), [equipment])
 
   const detailEquipment = useMemo(
     () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
@@ -335,11 +210,6 @@ export function CentroTecnicoDocumentalPage() {
     }
   }, [detailId, lightbox, editingEquipment, searchParams, setSearchParams])
 
-  async function reload() {
-    const fresh = await getEquipments()
-    setEquipment(fresh)
-  }
-
   async function handlePhotoUpload(files: FileList | null) {
     if (!files || files.length === 0 || !detailEquipment || !canEditEquipment) return
     setPhotoUploading(true)
@@ -385,168 +255,6 @@ export function CentroTecnicoDocumentalPage() {
       setImportingPlaca(false)
       if (placaInputRef.current) placaInputRef.current.value = ''
     }
-  }
-
-  const kpis = useMemo(() => {
-    let critA = 0
-    let cond3 = 0
-    let vencidas = 0
-    let incompletas = 0
-    let favs = 0
-    for (const e of equipos) {
-      if (e.criticidad === 'alta') critA++
-      if (e.fichaTecnica?.condicion === 3) cond3++
-      if (diasVencida(e.fichaTecnica?.proximaInspeccion) !== null) vencidas++
-      if (completitud(e) < 100) incompletas++
-      if (favorites.has(e.id)) favs++
-    }
-    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
-  }, [equipos, favorites])
-
-  const secciones = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      const s = seccionDe(e)
-      if (s) set.add(s)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos])
-
-  // Líneas dependientes de la sección elegida (cascada).
-  const lineas = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) continue
-      const l = lineaDe(e)
-      if (l) set.add(l)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos, seccionFiltro])
-
-  const tipos = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      const t = e.tipo?.trim()
-      if (t) set.add(t)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos])
-
-  const visibles = useMemo(() => {
-    const term = debouncedQ.trim().toLowerCase()
-    const rows = equipos.filter((e) => {
-      if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
-      if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
-      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
-      if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false
-      if (tipoFiltro !== 'all' && (e.tipo ?? '') !== tipoFiltro) return false
-      switch (filtro) {
-        case 'A':
-          return e.criticidad === 'alta'
-        case 'cond3':
-          return e.fichaTecnica?.condicion === 3
-        case 'vencida':
-          return diasVencida(e.fichaTecnica?.proximaInspeccion) !== null
-        case 'incompleta':
-          return completitud(e) < 100
-        case 'favoritos':
-          return favorites.has(e.id)
-        default:
-          return true
-      }
-    })
-    const critRank: Record<Equipment['criticidad'], number> = { alta: 0, media: 1, baja: 2 }
-    const sorted = [...rows]
-    switch (orden) {
-      case 'proxima':
-        sorted.sort((a, b) => proximaMs(a) - proximaMs(b))
-        break
-      case 'ficha':
-        sorted.sort((a, b) => completitud(a) - completitud(b))
-        break
-      case 'area':
-        sorted.sort(
-          (a, b) =>
-            (seccionDe(a) ?? '').localeCompare(seccionDe(b) ?? '', 'es') ||
-            (lineaDe(a) ?? '').localeCompare(lineaDe(b) ?? '', 'es') ||
-            a.nombre.localeCompare(b.nombre, 'es'),
-        )
-        break
-      case 'nombre':
-        sorted.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-        break
-      default:
-        // criticidad (A>B>C), luego condición peor primero
-        sorted.sort((a, b) => {
-          const c = critRank[a.criticidad] - critRank[b.criticidad]
-          if (c !== 0) return c
-          return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
-        })
-    }
-    return sorted
-  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites])
-
-  const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
-  const pageSafe = Math.min(page, totalPages)
-  const paginated = useMemo(
-    () => visibles.slice((pageSafe - 1) * ITEMS_PER_PAGE, pageSafe * ITEMS_PER_PAGE),
-    [visibles, pageSafe],
-  )
-
-  // Debounce de la búsqueda (evita refiltrar en cada tecla)
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedQ(q), 250)
-    return () => clearTimeout(id)
-  }, [q])
-
-  // Volver a la página 1 cuando cambian filtros/orden/búsqueda
-  useEffect(() => {
-    setPage(1)
-  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ])
-
-  // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
-  useEffect(() => {
-    setLineaFiltro('all')
-  }, [seccionFiltro])
-
-  // Agenda: agrupa los equipos filtrados por ventana de próxima inspección.
-  const agenda = useMemo(() => {
-    const groups: Record<Bucket, Equipment[]> = { vencidas: [], d30: [], d60: [], d90: [], futuro: [], sin: [] }
-    for (const e of visibles) groups[bucketDe(e)].push(e)
-    for (const k of Object.keys(groups) as Bucket[]) groups[k].sort((a, b) => proximaMs(a) - proximaMs(b))
-    return groups
-  }, [visibles])
-
-  const kpiFiltros: { key: Filtro; label: string; n: number; cls?: string }[] = [
-    { key: 'todos', label: 'Equipos', n: kpis.total },
-    { key: 'A', label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
-    { key: 'cond3', label: 'Condición 🔴', n: kpis.cond3, cls: 'text-red-600' },
-    { key: 'vencida', label: 'Inspección vencida', n: kpis.vencidas, cls: 'text-amber-600' },
-    { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
-    { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
-  ]
-
-  const estadoChips: { key: EstadoFiltro; label: string }[] = [
-    { key: 'all', label: 'Todos los estados' },
-    { key: 'operativo', label: ESTADO.operativo.label },
-    { key: 'en_mantenimiento', label: ESTADO.en_mantenimiento.label },
-    { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
-  ]
-
-  const filtrosActivos =
-    filtro !== 'todos' ||
-    estadoFiltro !== 'all' ||
-    seccionFiltro !== 'all' ||
-    lineaFiltro !== 'all' ||
-    tipoFiltro !== 'all' ||
-    q.trim() !== ''
-  function limpiarFiltros() {
-    setFiltro('todos')
-    setEstadoFiltro('all')
-    setSeccionFiltro('all')
-    setLineaFiltro('all')
-    setTipoFiltro('all')
-    setQ('')
   }
 
   // Exporta el programa (filtro actual) a Excel — handoff de auditoría NFPA 70B.
