@@ -13,6 +13,7 @@ import {
   QrCode,
   Star,
   Trash2,
+  Upload,
   X,
   Zap,
 } from 'lucide-react'
@@ -21,6 +22,9 @@ import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
 import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
+import { getMaintenanceLog } from '@/services/maintenanceLog'
+import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
+import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAppStore, useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
@@ -30,7 +34,7 @@ import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident } from '@/types'
+import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -115,6 +119,36 @@ const ITEMS_PER_PAGE = 50
 type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
 type EstadoFiltro = 'all' | Equipment['estado']
 type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
+type Vista = 'lista' | 'agenda'
+
+/** Fecha de próxima inspección en ms (Infinity si no hay / inválida) — para ordenar. */
+function proximaMs(eq: Equipment): number {
+  const iso = eq.fichaTecnica?.proximaInspeccion
+  const t = iso ? new Date(iso).getTime() : NaN
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
+}
+
+type Bucket = 'vencidas' | 'd30' | 'd60' | 'd90' | 'futuro' | 'sin'
+const BUCKETS: { key: Bucket; label: string }[] = [
+  { key: 'vencidas', label: 'Vencidas' },
+  { key: 'd30', label: 'Próximos 30 días' },
+  { key: 'd60', label: '31–60 días' },
+  { key: 'd90', label: '61–90 días' },
+  { key: 'futuro', label: 'Más de 90 días' },
+  { key: 'sin', label: 'Sin fecha de inspección' },
+]
+function bucketDe(eq: Equipment): Bucket {
+  const iso = eq.fichaTecnica?.proximaInspeccion
+  if (!iso) return 'sin'
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return 'sin'
+  const dias = Math.floor((t - startOfToday()) / 86400000)
+  if (dias < 0) return 'vencidas'
+  if (dias <= 30) return 'd30'
+  if (dias <= 60) return 'd60'
+  if (dias <= 90) return 'd90'
+  return 'futuro'
+}
 
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
@@ -133,6 +167,7 @@ export function CentroTecnicoDocumentalPage() {
   const [tipoFiltro, setTipoFiltro] = useState<string>('all')
   const [orden, setOrden] = useState<OrdenCampo>('criticidad')
   const [compact, setCompact] = useState(false)
+  const [vista, setVista] = useState<Vista>('lista')
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
 
@@ -141,9 +176,12 @@ export function CentroTecnicoDocumentalPage() {
   const detailId = searchParams.get('eq')
   const detailTab = searchParams.get('tab') ?? 'info'
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
+  const [detailLog, setDetailLog] = useState<MaintenanceLogEntry[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const [importingPlaca, setImportingPlaca] = useState(false)
+  const placaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let alive = true
@@ -169,20 +207,26 @@ export function CentroTecnicoDocumentalPage() {
     [detailId, equipos],
   )
 
-  // Cargar incidencias del equipo abierto (para la timeline de la Ficha)
+  // Cargar incidencias + historial del equipo abierto (timeline de la Ficha y reporte PDF)
   useEffect(() => {
     if (!detailId) {
       setDetailIncidents([])
+      setDetailLog([])
       return
     }
     let alive = true
-    getIncidents({ equipmentId: detailId, limit: 50 })
-      .then((rows) => {
-        if (alive) setDetailIncidents(rows)
+    Promise.all([getIncidents({ equipmentId: detailId, limit: 50 }), getMaintenanceLog(detailId)])
+      .then(([inc, log]) => {
+        if (!alive) return
+        setDetailIncidents(inc)
+        setDetailLog(log)
       })
       .catch((err) => {
-        logger.error('Error cargando incidencias del expediente', err instanceof Error ? err : new Error(String(err)))
-        if (alive) setDetailIncidents([])
+        logger.error('Error cargando expediente (incidencias/historial)', err instanceof Error ? err : new Error(String(err)))
+        if (alive) {
+          setDetailIncidents([])
+          setDetailLog([])
+        }
       })
     return () => {
       alive = false
@@ -264,6 +308,24 @@ export function CentroTecnicoDocumentalPage() {
     } catch (e: unknown) {
       logger.error('Photo delete failed (CTD)', e instanceof Error ? e : new Error('Error al eliminar foto'))
       alert('No se pudo eliminar la foto. Intenta de nuevo.')
+    }
+  }
+
+  async function handleImportPlaca(file: File | null) {
+    if (!file) return
+    setImportingPlaca(true)
+    try {
+      const r = await importarPlacaExcel(file, equipos)
+      await reload()
+      alert(
+        `Placa importada: ${r.actualizados} actualizados · ${r.sinCambios} sin cambios · ${r.sinMatch.length} sin match (de ${r.total} filas).`,
+      )
+    } catch (e: unknown) {
+      logger.error('Error importando placa (CTD)', e instanceof Error ? e : new Error('Error al importar placa'))
+      alert('No se pudo importar el Excel de placa. Revisa que tenga la columna "Código" y el formato de la plantilla.')
+    } finally {
+      setImportingPlaca(false)
+      if (placaInputRef.current) placaInputRef.current.value = ''
     }
   }
 
@@ -388,6 +450,14 @@ export function CentroTecnicoDocumentalPage() {
     setLineaFiltro('all')
   }, [seccionFiltro])
 
+  // Agenda: agrupa los equipos filtrados por ventana de próxima inspección.
+  const agenda = useMemo(() => {
+    const groups: Record<Bucket, Equipment[]> = { vencidas: [], d30: [], d60: [], d90: [], futuro: [], sin: [] }
+    for (const e of visibles) groups[bucketDe(e)].push(e)
+    for (const k of Object.keys(groups) as Bucket[]) groups[k].sort((a, b) => proximaMs(a) - proximaMs(b))
+    return groups
+  }, [visibles])
+
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
     { key: 'favoritos', label: `★ Favoritos (${kpis.favs})` },
@@ -465,9 +535,28 @@ export function CentroTecnicoDocumentalPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
-          <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canEditEquipment && (
+            <>
+              <input
+                ref={placaInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => handleImportPlaca(e.target.files?.[0] ?? null)}
+              />
+              <Button variant="outline" size="sm" onClick={() => descargarPlantillaPlaca(equipos)} disabled={loading}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> Plantilla placa
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => placaInputRef.current?.click()} disabled={importingPlaca || loading}>
+                <Upload className="h-3.5 w-3.5 mr-1.5" /> {importingPlaca ? 'Importando…' : 'Importar placa'}
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -527,8 +616,22 @@ export function CentroTecnicoDocumentalPage() {
         ))}
       </div>
 
-      {/* Sección · Línea · Tipo · Orden · Densidad */}
+      {/* Vista · Sección · Línea · Tipo · Orden · Densidad */}
       <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border overflow-hidden mr-1">
+          <button
+            onClick={() => setVista('lista')}
+            className={`text-xs px-3 py-1.5 ${vista === 'lista' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+          >
+            Lista
+          </button>
+          <button
+            onClick={() => setVista('agenda')}
+            className={`text-xs px-3 py-1.5 ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+          >
+            Agenda
+          </button>
+        </div>
         <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
         <select
           value={seccionFiltro}
@@ -613,8 +716,12 @@ export function CentroTecnicoDocumentalPage() {
         )}
       </div>
 
-      {/* Tabla */}
-      <Card>
+      {/* Agenda de inspecciones (vista agenda) */}
+      {vista === 'agenda' && <AgendaInspecciones groups={agenda} onOpen={(id) => openExpediente(id, 'ficha')} />}
+
+      {/* Tabla (vista lista) */}
+      {vista === 'lista' && (
+        <Card>
         <CardContent className="p-0">
           {loading ? (
             <p className="p-4 text-sm text-muted-foreground italic">Cargando equipos…</p>
@@ -745,9 +852,10 @@ export function CentroTecnicoDocumentalPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
-      {!loading && totalPages > 1 && (
+      {vista === 'lista' && !loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             Anterior
@@ -776,6 +884,7 @@ export function CentroTecnicoDocumentalPage() {
         <ExpedienteDialog
           equipment={detailEquipment}
           incidents={detailIncidents}
+          log={detailLog}
           tab={detailTab}
           onTabChange={setDetailTab}
           isFavorite={favorites.has(detailEquipment.id)}
@@ -824,6 +933,7 @@ export function CentroTecnicoDocumentalPage() {
 function ExpedienteDialog({
   equipment,
   incidents,
+  log,
   tab,
   onTabChange,
   isFavorite,
@@ -842,6 +952,7 @@ function ExpedienteDialog({
 }: {
   equipment: Equipment
   incidents: Incident[]
+  log: MaintenanceLogEntry[]
   tab: string
   onTabChange: (tab: string) => void
   isFavorite: boolean
@@ -902,6 +1013,9 @@ function ExpedienteDialog({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => generarReporteEquipo(equipment, incidents, log)}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> PDF
+              </Button>
               {canEdit && (
                 <Button variant="outline" size="sm" onClick={onEdit}>
                   <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar
@@ -1135,6 +1249,66 @@ function ExpedienteDialog({
           </Tabs>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function AgendaInspecciones({
+  groups,
+  onOpen,
+}: {
+  groups: Record<Bucket, Equipment[]>
+  onOpen: (id: string) => void
+}) {
+  const total = BUCKETS.reduce((n, b) => n + groups[b.key].length, 0)
+  if (total === 0) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</CardContent>
+      </Card>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      {BUCKETS.map((b) => {
+        const items = groups[b.key]
+        if (items.length === 0) return null
+        const danger = b.key === 'vencidas'
+        return (
+          <Card key={b.key}>
+            <CardContent className="p-0">
+              <div className={`px-4 py-2 flex items-center justify-between text-sm font-semibold ${danger ? 'text-red-600' : ''}`}>
+                <span>{b.label}</span>
+                <span className="text-xs text-muted-foreground">{items.length}</span>
+              </div>
+              <div className="divide-y border-t">
+                {items.map((e) => {
+                  const crit = CRIT[e.criticidad]
+                  const cond = e.fichaTecnica?.condicion
+                  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+                  const prox = e.fichaTecnica?.proximaInspeccion
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => onOpen(e.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40"
+                    >
+                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+                      <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : '—'}</span>
+                      <span className="flex-1 min-w-0 truncate">
+                        {e.nombre} <span className="text-[11px] text-muted-foreground font-mono">· {e.codigo}</span>
+                      </span>
+                      <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                        {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }

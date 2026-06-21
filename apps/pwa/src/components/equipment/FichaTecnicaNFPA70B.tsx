@@ -221,17 +221,48 @@ export function FichaTecnicaNFPA70B({
     if (!draft.hallazgo.trim()) return
     setSavingEntry(true)
     try {
+      const fechaEvento = new Date(draft.fecha)
+      // Cerrar el ciclo NFPA 70B: una inspección registra la condición observada
+      // (severidad → condición) y reprograma la próxima fecha (criticidad × condición).
+      const esInspeccion = ['inspeccion', 'termografia', 'medicion', 'preventivo', 'predictivo'].includes(draft.tipo)
+      const nuevaCondicion: 1 | 2 | 3 | undefined = esInspeccion
+        ? ({ verde: 1, amarillo: 2, rojo: 3 } as const)[draft.severidad]
+        : undefined
+      const condParaIntervalo = nuevaCondicion ?? ficha.condicion
+      const intervalo = intervaloInspeccionDias(equipment.criticidad, condParaIntervalo)
+      const proximaISO = esInspeccion
+        ? new Date(fechaEvento.getTime() + intervalo * 86400000).toISOString().slice(0, 10)
+        : undefined
+
       await addMaintenanceLogEntry({
         equipmentId: equipment.id,
         hierarchyNodeId: equipment.hierarchyNodeId,
-        fecha: new Date(draft.fecha),
+        fecha: fechaEvento,
         tipo: draft.tipo,
         tecnico: draft.tecnico.trim() || undefined,
         hallazgo: draft.hallazgo.trim(),
         severidad: draft.severidad,
+        proximaInspeccion: proximaISO,
       })
+
+      // Si fue una inspección, actualizar la ficha (condición + próxima inspección).
+      if (esInspeccion) {
+        const cleaned = clean({
+          ...ficha,
+          condicion: nuevaCondicion,
+          frecuenciaInspeccionDias: intervalo,
+          proximaInspeccion: proximaISO,
+        })
+        await updateEquipment(equipment.id, { fichaTecnica: cleaned })
+        setFicha(cleaned)
+      }
+
       const rows = await getMaintenanceLog(equipment.id)
       setLog(rows)
+      if (esInspeccion) {
+        const fresh = await getEquipments()
+        setEquipment(fresh)
+      }
       setDraft(emptyDraft())
       setAddingEntry(false)
     } catch (err) {
@@ -515,6 +546,11 @@ export function FichaTecnicaNFPA70B({
                   onChange={(e) => setDraft((d) => ({ ...d, hallazgo: e.target.value }))}
                 />
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Si el tipo es una inspección (inspección/termografía/medición/preventivo/predictivo), al guardar se
+                actualiza la condición del equipo según la severidad y se reprograma la próxima inspección
+                (criticidad × condición).
+              </p>
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleAddEntry} disabled={savingEntry || !draft.hallazgo.trim()}>
                   <Check className="h-3.5 w-3.5 mr-1.5" /> {savingEntry ? 'Guardando…' : 'Guardar evento'}
