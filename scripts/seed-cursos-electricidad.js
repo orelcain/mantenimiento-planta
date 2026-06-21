@@ -293,25 +293,6 @@ const M2_MANUAL = [
       'Como es a libro abierto, ten claro en que leccion esta cada tema para responder rapido.',
     ],
   },
-  {
-    id: 'm2-10-glosario',
-    title: 'Glosario de siglas',
-    intro: 'Siglas que se usan en todo el modulo. Entre parentesis, la Leccion donde se explica cada una (para ir a verla en contexto).',
-    clave: [
-      'SVB = Soporte Vital Basico · RCP = Reanimacion Cardiopulmonar · DEA/DAE = Desfibrilador Externo Automatico. (Leccion 7)',
-      'MES = Mirar el torax, Escuchar, Sentir (para evaluar la ventilacion). (Leccion 7)',
-      'ABCDE = Airway (via aerea), Breathing (ventilacion), Circulation (circulacion), Disability (dano neuro), Exposure (exposicion). (Leccion 8)',
-      'AVDN = Alerta / responde a Verbal / responde a Dolor / No responde (nivel de conciencia). (Leccion 8)',
-      'PIRRL = Pupilas Iguales, Redondas, Reactivas a la Luz. (Leccion 8)',
-      'SER = orden de la Seguridad: yo, mi equipo, la victima (evaluar escena, cinematica y recursos). (Leccion 11)',
-      'TEC = Traumatismo Encefalo-Craneano (dano neurologico). (Leccion 11)',
-      'RICE = Reposo, Hielo (Ice), Compresion, Elevacion (esguince leve). (Leccion 6)',
-      '5 Reglas de Oro = secuencia de trabajo sin tension. (Leccion 3)',
-      'EPP = Equipo de Proteccion Personal · ESE = Elementos de Seguridad Electrica · AR = Arco-Resistente. (Leccion 3)',
-      'NFPA 70E = norma de seguridad electrica en lugares de trabajo (Ed. 2024). (Leccion 1)',
-      'SEC = Superintendencia de Electricidad y Combustibles · RIC = Reglamento de Instalaciones de Consumo. (Leccion 1)',
-    ],
-  },
 ];
 
 const M2_PROCEDURES = [
@@ -987,25 +968,6 @@ const M3_MANUAL = [
       'Ojo: la trampa de onda (line trap) sirve para comunicacion por onda portadora (PLC), NO para descargas atmosfericas; de eso se encargan el pararrayos y el cable de guarda.',
     ],
   },
-  {
-    id: 'm3-09-glosario',
-    title: 'Glosario de siglas',
-    intro: 'Siglas que se usan en todo el modulo. Entre parentesis, la Leccion donde se explica cada una (para ir a verla en contexto).',
-    clave: [
-      'NFPA 70B = Norma para el Mantenimiento del Equipo Electrico (la de este modulo) · NFPA 70E = Seguridad Electrica en lugares de trabajo · NFPA 70 / NEC = Codigo Electrico Nacional. (Leccion 1)',
-      'AC = Autoridad Competente (en Chile = la SEC) · SEC = Superintendencia de Electricidad y Combustibles. (Leccion 1)',
-      'MEP = Mantenimiento Electrico Preventivo: programa de inspeccion, pruebas, analisis y servicios. (Leccion 3)',
-      'TPEF = Tiempo Promedio Entre Fallas (categorias 1 a 5). (Leccion 4)',
-      'PHVA = Planificar / Hacer / Verificar / Actuar (ciclo de mejora). (Leccion 7)',
-      'BT / MT / AT = Baja (≤1 kV) / Media (>1-23 kV) / Alta (>23-230 kV) Tension. (Leccion 8)',
-      'RCM = Centrado en la Confiabilidad · TPM = Productivo Total · MBC = Basado en la Condicion · CMMS = Administracion del Mantenimiento Computacional. (Leccion 9)',
-      'Px = plan de puesta en marcha · FPT = pruebas de desempeno funcional. (Leccion 9)',
-      'True RMS = valor eficaz verdadero (mide todo el espectro de frecuencia) · p.u. = por unidad (rango 0,95-1,05). (Leccion 10)',
-      'PE = conductor de proteccion a tierra (verde / verde-amarillo). (Leccion 11)',
-      'SEP = Sistema Electrico de Potencia · SSEE = Subestaciones. (Leccion 12)',
-      'IP = Grado de Proteccion (1er digito solidos/polvo, 2° agua) · PLC = comunicacion por onda portadora · RIC = Reglamento de Instalaciones de Consumo. (Leccion 12)',
-    ],
-  },
 ];
 
 const M3_PROCEDURES = [
@@ -1573,25 +1535,6 @@ const M1_MANUAL = [
       'El examen apunta fuerte a las 5 Reglas, las fronteras, la tabla de efectos de la corriente y la jerarquia de control.',
     ],
   },
-  {
-    id: 'm1-10-glosario',
-    title: 'Glosario de siglas y terminos',
-    intro: 'Terminos y siglas clave del modulo. Entre parentesis, la Leccion donde se explica cada uno (para ir a verlo en contexto).',
-    clave: [
-      'NFPA 70E = Norma de Seguridad Electrica en Lugares de Trabajo (la de este modulo). (Leccion 1)',
-      'PSE = Programa de Seguridad Electrica. (Leccion 1)',
-      'BT / MT / AT = Baja (≤1 kV) / Media (>1-23 kV) / Alta (>23-230 kV) Tension. (Leccion 1)',
-      'Persona Calificada / No Calificada = quien tiene (o no) habilidades y entrenamiento para reconocer y evitar el peligro electrico. (Leccion 1)',
-      'SEC = Superintendencia de Electricidad y Combustibles (fiscaliza en Chile) · RIC = Reglamento de Instalaciones de Consumo. (Leccion 1)',
-      'Energia incidente = energia (cal/cm²) que un arco entrega sobre una superficie a una distancia dada. (Leccion 4)',
-      '5 Reglas de Oro = secuencia para dejar la instalacion sin tension. (Leccion 5)',
-      'LOTO = Lock Out / Tag Out (Bloqueo / Etiquetado). (Leccion 6)',
-      'FAL = Frontera de Aproximacion Limitada · FAR = Frontera de Aproximacion Restringida. (Leccion 7)',
-      'EPP = Equipo de Proteccion Personal · ESE = Elementos de Seguridad Electrica. (Leccion 7)',
-      'AR = Arco-Resistente · FR = Resistente a la Llama · ATPV = Valor de Proteccion Termica del Arco (cal/cm², bordado en la prenda). (Leccion 7)',
-      'Jerarquia de control = Eliminacion > Sustitucion > Ingenieria > Avisos > Administrativos > EPP. (Leccion 8)',
-    ],
-  },
 ];
 
 const M1_PROCEDURES = [
@@ -1796,13 +1739,134 @@ const M1_QUIZ = [
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
+// GLOSARIOS — pestana propia "Glosario" (term / definition / lesson para redirigir)
+// ════════════════════════════════════════════════════════════════════════════
+
+const M1_GLOSSARY = [
+  { term: 'NFPA 70E', definition: 'Norma de Seguridad Electrica en Lugares de Trabajo (la de este modulo).', lesson: 1 },
+  { term: 'PSE', definition: 'Programa de Seguridad Electrica.', lesson: 1 },
+  { term: 'BT / MT / AT', definition: 'Baja (≤1 kV) / Media (>1-23 kV) / Alta (>23-230 kV) Tension.', lesson: 1 },
+  { term: 'Persona Calificada / No Calificada', definition: 'Quien tiene (o no) habilidades y entrenamiento para reconocer y evitar el peligro electrico.', lesson: 1 },
+  { term: 'SEC', definition: 'Superintendencia de Electricidad y Combustibles (fiscaliza en Chile).', lesson: 1 },
+  { term: 'RIC', definition: 'Reglamento de Instalaciones de Consumo.', lesson: 1 },
+  { term: 'Energia incidente', definition: 'Energia (cal/cm²) que un arco entrega sobre una superficie a una distancia dada.', lesson: 4 },
+  { term: '5 Reglas de Oro', definition: 'Secuencia para dejar la instalacion sin tension.', lesson: 5 },
+  { term: 'LOTO', definition: 'Lock Out / Tag Out (Bloqueo / Etiquetado).', lesson: 6 },
+  { term: 'FAL', definition: 'Frontera de Aproximacion Limitada.', lesson: 7 },
+  { term: 'FAR', definition: 'Frontera de Aproximacion Restringida.', lesson: 7 },
+  { term: 'EPP', definition: 'Equipo de Proteccion Personal.', lesson: 7 },
+  { term: 'ESE', definition: 'Elementos de Seguridad Electrica.', lesson: 7 },
+  { term: 'AR', definition: 'Arco-Resistente (ropa de proteccion contra arco).', lesson: 7 },
+  { term: 'FR', definition: 'Resistente a la Llama.', lesson: 7 },
+  { term: 'ATPV', definition: 'Valor de Proteccion Termica del Arco (cal/cm², bordado en la prenda).', lesson: 7 },
+  { term: 'Jerarquia de control', definition: 'Eliminacion > Sustitucion > Ingenieria > Avisos > Administrativos > EPP.', lesson: 8 },
+];
+
+const M2_GLOSSARY = [
+  { term: 'SVB', definition: 'Soporte Vital Basico.', lesson: 7 },
+  { term: 'RCP', definition: 'Reanimacion Cardiopulmonar.', lesson: 7 },
+  { term: 'DEA / DAE', definition: 'Desfibrilador Externo Automatico.', lesson: 7 },
+  { term: 'MES', definition: 'Mirar el torax, Escuchar, Sentir (para evaluar la ventilacion).', lesson: 7 },
+  { term: 'ABCDE', definition: 'Airway (via aerea), Breathing (ventilacion), Circulation (circulacion), Disability (dano neuro), Exposure (exposicion).', lesson: 8 },
+  { term: 'AVDN', definition: 'Alerta / responde a Verbal / responde a Dolor / No responde (nivel de conciencia).', lesson: 8 },
+  { term: 'PIRRL', definition: 'Pupilas Iguales, Redondas, Reactivas a la Luz.', lesson: 8 },
+  { term: 'SER', definition: 'Orden de la Seguridad: yo, mi equipo, la victima (escena, cinematica, recursos).', lesson: 11 },
+  { term: 'TEC', definition: 'Traumatismo Encefalo-Craneano (dano neurologico).', lesson: 11 },
+  { term: 'RICE', definition: 'Reposo, Hielo (Ice), Compresion, Elevacion (esguince leve).', lesson: 6 },
+  { term: '5 Reglas de Oro', definition: 'Secuencia de trabajo sin tension.', lesson: 3 },
+  { term: 'EPP', definition: 'Equipo de Proteccion Personal.', lesson: 3 },
+  { term: 'ESE', definition: 'Elementos de Seguridad Electrica.', lesson: 3 },
+  { term: 'AR', definition: 'Arco-Resistente.', lesson: 3 },
+  { term: 'NFPA 70E', definition: 'Norma de seguridad electrica en lugares de trabajo (Ed. 2024).', lesson: 1 },
+  { term: 'SEC', definition: 'Superintendencia de Electricidad y Combustibles.', lesson: 1 },
+  { term: 'RIC', definition: 'Reglamento de Instalaciones de Consumo.', lesson: 1 },
+];
+
+const M3_GLOSSARY = [
+  { term: 'NFPA 70B', definition: 'Norma para el Mantenimiento del Equipo Electrico (la de este modulo).', lesson: 1 },
+  { term: 'NFPA 70E', definition: 'Norma de Seguridad Electrica en lugares de trabajo.', lesson: 1 },
+  { term: 'NFPA 70 / NEC', definition: 'Codigo Electrico Nacional (National Electrical Code).', lesson: 1 },
+  { term: 'AC', definition: 'Autoridad Competente (en Chile = la SEC).', lesson: 1 },
+  { term: 'SEC', definition: 'Superintendencia de Electricidad y Combustibles (fiscaliza en Chile).', lesson: 1 },
+  { term: 'MEP', definition: 'Mantenimiento Electrico Preventivo: programa de inspeccion, pruebas, analisis y servicios.', lesson: 3 },
+  { term: 'TPEF', definition: 'Tiempo Promedio Entre Fallas (categorias 1 a 5).', lesson: 4 },
+  { term: 'PHVA', definition: 'Planificar / Hacer / Verificar / Actuar (ciclo de mejora).', lesson: 7 },
+  { term: 'BT / MT / AT', definition: 'Baja (≤1 kV) / Media (>1-23 kV) / Alta (>23-230 kV) Tension.', lesson: 8 },
+  { term: 'RCM', definition: 'Mantenimiento Centrado en la Confiabilidad.', lesson: 9 },
+  { term: 'TPM', definition: 'Mantenimiento Productivo Total.', lesson: 9 },
+  { term: 'MBC', definition: 'Mantenimiento Basado en la Condicion.', lesson: 9 },
+  { term: 'CMMS', definition: 'Sistema de Administracion del Mantenimiento Computacional.', lesson: 9 },
+  { term: 'Px', definition: 'Plan de puesta en marcha.', lesson: 9 },
+  { term: 'FPT', definition: 'Pruebas de Desempeno Funcional.', lesson: 9 },
+  { term: 'True RMS', definition: 'Valor eficaz verdadero (mide todo el espectro de frecuencia).', lesson: 10 },
+  { term: 'p.u.', definition: 'Por unidad (rango de tension admisible 0,95-1,05).', lesson: 10 },
+  { term: 'PE', definition: 'Conductor de proteccion a tierra (verde / verde-amarillo).', lesson: 11 },
+  { term: 'SEP', definition: 'Sistema Electrico de Potencia.', lesson: 12 },
+  { term: 'SSEE', definition: 'Subestaciones Electricas.', lesson: 12 },
+  { term: 'IP', definition: 'Grado de Proteccion (1er digito solidos/polvo, 2° agua).', lesson: 12 },
+  { term: 'PLC', definition: 'Comunicacion por onda portadora (Power Line Carrier).', lesson: 12 },
+  { term: 'RIC', definition: 'Reglamento de Instalaciones de Consumo (diferencial de 30 mA obligatorio).', lesson: 12 },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIBLIOGRAFIAS — pestana propia "Bibliografia" (label / url). Fuentes del manual.
+// ════════════════════════════════════════════════════════════════════════════
+
+const M1_BIBLIO = [
+  { label: 'NFPA 70E — Norma de Seguridad Electrica en Lugares de Trabajo, edicion en espanol 2024.', url: 'https://link.nfpa.org/all-publications/70E/2024' },
+  { label: 'OSHA 1910.269 — Estandares de Seguridad y Salud Ocupacional, Subparte R (Generacion, Transmision y Distribucion de Energia Electrica).', url: 'https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.269' },
+  { label: 'Ministerio de Salud — Departamento de Estadisticas e Informacion de Salud (DEIS), MINSAL.', url: 'https://deis.minsal.cl/' },
+  { label: 'SEC — Superintendencia de Electricidad y Combustibles.', url: 'https://www.sec.cl' },
+  { label: 'DS 08/2019 — Reglamento de Instalaciones de Consumo (RIC) y pliegos tecnicos.', url: 'https://www.sec.cl/reglamento-de-seguridad-de-las-instalaciones-de-consumo-de-energia-electrica-decreto-08/' },
+  { label: 'Decreto Supremo 109 (2018) — Reglamento de Seguridad de instalaciones electricas, Ministerio de Energia.', url: 'https://www.sec.cl/centro-de-descargas/' },
+  { label: 'Pliego Tecnico Normativo RPTD N°15 — Operacion y mantenimiento.', url: null },
+  { label: 'Pliego Tecnico Normativo RPTD N°17.', url: null },
+  { label: 'R. H. Lee, "The Other Electrical Hazard: Electrical Arc Blast Burns", IEEE Transactions on Industry Applications, Vol. 1A-18, N°3, 1982.', url: null },
+  { label: 'Normas ASTM — Sociedad Americana de Ensayos y Materiales.', url: 'https://www.astm.org' },
+  { label: 'Normas IEEE — Instituto de Ingenieros Electricos y Electronicos.', url: 'https://www.ieee.org/standards/' },
+  { label: 'Manual de Primeros Auxilios ACHS.', url: null },
+  { label: 'Manuales del curso, OTEC ADVISOR Capacitaciones SpA.', url: 'https://advisorcapacitacion.cl/' },
+];
+
+const M2_BIBLIO = [
+  { label: 'NFPA 70E — Norma de seguridad electrica en lugares de trabajo, version en espanol 2024.', url: 'https://link.nfpa.org/all-publications/70E/2024' },
+  { label: 'OSHA 1910.269 — Estandares de Seguridad y Salud Ocupacional, Subparte R.', url: 'https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.269' },
+  { label: 'Ministerio de Salud — DEIS, MINSAL.', url: 'https://deis.minsal.cl/' },
+  { label: 'SEC — Superintendencia de Electricidad y Combustibles.', url: 'https://www.sec.cl' },
+  { label: 'DS 08/2019 — Reglamento de Instalaciones de Consumo (RIC) y pliegos tecnicos.', url: 'https://www.sec.cl/reglamento-de-seguridad-de-las-instalaciones-de-consumo-de-energia-electrica-decreto-08/' },
+  { label: 'Decreto Supremo 109 (2018) — Reglamento de Seguridad de instalaciones electricas, Ministerio de Energia.', url: 'https://www.sec.cl/centro-de-descargas/' },
+  { label: 'Pliegos Tecnicos Normativos RPTD N°15 (Operacion y mantenimiento) y N°17.', url: null },
+  { label: 'R. H. Lee, "The Other Electrical Hazard: Electrical Arc Blast Burns", IEEE Transactions on Industry Applications, 1982.', url: null },
+  { label: 'RCP Corp. — Norma Nacional de Reanimacion Cardiopulmonar Basica del Adulto y Pediatrica.', url: null },
+  { label: 'Manual de Primeros Auxilios ACHS.', url: null },
+  { label: 'Normas ASTM — Sociedad Americana de Ensayos y Materiales.', url: 'https://www.astm.org' },
+  { label: 'Normas IEEE — Instituto de Ingenieros Electricos y Electronicos.', url: 'https://www.ieee.org/standards/' },
+  { label: 'Manuales Rescate Electrico y SVB, OTEC ADVISOR Capacitaciones SpA.', url: 'https://advisorcapacitacion.cl/' },
+];
+
+const M3_BIBLIO = [
+  { label: 'NFPA 70B — Norma para el Mantenimiento del Equipo Electrico (edicion 2023).', url: null },
+  { label: 'OSHA 1910.269 — Estandares de Seguridad y Salud Ocupacional, Subparte R.', url: 'https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.269' },
+  { label: 'Ministerio de Salud — DEIS, MINSAL.', url: 'https://deis.minsal.cl/' },
+  { label: 'SEC — Superintendencia de Electricidad y Combustibles.', url: 'https://www.sec.cl' },
+  { label: 'DS 08/2019 — Reglamento de Instalaciones de Consumo (RIC) y pliegos tecnicos.', url: 'https://www.sec.cl/reglamento-de-seguridad-de-las-instalaciones-de-consumo-de-energia-electrica-decreto-08/' },
+  { label: 'Decreto Supremo 109 (2018) — Reglamento de Seguridad de instalaciones electricas, Ministerio de Energia.', url: 'https://www.sec.cl/centro-de-descargas/' },
+  { label: 'Pliegos Tecnicos Normativos RPTD N°15 (Operacion y mantenimiento) y N°17.', url: null },
+  { label: 'Normas ASTM — Sociedad Americana de Ensayos y Materiales.', url: 'https://www.astm.org' },
+  { label: 'Normas IEEE — Instituto de Ingenieros Electricos y Electronicos.', url: 'https://www.ieee.org/standards/' },
+  { label: 'Comision Nacional de Energia (CNE).', url: 'https://www.cne.cl' },
+  { label: 'Ministerio de Energia.', url: 'https://energia.gob.cl' },
+  { label: 'Manuales del curso, OTEC ADVISOR Capacitaciones SpA.', url: 'https://advisorcapacitacion.cl/' },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
 // ENSAMBLAJE
 // ════════════════════════════════════════════════════════════════════════════
 
 const MODULES = [
-  { slug: 'seguridad-electrica', name: 'Seguridad Electrica (NFPA 70E)', manual: M1_MANUAL, procedures: M1_PROCEDURES, flows: M1_FLOWS, diagnosis: M1_DIAGNOSIS, quiz: M1_QUIZ },
-  { slug: 'rescate-svb', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS, quiz: M2_QUIZ },
-  { slug: 'nfpa-70b', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS, quiz: M3_QUIZ },
+  { slug: 'seguridad-electrica', prefix: 'm1', name: 'Seguridad Electrica (NFPA 70E)', manual: M1_MANUAL, procedures: M1_PROCEDURES, flows: M1_FLOWS, diagnosis: M1_DIAGNOSIS, quiz: M1_QUIZ, glossary: M1_GLOSSARY, bibliografia: M1_BIBLIO },
+  { slug: 'rescate-svb', prefix: 'm2', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS, quiz: M2_QUIZ, glossary: M2_GLOSSARY, bibliografia: M2_BIBLIO },
+  { slug: 'nfpa-70b', prefix: 'm3', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS, quiz: M3_QUIZ, glossary: M3_GLOSSARY, bibliografia: M3_BIBLIO },
 ];
 
 function buildDocs(mod) {
@@ -1861,7 +1925,23 @@ function buildDocs(mod) {
       updatedAt: BASE,
     },
   }));
-  return { manual, procedures, flows, diagnosis, quiz };
+  // glosario: ordenado por `order` asc (term/definition/lesson)
+  const glossary = (mod.glossary || []).map((g, i) => {
+    const id = `${mod.prefix}-glo-${String(i + 1).padStart(2, '0')}`;
+    return {
+      id,
+      data: { id, term: g.term, definition: g.definition, lesson: g.lesson ?? null, order: i + 1, createdAt: BASE, updatedAt: BASE },
+    };
+  });
+  // bibliografia: ordenada por `order` asc (label/url)
+  const bibliografia = (mod.bibliografia || []).map((b, i) => {
+    const id = `${mod.prefix}-bib-${String(i + 1).padStart(2, '0')}`;
+    return {
+      id,
+      data: { id, label: b.label, url: b.url ?? null, order: i + 1, createdAt: BASE, updatedAt: BASE },
+    };
+  });
+  return { manual, procedures, flows, diagnosis, quiz, glossary, bibliografia };
 }
 
 // ── Init Firebase Admin ──
@@ -1901,6 +1981,20 @@ async function main() {
   console.log('='.repeat(64));
   if (isDryRun) console.log('** MODO DRY-RUN: no se escribe en Firestore **');
 
+  // El glosario paso de ser una leccion del manual a su pestana propia.
+  // Borramos los docs-glosario huerfanos que quedaron en la coleccion `manual`.
+  const ORPHAN_MANUAL_GLOSSARY = [
+    { slug: 'seguridad-electrica', id: 'm1-10-glosario' },
+    { slug: 'rescate-svb', id: 'm2-10-glosario' },
+    { slug: 'nfpa-70b', id: 'm3-09-glosario' },
+  ];
+  if (!isDryRun) {
+    for (const o of ORPHAN_MANUAL_GLOSSARY) {
+      await db.collection('learningContent').doc(o.slug).collection('manual').doc(o.id).delete();
+    }
+    console.log(`\nLimpieza: ${ORPHAN_MANUAL_GLOSSARY.length} docs-glosario huerfanos borrados de la coleccion manual.`);
+  }
+
   for (const mod of MODULES) {
     const docs = buildDocs(mod);
     console.log(`\n[${mod.slug}] ${mod.name}`);
@@ -1909,7 +2003,9 @@ async function main() {
     const f = await seedSection(mod.slug, 'flows', docs.flows);
     const d = await seedSection(mod.slug, 'diagnosis', docs.diagnosis);
     const q = await seedSection(mod.slug, 'quiz', docs.quiz);
-    console.log(`   manual: ${m}  ·  procedimientos: ${p}  ·  flujos: ${f}  ·  diagnostico: ${d}  ·  examen: ${q}`);
+    const g = await seedSection(mod.slug, 'glossary', docs.glossary);
+    const b = await seedSection(mod.slug, 'bibliografia', docs.bibliografia);
+    console.log(`   manual: ${m}  ·  procedimientos: ${p}  ·  flujos: ${f}  ·  diagnostico: ${d}  ·  examen: ${q}  ·  glosario: ${g}  ·  bibliografia: ${b}`);
   }
 
   console.log('\n' + '-'.repeat(64));
