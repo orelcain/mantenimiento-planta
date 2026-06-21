@@ -21,7 +21,8 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## TODO — Centro Técnico Documental (NFPA 70B)
 
-> Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`. Aún SIN codear.
+> Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
+> **v1+v2 codeadas en rama `feat/centro-tecnico-documental-v1` (sin push, sin merge). v3 pendiente.**
 > Decisiones cerradas: **enriquecer el módulo Equipos** (`/equipment`, NO módulo aparte); ficha =
 > **campo dedicado `fichaTecnica`** en el registro `equipment`, hereda repuestos/manuales del nodo
 > `hierarchy` vía `hierarchyNodeId`; `maintenanceLog` = **colección plana** con `equipmentId` (necesita
@@ -29,8 +30,8 @@ No tomes una tarea que ya está EN CURSO por otro.
 > 🟢🟡🔴); próxima inspección = **criticidad × condición** (Cap. 9 / Tabla 9.2.2). Piloto: motor
 > `720004608` + bomba `720004607` (NH₃) — verificar que existen como registros `equipment`.
 
-- [ ] **v1 — ficha solo-lectura** en `EquipmentPage`: placa (vacía aún) + documentos heredados + criticidad + historial. No requiere regla nueva ni datos nuevos. Dueño: —
-- [ ] **v2 — edición de `fichaTecnica`** (escribe en `equipment`, ya tiene regla de write). Cargar placa real del piloto. Dueño: —
+- [x] **v1 — ficha solo-lectura** en `EquipmentPage`: pestaña "Ficha NFPA 70B" con placa + documentos heredados + criticidad + historial. (claude, 2026-06-20, rama `feat/centro-tecnico-documental-v1`)
+- [x] **v2 — edición de `fichaTecnica`** — editor inline (placa eléctrica + condición 1/2/3 + vida útil/frecuencia/próxima inspección), guarda en `equipment.fichaTecnica` vía `updateEquipment`. tsc+eslint limpios. Falta cargar la placa real del piloto en la app. (claude, 2026-06-20)
 - [ ] **v3 — `maintenanceLog`** + auto-registro desde `incidents`/termografías + cálculo de próxima inspección. Requiere regla nueva en `firestore.rules`. Dueño: —
 
 ## Backlog general / futuro
