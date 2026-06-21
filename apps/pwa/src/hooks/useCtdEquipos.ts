@@ -15,6 +15,8 @@ import {
   seccionDe,
 } from '@/lib/ctd'
 import type { Bucket, EstadoFiltro, Filtro, OrdenCampo, OtCount, Vista } from '@/lib/ctd'
+import { FAMILIAS, familiaDe } from '@/lib/nfpa70b'
+import type { Familia } from '@/lib/nfpa70b'
 import type { Equipment } from '@/types'
 
 /**
@@ -36,6 +38,7 @@ export function useCtdEquipos(favorites: Set<string>) {
   const [seccionFiltro, setSeccionFiltro] = useState<string>('all')
   const [lineaFiltro, setLineaFiltro] = useState<string>('all')
   const [tipoFiltro, setTipoFiltro] = useState<string>('all')
+  const [familiaFiltro, setFamiliaFiltro] = useState<Familia | 'all'>('all')
   const [orden, setOrden] = useState<OrdenCampo>('criticidad')
   const [compact, setCompact] = useState(false)
   const [vista, setVista] = useState<Vista>('lista')
@@ -135,6 +138,16 @@ export function useCtdEquipos(favorites: Set<string>) {
     return [...set].sort((a, b) => a.localeCompare(b, 'es'))
   }, [equipos])
 
+  // Familias eléctricas (NFPA 70B) presentes, con conteo, en orden normativo.
+  const familias = useMemo(() => {
+    const counts = new Map<Familia, number>()
+    for (const e of equipos) {
+      const f = familiaDe(e)
+      counts.set(f, (counts.get(f) ?? 0) + 1)
+    }
+    return FAMILIAS.filter((f) => counts.has(f)).map((f) => ({ key: f, n: counts.get(f) ?? 0 }))
+  }, [equipos])
+
   const visibles = useMemo(() => {
     const term = debouncedQ.trim().toLowerCase()
     const rows = equipos.filter((e) => {
@@ -143,6 +156,7 @@ export function useCtdEquipos(favorites: Set<string>) {
       if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
       if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false
       if (tipoFiltro !== 'all' && (e.tipo ?? '') !== tipoFiltro) return false
+      if (familiaFiltro !== 'all' && familiaDe(e) !== familiaFiltro) return false
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
@@ -191,7 +205,7 @@ export function useCtdEquipos(favorites: Set<string>) {
         })
     }
     return sorted
-  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites, otByEquipo])
+  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, familiaFiltro, orden, debouncedQ, favorites, otByEquipo])
 
   const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
   const pageSafe = Math.min(page, totalPages)
@@ -209,7 +223,7 @@ export function useCtdEquipos(favorites: Set<string>) {
   // Volver a la página 1 cuando cambian filtros/orden/búsqueda
   useEffect(() => {
     setPage(1)
-  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ])
+  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, familiaFiltro, orden, debouncedQ])
 
   // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
   useEffect(() => {
@@ -248,6 +262,7 @@ export function useCtdEquipos(favorites: Set<string>) {
     seccionFiltro !== 'all' ||
     lineaFiltro !== 'all' ||
     tipoFiltro !== 'all' ||
+    familiaFiltro !== 'all' ||
     q.trim() !== ''
   function limpiarFiltros() {
     setFiltro('todos')
@@ -255,6 +270,7 @@ export function useCtdEquipos(favorites: Set<string>) {
     setSeccionFiltro('all')
     setLineaFiltro('all')
     setTipoFiltro('all')
+    setFamiliaFiltro('all')
     setQ('')
   }
 
@@ -271,6 +287,8 @@ export function useCtdEquipos(favorites: Set<string>) {
     setLineaFiltro,
     tipoFiltro,
     setTipoFiltro,
+    familiaFiltro,
+    setFamiliaFiltro,
     orden,
     setOrden,
     compact,
@@ -288,6 +306,7 @@ export function useCtdEquipos(favorites: Set<string>) {
     secciones,
     lineas,
     tipos,
+    familias,
     visibles,
     totalPages,
     pageSafe,

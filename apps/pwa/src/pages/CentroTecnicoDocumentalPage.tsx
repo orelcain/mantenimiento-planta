@@ -61,6 +61,7 @@ import {
   seccionDe,
 } from '@/lib/ctd'
 import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
+import { FAMILIA_LABEL, checklistDe, familiaDe } from '@/lib/nfpa70b'
 import type { Equipment, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
 
 /**
@@ -95,6 +96,8 @@ export function CentroTecnicoDocumentalPage() {
     setLineaFiltro,
     tipoFiltro,
     setTipoFiltro,
+    familiaFiltro,
+    setFamiliaFiltro,
     orden,
     setOrden,
     compact,
@@ -110,6 +113,7 @@ export function CentroTecnicoDocumentalPage() {
     secciones,
     lineas,
     tipos,
+    familias,
     visibles,
     totalPages,
     pageSafe,
@@ -497,6 +501,22 @@ export function CentroTecnicoDocumentalPage() {
           {tipos.map((t) => (
             <option key={t} value={t}>
               {t}
+            </option>
+          ))}
+        </select>
+
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Familia</label>
+        <select
+          value={familiaFiltro}
+          onChange={(e) => setFamiliaFiltro(e.target.value as typeof familiaFiltro)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          aria-label="Filtrar por familia eléctrica (NFPA 70B)"
+          title="Familia eléctrica NFPA 70B (máquina rotativa incluye motores, motorreductores, mototambores y bombas)"
+        >
+          <option value="all">Todas ({familias.length})</option>
+          {familias.map((f) => (
+            <option key={f.key} value={f.key}>
+              {FAMILIA_LABEL[f.key]} ({f.n})
             </option>
           ))}
         </select>
@@ -1037,6 +1057,10 @@ function ExpedienteDialog({
                       <div className="font-medium">{equipment.tipo || '—'}</div>
                     </div>
                     <div>
+                      <div className="text-sm text-muted-foreground">Familia (NFPA 70B)</div>
+                      <div className="font-medium">{FAMILIA_LABEL[familiaDe(equipment)]}</div>
+                    </div>
+                    <div>
                       <div className="text-sm text-muted-foreground">Estado</div>
                       <div className="font-medium">{est.label}</div>
                     </div>
@@ -1044,6 +1068,33 @@ function ExpedienteDialog({
                       <div className="text-sm text-muted-foreground">Descripción</div>
                       <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '—'}</div>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Protocolo de inspección NFPA 70B (según la familia del equipo) */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-1">
+                      Protocolo de inspección NFPA 70B{' '}
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        · familia {FAMILIA_LABEL[familiaDe(equipment)]}
+                      </span>
+                    </div>
+                    <ul className="divide-y">
+                      {checklistDe(equipment).map((t) => (
+                        <li key={t.id} className="py-1.5 flex items-start justify-between gap-3 text-sm">
+                          <span className="flex items-start gap-2 min-w-0">
+                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0">{t.tarea}</span>
+                          </span>
+                          <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">{t.metodo}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Tareas recomendadas por familia (NFPA 70B). Al registrar una inspección en la Ficha, documenta
+                      hallazgo y condición. Plantilla de arranque — se afina con el estándar completo / RPTD N°15.
+                    </p>
                   </CardContent>
                 </Card>
 
