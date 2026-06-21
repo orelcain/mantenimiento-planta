@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-20 · claude · Tableros — REALINEADO: del módulo suelto al expediente del equipo
+
+- Feedback de Orel: *"todo debería estar centralizado desde el Centro Técnico Documental, ¿no?"*. Correcto — el spec (`docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`) dice que el CTD **NO es módulo aparte, enriquece Equipos**, y que el centro documental "está ~70% construido pero **disperso**, falta consolidarlo". Mi `/tableros` suelto era justo lo disperso que el CTD quiere evitar.
+- Decisión (Orel): el **tablero ES un equipo** y su levantamiento/unifilar vive como **sección del expediente del equipo**, no como módulo.
+- Hecho: quitado el módulo suelto (ruta `/tableros` en App.tsx, nav "Tableros" + import Zap en MainLayout, borrado `pages/TablerosPage.tsx`). Nuevo `components/equipment/TableroExpediente.tsx` (sección lectura/edición + circuitos + Excel) montado como **tab "Tablero"** en el detalle de equipo (`EquipmentPage.tsx`, junto a "Ficha NFPA 70B"). Servicio reescrito: doc `tableros/{equipmentId}` (1:1), `getTableroByEquipment` + `saveTableroForEquipment` (alta = Revisión 0 as-found; edición opcional agrega revisión "cambio"). `types/tableros.ts` + `equipmentId`. **NO se tocó `FichaTecnicaNFPA70B.tsx`** (lo trabaja otro agente) — solo se sumó un tab hermano.
+- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sesión admin)**: abrí un equipo → tab "Tablero" monta el expediente con empty-state + Levantar/Plantilla/Importar + "se guardará como Revisión 0 (as-found)". Lectura da `permission-denied` (regla `tableros` sin desplegar — esperado). Nota: tras borrar `TablerosPage.tsx` Vite tira `Failed to reload TablerosPage.tsx` por HMR (ruido del dev server, no afecta build/tsc).
+- Estado: EN REVISIÓN (rama sin push/merge; commit `046df802`).
+- Sigue: PR+merge → desplegar reglas; levantar tablero piloto; **filtro "Tableros" en Equipos** (ver todos); fotos a Storage; `cargaNombre`→`cargaNodeId`.
+
 ## 2026-06-20 · claude · Tableros / Unifilares (NFPA 70B) v1 — levantamiento (Excel + form PWA)
 
 - Pedido de Orel: cubrir **unifilares de tableros desde la PWA**. Decisión: **"primero el dato" (Fase 0)** — levantamiento estructurado antes de dibujar. El levantamiento inicial se guarda como **Revisión 0 (as-found)** → nace el histórico de cambios que hoy no existe. Spec/protocolo en OneDrive: `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. (Fluyo NO es la herramienta del unifilar: es para arquitectura de software, sin símbolos eléctricos.)
