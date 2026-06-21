@@ -172,6 +172,7 @@ export function CentroTecnicoDocumentalPage() {
   const [vista, setVista] = useState<Vista>('lista')
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
+  const [debouncedQ, setDebouncedQ] = useState('')
 
   // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
   // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
@@ -378,7 +379,7 @@ export function CentroTecnicoDocumentalPage() {
   }, [equipos])
 
   const visibles = useMemo(() => {
-    const term = q.trim().toLowerCase()
+    const term = debouncedQ.trim().toLowerCase()
     const rows = equipos.filter((e) => {
       if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
       if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
@@ -401,15 +402,10 @@ export function CentroTecnicoDocumentalPage() {
       }
     })
     const critRank: Record<Equipment['criticidad'], number> = { alta: 0, media: 1, baja: 2 }
-    const proxMs = (e: Equipment) => {
-      const iso = e.fichaTecnica?.proximaInspeccion
-      const t = iso ? new Date(iso).getTime() : NaN
-      return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
-    }
     const sorted = [...rows]
     switch (orden) {
       case 'proxima':
-        sorted.sort((a, b) => proxMs(a) - proxMs(b))
+        sorted.sort((a, b) => proximaMs(a) - proximaMs(b))
         break
       case 'ficha':
         sorted.sort((a, b) => completitud(a) - completitud(b))
@@ -434,7 +430,7 @@ export function CentroTecnicoDocumentalPage() {
         })
     }
     return sorted
-  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q, favorites])
+  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites])
 
   const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
   const pageSafe = Math.min(page, totalPages)
@@ -443,10 +439,16 @@ export function CentroTecnicoDocumentalPage() {
     [visibles, pageSafe],
   )
 
+  // Debounce de la búsqueda (evita refiltrar en cada tecla)
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQ(q), 250)
+    return () => clearTimeout(id)
+  }, [q])
+
   // Volver a la página 1 cuando cambian filtros/orden/búsqueda
   useEffect(() => {
     setPage(1)
-  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q])
+  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ])
 
   // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
   useEffect(() => {
@@ -461,13 +463,13 @@ export function CentroTecnicoDocumentalPage() {
     return groups
   }, [visibles])
 
-  const chips: { key: Filtro; label: string }[] = [
-    { key: 'todos', label: `Todos (${kpis.total})` },
-    { key: 'favoritos', label: `★ Favoritos (${kpis.favs})` },
-    { key: 'A', label: `Criticidad A (${kpis.critA})` },
-    { key: 'cond3', label: `Condición 🔴 (${kpis.cond3})` },
-    { key: 'vencida', label: `Inspección vencida (${kpis.vencidas})` },
-    { key: 'incompleta', label: `Ficha incompleta (${kpis.incompletas})` },
+  const kpiFiltros: { key: Filtro; label: string; n: number; cls?: string }[] = [
+    { key: 'todos', label: 'Equipos', n: kpis.total },
+    { key: 'A', label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
+    { key: 'cond3', label: 'Condición 🔴', n: kpis.cond3, cls: 'text-red-600' },
+    { key: 'vencida', label: 'Inspección vencida', n: kpis.vencidas, cls: 'text-amber-600' },
+    { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
+    { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
   ]
 
   const estadoChips: { key: EstadoFiltro; label: string }[] = [
@@ -594,22 +596,24 @@ export function CentroTecnicoDocumentalPage() {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          { n: kpis.total, l: 'Equipos', cls: '' },
-          { n: kpis.critA, l: 'Criticidad A', cls: 'text-red-600' },
-          { n: kpis.cond3, l: 'Condición 🔴', cls: 'text-red-600' },
-          { n: kpis.vencidas, l: 'Inspección vencida', cls: 'text-amber-600' },
-          { n: kpis.incompletas, l: 'Ficha incompleta', cls: 'text-amber-600' },
-        ].map((k) => (
-          <Card key={k.l}>
-            <CardContent className="p-3 text-center">
-              <div className={`text-2xl font-extrabold leading-none ${k.cls}`}>{k.n}</div>
-              <div className="text-[11px] text-muted-foreground mt-1">{k.l}</div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPIs = filtros rápidos (click para filtrar) */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        {kpiFiltros.map((k) => {
+          const active = filtro === k.key
+          return (
+            <button
+              key={k.key}
+              onClick={() => setFiltro(k.key)}
+              title={`Filtrar: ${k.label}`}
+              className={`rounded-lg border p-3 text-center transition-colors ${
+                active ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border hover:bg-muted/40'
+              }`}
+            >
+              <div className={`text-2xl font-extrabold leading-none ${k.cls ?? ''}`}>{k.n}</div>
+              <div className="text-[11px] text-muted-foreground mt-1 truncate">{k.label}</div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Búsqueda */}
@@ -620,38 +624,7 @@ export function CentroTecnicoDocumentalPage() {
         className="max-w-sm"
       />
 
-      {/* Filtros NFPA 70B + favoritos */}
-      <div className="flex flex-wrap gap-2">
-        {chips.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setFiltro(c.key)}
-            className={`text-xs px-3 py-1.5 rounded-full border ${
-              filtro === c.key ? 'border-primary text-primary font-semibold' : 'border-border text-muted-foreground'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtro por estado */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</span>
-        {estadoChips.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setEstadoFiltro(c.key)}
-            className={`text-xs px-3 py-1.5 rounded-full border ${
-              estadoFiltro === c.key ? 'border-primary text-primary font-semibold' : 'border-border text-muted-foreground'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Vista · Sección · Línea · Tipo · Orden · Densidad */}
+      {/* Vista · Estado · Sección · Línea · Tipo · Orden · Densidad */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-md border overflow-hidden mr-1">
           <button
@@ -673,6 +646,19 @@ export function CentroTecnicoDocumentalPage() {
             Agenda
           </button>
         </div>
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</label>
+        <select
+          value={estadoFiltro}
+          onChange={(e) => setEstadoFiltro(e.target.value as EstadoFiltro)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background"
+          aria-label="Filtrar por estado"
+        >
+          {estadoChips.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.label}
+            </option>
+          ))}
+        </select>
         <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
         <select
           value={seccionFiltro}
