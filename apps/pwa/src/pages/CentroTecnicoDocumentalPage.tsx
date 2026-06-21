@@ -96,8 +96,18 @@ function qrUrl(equipmentId: string): string {
   return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
 }
 
+/** Área (línea) del equipo = segmento padre inmediato de su ruta jerárquica. */
+function areaDe(eq: Equipment): string | null {
+  const parts = (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+  if (parts.length < 2) return null
+  return parts[parts.length - 2] ?? null
+}
+
+const ITEMS_PER_PAGE = 50
+
 type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
 type EstadoFiltro = 'all' | Equipment['estado']
+type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
 
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
@@ -111,6 +121,10 @@ export function CentroTecnicoDocumentalPage() {
   const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
+  const [areaFiltro, setAreaFiltro] = useState<string>('all')
+  const [orden, setOrden] = useState<OrdenCampo>('criticidad')
+  const [compact, setCompact] = useState(false)
+  const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
 
   // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
@@ -260,11 +274,21 @@ export function CentroTecnicoDocumentalPage() {
     return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
   }, [equipos, favorites])
 
+  const areas = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      const a = areaDe(e)
+      if (a) set.add(a)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos])
+
   const visibles = useMemo(() => {
     const term = q.trim().toLowerCase()
     const rows = equipos.filter((e) => {
       if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
       if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
+      if (areaFiltro !== 'all' && areaDe(e) !== areaFiltro) return false
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
@@ -280,14 +304,50 @@ export function CentroTecnicoDocumentalPage() {
           return true
       }
     })
-    // Orden: criticidad (A>B>C), luego condición peor primero
     const critRank: Record<Equipment['criticidad'], number> = { alta: 0, media: 1, baja: 2 }
-    return rows.sort((a, b) => {
-      const c = critRank[a.criticidad] - critRank[b.criticidad]
-      if (c !== 0) return c
-      return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
-    })
-  }, [equipos, filtro, estadoFiltro, q, favorites])
+    const proxMs = (e: Equipment) => {
+      const iso = e.fichaTecnica?.proximaInspeccion
+      const t = iso ? new Date(iso).getTime() : NaN
+      return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
+    }
+    const sorted = [...rows]
+    switch (orden) {
+      case 'proxima':
+        sorted.sort((a, b) => proxMs(a) - proxMs(b))
+        break
+      case 'ficha':
+        sorted.sort((a, b) => completitud(a) - completitud(b))
+        break
+      case 'area':
+        sorted.sort(
+          (a, b) => (areaDe(a) ?? '').localeCompare(areaDe(b) ?? '', 'es') || a.nombre.localeCompare(b.nombre, 'es'),
+        )
+        break
+      case 'nombre':
+        sorted.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+        break
+      default:
+        // criticidad (A>B>C), luego condición peor primero
+        sorted.sort((a, b) => {
+          const c = critRank[a.criticidad] - critRank[b.criticidad]
+          if (c !== 0) return c
+          return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
+        })
+    }
+    return sorted
+  }, [equipos, filtro, estadoFiltro, areaFiltro, orden, q, favorites])
+
+  const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
+  const pageSafe = Math.min(page, totalPages)
+  const paginated = useMemo(
+    () => visibles.slice((pageSafe - 1) * ITEMS_PER_PAGE, pageSafe * ITEMS_PER_PAGE),
+    [visibles, pageSafe],
+  )
+
+  // Volver a la página 1 cuando cambian filtros/orden/búsqueda
+  useEffect(() => {
+    setPage(1)
+  }, [filtro, estadoFiltro, areaFiltro, orden, q])
 
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
@@ -305,10 +365,11 @@ export function CentroTecnicoDocumentalPage() {
     { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
   ]
 
-  const filtrosActivos = filtro !== 'todos' || estadoFiltro !== 'all' || q.trim() !== ''
+  const filtrosActivos = filtro !== 'todos' || estadoFiltro !== 'all' || areaFiltro !== 'all' || q.trim() !== ''
   function limpiarFiltros() {
     setFiltro('todos')
     setEstadoFiltro('all')
+    setAreaFiltro('all')
     setQ('')
   }
 
@@ -416,10 +477,52 @@ export function CentroTecnicoDocumentalPage() {
         ))}
       </div>
 
+      {/* Área · Orden · Densidad */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Área</label>
+        <select
+          value={areaFiltro}
+          onChange={(e) => setAreaFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[220px]"
+          aria-label="Filtrar por área"
+        >
+          <option value="all">Todas las áreas ({areas.length})</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+
+        <label className="ml-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ordenar</label>
+        <select
+          value={orden}
+          onChange={(e) => setOrden(e.target.value as OrdenCampo)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background"
+          aria-label="Ordenar por"
+        >
+          <option value="criticidad">Criticidad y condición</option>
+          <option value="proxima">Próxima inspección</option>
+          <option value="ficha">Ficha (menos completa)</option>
+          <option value="area">Área</option>
+          <option value="nombre">Nombre</option>
+        </select>
+
+        <Button variant={compact ? 'default' : 'outline'} size="sm" className="ml-auto" onClick={() => setCompact((v) => !v)}>
+          {compact ? 'Vista normal' : 'Vista compacta'}
+        </Button>
+      </div>
+
       {/* Conteo + limpiar filtros */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">
-          {loading ? 'Cargando…' : `Mostrando ${visibles.length} de ${kpis.total} equipos`}
+          {loading
+            ? 'Cargando…'
+            : visibles.length === 0
+              ? 'Sin resultados'
+              : `Mostrando ${(pageSafe - 1) * ITEMS_PER_PAGE + 1}–${Math.min(pageSafe * ITEMS_PER_PAGE, visibles.length)} de ${visibles.length}${
+                  visibles.length !== kpis.total ? ` (${kpis.total} en total)` : ''
+                }`}
         </span>
         {filtrosActivos && (
           <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
@@ -437,7 +540,7 @@ export function CentroTecnicoDocumentalPage() {
             <p className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
           ) : (
             <div className="divide-y">
-              {visibles.map((e) => {
+              {paginated.map((e) => {
                 const crit = CRIT[e.criticidad]
                 const est = ESTADO[e.estado]
                 const cond = e.fichaTecnica?.condicion
@@ -449,7 +552,7 @@ export function CentroTecnicoDocumentalPage() {
                 return (
                   <div
                     key={e.id}
-                    className="flex items-center gap-3 px-3 py-3 hover:bg-muted/40 cursor-pointer"
+                    className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
                     onClick={() => openExpediente(e.id, 'info')}
                   >
                     {/* Favorito */}
@@ -466,7 +569,7 @@ export function CentroTecnicoDocumentalPage() {
                     </button>
 
                     {/* Foto */}
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center">
+                    <div className={`shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
                       {foto ? (
                         <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
                       ) : (
@@ -483,7 +586,16 @@ export function CentroTecnicoDocumentalPage() {
                         <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
                         {cond ? <span>{COND_EMOJI[cond]}</span> : null}
                         <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
-                        <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
+                        <button
+                          className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
+                          title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            openExpediente(e.id, 'ficha')
+                          }}
+                        >
+                          {pct > 0 ? `${pct}%` : 'Completar ficha'}
+                        </button>
                       </div>
                     </div>
 
@@ -495,7 +607,16 @@ export function CentroTecnicoDocumentalPage() {
                       <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
                       </span>
-                      <span className={`w-10 text-right ${pct < 100 ? 'text-amber-600' : 'text-emerald-600'}`}>{pct > 0 ? `${pct}%` : '—'}</span>
+                      <button
+                        className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
+                        title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openExpediente(e.id, 'ficha')
+                        }}
+                      >
+                        {pct > 0 ? `${pct}%` : 'Completar'}
+                      </button>
                     </div>
 
                     {/* Acciones */}
@@ -543,6 +664,25 @@ export function CentroTecnicoDocumentalPage() {
           )}
         </CardContent>
       </Card>
+
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            Anterior
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Página {pageSafe} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pageSafe >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Siguiente
+          </Button>
+        </div>
+      )}
 
       <p className="text-[11px] text-muted-foreground">
         El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre aquí mismo, sin salir del CTD. “Ficha
