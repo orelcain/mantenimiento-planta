@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-21 · claude · CTD → expediente autosuficiente (PR #92 + #93, DESPLEGADO)
+
+- **PR #92 MERGEADO** (`b919dbd1`): portada CTD `/centro-tecnico-documental` (KPIs + buscador + v3c próxima-inspección auto criticidad×condición + export Excel). Solo redeploy PWA.
+- **PR #93 MERGEADO** (`67e04316`) — el CTD pasa de portada a **expediente AUTOSUFICIENTE**:
+  - CTD movido al grupo **Aprendizaje** (decisión Orel; no se cambió el landing/HomeRedirect).
+  - **Expediente en sitio**: el click abre el equipo dentro del CTD (panel con pestañas Info/Ficha NFPA 70B/Tablero/Fotos/Notas/QR; reusa `FichaTecnicaNFPA70B` + `TableroExpediente`). Estado en URL `?eq=&tab=` (deep-link/atrás), Esc, scroll-lock. **Ya NO salta a `/equipment`.**
+  - Migrado de Equipos: **favoritos** + **notas** (hooks `useEquipmentFavorites`/`useEquipmentNotes` que comparten la misma clave localStorage que EquipmentPage → única fuente de verdad), **editar datos básicos** (`EquipmentForm` extraído a `components/equipment/EquipmentForm.tsx`, reusado en ambos lados), **fotos** subir/borrar.
+  - Filtros: estado · **Sección→Línea** (cascada, de `hierarchyPath` niveles 2/3) · **Tipo**; orden (criticidad/próxima/ficha/sección-línea/nombre); paginación (50); vista compacta; "completar ficha" rápido (el % abre la Ficha).
+  - **Nuevo campo `Equipment.tipo`** (+ `validation.ts` + editable en `EquipmentForm` con datalist + columna Excel + visible en Info).
+- Datos: `scripts/backfill-equipment-tipo.js` (dry-run por defecto, `--write`) **EJECUTADO en prod** → 508/553 equipos con `tipo` (~45 sin match: Baader/Knuro/climatización/tableros abreviados → fijar a mano).
+- Archivos: `pages/CentroTecnicoDocumentalPage.tsx`, `components/equipment/EquipmentForm.tsx` (extraído), `hooks/useEquipmentFavorites.ts`, `hooks/useEquipmentNotes.ts`, `components/layout/MainLayout.tsx`, `types/index.ts`, `lib/validation.ts`, `scripts/backfill-equipment-tipo.js`, `pages/EquipmentPage.tsx` (usa el form extraído).
+- Verificación: `tsc --noEmit` + `eslint` limpios en cada commit; CI build verde en #93. Navegador NO verificable (login Google) → Orel prueba en vivo. Sin reglas Firestore nuevas → solo redeploy PWA.
+- Estado: HECHO / DESPLEGADO.
+- Sigue: cargar placa real del piloto (motor 720004608 + bomba 720004607); fijar `tipo` a los ~45 sin match; (opcional) "CTD como puerta principal" quedó descartado por ahora.
+
 ## 2026-06-20 · claude · Reconciliación tableros + PR #91 (CTD integrado, SIN deploy)
 
 - ⚠️ **Para el otro agente**: tu merge `3682d389` trajo la versión **SUELTA** de tableros (`/tableros` + `TablerosPage.tsx`). Yo la **realineé después** (tab "Tablero" en el expediente del equipo, se borró el módulo suelto). Reconcilié haciendo `merge feat/levantamiento-tableros-v1` sobre esta rama (commit `71bac189`): **gana la versión tab**; `TablerosPage.tsx` borrada, `TableroExpediente.tsx` + tab en `EquipmentPage`. NO vuelvas a mergear la versión suelta.

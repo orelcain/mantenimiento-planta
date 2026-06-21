@@ -22,8 +22,9 @@ No tomes una tarea que ya está EN CURSO por otro.
 ## TODO — Centro Técnico Documental (NFPA 70B)
 
 > Diseño aprobado 2026-06-20 con Orel. Spec: `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
-> **v1+v2+v3+v3b codeadas en rama `feat/centro-tecnico-documental-v1` (sin push, sin merge). tsc+eslint limpios.**
-> Regla `maintenanceLog` ya en `firestore.rules` (se despliega sola al mergear vía `deploy-firestore-rules.yml`).
+> **DESPLEGADO a prod 2026-06-21**: PR #91 (v1–v3b + tableros), PR #92 (portada CTD + v3c) y
+> PR #93 (CTD = expediente autosuficiente + migración de Equipos + campo `tipo`) MERGEADOS.
+> Reglas `maintenanceLog` + `tableros` desplegadas. El CTD vive en el grupo **Aprendizaje**.
 > Decisiones cerradas: **enriquecer el módulo Equipos** (`/equipment`, NO módulo aparte); ficha =
 > **campo dedicado `fichaTecnica`** en el registro `equipment`, hereda repuestos/manuales del nodo
 > `hierarchy` vía `hierarchyNodeId`; `maintenanceLog` = **colección plana** con `equipmentId` (necesita
@@ -35,8 +36,12 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [x] **v2 — edición de `fichaTecnica`** — editor inline (placa eléctrica + condición 1/2/3 + vida útil/frecuencia/próxima inspección), guarda en `equipment.fichaTecnica` vía `updateEquipment`. tsc+eslint limpios. Falta cargar la placa real del piloto en la app. (claude, 2026-06-20)
 - [x] **v3 — `maintenanceLog`** — colección plana + regla Firestore (read activeUser / create technician) + servicio `getMaintenanceLog`/`addMaintenanceLogEntry` + UI: timeline 🟢🟡🔴 y formulario "Registrar evento" en la ficha. (claude, 2026-06-20)
 - [x] **v3b — incidencias en el timeline (auto)** — read-merge: las incidencias del equipo (`equipmentId`) aparecen en el historial junto a las entradas manuales, prioridad→semáforo; sin duplicar datos. (claude, 2026-06-20, worktree por colisión)
-- [ ] **v3c — próxima inspección automática** — calcular fecha sugerida = criticidad × condición (Cap. 9 / Tabla 9.2.2). Opcional: que termografías escriban entrada en `maintenanceLog`. Dueño: —
-- [ ] **Merge a main** — revisar rama `feat/centro-tecnico-documental-v1`, push + PR. Al mergear se despliega la regla `maintenanceLog`. Dueño: Orel
+- [x] **v3c — próxima inspección automática** — fecha sugerida = criticidad × condición. (claude, 2026-06-21, PR #92)
+- [x] **Merge a main** — PR #91 + #92 + #93 mergeados y desplegados (solo redeploy PWA; reglas ya estaban). (Orel, 2026-06-21)
+- [x] **CTD = expediente autosuficiente + migración de Equipos** (PR #93, 2026-06-21) — CTD movido a Aprendizaje; el click abre el expediente EN SITIO (pestañas Info/Ficha/Tablero/Fotos/Notas/QR, reusa `FichaTecnicaNFPA70B`+`TableroExpediente`), estado en URL `?eq=&tab=`. Migrado: favoritos+notas (hooks `useEquipmentFavorites`/`useEquipmentNotes`, comparten localStorage con Equipos), editar datos básicos (`EquipmentForm` extraído), fotos subir/borrar. Filtros estado/Sección→Línea(cascada)/Tipo + orden + paginación + vista compacta + completar-ficha. Nuevo campo `Equipment.tipo`. (claude)
+- [x] **Backfill `tipo`** — `scripts/backfill-equipment-tipo.js` ejecutado en prod: 508/553 equipos clasificados desde el nombre. (claude, 2026-06-21)
+- [ ] **Cargar placa real del piloto** — motor `720004608` + bomba `720004607` (NH₃): capturar placa eléctrica + condición y validar el flujo completo en vivo. Dueño: Orel
+- [ ] **Fijar `tipo` a ~45 equipos sin match** del backfill (Baader/Knuro/climatización/tableros abreviados) a mano en la ficha. Dueño: —
 
 ## TODO — Tableros / Unifilares (NFPA 70B)
 
@@ -46,7 +51,7 @@ No tomes una tarea que ya está EN CURSO por otro.
 > (es para arquitectura de software). El levantamiento inicial se guarda como **Revisión 0 (as-found)**.
 
 - [x] **v1 — levantamiento (Excel + form) → REALINEADO al expediente** — el tablero ES un equipo; el levantamiento/unifilar vive como **tab "Tablero" dentro del expediente del equipo** (`EquipmentPage`, junto a la Ficha NFPA 70B), **NO como módulo `/tableros` suelto** (consistente con "el Centro Técnico Documental enriquece Equipos, no es módulo aparte"). Doc `tableros/{equipmentId}` (1:1). Archivos: `types/tableros.ts`, `services/tableros.ts` (`getTableroByEquipment`/`saveTableroForEquipment`, alta = Revisión 0 as-found), `services/tablerosExcel.ts` (plantilla descargar/importar, SheetJS), `components/equipment/TableroExpediente.tsx`, tab en `EquipmentPage.tsx`, regla `tableros` en `firestore.rules`. Se quitó ruta/nav/`TablerosPage.tsx`. **tsc limpio; preview en vivo OK** (tab "Tablero" monta en el expediente; lectura da `permission-denied` hasta desplegar reglas). (claude, 2026-06-20, rama `feat/levantamiento-tableros-v1`, commits `91ad1367`→`046df802`, sin push)
-- [ ] **Merge + deploy reglas** — push+PR de `feat/levantamiento-tableros-v1`; al mergear se despliega la regla `tableros` (o `firebase deploy --only firestore:rules`). **Sin esto el tab da permission-denied.** Dueño: Orel
+- [x] **Merge + deploy reglas** — DESPLEGADO 2026-06-21 (vía PR #91); regla `tableros` activa, el tab "Tablero" ya lee/escribe. (Orel)
 - [ ] **Levantar tablero piloto** — CCM que alimenta motor 720004608 + bomba 720004607. Dueño: —
 - [ ] **Filtro "Tableros" en Equipos** — "ver todos los tableros" = filtro en `/equipment` (equipos con doc en `tableros`). Aún no hecho. Dueño: —
 - [ ] **v2** — fotos a Storage (no cableado en v1) · enlazar `cargaNombre`→`cargaNodeId` de `hierarchy` · render del unifilar sobre el dato levantado. Dueño: —
