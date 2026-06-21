@@ -89,7 +89,33 @@ export interface QuizQuestion {
   updatedAt: number
 }
 
-export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz'
+/** Entrada del glosario (pestaña "Glosario" en temas de curso). */
+export interface GlossaryEntry {
+  id: string
+  /** Sigla o término. */
+  term: string
+  /** Definición breve. */
+  definition: string
+  /** Nº de lección donde se explica (para el redireccionamiento). Opcional. */
+  lesson?: number
+  order: number
+  createdAt: number
+  updatedAt: number
+}
+
+/** Referencia bibliográfica (pestaña "Bibliografía" en temas de curso). */
+export interface BibliographyEntry {
+  id: string
+  /** Cita / referencia. */
+  label: string
+  /** URL de la fuente, si existe. */
+  url?: string | null
+  order: number
+  createdAt: number
+  updatedAt: number
+}
+
+export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz' | 'glossary' | 'bibliografia'
 
 // ─────────────────────────────────────────────────────────────
 // PATHS HELPERS
@@ -537,6 +563,26 @@ export async function saveQuiz(
 
 export async function deleteQuiz(machineSlug: string, id: string): Promise<void> {
   await deleteDoc(sectionDoc(machineSlug, 'quiz', id))
+}
+
+// ─────────────────────────────────────────────────────────────
+// GLOSARIO (pestaña "Glosario" de los temas de curso)
+// ─────────────────────────────────────────────────────────────
+
+export async function listGlossary(machineSlug: string): Promise<GlossaryEntry[]> {
+  const q = query(sectionCollection(machineSlug, 'glossary'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as GlossaryEntry), id: d.id }))
+}
+
+// ─────────────────────────────────────────────────────────────
+// BIBLIOGRAFIA (pestaña "Bibliografía" de los temas de curso)
+// ─────────────────────────────────────────────────────────────
+
+export async function listBibliografia(machineSlug: string): Promise<BibliographyEntry[]> {
+  const q = query(sectionCollection(machineSlug, 'bibliografia'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as BibliographyEntry), id: d.id }))
 }
 
 // ─────────────────────────────────────────────────────────────

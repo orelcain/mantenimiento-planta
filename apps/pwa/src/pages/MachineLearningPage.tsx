@@ -10,7 +10,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ClipboardCheck, ShieldCheck, Activity,
-  ZoomIn, ZoomOut, RotateCcw, X, GraduationCap,
+  ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library, ExternalLink, Search,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
@@ -21,11 +21,15 @@ import {
   listFlows,
   listDiagnosis,
   listQuiz,
+  listGlossary,
+  listBibliografia,
   type Procedure,
   type ManualSection,
   type Flow,
   type DiagnosisEntry,
   type QuizQuestion,
+  type GlossaryEntry,
+  type BibliographyEntry,
 } from '@/services/learningContent'
 import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
@@ -35,7 +39,7 @@ import { QuizView } from '@/components/learning/QuizView'
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'casos' | 'quiz'
+type TabId = LearningSection | 'casos' | 'quiz' | 'glossary' | 'bibliografia'
 
 interface TabDef {
   id: TabId
@@ -106,6 +110,20 @@ const COURSE_TABS: TabDef[] = [
     icon: GraduationCap,
     description: 'Autoevaluacion tipo prueba con explicacion.',
   },
+  {
+    id: 'glossary',
+    label: 'Glosario',
+    shortLabel: 'Glosario',
+    icon: BookMarked,
+    description: 'Siglas y terminos del curso, con enlace a la leccion donde se explican.',
+  },
+  {
+    id: 'bibliografia',
+    label: 'Bibliografia',
+    shortLabel: 'Biblio.',
+    icon: Library,
+    description: 'Fuentes y normas en que se basa el manual del curso.',
+  },
 ]
 
 export function MachineLearningPage() {
@@ -118,7 +136,11 @@ export function MachineLearningPage() {
   const [flows, setFlows] = useState<Flow[]>([])
   const [diagnosis, setDiagnosis] = useState<DiagnosisEntry[]>([])
   const [quiz, setQuiz] = useState<QuizQuestion[]>([])
+  const [glossary, setGlossary] = useState<GlossaryEntry[]>([])
+  const [bibliografia, setBibliografia] = useState<BibliographyEntry[]>([])
   const [loadingTab, setLoadingTab] = useState(false)
+  // Leccion a la que saltar cuando el usuario toca "Leccion N" en el Glosario.
+  const [pendingLessonOrder, setPendingLessonOrder] = useState<number | null>(null)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
@@ -144,6 +166,10 @@ export function MachineLearningPage() {
       loaders.push(listDiagnosis(machine.slug).then(list => { if (!cancelled) setDiagnosis(list) }))
     } else if (activeTab === 'quiz') {
       loaders.push(listQuiz(machine.slug).then(list => { if (!cancelled) setQuiz(list) }))
+    } else if (activeTab === 'glossary') {
+      loaders.push(listGlossary(machine.slug).then(list => { if (!cancelled) setGlossary(list) }))
+    } else if (activeTab === 'bibliografia') {
+      loaders.push(listBibliografia(machine.slug).then(list => { if (!cancelled) setBibliografia(list) }))
     }
 
     Promise.all(loaders)
@@ -180,6 +206,8 @@ export function MachineLearningPage() {
     : id === 'diagnosis' ? diagnosis.length
     : id === 'casos' ? flows.length + diagnosis.length
     : id === 'quiz' ? quiz.length
+    : id === 'glossary' ? glossary.length
+    : id === 'bibliografia' ? bibliografia.length
     : 0
   const activeCount = countFor(activeTab)
   const sectionEnabled = activeCount > 0 || (!isCourse && machine.sections[activeTab as LearningSection])
@@ -316,7 +344,7 @@ export function MachineLearningPage() {
       {/* Tabs */}
       <div className="sticky top-0 z-20 max-w-6xl mx-auto px-4 sm:static sm:px-6 mt-3">
         <div
-          className="grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-lg backdrop-blur"
+          className={`grid grid-cols-2 ${isCourse ? 'sm:grid-cols-6' : 'sm:grid-cols-4'} gap-px overflow-hidden rounded-lg backdrop-blur`}
           style={{ background: LC.border, border: `1px solid ${LC.border}` }}
         >
           {tabs.map(tab => {
@@ -384,7 +412,7 @@ export function MachineLearningPage() {
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
           <ProceduresList procedures={procedures} color={machine.color} />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} />
+          <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} color={machine.color} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
@@ -418,6 +446,14 @@ export function MachineLearningPage() {
           </div>
         ) : activeTab === 'quiz' && quiz.length > 0 ? (
           <QuizView questions={quiz} color={machine.color} />
+        ) : activeTab === 'glossary' && glossary.length > 0 ? (
+          <GlossaryView
+            entries={glossary}
+            color={machine.color}
+            onGoToLesson={order => { setPendingLessonOrder(order); setActiveTab('manual') }}
+          />
+        ) : activeTab === 'bibliografia' && bibliografia.length > 0 ? (
+          <BibliografiaView entries={bibliografia} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -568,12 +604,17 @@ function ManualList({
   machineSlug,
   canEdit,
   isCourse = false,
+  jumpToOrder = null,
+  onJumpConsumed,
 }: {
   sections: ManualSection[]
   color: string
   machineSlug: string
   canEdit: boolean
   isCourse?: boolean
+  /** Orden de leccion a abrir (viene del Glosario). */
+  jumpToOrder?: number | null
+  onJumpConsumed?: () => void
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
@@ -589,6 +630,17 @@ function ManualList({
       setActiveId(sections[0]?.id ?? '')
     }
   }, [activeId, sections])
+
+  // Salto a una leccion concreta desde el Glosario ("Leccion N").
+  useEffect(() => {
+    if (jumpToOrder == null) return
+    const target = sections.find(section => section.order === jumpToOrder)
+    if (target) {
+      setActiveId(target.id)
+      setOpenGroupId(null)
+    }
+    onJumpConsumed?.()
+  }, [jumpToOrder, sections, onJumpConsumed])
 
   if (!activeSection) return null
 
@@ -1377,6 +1429,108 @@ function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: s
         )
       })}
     </div>
+  )
+}
+
+function GlossaryView({
+  entries,
+  color,
+  onGoToLesson,
+}: {
+  entries: GlossaryEntry[]
+  color: string
+  onGoToLesson: (order: number) => void
+}) {
+  const [queryText, setQueryText] = useState('')
+  const q = queryText.trim().toLowerCase()
+  const filtered = q
+    ? entries.filter(e => e.term.toLowerCase().includes(q) || e.definition.toLowerCase().includes(q))
+    : entries
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LC.inkLo }} />
+        <input
+          type="text"
+          value={queryText}
+          onChange={e => setQueryText(e.target.value)}
+          placeholder="Buscar sigla o termino…"
+          className="w-full rounded-lg py-2.5 pl-9 pr-3 text-sm outline-none"
+          style={{ background: LC.surface, border: `1px solid ${LC.border}`, color: LC.ink }}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="px-1 py-6 text-center text-sm" style={{ color: LC.inkLo }}>
+          Sin resultados para “{queryText}”.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {filtered.map(entry => (
+            <li
+              key={entry.id}
+              className="rounded-lg p-4"
+              style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-bold" style={{ color }}>{entry.term}</h3>
+                {entry.lesson != null && (
+                  <button
+                    type="button"
+                    onClick={() => onGoToLesson(entry.lesson!)}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition hover:brightness-110"
+                    style={{ background: `${color}16`, color, border: `1px solid ${color}33` }}
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    Leccion {entry.lesson}
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-sm leading-relaxed" style={{ color: LC.inkMid }}>
+                {entry.definition}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function BibliografiaView({ entries, color }: { entries: BibliographyEntry[]; color: string }) {
+  return (
+    <ol className="space-y-2.5">
+      {entries.map((entry, idx) => (
+        <li
+          key={entry.id}
+          className="flex gap-3 rounded-lg p-4"
+          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+        >
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
+            style={{ background: `${color}16`, color, border: `1px solid ${color}40` }}
+          >
+            {idx + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-relaxed" style={{ color: LC.ink }}>{entry.label}</p>
+            {entry.url && (
+              <a
+                href={entry.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold break-all transition hover:underline"
+                style={{ color }}
+              >
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                {entry.url.replace(/^https?:\/\//, '')}
+              </a>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
   )
 }
 
