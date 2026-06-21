@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Check,
   ChevronRight,
+  Copy,
   Download,
   Edit2,
   FolderArchive,
@@ -33,6 +34,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
+import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { logger } from '@/lib/logger'
 import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
@@ -119,7 +121,7 @@ const ITEMS_PER_PAGE = 50
 type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
 type EstadoFiltro = 'all' | Equipment['estado']
 type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
-type Vista = 'lista' | 'agenda'
+type Vista = 'lista' | 'agenda' | 'tarjetas'
 
 /** Fecha de próxima inspección en ms (Infinity si no hay / inválida) — para ordenar. */
 function proximaMs(eq: Equipment): number {
@@ -182,6 +184,7 @@ export function CentroTecnicoDocumentalPage() {
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
   const [importingPlaca, setImportingPlaca] = useState(false)
   const placaInputRef = useRef<HTMLInputElement>(null)
+  const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -526,6 +529,38 @@ export function CentroTecnicoDocumentalPage() {
     XLSX.writeFile(wb, `centro-tecnico-documental-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
+  // Copia al portapapeles los códigos del set filtrado (planificación / compras).
+  function copiarCodigos() {
+    const codes = visibles.map((e) => e.codigo).join('\n')
+    if (!codes) return
+    navigator.clipboard
+      .writeText(codes)
+      .then(() => alert(`${visibles.length} código(s) copiados al portapapeles.`))
+      .catch(() => alert('No se pudo copiar al portapapeles.'))
+  }
+
+  // Guarda la versión anotada de una foto (reemplaza la original o la agrega como nueva).
+  async function handleAnnotatedSave(annotatedImageUrl: string) {
+    if (!detailEquipment || !editingPhoto) return
+    setPhotoUploading(true)
+    try {
+      const blob = await (await fetch(annotatedImageUrl)).blob()
+      const file = new File([blob], `annotated-${Date.now()}.webp`, { type: 'image/webp' })
+      const reemplazar = window.confirm(
+        '¿Reemplazar la foto original con la versión anotada? Si cancelas, se agrega como foto nueva.',
+      )
+      if (reemplazar) await removeEquipmentPhoto(detailEquipment.id, editingPhoto)
+      await addEquipmentPhoto(detailEquipment.id, file)
+      await reload()
+      setEditingPhoto(null)
+    } catch (e: unknown) {
+      logger.error('Error guardando foto anotada (CTD)', e instanceof Error ? e : new Error('Error foto anotada'))
+      alert('No se pudo guardar la foto anotada. Intenta de nuevo.')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -626,8 +661,14 @@ export function CentroTecnicoDocumentalPage() {
             Lista
           </button>
           <button
+            onClick={() => setVista('tarjetas')}
+            className={`text-xs px-3 py-1.5 border-l ${vista === 'tarjetas' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+          >
+            Tarjetas
+          </button>
+          <button
             onClick={() => setVista('agenda')}
-            className={`text-xs px-3 py-1.5 ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+            className={`text-xs px-3 py-1.5 border-l ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
           >
             Agenda
           </button>
@@ -709,15 +750,91 @@ export function CentroTecnicoDocumentalPage() {
                   visibles.length !== kpis.total ? ` (${kpis.total} en total)` : ''
                 }`}
         </span>
-        {filtrosActivos && (
-          <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
-            Limpiar filtros
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={copiarCodigos}
+            disabled={loading || visibles.length === 0}
+            title="Copiar los códigos del set filtrado"
+          >
+            <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar códigos
           </Button>
-        )}
+          {filtrosActivos && (
+            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Agenda de inspecciones (vista agenda) */}
       {vista === 'agenda' && <AgendaInspecciones groups={agenda} onOpen={(id) => openExpediente(id, 'ficha')} />}
+
+      {/* Tarjetas (vista tarjetas) */}
+      {vista === 'tarjetas' &&
+        (loading ? (
+          <p className="text-sm text-muted-foreground italic">Cargando equipos…</p>
+        ) : paginated.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {paginated.map((e) => {
+              const crit = CRIT[e.criticidad]
+              const est = ESTADO[e.estado]
+              const cond = e.fichaTecnica?.condicion
+              const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+              const pct = completitud(e)
+              const foto = e.photos?.[0]
+              const isFav = favorites.has(e.id)
+              return (
+                <Card
+                  key={e.id}
+                  className="overflow-hidden cursor-pointer hover:bg-muted/30"
+                  onClick={() => openExpediente(e.id, 'info')}
+                >
+                  <div className="relative aspect-video bg-muted flex items-center justify-center">
+                    {foto ? (
+                      <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                    )}
+                    <button
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        toggleFavorite(e.id)
+                      }}
+                      title={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                      aria-label={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                      className="absolute top-1 right-1 p-1 rounded bg-black/40"
+                    >
+                      <Star className={`h-4 w-4 ${isFav ? 'fill-current text-yellow-500' : 'text-white'}`} />
+                    </button>
+                  </div>
+                  <CardContent className="p-3 space-y-1.5">
+                    <div className="font-medium text-sm truncate">{e.nombre}</div>
+                    <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+                      {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
+                      <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
+                        {dias !== null
+                          ? `vencida ${dias} d`
+                          : e.fichaTecnica?.proximaInspeccion
+                            ? new Date(e.fichaTecnica.proximaInspeccion).toLocaleDateString()
+                            : 'sin fecha'}
+                      </span>
+                      <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ))}
 
       {/* Tabla (vista lista) */}
       {vista === 'lista' && (
@@ -855,7 +972,7 @@ export function CentroTecnicoDocumentalPage() {
         </Card>
       )}
 
-      {vista === 'lista' && !loading && totalPages > 1 && (
+      {vista !== 'agenda' && !loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" size="sm" disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             Anterior
@@ -896,6 +1013,7 @@ export function CentroTecnicoDocumentalPage() {
           photoUploading={photoUploading}
           onPhotoUpload={handlePhotoUpload}
           onPhotoDelete={handlePhotoDelete}
+          onAnnotatePhoto={(url) => setEditingPhoto(url)}
           notes={notesFor(detailEquipment.id)}
           onAddNote={(text) => addNote(detailEquipment.id, text)}
           onEditNote={(noteId, text) => editNote(detailEquipment.id, noteId, text)}
@@ -926,6 +1044,11 @@ export function CentroTecnicoDocumentalPage() {
           <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded" />
         </div>
       )}
+
+      {/* Editor de anotación de fotos (marcar hallazgos) */}
+      {editingPhoto && detailEquipment && (
+        <PhotoAnnotationEditor photoUrl={editingPhoto} onSave={handleAnnotatedSave} onClose={() => setEditingPhoto(null)} />
+      )}
     </div>
   )
 }
@@ -945,6 +1068,7 @@ function ExpedienteDialog({
   photoUploading,
   onPhotoUpload,
   onPhotoDelete,
+  onAnnotatePhoto,
   notes,
   onAddNote,
   onEditNote,
@@ -964,6 +1088,7 @@ function ExpedienteDialog({
   photoUploading: boolean
   onPhotoUpload: (files: FileList | null) => void
   onPhotoDelete: (photoUrl: string) => void
+  onAnnotatePhoto: (photoUrl: string) => void
   notes: EquipmentNote[]
   onAddNote: (text: string) => void
   onEditNote: (noteId: string, text: string) => void
@@ -1116,6 +1241,19 @@ function ExpedienteDialog({
                             onClick={() => onLightbox(url)}
                             loading="lazy"
                           />
+                          {canEdit && (
+                            <button
+                              className="absolute top-1 left-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Anotar foto (marcar hallazgos)"
+                              aria-label="Anotar foto"
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                onAnnotatePhoto(url)
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                           {canEdit && (
                             <button
                               className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
