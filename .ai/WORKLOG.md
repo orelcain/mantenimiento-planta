@@ -13,6 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-06-21 · claude · CTD: traer de Equipos + repasada de flujo (PR #95 + #96, DESPLEGADO)
+
+- **PR #95 MERGEADO** (`c201da6f`): trae de Equipos al expediente del CTD →
+  (1) **anotar fotos** (botón lápiz en cada foto → `PhotoAnnotationEditor`; al guardar reemplaza o agrega como nueva);
+  (2) **vista Tarjetas** (3er modo Lista/Tarjetas/Agenda, grid con foto; paginación aplica a Lista y Tarjetas);
+  (3) **copiar códigos** del set filtrado al portapapeles.
+- **PR #96 MERGEADO** (`69ce703d`): repasada técnica+visual del flujo →
+  KPIs ahora **clicables = filtros** (se quitó la fila de chips NFPA duplicada); Estado pasó de chips a `select`
+  (barra única Vista/Estado/Sección/Línea/Tipo/Orden/Densidad); encabezado con menú **"Datos"** (Exportar/Plantilla/
+  Importar placa); Agenda con CTA **"Registrar →"** en vencidas; **debounce** 250 ms en búsqueda; dedupe `proxMs`;
+  **refactor**: extraídos `CtdEquipoRow` + `CtdEquipoCard`.
+- Archivos: `pages/CentroTecnicoDocumentalPage.tsx` (+ usa `components/PhotoAnnotationEditor`).
+- Verificación: `tsc --noEmit` + `eslint` limpios por commit; CI verde. Sin reglas nuevas → solo redeploy PWA.
+- Estado: HECHO / DESPLEGADO.
+- Sigue (opcional): extraer `useCtdEquipos` (lógica) si el componente sigue creciendo; cargar placa del piloto.
+
 ## 2026-06-21 · claude · CTD "programa vivo" (PR #94, DESPLEGADO)
 
 - **PR #94 MERGEADO** (`7388c4a6`) — el CTD pasa de catálogo a programa NFPA 70B que maneja el ciclo:
