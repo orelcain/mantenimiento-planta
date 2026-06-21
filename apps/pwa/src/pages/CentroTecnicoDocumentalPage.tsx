@@ -22,7 +22,9 @@ import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
 import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
+import { getMaintenanceLog } from '@/services/maintenanceLog'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
+import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { useAppStore, useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
@@ -32,7 +34,7 @@ import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident } from '@/types'
+import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -174,6 +176,7 @@ export function CentroTecnicoDocumentalPage() {
   const detailId = searchParams.get('eq')
   const detailTab = searchParams.get('tab') ?? 'info'
   const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
+  const [detailLog, setDetailLog] = useState<MaintenanceLogEntry[]>([])
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
@@ -204,20 +207,26 @@ export function CentroTecnicoDocumentalPage() {
     [detailId, equipos],
   )
 
-  // Cargar incidencias del equipo abierto (para la timeline de la Ficha)
+  // Cargar incidencias + historial del equipo abierto (timeline de la Ficha y reporte PDF)
   useEffect(() => {
     if (!detailId) {
       setDetailIncidents([])
+      setDetailLog([])
       return
     }
     let alive = true
-    getIncidents({ equipmentId: detailId, limit: 50 })
-      .then((rows) => {
-        if (alive) setDetailIncidents(rows)
+    Promise.all([getIncidents({ equipmentId: detailId, limit: 50 }), getMaintenanceLog(detailId)])
+      .then(([inc, log]) => {
+        if (!alive) return
+        setDetailIncidents(inc)
+        setDetailLog(log)
       })
       .catch((err) => {
-        logger.error('Error cargando incidencias del expediente', err instanceof Error ? err : new Error(String(err)))
-        if (alive) setDetailIncidents([])
+        logger.error('Error cargando expediente (incidencias/historial)', err instanceof Error ? err : new Error(String(err)))
+        if (alive) {
+          setDetailIncidents([])
+          setDetailLog([])
+        }
       })
     return () => {
       alive = false
@@ -875,6 +884,7 @@ export function CentroTecnicoDocumentalPage() {
         <ExpedienteDialog
           equipment={detailEquipment}
           incidents={detailIncidents}
+          log={detailLog}
           tab={detailTab}
           onTabChange={setDetailTab}
           isFavorite={favorites.has(detailEquipment.id)}
@@ -923,6 +933,7 @@ export function CentroTecnicoDocumentalPage() {
 function ExpedienteDialog({
   equipment,
   incidents,
+  log,
   tab,
   onTabChange,
   isFavorite,
@@ -941,6 +952,7 @@ function ExpedienteDialog({
 }: {
   equipment: Equipment
   incidents: Incident[]
+  log: MaintenanceLogEntry[]
   tab: string
   onTabChange: (tab: string) => void
   isFavorite: boolean
@@ -1001,6 +1013,9 @@ function ExpedienteDialog({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => generarReporteEquipo(equipment, incidents, log)}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> PDF
+              </Button>
               {canEdit && (
                 <Button variant="outline" size="sm" onClick={onEdit}>
                   <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar
