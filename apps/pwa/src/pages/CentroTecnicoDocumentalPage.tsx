@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, FolderArchive } from 'lucide-react'
+import { ChevronRight, Download, FolderArchive } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input } from '@/components/ui'
 import { getEquipments } from '@/services/equipment'
 import { logger } from '@/lib/logger'
@@ -131,13 +132,50 @@ export function CentroTecnicoDocumentalPage() {
     { key: 'incompleta', label: `Ficha incompleta (${kpis.incompletas})` },
   ]
 
+  // Exporta el programa (filtro actual) a Excel — handoff de auditoría NFPA 70B.
+  function exportarExcel() {
+    const rows = visibles.map((e) => {
+      const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+      return {
+        'Código': e.codigo,
+        'Equipo': e.nombre,
+        'Ubicación': e.hierarchyPath ?? e.zoneId ?? '',
+        'Criticidad': CRIT[e.criticidad].nivel,
+        'Condición': e.fichaTecnica?.condicion ?? '',
+        'Estado': e.estado,
+        'Vida útil (años)': e.fichaTecnica?.vidaUtilAnios ?? '',
+        'Frecuencia (días)': e.fichaTecnica?.frecuenciaInspeccionDias ?? '',
+        'Próx. inspección': e.fichaTecnica?.proximaInspeccion ?? '',
+        'Vencida': dias !== null ? 'Sí' : 'No',
+        'Días vencida': dias ?? '',
+        'Ficha (%)': completitud(e),
+        'Marca': e.marca ?? '',
+        'Modelo': e.modelo ?? '',
+        'N° serie': e.numeroSerie ?? '',
+        'Potencia (kW)': e.fichaTecnica?.potenciaKw ?? '',
+        'Voltaje (V)': e.fichaTecnica?.voltajeV ?? '',
+        'Corriente (A)': e.fichaTecnica?.corrienteA ?? '',
+        'RPM': e.fichaTecnica?.rpm ?? '',
+      }
+    })
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(wb, ws, 'Programa NFPA 70B')
+    XLSX.writeFile(wb, `centro-tecnico-documental-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <FolderArchive className="h-5 w-5" /> Centro Técnico Documental
-        </h1>
-        <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <FolderArchive className="h-5 w-5" /> Centro Técnico Documental
+          </h1>
+          <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={exportarExcel} disabled={loading || visibles.length === 0}>
+          <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar (Excel)
+        </Button>
       </div>
 
       {/* KPIs */}
