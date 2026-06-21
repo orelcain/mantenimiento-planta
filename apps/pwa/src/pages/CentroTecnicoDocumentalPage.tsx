@@ -796,60 +796,15 @@ export function CentroTecnicoDocumentalPage() {
           <p className="text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {paginated.map((e) => {
-              const crit = CRIT[e.criticidad]
-              const est = ESTADO[e.estado]
-              const cond = e.fichaTecnica?.condicion
-              const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
-              const pct = completitud(e)
-              const foto = e.photos?.[0]
-              const isFav = favorites.has(e.id)
-              return (
-                <Card
-                  key={e.id}
-                  className="overflow-hidden cursor-pointer hover:bg-muted/30"
-                  onClick={() => openExpediente(e.id, 'info')}
-                >
-                  <div className="relative aspect-video bg-muted flex items-center justify-center">
-                    {foto ? (
-                      <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                    )}
-                    <button
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        toggleFavorite(e.id)
-                      }}
-                      title={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                      aria-label={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                      className="absolute top-1 right-1 p-1 rounded bg-black/40"
-                    >
-                      <Star className={`h-4 w-4 ${isFav ? 'fill-current text-yellow-500' : 'text-white'}`} />
-                    </button>
-                  </div>
-                  <CardContent className="p-3 space-y-1.5">
-                    <div className="font-medium text-sm truncate">{e.nombre}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
-                      {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
-                      <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
-                        {dias !== null
-                          ? `vencida ${dias} d`
-                          : e.fichaTecnica?.proximaInspeccion
-                            ? new Date(e.fichaTecnica.proximaInspeccion).toLocaleDateString()
-                            : 'sin fecha'}
-                      </span>
-                      <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+            {paginated.map((e) => (
+              <CtdEquipoCard
+                key={e.id}
+                equipment={e}
+                isFavorite={favorites.has(e.id)}
+                onToggleFavorite={() => toggleFavorite(e.id)}
+                onOpen={(tab) => openExpediente(e.id, tab)}
+              />
+            ))}
           </div>
         ))}
 
@@ -863,126 +818,16 @@ export function CentroTecnicoDocumentalPage() {
             <p className="p-4 text-sm text-muted-foreground italic">No hay equipos para este filtro.</p>
           ) : (
             <div className="divide-y">
-              {paginated.map((e) => {
-                const crit = CRIT[e.criticidad]
-                const est = ESTADO[e.estado]
-                const cond = e.fichaTecnica?.condicion
-                const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
-                const prox = e.fichaTecnica?.proximaInspeccion
-                const pct = completitud(e)
-                const foto = e.photos?.[0]
-                const isFav = favorites.has(e.id)
-                return (
-                  <div
-                    key={e.id}
-                    className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
-                    onClick={() => openExpediente(e.id, 'info')}
-                  >
-                    {/* Favorito */}
-                    <button
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        toggleFavorite(e.id)
-                      }}
-                      title={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                      aria-label={isFav ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                      className="shrink-0 p-1 -m-1"
-                    >
-                      <Star className={`h-4 w-4 ${isFav ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
-                    </button>
-
-                    {/* Foto */}
-                    <div className={`shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-                      {foto ? (
-                        <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-
-                    {/* Nombre + código */}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{e.nombre}</div>
-                      <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
-                      {/* Meta compacta en móvil */}
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
-                        <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
-                        {cond ? <span>{COND_EMOJI[cond]}</span> : null}
-                        <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
-                        <button
-                          className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
-                          title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
-                          onClick={(ev) => {
-                            ev.stopPropagation()
-                            openExpediente(e.id, 'ficha')
-                          }}
-                        >
-                          {pct > 0 ? `${pct}%` : 'Completar ficha'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Meta en escritorio */}
-                    <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
-                      <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
-                      <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
-                      <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
-                      <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                        {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
-                      </span>
-                      <button
-                        className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
-                        title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          openExpediente(e.id, 'ficha')
-                        }}
-                      >
-                        {pct > 0 ? `${pct}%` : 'Completar'}
-                      </button>
-                    </div>
-
-                    {/* Acciones */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary hidden sm:inline-flex"
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          openExpediente(e.id, 'info')
-                        }}
-                      >
-                        Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Abrir Tablero del equipo"
-                        aria-label="Abrir Tablero del equipo"
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          openExpediente(e.id, 'tablero')
-                        }}
-                      >
-                        <Zap className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Ver código QR"
-                        aria-label="Ver código QR"
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          openExpediente(e.id, 'qr')
-                        }}
-                      >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
+              {paginated.map((e) => (
+                <CtdEquipoRow
+                  key={e.id}
+                  equipment={e}
+                  compact={compact}
+                  isFavorite={favorites.has(e.id)}
+                  onToggleFavorite={() => toggleFavorite(e.id)}
+                  onOpen={(tab) => openExpediente(e.id, tab)}
+                />
+              ))}
             </div>
           )}
         </CardContent>
@@ -1474,6 +1319,191 @@ function AgendaInspecciones({
           </Card>
         )
       })}
+    </div>
+  )
+}
+
+function CtdEquipoCard({
+  equipment: e,
+  isFavorite,
+  onToggleFavorite,
+  onOpen,
+}: {
+  equipment: Equipment
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onOpen: (tab: string) => void
+}) {
+  const crit = CRIT[e.criticidad]
+  const est = ESTADO[e.estado]
+  const cond = e.fichaTecnica?.condicion
+  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+  const pct = completitud(e)
+  const foto = e.photos?.[0]
+  return (
+    <Card className="overflow-hidden cursor-pointer hover:bg-muted/30" onClick={() => onOpen('info')}>
+      <div className="relative aspect-video bg-muted flex items-center justify-center">
+        {foto ? (
+          <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+        )}
+        <button
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onToggleFavorite()
+          }}
+          title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+          aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+          className="absolute top-1 right-1 p-1 rounded bg-black/40"
+        >
+          <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-white'}`} />
+        </button>
+      </div>
+      <CardContent className="p-3 space-y-1.5">
+        <div className="font-medium text-sm truncate">{e.nombre}</div>
+        <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+          {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
+          <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
+            {dias !== null
+              ? `vencida ${dias} d`
+              : e.fichaTecnica?.proximaInspeccion
+                ? new Date(e.fichaTecnica.proximaInspeccion).toLocaleDateString()
+                : 'sin fecha'}
+          </span>
+          <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CtdEquipoRow({
+  equipment: e,
+  compact,
+  isFavorite,
+  onToggleFavorite,
+  onOpen,
+}: {
+  equipment: Equipment
+  compact: boolean
+  isFavorite: boolean
+  onToggleFavorite: () => void
+  onOpen: (tab: string) => void
+}) {
+  const crit = CRIT[e.criticidad]
+  const est = ESTADO[e.estado]
+  const cond = e.fichaTecnica?.condicion
+  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
+  const prox = e.fichaTecnica?.proximaInspeccion
+  const pct = completitud(e)
+  const foto = e.photos?.[0]
+  return (
+    <div
+      className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
+      onClick={() => onOpen('info')}
+    >
+      <button
+        onClick={(ev) => {
+          ev.stopPropagation()
+          onToggleFavorite()
+        }}
+        title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+        aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+        className="shrink-0 p-1 -m-1"
+      >
+        <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+      </button>
+
+      <div className={`shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
+        {foto ? (
+          <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="font-medium truncate">{e.nombre}</div>
+        <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
+          <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
+          {cond ? <span>{COND_EMOJI[cond]}</span> : null}
+          <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
+          <button
+            className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
+            title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
+            onClick={(ev) => {
+              ev.stopPropagation()
+              onOpen('ficha')
+            }}
+          >
+            {pct > 0 ? `${pct}%` : 'Completar ficha'}
+          </button>
+        </div>
+      </div>
+
+      <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
+        <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
+        <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
+        <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+        <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+          {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
+        </span>
+        <button
+          className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
+          title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onOpen('ficha')
+          }}
+        >
+          {pct > 0 ? `${pct}%` : 'Completar'}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-primary hidden sm:inline-flex"
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onOpen('info')
+          }}
+        >
+          Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          title="Abrir Tablero del equipo"
+          aria-label="Abrir Tablero del equipo"
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onOpen('tablero')
+          }}
+        >
+          <Zap className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          title="Ver código QR"
+          aria-label="Ver código QR"
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onOpen('qr')
+          }}
+        >
+          <QrCode className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   )
 }
