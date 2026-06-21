@@ -96,11 +96,18 @@ function qrUrl(equipmentId: string): string {
   return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
 }
 
-/** Área (línea) del equipo = segmento padre inmediato de su ruta jerárquica. */
-function areaDe(eq: Equipment): string | null {
-  const parts = (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
-  if (parts.length < 2) return null
-  return parts[parts.length - 2] ?? null
+/** Segmentos de la ruta jerárquica del equipo (sin vacíos).
+ *  Forma real: "Aquachile… > PLANTA > SECCIÓN > LÍNEA > … > Equipo". */
+function pathParts(eq: Equipment): string[] {
+  return (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+}
+/** Sección = nivel 2 (PROCESO, FRIGORIFICO, EXTERIORES, PLANTA RILES…). */
+function seccionDe(eq: Equipment): string | null {
+  return pathParts(eq)[2] ?? null
+}
+/** Línea = nivel 3 (TUNELES, EMPAQUE, EVISCERADO, CAMARAS…). */
+function lineaDe(eq: Equipment): string | null {
+  return pathParts(eq)[3] ?? null
 }
 
 const ITEMS_PER_PAGE = 50
@@ -121,7 +128,9 @@ export function CentroTecnicoDocumentalPage() {
   const [loading, setLoading] = useState(() => equipment.length === 0)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
-  const [areaFiltro, setAreaFiltro] = useState<string>('all')
+  const [seccionFiltro, setSeccionFiltro] = useState<string>('all')
+  const [lineaFiltro, setLineaFiltro] = useState<string>('all')
+  const [tipoFiltro, setTipoFiltro] = useState<string>('all')
   const [orden, setOrden] = useState<OrdenCampo>('criticidad')
   const [compact, setCompact] = useState(false)
   const [page, setPage] = useState(1)
@@ -274,11 +283,31 @@ export function CentroTecnicoDocumentalPage() {
     return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
   }, [equipos, favorites])
 
-  const areas = useMemo(() => {
+  const secciones = useMemo(() => {
     const set = new Set<string>()
     for (const e of equipos) {
-      const a = areaDe(e)
-      if (a) set.add(a)
+      const s = seccionDe(e)
+      if (s) set.add(s)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos])
+
+  // Líneas dependientes de la sección elegida (cascada).
+  const lineas = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) continue
+      const l = lineaDe(e)
+      if (l) set.add(l)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos, seccionFiltro])
+
+  const tipos = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of equipos) {
+      const t = e.tipo?.trim()
+      if (t) set.add(t)
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'es'))
   }, [equipos])
@@ -288,7 +317,9 @@ export function CentroTecnicoDocumentalPage() {
     const rows = equipos.filter((e) => {
       if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
       if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
-      if (areaFiltro !== 'all' && areaDe(e) !== areaFiltro) return false
+      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
+      if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false
+      if (tipoFiltro !== 'all' && (e.tipo ?? '') !== tipoFiltro) return false
       switch (filtro) {
         case 'A':
           return e.criticidad === 'alta'
@@ -320,7 +351,10 @@ export function CentroTecnicoDocumentalPage() {
         break
       case 'area':
         sorted.sort(
-          (a, b) => (areaDe(a) ?? '').localeCompare(areaDe(b) ?? '', 'es') || a.nombre.localeCompare(b.nombre, 'es'),
+          (a, b) =>
+            (seccionDe(a) ?? '').localeCompare(seccionDe(b) ?? '', 'es') ||
+            (lineaDe(a) ?? '').localeCompare(lineaDe(b) ?? '', 'es') ||
+            a.nombre.localeCompare(b.nombre, 'es'),
         )
         break
       case 'nombre':
@@ -335,7 +369,7 @@ export function CentroTecnicoDocumentalPage() {
         })
     }
     return sorted
-  }, [equipos, filtro, estadoFiltro, areaFiltro, orden, q, favorites])
+  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q, favorites])
 
   const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
   const pageSafe = Math.min(page, totalPages)
@@ -347,7 +381,12 @@ export function CentroTecnicoDocumentalPage() {
   // Volver a la página 1 cuando cambian filtros/orden/búsqueda
   useEffect(() => {
     setPage(1)
-  }, [filtro, estadoFiltro, areaFiltro, orden, q])
+  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, q])
+
+  // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
+  useEffect(() => {
+    setLineaFiltro('all')
+  }, [seccionFiltro])
 
   const chips: { key: Filtro; label: string }[] = [
     { key: 'todos', label: `Todos (${kpis.total})` },
@@ -365,11 +404,19 @@ export function CentroTecnicoDocumentalPage() {
     { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
   ]
 
-  const filtrosActivos = filtro !== 'todos' || estadoFiltro !== 'all' || areaFiltro !== 'all' || q.trim() !== ''
+  const filtrosActivos =
+    filtro !== 'todos' ||
+    estadoFiltro !== 'all' ||
+    seccionFiltro !== 'all' ||
+    lineaFiltro !== 'all' ||
+    tipoFiltro !== 'all' ||
+    q.trim() !== ''
   function limpiarFiltros() {
     setFiltro('todos')
     setEstadoFiltro('all')
-    setAreaFiltro('all')
+    setSeccionFiltro('all')
+    setLineaFiltro('all')
+    setTipoFiltro('all')
     setQ('')
   }
 
@@ -381,6 +428,9 @@ export function CentroTecnicoDocumentalPage() {
         'Código': e.codigo,
         'Equipo': e.nombre,
         'Ubicación': e.hierarchyPath ?? e.zoneId ?? '',
+        'Sección': seccionDe(e) ?? '',
+        'Línea': lineaDe(e) ?? '',
+        'Tipo': e.tipo ?? '',
         'Favorito': favorites.has(e.id) ? 'Sí' : 'No',
         'Criticidad': CRIT[e.criticidad].nivel,
         'Condición': e.fichaTecnica?.condicion ?? '',
@@ -477,19 +527,51 @@ export function CentroTecnicoDocumentalPage() {
         ))}
       </div>
 
-      {/* Área · Orden · Densidad */}
+      {/* Sección · Línea · Tipo · Orden · Densidad */}
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Área</label>
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
         <select
-          value={areaFiltro}
-          onChange={(e) => setAreaFiltro(e.target.value)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[220px]"
-          aria-label="Filtrar por área"
+          value={seccionFiltro}
+          onChange={(e) => setSeccionFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          aria-label="Filtrar por sección"
         >
-          <option value="all">Todas las áreas ({areas.length})</option>
-          {areas.map((a) => (
-            <option key={a} value={a}>
-              {a}
+          <option value="all">Todas ({secciones.length})</option>
+          {secciones.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Línea</label>
+        <select
+          value={lineaFiltro}
+          onChange={(e) => setLineaFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px] disabled:opacity-50"
+          aria-label="Filtrar por línea"
+          disabled={lineas.length === 0}
+        >
+          <option value="all">Todas ({lineas.length})</option>
+          {lineas.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</label>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[180px] disabled:opacity-50"
+          aria-label="Filtrar por tipo"
+          disabled={tipos.length === 0}
+        >
+          <option value="all">{tipos.length === 0 ? 'Sin tipos aún' : `Todos (${tipos.length})`}</option>
+          {tipos.map((t) => (
+            <option key={t} value={t}>
+              {t}
             </option>
           ))}
         </select>
@@ -504,7 +586,7 @@ export function CentroTecnicoDocumentalPage() {
           <option value="criticidad">Criticidad y condición</option>
           <option value="proxima">Próxima inspección</option>
           <option value="ficha">Ficha (menos completa)</option>
-          <option value="area">Área</option>
+          <option value="area">Sección y línea</option>
           <option value="nombre">Nombre</option>
         </select>
 
@@ -855,6 +937,10 @@ function ExpedienteDialog({
                   <div>
                     <div className="text-sm text-muted-foreground">Número de serie</div>
                     <div className="font-medium">{equipment.numeroSerie || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Tipo</div>
+                    <div className="font-medium">{equipment.tipo || '—'}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Estado</div>

@@ -48,6 +48,7 @@ export function EquipmentForm({
     marca: equipment.marca || '',
     modelo: equipment.modelo || '',
     numeroSerie: equipment.numeroSerie || '',
+    tipo: equipment.tipo || '',
     syncExcluded: Boolean(equipment.syncExcluded),
     criticidad: equipment.criticidad || ('media' as Equipment['criticidad']),
     estado: equipment.estado || ('operativo' as Equipment['estado']),
@@ -72,6 +73,7 @@ export function EquipmentForm({
         marca: formData.marca || undefined,
         modelo: formData.modelo || undefined,
         numeroSerie: formData.numeroSerie || undefined,
+        tipo: formData.tipo || undefined,
         criticidad: formData.criticidad,
         estado: formData.estado,
       }
@@ -96,6 +98,7 @@ export function EquipmentForm({
         marca: formData.marca || undefined,
         modelo: formData.modelo || undefined,
         numeroSerie: formData.numeroSerie || undefined,
+        tipo: formData.tipo || undefined,
         syncExcluded: formData.syncExcluded,
         criticidad: formData.criticidad,
         estado: formData.estado,
@@ -176,6 +179,36 @@ export function EquipmentForm({
               rows={2}
             />
             {validationErrors.descripcion && <p className="text-sm text-destructive">{validationErrors.descripcion}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tipo">Tipo</Label>
+            <Input
+              id="tipo"
+              list="equipment-tipos"
+              value={formData.tipo}
+              onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              placeholder="Motor, Bomba, Compresor…"
+            />
+            <datalist id="equipment-tipos">
+              {[
+                'Motor',
+                'Bomba',
+                'Compresor',
+                'Ventilador',
+                'Evaporador',
+                'Condensador',
+                'Tablero',
+                'Reductor',
+                'Intercambiador',
+                'Cinta transportadora',
+                'Chiller',
+                'Válvula',
+              ].map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+            {validationErrors.tipo && <p className="text-sm text-destructive">{validationErrors.tipo}</p>}
           </div>
 
           {canDeleteEquipment && (

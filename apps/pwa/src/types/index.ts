@@ -79,6 +79,7 @@ export interface Equipment {
   marca?: string
   modelo?: string
   numeroSerie?: string
+  tipo?: string // Tipo/categoría del equipo (Motor, Bomba, Compresor…) — usado por filtros del CTD
   // Ubicación (nuevo): fuente de verdad es la jerarquía
   hierarchyNodeId?: string // ID del nodo jerárquico asociado
   hierarchyPath?: string // "Planta > Área > ... > Equipo" (snapshot opcional)
