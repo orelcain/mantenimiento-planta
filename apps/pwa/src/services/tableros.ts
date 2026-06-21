@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -14,8 +15,9 @@ import type { RevisionTablero, Tablero, TipoRevision } from '@/types/tableros'
 
 /**
  * Servicio del levantamiento de tableros eléctricos (Centro Técnico Documental / NFPA 70B).
- * Colección plana `tableros`. Circuitos y revisiones viven como arrays dentro del documento
- * (un tablero cabe holgado en el límite de 1MB). El levantamiento inicial se guarda como
+ * El tablero ES un equipo: el documento vive en la colección `tableros` con **doc id = equipmentId**
+ * (1:1), de modo que el levantamiento es una sección del expediente del equipo (no un módulo aparte).
+ * Circuitos y revisiones viven como arrays dentro del doc. El levantamiento inicial se guarda como
  * Revisión 0 (as-found). Ver docs/LEVANTAMIENTO_TABLEROS.md.
  */
 
@@ -44,6 +46,7 @@ function stripUndefined<T>(value: T): T {
 function docToTablero(id: string, data: Record<string, unknown>): Tablero {
   return {
     id,
+    equipmentId: (data.equipmentId as string | undefined) ?? id,
     tag: String(data.tag ?? ''),
     nombre: String(data.nombre ?? ''),
     tipo: (data.tipo as Tablero['tipo']) ?? 'otro',
@@ -78,56 +81,54 @@ export function nuevaRevision(tipo: TipoRevision, descripcion: string, autor?: s
   }
 }
 
-// Listado completo (orden client-side por tag → sin índice compuesto).
+// Datos del levantamiento (sin las claves que maneja el servicio).
+export type TableroInput = Omit<Tablero, 'id' | 'equipmentId' | 'createdAt' | 'updatedAt' | 'revisiones'>
+
+// Listado completo (para un filtro "Tableros" en Equipos). Orden client-side por tag.
 export async function getTableros(): Promise<Tablero[]> {
   const snap = await getDocs(collection(db, COLLECTION))
   const tableros = snap.docs.map((d) => docToTablero(d.id, d.data() as Record<string, unknown>))
   return tableros.sort((a, b) => a.tag.localeCompare(b.tag))
 }
 
-export type TableroInput = Omit<Tablero, 'id' | 'createdAt' | 'updatedAt' | 'revisiones'>
+// El levantamiento de un equipo (doc id = equipmentId), o null si aún no se levantó.
+export async function getTableroByEquipment(equipmentId: string): Promise<Tablero | null> {
+  const snap = await getDoc(doc(db, COLLECTION, equipmentId))
+  if (!snap.exists()) return null
+  return docToTablero(snap.id, snap.data() as Record<string, unknown>)
+}
 
-// Crea un tablero y siembra la Revisión 0 (as-found) → punto cero del histórico.
-export async function createTablero(
+/**
+ * Crea o actualiza el levantamiento de un equipo. La primera vez siembra la Revisión 0 (as-found)
+ * → punto cero del histórico. En ediciones, si se pasa `revisionNota`, agrega una revisión "cambio".
+ */
+export async function saveTableroForEquipment(
+  equipmentId: string,
   input: TableroInput,
-  opts?: { autor?: string; descripcionInicial?: string }
-): Promise<string> {
-  const id = generateId()
-  const revision0 = nuevaRevision(
-    'as-found',
-    opts?.descripcionInicial?.trim() || 'Levantamiento inicial (as-found)',
-    opts?.autor
-  )
-  const payload = stripUndefined({
-    ...input,
-    revisiones: [revision0],
-    ...(opts?.autor ? { createdBy: opts.autor } : {}),
-  })
-  await setDoc(doc(db, COLLECTION, id), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  return id
-}
-
-// Actualiza campos del tablero (sin tocar createdAt).
-export async function updateTablero(id: string, patch: Partial<TableroInput & { revisiones: RevisionTablero[] }>): Promise<void> {
-  const clean = stripUndefined(patch)
-  await updateDoc(doc(db, COLLECTION, id), {
-    ...clean,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-// Agrega una revisión al histórico (append-only) preservando el orden existente.
-export async function addRevision(
-  tablero: Tablero,
-  rev: RevisionTablero
+  opts?: { autor?: string; revisionNota?: string }
 ): Promise<void> {
-  await updateTablero(tablero.id, { revisiones: [...tablero.revisiones, rev] })
+  const ref = doc(db, COLLECTION, equipmentId)
+  const existing = await getDoc(ref)
+  if (!existing.exists()) {
+    const revision0 = nuevaRevision('as-found', 'Levantamiento inicial (as-found)', opts?.autor)
+    const payload = stripUndefined({
+      ...input,
+      equipmentId,
+      revisiones: [revision0],
+      ...(opts?.autor ? { createdBy: opts.autor } : {}),
+    })
+    await setDoc(ref, { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+  } else {
+    const prev = docToTablero(existing.id, existing.data() as Record<string, unknown>)
+    const revisiones = [...prev.revisiones]
+    if (opts?.revisionNota?.trim()) {
+      revisiones.push(nuevaRevision('cambio', opts.revisionNota.trim(), opts?.autor))
+    }
+    const payload = stripUndefined({ ...input, equipmentId, revisiones })
+    await updateDoc(ref, { ...payload, updatedAt: serverTimestamp() })
+  }
 }
 
-export async function deleteTablero(id: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION, id))
+export async function deleteTablero(equipmentId: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTION, equipmentId))
 }

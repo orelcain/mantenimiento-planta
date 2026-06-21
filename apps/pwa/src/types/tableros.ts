@@ -44,6 +44,7 @@ export interface InterruptorPrincipal {
 
 export interface Tablero {
   id: string
+  equipmentId?: string // el tablero ES un equipo (doc id = equipmentId); vive en su expediente
   tag: string
   nombre: string
   tipo: TipoTablero
