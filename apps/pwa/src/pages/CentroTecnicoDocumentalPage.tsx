@@ -47,6 +47,7 @@ import {
   BUCKETS,
   COND_EMOJI,
   CRIT,
+  CRIT_INFO,
   ESTADO,
   ITEMS_PER_PAGE,
   WO_ESTADO,
@@ -1264,7 +1265,9 @@ function ExpedienteDialog({
               </div>
               <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={`${crit.cls} text-xs`}>Criticidad {crit.nivel}</Badge>
+                <Badge variant="outline" className={`${crit.cls} text-xs`} title={CRIT_INFO[equipment.criticidad].desc}>
+                  Criticidad {crit.nivel}
+                </Badge>
                 <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
                 {ubicacion && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -1328,6 +1331,13 @@ function ExpedienteDialog({
                     <div>
                       <div className="text-sm text-muted-foreground">Estado</div>
                       <div className="font-medium">{est.label}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-sm text-muted-foreground">Criticidad (NFPA 70B §2.4)</div>
+                      <div className="font-medium">
+                        {CRIT_INFO[equipment.criticidad].label}{' '}
+                        <span className="text-xs font-normal text-muted-foreground">— {CRIT_INFO[equipment.criticidad].desc}</span>
+                      </div>
                     </div>
                     <div className="md:col-span-2">
                       <div className="text-sm text-muted-foreground">Descripción</div>

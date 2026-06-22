@@ -14,6 +14,13 @@ export const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string 
   baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
 }
 
+/** Explicación de la criticidad (NFPA 70B §2.4) para mostrar/aclarar en la UI. */
+export const CRIT_INFO: Record<Equipment['criticidad'], { label: string; desc: string }> = {
+  alta: { label: 'A · Alta', desc: 'Su falla amenaza a personas, producto o propiedad (NFPA 70B §2.4). Inspección base ~180 días.' },
+  media: { label: 'B · Media', desc: 'Falla con impacto moderado o con respaldo parcial. Inspección base ~365 días.' },
+  baja: { label: 'C · Baja', desc: 'Falla sin impacto significativo o equipo redundante. Inspección base ~1095 días.' },
+}
+
 export const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
   operativo: { label: 'Operativo', cls: 'border-emerald-500 text-emerald-600' },
   en_mantenimiento: { label: 'En mantención', cls: 'border-amber-500 text-amber-600' },

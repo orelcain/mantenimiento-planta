@@ -1,9 +1,11 @@
 import {
   collection,
+  deleteDoc,
   doc,
   setDoc,
   getDocs,
   query,
+  updateDoc,
   where,
   serverTimestamp,
   Timestamp,
@@ -74,4 +76,23 @@ export async function addMaintenanceLogEntry(
     )
   }
   await setDoc(doc(db, COLLECTION, id), payload)
+}
+
+// Editar una entrada (admin). Solo campos básicos; no reprograma inspección.
+export async function updateMaintenanceLogEntry(
+  id: string,
+  patch: Partial<Pick<MaintenanceLogEntry, 'fecha' | 'tipo' | 'severidad' | 'tecnico' | 'hallazgo'>>,
+): Promise<void> {
+  const clean: Record<string, unknown> = {}
+  if (patch.fecha) clean.fecha = Timestamp.fromDate(patch.fecha)
+  if (patch.tipo) clean.tipo = patch.tipo
+  if (patch.severidad) clean.severidad = patch.severidad
+  if (patch.tecnico !== undefined) clean.tecnico = patch.tecnico
+  if (patch.hallazgo !== undefined) clean.hallazgo = patch.hallazgo
+  await updateDoc(doc(db, COLLECTION, id), clean)
+}
+
+// Eliminar una entrada del historial (admin).
+export async function deleteMaintenanceLogEntry(id: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTION, id))
 }

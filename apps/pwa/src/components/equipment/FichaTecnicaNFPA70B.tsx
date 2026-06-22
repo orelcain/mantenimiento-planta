@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { BookOpen, Check, ClipboardList, FileText, Gauge, Info, Pencil, Plus, X } from 'lucide-react'
+import { BookOpen, Check, ClipboardList, FileText, Gauge, Info, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Badge, Button, Card, CardContent, Input, Label, Textarea } from '@/components/ui'
 import { getEquipments, updateEquipment } from '@/services/equipment'
-import { addMaintenanceLogEntry, getMaintenanceLog } from '@/services/maintenanceLog'
+import {
+  addMaintenanceLogEntry,
+  deleteMaintenanceLogEntry,
+  getMaintenanceLog,
+  updateMaintenanceLogEntry,
+} from '@/services/maintenanceLog'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useAppStore } from '@/store'
 import { logger } from '@/lib/logger'
 import { FAMILIA_LABEL, checklistDe, familiaDe } from '@/lib/nfpa70b'
@@ -95,6 +101,7 @@ type TimelineRow = {
   texto: string
   source: 'log' | 'incidencia'
   checklist?: ChecklistResultado[]
+  logId?: string
 }
 
 function asDate(v: unknown): Date {
@@ -214,6 +221,60 @@ export function FichaTecnicaNFPA70B({
     setDraft((d) => ({ ...d, checklist: d.checklist.map((t, j) => (j === i ? { ...t, ...patch } : t)) }))
   }
 
+  // Edición/borrado de entradas del historial (solo admin).
+  const { isAdmin } = usePermissions()
+  const [editLogId, setEditLogId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<{
+    fecha: string
+    tipo: MaintenanceLogEntry['tipo']
+    severidad: MaintenanceLogEntry['severidad']
+    tecnico: string
+    hallazgo: string
+  }>({ fecha: '', tipo: 'inspeccion', severidad: 'verde', tecnico: '', hallazgo: '' })
+
+  function startEditLog(logId: string) {
+    const l = log.find((x) => x.id === logId)
+    if (!l) return
+    setEditLogId(logId)
+    setEditDraft({
+      fecha: new Date(l.fecha).toISOString().slice(0, 10),
+      tipo: l.tipo,
+      severidad: l.severidad,
+      tecnico: l.tecnico ?? '',
+      hallazgo: l.hallazgo,
+    })
+  }
+
+  async function saveEditLog() {
+    if (!editLogId || !editDraft.hallazgo.trim()) return
+    try {
+      await updateMaintenanceLogEntry(editLogId, {
+        fecha: new Date(editDraft.fecha),
+        tipo: editDraft.tipo,
+        severidad: editDraft.severidad,
+        tecnico: editDraft.tecnico.trim() || undefined,
+        hallazgo: editDraft.hallazgo.trim(),
+      })
+      setLog(await getMaintenanceLog(equipment.id))
+      setEditLogId(null)
+    } catch (err) {
+      logger.error('Error editando entrada del historial', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo editar la entrada.')
+    }
+  }
+
+  async function delLog(logId: string) {
+    if (!window.confirm('¿Eliminar esta entrada del historial? No se puede deshacer.')) return
+    try {
+      await deleteMaintenanceLogEntry(logId)
+      setLog(await getMaintenanceLog(equipment.id))
+      if (editLogId === logId) setEditLogId(null)
+    } catch (err) {
+      logger.error('Error eliminando entrada del historial', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo eliminar la entrada.')
+    }
+  }
+
   useEffect(() => {
     let alive = true
     setLoadingLog(true)
@@ -301,6 +362,7 @@ export function FichaTecnicaNFPA70B({
       texto: `${e.tecnico ? `${e.tecnico} — ` : ''}${e.hallazgo}`,
       source: 'log' as const,
       checklist: e.checklist,
+      logId: e.id,
     })),
     ...incidents.map((i) => ({
       key: `inc-${i.id}`,
@@ -556,6 +618,10 @@ export function FichaTecnicaNFPA70B({
                     </Button>
                   ))}
                 </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  🟢 Condición 1 · como nuevo, sin alertas — 🟡 Condición 2 · con desvíos, requiere atención — 🔴 Condición 3 ·
+                  acción correctiva requerida.
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Protocolo de inspección · {FAMILIA_LABEL[familiaDe(equipment)]}</Label>
@@ -633,25 +699,92 @@ export function FichaTecnicaNFPA70B({
             </p>
           ) : (
             <div className="space-y-1">
-              {timeline.map((e) => (
-                <div key={e.key} className="flex items-start gap-3 py-2 border-t first:border-t-0">
-                  <span className="text-sm leading-5">{SEVERIDAD[e.severidad]}</span>
-                  <span className="text-xs text-muted-foreground min-w-[88px]">{e.fecha.toLocaleDateString()}</span>
-                  <span className="text-sm">
-                    <span className="font-semibold">{e.tipoLabel}</span>
-                    {e.source === 'incidencia' && (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground"> · incidencia</span>
-                    )}
-                    {' — '}
-                    {e.texto}
-                    {e.checklist && e.checklist.length > 0 && (
-                      <span className="ml-1 text-[10px] text-muted-foreground">
-                        · {e.checklist.filter((t) => t.estado === 'ok').length}✓ {e.checklist.filter((t) => t.estado === 'obs').length}⚠
+              {timeline.map((e) => {
+                const lid = e.source === 'log' ? e.logId : undefined
+                if (lid && editLogId === lid) {
+                  return (
+                    <div key={e.key} className="space-y-2 rounded-md border bg-muted/30 p-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          type="date"
+                          value={editDraft.fecha}
+                          onChange={(ev) => setEditDraft((d) => ({ ...d, fecha: ev.target.value }))}
+                        />
+                        <Input
+                          placeholder="Técnico"
+                          value={editDraft.tecnico}
+                          onChange={(ev) => setEditDraft((d) => ({ ...d, tecnico: ev.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(['verde', 'amarillo', 'rojo'] as const).map((s) => (
+                          <Button
+                            key={s}
+                            type="button"
+                            size="sm"
+                            variant={editDraft.severidad === s ? 'default' : 'outline'}
+                            onClick={() => setEditDraft((d) => ({ ...d, severidad: s }))}
+                          >
+                            {SEVERIDAD[s]} {s}
+                          </Button>
+                        ))}
+                      </div>
+                      <Textarea
+                        rows={2}
+                        value={editDraft.hallazgo}
+                        onChange={(ev) => setEditDraft((d) => ({ ...d, hallazgo: ev.target.value }))}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={saveEditLog} disabled={!editDraft.hallazgo.trim()}>
+                          <Check className="h-3.5 w-3.5 mr-1.5" /> Guardar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditLogId(null)}>
+                          <X className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={e.key} className="flex items-start gap-3 py-2 border-t first:border-t-0">
+                    <span className="text-sm leading-5">{SEVERIDAD[e.severidad]}</span>
+                    <span className="text-xs text-muted-foreground min-w-[88px]">{e.fecha.toLocaleDateString()}</span>
+                    <span className="text-sm flex-1 min-w-0">
+                      <span className="font-semibold">{e.tipoLabel}</span>
+                      {e.source === 'incidencia' && (
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground"> · incidencia</span>
+                      )}
+                      {' — '}
+                      {e.texto}
+                      {e.checklist && e.checklist.length > 0 && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">
+                          · {e.checklist.filter((t) => t.estado === 'ok').length}✓ {e.checklist.filter((t) => t.estado === 'obs').length}⚠
+                        </span>
+                      )}
+                    </span>
+                    {isAdmin && lid && (
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        <button
+                          className="p-1 text-muted-foreground hover:text-foreground"
+                          title="Editar entrada"
+                          aria-label="Editar entrada"
+                          onClick={() => startEditLog(lid)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          className="p-1 text-muted-foreground hover:text-destructive"
+                          title="Eliminar entrada"
+                          aria-label="Eliminar entrada"
+                          onClick={() => delLog(lid)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </span>
                     )}
-                  </span>
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
