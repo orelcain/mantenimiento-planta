@@ -1264,6 +1264,7 @@ function ExpedienteDialog({
                 <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
               </div>
               <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
+              {equipment.nombreComun && <div className="text-sm text-muted-foreground truncate">“{equipment.nombreComun}”</div>}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className={`${crit.cls} text-xs`} title={CRIT_INFO[equipment.criticidad].desc}>
                   Criticidad {crit.nivel}
@@ -2011,6 +2012,7 @@ function CtdEquipoCard({
       <CardContent className="p-3 space-y-1.5">
         <div className="font-medium text-sm truncate">{e.nombre}</div>
         <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-[11px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
           {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
@@ -2074,6 +2076,7 @@ function CtdEquipoRow({
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{e.nombre}</div>
         <div className="text-[10px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-[10px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
           {cond ? <span>{COND_EMOJI[cond]}</span> : null}

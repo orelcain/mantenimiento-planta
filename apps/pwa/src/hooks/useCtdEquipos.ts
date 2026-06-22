@@ -151,7 +151,7 @@ export function useCtdEquipos(favorites: Set<string>) {
   const visibles = useMemo(() => {
     const term = debouncedQ.trim().toLowerCase()
     const rows = equipos.filter((e) => {
-      if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
+      if (term && !`${e.nombre} ${e.nombreComun ?? ''} ${e.codigo}`.toLowerCase().includes(term)) return false
       if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
       if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
       if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false

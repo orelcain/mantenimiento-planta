@@ -75,6 +75,7 @@ export interface Equipment {
   id: string
   codigo: string // Código interno del equipo
   nombre: string
+  nombreComun?: string // Apodo / nombre común (buscable; el "nombre" es el SAP)
   descripcion?: string
   marca?: string
   modelo?: string
