@@ -26,6 +26,7 @@ import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, T
 import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
+import { addMedicion, getMediciones } from '@/services/mediciones'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
@@ -61,8 +62,9 @@ import {
   seccionDe,
 } from '@/lib/ctd'
 import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
-import { FAMILIA_LABEL, checklistDe, familiaDe } from '@/lib/nfpa70b'
-import type { Equipment, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
+import { FAMILIA_LABEL, checklistDe, familiaDe, medicionesDe } from '@/lib/nfpa70b'
+import type { CampoMedicion } from '@/lib/nfpa70b'
+import type { Equipment, Incident, MaintenanceLogEntry, Medicion, WorkOrder } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -801,6 +803,238 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
   )
 }
 
+type MedicionDraft = {
+  fecha: string
+  contexto: Medicion['contexto']
+  tecnico: string
+  nota: string
+  valores: Record<string, string>
+}
+function emptyMedicionDraft(): MedicionDraft {
+  return { fecha: new Date().toISOString().slice(0, 10), contexto: 'proceso', tecnico: '', nota: '', valores: {} }
+}
+const CTX_COLOR: Record<Medicion['contexto'], string> = { proceso: '#2563eb', reposo: '#94a3b8' }
+
+/** Sparkline de una serie (un campo) con líneas separadas por contexto proceso/reposo. */
+function SerieCampo({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion }) {
+  const pts = rows
+    .map((r, i) => ({ i, v: r.valores[campo.id], ctx: r.contexto }))
+    .filter((p) => typeof p.v === 'number') as { i: number; v: number; ctx: Medicion['contexto'] }[]
+  if (pts.length === 0) {
+    return (
+      <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+        <span className="w-32 shrink-0 truncate">{campo.label}</span>
+        <span className="flex-1 italic">sin datos</span>
+      </div>
+    )
+  }
+  const vals = pts.map((p) => p.v)
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  const W = 160
+  const H = 32
+  const P = 4
+  const n = rows.length
+  const x = (i: number) => (n <= 1 ? W / 2 : P + (i / (n - 1)) * (W - 2 * P))
+  const y = (v: number) => (max === min ? H / 2 : H - P - ((v - min) / (max - min)) * (H - 2 * P))
+  const lineFor = (ctx: Medicion['contexto']) =>
+    pts.filter((p) => p.ctx === ctx).map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const last = pts[pts.length - 1]
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="w-32 shrink-0 text-xs truncate" title={campo.label}>
+        {campo.label}
+      </span>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 h-8" role="img" aria-label={campo.label}>
+        {(['proceso', 'reposo'] as const).map((ctx) => {
+          const pl = lineFor(ctx)
+          return pl.includes(' ') ? (
+            <polyline key={ctx} points={pl} fill="none" stroke={CTX_COLOR[ctx]} strokeOpacity={0.7} strokeWidth={1.5} />
+          ) : null
+        })}
+        {pts.map((p) => (
+          <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={2.5} fill={CTX_COLOR[p.ctx]} />
+        ))}
+      </svg>
+      <span className="w-20 shrink-0 text-right text-xs tabular-nums">
+        {last?.v} <span className="text-muted-foreground">{campo.unidad}</span>
+      </span>
+    </div>
+  )
+}
+
+/** Pestaña Mediciones — bitácora de comportamiento + tendencias (solo favoritos). */
+function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
+  const campos = medicionesDe(equipment)
+  const [rows, setRows] = useState<Medicion[]>([])
+  const [loading, setLoading] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState<MedicionDraft>(emptyMedicionDraft)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    getMediciones(equipment.id)
+      .then((r) => {
+        if (alive) setRows(r)
+      })
+      .catch((err) => {
+        if (alive) setRows([])
+        logger.error('Error cargando mediciones', err instanceof Error ? err : new Error(String(err)))
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  async function guardar() {
+    const valores: Record<string, number> = {}
+    for (const c of campos) {
+      const raw = draft.valores[c.id]
+      const num = raw == null || raw.trim() === '' ? NaN : Number(raw)
+      if (Number.isFinite(num)) valores[c.id] = num
+    }
+    if (Object.keys(valores).length === 0) {
+      alert('Anota al menos un valor.')
+      return
+    }
+    setSaving(true)
+    try {
+      await addMedicion({
+        equipmentId: equipment.id,
+        hierarchyNodeId: equipment.hierarchyNodeId,
+        fecha: new Date(draft.fecha),
+        contexto: draft.contexto,
+        tecnico: draft.tecnico.trim() || undefined,
+        valores,
+        nota: draft.nota.trim() || undefined,
+      })
+      setRows(await getMediciones(equipment.id))
+      setAdding(false)
+      setDraft(emptyMedicionDraft())
+    } catch (err) {
+      logger.error('Error guardando medición', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo guardar la medición.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Tendencias de comportamiento{' '}
+            <span className="text-[11px] font-normal text-muted-foreground">· {FAMILIA_LABEL[familiaDe(equipment)]}</span>
+          </div>
+          {canEdit && !adding && (
+            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar medición
+            </Button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="grid md:grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Fecha</label>
+                <Input type="date" value={draft.fecha} onChange={(e) => setDraft((d) => ({ ...d, fecha: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Contexto</label>
+                <div className="inline-flex rounded-md border overflow-hidden mt-1">
+                  {(['proceso', 'reposo'] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, contexto: c }))}
+                      className={`px-3 py-1.5 text-xs capitalize ${draft.contexto === c ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Técnico</label>
+                <Input value={draft.tecnico} onChange={(e) => setDraft((d) => ({ ...d, tecnico: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {campos.map((c) => (
+                <div key={c.id}>
+                  <label className="text-xs text-muted-foreground">
+                    {c.label} ({c.unidad})
+                  </label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={draft.valores[c.id] ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, valores: { ...d.valores, [c.id]: e.target.value } }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <Input
+              placeholder="Nota (opcional)…"
+              value={draft.nota}
+              onChange={(e) => setDraft((d) => ({ ...d, nota: e.target.value }))}
+            />
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={guardar} disabled={saving}>
+                <Check className="h-3.5 w-3.5 mr-1.5" /> {saving ? 'Guardando…' : 'Guardar medición'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false)
+                  setDraft(emptyMedicionDraft())
+                }}
+                disabled={saving}
+              >
+                <X className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm text-muted-foreground italic">Cargando…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            Sin mediciones todavía. Registra corriente por fase, temperatura (proceso/reposo), vibración… y se arma la
+            tendencia de comportamiento.
+          </p>
+        ) : (
+          <>
+            <div className="divide-y">
+              {campos.map((c) => (
+                <SerieCampo key={c.id} rows={rows} campo={c} />
+              ))}
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: CTX_COLOR.proceso }} /> proceso
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: CTX_COLOR.reposo }} /> reposo
+              </span>
+              <span>· {rows.length} medición(es)</span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 /** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
 function OtBadge({ ot }: { ot?: OtCount }) {
   if (!ot || ot.abiertas === 0) return null
@@ -1024,6 +1258,7 @@ function ExpedienteDialog({
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
               <TabsTrigger value="recursos">Recursos</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
+              {isFavorite && <TabsTrigger value="mediciones">Mediciones</TabsTrigger>}
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
               <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
               <TabsTrigger value="qr">QR</TabsTrigger>
@@ -1418,6 +1653,12 @@ function ExpedienteDialog({
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {isFavorite && (
+              <TabsContent value="mediciones">
+                <MedicionesTab equipment={equipment} canEdit={canEdit} />
+              </TabsContent>
+            )}
 
             <TabsContent value="fotos">
               <Card>

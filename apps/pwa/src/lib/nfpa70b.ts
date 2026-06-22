@@ -139,3 +139,55 @@ export const CHECKLIST: Record<Familia, TareaChecklist[]> = {
 export function checklistDe(eq: Pick<Equipment, 'nombre' | 'tipo'>): TareaChecklist[] {
   return CHECKLIST[familiaDe(eq)]
 }
+
+export type CampoMedicion = { id: string; label: string; unidad: string }
+
+/**
+ * Series de comportamiento a registrar por familia (mediciones oportunistas,
+ * en proceso y en reposo). Base de las tendencias de confiabilidad.
+ */
+export const MEDICIONES_POR_FAMILIA: Record<Familia, CampoMedicion[]> = {
+  rotativa: [
+    { id: 'corrienteL1', label: 'Corriente L1', unidad: 'A' },
+    { id: 'corrienteL2', label: 'Corriente L2', unidad: 'A' },
+    { id: 'corrienteL3', label: 'Corriente L3', unidad: 'A' },
+    { id: 'tempCarcasa', label: 'Temp. carcasa', unidad: '°C' },
+    { id: 'tempRodamiento', label: 'Temp. rodamiento', unidad: '°C' },
+    { id: 'vibracion', label: 'Vibración', unidad: 'mm/s' },
+    { id: 'rpm', label: 'RPM bajo carga', unidad: 'rpm' },
+    { id: 'consumo', label: 'Consumo', unidad: 'kW' },
+  ],
+  tablero: [
+    { id: 'tempMax', label: 'Temp. máx (termografía)', unidad: '°C' },
+    { id: 'tempAmbiente', label: 'Temp. ambiente', unidad: '°C' },
+    { id: 'deltaT', label: 'ΔT vs. referencia', unidad: '°C' },
+    { id: 'corriente', label: 'Corriente general', unidad: 'A' },
+  ],
+  transformador: [
+    { id: 'tempAceite', label: 'Temp. aceite', unidad: '°C' },
+    { id: 'tempDevanado', label: 'Temp. devanado', unidad: '°C' },
+    { id: 'carga', label: 'Carga', unidad: '%' },
+  ],
+  proteccion: [
+    { id: 'tempContactos', label: 'Temp. contactos', unidad: '°C' },
+    { id: 'corriente', label: 'Corriente', unidad: 'A' },
+  ],
+  cable: [
+    { id: 'tempTerminacion', label: 'Temp. terminación', unidad: '°C' },
+    { id: 'corriente', label: 'Corriente', unidad: 'A' },
+  ],
+  bateria: [
+    { id: 'tensionFlotacion', label: 'Tensión flotación', unidad: 'V' },
+    { id: 'tempBanco', label: 'Temp. banco', unidad: '°C' },
+  ],
+  iluminacion: [{ id: 'nivel', label: 'Nivel iluminación', unidad: 'lx' }],
+  otros: [
+    { id: 'temperatura', label: 'Temperatura', unidad: '°C' },
+    { id: 'corriente', label: 'Corriente', unidad: 'A' },
+  ],
+}
+
+/** Campos de medición sugeridos para un equipo (según su familia). */
+export function medicionesDe(eq: Pick<Equipment, 'nombre' | 'tipo'>): CampoMedicion[] {
+  return MEDICIONES_POR_FAMILIA[familiaDe(eq)]
+}

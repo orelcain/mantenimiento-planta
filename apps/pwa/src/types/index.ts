@@ -165,6 +165,20 @@ export interface MaintenanceLogEntry {
   createdAt: Date
 }
 
+// Medición de comportamiento (colección plana `mediciones`) — series por equipo.
+// Bitácora oportunista (sin cadencia) para los equipos seguidos; base de tendencias.
+export interface Medicion {
+  id: string
+  equipmentId: string
+  hierarchyNodeId?: string
+  fecha: Date
+  contexto: 'proceso' | 'reposo'
+  tecnico?: string
+  valores: Record<string, number> // campo (de la familia) → valor numérico
+  nota?: string
+  createdAt: Date
+}
+
 // Umbrales predictivos configurables
 export interface PredictiveThresholds {
   tempWarnLow: number

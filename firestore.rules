@@ -572,6 +572,24 @@ service cloud.firestore {
     }
 
     // ============================================
+    // MEDICIONES — Series de comportamiento por equipo (Centro Técnico Documental)
+    // Bitácora oportunista (sin cadencia) para los equipos seguidos: corriente por
+    // fase, temperatura proceso/reposo, vibración, RPM, termografía de tableros…
+    // Un doc por lectura, referenciada por equipmentId. Base de las tendencias.
+    // ============================================
+    match /mediciones/{medId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.equipmentId is string
+        && request.resource.data.equipmentId.size() > 0
+        && request.resource.data.contexto in ['proceso', 'reposo']
+        && request.resource.data.valores is map;
+      allow update: if isTechnician() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // TABLEROS — Levantamiento eléctrico / unifilares (Centro Técnico Documental, NFPA 70B)
     // Un doc por tablero; circuitos y revisiones como arrays. Revisión 0 = as-found.
     // Ver docs/LEVANTAMIENTO_TABLEROS.md.
