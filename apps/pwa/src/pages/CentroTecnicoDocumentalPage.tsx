@@ -1051,6 +1051,36 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   )
 }
 
+/** Rail izquierdo (desktop): ruta del equipo en la jerarquía de la planta. */
+function UbicacionRail({ equipment }: { equipment: Equipment }) {
+  const parts = (equipment.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+  return (
+    <div className="rounded-lg border bg-card/95 p-3 shadow-sm">
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <MapPin className="h-3.5 w-3.5" /> Ubicación en la planta
+      </div>
+      {parts.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">Sin ruta de jerarquía.</p>
+      ) : (
+        <ol className="space-y-0.5">
+          {parts.map((p, i) => {
+            const last = i === parts.length - 1
+            return (
+              <li key={`${i}-${p}`} style={{ paddingLeft: `${i * 12}px` }} className="flex items-start">
+                <span className={`text-xs ${last ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                  {i > 0 && <span className="mr-1 text-muted-foreground/50">└</span>}
+                  {p}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+      <p className="mt-3 text-[10px] text-muted-foreground">Origen: jerarquía SAP del equipo.</p>
+    </div>
+  )
+}
+
 function ExpedienteDialog({
   equipment,
   incidents,
@@ -1203,13 +1233,20 @@ function ExpedienteDialog({
   const [editingNoteText, setEditingNoteText] = useState('')
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <Card className="my-4 w-full max-w-3xl" onClick={(ev) => ev.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex bg-black/50" onClick={onClose} role="dialog" aria-modal="true">
+      {/* Izquierda (desktop): ruta/ubicación en la jerarquía */}
+      <aside
+        className="hidden w-[30%] shrink-0 flex-col gap-2 overflow-y-auto p-4 md:flex lg:w-[26%] xl:w-[22%]"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <UbicacionRail equipment={equipment} />
+      </aside>
+
+      {/* Derecha: panel del expediente (columna fija ancha, no modal) */}
+      <Card
+        className="ml-auto h-full w-full overflow-y-auto rounded-none border-l md:w-[70%] lg:w-[74%] xl:w-[78%]"
+        onClick={(ev) => ev.stopPropagation()}
+      >
         <CardContent className="p-4 md:p-5 space-y-4">
           {/* Encabezado */}
           <div className="flex items-start justify-between gap-3">
