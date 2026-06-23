@@ -1618,7 +1618,7 @@ function ExpedienteDialog({
 
   return (
     <section
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background lg:static lg:z-auto lg:w-[46%] lg:shrink-0 lg:border-l xl:w-[42%]"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
       role="dialog"
       aria-modal="true"
     >
@@ -1670,6 +1670,7 @@ function ExpedienteDialog({
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="info">Información</TabsTrigger>
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
+              <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
               <TabsTrigger value="recursos">Recursos</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
@@ -1721,39 +1722,8 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                {/* Protocolo de inspección NFPA 70B (según la familia del equipo) */}
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-sm font-semibold mb-1">
-                      Protocolo de inspección NFPA 70B{' '}
-                      <span className="text-[11px] font-normal text-muted-foreground">
-                        · familia {FAMILIA_LABEL[familiaDe(equipment)]}
-                      </span>
-                    </div>
-                    <ul className="divide-y">
-                      {checklistDe(equipment).map((t) => (
-                        <li key={t.id} className="py-1.5 flex items-start gap-2 text-sm">
-                          <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <div>{t.tarea}</div>
-                            {t.nota && <div className="text-[11px] text-muted-foreground">{t.nota}</div>}
-                          </div>
-                          <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
-                            {t.tipo === 'medicion'
-                              ? `medición${t.unidad ? ` · ${t.unidad}` : ''}${t.rango ? ` (${t.rango.min ?? ''}${t.rango.min != null && t.rango.max != null ? '–' : ''}${t.rango.max ?? ''})` : ''}`
-                              : 'cualitativo'}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                      Tareas recomendadas por familia (NFPA 70B). Al registrar una inspección en la Ficha, documenta
-                      hallazgo y condición. Plantilla de arranque — se afina con el estándar completo / RPTD N°15.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Ciclo de vida */}
+                {/* Ciclo de vida — solo si hay fecha de instalación o vida útil */}
+                {(edad != null || vidaUtil != null) && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">Ciclo de vida</div>
@@ -1801,7 +1771,10 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                {/* Confiabilidad */}
+                )}
+
+                {/* Confiabilidad — solo si hay incidencias */}
+                {incidents.length > 0 && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">
@@ -1829,7 +1802,10 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                {/* Costo de mantenimiento (TCO) — suma de costos de las OT del equipo */}
+                )}
+
+                {/* Costo de mantenimiento (TCO) — solo si hay órdenes de trabajo */}
+                {workOrders.length > 0 && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">
@@ -1858,12 +1834,47 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                <TendenciaCondicion log={log} equipment={equipment} />
+                )}
+
+                {log.length > 0 && <TendenciaCondicion log={log} equipment={equipment} />}
               </div>
             </TabsContent>
 
             <TabsContent value="ficha">
               <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
+            </TabsContent>
+
+            <TabsContent value="protocolo">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm font-semibold mb-1">
+                    Protocolo de inspección NFPA 70B{' '}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      · familia {FAMILIA_LABEL[familiaDe(equipment)]}
+                    </span>
+                  </div>
+                  <ul className="divide-y">
+                    {checklistDe(equipment).map((t) => (
+                      <li key={t.id} className="py-1.5 flex items-start gap-2 text-sm">
+                        <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div>{t.tarea}</div>
+                          {t.nota && <div className="text-[11px] text-muted-foreground">{t.nota}</div>}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                          {t.tipo === 'medicion'
+                            ? `medición${t.unidad ? ` · ${t.unidad}` : ''}${t.rango ? ` (${t.rango.min ?? ''}${t.rango.min != null && t.rango.max != null ? '–' : ''}${t.rango.max ?? ''})` : ''}`
+                            : 'cualitativo'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Tareas recomendadas por familia (NFPA 70B). Al registrar una inspección en la Ficha se captura el
+                    protocolo con valores y rangos. Plantilla de arranque — se afina con el estándar completo / RPTD N°15.
+                  </p>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="tablero">
@@ -2469,17 +2480,6 @@ function CtdEquipoRow({
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-primary hidden sm:inline-flex"
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onOpen('info')
-          }}
-        >
-          Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
-        </Button>
         <Button
           variant="ghost"
           size="sm"
