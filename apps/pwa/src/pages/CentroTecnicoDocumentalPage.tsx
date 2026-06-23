@@ -27,6 +27,8 @@ import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
 import { addMedicion, getMediciones } from '@/services/mediciones'
+import { getRepuestosMaestro, linkRepuestoEquipo, unlinkRepuestoEquipo } from '@/services/repuestosLink'
+import type { RepuestoMaestroItem } from '@/services/repuestosLink'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
@@ -1167,6 +1169,163 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   )
 }
 
+/** Recursos · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
+function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
+  const nodeId = equipment.hierarchyNodeId
+  const [reloadKey, setReloadKey] = useState(0)
+  const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
+  const [adding, setAdding] = useState(false)
+  const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
+  const [loadingMaestro, setLoadingMaestro] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function openAdd() {
+    setAdding(true)
+    if (!maestro && !loadingMaestro) {
+      setLoadingMaestro(true)
+      try {
+        setMaestro(await getRepuestosMaestro())
+      } catch (e) {
+        logger.error('Error cargando maestro de repuestos', e instanceof Error ? e : new Error(String(e)))
+      } finally {
+        setLoadingMaestro(false)
+      }
+    }
+  }
+
+  const term = q.trim().toLowerCase()
+  const linkedIds = new Set(repuestos.map((r) => r.id))
+  const resultados = (maestro ?? [])
+    .filter((m) => !m.equipos.includes(nodeId ?? '') && !linkedIds.has(m.id))
+    .filter((m) => term.length >= 2 && `${m.nombre} ${m.codigoSAP}`.toLowerCase().includes(term))
+    .slice(0, 20)
+
+  async function vincular(m: RepuestoMaestroItem) {
+    if (!nodeId) return
+    setBusy(true)
+    try {
+      await linkRepuestoEquipo(m.id, nodeId, equipment.codigo)
+      setReloadKey((k) => k + 1)
+      setQ('')
+    } catch (e) {
+      logger.error('Error vinculando repuesto', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo vincular el repuesto.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function desvincular(id: string) {
+    if (!nodeId || !window.confirm('¿Quitar este repuesto del equipo?')) return
+    setBusy(true)
+    try {
+      await unlinkRepuestoEquipo(id, nodeId)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      logger.error('Error desvinculando repuesto', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo quitar el repuesto.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Repuestos del equipo{' '}
+            {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
+          </div>
+          {canEdit && nodeId && !adding && (
+            <Button variant="outline" size="sm" onClick={openAdd}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Vincular
+            </Button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="space-y-2 rounded-lg border p-2">
+            <Input placeholder="Buscar repuesto por nombre o SAP…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+            {loadingMaestro ? (
+              <p className="text-xs italic text-muted-foreground">Cargando maestro…</p>
+            ) : term.length < 2 ? (
+              <p className="text-xs italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
+            ) : resultados.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground">Sin coincidencias (o ya vinculados).</p>
+            ) : (
+              <div className="max-h-56 divide-y overflow-y-auto">
+                {resultados.map((m) => (
+                  <button
+                    key={m.id}
+                    disabled={busy}
+                    onClick={() => vincular(m)}
+                    className="flex w-full items-center gap-2 py-1.5 text-left text-sm hover:bg-muted/40 disabled:opacity-50"
+                  >
+                    <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{m.codigoSAP || '—'}</span>
+                    <span className="min-w-0 flex-1 truncate">{m.nombre}</span>
+                    <Plus className="h-4 w-4 shrink-0 text-primary" />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false)
+                  setQ('')
+                }}
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm italic text-muted-foreground">Cargando…</p>
+        ) : repuestos.length === 0 ? (
+          <p className="text-sm italic text-muted-foreground">
+            Sin repuestos vinculados{nodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
+          </p>
+        ) : (
+          <div className="divide-y">
+            {repuestos.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{r.codigoSAP || '—'}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {r.nombre}
+                  {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
+                </span>
+                {typeof r.stockFisico === 'number' && (
+                  <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+                )}
+                {canEdit && nodeId && (
+                  <button
+                    disabled={busy}
+                    onClick={() => desvincular(r.id)}
+                    className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                    title="Quitar del equipo"
+                    aria-label="Quitar repuesto"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          Los repuestos se comparten N:M con el maestro; “Vincular” agrega este equipo al repuesto.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 /** Rail izquierdo (desktop): ruta del equipo en la jerarquía de la planta. */
 function UbicacionRail({ equipment }: { equipment: Equipment }) {
   const parts = (equipment.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
@@ -1253,10 +1412,10 @@ function ExpedienteDialog({
       : null
   const rel = confiabilidad(incidents)
 
-  // Repuestos + documentos heredados del nodo de jerarquía (maestro N:M)
+  // Documentos heredados del nodo de jerarquía (maestro N:M). Los repuestos
+  // viven en su propio sub-componente (lista + vincular) para refrescar al enlazar.
   const nodeIds = equipment.hierarchyNodeId ? [equipment.hierarchyNodeId] : []
   const { manuales, loading: manualesLoading } = useManualesDeEquipos(nodeIds)
-  const { repuestos, loading: repuestosLoading } = useRepuestosDeEquipo(equipment.hierarchyNodeId)
 
   // Órdenes de trabajo del equipo
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
@@ -1613,36 +1772,7 @@ function ExpedienteDialog({
 
             <TabsContent value="recursos">
               <div className="space-y-3">
-                <Card>
-                  <CardContent className="p-4 space-y-2">
-                    <div className="text-sm font-semibold">
-                      Repuestos del equipo{' '}
-                      {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
-                    </div>
-                    {repuestosLoading ? (
-                      <p className="text-sm text-muted-foreground italic">Cargando…</p>
-                    ) : repuestos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic">
-                        Sin repuestos vinculados{equipment.hierarchyNodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {repuestos.map((r) => (
-                          <div key={r.id} className="py-2 flex items-center gap-3 text-sm">
-                            <span className="font-mono text-xs text-muted-foreground w-28 shrink-0">{r.codigoSAP || '—'}</span>
-                            <span className="flex-1 min-w-0 truncate">
-                              {r.nombre}
-                              {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
-                            </span>
-                            {typeof r.stockFisico === 'number' && (
-                              <span className="text-xs text-muted-foreground shrink-0">stock {r.stockFisico}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <RecursosRepuestos equipment={equipment} canEdit={canEdit} />
 
                 <Card>
                   <CardContent className="p-4 space-y-2">

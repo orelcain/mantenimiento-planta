@@ -18,7 +18,7 @@ export interface RepuestoDeEquipo {
   stockFisico?: number
 }
 
-export function useRepuestosDeEquipo(nodeId?: string): { repuestos: RepuestoDeEquipo[]; loading: boolean } {
+export function useRepuestosDeEquipo(nodeId?: string, reloadKey?: number): { repuestos: RepuestoDeEquipo[]; loading: boolean } {
   const [repuestos, setRepuestos] = useState<RepuestoDeEquipo[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -57,7 +57,7 @@ export function useRepuestosDeEquipo(nodeId?: string): { repuestos: RepuestoDeEq
     return () => {
       alive = false
     }
-  }, [nodeId])
+  }, [nodeId, reloadKey])
 
   return { repuestos, loading }
 }
