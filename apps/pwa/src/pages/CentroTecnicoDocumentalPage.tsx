@@ -816,6 +816,93 @@ function emptyMedicionDraft(): MedicionDraft {
 }
 const CTX_COLOR: Record<Medicion['contexto'], string> = { proceso: '#2563eb', reposo: '#94a3b8' }
 
+function fmtNum(v: number): string {
+  return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)
+}
+
+/** Gráfico de área grande de una métrica: área con gradiente (proceso) + línea reposo + ejes. */
+function MetricChart({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion }) {
+  const pts = rows
+    .map((r, i) => ({ i, v: r.valores[campo.id], ctx: r.contexto, fecha: r.fecha }))
+    .filter((p) => typeof p.v === 'number') as { i: number; v: number; ctx: Medicion['contexto']; fecha: Date }[]
+  if (pts.length === 0) {
+    return <p className="py-6 text-center text-sm italic text-muted-foreground">Sin datos de {campo.label} todavía.</p>
+  }
+  const vals = pts.map((p) => p.v)
+  let min = Math.min(...vals)
+  let max = Math.max(...vals)
+  if (min === max) {
+    min -= 1
+    max += 1
+  }
+  const padV = (max - min) * 0.12
+  min -= padV
+  max += padV
+  const W = 640
+  const H = 200
+  const L = 46
+  const R = 14
+  const T = 14
+  const B = 26
+  const baseY = H - B
+  const n = rows.length
+  const x = (i: number) => (n <= 1 ? L + (W - L - R) / 2 : L + (i / (n - 1)) * (W - L - R))
+  const y = (v: number) => T + (1 - (v - min) / (max - min)) * (H - T - B)
+  const procesoPts = pts.filter((p) => p.ctx === 'proceso')
+  const reposoPts = pts.filter((p) => p.ctx === 'reposo')
+  const line = (ps: typeof pts) => ps.map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const area =
+    procesoPts.length > 0
+      ? `M ${x(procesoPts[0]!.i).toFixed(1)},${baseY} ` +
+        procesoPts.map((p) => `L ${x(p.i).toFixed(1)},${y(p.v).toFixed(1)} `).join('') +
+        `L ${x(procesoPts[procesoPts.length - 1]!.i).toFixed(1)},${baseY} Z`
+      : ''
+  const gid = `mc-grad-${campo.id}`
+  const first = pts[0]
+  const last = pts[pts.length - 1]
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full text-muted-foreground" role="img" aria-label={`Tendencia de ${campo.label}`}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={CTX_COLOR.proceso} stopOpacity={0.35} />
+          <stop offset="100%" stopColor={CTX_COLOR.proceso} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      {[max - (max - min) * 0.12, (min + max) / 2, min + (max - min) * 0.12].map((v, idx) => {
+        const yy = y(v)
+        return (
+          <g key={idx}>
+            <line x1={L} x2={W - R} y1={yy} y2={yy} stroke="currentColor" strokeOpacity={0.1} />
+            <text x={L - 6} y={yy + 3} textAnchor="end" fontSize={9} fill="currentColor" opacity={0.7}>
+              {fmtNum(v)}
+            </text>
+          </g>
+        )
+      })}
+      {area && <path d={area} fill={`url(#${gid})`} />}
+      {procesoPts.length > 1 && (
+        <polyline points={line(procesoPts)} fill="none" stroke={CTX_COLOR.proceso} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      )}
+      {reposoPts.length > 1 && (
+        <polyline points={line(reposoPts)} fill="none" stroke={CTX_COLOR.reposo} strokeWidth={1.5} strokeDasharray="4 3" />
+      )}
+      {pts.map((p) => (
+        <circle key={`${p.ctx}-${p.i}`} cx={x(p.i)} cy={y(p.v)} r={2.5} fill={CTX_COLOR[p.ctx]} />
+      ))}
+      {first && (
+        <text x={L} y={H - 8} fontSize={9} fill="currentColor" opacity={0.7}>
+          {first.fecha.toLocaleDateString()}
+        </text>
+      )}
+      {last && pts.length > 1 && (
+        <text x={W - R} y={H - 8} textAnchor="end" fontSize={9} fill="currentColor" opacity={0.7}>
+          {last.fecha.toLocaleDateString()}
+        </text>
+      )}
+    </svg>
+  )
+}
+
 /** Sparkline de una serie (un campo) con líneas separadas por contexto proceso/reposo. */
 function SerieCampo({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion }) {
   const pts = rows
@@ -872,6 +959,11 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState<MedicionDraft>(emptyMedicionDraft)
+  const [metricId, setMetricId] = useState<string>('')
+
+  // Campos que ya tienen al menos un dato (para el gráfico y el selector).
+  const camposConDatos = campos.filter((c) => rows.some((r) => typeof r.valores[c.id] === 'number'))
+  const metricSel = camposConDatos.find((c) => c.id === metricId) ?? camposConDatos[0]
 
   useEffect(() => {
     let alive = true
@@ -1015,6 +1107,29 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
           </p>
         ) : (
           <>
+            {metricSel && (
+              <div className="rounded-lg border bg-muted/20 p-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="text-xs font-medium">
+                    {metricSel.label} <span className="text-muted-foreground">({metricSel.unidad})</span>
+                  </div>
+                  <select
+                    value={metricSel.id}
+                    onChange={(e) => setMetricId(e.target.value)}
+                    className="rounded-md border bg-background px-2 py-1 text-xs"
+                    aria-label="Métrica a graficar"
+                  >
+                    {camposConDatos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <MetricChart rows={rows} campo={metricSel} />
+              </div>
+            )}
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Todas las series</div>
             <div className="divide-y">
               {campos.map((c) => (
                 <SerieCampo key={c.id} rows={rows} campo={c} />
