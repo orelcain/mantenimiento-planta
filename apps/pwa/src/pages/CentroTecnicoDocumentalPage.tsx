@@ -1473,12 +1473,17 @@ function ExpedienteDialog({
                     </div>
                     <ul className="divide-y">
                       {checklistDe(equipment).map((t) => (
-                        <li key={t.id} className="py-1.5 flex items-start justify-between gap-3 text-sm">
-                          <span className="flex items-start gap-2 min-w-0">
-                            <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0">{t.tarea}</span>
+                        <li key={t.id} className="py-1.5 flex items-start gap-2 text-sm">
+                          <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <div>{t.tarea}</div>
+                            {t.nota && <div className="text-[11px] text-muted-foreground">{t.nota}</div>}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                            {t.tipo === 'medicion'
+                              ? `medición${t.unidad ? ` · ${t.unidad}` : ''}${t.rango ? ` (${t.rango.min ?? ''}${t.rango.min != null && t.rango.max != null ? '–' : ''}${t.rango.max ?? ''})` : ''}`
+                              : 'cualitativo'}
                           </span>
-                          <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">{t.metodo}</span>
                         </li>
                       ))}
                     </ul>

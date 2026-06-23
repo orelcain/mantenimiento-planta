@@ -80,6 +80,22 @@ const CHK_ESTADO: { value: ChecklistResultado['estado']; label: string; on: stri
   { value: 'na', label: '–', on: 'bg-muted text-foreground' },
 ]
 
+function rangoText(r?: { min?: number; max?: number }): string {
+  if (!r) return ''
+  if (r.min != null && r.max != null) return `${r.min}–${r.max}`
+  if (r.max != null) return `máx ${r.max}`
+  if (r.min != null) return `mín ${r.min}`
+  return ''
+}
+function fueraDeRango(valor: string | undefined, r?: { min?: number; max?: number }): boolean {
+  if (!r || valor == null || valor.trim() === '') return false
+  const v = Number(valor)
+  if (!Number.isFinite(v)) return false
+  if (r.max != null && v > r.max) return true
+  if (r.min != null && v < r.min) return true
+  return false
+}
+
 const TIPO_LABEL = Object.fromEntries(TIPOS.map((t) => [t.value, t.label])) as Record<
   MaintenanceLogEntry['tipo'],
   string
@@ -220,6 +236,8 @@ export function FichaTecnicaNFPA70B({
   function setChkItem(i: number, patch: Partial<ChecklistResultado>) {
     setDraft((d) => ({ ...d, checklist: d.checklist.map((t, j) => (j === i ? { ...t, ...patch } : t)) }))
   }
+  // Metadatos del protocolo (cualitativo/medición, rango, especificación) por familia.
+  const chkMetas = checklistDe(equipment)
 
   // Edición/borrado de entradas del historial (solo admin).
   const { isAdmin } = usePermissions()
@@ -311,7 +329,9 @@ export function FichaTecnicaNFPA70B({
         : undefined
 
       // Solo se guardan las tareas evaluadas (estado ≠ no-evaluado) o con medición.
-      const checklist = draft.checklist.filter((t) => t.estado !== 'na' || (t.valor && t.valor.trim()))
+      const checklist = draft.checklist.filter(
+        (t) => t.estado !== 'na' || (t.valor && t.valor.trim()) || (t.detalle && t.detalle.trim()),
+      )
 
       await addMaintenanceLogEntry({
         equipmentId: equipment.id,
@@ -625,37 +645,76 @@ export function FichaTecnicaNFPA70B({
               </div>
               <div>
                 <Label className="text-xs">Protocolo de inspección · {FAMILIA_LABEL[familiaDe(equipment)]}</Label>
-                <div className="mt-1 space-y-1">
-                  {draft.checklist.map((t, i) => (
-                    <div key={t.id} className="flex items-center gap-2">
-                      <span className="flex-1 min-w-0 text-xs truncate" title={t.tarea}>
-                        {t.tarea}
-                      </span>
-                      <Input
-                        className="h-7 w-20 text-xs"
-                        placeholder="valor"
-                        value={t.valor ?? ''}
-                        onChange={(e) => setChkItem(i, { valor: e.target.value })}
-                      />
-                      <div className="inline-flex rounded-md border overflow-hidden shrink-0">
-                        {CHK_ESTADO.map((st) => (
-                          <button
-                            key={st.value}
-                            type="button"
-                            onClick={() => setChkItem(i, { estado: st.value })}
-                            className={`px-2 py-1 text-[11px] ${t.estado === st.value ? st.on : 'bg-background text-muted-foreground'}`}
-                            title={st.value === 'ok' ? 'Conforme' : st.value === 'obs' ? 'Observación' : 'No evaluado'}
-                          >
-                            {st.label}
-                          </button>
-                        ))}
+                <div className="mt-1 space-y-1.5">
+                  {draft.checklist.map((t, i) => {
+                    const m = chkMetas.find((x) => x.id === t.id)
+                    const medicion = m?.tipo === 'medicion'
+                    const fuera = medicion && fueraDeRango(t.valor, m?.rango)
+                    return (
+                      <div key={t.id} className="rounded-md border p-2 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-medium">{t.tarea}</div>
+                            {m?.nota && <div className="text-[10px] text-muted-foreground">{m.nota}</div>}
+                          </div>
+                          <div className="inline-flex shrink-0 overflow-hidden rounded-md border">
+                            {CHK_ESTADO.map((st) => (
+                              <button
+                                key={st.value}
+                                type="button"
+                                onClick={() => setChkItem(i, { estado: st.value })}
+                                className={`px-2 py-1 text-[11px] ${t.estado === st.value ? st.on : 'bg-background text-muted-foreground'}`}
+                                title={st.value === 'ok' ? 'Conforme' : st.value === 'obs' ? 'Observación' : 'No evaluado / N/A'}
+                              >
+                                {st.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {medicion && (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                className={`h-7 w-24 text-xs ${fuera ? 'border-red-500 text-red-600' : ''}`}
+                                placeholder="valor"
+                                value={t.valor ?? ''}
+                                onChange={(e) => setChkItem(i, { valor: e.target.value })}
+                              />
+                              {m?.unidad && <span className="text-[10px] text-muted-foreground">{m.unidad}</span>}
+                              {m?.rango && (
+                                <span className={`text-[10px] ${fuera ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                  ok: {rangoText(m.rango)}
+                                  {fuera ? ' · fuera' : ''}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <Input
+                            className="h-7 flex-1 min-w-[120px] text-xs"
+                            placeholder={m?.instrumento ? `Detalle / borne (req. ${m.instrumento})` : 'Detalle (opcional)'}
+                            value={t.detalle ?? ''}
+                            onChange={(e) => setChkItem(i, { detalle: e.target.value })}
+                          />
+                          {m?.instrumento && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-muted-foreground underline decoration-dotted"
+                              onClick={() => setChkItem(i, { estado: 'na', detalle: 'falta de instrumento' })}
+                              title={`Marcar N/A por falta de ${m.instrumento}`}
+                            >
+                              sin instrumento
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Marca cada tarea (✓ conforme · ⚠ observación · – no evaluado) y anota la medición. Solo se guardan las
-                  evaluadas.
+                  ✓ conforme · ⚠ observación · – no evaluado/N/A. En medición anota el valor (se resalta si sale del rango
+                  sugerido). Solo se guardan las tareas evaluadas o con valor. Rangos = sugeridos (afinar con el fabricante).
                 </p>
               </div>
               <div>

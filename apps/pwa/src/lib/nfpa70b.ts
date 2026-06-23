@@ -73,65 +73,84 @@ export function familiaDe(eq: Pick<Equipment, 'nombre' | 'tipo'>): Familia {
   return 'otros'
 }
 
-export type TareaChecklist = { id: string; tarea: string; metodo: string }
+export type TareaChecklist = {
+  id: string
+  tarea: string
+  /** cualitativo = se evalúa (conforme/observación); medicion = se cuantifica con valor + unidad. */
+  tipo: 'cualitativo' | 'medicion'
+  unidad?: string
+  /** Rango aceptable SUGERIDO (afinar con el fabricante / norma). Fuera de rango → se resalta. */
+  rango?: { min?: number; max?: number }
+  /** Especificación: dónde/cómo/condición (p.ej. "lado eje", "borne 1–6", "solo sin proceso, sin carga"). */
+  nota?: string
+  /** Si requiere instrumento, habilita "N/A por falta de instrumento". */
+  instrumento?: string
+}
 
-/** Protocolo de inspección NFPA 70B por familia (plantilla de arranque). */
+/**
+ * Protocolo de inspección NFPA 70B por familia (plantilla de arranque).
+ * Los rangos son SUGERIDOS: afinar con el manual del fabricante / la norma.
+ */
 export const CHECKLIST: Record<Familia, TareaChecklist[]> = {
   rotativa: [
-    { id: 'visual', tarea: 'Inspección visual: limpieza, montaje, acoplamiento, fugas', metodo: 'Visual' },
-    { id: 'termografia', tarea: 'Termografía de carcasa, rodamientos y conexiones', metodo: 'Termografía' },
-    { id: 'aislacion', tarea: 'Resistencia de aislación de devanados (megóhmetro)', metodo: 'Medición · MΩ' },
-    { id: 'corriente', tarea: 'Corriente por fase vs. nominal de placa', metodo: 'Medición · A' },
-    { id: 'vibracion', tarea: 'Vibración de rodamientos', metodo: 'Medición · mm/s' },
-    { id: 'temperatura', tarea: 'Temperatura de operación / rodamientos', metodo: 'Medición · °C' },
-    { id: 'conexiones', tarea: 'Apriete de conexiones de fuerza', metodo: 'Torque' },
+    { id: 'visual', tarea: 'Inspección visual: limpieza, montaje, acoplamiento, fugas', tipo: 'cualitativo' },
+    { id: 'tempCarcasa', tarea: 'Termografía carcasa (lado eje)', tipo: 'medicion', unidad: '°C', rango: { max: 70 }, nota: 'En proceso solo el lado del eje; el lado del aspa requiere parada.', instrumento: 'cámara termográfica' },
+    { id: 'tempRodamiento', tarea: 'Temperatura rodamiento (lado eje)', tipo: 'medicion', unidad: '°C', rango: { max: 80 }, nota: 'Rodamiento accesible, con carga de proceso.', instrumento: 'termómetro IR' },
+    { id: 'corrienteL1', tarea: 'Corriente L1', tipo: 'medicion', unidad: 'A', nota: 'Comparar entre fases (desbalance < 10%) y vs. placa.', instrumento: 'pinza amperimétrica' },
+    { id: 'corrienteL2', tarea: 'Corriente L2', tipo: 'medicion', unidad: 'A', instrumento: 'pinza amperimétrica' },
+    { id: 'corrienteL3', tarea: 'Corriente L3', tipo: 'medicion', unidad: 'A', instrumento: 'pinza amperimétrica' },
+    { id: 'vibracion', tarea: 'Vibración de rodamientos', tipo: 'medicion', unidad: 'mm/s', rango: { max: 4.5 }, nota: 'Ref. ISO 10816. Sin vibrómetro → N/A por falta de instrumento.', instrumento: 'vibrómetro' },
+    { id: 'aislacion', tarea: 'Aislación devanado–tierra', tipo: 'medicion', unidad: 'MΩ', rango: { min: 1 }, nota: 'SIN energía, motor frío. Mín ~ (1 MΩ/kV) + 1.', instrumento: 'megóhmetro' },
+    { id: 'indicePolarizacion', tarea: 'Índice de polarización (R10min/R1min)', tipo: 'medicion', rango: { min: 2 }, nota: 'SIN energía. Aislación sana ≥ 2.', instrumento: 'megóhmetro' },
+    { id: 'bornera', tarea: 'Termografía de bornera', tipo: 'medicion', unidad: '°C', nota: 'SOLO sin proceso: bornera abierta, SIN carga. Indicar borne (1–6) en el detalle.', instrumento: 'cámara termográfica' },
+    { id: 'conexiones', tarea: 'Apriete de conexiones de fuerza', tipo: 'cualitativo', nota: 'Reapriete SOLO sin energía.' },
   ],
   tablero: [
-    { id: 'visual', tarea: 'Inspección visual: limpieza, señalización, sellos, corrosión', metodo: 'Visual' },
-    { id: 'termografia', tarea: 'Termografía de barras, borneras y conexiones bajo carga', metodo: 'Termografía' },
-    { id: 'torque', tarea: 'Reapriete de conexiones (torque a especificación)', metodo: 'Torque · N·m' },
-    { id: 'protecciones', tarea: 'Verificación/prueba de protecciones y ajustes', metodo: 'Prueba' },
-    { id: 'aislacion', tarea: 'Resistencia de aislación de barras', metodo: 'Medición · MΩ' },
-    { id: 'tierra', tarea: 'Continuidad de puesta a tierra', metodo: 'Medición · Ω' },
-    { id: 'ventilacion', tarea: 'Ventilación / filtros y temperatura interior', metodo: 'Visual · °C' },
+    { id: 'visual', tarea: 'Inspección visual: limpieza, señalización, sellos, corrosión', tipo: 'cualitativo' },
+    { id: 'termografiaBarras', tarea: 'Termografía de barras/borneras (bajo carga)', tipo: 'medicion', unidad: '°C', rango: { max: 60 }, nota: 'Con carga; por mirilla IR o tras retirar tapa según procedimiento. Indicar punto.', instrumento: 'cámara termográfica' },
+    { id: 'torque', tarea: 'Reapriete de conexiones (torque)', tipo: 'cualitativo', nota: 'SOLO sin energía. Torque a especificación; indicar borne.' },
+    { id: 'protecciones', tarea: 'Verificación/prueba de protecciones y ajustes', tipo: 'cualitativo', nota: 'Comparar con estudio de coordinación.' },
+    { id: 'aislacionBarras', tarea: 'Aislación de barras', tipo: 'medicion', unidad: 'MΩ', rango: { min: 1 }, nota: 'SIN energía.', instrumento: 'megóhmetro' },
+    { id: 'tierra', tarea: 'Continuidad de puesta a tierra', tipo: 'medicion', unidad: 'Ω', rango: { max: 5 }, instrumento: 'telurómetro' },
+    { id: 'ventilacion', tarea: 'Ventilación / filtros y temperatura interior', tipo: 'cualitativo', nota: 'Filtros limpios; ventiladores operativos.' },
   ],
   transformador: [
-    { id: 'visual', tarea: 'Inspección visual: fugas, nivel y estado del aceite, sílica gel', metodo: 'Visual' },
-    { id: 'termografia', tarea: 'Termografía de bushings y conexiones', metodo: 'Termografía' },
-    { id: 'aislacion', tarea: 'Resistencia de aislación / índice de polarización', metodo: 'Medición · MΩ' },
-    { id: 'relacion', tarea: 'Relación de transformación (TTR)', metodo: 'Prueba' },
-    { id: 'aceite', tarea: 'Análisis de aceite (rigidez dieléctrica / DGA)', metodo: 'Laboratorio' },
-    { id: 'tierra', tarea: 'Puesta a tierra y conexiones', metodo: 'Medición · Ω' },
+    { id: 'visual', tarea: 'Inspección visual: fugas, nivel de aceite, sílica gel', tipo: 'cualitativo' },
+    { id: 'termografia', tarea: 'Termografía de bushings y conexiones', tipo: 'medicion', unidad: '°C', rango: { max: 70 }, instrumento: 'cámara termográfica' },
+    { id: 'aislacion', tarea: 'Aislación / índice de polarización', tipo: 'medicion', unidad: 'MΩ', rango: { min: 1 }, nota: 'SIN energía.', instrumento: 'megóhmetro' },
+    { id: 'relacion', tarea: 'Relación de transformación (TTR)', tipo: 'cualitativo', nota: 'Desviación < 0.5% vs. placa.', instrumento: 'TTR' },
+    { id: 'aceite', tarea: 'Rigidez dieléctrica del aceite', tipo: 'medicion', unidad: 'kV', rango: { min: 30 }, nota: 'Muestra a laboratorio (DGA si aplica).' },
+    { id: 'tierra', tarea: 'Puesta a tierra y conexiones', tipo: 'medicion', unidad: 'Ω', rango: { max: 5 }, instrumento: 'telurómetro' },
   ],
   proteccion: [
-    { id: 'visual', tarea: 'Inspección visual y limpieza', metodo: 'Visual' },
-    { id: 'disparo', tarea: 'Prueba de disparo / tiempos', metodo: 'Prueba' },
-    { id: 'ajustes', tarea: 'Verificación de ajustes vs. estudio de coordinación', metodo: 'Verificación' },
-    { id: 'termografia', tarea: 'Termografía de contactos / conexiones', metodo: 'Termografía' },
-    { id: 'mecanismo', tarea: 'Lubricación / operación del mecanismo', metodo: 'Visual' },
+    { id: 'visual', tarea: 'Inspección visual y limpieza', tipo: 'cualitativo' },
+    { id: 'disparo', tarea: 'Prueba de disparo / tiempos', tipo: 'cualitativo', nota: 'SIN energía / banco de pruebas.', instrumento: 'maleta de inyección' },
+    { id: 'ajustes', tarea: 'Verificación de ajustes vs. coordinación', tipo: 'cualitativo' },
+    { id: 'termografia', tarea: 'Termografía de contactos', tipo: 'medicion', unidad: '°C', rango: { max: 60 }, instrumento: 'cámara termográfica' },
+    { id: 'mecanismo', tarea: 'Lubricación / operación del mecanismo', tipo: 'cualitativo' },
   ],
   cable: [
-    { id: 'visual', tarea: 'Inspección visual de aislación, terminaciones y empalmes', metodo: 'Visual' },
-    { id: 'termografia', tarea: 'Termografía de terminaciones', metodo: 'Termografía' },
-    { id: 'aislacion', tarea: 'Resistencia de aislación', metodo: 'Medición · MΩ' },
-    { id: 'tierra', tarea: 'Continuidad de pantallas / puesta a tierra', metodo: 'Medición · Ω' },
+    { id: 'visual', tarea: 'Inspección visual de aislación, terminaciones y empalmes', tipo: 'cualitativo' },
+    { id: 'termografia', tarea: 'Termografía de terminaciones', tipo: 'medicion', unidad: '°C', rango: { max: 60 }, instrumento: 'cámara termográfica' },
+    { id: 'aislacion', tarea: 'Resistencia de aislación', tipo: 'medicion', unidad: 'MΩ', rango: { min: 1 }, nota: 'SIN energía.', instrumento: 'megóhmetro' },
+    { id: 'tierra', tarea: 'Continuidad de pantallas / PAT', tipo: 'medicion', unidad: 'Ω', rango: { max: 5 }, instrumento: 'telurómetro' },
   ],
   bateria: [
-    { id: 'visual', tarea: 'Inspección visual: bornes, fugas, hinchazón, ventilación', metodo: 'Visual' },
-    { id: 'tension', tarea: 'Tensión de flotación y por celda / bloque', metodo: 'Medición · V' },
-    { id: 'impedancia', tarea: 'Impedancia / resistencia interna por celda', metodo: 'Medición · mΩ' },
-    { id: 'termografia', tarea: 'Termografía de conexiones', metodo: 'Termografía' },
-    { id: 'autonomia', tarea: 'Prueba de autonomía / descarga', metodo: 'Prueba' },
+    { id: 'visual', tarea: 'Inspección visual: bornes, fugas, hinchazón, ventilación', tipo: 'cualitativo' },
+    { id: 'tension', tarea: 'Tensión de flotación / por celda', tipo: 'medicion', unidad: 'V', nota: 'Comparar entre celdas; indicar celda fuera de rango.', instrumento: 'multímetro' },
+    { id: 'impedancia', tarea: 'Impedancia interna por celda', tipo: 'medicion', unidad: 'mΩ', instrumento: 'medidor de impedancia' },
+    { id: 'termografia', tarea: 'Termografía de conexiones', tipo: 'medicion', unidad: '°C', rango: { max: 50 }, instrumento: 'cámara termográfica' },
+    { id: 'autonomia', tarea: 'Prueba de autonomía / descarga', tipo: 'cualitativo' },
   ],
   iluminacion: [
-    { id: 'visual', tarea: 'Inspección visual: estado, fijación, hermeticidad', metodo: 'Visual' },
-    { id: 'nivel', tarea: 'Nivel de iluminación (luxes)', metodo: 'Medición · lx' },
-    { id: 'emergencia', tarea: 'Prueba de luminarias de emergencia', metodo: 'Prueba' },
+    { id: 'visual', tarea: 'Inspección visual: estado, fijación, hermeticidad', tipo: 'cualitativo' },
+    { id: 'nivel', tarea: 'Nivel de iluminación', tipo: 'medicion', unidad: 'lx', instrumento: 'luxómetro' },
+    { id: 'emergencia', tarea: 'Prueba de luminarias de emergencia', tipo: 'cualitativo' },
   ],
   otros: [
-    { id: 'visual', tarea: 'Inspección visual general', metodo: 'Visual' },
-    { id: 'termografia', tarea: 'Termografía de conexiones eléctricas', metodo: 'Termografía' },
-    { id: 'conexiones', tarea: 'Apriete de conexiones', metodo: 'Torque' },
+    { id: 'visual', tarea: 'Inspección visual general', tipo: 'cualitativo' },
+    { id: 'termografia', tarea: 'Termografía de conexiones eléctricas', tipo: 'medicion', unidad: '°C', rango: { max: 60 }, instrumento: 'cámara termográfica' },
+    { id: 'conexiones', tarea: 'Apriete de conexiones', tipo: 'cualitativo', nota: 'SOLO sin energía.' },
   ],
 }
 

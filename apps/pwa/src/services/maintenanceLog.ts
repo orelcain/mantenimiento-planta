@@ -71,9 +71,12 @@ export async function addMaintenanceLogEntry(
   if (entry.proximaInspeccion) payload.proximaInspeccion = entry.proximaInspeccion
   if (entry.checklist && entry.checklist.length > 0) {
     // Saneado: Firestore no acepta `undefined` (omitir `valor` si no hay).
-    payload.checklist = entry.checklist.map((t) =>
-      t.valor != null && t.valor !== '' ? { id: t.id, tarea: t.tarea, estado: t.estado, valor: t.valor } : { id: t.id, tarea: t.tarea, estado: t.estado },
-    )
+    payload.checklist = entry.checklist.map((t) => {
+      const o: Record<string, unknown> = { id: t.id, tarea: t.tarea, estado: t.estado }
+      if (t.valor != null && t.valor !== '') o.valor = t.valor
+      if (t.detalle != null && t.detalle !== '') o.detalle = t.detalle
+      return o
+    })
   }
   await setDoc(doc(db, COLLECTION, id), payload)
 }

@@ -146,8 +146,9 @@ export interface WorkOrder {
 export interface ChecklistResultado {
   id: string
   tarea: string
-  estado: 'ok' | 'obs' | 'na' // ok=conforme · obs=observación · na=no evaluado
-  valor?: string // medición opcional (A, MΩ, °C, mm/s…)
+  estado: 'ok' | 'obs' | 'na' // ok=conforme · obs=observación · na=no evaluado / N/A
+  valor?: string // medición (A, MΩ, °C, mm/s…) para tareas cuantificables
+  detalle?: string // punto/borne/celda evaluada o motivo de N/A (p.ej. "borne 3", "falta instrumento")
 }
 
 // Historial de mantenimiento NFPA 70B (colección plana `maintenanceLog`)
