@@ -16,23 +16,31 @@ import {
   QrCode,
   Star,
   Trash2,
+  Wrench,
   X,
   Zap,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import ReactECharts from 'echarts-for-react'
 import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
-import { addEquipmentPhoto, getEquipments, removeEquipmentPhoto } from '@/services/equipment'
+import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { getMaintenanceLog } from '@/services/maintenanceLog'
+import { addMedicion, getMediciones } from '@/services/mediciones'
+import { getRepuestosMaestro, linkRepuestoEquipo, unlinkRepuestoEquipo } from '@/services/repuestosLink'
+import type { RepuestoMaestroItem } from '@/services/repuestosLink'
+import { getParentCandidates, moverEquipoEnJerarquia } from '@/services/hierarchyMove'
+import type { AreaNode } from '@/services/hierarchyMove'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
-import { useAppStore, useAuthStore } from '@/store'
+import { useAuthStore } from '@/store'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
 import type { EquipmentNote } from '@/hooks/useEquipmentNotes'
 import { usePermissions } from '@/hooks/usePermissions'
+import { useCtdEquipos } from '@/hooks/useCtdEquipos'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
@@ -40,7 +48,29 @@ import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
-import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry, WorkOrder } from '@/types'
+import {
+  BUCKETS,
+  COND_EMOJI,
+  CRIT,
+  CRIT_INFO,
+  ESTADO,
+  ITEMS_PER_PAGE,
+  WO_ESTADO,
+  WO_PRIORIDAD,
+  WO_TIPOS,
+  aniosDesde,
+  completitud,
+  confiabilidad,
+  diasVencida,
+  formatCosto,
+  lineaDe,
+  qrUrl,
+  seccionDe,
+} from '@/lib/ctd'
+import type { Bucket, EstadoFiltro, OrdenCampo, OtCount } from '@/lib/ctd'
+import { FAMILIA_LABEL, checklistDe, familiaDe, medicionesDe } from '@/lib/nfpa70b'
+import type { CampoMedicion } from '@/lib/nfpa70b'
+import type { Equipment, Incident, MaintenanceLogEntry, Medicion, WorkOrder } from '@/types'
 
 /**
  * Centro Técnico Documental — portada / panel del programa (EMP · NFPA 70B).
@@ -53,179 +83,58 @@ import type { Equipment, FichaTecnica, Incident, MaintenanceLogEntry, WorkOrder 
  * Ver `docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`.
  */
 
-const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string }> = {
-  alta: { nivel: 'A', cls: 'border-red-500 text-red-600' },
-  media: { nivel: 'B', cls: 'border-amber-500 text-amber-600' },
-  baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
-}
-
-const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
-  operativo: { label: 'Operativo', cls: 'border-emerald-500 text-emerald-600' },
-  en_mantenimiento: { label: 'En mantención', cls: 'border-amber-500 text-amber-600' },
-  fuera_servicio: { label: 'Fuera de servicio', cls: 'border-red-500 text-red-600' },
-}
-
-const COND_EMOJI: Record<1 | 2 | 3, string> = { 1: '🟢', 2: '🟡', 3: '🔴' }
-
-const WO_ESTADO: Record<WorkOrder['estado'], { label: string; cls: string }> = {
-  abierta: { label: 'Abierta', cls: 'border-blue-500 text-blue-600' },
-  en_proceso: { label: 'En proceso', cls: 'border-amber-500 text-amber-600' },
-  cerrada: { label: 'Cerrada', cls: 'border-emerald-500 text-emerald-600' },
-  cancelada: { label: 'Cancelada', cls: 'border-border text-muted-foreground' },
-}
-const WO_PRIORIDAD: Record<WorkOrder['prioridad'], { label: string; cls: string }> = {
-  critica: { label: 'Crítica', cls: 'text-red-600' },
-  alta: { label: 'Alta', cls: 'text-amber-600' },
-  media: { label: 'Media', cls: 'text-muted-foreground' },
-  baja: { label: 'Baja', cls: 'text-muted-foreground' },
-}
-const WO_TIPOS: { value: WorkOrder['tipo']; label: string }[] = [
-  { value: 'correctivo', label: 'Correctivo' },
-  { value: 'preventivo', label: 'Preventivo' },
-  { value: 'predictivo', label: 'Predictivo' },
-  { value: 'inspeccion', label: 'Inspección' },
-  { value: 'mejora', label: 'Mejora' },
-]
-
-const PLACA_FIELDS: (keyof FichaTecnica)[] = [
-  'potenciaKw',
-  'voltajeV',
-  'corrienteA',
-  'rpm',
-  'factorServicio',
-  'claseAislamiento',
-  'gradoIP',
-]
-
-function completitud(eq: Equipment): number {
-  const ft = eq.fichaTecnica
-  if (!ft) return 0
-  const filled = PLACA_FIELDS.filter((k) => {
-    const v = ft[k]
-    return v !== undefined && v !== null && v !== ''
-  }).length
-  return Math.round((filled / PLACA_FIELDS.length) * 100)
-}
-
-function startOfToday(): number {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-
-function diasVencida(iso?: string): number | null {
-  if (!iso) return null
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return null
-  const diff = startOfToday() - t
-  return diff > 0 ? Math.floor(diff / 86400000) : null
-}
-
-/** Años transcurridos desde una fecha (null si no hay/ inválida). */
-function aniosDesde(d?: Date | string): number | null {
-  if (!d) return null
-  const t = new Date(d).getTime()
-  if (Number.isNaN(t)) return null
-  return (Date.now() - t) / (365.25 * 86400000)
-}
-
-/** Métricas de confiabilidad de un equipo a partir de sus incidencias. */
-function confiabilidad(incidents: Incident[]): {
-  fallas: number
-  mttrHoras: number | null
-  mtbfDias: number | null
-  disponibilidad: number | null
-} {
-  const correctivos = incidents.filter((i) => i.tipo === 'correctivo')
-  const fallas = correctivos.length
-  const conTiempo = correctivos.filter((i) => typeof i.tiempoResolucionMinutos === 'number')
-  const downtimeMin = conTiempo.reduce((s, i) => s + (i.tiempoResolucionMinutos ?? 0), 0)
-  const mttrHoras = conTiempo.length > 0 ? downtimeMin / conTiempo.length / 60 : null
-  // Ventana = desde la incidencia más antigua cargada hasta hoy.
-  const fechas = incidents.map((i) => new Date(i.createdAt).getTime()).filter((t) => !Number.isNaN(t))
-  const desde = fechas.length ? Math.min(...fechas) : null
-  const ventanaMin = desde ? (Date.now() - desde) / 60000 : null
-  const mtbfDias = ventanaMin && fallas > 0 ? ventanaMin / fallas / 1440 : null
-  const disponibilidad = ventanaMin && ventanaMin > 0 ? Math.max(0, ((ventanaMin - downtimeMin) / ventanaMin) * 100) : null
-  return { fallas, mttrHoras, mtbfDias, disponibilidad }
-}
-
-/** URL pública del equipo para el código QR (misma convención que EquipmentPage). */
-function qrUrl(equipmentId: string): string {
-  return `${window.location.origin}/mantenimiento-planta/public/equipment/${equipmentId}`
-}
-
-/** Segmentos de la ruta jerárquica del equipo (sin vacíos).
- *  Forma real: "Aquachile… > PLANTA > SECCIÓN > LÍNEA > … > Equipo". */
-function pathParts(eq: Equipment): string[] {
-  return (eq.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
-}
-/** Sección = nivel 2 (PROCESO, FRIGORIFICO, EXTERIORES, PLANTA RILES…). */
-function seccionDe(eq: Equipment): string | null {
-  return pathParts(eq)[2] ?? null
-}
-/** Línea = nivel 3 (TUNELES, EMPAQUE, EVISCERADO, CAMARAS…). */
-function lineaDe(eq: Equipment): string | null {
-  return pathParts(eq)[3] ?? null
-}
-
-const ITEMS_PER_PAGE = 50
-
-type Filtro = 'todos' | 'A' | 'cond3' | 'vencida' | 'incompleta' | 'favoritos'
-type EstadoFiltro = 'all' | Equipment['estado']
-type OrdenCampo = 'criticidad' | 'proxima' | 'ficha' | 'area' | 'nombre'
-type Vista = 'lista' | 'agenda' | 'tarjetas'
-
-/** Fecha de próxima inspección en ms (Infinity si no hay / inválida) — para ordenar. */
-function proximaMs(eq: Equipment): number {
-  const iso = eq.fichaTecnica?.proximaInspeccion
-  const t = iso ? new Date(iso).getTime() : NaN
-  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t
-}
-
-type Bucket = 'vencidas' | 'd30' | 'd60' | 'd90' | 'futuro' | 'sin'
-const BUCKETS: { key: Bucket; label: string }[] = [
-  { key: 'vencidas', label: 'Vencidas' },
-  { key: 'd30', label: 'Próximos 30 días' },
-  { key: 'd60', label: '31–60 días' },
-  { key: 'd90', label: '61–90 días' },
-  { key: 'futuro', label: 'Más de 90 días' },
-  { key: 'sin', label: 'Sin fecha de inspección' },
-]
-function bucketDe(eq: Equipment): Bucket {
-  const iso = eq.fichaTecnica?.proximaInspeccion
-  if (!iso) return 'sin'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return 'sin'
-  const dias = Math.floor((t - startOfToday()) / 86400000)
-  if (dias < 0) return 'vencidas'
-  if (dias <= 30) return 'd30'
-  if (dias <= 60) return 'd60'
-  if (dias <= 90) return 'd90'
-  return 'futuro'
-}
-
 export function CentroTecnicoDocumentalPage() {
   const user = useAuthStore((s) => s.user)
-  const { equipment, setEquipment } = useAppStore()
   const { canEditEquipment } = usePermissions()
   const { favorites, toggleFavorite } = useEquipmentFavorites(user?.id)
   const { notesFor, addNote, editNote, deleteNote } = useEquipmentNotes(user?.id)
 
-  const [searchParams, setSearchParams] = useSearchParams()
+  // Estado y derivaciones del listado a nivel programa (carga, filtros, KPIs,
+  // búsqueda, orden, paginación, agenda) viven en el hook; el expediente del
+  // equipo abierto se queda en la página.
+  const {
+    loading,
+    filtro,
+    setFiltro,
+    estadoFiltro,
+    setEstadoFiltro,
+    seccionFiltro,
+    setSeccionFiltro,
+    lineaFiltro,
+    setLineaFiltro,
+    tipoFiltro,
+    setTipoFiltro,
+    familiaFiltro,
+    setFamiliaFiltro,
+    orden,
+    setOrden,
+    compact,
+    setCompact,
+    vista,
+    setVista,
+    setPage,
+    q,
+    setQ,
+    equipos,
+    kpis,
+    otByEquipo,
+    secciones,
+    lineas,
+    tipos,
+    familias,
+    visibles,
+    totalPages,
+    pageSafe,
+    paginated,
+    agenda,
+    kpiFiltros,
+    estadoChips,
+    filtrosActivos,
+    limpiarFiltros,
+    reload,
+  } = useCtdEquipos(favorites)
 
-  const [loading, setLoading] = useState(() => equipment.length === 0)
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('all')
-  const [seccionFiltro, setSeccionFiltro] = useState<string>('all')
-  const [lineaFiltro, setLineaFiltro] = useState<string>('all')
-  const [tipoFiltro, setTipoFiltro] = useState<string>('all')
-  const [orden, setOrden] = useState<OrdenCampo>('criticidad')
-  const [compact, setCompact] = useState(false)
-  const [vista, setVista] = useState<Vista>('lista')
-  const [page, setPage] = useState(1)
-  const [q, setQ] = useState('')
-  const [debouncedQ, setDebouncedQ] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Expediente en sitio (sin salto a Equipos). El equipo abierto y la pestaña
   // viven en la URL (?eq=<id>&tab=<tab>) → deep-link, refresh y botón atrás.
@@ -240,25 +149,6 @@ export function CentroTecnicoDocumentalPage() {
   const placaInputRef = useRef<HTMLInputElement>(null)
   const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
   const [datosMenu, setDatosMenu] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    getEquipments()
-      .then((rows) => {
-        if (alive) setEquipment(rows)
-      })
-      .catch((err) =>
-        logger.error('Error cargando equipos (Centro Técnico Documental)', err instanceof Error ? err : new Error(String(err))),
-      )
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [setEquipment])
-
-  const equipos = useMemo(() => equipment.filter((e) => !e.deleted), [equipment])
 
   const detailEquipment = useMemo(
     () => (detailId ? equipos.find((e) => e.id === detailId) ?? null : null),
@@ -335,11 +225,6 @@ export function CentroTecnicoDocumentalPage() {
     }
   }, [detailId, lightbox, editingEquipment, searchParams, setSearchParams])
 
-  async function reload() {
-    const fresh = await getEquipments()
-    setEquipment(fresh)
-  }
-
   async function handlePhotoUpload(files: FileList | null) {
     if (!files || files.length === 0 || !detailEquipment || !canEditEquipment) return
     setPhotoUploading(true)
@@ -385,168 +270,6 @@ export function CentroTecnicoDocumentalPage() {
       setImportingPlaca(false)
       if (placaInputRef.current) placaInputRef.current.value = ''
     }
-  }
-
-  const kpis = useMemo(() => {
-    let critA = 0
-    let cond3 = 0
-    let vencidas = 0
-    let incompletas = 0
-    let favs = 0
-    for (const e of equipos) {
-      if (e.criticidad === 'alta') critA++
-      if (e.fichaTecnica?.condicion === 3) cond3++
-      if (diasVencida(e.fichaTecnica?.proximaInspeccion) !== null) vencidas++
-      if (completitud(e) < 100) incompletas++
-      if (favorites.has(e.id)) favs++
-    }
-    return { total: equipos.length, critA, cond3, vencidas, incompletas, favs }
-  }, [equipos, favorites])
-
-  const secciones = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      const s = seccionDe(e)
-      if (s) set.add(s)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos])
-
-  // Líneas dependientes de la sección elegida (cascada).
-  const lineas = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) continue
-      const l = lineaDe(e)
-      if (l) set.add(l)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos, seccionFiltro])
-
-  const tipos = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of equipos) {
-      const t = e.tipo?.trim()
-      if (t) set.add(t)
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [equipos])
-
-  const visibles = useMemo(() => {
-    const term = debouncedQ.trim().toLowerCase()
-    const rows = equipos.filter((e) => {
-      if (term && !`${e.nombre} ${e.codigo}`.toLowerCase().includes(term)) return false
-      if (estadoFiltro !== 'all' && e.estado !== estadoFiltro) return false
-      if (seccionFiltro !== 'all' && seccionDe(e) !== seccionFiltro) return false
-      if (lineaFiltro !== 'all' && lineaDe(e) !== lineaFiltro) return false
-      if (tipoFiltro !== 'all' && (e.tipo ?? '') !== tipoFiltro) return false
-      switch (filtro) {
-        case 'A':
-          return e.criticidad === 'alta'
-        case 'cond3':
-          return e.fichaTecnica?.condicion === 3
-        case 'vencida':
-          return diasVencida(e.fichaTecnica?.proximaInspeccion) !== null
-        case 'incompleta':
-          return completitud(e) < 100
-        case 'favoritos':
-          return favorites.has(e.id)
-        default:
-          return true
-      }
-    })
-    const critRank: Record<Equipment['criticidad'], number> = { alta: 0, media: 1, baja: 2 }
-    const sorted = [...rows]
-    switch (orden) {
-      case 'proxima':
-        sorted.sort((a, b) => proximaMs(a) - proximaMs(b))
-        break
-      case 'ficha':
-        sorted.sort((a, b) => completitud(a) - completitud(b))
-        break
-      case 'area':
-        sorted.sort(
-          (a, b) =>
-            (seccionDe(a) ?? '').localeCompare(seccionDe(b) ?? '', 'es') ||
-            (lineaDe(a) ?? '').localeCompare(lineaDe(b) ?? '', 'es') ||
-            a.nombre.localeCompare(b.nombre, 'es'),
-        )
-        break
-      case 'nombre':
-        sorted.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-        break
-      default:
-        // criticidad (A>B>C), luego condición peor primero
-        sorted.sort((a, b) => {
-          const c = critRank[a.criticidad] - critRank[b.criticidad]
-          if (c !== 0) return c
-          return (b.fichaTecnica?.condicion ?? 0) - (a.fichaTecnica?.condicion ?? 0)
-        })
-    }
-    return sorted
-  }, [equipos, filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ, favorites])
-
-  const totalPages = Math.max(1, Math.ceil(visibles.length / ITEMS_PER_PAGE))
-  const pageSafe = Math.min(page, totalPages)
-  const paginated = useMemo(
-    () => visibles.slice((pageSafe - 1) * ITEMS_PER_PAGE, pageSafe * ITEMS_PER_PAGE),
-    [visibles, pageSafe],
-  )
-
-  // Debounce de la búsqueda (evita refiltrar en cada tecla)
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedQ(q), 250)
-    return () => clearTimeout(id)
-  }, [q])
-
-  // Volver a la página 1 cuando cambian filtros/orden/búsqueda
-  useEffect(() => {
-    setPage(1)
-  }, [filtro, estadoFiltro, seccionFiltro, lineaFiltro, tipoFiltro, orden, debouncedQ])
-
-  // Al cambiar de sección, la línea elegida deja de aplicar (cascada)
-  useEffect(() => {
-    setLineaFiltro('all')
-  }, [seccionFiltro])
-
-  // Agenda: agrupa los equipos filtrados por ventana de próxima inspección.
-  const agenda = useMemo(() => {
-    const groups: Record<Bucket, Equipment[]> = { vencidas: [], d30: [], d60: [], d90: [], futuro: [], sin: [] }
-    for (const e of visibles) groups[bucketDe(e)].push(e)
-    for (const k of Object.keys(groups) as Bucket[]) groups[k].sort((a, b) => proximaMs(a) - proximaMs(b))
-    return groups
-  }, [visibles])
-
-  const kpiFiltros: { key: Filtro; label: string; n: number; cls?: string }[] = [
-    { key: 'todos', label: 'Equipos', n: kpis.total },
-    { key: 'A', label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
-    { key: 'cond3', label: 'Condición 🔴', n: kpis.cond3, cls: 'text-red-600' },
-    { key: 'vencida', label: 'Inspección vencida', n: kpis.vencidas, cls: 'text-amber-600' },
-    { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
-    { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
-  ]
-
-  const estadoChips: { key: EstadoFiltro; label: string }[] = [
-    { key: 'all', label: 'Todos los estados' },
-    { key: 'operativo', label: ESTADO.operativo.label },
-    { key: 'en_mantenimiento', label: ESTADO.en_mantenimiento.label },
-    { key: 'fuera_servicio', label: ESTADO.fuera_servicio.label },
-  ]
-
-  const filtrosActivos =
-    filtro !== 'todos' ||
-    estadoFiltro !== 'all' ||
-    seccionFiltro !== 'all' ||
-    lineaFiltro !== 'all' ||
-    tipoFiltro !== 'all' ||
-    q.trim() !== ''
-  function limpiarFiltros() {
-    setFiltro('todos')
-    setEstadoFiltro('all')
-    setSeccionFiltro('all')
-    setLineaFiltro('all')
-    setTipoFiltro('all')
-    setQ('')
   }
 
   // Exporta el programa (filtro actual) a Excel — handoff de auditoría NFPA 70B.
@@ -618,13 +341,22 @@ export function CentroTecnicoDocumentalPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+    <div className="relative flex h-full bg-background">
+      {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
+      {detailEquipment && (
+        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r p-3 lg:flex">
+          <UbicacionRail equipment={detailEquipment} onMoved={reload} />
+        </aside>
+      )}
+      {/* Centro: lista del programa */}
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <FolderArchive className="h-5 w-5" /> Centro Técnico Documental
           </h1>
-          <p className="text-sm text-muted-foreground">Programa de mantenimiento eléctrico · EMP · NFPA 70B</p>
+          <p className="text-sm text-muted-foreground">Expediente documental por equipo · placa, documentos y criticidad</p>
         </div>
         <div className="relative">
           <input
@@ -649,7 +381,7 @@ export function CentroTecnicoDocumentalPage() {
                   }}
                   disabled={visibles.length === 0}
                 >
-                  Exportar programa (Excel)
+                  Exportar listado (Excel)
                 </button>
                 {canEditEquipment && (
                   <>
@@ -681,7 +413,7 @@ export function CentroTecnicoDocumentalPage() {
       </div>
 
       {/* KPIs = filtros rápidos (click para filtrar) */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {kpiFiltros.map((k) => {
           const active = filtro === k.key
           return (
@@ -722,12 +454,6 @@ export function CentroTecnicoDocumentalPage() {
             className={`text-xs px-3 py-1.5 border-l ${vista === 'tarjetas' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
           >
             Tarjetas
-          </button>
-          <button
-            onClick={() => setVista('agenda')}
-            className={`text-xs px-3 py-1.5 border-l ${vista === 'agenda' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
-          >
-            Agenda
           </button>
         </div>
         <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</label>
@@ -790,6 +516,22 @@ export function CentroTecnicoDocumentalPage() {
           ))}
         </select>
 
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Familia</label>
+        <select
+          value={familiaFiltro}
+          onChange={(e) => setFamiliaFiltro(e.target.value as typeof familiaFiltro)}
+          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          aria-label="Filtrar por familia eléctrica (NFPA 70B)"
+          title="Familia eléctrica NFPA 70B (máquina rotativa incluye motores, motorreductores, mototambores y bombas)"
+        >
+          <option value="all">Todas ({familias.length})</option>
+          {familias.map((f) => (
+            <option key={f.key} value={f.key}>
+              {FAMILIA_LABEL[f.key]} ({f.n})
+            </option>
+          ))}
+        </select>
+
         <label className="ml-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ordenar</label>
         <select
           value={orden}
@@ -797,8 +539,7 @@ export function CentroTecnicoDocumentalPage() {
           className="text-xs border rounded-md px-2 py-1.5 bg-background"
           aria-label="Ordenar por"
         >
-          <option value="criticidad">Criticidad y condición</option>
-          <option value="proxima">Próxima inspección</option>
+          <option value="criticidad">Criticidad</option>
           <option value="ficha">Ficha (menos completa)</option>
           <option value="area">Sección y línea</option>
           <option value="nombre">Nombre</option>
@@ -839,7 +580,9 @@ export function CentroTecnicoDocumentalPage() {
       </div>
 
       {/* Agenda de inspecciones (vista agenda) */}
-      {vista === 'agenda' && <AgendaInspecciones groups={agenda} onOpen={(id) => openExpediente(id, 'ficha')} />}
+      {vista === 'agenda' && (
+        <AgendaInspecciones groups={agenda} otByEquipo={otByEquipo} onOpen={(id) => openExpediente(id, 'ficha')} />
+      )}
 
       {/* Tarjetas (vista tarjetas) */}
       {vista === 'tarjetas' &&
@@ -853,6 +596,8 @@ export function CentroTecnicoDocumentalPage() {
               <CtdEquipoCard
                 key={e.id}
                 equipment={e}
+                ot={otByEquipo.get(e.id)}
+                selected={detailId === e.id}
                 isFavorite={favorites.has(e.id)}
                 onToggleFavorite={() => toggleFavorite(e.id)}
                 onOpen={(tab) => openExpediente(e.id, tab)}
@@ -875,7 +620,9 @@ export function CentroTecnicoDocumentalPage() {
                 <CtdEquipoRow
                   key={e.id}
                   equipment={e}
+                  ot={otByEquipo.get(e.id)}
                   compact={compact}
+                  selected={detailId === e.id}
                   isFavorite={favorites.has(e.id)}
                   onToggleFavorite={() => toggleFavorite(e.id)}
                   onOpen={(tab) => openExpediente(e.id, tab)}
@@ -907,11 +654,13 @@ export function CentroTecnicoDocumentalPage() {
       )}
 
       <p className="text-[11px] text-muted-foreground">
-        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre aquí mismo, sin salir del CTD. “Ficha
+        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre a la derecha, sin salir del CTD. “Ficha
         %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
+        </div>
+      </main>
 
-      {/* Expediente en sitio */}
+      {/* Derecha: detalle del equipo seleccionado (columna en desktop; overlay en móvil) */}
       {detailEquipment && (
         <ExpedienteDialog
           equipment={detailEquipment}
@@ -964,6 +713,968 @@ export function CentroTecnicoDocumentalPage() {
       {editingPhoto && detailEquipment && (
         <PhotoAnnotationEditor photoUrl={editingPhoto} onSave={handleAnnotatedSave} onClose={() => setEditingPhoto(null)} />
       )}
+    </div>
+  )
+}
+
+const SEV_VAL: Record<MaintenanceLogEntry['severidad'], number> = { verde: 1, amarillo: 2, rojo: 3 }
+const SEV_HEX: Record<MaintenanceLogEntry['severidad'], string> = { verde: '#10b981', amarillo: '#f59e0b', rojo: '#ef4444' }
+const SEV_LABEL: Record<MaintenanceLogEntry['severidad'], string> = {
+  verde: 'Condición 1',
+  amarillo: 'Condición 2',
+  rojo: 'Condición 3',
+}
+
+/** Tendencia de la condición (severidad del historial) + trazabilidad de cambios. */
+function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; equipment: Equipment }) {
+  // Serie cronológica ascendente (el historial llega en orden descendente).
+  const serie = useMemo(() => [...log].sort((a, b) => a.fecha.getTime() - b.fecha.getTime()), [log])
+
+  // Trazabilidad: puntos donde la condición (severidad) cambia respecto al anterior.
+  const cambios = useMemo(() => {
+    const out: { fecha: Date; from: MaintenanceLogEntry['severidad']; to: MaintenanceLogEntry['severidad'] }[] = []
+    for (let i = 1; i < serie.length; i++) {
+      const prev = serie[i - 1]
+      const cur = serie[i]
+      if (prev && cur && prev.severidad !== cur.severidad) out.push({ fecha: cur.fecha, from: prev.severidad, to: cur.severidad })
+    }
+    return out.reverse()
+  }, [serie])
+
+  const condActual = equipment.fichaTecnica?.condicion
+
+  // Serie de severidad (Cond. 1/2/3) en el tiempo con el mismo look echarts que
+  // Mediciones: línea escalonada + puntos coloreados por condición + ejes rotulados.
+  const condData = serie.map((e) => ({
+    value: [e.fecha.getTime(), SEV_VAL[e.severidad]] as [number, number],
+    itemStyle: { color: SEV_HEX[e.severidad] },
+    hallazgo: e.hallazgo,
+    sevLabel: SEV_LABEL[e.severidad],
+  }))
+  const condOption = {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 14, top: 12, bottom: 18, containLabel: true },
+    tooltip: {
+      trigger: 'axis' as const,
+      axisPointer: { type: 'line' as const, lineStyle: { color: MC_AXIS, type: 'dashed', width: 1 } },
+      formatter: (params: any) => {
+        const arr = Array.isArray(params) ? params : [params]
+        const p = arr[0]
+        if (!p) return ''
+        const fecha = new Date(p.value?.[0]).toLocaleDateString()
+        const cond = p.data?.sevLabel ?? ''
+        const hallazgo = p.data?.hallazgo ? `<div style="font-size:11px">${p.data.hallazgo}</div>` : ''
+        return `<div style="font-size:11px;color:#64748b;margin-bottom:2px">${fecha}</div><strong>${cond}</strong>${hallazgo}`
+      },
+    },
+    xAxis: {
+      type: 'time' as const,
+      axisLine: { lineStyle: { color: MC_GRID } },
+      axisTick: { show: true, lineStyle: { color: MC_GRID }, length: 3 },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        hideOverlap: true,
+        formatter: (v: number) => new Date(v).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
+      },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      min: 0.5,
+      max: 3.5,
+      interval: 1,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        formatter: (v: number) => (v === 1 ? 'Cond 1' : v === 2 ? 'Cond 2' : v === 3 ? 'Cond 3' : ''),
+      },
+      splitLine: { lineStyle: { color: MC_GRID, type: 'dashed' as const } },
+    },
+    series: [
+      {
+        type: 'line' as const,
+        step: 'end' as const,
+        data: condData,
+        symbolSize: 7,
+        lineStyle: { color: '#94a3b8', width: 2 },
+        areaStyle: { color: 'rgba(148,163,184,0.12)' },
+      },
+    ],
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Tendencia de condición{' '}
+            <span className="text-[11px] font-normal text-muted-foreground">(historial NFPA 70B)</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Actual: {condActual ? `${COND_EMOJI[condActual]} Cond. ${condActual}` : '—'}
+          </div>
+        </div>
+
+        {serie.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground italic">
+            Sin historial para calcular la tendencia. Registra inspecciones en la Ficha NFPA 70B.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3">
+              <ReactECharts option={condOption} style={{ height: 150, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>🟢 Cond 1 (mejor) · 🟡 2 · 🔴 3 (peor)</span>
+              <span>{serie.length} registro(s)</span>
+            </div>
+          </>
+        )}
+
+        <div className="mt-3 border-t pt-2">
+          <div className="text-xs font-medium mb-1">Trazabilidad de cambios</div>
+          {cambios.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">Sin cambios de condición registrados.</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {cambios.slice(0, 6).map((c, i) => (
+                <li key={`${c.fecha.getTime()}-${i}`} className="text-[11px] text-muted-foreground">
+                  {c.fecha.toLocaleDateString()} · {SEV_LABEL[c.from]} →{' '}
+                  <span className="font-medium text-foreground">{SEV_LABEL[c.to]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Última actualización de la ficha: {equipment.updatedAt ? new Date(equipment.updatedAt).toLocaleString() : '—'}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+type MedicionDraft = {
+  fecha: string
+  contexto: Medicion['contexto']
+  tecnico: string
+  nota: string
+  valores: Record<string, string>
+}
+function emptyMedicionDraft(): MedicionDraft {
+  return { fecha: new Date().toISOString().slice(0, 10), contexto: 'proceso', tecnico: '', nota: '', valores: {} }
+}
+const CTX_COLOR: Record<Medicion['contexto'], string> = { proceso: '#2563eb', reposo: '#94a3b8' }
+
+function fmtNum(v: number): string {
+  return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)
+}
+
+/** Evento de intervención de mantenimiento para marcar sobre la tendencia. */
+export type IntervencionEvento = {
+  fecha: Date
+  label: string
+  tipo: WorkOrder['tipo'] | MaintenanceLogEntry['tipo']
+  origen: 'ot' | 'historial'
+}
+
+// Colores legibles en tema claro y oscuro (no dependen de currentColor).
+const MC_AXIS = '#64748b' //  slate-500 — ejes/etiquetas
+const MC_GRID = 'rgba(100,116,139,0.16)' // gridlines tenues
+const MC_EVENT = '#7c3aed' // violet-600 — intervención
+const MC_LIMIT = '#ef4444' // red-500 — umbral NFPA
+
+function shortLabel(s: string, n = 16): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s
+}
+
+/**
+ * Gráfico de tendencia de una métrica (echarts): área suave translúcida por
+ * contexto (proceso/reposo), marcadores verticales de intervención (OT cerradas
+ * + historial) y línea de umbral NFPA. Sostiene la lectura RCM "antes/después de
+ * la intervención" + la variación del período. Reemplaza el SVG plano anterior.
+ */
+function MetricChart({
+  rows,
+  campo,
+  eventos,
+  umbral,
+}: {
+  rows: Medicion[]
+  campo: CampoMedicion
+  eventos: IntervencionEvento[]
+  umbral?: { min?: number; max?: number }
+}) {
+  const pts = rows
+    .map((r) => ({ t: r.fecha.getTime(), v: r.valores[campo.id], ctx: r.contexto, fecha: r.fecha }))
+    .filter((p) => typeof p.v === 'number') as { t: number; v: number; ctx: Medicion['contexto']; fecha: Date }[]
+  if (pts.length === 0) {
+    return <p className="py-6 text-center text-sm italic text-muted-foreground">Sin datos de {campo.label} todavía.</p>
+  }
+
+  // Rango Y: encierra los datos y, si la familia define umbral, también el límite
+  // (para ver la cercanía al máximo/mínimo NFPA). Si no hay umbral, escala a los
+  // datos para resaltar la fluctuación.
+  const vals = pts.map((p) => p.v)
+  let yMin = Math.min(...vals)
+  let yMax = Math.max(...vals)
+  if (umbral?.max != null) yMax = Math.max(yMax, umbral.max)
+  if (umbral?.min != null) yMin = Math.min(yMin, umbral.min)
+  const pad = (yMax - yMin) * 0.12 || 1
+  yMin -= pad
+  yMax += pad
+
+  const procesoData = pts.filter((p) => p.ctx === 'proceso').map((p) => [p.t, p.v] as [number, number])
+  const reposoData = pts.filter((p) => p.ctx === 'reposo').map((p) => [p.t, p.v] as [number, number])
+
+  // Variación del período (primer → último punto, cronológico).
+  const ordered = [...pts].sort((a, b) => a.t - b.t)
+  const first = ordered[0]!
+  const last = ordered[ordered.length - 1]!
+  const tieneVariacion = ordered.length >= 2 && last.t > first.t
+  const delta = last.v - first.v
+  const pct = first.v !== 0 ? (delta / Math.abs(first.v)) * 100 : null
+  const dias = (last.t - first.t) / 86_400_000
+  const meses = dias / 30.44
+  const periodo = meses < 1.5 ? `${Math.round(dias)} días` : `${meses.toFixed(meses < 6 ? 1 : 0)} meses`
+  const sobreLimite = umbral?.max != null && last.v > umbral.max
+  const bajoLimite = umbral?.min != null && last.v < umbral.min
+
+  // markLines: intervenciones (verticales) + umbral (horizontales). Se concatenan
+  // como union para que TS no fuerce una sola forma de ítem.
+  const eventLines = eventos.map((e) => ({
+    xAxis: e.fecha.getTime(),
+    lineStyle: { color: MC_EVENT, type: 'dashed' as const, width: 1 },
+    label: {
+      show: true,
+      formatter: shortLabel(e.label),
+      color: MC_EVENT,
+      fontSize: 9,
+      position: 'end' as const,
+      padding: [2, 3] as [number, number],
+      backgroundColor: 'rgba(124,58,237,0.10)',
+      borderRadius: 3,
+    },
+  }))
+  const limitLines: Record<string, unknown>[] = []
+  if (umbral?.max != null)
+    limitLines.push({
+      yAxis: umbral.max,
+      lineStyle: { color: MC_LIMIT, type: 'dashed', width: 1 },
+      label: { show: true, formatter: `máx ${fmtNum(umbral.max)} ${campo.unidad}`.trim(), color: MC_LIMIT, fontSize: 9, position: 'insideEndTop' },
+    })
+  if (umbral?.min != null)
+    limitLines.push({
+      yAxis: umbral.min,
+      lineStyle: { color: MC_LIMIT, type: 'dashed', width: 1 },
+      label: { show: true, formatter: `mín ${fmtNum(umbral.min)} ${campo.unidad}`.trim(), color: MC_LIMIT, fontSize: 9, position: 'insideEndBottom' },
+    })
+  const markData = [...eventLines, ...limitLines]
+
+  const procesoSeries = {
+    name: 'En proceso',
+    type: 'line' as const,
+    data: procesoData,
+    smooth: 0.4,
+    showSymbol: true,
+    symbolSize: 5,
+    connectNulls: false,
+    lineStyle: { color: CTX_COLOR.proceso, width: 2 },
+    itemStyle: { color: CTX_COLOR.proceso },
+    areaStyle: {
+      color: {
+        type: 'linear' as const,
+        x: 0,
+        y: 0,
+        x2: 0,
+        y2: 1,
+        colorStops: [
+          { offset: 0, color: 'rgba(37,99,235,0.30)' },
+          { offset: 1, color: 'rgba(37,99,235,0.02)' },
+        ],
+      },
+    },
+  }
+  const reposoSeries = {
+    name: 'En reposo',
+    type: 'line' as const,
+    data: reposoData,
+    smooth: 0.4,
+    showSymbol: true,
+    symbolSize: 4,
+    connectNulls: false,
+    lineStyle: { color: CTX_COLOR.reposo, width: 1.5, type: 'dashed' as const },
+    itemStyle: { color: CTX_COLOR.reposo },
+  }
+
+  // El markLine cuelga de la primera serie con datos (proceso si existe).
+  const markLine = { symbol: ['none', 'none'] as [string, string], silent: true, animation: false, data: markData }
+  const series: any[] = []
+  if (procesoData.length > 0) series.push({ ...procesoSeries, markLine })
+  if (reposoData.length > 0) series.push(series.length === 0 ? { ...reposoSeries, markLine } : reposoSeries)
+
+  const option = {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 16, top: 30, bottom: 18, containLabel: true },
+    legend: {
+      show: true,
+      top: 0,
+      right: 0,
+      icon: 'roundRect',
+      itemWidth: 12,
+      itemHeight: 8,
+      textStyle: { color: MC_AXIS, fontSize: 10 },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      axisPointer: { type: 'line' as const, lineStyle: { color: MC_AXIS, type: 'dashed', width: 1 } },
+      formatter: (params: any) => {
+        const arr = Array.isArray(params) ? params : [params]
+        if (arr.length === 0) return ''
+        const ts = arr[0]?.value?.[0] as number
+        const fecha = new Date(ts).toLocaleDateString()
+        const filas = arr
+          .filter((p: any) => p.value?.[1] != null)
+          .map(
+            (p: any) =>
+              `<span style="color:${p.color}">●</span> ${p.seriesName}: <strong>${fmtNum(p.value[1])}</strong> ${campo.unidad}`,
+          )
+          .join('<br/>')
+        return `<div style="font-size:11px;color:#64748b;margin-bottom:2px">${fecha}</div>${filas}`
+      },
+    },
+    xAxis: {
+      type: 'time' as const,
+      axisLine: { lineStyle: { color: MC_GRID } },
+      axisTick: { show: true, lineStyle: { color: MC_GRID }, length: 3 },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        hideOverlap: true,
+        formatter: (v: number) => new Date(v).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
+      },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      name: campo.unidad,
+      min: yMin,
+      max: yMax,
+      nameTextStyle: { color: MC_AXIS, fontSize: 9, align: 'left' as const },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: MC_AXIS, fontSize: 9, formatter: (v: number) => fmtNum(v) },
+      splitLine: { lineStyle: { color: MC_GRID, type: 'dashed' as const } },
+    },
+    series,
+  }
+
+  return (
+    <div>
+      {tieneVariacion && (
+        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-red-600' : ''}`}>
+          <span className="font-medium">
+            {fmtNum(first.v)} → {fmtNum(last.v)} {campo.unidad}
+          </span>{' '}
+          <span className={delta > 0 ? 'text-amber-600' : delta < 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
+            {delta >= 0 ? '▲' : '▼'}{' '}
+            {pct != null ? `${delta >= 0 ? '+' : ''}${pct.toFixed(0)}%` : `${delta >= 0 ? '+' : ''}${fmtNum(delta)} ${campo.unidad}`}
+          </span>{' '}
+          <span className="text-muted-foreground">en {periodo}</span>
+          {sobreLimite && <span className="ml-1">⚠ sobre el límite NFPA</span>}
+          {bajoLimite && <span className="ml-1">⚠ bajo el mínimo NFPA</span>}
+        </div>
+      )}
+      <ReactECharts option={option} style={{ height: 240, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
+      {eventos.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {eventos.map((e, i) => (
+            <li key={`${e.fecha.getTime()}-${i}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: MC_EVENT }} />
+              <span className="tabular-nums">{e.fecha.toLocaleDateString()}</span>
+              <span className="text-foreground">· {e.label}</span>
+              <span className="capitalize">({e.tipo})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** Sparkline de una serie (un campo) con líneas separadas por contexto proceso/reposo. */
+function SerieCampo({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion }) {
+  const pts = rows
+    .map((r, i) => ({ i, v: r.valores[campo.id], ctx: r.contexto }))
+    .filter((p) => typeof p.v === 'number') as { i: number; v: number; ctx: Medicion['contexto'] }[]
+  if (pts.length === 0) {
+    return (
+      <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+        <span className="w-32 shrink-0 truncate">{campo.label}</span>
+        <span className="flex-1 italic">sin datos</span>
+      </div>
+    )
+  }
+  const vals = pts.map((p) => p.v)
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  const W = 160
+  const H = 32
+  const P = 4
+  const n = rows.length
+  const x = (i: number) => (n <= 1 ? W / 2 : P + (i / (n - 1)) * (W - 2 * P))
+  const y = (v: number) => (max === min ? H / 2 : H - P - ((v - min) / (max - min)) * (H - 2 * P))
+  const lineFor = (ctx: Medicion['contexto']) =>
+    pts.filter((p) => p.ctx === ctx).map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
+  const last = pts[pts.length - 1]
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="w-32 shrink-0 text-xs truncate" title={campo.label}>
+        {campo.label}
+      </span>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 h-8" role="img" aria-label={campo.label}>
+        {(['proceso', 'reposo'] as const).map((ctx) => {
+          const pl = lineFor(ctx)
+          return pl.includes(' ') ? (
+            <polyline key={ctx} points={pl} fill="none" stroke={CTX_COLOR[ctx]} strokeOpacity={0.7} strokeWidth={1.5} />
+          ) : null
+        })}
+        {pts.map((p) => (
+          <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={2.5} fill={CTX_COLOR[p.ctx]} />
+        ))}
+      </svg>
+      <span className="w-20 shrink-0 text-right text-xs tabular-nums">
+        {last?.v} <span className="text-muted-foreground">{campo.unidad}</span>
+      </span>
+    </div>
+  )
+}
+
+/** Pestaña Mediciones — bitácora de comportamiento + tendencias (solo favoritos). */
+function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
+  const campos = medicionesDe(equipment)
+  const [rows, setRows] = useState<Medicion[]>([])
+  const [loading, setLoading] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState<MedicionDraft>(emptyMedicionDraft)
+  const [metricId, setMetricId] = useState<string>('')
+  const [eventos, setEventos] = useState<IntervencionEvento[]>([])
+
+  // Campos que ya tienen al menos un dato (para el gráfico y el selector).
+  const camposConDatos = campos.filter((c) => rows.some((r) => typeof r.valores[c.id] === 'number'))
+  const metricSel = camposConDatos.find((c) => c.id === metricId) ?? camposConDatos[0]
+  // Umbral NFPA del campo (si la familia lo define en el protocolo) → línea límite.
+  const umbral = metricSel ? checklistDe(equipment).find((t) => t.id === metricSel.id)?.rango : undefined
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    getMediciones(equipment.id)
+      .then((r) => {
+        if (alive) setRows(r)
+      })
+      .catch((err) => {
+        if (alive) setRows([])
+        logger.error('Error cargando mediciones', err instanceof Error ? err : new Error(String(err)))
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  // Intervenciones (OT cerradas + historial correctivo/preventivo/predictivo) →
+  // marcadores verticales sobre la tendencia para leer el "antes/después".
+  useEffect(() => {
+    let alive = true
+    Promise.all([getWorkOrders(equipment.id), getMaintenanceLog(equipment.id)])
+      .then(([wos, mlog]) => {
+        if (!alive) return
+        const OT_INTERV = new Set<WorkOrder['tipo']>(['correctivo', 'preventivo', 'predictivo', 'mejora'])
+        const LOG_INTERV = new Set<MaintenanceLogEntry['tipo']>(['correctivo', 'preventivo', 'predictivo'])
+        const deOt: IntervencionEvento[] = wos
+          .filter((w) => w.estado === 'cerrada' && !!w.fechaCierre && OT_INTERV.has(w.tipo))
+          .map((w) => ({ fecha: new Date(w.fechaCierre as string), label: w.titulo || w.tipo, tipo: w.tipo, origen: 'ot' }))
+        const deLog: IntervencionEvento[] = mlog
+          .filter((e) => LOG_INTERV.has(e.tipo))
+          .map((e) => ({ fecha: e.fecha, label: e.hallazgo || e.tipo, tipo: e.tipo, origen: 'historial' }))
+        setEventos([...deOt, ...deLog].sort((a, b) => a.fecha.getTime() - b.fecha.getTime()))
+      })
+      .catch((err) => {
+        if (alive) setEventos([])
+        logger.error('Error cargando intervenciones para tendencia', err instanceof Error ? err : new Error(String(err)))
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  async function guardar() {
+    const valores: Record<string, number> = {}
+    for (const c of campos) {
+      const raw = draft.valores[c.id]
+      const num = raw == null || raw.trim() === '' ? NaN : Number(raw)
+      if (Number.isFinite(num)) valores[c.id] = num
+    }
+    if (Object.keys(valores).length === 0) {
+      alert('Anota al menos un valor.')
+      return
+    }
+    setSaving(true)
+    try {
+      await addMedicion({
+        equipmentId: equipment.id,
+        hierarchyNodeId: equipment.hierarchyNodeId,
+        fecha: new Date(draft.fecha),
+        contexto: draft.contexto,
+        tecnico: draft.tecnico.trim() || undefined,
+        valores,
+        nota: draft.nota.trim() || undefined,
+      })
+      setRows(await getMediciones(equipment.id))
+      setAdding(false)
+      setDraft(emptyMedicionDraft())
+    } catch (err) {
+      logger.error('Error guardando medición', err instanceof Error ? err : new Error(String(err)))
+      alert('No se pudo guardar la medición.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Tendencias de comportamiento{' '}
+            <span className="text-[11px] font-normal text-muted-foreground">· {FAMILIA_LABEL[familiaDe(equipment)]}</span>
+          </div>
+          {canEdit && !adding && (
+            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar medición
+            </Button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="grid md:grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Fecha</label>
+                <Input type="date" value={draft.fecha} onChange={(e) => setDraft((d) => ({ ...d, fecha: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Contexto</label>
+                <div className="inline-flex rounded-md border overflow-hidden mt-1">
+                  {(['proceso', 'reposo'] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, contexto: c }))}
+                      className={`px-3 py-1.5 text-xs capitalize ${draft.contexto === c ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Técnico</label>
+                <Input value={draft.tecnico} onChange={(e) => setDraft((d) => ({ ...d, tecnico: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {campos.map((c) => (
+                <div key={c.id}>
+                  <label className="text-xs text-muted-foreground">
+                    {c.label} ({c.unidad})
+                  </label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={draft.valores[c.id] ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, valores: { ...d.valores, [c.id]: e.target.value } }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <Input
+              placeholder="Nota (opcional)…"
+              value={draft.nota}
+              onChange={(e) => setDraft((d) => ({ ...d, nota: e.target.value }))}
+            />
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={guardar} disabled={saving}>
+                <Check className="h-3.5 w-3.5 mr-1.5" /> {saving ? 'Guardando…' : 'Guardar medición'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false)
+                  setDraft(emptyMedicionDraft())
+                }}
+                disabled={saving}
+              >
+                <X className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm text-muted-foreground italic">Cargando…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">
+            Sin mediciones todavía. Registra corriente por fase, temperatura (proceso/reposo), vibración… y se arma la
+            tendencia de comportamiento.
+          </p>
+        ) : (
+          <>
+            {metricSel && (
+              <div className="rounded-lg border bg-muted/20 p-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="text-xs font-medium">
+                    {metricSel.label} <span className="text-muted-foreground">({metricSel.unidad})</span>
+                  </div>
+                  <select
+                    value={metricSel.id}
+                    onChange={(e) => setMetricId(e.target.value)}
+                    className="rounded-md border bg-background px-2 py-1 text-xs"
+                    aria-label="Métrica a graficar"
+                  >
+                    {camposConDatos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <MetricChart rows={rows} campo={metricSel} eventos={eventos} umbral={umbral} />
+              </div>
+            )}
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Todas las series</div>
+            <div className="divide-y">
+              {campos.map((c) => (
+                <SerieCampo key={c.id} rows={rows} campo={c} />
+              ))}
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: CTX_COLOR.proceso }} /> proceso
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: CTX_COLOR.reposo }} /> reposo
+              </span>
+              <span>· {rows.length} medición(es)</span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
+function OtBadge({ ot }: { ot?: OtCount }) {
+  if (!ot || ot.abiertas === 0) return null
+  const danger = ot.vencidas > 0
+  return (
+    <span
+      title={`${ot.abiertas} OT abierta(s)${ot.vencidas > 0 ? ` · ${ot.vencidas} vencida(s)` : ''}`}
+      className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
+    >
+      <Wrench className="h-3 w-3" />
+      {ot.abiertas}
+      {ot.vencidas > 0 ? `·${ot.vencidas}!` : ''}
+    </span>
+  )
+}
+
+/** Recursos · repuestos del equipo (N:M) + buscador embebido para vincular/desvincular. */
+function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEdit: boolean }) {
+  const nodeId = equipment.hierarchyNodeId
+  const [reloadKey, setReloadKey] = useState(0)
+  const { repuestos, loading } = useRepuestosDeEquipo(nodeId, reloadKey)
+  const [adding, setAdding] = useState(false)
+  const [maestro, setMaestro] = useState<RepuestoMaestroItem[] | null>(null)
+  const [loadingMaestro, setLoadingMaestro] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function openAdd() {
+    setAdding(true)
+    if (!maestro && !loadingMaestro) {
+      setLoadingMaestro(true)
+      try {
+        setMaestro(await getRepuestosMaestro())
+      } catch (e) {
+        logger.error('Error cargando maestro de repuestos', e instanceof Error ? e : new Error(String(e)))
+      } finally {
+        setLoadingMaestro(false)
+      }
+    }
+  }
+
+  const term = q.trim().toLowerCase()
+  const linkedIds = new Set(repuestos.map((r) => r.id))
+  const resultados = (maestro ?? [])
+    .filter((m) => !m.equipos.includes(nodeId ?? '') && !linkedIds.has(m.id))
+    .filter((m) => term.length >= 2 && `${m.nombre} ${m.codigoSAP}`.toLowerCase().includes(term))
+    .slice(0, 20)
+
+  async function vincular(m: RepuestoMaestroItem) {
+    if (!nodeId) return
+    setBusy(true)
+    try {
+      await linkRepuestoEquipo(m.id, nodeId, equipment.codigo)
+      setReloadKey((k) => k + 1)
+      setQ('')
+    } catch (e) {
+      logger.error('Error vinculando repuesto', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo vincular el repuesto.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function desvincular(id: string) {
+    if (!nodeId || !window.confirm('¿Quitar este repuesto del equipo?')) return
+    setBusy(true)
+    try {
+      await unlinkRepuestoEquipo(id, nodeId)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      logger.error('Error desvinculando repuesto', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo quitar el repuesto.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Repuestos del equipo{' '}
+            {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
+          </div>
+          {canEdit && nodeId && !adding && (
+            <Button variant="outline" size="sm" onClick={openAdd}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Vincular
+            </Button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="space-y-2 rounded-lg border p-2">
+            <Input placeholder="Buscar repuesto por nombre o SAP…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+            {loadingMaestro ? (
+              <p className="text-xs italic text-muted-foreground">Cargando maestro…</p>
+            ) : term.length < 2 ? (
+              <p className="text-xs italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
+            ) : resultados.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground">Sin coincidencias (o ya vinculados).</p>
+            ) : (
+              <div className="max-h-56 divide-y overflow-y-auto">
+                {resultados.map((m) => (
+                  <button
+                    key={m.id}
+                    disabled={busy}
+                    onClick={() => vincular(m)}
+                    className="flex w-full items-center gap-2 py-1.5 text-left text-sm hover:bg-muted/40 disabled:opacity-50"
+                  >
+                    <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{m.codigoSAP || '—'}</span>
+                    <span className="min-w-0 flex-1 truncate">{m.nombre}</span>
+                    <Plus className="h-4 w-4 shrink-0 text-primary" />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false)
+                  setQ('')
+                }}
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm italic text-muted-foreground">Cargando…</p>
+        ) : repuestos.length === 0 ? (
+          <p className="text-sm italic text-muted-foreground">
+            Sin repuestos vinculados{nodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
+          </p>
+        ) : (
+          <div className="divide-y">
+            {repuestos.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{r.codigoSAP || '—'}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {r.nombre}
+                  {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
+                </span>
+                {typeof r.stockFisico === 'number' && (
+                  <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+                )}
+                {canEdit && nodeId && (
+                  <button
+                    disabled={busy}
+                    onClick={() => desvincular(r.id)}
+                    className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                    title="Quitar del equipo"
+                    aria-label="Quitar repuesto"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          Los repuestos se comparten N:M con el maestro; “Vincular” agrega este equipo al repuesto.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Rail izquierdo (desktop): ruta del equipo en la jerarquía + cambiar ubicación (admin). */
+function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?: () => void }) {
+  const { isAdmin } = usePermissions()
+  const nodeId = equipment.hierarchyNodeId
+  const parts = (equipment.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+
+  const [moving, setMoving] = useState(false)
+  const [cands, setCands] = useState<AreaNode[] | null>(null)
+  const [loadingCands, setLoadingCands] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function openMove() {
+    setMoving(true)
+    if (!cands && !loadingCands && nodeId) {
+      setLoadingCands(true)
+      try {
+        setCands(await getParentCandidates(nodeId))
+      } catch (e) {
+        logger.error('Error cargando jerarquía', e instanceof Error ? e : new Error(String(e)))
+      } finally {
+        setLoadingCands(false)
+      }
+    }
+  }
+
+  const term = q.trim().toLowerCase()
+  const resultados = (cands ?? []).filter((c) => term.length >= 2 && c.rutaNombre.toLowerCase().includes(term)).slice(0, 25)
+
+  async function mover(c: AreaNode) {
+    if (!nodeId) return
+    if (!window.confirm(`Mover "${equipment.nombre}" bajo:\n${c.rutaNombre}\n\nReubica el nodo en la jerarquía SAP y excluye del sync. Conserva repuestos y manuales.`))
+      return
+    setBusy(true)
+    try {
+      await moverEquipoEnJerarquia(equipment.id, nodeId, c.id)
+      setMoving(false)
+      setQ('')
+      onMoved?.()
+    } catch (e) {
+      logger.error('Error moviendo equipo en la jerarquía', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo mover el equipo. ' + (e instanceof Error ? e.message : ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border bg-card/95 p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5" /> Ubicación en la planta
+        </span>
+        {isAdmin && nodeId && !moving && (
+          <button className="text-[11px] text-primary hover:underline" onClick={openMove}>
+            Cambiar
+          </button>
+        )}
+      </div>
+      {parts.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">Sin ruta de jerarquía.</p>
+      ) : (
+        <ol className="space-y-0.5">
+          {parts.map((p, i) => {
+            const last = i === parts.length - 1
+            return (
+              <li key={`${i}-${p}`} style={{ paddingLeft: `${i * 12}px` }} className="flex items-start">
+                <span className={`text-xs ${last ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                  {i > 0 && <span className="mr-1 text-muted-foreground/50">└</span>}
+                  {p}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+
+      {moving && (
+        <div className="mt-3 space-y-2 rounded-md border p-2">
+          <div className="text-[11px] font-medium">Mover bajo… (nuevo padre)</div>
+          <Input placeholder="Buscar área/equipo destino…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          {loadingCands ? (
+            <p className="text-[11px] italic text-muted-foreground">Cargando jerarquía…</p>
+          ) : term.length < 2 ? (
+            <p className="text-[11px] italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
+          ) : resultados.length === 0 ? (
+            <p className="text-[11px] italic text-muted-foreground">Sin coincidencias.</p>
+          ) : (
+            <div className="max-h-60 divide-y overflow-y-auto">
+              {resultados.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={busy}
+                  onClick={() => mover(c)}
+                  className="block w-full py-1.5 text-left text-[11px] hover:bg-muted/40 disabled:opacity-50"
+                  title={c.rutaNombre}
+                >
+                  {c.rutaNombre}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setMoving(false)
+                setQ('')
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-[10px] text-muted-foreground">
+        Origen: jerarquía SAP. {isAdmin ? 'Cambiar reubica el nodo y excluye del sync (conserva repuestos/manuales).' : ''}
+      </p>
     </div>
   )
 }
@@ -1024,10 +1735,10 @@ function ExpedienteDialog({
       : null
   const rel = confiabilidad(incidents)
 
-  // Repuestos + documentos heredados del nodo de jerarquía (maestro N:M)
+  // Documentos heredados del nodo de jerarquía (maestro N:M). Los repuestos
+  // viven en su propio sub-componente (lista + vincular) para refrescar al enlazar.
   const nodeIds = equipment.hierarchyNodeId ? [equipment.hierarchyNodeId] : []
   const { manuales, loading: manualesLoading } = useManualesDeEquipos(nodeIds)
-  const { repuestos, loading: repuestosLoading } = useRepuestosDeEquipo(equipment.hierarchyNodeId)
 
   // Órdenes de trabajo del equipo
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
@@ -1040,8 +1751,13 @@ function ExpedienteDialog({
     prioridad: WorkOrder['prioridad']
     asignadoA: string
     fechaProgramada: string
+    costo: string
     descripcion: string
-  }>({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+  }>({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', costo: '', descripcion: '' })
+
+  // Costo total de mantenimiento del equipo (TCO) = suma de costos de sus OT.
+  const tco = workOrders.reduce((s, wo) => s + (wo.costo ?? 0), 0)
+  const otConCosto = workOrders.filter((wo) => typeof wo.costo === 'number').length
 
   useEffect(() => {
     let alive = true
@@ -1066,6 +1782,7 @@ function ExpedienteDialog({
     if (!woDraft.titulo.trim()) return
     setWoSaving(true)
     try {
+      const costoNum = woDraft.costo.trim() ? Number(woDraft.costo) : undefined
       await createWorkOrder({
         equipmentId: equipment.id,
         hierarchyNodeId: equipment.hierarchyNodeId,
@@ -1076,10 +1793,11 @@ function ExpedienteDialog({
         estado: 'abierta',
         asignadoA: woDraft.asignadoA.trim() || undefined,
         fechaProgramada: woDraft.fechaProgramada || undefined,
+        costo: costoNum != null && Number.isFinite(costoNum) ? costoNum : undefined,
       })
       setWorkOrders(await getWorkOrders(equipment.id))
       setWoForm(false)
-      setWoDraft({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', descripcion: '' })
+      setWoDraft({ titulo: '', tipo: 'correctivo', prioridad: 'media', asignadoA: '', fechaProgramada: '', costo: '', descripcion: '' })
     } catch (err) {
       logger.error('Error creando OT', err instanceof Error ? err : new Error(String(err)))
       alert('No se pudo crear la orden de trabajo.')
@@ -1091,7 +1809,15 @@ function ExpedienteDialog({
   async function cambiarEstadoOT(wo: WorkOrder, estado: WorkOrder['estado']) {
     try {
       const patch: Partial<WorkOrder> = { estado }
-      if (estado === 'cerrada') patch.fechaCierre = new Date().toISOString().slice(0, 10)
+      if (estado === 'cerrada') {
+        patch.fechaCierre = new Date().toISOString().slice(0, 10)
+        // Capturar/confirmar el costo al cerrar (alimenta el TCO del activo).
+        const ingresado = window.prompt('Costo de esta OT (opcional, solo número):', wo.costo != null ? String(wo.costo) : '')
+        if (ingresado !== null && ingresado.trim() !== '') {
+          const n = Number(ingresado)
+          if (Number.isFinite(n)) patch.costo = n
+        }
+      }
       await updateWorkOrder(wo.id, patch)
       setWorkOrders(await getWorkOrders(equipment.id))
     } catch (err) {
@@ -1105,14 +1831,12 @@ function ExpedienteDialog({
   const [editingNoteText, setEditingNoteText] = useState('')
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
-      onClick={onClose}
+    <section
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
       role="dialog"
       aria-modal="true"
     >
-      <Card className="my-4 w-full max-w-3xl" onClick={(ev) => ev.stopPropagation()}>
-        <CardContent className="p-4 md:p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
           {/* Encabezado */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1128,8 +1852,11 @@ function ExpedienteDialog({
                 <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
               </div>
               <div className="text-xs text-muted-foreground font-mono">{equipment.codigo}</div>
+              {equipment.nombreComun && <div className="text-sm text-muted-foreground truncate">“{equipment.nombreComun}”</div>}
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={`${crit.cls} text-xs`}>Criticidad {crit.nivel}</Badge>
+                <Badge variant="outline" className={`${crit.cls} text-xs`} title={CRIT_INFO[equipment.criticidad].desc}>
+                  Criticidad {crit.nivel}
+                </Badge>
                 <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
                 {ubicacion && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -1157,9 +1884,11 @@ function ExpedienteDialog({
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="info">Información</TabsTrigger>
               <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
+              <TabsTrigger value="protocolo">Protocolo</TabsTrigger>
               <TabsTrigger value="tablero">Tablero</TabsTrigger>
               <TabsTrigger value="recursos">Recursos</TabsTrigger>
               <TabsTrigger value="trabajos">Trabajos ({workOrders.length})</TabsTrigger>
+              {isFavorite && <TabsTrigger value="mediciones">Mediciones</TabsTrigger>}
               <TabsTrigger value="fotos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
               <TabsTrigger value="notas">Notas ({notes.length})</TabsTrigger>
               <TabsTrigger value="qr">QR</TabsTrigger>
@@ -1186,8 +1915,19 @@ function ExpedienteDialog({
                       <div className="font-medium">{equipment.tipo || '—'}</div>
                     </div>
                     <div>
+                      <div className="text-sm text-muted-foreground">Familia (NFPA 70B)</div>
+                      <div className="font-medium">{FAMILIA_LABEL[familiaDe(equipment)]}</div>
+                    </div>
+                    <div>
                       <div className="text-sm text-muted-foreground">Estado</div>
                       <div className="font-medium">{est.label}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-sm text-muted-foreground">Criticidad (NFPA 70B §2.4)</div>
+                      <div className="font-medium">
+                        {CRIT_INFO[equipment.criticidad].label}{' '}
+                        <span className="text-xs font-normal text-muted-foreground">— {CRIT_INFO[equipment.criticidad].desc}</span>
+                      </div>
                     </div>
                     <div className="md:col-span-2">
                       <div className="text-sm text-muted-foreground">Descripción</div>
@@ -1196,7 +1936,8 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                {/* Ciclo de vida */}
+                {/* Ciclo de vida — solo si hay fecha de instalación o vida útil */}
+                {(edad != null || vidaUtil != null) && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">Ciclo de vida</div>
@@ -1244,7 +1985,10 @@ function ExpedienteDialog({
                   </CardContent>
                 </Card>
 
-                {/* Confiabilidad */}
+                )}
+
+                {/* Confiabilidad — solo si hay incidencias */}
+                {incidents.length > 0 && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">
@@ -1271,11 +2015,80 @@ function ExpedienteDialog({
                     </div>
                   </CardContent>
                 </Card>
+
+                )}
+
+                {/* Costo de mantenimiento (TCO) — solo si hay órdenes de trabajo */}
+                {workOrders.length > 0 && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-semibold mb-2">
+                      Costo de mantenimiento (TCO){' '}
+                      <span className="text-[11px] font-normal text-muted-foreground">(según OT con costo)</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground text-xs">Costo acumulado</div>
+                        <div className="font-medium">{formatCosto(tco)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">OT con costo</div>
+                        <div className="font-medium">
+                          {otConCosto} / {workOrders.length}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-xs">Costo promedio</div>
+                        <div className="font-medium">{otConCosto > 0 ? formatCosto(tco / otConCosto) : '—'}</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      El costo se captura al crear o cerrar una orden de trabajo (pestaña Trabajos).
+                    </p>
+                  </CardContent>
+                </Card>
+
+                )}
+
+                {log.length > 0 && <TendenciaCondicion log={log} equipment={equipment} />}
               </div>
             </TabsContent>
 
             <TabsContent value="ficha">
               <FichaTecnicaNFPA70B equipment={equipment} incidents={incidents} />
+            </TabsContent>
+
+            <TabsContent value="protocolo">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm font-semibold mb-1">
+                    Protocolo de inspección NFPA 70B{' '}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      · familia {FAMILIA_LABEL[familiaDe(equipment)]}
+                    </span>
+                  </div>
+                  <ul className="divide-y">
+                    {checklistDe(equipment).map((t) => (
+                      <li key={t.id} className="py-1.5 flex items-start gap-2 text-sm">
+                        <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div>{t.tarea}</div>
+                          {t.nota && <div className="text-[11px] text-muted-foreground">{t.nota}</div>}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                          {t.tipo === 'medicion'
+                            ? `medición${t.unidad ? ` · ${t.unidad}` : ''}${t.rango ? ` (${t.rango.min ?? ''}${t.rango.min != null && t.rango.max != null ? '–' : ''}${t.rango.max ?? ''})` : ''}`
+                            : 'cualitativo'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Tareas recomendadas por familia (NFPA 70B). Al registrar una inspección en la Ficha se captura el
+                    protocolo con valores y rangos. Plantilla de arranque — se afina con el estándar completo / RPTD N°15.
+                  </p>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="tablero">
@@ -1284,36 +2097,7 @@ function ExpedienteDialog({
 
             <TabsContent value="recursos">
               <div className="space-y-3">
-                <Card>
-                  <CardContent className="p-4 space-y-2">
-                    <div className="text-sm font-semibold">
-                      Repuestos del equipo{' '}
-                      {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
-                    </div>
-                    {repuestosLoading ? (
-                      <p className="text-sm text-muted-foreground italic">Cargando…</p>
-                    ) : repuestos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic">
-                        Sin repuestos vinculados{equipment.hierarchyNodeId ? '' : ' (equipo sin nodo de jerarquía)'}.
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {repuestos.map((r) => (
-                          <div key={r.id} className="py-2 flex items-center gap-3 text-sm">
-                            <span className="font-mono text-xs text-muted-foreground w-28 shrink-0">{r.codigoSAP || '—'}</span>
-                            <span className="flex-1 min-w-0 truncate">
-                              {r.nombre}
-                              {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
-                            </span>
-                            {typeof r.stockFisico === 'number' && (
-                              <span className="text-xs text-muted-foreground shrink-0">stock {r.stockFisico}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <RecursosRepuestos equipment={equipment} canEdit={canEdit} />
 
                 <Card>
                   <CardContent className="p-4 space-y-2">
@@ -1355,7 +2139,9 @@ function ExpedienteDialog({
                     <div className="text-sm font-semibold">
                       Órdenes de trabajo{' '}
                       {workOrders.length > 0 && (
-                        <span className="text-xs font-normal text-muted-foreground">({workOrders.length})</span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          ({workOrders.length}){tco > 0 ? ` · TCO ${formatCosto(tco)}` : ''}
+                        </span>
                       )}
                     </div>
                     {canEdit && !woForm && (
@@ -1400,11 +2186,21 @@ function ExpedienteDialog({
                           onChange={(e) => setWoDraft((d) => ({ ...d, fechaProgramada: e.target.value }))}
                         />
                       </div>
-                      <Input
-                        placeholder="Asignado a (técnico)…"
-                        value={woDraft.asignadoA}
-                        onChange={(e) => setWoDraft((d) => ({ ...d, asignadoA: e.target.value }))}
-                      />
+                      <div className="grid md:grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Asignado a (técnico)…"
+                          value={woDraft.asignadoA}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, asignadoA: e.target.value }))}
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          inputMode="numeric"
+                          placeholder="Costo (CLP, opcional)…"
+                          value={woDraft.costo}
+                          onChange={(e) => setWoDraft((d) => ({ ...d, costo: e.target.value }))}
+                        />
+                      </div>
                       <Textarea
                         rows={2}
                         placeholder="Descripción…"
@@ -1450,6 +2246,7 @@ function ExpedienteDialog({
                               {wo.asignadoA && <span>👤 {wo.asignadoA}</span>}
                               {wo.fechaProgramada && <span>📅 {new Date(wo.fechaProgramada).toLocaleDateString()}</span>}
                               {wo.fechaCierre && <span>✓ {new Date(wo.fechaCierre).toLocaleDateString()}</span>}
+                              {typeof wo.costo === 'number' && <span>💲 {formatCosto(wo.costo)}</span>}
                             </div>
                             {canEdit && wo.estado !== 'cerrada' && wo.estado !== 'cancelada' && (
                               <div className="flex items-center gap-1 pt-0.5">
@@ -1479,6 +2276,12 @@ function ExpedienteDialog({
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {isFavorite && (
+              <TabsContent value="mediciones">
+                <MedicionesTab equipment={equipment} canEdit={canEdit} />
+              </TabsContent>
+            )}
 
             <TabsContent value="fotos">
               <Card>
@@ -1664,17 +2467,18 @@ function ExpedienteDialog({
               </Card>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </section>
   )
 }
 
 function AgendaInspecciones({
   groups,
+  otByEquipo,
   onOpen,
 }: {
   groups: Record<Bucket, Equipment[]>
+  otByEquipo: Map<string, OtCount>
   onOpen: (id: string) => void
 }) {
   const total = BUCKETS.reduce((n, b) => n + groups[b.key].length, 0)
@@ -1720,6 +2524,7 @@ function AgendaInspecciones({
                       <span className="flex-1 min-w-0 truncate">
                         {e.nombre} <span className="text-[11px] text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
+                      <OtBadge ot={otByEquipo.get(e.id)} />
                       <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
@@ -1742,11 +2547,15 @@ function AgendaInspecciones({
 
 function CtdEquipoCard({
   equipment: e,
+  ot,
+  selected,
   isFavorite,
   onToggleFavorite,
   onOpen,
 }: {
   equipment: Equipment
+  ot?: OtCount
+  selected?: boolean
   isFavorite: boolean
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
@@ -1754,11 +2563,13 @@ function CtdEquipoCard({
   const crit = CRIT[e.criticidad]
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
-  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
   const pct = completitud(e)
   const foto = e.photos?.[0]
   return (
-    <Card className="overflow-hidden cursor-pointer hover:bg-muted/30" onClick={() => onOpen('info')}>
+    <Card
+      className={`overflow-hidden cursor-pointer transition-colors ${selected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'hover:bg-muted/30'}`}
+      onClick={() => onOpen('info')}
+    >
       <div className="relative aspect-video bg-muted flex items-center justify-center">
         {foto ? (
           <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -1780,19 +2591,15 @@ function CtdEquipoCard({
       <CardContent className="p-3 space-y-1.5">
         <div className="font-medium text-sm truncate">{e.nombre}</div>
         <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-[11px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
           {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
           <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
+          <OtBadge ot={ot} />
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className={dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
-            {dias !== null
-              ? `vencida ${dias} d`
-              : e.fichaTecnica?.proximaInspeccion
-                ? new Date(e.fichaTecnica.proximaInspeccion).toLocaleDateString()
-                : 'sin fecha'}
-          </span>
+          <span className="text-muted-foreground">Ficha</span>
           <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
         </div>
       </CardContent>
@@ -1802,13 +2609,17 @@ function CtdEquipoCard({
 
 function CtdEquipoRow({
   equipment: e,
+  ot,
   compact,
+  selected,
   isFavorite,
   onToggleFavorite,
   onOpen,
 }: {
   equipment: Equipment
+  ot?: OtCount
   compact: boolean
+  selected?: boolean
   isFavorite: boolean
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
@@ -1816,13 +2627,11 @@ function CtdEquipoRow({
   const crit = CRIT[e.criticidad]
   const est = ESTADO[e.estado]
   const cond = e.fichaTecnica?.condicion
-  const dias = diasVencida(e.fichaTecnica?.proximaInspeccion)
-  const prox = e.fichaTecnica?.proximaInspeccion
   const pct = completitud(e)
   const foto = e.photos?.[0]
   return (
     <div
-      className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
+      className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted/40'}`}
       onClick={() => onOpen('info')}
     >
       <button
@@ -1846,12 +2655,14 @@ function CtdEquipoRow({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{e.nombre}</div>
-        <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        <div className="text-xs font-medium truncate">{e.nombre}</div>
+        <div className="text-[10px] text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-[10px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
           {cond ? <span>{COND_EMOJI[cond]}</span> : null}
           <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
+          <OtBadge ot={ot} />
           <button
             className={pct < 100 ? 'text-amber-600 underline decoration-dotted' : 'text-emerald-600'}
             title={pct < 100 ? 'Completar ficha' : 'Ficha completa'}
@@ -1869,9 +2680,7 @@ function CtdEquipoRow({
         <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
         <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
         <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
-        <span className={`w-28 text-right ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-          {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : '—'}
-        </span>
+        <span className="w-12 text-right"><OtBadge ot={ot} /></span>
         <button
           className={`w-16 text-right ${pct < 100 ? 'text-amber-600 underline decoration-dotted underline-offset-2' : 'text-emerald-600'}`}
           title={pct < 100 ? 'Completar ficha (placa eléctrica)' : 'Ficha completa'}
@@ -1885,17 +2694,6 @@ function CtdEquipoRow({
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-primary hidden sm:inline-flex"
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onOpen('info')
-          }}
-        >
-          Abrir <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
-        </Button>
         <Button
           variant="ghost"
           size="sm"

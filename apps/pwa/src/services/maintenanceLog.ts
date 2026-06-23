@@ -1,9 +1,11 @@
 import {
   collection,
+  deleteDoc,
   doc,
   setDoc,
   getDocs,
   query,
+  updateDoc,
   where,
   serverTimestamp,
   Timestamp,
@@ -43,6 +45,7 @@ export async function getMaintenanceLog(equipmentId: string): Promise<Maintenanc
       severidad: (data.severidad as MaintenanceLogEntry['severidad']) ?? 'verde',
       incidenciaId: data.incidenciaId as string | undefined,
       proximaInspeccion: data.proximaInspeccion as string | undefined,
+      checklist: Array.isArray(data.checklist) ? (data.checklist as MaintenanceLogEntry['checklist']) : undefined,
       createdAt: toDate(data.createdAt),
     }
   })
@@ -66,5 +69,33 @@ export async function addMaintenanceLogEntry(
   if (entry.tecnico) payload.tecnico = entry.tecnico
   if (entry.incidenciaId) payload.incidenciaId = entry.incidenciaId
   if (entry.proximaInspeccion) payload.proximaInspeccion = entry.proximaInspeccion
+  if (entry.checklist && entry.checklist.length > 0) {
+    // Saneado: Firestore no acepta `undefined` (omitir `valor` si no hay).
+    payload.checklist = entry.checklist.map((t) => {
+      const o: Record<string, unknown> = { id: t.id, tarea: t.tarea, estado: t.estado }
+      if (t.valor != null && t.valor !== '') o.valor = t.valor
+      if (t.detalle != null && t.detalle !== '') o.detalle = t.detalle
+      return o
+    })
+  }
   await setDoc(doc(db, COLLECTION, id), payload)
+}
+
+// Editar una entrada (admin). Solo campos básicos; no reprograma inspección.
+export async function updateMaintenanceLogEntry(
+  id: string,
+  patch: Partial<Pick<MaintenanceLogEntry, 'fecha' | 'tipo' | 'severidad' | 'tecnico' | 'hallazgo'>>,
+): Promise<void> {
+  const clean: Record<string, unknown> = {}
+  if (patch.fecha) clean.fecha = Timestamp.fromDate(patch.fecha)
+  if (patch.tipo) clean.tipo = patch.tipo
+  if (patch.severidad) clean.severidad = patch.severidad
+  if (patch.tecnico !== undefined) clean.tecnico = patch.tecnico
+  if (patch.hallazgo !== undefined) clean.hallazgo = patch.hallazgo
+  await updateDoc(doc(db, COLLECTION, id), clean)
+}
+
+// Eliminar una entrada del historial (admin).
+export async function deleteMaintenanceLogEntry(id: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTION, id))
 }

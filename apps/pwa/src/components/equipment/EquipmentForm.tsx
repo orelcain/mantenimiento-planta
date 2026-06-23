@@ -44,6 +44,7 @@ export function EquipmentForm({
   const [formData, setFormData] = useState({
     codigo: equipment.codigo || '',
     nombre: equipment.nombre || '',
+    nombreComun: equipment.nombreComun || '',
     descripcion: equipment.descripcion || '',
     marca: equipment.marca || '',
     modelo: equipment.modelo || '',
@@ -99,6 +100,7 @@ export function EquipmentForm({
         modelo: formData.modelo || undefined,
         numeroSerie: formData.numeroSerie || undefined,
         tipo: formData.tipo || undefined,
+        nombreComun: formData.nombreComun.trim() || undefined,
         syncExcluded: formData.syncExcluded,
         criticidad: formData.criticidad,
         estado: formData.estado,
@@ -167,6 +169,19 @@ export function EquipmentForm({
               <Label htmlFor="nombre">Nombre *</Label>
               <Input id="nombre" value={formData.nombre} disabled />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="nombreComun">Nombre común / apodo</Label>
+            <Input
+              id="nombreComun"
+              value={formData.nombreComun}
+              onChange={(e) => setFormData({ ...formData, nombreComun: e.target.value })}
+              placeholder='Cómo le dicen en planta (ej. "Motor cinta larga grader")'
+            />
+            <p className="text-[11px] text-muted-foreground">
+              El “Nombre” viene del SAP y no se edita. El nombre común es buscable.
+            </p>
           </div>
 
           <div className="space-y-2">

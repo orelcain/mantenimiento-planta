@@ -75,6 +75,7 @@ export interface Equipment {
   id: string
   codigo: string // Código interno del equipo
   nombre: string
+  nombreComun?: string // Apodo / nombre común (buscable; el "nombre" es el SAP)
   descripcion?: string
   marca?: string
   modelo?: string
@@ -141,6 +142,15 @@ export interface WorkOrder {
   updatedAt: Date
 }
 
+// Resultado de una tarea del protocolo de inspección NFPA 70B (por familia)
+export interface ChecklistResultado {
+  id: string
+  tarea: string
+  estado: 'ok' | 'obs' | 'na' // ok=conforme · obs=observación · na=no evaluado / N/A
+  valor?: string // medición (A, MΩ, °C, mm/s…) para tareas cuantificables
+  detalle?: string // punto/borne/celda evaluada o motivo de N/A (p.ej. "borne 3", "falta instrumento")
+}
+
 // Historial de mantenimiento NFPA 70B (colección plana `maintenanceLog`)
 export interface MaintenanceLogEntry {
   id: string
@@ -153,6 +163,21 @@ export interface MaintenanceLogEntry {
   severidad: 'verde' | 'amarillo' | 'rojo' // = condición 1/2/3 (Cap. 9)
   incidenciaId?: string
   proximaInspeccion?: string // ISO date
+  checklist?: ChecklistResultado[] // resultados del protocolo de inspección por familia
+  createdAt: Date
+}
+
+// Medición de comportamiento (colección plana `mediciones`) — series por equipo.
+// Bitácora oportunista (sin cadencia) para los equipos seguidos; base de tendencias.
+export interface Medicion {
+  id: string
+  equipmentId: string
+  hierarchyNodeId?: string
+  fecha: Date
+  contexto: 'proceso' | 'reposo'
+  tecnico?: string
+  valores: Record<string, number> // campo (de la familia) → valor numérico
+  nota?: string
   createdAt: Date
 }
 
