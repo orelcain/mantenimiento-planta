@@ -29,6 +29,8 @@ import { getMaintenanceLog } from '@/services/maintenanceLog'
 import { addMedicion, getMediciones } from '@/services/mediciones'
 import { getRepuestosMaestro, linkRepuestoEquipo, unlinkRepuestoEquipo } from '@/services/repuestosLink'
 import type { RepuestoMaestroItem } from '@/services/repuestosLink'
+import { getParentCandidates, moverEquipoEnJerarquia } from '@/services/hierarchyMove'
+import type { AreaNode } from '@/services/hierarchyMove'
 import { createWorkOrder, getWorkOrders, updateWorkOrder } from '@/services/workOrders'
 import { descargarPlantillaPlaca, importarPlacaExcel } from '@/services/equipmentFichaExcel'
 import { generarReporteEquipo } from '@/services/equipmentReportPdf'
@@ -666,6 +668,7 @@ export function CentroTecnicoDocumentalPage() {
           onAddNote={(text) => addNote(detailEquipment.id, text)}
           onEditNote={(noteId, text) => editNote(detailEquipment.id, noteId, text)}
           onDeleteNote={(noteId) => deleteNote(detailEquipment.id, noteId)}
+          onReload={reload}
         />
       )}
 
@@ -1326,13 +1329,64 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
   )
 }
 
-/** Rail izquierdo (desktop): ruta del equipo en la jerarquía de la planta. */
-function UbicacionRail({ equipment }: { equipment: Equipment }) {
+/** Rail izquierdo (desktop): ruta del equipo en la jerarquía + cambiar ubicación (admin). */
+function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?: () => void }) {
+  const { isAdmin } = usePermissions()
+  const nodeId = equipment.hierarchyNodeId
   const parts = (equipment.hierarchyPath ?? '').split('>').map((s) => s.trim()).filter(Boolean)
+
+  const [moving, setMoving] = useState(false)
+  const [cands, setCands] = useState<AreaNode[] | null>(null)
+  const [loadingCands, setLoadingCands] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function openMove() {
+    setMoving(true)
+    if (!cands && !loadingCands && nodeId) {
+      setLoadingCands(true)
+      try {
+        setCands(await getParentCandidates(nodeId))
+      } catch (e) {
+        logger.error('Error cargando jerarquía', e instanceof Error ? e : new Error(String(e)))
+      } finally {
+        setLoadingCands(false)
+      }
+    }
+  }
+
+  const term = q.trim().toLowerCase()
+  const resultados = (cands ?? []).filter((c) => term.length >= 2 && c.rutaNombre.toLowerCase().includes(term)).slice(0, 25)
+
+  async function mover(c: AreaNode) {
+    if (!nodeId) return
+    if (!window.confirm(`Mover "${equipment.nombre}" bajo:\n${c.rutaNombre}\n\nReubica el nodo en la jerarquía SAP y excluye del sync. Conserva repuestos y manuales.`))
+      return
+    setBusy(true)
+    try {
+      await moverEquipoEnJerarquia(equipment.id, nodeId, c.id)
+      setMoving(false)
+      setQ('')
+      onMoved?.()
+    } catch (e) {
+      logger.error('Error moviendo equipo en la jerarquía', e instanceof Error ? e : new Error(String(e)))
+      alert('No se pudo mover el equipo. ' + (e instanceof Error ? e.message : ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="rounded-lg border bg-card/95 p-3 shadow-sm">
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-        <MapPin className="h-3.5 w-3.5" /> Ubicación en la planta
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5" /> Ubicación en la planta
+        </span>
+        {isAdmin && nodeId && !moving && (
+          <button className="text-[11px] text-primary hover:underline" onClick={openMove}>
+            Cambiar
+          </button>
+        )}
       </div>
       {parts.length === 0 ? (
         <p className="text-xs italic text-muted-foreground">Sin ruta de jerarquía.</p>
@@ -1351,7 +1405,50 @@ function UbicacionRail({ equipment }: { equipment: Equipment }) {
           })}
         </ol>
       )}
-      <p className="mt-3 text-[10px] text-muted-foreground">Origen: jerarquía SAP del equipo.</p>
+
+      {moving && (
+        <div className="mt-3 space-y-2 rounded-md border p-2">
+          <div className="text-[11px] font-medium">Mover bajo… (nuevo padre)</div>
+          <Input placeholder="Buscar área/equipo destino…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          {loadingCands ? (
+            <p className="text-[11px] italic text-muted-foreground">Cargando jerarquía…</p>
+          ) : term.length < 2 ? (
+            <p className="text-[11px] italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
+          ) : resultados.length === 0 ? (
+            <p className="text-[11px] italic text-muted-foreground">Sin coincidencias.</p>
+          ) : (
+            <div className="max-h-60 divide-y overflow-y-auto">
+              {resultados.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={busy}
+                  onClick={() => mover(c)}
+                  className="block w-full py-1.5 text-left text-[11px] hover:bg-muted/40 disabled:opacity-50"
+                  title={c.rutaNombre}
+                >
+                  {c.rutaNombre}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setMoving(false)
+                setQ('')
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-3 text-[10px] text-muted-foreground">
+        Origen: jerarquía SAP. {isAdmin ? 'Cambiar reubica el nodo y excluye del sync (conserva repuestos/manuales).' : ''}
+      </p>
     </div>
   )
 }
@@ -1376,6 +1473,7 @@ function ExpedienteDialog({
   onAddNote,
   onEditNote,
   onDeleteNote,
+  onReload,
 }: {
   equipment: Equipment
   incidents: Incident[]
@@ -1396,6 +1494,7 @@ function ExpedienteDialog({
   onAddNote: (text: string) => void
   onEditNote: (noteId: string, text: string) => void
   onDeleteNote: (noteId: string) => void
+  onReload?: () => void
 }) {
   const crit = CRIT[equipment.criticidad]
   const est = ESTADO[equipment.estado]
@@ -1514,7 +1613,7 @@ function ExpedienteDialog({
         className="hidden w-[30%] shrink-0 flex-col gap-2 overflow-y-auto p-4 md:flex lg:w-[26%] xl:w-[22%]"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <UbicacionRail equipment={equipment} />
+        <UbicacionRail equipment={equipment} onMoved={onReload} />
       </aside>
 
       {/* Derecha: panel del expediente (columna fija ancha, no modal) */}
