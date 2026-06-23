@@ -596,6 +596,7 @@ export function CentroTecnicoDocumentalPage() {
                 key={e.id}
                 equipment={e}
                 ot={otByEquipo.get(e.id)}
+                selected={detailId === e.id}
                 isFavorite={favorites.has(e.id)}
                 onToggleFavorite={() => toggleFavorite(e.id)}
                 onOpen={(tab) => openExpediente(e.id, tab)}
@@ -620,6 +621,7 @@ export function CentroTecnicoDocumentalPage() {
                   equipment={e}
                   ot={otByEquipo.get(e.id)}
                   compact={compact}
+                  selected={detailId === e.id}
                   isFavorite={favorites.has(e.id)}
                   onToggleFavorite={() => toggleFavorite(e.id)}
                   onOpen={(tab) => openExpediente(e.id, tab)}
@@ -2321,12 +2323,14 @@ function AgendaInspecciones({
 function CtdEquipoCard({
   equipment: e,
   ot,
+  selected,
   isFavorite,
   onToggleFavorite,
   onOpen,
 }: {
   equipment: Equipment
   ot?: OtCount
+  selected?: boolean
   isFavorite: boolean
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
@@ -2337,7 +2341,10 @@ function CtdEquipoCard({
   const pct = completitud(e)
   const foto = e.photos?.[0]
   return (
-    <Card className="overflow-hidden cursor-pointer hover:bg-muted/30" onClick={() => onOpen('info')}>
+    <Card
+      className={`overflow-hidden cursor-pointer transition-colors ${selected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'hover:bg-muted/30'}`}
+      onClick={() => onOpen('info')}
+    >
       <div className="relative aspect-video bg-muted flex items-center justify-center">
         {foto ? (
           <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -2379,6 +2386,7 @@ function CtdEquipoRow({
   equipment: e,
   ot,
   compact,
+  selected,
   isFavorite,
   onToggleFavorite,
   onOpen,
@@ -2386,6 +2394,7 @@ function CtdEquipoRow({
   equipment: Equipment
   ot?: OtCount
   compact: boolean
+  selected?: boolean
   isFavorite: boolean
   onToggleFavorite: () => void
   onOpen: (tab: string) => void
@@ -2397,7 +2406,7 @@ function CtdEquipoRow({
   const foto = e.photos?.[0]
   return (
     <div
-      className={`flex items-center gap-3 px-3 hover:bg-muted/40 cursor-pointer ${compact ? 'py-1.5' : 'py-3'}`}
+      className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted/40'}`}
       onClick={() => onOpen('info')}
     >
       <button
