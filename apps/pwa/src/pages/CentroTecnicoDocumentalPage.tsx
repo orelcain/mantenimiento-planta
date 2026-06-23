@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import {
   BookOpen,
@@ -341,7 +340,16 @@ export function CentroTecnicoDocumentalPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+    <div className="relative flex h-full bg-background">
+      {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
+      {detailEquipment && (
+        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r p-3 lg:flex">
+          <UbicacionRail equipment={detailEquipment} onMoved={reload} />
+        </aside>
+      )}
+      {/* Centro: lista del programa */}
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -643,11 +651,13 @@ export function CentroTecnicoDocumentalPage() {
       )}
 
       <p className="text-[11px] text-muted-foreground">
-        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre aquí mismo, sin salir del CTD. “Ficha
+        El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre a la derecha, sin salir del CTD. “Ficha
         %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
+        </div>
+      </main>
 
-      {/* Expediente en sitio */}
+      {/* Derecha: detalle del equipo seleccionado (columna en desktop; overlay en móvil) */}
       {detailEquipment && (
         <ExpedienteDialog
           equipment={detailEquipment}
@@ -669,7 +679,6 @@ export function CentroTecnicoDocumentalPage() {
           onAddNote={(text) => addNote(detailEquipment.id, text)}
           onEditNote={(noteId, text) => editNote(detailEquipment.id, noteId, text)}
           onDeleteNote={(noteId) => deleteNote(detailEquipment.id, noteId)}
-          onReload={reload}
         />
       )}
 
@@ -1474,7 +1483,6 @@ function ExpedienteDialog({
   onAddNote,
   onEditNote,
   onDeleteNote,
-  onReload,
 }: {
   equipment: Equipment
   incidents: Incident[]
@@ -1495,7 +1503,6 @@ function ExpedienteDialog({
   onAddNote: (text: string) => void
   onEditNote: (noteId: string, text: string) => void
   onDeleteNote: (noteId: string) => void
-  onReload?: () => void
 }) {
   const crit = CRIT[equipment.criticidad]
   const est = ESTADO[equipment.estado]
@@ -1607,22 +1614,13 @@ function ExpedienteDialog({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex bg-black/50" onClick={onClose} role="dialog" aria-modal="true">
-      {/* Izquierda (desktop): ruta/ubicación en la jerarquía */}
-      <aside
-        className="hidden w-[30%] shrink-0 flex-col gap-2 overflow-y-auto p-4 md:flex lg:w-[26%] xl:w-[22%]"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <UbicacionRail equipment={equipment} onMoved={onReload} />
-      </aside>
-
-      {/* Derecha: panel del expediente (columna fija ancha, no modal) */}
-      <Card
-        className="ml-auto h-full w-full overflow-y-auto rounded-none border-l md:w-[70%] lg:w-[74%] xl:w-[78%]"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <CardContent className="p-4 md:p-5 space-y-4">
+  return (
+    <section
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background lg:static lg:z-auto lg:w-[46%] lg:shrink-0 lg:border-l xl:w-[42%]"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="p-4 md:p-5 space-y-4">
           {/* Encabezado */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -2242,10 +2240,8 @@ function ExpedienteDialog({
               </Card>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
-    </div>,
-    document.body,
+      </div>
+    </section>
   )
 }
 
