@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import ReactECharts from 'echarts-for-react'
 import * as XLSX from 'xlsx'
 import { Badge, Button, Card, CardContent, Input, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/components/ui'
 import { addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
@@ -740,18 +741,69 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
     return out.reverse()
   }, [serie])
 
-  const W = 300
-  const H = 60
-  const P = 8
-  const puntos = serie.map((e, i) => {
-    const x = serie.length <= 1 ? W / 2 : P + (i / (serie.length - 1)) * (W - 2 * P)
-    const y = H - P - ((SEV_VAL[e.severidad] - 1) / 2) * (H - 2 * P)
-    return { x, y, sev: e.severidad, fecha: e.fecha }
-  })
-  const polyline = puntos.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-  const primero = puntos[0]
-  const ultimo = puntos[puntos.length - 1]
   const condActual = equipment.fichaTecnica?.condicion
+
+  // Serie de severidad (Cond. 1/2/3) en el tiempo con el mismo look echarts que
+  // Mediciones: línea escalonada + puntos coloreados por condición + ejes rotulados.
+  const condData = serie.map((e) => ({
+    value: [e.fecha.getTime(), SEV_VAL[e.severidad]] as [number, number],
+    itemStyle: { color: SEV_HEX[e.severidad] },
+    hallazgo: e.hallazgo,
+    sevLabel: SEV_LABEL[e.severidad],
+  }))
+  const condOption = {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 14, top: 12, bottom: 18, containLabel: true },
+    tooltip: {
+      trigger: 'axis' as const,
+      axisPointer: { type: 'line' as const, lineStyle: { color: MC_AXIS, type: 'dashed', width: 1 } },
+      formatter: (params: any) => {
+        const arr = Array.isArray(params) ? params : [params]
+        const p = arr[0]
+        if (!p) return ''
+        const fecha = new Date(p.value?.[0]).toLocaleDateString()
+        const cond = p.data?.sevLabel ?? ''
+        const hallazgo = p.data?.hallazgo ? `<div style="font-size:11px">${p.data.hallazgo}</div>` : ''
+        return `<div style="font-size:11px;color:#64748b;margin-bottom:2px">${fecha}</div><strong>${cond}</strong>${hallazgo}`
+      },
+    },
+    xAxis: {
+      type: 'time' as const,
+      axisLine: { lineStyle: { color: MC_GRID } },
+      axisTick: { show: true, lineStyle: { color: MC_GRID }, length: 3 },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        hideOverlap: true,
+        formatter: (v: number) => new Date(v).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
+      },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      min: 0.5,
+      max: 3.5,
+      interval: 1,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        formatter: (v: number) => (v === 1 ? 'Cond 1' : v === 2 ? 'Cond 2' : v === 3 ? 'Cond 3' : ''),
+      },
+      splitLine: { lineStyle: { color: MC_GRID, type: 'dashed' as const } },
+    },
+    series: [
+      {
+        type: 'line' as const,
+        step: 'end' as const,
+        data: condData,
+        symbolSize: 7,
+        lineStyle: { color: '#94a3b8', width: 2 },
+        areaStyle: { color: 'rgba(148,163,184,0.12)' },
+      },
+    ],
+  }
 
   return (
     <Card>
@@ -772,28 +824,12 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
           </p>
         ) : (
           <>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              preserveAspectRatio="none"
-              className="mt-3 w-full h-16 text-muted-foreground"
-              role="img"
-              aria-label="Tendencia de condición"
-            >
-              {[1, 2, 3].map((v) => {
-                const y = H - P - ((v - 1) / 2) * (H - 2 * P)
-                return <line key={v} x1={0} x2={W} y1={y} y2={y} stroke="currentColor" strokeOpacity={0.12} strokeWidth={1} />
-              })}
-              {puntos.length > 1 && (
-                <polyline points={polyline} fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5} />
-              )}
-              {puntos.map((p, i) => (
-                <circle key={`${p.fecha.getTime()}-${i}`} cx={p.x} cy={p.y} r={3} fill={SEV_HEX[p.sev]} />
-              ))}
-            </svg>
+            <div className="mt-3">
+              <ReactECharts option={condOption} style={{ height: 150, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
+            </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{primero ? primero.fecha.toLocaleDateString() : ''}</span>
-              <span>🟢 mejor · 🔴 peor · {serie.length} registro(s)</span>
-              <span>{ultimo ? ultimo.fecha.toLocaleDateString() : ''}</span>
+              <span>🟢 Cond 1 (mejor) · 🟡 2 · 🔴 3 (peor)</span>
+              <span>{serie.length} registro(s)</span>
             </div>
           </>
         )}
@@ -837,86 +873,235 @@ function fmtNum(v: number): string {
   return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)
 }
 
-/** Gráfico de área grande de una métrica: área con gradiente (proceso) + línea reposo + ejes. */
-function MetricChart({ rows, campo }: { rows: Medicion[]; campo: CampoMedicion }) {
+/** Evento de intervención de mantenimiento para marcar sobre la tendencia. */
+export type IntervencionEvento = {
+  fecha: Date
+  label: string
+  tipo: WorkOrder['tipo'] | MaintenanceLogEntry['tipo']
+  origen: 'ot' | 'historial'
+}
+
+// Colores legibles en tema claro y oscuro (no dependen de currentColor).
+const MC_AXIS = '#64748b' //  slate-500 — ejes/etiquetas
+const MC_GRID = 'rgba(100,116,139,0.16)' // gridlines tenues
+const MC_EVENT = '#7c3aed' // violet-600 — intervención
+const MC_LIMIT = '#ef4444' // red-500 — umbral NFPA
+
+function shortLabel(s: string, n = 16): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s
+}
+
+/**
+ * Gráfico de tendencia de una métrica (echarts): área suave translúcida por
+ * contexto (proceso/reposo), marcadores verticales de intervención (OT cerradas
+ * + historial) y línea de umbral NFPA. Sostiene la lectura RCM "antes/después de
+ * la intervención" + la variación del período. Reemplaza el SVG plano anterior.
+ */
+function MetricChart({
+  rows,
+  campo,
+  eventos,
+  umbral,
+}: {
+  rows: Medicion[]
+  campo: CampoMedicion
+  eventos: IntervencionEvento[]
+  umbral?: { min?: number; max?: number }
+}) {
   const pts = rows
-    .map((r, i) => ({ i, v: r.valores[campo.id], ctx: r.contexto, fecha: r.fecha }))
-    .filter((p) => typeof p.v === 'number') as { i: number; v: number; ctx: Medicion['contexto']; fecha: Date }[]
+    .map((r) => ({ t: r.fecha.getTime(), v: r.valores[campo.id], ctx: r.contexto, fecha: r.fecha }))
+    .filter((p) => typeof p.v === 'number') as { t: number; v: number; ctx: Medicion['contexto']; fecha: Date }[]
   if (pts.length === 0) {
     return <p className="py-6 text-center text-sm italic text-muted-foreground">Sin datos de {campo.label} todavía.</p>
   }
+
+  // Rango Y: encierra los datos y, si la familia define umbral, también el límite
+  // (para ver la cercanía al máximo/mínimo NFPA). Si no hay umbral, escala a los
+  // datos para resaltar la fluctuación.
   const vals = pts.map((p) => p.v)
-  let min = Math.min(...vals)
-  let max = Math.max(...vals)
-  if (min === max) {
-    min -= 1
-    max += 1
+  let yMin = Math.min(...vals)
+  let yMax = Math.max(...vals)
+  if (umbral?.max != null) yMax = Math.max(yMax, umbral.max)
+  if (umbral?.min != null) yMin = Math.min(yMin, umbral.min)
+  const pad = (yMax - yMin) * 0.12 || 1
+  yMin -= pad
+  yMax += pad
+
+  const procesoData = pts.filter((p) => p.ctx === 'proceso').map((p) => [p.t, p.v] as [number, number])
+  const reposoData = pts.filter((p) => p.ctx === 'reposo').map((p) => [p.t, p.v] as [number, number])
+
+  // Variación del período (primer → último punto, cronológico).
+  const ordered = [...pts].sort((a, b) => a.t - b.t)
+  const first = ordered[0]!
+  const last = ordered[ordered.length - 1]!
+  const tieneVariacion = ordered.length >= 2 && last.t > first.t
+  const delta = last.v - first.v
+  const pct = first.v !== 0 ? (delta / Math.abs(first.v)) * 100 : null
+  const dias = (last.t - first.t) / 86_400_000
+  const meses = dias / 30.44
+  const periodo = meses < 1.5 ? `${Math.round(dias)} días` : `${meses.toFixed(meses < 6 ? 1 : 0)} meses`
+  const sobreLimite = umbral?.max != null && last.v > umbral.max
+  const bajoLimite = umbral?.min != null && last.v < umbral.min
+
+  // markLines: intervenciones (verticales) + umbral (horizontales). Se concatenan
+  // como union para que TS no fuerce una sola forma de ítem.
+  const eventLines = eventos.map((e) => ({
+    xAxis: e.fecha.getTime(),
+    lineStyle: { color: MC_EVENT, type: 'dashed' as const, width: 1 },
+    label: {
+      show: true,
+      formatter: shortLabel(e.label),
+      color: MC_EVENT,
+      fontSize: 9,
+      position: 'end' as const,
+      padding: [2, 3] as [number, number],
+      backgroundColor: 'rgba(124,58,237,0.10)',
+      borderRadius: 3,
+    },
+  }))
+  const limitLines: Record<string, unknown>[] = []
+  if (umbral?.max != null)
+    limitLines.push({
+      yAxis: umbral.max,
+      lineStyle: { color: MC_LIMIT, type: 'dashed', width: 1 },
+      label: { show: true, formatter: `máx ${fmtNum(umbral.max)} ${campo.unidad}`.trim(), color: MC_LIMIT, fontSize: 9, position: 'insideEndTop' },
+    })
+  if (umbral?.min != null)
+    limitLines.push({
+      yAxis: umbral.min,
+      lineStyle: { color: MC_LIMIT, type: 'dashed', width: 1 },
+      label: { show: true, formatter: `mín ${fmtNum(umbral.min)} ${campo.unidad}`.trim(), color: MC_LIMIT, fontSize: 9, position: 'insideEndBottom' },
+    })
+  const markData = [...eventLines, ...limitLines]
+
+  const procesoSeries = {
+    name: 'En proceso',
+    type: 'line' as const,
+    data: procesoData,
+    smooth: 0.4,
+    showSymbol: true,
+    symbolSize: 5,
+    connectNulls: false,
+    lineStyle: { color: CTX_COLOR.proceso, width: 2 },
+    itemStyle: { color: CTX_COLOR.proceso },
+    areaStyle: {
+      color: {
+        type: 'linear' as const,
+        x: 0,
+        y: 0,
+        x2: 0,
+        y2: 1,
+        colorStops: [
+          { offset: 0, color: 'rgba(37,99,235,0.30)' },
+          { offset: 1, color: 'rgba(37,99,235,0.02)' },
+        ],
+      },
+    },
   }
-  const padV = (max - min) * 0.12
-  min -= padV
-  max += padV
-  const W = 640
-  const H = 200
-  const L = 46
-  const R = 14
-  const T = 14
-  const B = 26
-  const baseY = H - B
-  const n = rows.length
-  const x = (i: number) => (n <= 1 ? L + (W - L - R) / 2 : L + (i / (n - 1)) * (W - L - R))
-  const y = (v: number) => T + (1 - (v - min) / (max - min)) * (H - T - B)
-  const procesoPts = pts.filter((p) => p.ctx === 'proceso')
-  const reposoPts = pts.filter((p) => p.ctx === 'reposo')
-  const line = (ps: typeof pts) => ps.map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')
-  const area =
-    procesoPts.length > 0
-      ? `M ${x(procesoPts[0]!.i).toFixed(1)},${baseY} ` +
-        procesoPts.map((p) => `L ${x(p.i).toFixed(1)},${y(p.v).toFixed(1)} `).join('') +
-        `L ${x(procesoPts[procesoPts.length - 1]!.i).toFixed(1)},${baseY} Z`
-      : ''
-  const gid = `mc-grad-${campo.id}`
-  const first = pts[0]
-  const last = pts[pts.length - 1]
+  const reposoSeries = {
+    name: 'En reposo',
+    type: 'line' as const,
+    data: reposoData,
+    smooth: 0.4,
+    showSymbol: true,
+    symbolSize: 4,
+    connectNulls: false,
+    lineStyle: { color: CTX_COLOR.reposo, width: 1.5, type: 'dashed' as const },
+    itemStyle: { color: CTX_COLOR.reposo },
+  }
+
+  // El markLine cuelga de la primera serie con datos (proceso si existe).
+  const markLine = { symbol: ['none', 'none'] as [string, string], silent: true, animation: false, data: markData }
+  const series: any[] = []
+  if (procesoData.length > 0) series.push({ ...procesoSeries, markLine })
+  if (reposoData.length > 0) series.push(series.length === 0 ? { ...reposoSeries, markLine } : reposoSeries)
+
+  const option = {
+    backgroundColor: 'transparent',
+    grid: { left: 8, right: 16, top: 30, bottom: 18, containLabel: true },
+    legend: {
+      show: true,
+      top: 0,
+      right: 0,
+      icon: 'roundRect',
+      itemWidth: 12,
+      itemHeight: 8,
+      textStyle: { color: MC_AXIS, fontSize: 10 },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      axisPointer: { type: 'line' as const, lineStyle: { color: MC_AXIS, type: 'dashed', width: 1 } },
+      formatter: (params: any) => {
+        const arr = Array.isArray(params) ? params : [params]
+        if (arr.length === 0) return ''
+        const ts = arr[0]?.value?.[0] as number
+        const fecha = new Date(ts).toLocaleDateString()
+        const filas = arr
+          .filter((p: any) => p.value?.[1] != null)
+          .map(
+            (p: any) =>
+              `<span style="color:${p.color}">●</span> ${p.seriesName}: <strong>${fmtNum(p.value[1])}</strong> ${campo.unidad}`,
+          )
+          .join('<br/>')
+        return `<div style="font-size:11px;color:#64748b;margin-bottom:2px">${fecha}</div>${filas}`
+      },
+    },
+    xAxis: {
+      type: 'time' as const,
+      axisLine: { lineStyle: { color: MC_GRID } },
+      axisTick: { show: true, lineStyle: { color: MC_GRID }, length: 3 },
+      axisLabel: {
+        color: MC_AXIS,
+        fontSize: 9,
+        hideOverlap: true,
+        formatter: (v: number) => new Date(v).toLocaleDateString(undefined, { day: '2-digit', month: 'short' }),
+      },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      name: campo.unidad,
+      min: yMin,
+      max: yMax,
+      nameTextStyle: { color: MC_AXIS, fontSize: 9, align: 'left' as const },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: MC_AXIS, fontSize: 9, formatter: (v: number) => fmtNum(v) },
+      splitLine: { lineStyle: { color: MC_GRID, type: 'dashed' as const } },
+    },
+    series,
+  }
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full text-muted-foreground" role="img" aria-label={`Tendencia de ${campo.label}`}>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={CTX_COLOR.proceso} stopOpacity={0.35} />
-          <stop offset="100%" stopColor={CTX_COLOR.proceso} stopOpacity={0.02} />
-        </linearGradient>
-      </defs>
-      {[max - (max - min) * 0.12, (min + max) / 2, min + (max - min) * 0.12].map((v, idx) => {
-        const yy = y(v)
-        return (
-          <g key={idx}>
-            <line x1={L} x2={W - R} y1={yy} y2={yy} stroke="currentColor" strokeOpacity={0.1} />
-            <text x={L - 6} y={yy + 3} textAnchor="end" fontSize={9} fill="currentColor" opacity={0.7}>
-              {fmtNum(v)}
-            </text>
-          </g>
-        )
-      })}
-      {area && <path d={area} fill={`url(#${gid})`} />}
-      {procesoPts.length > 1 && (
-        <polyline points={line(procesoPts)} fill="none" stroke={CTX_COLOR.proceso} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    <div>
+      {tieneVariacion && (
+        <div className={`mb-1 text-xs ${sobreLimite || bajoLimite ? 'font-medium text-red-600' : ''}`}>
+          <span className="font-medium">
+            {fmtNum(first.v)} → {fmtNum(last.v)} {campo.unidad}
+          </span>{' '}
+          <span className={delta > 0 ? 'text-amber-600' : delta < 0 ? 'text-emerald-600' : 'text-muted-foreground'}>
+            {delta >= 0 ? '▲' : '▼'}{' '}
+            {pct != null ? `${delta >= 0 ? '+' : ''}${pct.toFixed(0)}%` : `${delta >= 0 ? '+' : ''}${fmtNum(delta)} ${campo.unidad}`}
+          </span>{' '}
+          <span className="text-muted-foreground">en {periodo}</span>
+          {sobreLimite && <span className="ml-1">⚠ sobre el límite NFPA</span>}
+          {bajoLimite && <span className="ml-1">⚠ bajo el mínimo NFPA</span>}
+        </div>
       )}
-      {reposoPts.length > 1 && (
-        <polyline points={line(reposoPts)} fill="none" stroke={CTX_COLOR.reposo} strokeWidth={1.5} strokeDasharray="4 3" />
+      <ReactECharts option={option} style={{ height: 240, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
+      {eventos.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {eventos.map((e, i) => (
+            <li key={`${e.fecha.getTime()}-${i}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: MC_EVENT }} />
+              <span className="tabular-nums">{e.fecha.toLocaleDateString()}</span>
+              <span className="text-foreground">· {e.label}</span>
+              <span className="capitalize">({e.tipo})</span>
+            </li>
+          ))}
+        </ul>
       )}
-      {pts.map((p) => (
-        <circle key={`${p.ctx}-${p.i}`} cx={x(p.i)} cy={y(p.v)} r={2.5} fill={CTX_COLOR[p.ctx]} />
-      ))}
-      {first && (
-        <text x={L} y={H - 8} fontSize={9} fill="currentColor" opacity={0.7}>
-          {first.fecha.toLocaleDateString()}
-        </text>
-      )}
-      {last && pts.length > 1 && (
-        <text x={W - R} y={H - 8} textAnchor="end" fontSize={9} fill="currentColor" opacity={0.7}>
-          {last.fecha.toLocaleDateString()}
-        </text>
-      )}
-    </svg>
+    </div>
   )
 }
 
@@ -977,10 +1162,13 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState<MedicionDraft>(emptyMedicionDraft)
   const [metricId, setMetricId] = useState<string>('')
+  const [eventos, setEventos] = useState<IntervencionEvento[]>([])
 
   // Campos que ya tienen al menos un dato (para el gráfico y el selector).
   const camposConDatos = campos.filter((c) => rows.some((r) => typeof r.valores[c.id] === 'number'))
   const metricSel = camposConDatos.find((c) => c.id === metricId) ?? camposConDatos[0]
+  // Umbral NFPA del campo (si la familia lo define en el protocolo) → línea límite.
+  const umbral = metricSel ? checklistDe(equipment).find((t) => t.id === metricSel.id)?.rango : undefined
 
   useEffect(() => {
     let alive = true
@@ -995,6 +1183,32 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
       })
       .finally(() => {
         if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [equipment.id])
+
+  // Intervenciones (OT cerradas + historial correctivo/preventivo/predictivo) →
+  // marcadores verticales sobre la tendencia para leer el "antes/después".
+  useEffect(() => {
+    let alive = true
+    Promise.all([getWorkOrders(equipment.id), getMaintenanceLog(equipment.id)])
+      .then(([wos, mlog]) => {
+        if (!alive) return
+        const OT_INTERV = new Set<WorkOrder['tipo']>(['correctivo', 'preventivo', 'predictivo', 'mejora'])
+        const LOG_INTERV = new Set<MaintenanceLogEntry['tipo']>(['correctivo', 'preventivo', 'predictivo'])
+        const deOt: IntervencionEvento[] = wos
+          .filter((w) => w.estado === 'cerrada' && !!w.fechaCierre && OT_INTERV.has(w.tipo))
+          .map((w) => ({ fecha: new Date(w.fechaCierre as string), label: w.titulo || w.tipo, tipo: w.tipo, origen: 'ot' }))
+        const deLog: IntervencionEvento[] = mlog
+          .filter((e) => LOG_INTERV.has(e.tipo))
+          .map((e) => ({ fecha: e.fecha, label: e.hallazgo || e.tipo, tipo: e.tipo, origen: 'historial' }))
+        setEventos([...deOt, ...deLog].sort((a, b) => a.fecha.getTime() - b.fecha.getTime()))
+      })
+      .catch((err) => {
+        if (alive) setEventos([])
+        logger.error('Error cargando intervenciones para tendencia', err instanceof Error ? err : new Error(String(err)))
       })
     return () => {
       alive = false
@@ -1143,7 +1357,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
                     ))}
                   </select>
                 </div>
-                <MetricChart rows={rows} campo={metricSel} />
+                <MetricChart rows={rows} campo={metricSel} eventos={eventos} umbral={umbral} />
               </div>
             )}
             <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Todas las series</div>
