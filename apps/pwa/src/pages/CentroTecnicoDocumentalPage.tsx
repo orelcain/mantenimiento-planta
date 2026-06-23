@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import {
   BookOpen,
@@ -1606,7 +1607,7 @@ function ExpedienteDialog({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex bg-black/50" onClick={onClose} role="dialog" aria-modal="true">
       {/* Izquierda (desktop): ruta/ubicación en la jerarquía */}
       <aside
@@ -2243,7 +2244,8 @@ function ExpedienteDialog({
           </Tabs>
         </CardContent>
       </Card>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
