@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react'
-import { ScanLine } from 'lucide-react'
-import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { ScanLine, Boxes, AlertTriangle } from 'lucide-react'
+import type { Repuesto, RepuestoFormData, MaterialClase } from '@/types/repuestos'
+import { CLASE_LABEL } from '@/types/repuestos'
 import {
   Button,
   Dialog,
@@ -11,6 +12,11 @@ import {
   Input,
   Label,
   Textarea,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from '@/components/ui'
 import { BarcodeScannerModal } from './BarcodeScannerModal'
 
@@ -36,18 +42,32 @@ interface RepuestoFormModalProps {
   siblingNodes?: SiblingNode[]
   /** Nombre del equipo actual (nodo SAP) */
   equipmentName?: string
+  /** El material no pertenece a ningún equipo (insumo/herramienta transversal). */
+  transversal?: boolean
+  /** Clase inicial al crear (transversal → 'insumo'; equipo-bound → 'repuesto'). */
+  defaultClase?: MaterialClase
+  /** Detecta si ya existe un material con el SAP o nombre tecleado (aviso de duplicado). */
+  onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string } | null
+  /** Cambiar el equipo/destino (reabre el picker). Muestra el enlace "Cambiar". */
+  onChangeTarget?: () => void
   loading?: boolean
 }
+
+const CLASE_OPTIONS: MaterialClase[] = ['repuesto', 'insumo', 'herramienta', 'quimico', 'lubricante', 'refrigeracion']
 
 const defaultForm: RepuestoFormData = {
   codigoSAP: '',
   codigoFabricante: '',
   textoBreve: '',
   descripcion: '',
+  clase: 'repuesto',
   valorUnitario: 0,
   cantidadPorMaquina: 0,
   ubicacionEnPlanta: '',
   observaciones: '',
+  stockInicial: 0,
+  stockMinimo: 0,
+  ubicacionBodega: '',
 }
 
 export function RepuestoFormModal({
@@ -61,6 +81,10 @@ export function RepuestoFormModal({
   hasLinkedMachine,
   siblingNodes,
   equipmentName,
+  transversal = false,
+  defaultClase,
+  onCheckDuplicate,
+  onChangeTarget,
   loading = false,
 }: RepuestoFormModalProps) {
   const [form, setForm] = useState<RepuestoFormData>(defaultForm)
@@ -68,6 +92,12 @@ export function RepuestoFormModal({
   const [scannerOpen, setScannerOpen] = useState(false)
   const [target, setTarget] = useState<'own' | 'shared'>('own')
   const [selectedSiblings, setSelectedSiblings] = useState<Set<string>>(new Set())
+
+  // Aviso de duplicado: ¿ya existe un material con este SAP o nombre? (solo al crear)
+  const duplicate = useMemo(() => {
+    if (mode !== 'create' || !onCheckDuplicate) return null
+    return onCheckDuplicate({ codigoSAP: form.codigoSAP, textoBreve: form.textoBreve })
+  }, [mode, onCheckDuplicate, form.codigoSAP, form.textoBreve])
 
   useEffect(() => {
     if (open) {
@@ -78,16 +108,17 @@ export function RepuestoFormModal({
           codigoFabricante: initialData.codigoFabricante || '',
           textoBreve: initialData.textoBreve || '',
           descripcion: initialData.descripcion || '',
+          clase: initialData.clase || 'repuesto',
           valorUnitario: initialData.valorUnitario || 0,
           cantidadPorMaquina: initialData.cantidadPorMaquina || 0,
           ubicacionEnPlanta: initialData.ubicacionEnPlanta || '',
           observaciones: initialData.observaciones || '',
         })
       } else {
-        setForm(defaultForm)
+        setForm({ ...defaultForm, clase: defaultClase || (transversal ? 'insumo' : 'repuesto') })
       }
     }
-  }, [open, initialData])
+  }, [open, initialData, defaultClase, transversal])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -99,10 +130,14 @@ export function RepuestoFormModal({
         codigoFabricante: form.codigoFabricante.trim(),
         textoBreve: form.textoBreve.trim(),
         descripcion: form.descripcion?.trim() || '',
+        clase: form.clase || (transversal ? 'insumo' : 'repuesto'),
         valorUnitario: Number(form.valorUnitario) || 0,
         cantidadPorMaquina: Number(form.cantidadPorMaquina) || 0,
         ubicacionEnPlanta: form.ubicacionEnPlanta?.trim() || '',
         observaciones: form.observaciones?.trim() || '',
+        stockInicial: Number(form.stockInicial) || 0,
+        stockMinimo: Number(form.stockMinimo) || 0,
+        ubicacionBodega: form.ubicacionBodega?.trim() || '',
       }
 
       if (!payload.textoBreve) {
@@ -129,13 +164,23 @@ export function RepuestoFormModal({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Nuevo repuesto' : 'Editar repuesto'}
+            {mode === 'create' ? (transversal ? 'Nuevo material transversal' : 'Nuevo repuesto') : 'Editar repuesto'}
           </DialogTitle>
-          {machineName && (
+          {transversal ? (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Boxes className="h-4 w-4 text-primary" />
+              Insumo/herramienta · no pertenece a ningún equipo
+            </p>
+          ) : machineName ? (
             <p className="text-sm text-muted-foreground mt-1">
               Asociado a: <span className="font-medium text-foreground">{machineName}</span>
+              {onChangeTarget && (
+                <button type="button" onClick={onChangeTarget} className="ml-2 text-xs font-medium text-primary underline-offset-2 hover:underline">
+                  Cambiar
+                </button>
+              )}
             </p>
-          )}
+          ) : null}
         </DialogHeader>
 
         <form className="space-y-5 py-2" onSubmit={handleSubmit}>
@@ -173,7 +218,29 @@ export function RepuestoFormModal({
             </div>
           </div>
 
+          {/* Aviso de duplicado (no bloquea: solo advierte) */}
+          {duplicate && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Ya existe un material parecido: <span className="font-semibold">{duplicate.textoBreve}</span>
+                {duplicate.codigoSAP ? <> (SAP {duplicate.codigoSAP})</> : null}. Revísalo antes de crear un duplicado.
+              </span>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="clase">Clase de material</Label>
+              <Select value={form.clase || 'repuesto'} onValueChange={(v) => setForm({ ...form, clase: v as MaterialClase })}>
+                <SelectTrigger id="clase"><SelectValue placeholder="Clase" /></SelectTrigger>
+                <SelectContent>
+                  {CLASE_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>{CLASE_LABEL[c]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="textoBreve">Texto breve</Label>
               <Input
@@ -181,18 +248,7 @@ export function RepuestoFormModal({
                 value={form.textoBreve}
                 onChange={(e) => setForm({ ...form, textoBreve: e.target.value })}
                 required
-                placeholder="Nombre del repuesto"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="valorUnitario">Valor unitario (USD)</Label>
-              <Input
-                id="valorUnitario"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.valorUnitario}
-                onChange={(e) => setForm({ ...form, valorUnitario: Number(e.target.value) })}
+                placeholder={transversal ? 'Ej: GUANTE DESECHABLE NITRILO - TALLA XL' : 'Nombre del repuesto'}
               />
             </div>
           </div>
@@ -221,16 +277,32 @@ export function RepuestoFormModal({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cantidadPorMaquina">Cantidad por máquina</Label>
+              <Label htmlFor="valorUnitario">Valor unitario (USD)</Label>
               <Input
-                id="cantidadPorMaquina"
+                id="valorUnitario"
                 type="number"
                 min="0"
-                value={form.cantidadPorMaquina}
-                onChange={(e) => setForm({ ...form, cantidadPorMaquina: Number(e.target.value) })}
-                placeholder="Cuántas unidades usa la máquina"
+                step="0.01"
+                value={form.valorUnitario}
+                onChange={(e) => setForm({ ...form, valorUnitario: Number(e.target.value) })}
               />
             </div>
+            {!transversal && (
+              <div className="space-y-2">
+                <Label htmlFor="cantidadPorMaquina">Cantidad por máquina</Label>
+                <Input
+                  id="cantidadPorMaquina"
+                  type="number"
+                  min="0"
+                  value={form.cantidadPorMaquina}
+                  onChange={(e) => setForm({ ...form, cantidadPorMaquina: Number(e.target.value) })}
+                  placeholder="Cuántas unidades usa la máquina"
+                />
+              </div>
+            )}
+          </div>
+
+          {!transversal && (
             <div className="space-y-2">
               <Label htmlFor="ubicacionEnPlanta">Ubicación en planta</Label>
               <Input
@@ -240,7 +312,35 @@ export function RepuestoFormModal({
                 placeholder="Dónde se encuentra dentro de la máquina"
               />
             </div>
-          </div>
+          )}
+
+          {/* Stock en bodega — solo con SAP (el stock vive en `bodega` por SAP) */}
+          {form.codigoSAP.trim() ? (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                Stock en bodega <span className="font-normal">· se guarda por SAP</span>
+              </Label>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="stockInicial" className="text-xs">Stock inicial</Label>
+                  <Input id="stockInicial" type="number" min="0" value={form.stockInicial ?? 0}
+                    onChange={(e) => setForm({ ...form, stockInicial: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stockMinimo" className="text-xs">Stock mínimo</Label>
+                  <Input id="stockMinimo" type="number" min="0" value={form.stockMinimo ?? 0}
+                    onChange={(e) => setForm({ ...form, stockMinimo: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ubicacionBodega" className="text-xs">Ubicación</Label>
+                  <Input id="ubicacionBodega" value={form.ubicacionBodega || ''}
+                    onChange={(e) => setForm({ ...form, ubicacionBodega: e.target.value })} placeholder="Ej: C-31" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Agrega un código SAP para registrar stock y ubicación de bodega.</p>
+          )}
 
           {/* Destino y multi-equipo (solo en crear) */}
           {mode === 'create' && (
