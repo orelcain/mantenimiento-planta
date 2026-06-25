@@ -259,6 +259,8 @@ export interface RepuestoFormData {
   descripcion?: string;
   nombreManual?: string;
   codigoFabricante: string;
+  /** Clase del material (insumo/repuesto/herramienta/…). Se persiste vía `extra` en el create. */
+  clase?: MaterialClase;
   valorUnitario: number;
   /** Cuántas unidades de este repuesto usa la máquina */
   cantidadPorMaquina: number;
@@ -266,6 +268,13 @@ export interface RepuestoFormData {
   ubicacionEnPlanta?: string;
   /** Observaciones o notas adicionales */
   observaciones?: string;
+  // ── Stock de bodega (NO va al doc del repuesto; se escribe en `bodega` por SAP) ──
+  /** Stock inicial al crear (solo con SAP). */
+  stockInicial?: number;
+  /** Stock mínimo de alerta (solo con SAP). */
+  stockMinimo?: number;
+  /** Ubicación física en bodega (solo con SAP). */
+  ubicacionBodega?: string;
 }
 
 /**
