@@ -1,7 +1,17 @@
 # MEMORY — App Mantenimiento Planta (PWA)
 
 Estado canónico del proyecto. Actualizar cuando haya una decisión estable.
-Última actualización: 2026-06-12.
+Última actualización: 2026-06-25.
+
+## ⭐ META GRANDE / PREMISA (PRIORITARIA — aplica a TODO desarrollo)
+
+Cada módulo, feature o cambio de la app debe cumplir esta premisa: la app existe para
+**DEMOSTRAR con elementos cuantificables (gráficos, KPIs, reportes, entregables, exposiciones)
+que Mantención SÍ está haciendo el trabajo**, y que **gracias a Mantención el proceso fluye, se
+optimiza y mejora continuamente**. Antes de construir algo, preguntarse: *¿cómo ayuda esto a
+evidenciar, medir y mejorar el aporte de Mantención al proceso?* Si no aporta a
+cuantificar/demostrar/optimizar ese valor, replantearlo para que sí lo haga. Meta final =
+**mejora continua demostrable** con datos.
 
 ## Qué es / dónde
 
