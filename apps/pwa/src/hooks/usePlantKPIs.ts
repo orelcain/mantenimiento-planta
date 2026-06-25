@@ -6,8 +6,13 @@
  *   P = overallRatio promedio (capped 1.0)
  *   Q = 1 − P0Pct (solo si hay Grader data)
  *
- * MTTR = Σ durationSec de eventos downtime / n_paros  (min)
- * MTBF = uptimeSec total / n_paros                    (horas)
+ * MTTR/MTBF profesional (confiabilidad): se calculan SOLO sobre averías MACRO
+ * (paros relevantes), excluyendo las micro-detenciones (<5min, interferencias
+ * breves) que de otro modo arrastraban el MTTR a pocos segundos. Las micro se
+ * reportan aparte (microCount/microMin). Fuente única macro/micro:
+ * `shoplogixMaintenance.computeMaintenanceTotals`.
+ *   MTTR = Σ durationSec averías macro / n_averías_macro   (min)
+ *   MTBF = uptimeSec total / n_averías_macro               (horas)
  *
  * usePlantKPIsForPeriod agrega múltiples turnos para Día/Semana/Mes.
  */
@@ -17,6 +22,7 @@ import {
   listShoplogixShiftIdsForDay,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
+import { computeMaintenanceTotals } from '@/services/grader/shoplogixMaintenance'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -30,9 +36,15 @@ export interface MachineKPI {
   machineName: string
   availability: number
   performance: number
+  /** MTTR de averías MACRO (excluye micro-detenciones), en minutos. */
   mttrMin: number
   mtbfHours: number
+  /** N° de averías macro (paros relevantes ≥5min, sin micro ni paros operacionales). */
   failureCount: number
+  /** N° de micro-detenciones (<5min) — se reportan aparte, no inflan el MTTR. */
+  microCount: number
+  /** Tiempo total en micro-detenciones, en minutos. */
+  microMin: number
   shoplogixTargetCpm: number | null
   /** Total de ciclos de la máquina en el período. Útil para detectar
    *  períodos sin producción real donde A/P son matemáticamente válidos
@@ -56,6 +68,10 @@ export interface PlantKPIs {
   mttrMin: number
   mtbfHours: number
   failureCount: number
+  /** N° de micro-detenciones (<5min) agregadas del período. */
+  microCount: number
+  /** Tiempo total en micro-detenciones del período, en minutos. */
+  microMin: number
   machines: MachineKPI[]
   /** true cuando solo hay calidad Grader, sin datos Shoplogix */
   graderOnly?: boolean
@@ -83,18 +99,20 @@ const MONTH_NAMES = [
 ]
 
 function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
-  const downtimes    = m.states.filter((s) => s.type === 'downtime')
   const uptimeSec    = m.shiftRuntimeBreakdown.uptimeSec
-  const totalDtSec   = downtimes.reduce((a, s) => a + s.durationSec, 0)
+  // Averías MACRO (sin micro ni paros operacionales) para MTTR/MTBF profesional.
+  const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(m.states)
   const firstInterval = m.intervals.find((iv) => iv.expectedCycles > 0)
   return {
     machineid:          m.machineid,
     machineName:        m.machineName,
     availability:       m.shiftRuntime,
     performance:        Math.min(1, m.overallRatio),
-    mttrMin:            downtimes.length > 0 ? totalDtSec / downtimes.length / 60 : 0,
-    mtbfHours:          downtimes.length > 0 ? uptimeSec / downtimes.length / 3600 : uptimeSec / 3600,
-    failureCount:       downtimes.length,
+    mttrMin:            macroCount > 0 ? macroSec / macroCount / 60 : 0,
+    mtbfHours:          macroCount > 0 ? uptimeSec / macroCount / 3600 : uptimeSec / 3600,
+    failureCount:       macroCount,
+    microCount,
+    microMin:           microSec / 60,
     shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
     totalCycles:        m.totalCycles ?? 0,
   }
@@ -121,19 +139,19 @@ function aggregateShifts(
   const machineKPIs: MachineKPI[] = []
   for (const [, entries] of byMachine) {
     const ms = entries.map(e => e.machine)
-    const allDowntimes  = ms.flatMap(m => m.states.filter(s => s.type === 'downtime'))
-    const totalDtSec    = allDowntimes.reduce((a, s) => a + s.durationSec, 0)
+    const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(ms.flatMap(m => m.states))
     const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
-    const nFailures     = allDowntimes.length
     const firstInterval = ms[0]?.intervals.find(iv => iv.expectedCycles > 0)
     machineKPIs.push({
       machineid:          ms[0]!.machineid,
       machineName:        ms[0]!.machineName,
       availability:       avg(ms.map(m => m.shiftRuntime)),
       performance:        Math.min(1, avg(ms.map(m => m.overallRatio))),
-      mttrMin:            nFailures > 0 ? totalDtSec / nFailures / 60 : 0,
-      mtbfHours:          nFailures > 0 ? totalUptimeSec / nFailures / 3600 : totalUptimeSec / 3600,
-      failureCount:       nFailures,
+      mttrMin:            macroCount > 0 ? macroSec / macroCount / 60 : 0,
+      mtbfHours:          macroCount > 0 ? totalUptimeSec / macroCount / 3600 : totalUptimeSec / 3600,
+      failureCount:       macroCount,
+      microCount,
+      microMin:           microSec / 60,
       shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
       totalCycles:        ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0),
     })
@@ -184,6 +202,8 @@ function aggregateShifts(
     mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
     mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
     failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
+    microCount:   machineKPIs.reduce((a, m) => a + m.microCount, 0),
+    microMin:     machineKPIs.reduce((a, m) => a + m.microMin, 0),
     machines:     machineKPIs,
   }
 }
@@ -299,6 +319,8 @@ export function usePlantKPIs(
           mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
           mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
           failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
+          microCount:   machineKPIs.reduce((a, m) => a + m.microCount, 0),
+          microMin:     machineKPIs.reduce((a, m) => a + m.microMin, 0),
           machines:     machineKPIs,
         }
         if (!cancelled) setState({ loading: false, error: null, kpis })
@@ -429,7 +451,7 @@ export function usePlantKPIsForPeriod(
           dateKey: anchor, shiftId: '', periodLabel: label,
           shiftsCount: graderForPeriod.length,
           availability: null, performance: null, quality, oee: null,
-          mttrMin: 0, mtbfHours: 0, failureCount: 0, machines: [],
+          mttrMin: 0, mtbfHours: 0, failureCount: 0, microCount: 0, microMin: 0, machines: [],
           graderOnly: true,
         },
       }
