@@ -94,8 +94,8 @@ const DEFS = {
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
-  mttr:    { desc: 'Duración promedio de cada paro.\n\nMTTR = Σ duración / N° paros\n\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
-  mtbf:    { desc: 'Tiempo promedio entre paros.\n\nMTBF = Uptime / N° paros\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
+  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (paro relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
+  mtbf:    { desc: 'Tiempo medio entre averías macro.\n\nMTBF = Uptime / N° averías macro\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
 }
 
 // ── KPICard ───────────────────────────────────────────────────────────────────
@@ -296,8 +296,9 @@ export function PlantKPIBoard({
               />
             </div>
 
-            {/* ── Fila 2: MTTR · MTBF · Paros (ocultar si solo Grader) ── */}
+            {/* ── Fila 2: MTTR · MTBF · Averías macro (ocultar si solo Grader) ── */}
             {!kpis.graderOnly && (
+            <>
             <div className="grid grid-cols-3 gap-1.5">
               <KPICard
                 label="MTTR ↓"
@@ -315,14 +316,24 @@ export function PlantKPIBoard({
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
                 barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
               />
-              <div className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors">
-                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">N° Paros</div>
+              <div
+                className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors"
+                title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
+              >
+                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
                 <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight">
-                  eventos · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
+                  paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
+            {/* Micro-detenciones: se reportan aparte para no inflar el MTTR */}
+            {kpis.microCount > 0 && (
+              <p className="text-[10px] text-muted-foreground/70 leading-tight px-0.5">
+                + {kpis.microCount.toLocaleString('es-CL')} micro-detenciones (&lt;5min, {fmtMin(kpis.microMin)} total) — aparte, no inflan el MTTR.
+              </p>
+            )}
+            </>
             )}
 
             {/* ── Detalle por máquina (solo con Shoplogix) ──
