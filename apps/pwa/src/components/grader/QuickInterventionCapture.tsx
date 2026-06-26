@@ -18,11 +18,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Mic, Sparkles, Wand2, Wrench, ShieldCheck, Activity, Eye,
   Loader2, CheckCircle2, ClipboardList, AlertTriangle,
+  Brain, TrendingUp, Lightbulb,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
+import { useEquipmentForArea, type EquipmentDisplayNode } from '@/hooks/useEquipmentForArea'
 import {
   addMaintenanceLogEntry,
   getMaintenanceLogByPlantLine,
@@ -30,8 +33,11 @@ import {
 import {
   refineText,
   suggestInterventionFields,
+  analyzeAreaInterventions,
+  MIN_AREA_INTERVENTIONS,
   type InterventionTipo,
   type InterventionSeveridad,
+  type AreaInsights,
 } from '@/services/ai'
 import type { PlantLineId } from '@/config/plantLines'
 import type { MaintenanceLogEntry } from '@/types'
@@ -62,6 +68,13 @@ const TIPO_LABEL: Record<string, string> = {
 }
 const SEV_DOT: Record<string, string> = { verde: 'bg-emerald-500', amarillo: 'bg-amber-500', rojo: 'bg-red-500' }
 
+const RIESGO_STYLE: Record<AreaInsights['riesgo'], { label: string; cls: string }> = {
+  bajo: { label: 'Riesgo bajo', cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+  medio: { label: 'Riesgo medio', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+  alto: { label: 'Riesgo alto', cls: 'border-orange-500/40 bg-orange-500/10 text-orange-300' },
+  critico: { label: 'Riesgo crítico', cls: 'border-red-500/40 bg-red-500/10 text-red-300' },
+}
+
 /** Turno best-effort por hora local (las líneas manuales no tienen schedule Grader). */
 function currentShiftId(): string {
   const h = new Date().getHours()
@@ -73,6 +86,24 @@ function fmtFecha(d: Date): string {
     ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Valor del Select que representa "registrar a nivel de área" (Radix prohíbe value=""). */
+const AREA_LEVEL = '__area__'
+
+/** Aplana el árbol de equipos del área a una lista para el dropdown (con sangría por nivel). */
+function flattenEquipos(
+  nodes: EquipmentDisplayNode[],
+  depth = 0,
+  acc: { id: string; label: string }[] = [],
+): { id: string; label: string }[] {
+  for (const n of nodes) {
+    if (n.oculto) continue
+    const prefix = depth > 0 ? '· '.repeat(depth) : ''
+    acc.push({ id: n.id, label: `${prefix}${n.nombre}${n.codigo ? ` (${n.codigo})` : ''}` })
+    if (n.children?.length) flattenEquipos(n.children, depth + 1, acc)
+  }
+  return acc
+}
+
 export function QuickInterventionCapture({
   plantLineId, areaNodeId, areaLabel, className,
 }: QuickInterventionCaptureProps) {
@@ -82,6 +113,15 @@ export function QuickInterventionCapture({
   const [titulo, setTitulo] = useState('')
   const [tipo, setTipo] = useState<InterventionTipo>('correctivo')
   const [severidad, setSeveridad] = useState<InterventionSeveridad>('amarillo')
+  const [selectedEquipoId, setSelectedEquipoId] = useState<string>(AREA_LEVEL)
+
+  // Equipos del área (Fase 3b) — solo si la línea tiene `areaNodeId` linkeado.
+  const { equipment, loading: loadingEquip } = useEquipmentForArea(areaNodeId ?? null)
+  const flatEquipos = useMemo(() => flattenEquipos(equipment), [equipment])
+  const equipoLabelById = useMemo(
+    () => new Map(flatEquipos.map((e) => [e.id, e.label])),
+    [flatEquipos],
+  )
 
   const [refining, setRefining] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
@@ -92,10 +132,17 @@ export function QuickInterventionCapture({
   const [entries, setEntries] = useState<MaintenanceLogEntry[]>([])
   const [loadingEntries, setLoadingEntries] = useState(true)
 
+  // Análisis IA del área (Fase 3b)
+  const [insights, setInsights] = useState<AreaInsights | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [insightsError, setInsightsError] = useState<string | null>(null)
+
   const loadEntries = useCallback(async () => {
     setLoadingEntries(true)
     try {
       setEntries(await getMaintenanceLogByPlantLine(plantLineId))
+      setInsights(null)        // invalidar análisis previo: los datos cambiaron
+      setInsightsError(null)
     } catch {
       setEntries([])
     } finally {
@@ -117,6 +164,28 @@ export function QuickInterventionCapture({
     }, {})
     return { totalMes: mes.length, totalAll: entries.length, porTipo }
   }, [entries])
+
+  const canRunAreaAnalysis = entries.length >= MIN_AREA_INTERVENTIONS
+
+  const handleAnalyzeArea = useCallback(async () => {
+    if (!canRunAreaAnalysis) return
+    setAnalyzing(true)
+    setInsightsError(null)
+    try {
+      const res = await analyzeAreaInterventions(
+        entries.map((e) => ({
+          fecha: e.fecha, tipo: e.tipo, severidad: e.severidad, hallazgo: e.hallazgo, tecnico: e.tecnico,
+        })),
+        areaLabel ?? plantLineId,
+      )
+      if (res) setInsights(res)
+      else setInsightsError('No se pudo generar el análisis. Intentá de nuevo.')
+    } catch (err) {
+      setInsightsError(err instanceof Error ? err.message : 'Error al analizar.')
+    } finally {
+      setAnalyzing(false)
+    }
+  }, [canRunAreaAnalysis, entries, areaLabel, plantLineId])
 
   const canAnalyze = hallazgo.trim().length >= 8
 
@@ -157,8 +226,12 @@ export function QuickInterventionCapture({
       const hallazgoFinal = titulo.trim()
         ? `${titulo.trim()} — ${hallazgo.trim()}`
         : hallazgo.trim()
+      // Si se eligió un equipo concreto, la entrada se referencia a ese equipo
+      // (aparece en su expediente CTD); si no, queda a nivel de área (sentinel).
+      const isEquip = selectedEquipoId !== AREA_LEVEL
       await addMaintenanceLogEntry({
-        equipmentId: `area:${plantLineId}`,
+        equipmentId: isEquip ? selectedEquipoId : `area:${plantLineId}`,
+        hierarchyNodeId: isEquip ? selectedEquipoId : undefined,
         fecha: new Date(),
         tipo,
         severidad,
@@ -174,6 +247,7 @@ export function QuickInterventionCapture({
       setTitulo('')
       setTipo('correctivo')
       setSeveridad('amarillo')
+      setSelectedEquipoId(AREA_LEVEL)
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 3500)
       await loadEntries()
@@ -182,7 +256,7 @@ export function QuickInterventionCapture({
     } finally {
       setSaving(false)
     }
-  }, [hallazgo, titulo, tipo, severidad, user, plantLineId, areaNodeId, loadEntries])
+  }, [hallazgo, titulo, tipo, severidad, selectedEquipoId, user, plantLineId, areaNodeId, loadEntries])
 
   const busy = refining || suggesting
 
@@ -247,6 +321,31 @@ export function QuickInterventionCapture({
                 placeholder="Título técnico conciso"
                 className="text-sm bg-background/60"
               />
+            </div>
+          )}
+
+          {/* Equipo del área (opcional) — solo si la línea tiene areaNodeId linkeado */}
+          {areaNodeId && (
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-muted-foreground">
+                Equipo <span className="text-muted-foreground/60">(opcional)</span>
+              </label>
+              <Select value={selectedEquipoId} onValueChange={setSelectedEquipoId}>
+                <SelectTrigger className="text-sm bg-background/60">
+                  <SelectValue placeholder="Área general" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AREA_LEVEL}>Área general (sin equipo específico)</SelectItem>
+                  {flatEquipos.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {loadingEquip && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Cargando equipos del área…
+                </p>
+              )}
             </div>
           )}
 
@@ -364,10 +463,19 @@ export function QuickInterventionCapture({
             </p>
           ) : (
             <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-              {entries.slice(0, 25).map((e) => (
+              {entries.slice(0, 25).map((e) => {
+                const equipoLabel = e.equipmentId && !e.equipmentId.startsWith('area:')
+                  ? (equipoLabelById.get(e.equipmentId) ?? 'Equipo')
+                  : null
+                return (
                 <li key={e.id} className="flex items-start gap-2.5 rounded-md border border-border/40 bg-background/40 px-2.5 py-2">
                   <span className={cn('h-2 w-2 rounded-full shrink-0 mt-1.5', SEV_DOT[e.severidad] ?? 'bg-muted')} />
                   <div className="min-w-0 flex-1">
+                    {equipoLabel && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-primary/90 mb-0.5">
+                        <Wrench className="h-2.5 w-2.5" /> {equipoLabel}
+                      </span>
+                    )}
                     <p className="text-xs text-foreground break-words">{e.hallazgo}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5">
                       <span className="uppercase tracking-wide">{TIPO_LABEL[e.tipo] ?? e.tipo}</span>
@@ -378,8 +486,115 @@ export function QuickInterventionCapture({
                     </p>
                   </div>
                 </li>
-              ))}
+                )
+              })}
             </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Análisis IA + predictivo del área (Fase 3b) ── */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Brain className="h-4 w-4 text-primary" />
+            Análisis IA del área
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            La IA lee el historial de intervenciones y detecta patrones, riesgo y la próxima acción preventiva — de "registramos" a "optimizamos".
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!canRunAreaAnalysis ? (
+            <p className="text-xs text-muted-foreground py-2 text-center">
+              El análisis se activa con <b>{MIN_AREA_INTERVENTIONS}+</b> intervenciones registradas en esta área
+              {entries.length > 0 && ` (llevás ${entries.length})`}.
+            </p>
+          ) : (
+            <>
+              <Button
+                type="button" size="sm" variant="outline"
+                disabled={analyzing}
+                onClick={handleAnalyzeArea}
+                className="border-primary/30 text-primary hover:bg-primary/10"
+              >
+                {analyzing
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando {entries.length} intervenciones…</>
+                  : <><TrendingUp className="h-3.5 w-3.5 mr-1.5" />{insights ? 'Re-analizar tendencia' : 'Analizar tendencia'}</>}
+              </Button>
+
+              {insightsError && (
+                <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span className="break-words">{insightsError}</span>
+                </div>
+              )}
+
+              {insights && (
+                <div className="space-y-3 pt-1">
+                  {/* Riesgo + resumen */}
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold', RIESGO_STYLE[insights.riesgo].cls)}>
+                      <Activity className="h-3 w-3" />
+                      {RIESGO_STYLE[insights.riesgo].label}
+                    </span>
+                    {insights.confianza != null && (
+                      <span className="text-[10px] text-muted-foreground self-center">
+                        confianza {Math.round(insights.confianza * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  {insights.resumen && (
+                    <p className="text-xs text-foreground/90 leading-relaxed">{insights.resumen}</p>
+                  )}
+
+                  {/* Patrones recurrentes */}
+                  {insights.patrones.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium text-muted-foreground">Patrones recurrentes</p>
+                      {insights.patrones.map((p, i) => (
+                        <div key={i} className="rounded-md border border-border/40 bg-background/40 px-2.5 py-2">
+                          <p className="text-xs text-foreground flex items-start gap-1.5">
+                            <span className="text-amber-400 font-semibold tabular-nums shrink-0">×{p.frecuencia}</span>
+                            <span className="break-words">{p.descripcion}</span>
+                          </p>
+                          {p.recomendacion && (
+                            <p className="text-[11px] text-emerald-300/80 mt-1 flex items-start gap-1">
+                              <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
+                              <span className="break-words">{p.recomendacion}</span>
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Equipos a vigilar */}
+                  {insights.equiposAVigilar.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium text-muted-foreground">Equipos / componentes a vigilar</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {insights.equiposAVigilar.map((eq, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px] font-normal text-amber-300 border-amber-500/30">
+                            {eq}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Próxima acción preventiva */}
+                  {insights.proximaAccion && (
+                    <div className="rounded-md border border-primary/30 bg-primary/5 px-2.5 py-2">
+                      <p className="text-[11px] font-medium text-primary flex items-center gap-1.5">
+                        <Lightbulb className="h-3.5 w-3.5" /> Próxima acción preventiva (RCM)
+                      </p>
+                      <p className="text-xs text-foreground/90 mt-1 break-words">{insights.proximaAccion}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

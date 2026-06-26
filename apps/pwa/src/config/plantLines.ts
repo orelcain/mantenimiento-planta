@@ -13,11 +13,13 @@ export type PlantLineId =
   | 'chonchi-eviscerado'  // Planta Principal — 3 Baaders 142
   | 'yal-eviscerado'      // Planta Yal — 3 Baaders 142
   | 'chonchi-filete'      // Planta Principal — Línea 1 Filetes (próx.)
-  | 'acopio-general'      // Acopio — sin Grader/Shoplogix (captura manual, próx.)
-  | 'riles-general'       // Riles — sin Grader/Shoplogix (captura manual, próx.)
+  | 'chonchi-empaque'     // Planta Principal — Empaque (captura manual)
+  | 'acopio-general'      // Acopio — sin Grader/Shoplogix (captura manual)
+  | 'riles-general'       // Riles — sin Grader/Shoplogix (captura manual)
+  | 'exteriores-agua-mar' // Exteriores — sistema agua de mar (caseta mar → estanques)
 
 /** Planta física (nivel 1 de las pestañas). Cada planta agrupa una o más áreas (PlantLineConfig). */
-export type PlantId = 'principal' | 'yal' | 'acopio' | 'riles'
+export type PlantId = 'principal' | 'yal' | 'acopio' | 'riles' | 'exteriores'
 
 export interface PlantInfo {
   id: PlantId
@@ -26,10 +28,11 @@ export interface PlantInfo {
 
 /** Plantas de nivel 1 en el orden de las pestañas. */
 export const PLANTS: readonly PlantInfo[] = [
-  { id: 'principal', label: 'Planta Principal' },
-  { id: 'yal',       label: 'Planta Yal' },
-  { id: 'acopio',    label: 'Acopio' },
-  { id: 'riles',     label: 'Riles' },
+  { id: 'principal',  label: 'Planta Principal' },
+  { id: 'yal',        label: 'Planta Yal' },
+  { id: 'acopio',     label: 'Acopio' },
+  { id: 'riles',      label: 'Riles' },
+  { id: 'exteriores', label: 'Exteriores' },
 ] as const
 
 export interface PlantLineConfig {
@@ -135,6 +138,18 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     comingSoon: true,
   },
   {
+    id: 'chonchi-empaque',
+    plant: 'principal',
+    areaLabel: 'Empaque',
+    label: 'Empaque',
+    description: 'Captura rápida de intervenciones',
+    plantSlug: 'chonchi',         // placeholder — sin Grader/Shoplogix
+    hasGraderData: false,
+    shoplogixEnabled: false,
+    manualCapture: true,
+    areaNodeId: 'aq-in-cho-pcho-proc-empq', // nodo 'area' EMPAQUE (11 equipos: empacadora, glaseador…)
+  },
+  {
     id: 'acopio-general',
     plant: 'acopio',
     areaLabel: 'General',
@@ -144,6 +159,7 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     hasGraderData: false,
     shoplogixEnabled: false,
     manualCapture: true,          // sin Grader/Shoplogix → panel de Captura Rápida
+    areaNodeId: 'aq-in-cho-acop', // nodo 'area' ACOPIO (13 equipos) → selector de equipo
   },
   {
     id: 'riles-general',
@@ -155,6 +171,21 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     hasGraderData: false,
     shoplogixEnabled: false,
     manualCapture: true,          // sin Grader/Shoplogix → panel de Captura Rápida
+    areaNodeId: 'aq-in-cho-exte-pril', // nodo 'area' PLANTA RILES (14 equipos) → selector de equipo
+  },
+  {
+    // Sistema de agua de mar: caseta mar (bombas AM 1/2) → estanque inox → estanque 4 agua salada.
+    // Caseta Mar vive en la jerarquía bajo Acopio; acá la exponemos como su propia área de Exteriores.
+    id: 'exteriores-agua-mar',
+    plant: 'exteriores',
+    areaLabel: 'Agua de Mar',
+    label: 'Agua de Mar',
+    description: 'Caseta mar → estanques agua salada',
+    plantSlug: 'chonchi',         // placeholder — sin Grader/Shoplogix
+    hasGraderData: false,
+    shoplogixEnabled: false,
+    manualCapture: true,
+    areaNodeId: 'aq-in-cho-acop-caam', // nodo 'area' CASETA AGUA MAR (Bomba Agua Mar 1/2)
   },
 ] as const
 

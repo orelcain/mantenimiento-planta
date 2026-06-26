@@ -780,6 +780,106 @@ Responde SOLO con JSON:
   }
 }
 
+// ===== ANÁLISIS IA + PREDICTIVO POR ÁREA (Fase 3b) =====
+
+export interface AreaInterventionInput {
+  fecha: Date
+  tipo: string
+  severidad: string
+  hallazgo: string
+  tecnico?: string
+}
+
+export interface AreaInsights {
+  resumen: string                 // 1-2 frases del estado de mantención del área
+  riesgo: 'bajo' | 'medio' | 'alto' | 'critico'
+  patrones: Array<{ descripcion: string; frecuencia: number; recomendacion: string }>
+  equiposAVigilar: string[]       // componentes/equipos mencionados de forma recurrente
+  proximaAccion: string           // acción preventiva sugerida (RCM)
+  confianza: number               // 0..1
+}
+
+/** Nº mínimo de intervenciones para que el análisis sea significativo. */
+export const MIN_AREA_INTERVENTIONS = 3
+
+/**
+ * Análisis RCM/predictivo a NIVEL DE ÁREA sobre las intervenciones capturadas
+ * (`maintenanceLog` de una línea/área de Análisis de Turno). Complementa a
+ * `analyzeRecurrentIssues`/`predictNextFailure` (que son por equipo/incidente):
+ * aquí la unidad es el ÁREA, alimentada por la Captura Rápida de Intervención.
+ *
+ * Demuestra el aporte de Mantención: detecta patrones recurrentes, equipos a
+ * vigilar y la próxima acción preventiva → de "registramos" a "optimizamos".
+ * Robusto: ante datos insuficientes o fallo devuelve null (el caller guía).
+ */
+export async function analyzeAreaInterventions(
+  entries: AreaInterventionInput[],
+  areaLabel: string,
+): Promise<AreaInsights | null> {
+  if (!isAIConfigured() || entries.length < MIN_AREA_INTERVENTIONS) return null
+
+  try {
+    // Resumen compacto y ordenado (más reciente primero), acotado para el prompt.
+    const sorted = [...entries].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 60)
+    const summary = sorted.map((e) => ({
+      fecha: e.fecha.toISOString().slice(0, 10),
+      tipo: e.tipo,
+      condicion: e.severidad, // verde/amarillo/rojo = Cond 1/2/3
+      hallazgo: e.hallazgo,
+    }))
+
+    const prompt = `Eres un ingeniero de confiabilidad (RCM) analizando el historial de intervenciones de mantención de un ÁREA de planta: "${areaLabel}".
+
+Intervenciones (más reciente primero):
+${JSON.stringify(summary, null, 2)}
+
+Analiza y entrega:
+1. Estado general de mantención del área (resumen breve, 1-2 frases).
+2. Nivel de riesgo del área (bajo/medio/alto/critico) según frecuencia y condición de las intervenciones.
+3. Patrones recurrentes (fallas/equipos que se repiten) con su frecuencia y una recomendación preventiva por patrón.
+4. Equipos o componentes a vigilar (nombres/menciones que se repiten en los hallazgos).
+5. La PRÓXIMA acción preventiva concreta recomendada (enfoque RCM, evitar recurrencia).
+
+Responde SOLO con JSON:
+{
+  "resumen": "string",
+  "riesgo": "bajo|medio|alto|critico",
+  "patrones": [{ "descripcion": "string", "frecuencia": number, "recomendacion": "string" }],
+  "equiposAVigilar": ["string"],
+  "proximaAccion": "string",
+  "confianza": 0.0-1.0
+}`
+
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 1200 },
+    )
+    const jsonStr = (content || '{}').replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(jsonStr) as Partial<AreaInsights>
+
+    const riesgos: AreaInsights['riesgo'][] = ['bajo', 'medio', 'alto', 'critico']
+    return {
+      resumen: (parsed.resumen || '').toString().trim(),
+      riesgo: riesgos.includes(parsed.riesgo as AreaInsights['riesgo']) ? (parsed.riesgo as AreaInsights['riesgo']) : 'medio',
+      patrones: Array.isArray(parsed.patrones)
+        ? parsed.patrones.slice(0, 6).map((p) => ({
+            descripcion: String(p?.descripcion ?? '').trim(),
+            frecuencia: Number(p?.frecuencia) || 0,
+            recomendacion: String(p?.recomendacion ?? '').trim(),
+          })).filter((p) => p.descripcion)
+        : [],
+      equiposAVigilar: Array.isArray(parsed.equiposAVigilar)
+        ? parsed.equiposAVigilar.map((s) => String(s).trim()).filter(Boolean).slice(0, 8)
+        : [],
+      proximaAccion: (parsed.proximaAccion || '').toString().trim(),
+      confianza: typeof parsed.confianza === 'number' ? Math.max(0, Math.min(1, parsed.confianza)) : 0.5,
+    }
+  } catch (error) {
+    logger.error('Error analizando intervenciones del área con IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
+  }
+}
+
 // ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
 
 // Extender input para considerar todo el contexto
