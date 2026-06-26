@@ -18,6 +18,7 @@ import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploa
 import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
+import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -577,6 +578,8 @@ export function AnalisisGraderWizardPage() {
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   const hasData = Boolean(parsedData && parsedData.pieceRecords.length > 0)
+  // Líneas sin Grader/Shoplogix (Acopio/Riles): solo Captura Rápida de Intervención.
+  const isManual = lineConfig.manualCapture === true
 
   return (
     <div className="space-y-4">
@@ -593,7 +596,9 @@ export function AnalisisGraderWizardPage() {
                 ? lineConfig.isClassificationPlant === false
                   ? `${lineConfig.label} · eviscerado simplificado — Excel del Marelec`
                   : 'Línea completa Grader + Baaders — carga de Excel del Grader'
-                : `${lineConfig.description} · datos Shoplogix`}
+                : lineConfig.manualCapture
+                  ? `${lineConfig.description} · voz → IA → historial de Mantención`
+                  : `${lineConfig.description} · datos Shoplogix`}
             </p>
           </div>
           {/* El botón "Cargar Excel" se movió al lado de las pestañas de
@@ -713,7 +718,22 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
 
+      {/* Líneas de captura manual (Acopio/Riles): sin Grader/Shoplogix →
+          pestañas + panel de Captura Rápida de Intervención (Fase 3). */}
+      {isManual && (
+        <div className="space-y-4">
+          <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
+          <QuickInterventionCapture
+            plantLineId={lineId}
+            areaNodeId={lineConfig.areaNodeId}
+            areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+          />
+        </div>
+      )}
+
       {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
+      {!isManual && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* Col izquierda: pestañas + KPI */}
@@ -790,6 +810,8 @@ export function AnalisisGraderWizardPage() {
         onDateSelect={setSelectedDateKey}
         plantLineId={lineId}
       />
+      </>
+      )}
 
       {/* ═══ PANTALLA 2: Dashboard de análisis (full width) ═══ */}
       {hasData && analyticsResult && (

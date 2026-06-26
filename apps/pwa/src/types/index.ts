@@ -164,6 +164,14 @@ export interface MaintenanceLogEntry {
   incidenciaId?: string
   proximaInspeccion?: string // ISO date
   checklist?: ChecklistResultado[] // resultados del protocolo de inspección por familia
+  // ── Captura Rápida por área (Análisis de Turno · Fase 3) ──
+  // Enriquecen la entrada para agregar por planta/área/turno en la Lente de
+  // Mantención (líneas sin Grader/Shoplogix: Acopio, Riles). Opcionales: las
+  // entradas NFPA 70B clásicas (por equipo) no los traen.
+  plantLineId?: string  // ej. 'acopio-general' — línea/área del módulo Análisis
+  areaNodeId?: string   // nodo de jerarquía 'area' (cuando esté linkeado)
+  shiftId?: string      // turno en que se registró (best-effort: 'Turno día'/'Turno noche')
+  origen?: 'captura_rapida' | 'ficha_nfpa' | 'incidencia' // de dónde nació la entrada
   createdAt: Date
 }
 

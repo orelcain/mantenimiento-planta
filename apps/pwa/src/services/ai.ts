@@ -723,6 +723,63 @@ Responde SOLO con el texto técnico mejorado. Sin comillas ni puntos finales.`
   }
 }
 
+// ===== CAPTURA RÁPIDA DE INTERVENCIÓN (Análisis de Turno · Fase 3) =====
+
+export type InterventionTipo = 'correctivo' | 'preventivo' | 'predictivo' | 'inspeccion'
+export type InterventionSeveridad = 'verde' | 'amarillo' | 'rojo'
+
+export interface InterventionSuggestion {
+  titulo: string
+  tipo: InterventionTipo
+  severidad: InterventionSeveridad
+}
+
+/**
+ * Desde el relato de una intervención (dictado/limpiado), sugiere campos
+ * estructurados para `maintenanceLog`: título conciso, tipo de mantención y
+ * condición/severidad (1/2/3 → verde/amarillo/rojo). Todo editable por el
+ * técnico antes de guardar. Robusto: ante fallo devuelve un default neutro.
+ */
+export async function suggestInterventionFields(hallazgo: string): Promise<InterventionSuggestion | null> {
+  if (!isAIConfigured() || !hallazgo || hallazgo.trim().length < 8) return null
+
+  try {
+    const prompt = `Eres un planificador de mantenimiento industrial. A partir del relato de una intervención de mantención en planta, devuelve campos estructurados.
+
+Relato: "${hallazgo}"
+
+Reglas:
+- "titulo": frase técnica MUY concisa (máx 6 palabras), formato falla/acción + componente. Ej: "Cambio de rodamiento en bomba".
+- "tipo": uno de correctivo | preventivo | predictivo | inspeccion.
+   · correctivo = se reparó/atendió una falla ya ocurrida.
+   · preventivo = mantención planificada para evitar falla (lubricación, cambio por horas).
+   · predictivo = medición/diagnóstico de condición (vibración, termografía, análisis).
+   · inspeccion = revisión/chequeo sin intervención mayor.
+- "severidad": condición resultante. verde = sin riesgo / resuelto; amarillo = atención / seguimiento; rojo = crítico / equipo comprometido.
+
+Responde SOLO con JSON:
+{"titulo": "...", "tipo": "correctivo", "severidad": "verde"}`
+
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, max_tokens: 200 }
+    )
+    const jsonStr = (content || '{}').replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(jsonStr) as Partial<InterventionSuggestion>
+
+    const tipos: InterventionTipo[] = ['correctivo', 'preventivo', 'predictivo', 'inspeccion']
+    const sevs: InterventionSeveridad[] = ['verde', 'amarillo', 'rojo']
+    return {
+      titulo: (parsed.titulo || '').toString().replace(/^"|"$/g, '').replace(/\.$/, '').trim(),
+      tipo: tipos.includes(parsed.tipo as InterventionTipo) ? (parsed.tipo as InterventionTipo) : 'correctivo',
+      severidad: sevs.includes(parsed.severidad as InterventionSeveridad) ? (parsed.severidad as InterventionSeveridad) : 'amarillo',
+    }
+  } catch (error) {
+    logger.error('Error sugiriendo campos de intervención con IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
+  }
+}
+
 // ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
 
 // Extender input para considerar todo el contexto
