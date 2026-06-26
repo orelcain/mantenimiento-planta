@@ -13,9 +13,31 @@ export type PlantLineId =
   | 'chonchi-eviscerado'  // Planta Principal — 3 Baaders 142
   | 'yal-eviscerado'      // Planta Yal — 3 Baaders 142
   | 'chonchi-filete'      // Planta Principal — Línea 1 Filetes (próx.)
+  | 'acopio-general'      // Acopio — sin Grader/Shoplogix (captura manual, próx.)
+  | 'riles-general'       // Riles — sin Grader/Shoplogix (captura manual, próx.)
+
+/** Planta física (nivel 1 de las pestañas). Cada planta agrupa una o más áreas (PlantLineConfig). */
+export type PlantId = 'principal' | 'yal' | 'acopio' | 'riles'
+
+export interface PlantInfo {
+  id: PlantId
+  label: string
+}
+
+/** Plantas de nivel 1 en el orden de las pestañas. */
+export const PLANTS: readonly PlantInfo[] = [
+  { id: 'principal', label: 'Planta Principal' },
+  { id: 'yal',       label: 'Planta Yal' },
+  { id: 'acopio',    label: 'Acopio' },
+  { id: 'riles',     label: 'Riles' },
+] as const
 
 export interface PlantLineConfig {
   id: PlantLineId
+  /** Planta física a la que pertenece esta área (nivel 1 de las pestañas). */
+  plant: PlantId
+  /** Etiqueta del área (nivel 2 de las pestañas, ej. "Eviscerado", "Filete"). */
+  areaLabel: string
   /** Etiqueta corta para el tab strip */
   label: string
   /** Descripción para el subtítulo */
@@ -28,6 +50,20 @@ export interface PlantLineConfig {
   shoplogixEnabled: boolean
   /** Si true, el tab se renderiza pero está deshabilitado (proximamente) */
   comingSoon?: boolean
+  /**
+   * Si true, la línea NO tiene Grader/Shoplogix: su único flujo es la
+   * Captura Rápida de Intervención (voz→IA→`maintenanceLog`). Acopio / Riles.
+   * El wizard oculta el grid Grader (upload/KPI/calendario) y muestra el
+   * panel de captura.
+   */
+  manualCapture?: boolean
+  /**
+   * Nodo de jerarquía (tipo 'area') al que se asocian las intervenciones de
+   * captura manual. Si se define, la captura puede ofrecer un selector de
+   * equipos del área; si se omite, las intervenciones quedan a nivel de ÁREA
+   * (equipmentId sintético `area:{id}`). Pendiente de linkear para Acopio/Riles.
+   */
+  areaNodeId?: string
   /**
    * Horarios de turno por defecto para esta planta.
    * Si se omite, se usa DEFAULT_SHIFT_SCHEDULE (Chonchi: día 07-19, noche 19-07).
@@ -52,6 +88,8 @@ export interface PlantLineConfig {
 export const PLANT_LINES: readonly PlantLineConfig[] = [
   {
     id: 'chonchi-eviscerado',
+    plant: 'principal',
+    areaLabel: 'Eviscerado',
     label: 'P. Principal',
     description: 'Eviscerado · 3 Baaders',
     plantSlug: 'chonchi',
@@ -61,6 +99,8 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
   },
   {
     id: 'yal-eviscerado',
+    plant: 'yal',
+    areaLabel: 'Eviscerado',
     label: 'Planta Yal',
     description: 'Eviscerado · 3 Baaders',
     plantSlug: 'yal',
@@ -85,6 +125,8 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
   },
   {
     id: 'chonchi-filete',
+    plant: 'principal',
+    areaLabel: 'Filete',
     label: 'Filete',
     description: 'P. Principal · Línea 1',
     plantSlug: 'chonchi',
@@ -92,10 +134,54 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     shoplogixEnabled: false,
     comingSoon: true,
   },
+  {
+    id: 'acopio-general',
+    plant: 'acopio',
+    areaLabel: 'General',
+    label: 'Acopio',
+    description: 'Captura rápida de intervenciones',
+    plantSlug: 'chonchi',         // placeholder — no se consulta (sin Grader/Shoplogix)
+    hasGraderData: false,
+    shoplogixEnabled: false,
+    manualCapture: true,          // sin Grader/Shoplogix → panel de Captura Rápida
+  },
+  {
+    id: 'riles-general',
+    plant: 'riles',
+    areaLabel: 'General',
+    label: 'Riles',
+    description: 'Captura rápida de intervenciones',
+    plantSlug: 'chonchi',         // placeholder — no se consulta (sin Grader/Shoplogix)
+    hasGraderData: false,
+    shoplogixEnabled: false,
+    manualCapture: true,          // sin Grader/Shoplogix → panel de Captura Rápida
+  },
 ] as const
 
 export const DEFAULT_PLANT_LINE_ID: PlantLineId = 'chonchi-eviscerado'
 
 export function getPlantLineConfig(id?: PlantLineId | string | null): PlantLineConfig {
   return PLANT_LINES.find((l) => l.id === id) ?? PLANT_LINES[0]!
+}
+
+/** Planta (nivel 1) a la que pertenece una línea/área. */
+export function getPlantOf(id?: PlantLineId | string | null): PlantId {
+  return getPlantLineConfig(id).plant
+}
+
+/** Áreas (líneas) de una planta, en el orden declarado en PLANT_LINES. */
+export function getAreasOfPlant(plant: PlantId): PlantLineConfig[] {
+  return PLANT_LINES.filter((l) => l.plant === plant)
+}
+
+/** ¿Todas las áreas de la planta están "próximamente"? (planta deshabilitada). */
+export function isPlantComingSoon(plant: PlantId): boolean {
+  const areas = getAreasOfPlant(plant)
+  return areas.length > 0 && areas.every((a) => a.comingSoon)
+}
+
+/** Área por defecto de una planta (la primera no-comingSoon, o la primera). */
+export function getDefaultAreaOfPlant(plant: PlantId): PlantLineConfig | undefined {
+  const areas = getAreasOfPlant(plant)
+  return areas.find((a) => !a.comingSoon) ?? areas[0]
 }
