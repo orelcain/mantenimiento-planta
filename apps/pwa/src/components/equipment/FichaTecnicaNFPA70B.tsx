@@ -484,7 +484,7 @@ export function FichaTecnicaNFPA70B({
       {/* Criticidad / RCM — NFPA 70B §2.4 + Cap. 9 */}
       <Card>
         <CardContent className="p-4 space-y-3">
-          <SectionTitle icon={Gauge} hint="NFPA 70B §2.4 + Cap. 9">
+          <SectionTitle icon={Gauge} hint="criterio basado en NFPA 70B">
             Criticidad · RCM
           </SectionTitle>
           <div className="flex items-center gap-3 flex-wrap">
@@ -546,7 +546,7 @@ export function FichaTecnicaNFPA70B({
           {!editing && (
             <div className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-dashed p-2.5">
               <span className="text-xs text-muted-foreground">
-                💡 Próxima inspección sugerida (Cap. 9):{' '}
+                💡 Próxima inspección sugerida:{' '}
                 <span className="font-medium text-foreground">{sugeridaFecha.toLocaleDateString()}</span> — criticidad{' '}
                 {crit.nivel} × condición {ficha.condicion ?? '—'} → {sugeridaDias} d desde {refFecha.toLocaleDateString()}
               </span>
@@ -852,8 +852,8 @@ export function FichaTecnicaNFPA70B({
       <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
-          Estructura según NFPA 70B (§2.2 placa · §2.4 + Cap. 9 criticidad/condición · historial). Las
-          incidencias del equipo aparecen en el timeline automáticamente.
+          Estructura basada en NFPA 70B (placa · criticidad/condición · historial), según el material del
+          curso (no la norma oficial). Las incidencias del equipo aparecen en el timeline automáticamente.
         </span>
       </div>
     </div>

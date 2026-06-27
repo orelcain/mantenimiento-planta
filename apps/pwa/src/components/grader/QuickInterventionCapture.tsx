@@ -409,7 +409,7 @@ export function QuickInterventionCapture({
               })}
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              Estado en que queda u observás el equipo (vale para cualquier tipo · NFPA 70B Cap. 9):
+              Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}🟢 <b>1</b> como nuevo, sin alertas ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
             </p>
           </div>
