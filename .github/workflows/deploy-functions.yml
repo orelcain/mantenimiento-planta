@@ -55,9 +55,13 @@ jobs:
 
       - name: Deploy Cloud Functions
         working-directory: .
+        # El service account se pasa por env (NO interpolar `${{ secrets }}` inline:
+        # eso mangla el JSON y rompe la auth). `printf '%s'` preserva el contenido exacto.
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only functions --non-interactive
+          printf '%s' "$SA_JSON" > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only functions --project mantenimiento-planta-771a3 --non-interactive
           rm -f /tmp/sa.json
 
       - name: Notificar deploy exitoso
