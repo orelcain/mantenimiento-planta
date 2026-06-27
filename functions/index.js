@@ -918,6 +918,86 @@ exports.groqProxy = onCall(
   }
 )
 
+// ==================== WHISPER (Groq) — TRANSCRIPCIÓN DE AUDIO ====================
+
+/**
+ * Transcripción de audio con Groq Whisper large-v3 — mucho más precisa que la
+ * Web Speech API del navegador, sobre todo para español chileno + vocabulario
+ * técnico de planta. El cliente graba audio (MediaRecorder) y envía base64;
+ * la API key vive en el secret GROQ_API_KEY (no se expone al cliente).
+ *
+ * Body: { audioBase64, mimeType, language='es', prompt?, model? }
+ * Devuelve: { text }
+ */
+exports.whisperProxy = onCall(
+  {
+    secrets: ['GROQ_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 5,
+    memory: '512MiB',
+    timeoutSeconds: 120,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para transcribir audio')
+    }
+
+    const { audioBase64, mimeType, language, prompt, model } = request.data || {}
+    if (!audioBase64 || typeof audioBase64 !== 'string') {
+      throw new Error('Se requiere audio (audioBase64)')
+    }
+
+    const apiKey = process.env.GROQ_API_KEY
+    if (!apiKey) {
+      logger.error('GROQ_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio de transcripción no configurado')
+    }
+
+    const buffer = Buffer.from(audioBase64, 'base64')
+    if (buffer.length === 0) {
+      throw new Error('Audio vacío')
+    }
+    if (buffer.length > 25 * 1024 * 1024) {
+      throw new Error('El audio supera el límite de 25 MB')
+    }
+
+    const type = mimeType || 'audio/webm'
+    const ext = type.includes('mp4') || type.includes('m4a') ? 'm4a'
+      : type.includes('ogg') ? 'ogg'
+      : type.includes('wav') ? 'wav'
+      : (type.includes('mpeg') || type.includes('mp3')) ? 'mp3'
+      : 'webm'
+
+    try {
+      const form = new FormData()
+      form.append('file', new Blob([buffer], { type }), `audio.${ext}`)
+      form.append('model', model || 'whisper-large-v3-turbo')
+      form.append('language', language || 'es')
+      form.append('temperature', '0')
+      form.append('response_format', 'json')
+      if (prompt) form.append('prompt', String(prompt).slice(0, 800))
+
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Groq Whisper error', { status: response.status, body: errorText })
+        throw new Error(`Error de transcripción (${response.status})`)
+      }
+
+      const data = await response.json()
+      return { text: (data.text || '').trim() }
+    } catch (error) {
+      logger.error('Whisper proxy error:', error)
+      throw new Error('Error al transcribir el audio')
+    }
+  }
+)
+
 // ==================== GEMINI PROXY ====================
 
 exports.geminiProxy = onCall(
