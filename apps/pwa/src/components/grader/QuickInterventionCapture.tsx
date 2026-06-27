@@ -96,7 +96,9 @@ function flattenEquipos(
   for (const n of nodes) {
     if (n.oculto) continue
     const prefix = depth > 0 ? '· '.repeat(depth) : ''
-    acc.push({ id: n.id, label: `${prefix}${n.nombre}${n.codigo ? ` (${n.codigo})` : ''}` })
+    // El alias (apodo de planta, ej. "C1") va en el label → buscable y visible.
+    const alias = n.alias ? ` · ${n.alias}` : ''
+    acc.push({ id: n.id, label: `${prefix}${n.nombre}${n.codigo ? ` (${n.codigo})` : ''}${alias}` })
     if (n.children?.length) flattenEquipos(n.children, depth + 1, acc)
   }
   return acc
