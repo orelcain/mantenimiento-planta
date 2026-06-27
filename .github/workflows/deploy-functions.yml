@@ -53,6 +53,18 @@ jobs:
             echo "⚠️  FUNCTIONS_ENV secret no configurado — funciones nuevas pueden no tener env vars"
           fi
 
+      - name: DEBUG credencial y auth (temporal)
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA_JSON" > /tmp/sa.json
+          echo "bytes=$(wc -c < /tmp/sa.json) lineas=$(wc -l < /tmp/sa.json)"
+          echo "first3hex=$(head -c3 /tmp/sa.json | xxd -p)"
+          node -e "const k=JSON.parse(require('fs').readFileSync('/tmp/sa.json','utf8')); console.log('JSON_OK project=',k.project_id,'email=',k.client_email,'type=',k.type,'pk_escaped_nl=',k.private_key.includes(String.fromCharCode(92)+'n'),'pk_real_nl=',k.private_key.includes(String.fromCharCode(10)),'pk_len=',k.private_key.length)" || echo "JSON_PARSE_FAIL"
+          echo "--- auth check: firebase projects:list ---"
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase projects:list --non-interactive 2>&1 | tail -6 || echo "PROJECTS_LIST_FAILED rc=$?"
+          rm -f /tmp/sa.json
+
       - name: Deploy Cloud Functions
         working-directory: .
         # El service account se pasa por env (NO interpolar `${{ secrets }}` inline:
