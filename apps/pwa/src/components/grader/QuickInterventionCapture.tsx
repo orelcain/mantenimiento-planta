@@ -18,14 +18,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Mic, Sparkles, Wand2, Wrench, ShieldCheck, Activity, Eye,
   Loader2, CheckCircle2, ClipboardList, AlertTriangle,
-  Brain, TrendingUp, Lightbulb,
+  Brain, TrendingUp, Lightbulb, Pencil, FileText,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { useEquipmentForArea, type EquipmentDisplayNode } from '@/hooks/useEquipmentForArea'
+import { EquipoCombobox, AREA_LEVEL, type ComboOption } from './EquipoCombobox'
+import { InterventionEditDialog } from './InterventionEditDialog'
 import {
   addMaintenanceLogEntry,
   getMaintenanceLogByPlantLine,
@@ -86,15 +87,12 @@ function fmtFecha(d: Date): string {
     ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
 }
 
-/** Valor del Select que representa "registrar a nivel de área" (Radix prohíbe value=""). */
-const AREA_LEVEL = '__area__'
-
-/** Aplana el árbol de equipos del área a una lista para el dropdown (con sangría por nivel). */
+/** Aplana el árbol de equipos del área a una lista para el combobox (con sangría por nivel). */
 function flattenEquipos(
   nodes: EquipmentDisplayNode[],
   depth = 0,
-  acc: { id: string; label: string }[] = [],
-): { id: string; label: string }[] {
+  acc: ComboOption[] = [],
+): ComboOption[] {
   for (const n of nodes) {
     if (n.oculto) continue
     const prefix = depth > 0 ? '· '.repeat(depth) : ''
@@ -114,6 +112,9 @@ export function QuickInterventionCapture({
   const [tipo, setTipo] = useState<InterventionTipo>('correctivo')
   const [severidad, setSeveridad] = useState<InterventionSeveridad>('amarillo')
   const [selectedEquipoId, setSelectedEquipoId] = useState<string>(AREA_LEVEL)
+  const [sapAviso, setSapAviso] = useState('')
+  const [sapOrden, setSapOrden] = useState('')
+  const isAdmin = user?.rol === 'admin'
 
   // Equipos del área (Fase 3b) — solo si la línea tiene `areaNodeId` linkeado.
   const { equipment, loading: loadingEquip } = useEquipmentForArea(areaNodeId ?? null)
@@ -122,6 +123,14 @@ export function QuickInterventionCapture({
     () => new Map(flatEquipos.map((e) => [e.id, e.label])),
     [flatEquipos],
   )
+  // Opciones del combobox: "Área general" + equipos del área.
+  const equipoOptions = useMemo<ComboOption[]>(
+    () => [{ id: AREA_LEVEL, label: 'Área general (sin equipo específico)' }, ...flatEquipos],
+    [flatEquipos],
+  )
+
+  // Edición de una intervención existente (modal).
+  const [editingEntry, setEditingEntry] = useState<MaintenanceLogEntry | null>(null)
 
   const [refining, setRefining] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
@@ -241,6 +250,8 @@ export function QuickInterventionCapture({
         areaNodeId,
         shiftId: currentShiftId(),
         origen: 'captura_rapida',
+        sapAviso: sapAviso.trim() || undefined,
+        sapOrden: sapOrden.trim() || undefined,
       })
       // Reset y feedback
       setHallazgo('')
@@ -248,6 +259,8 @@ export function QuickInterventionCapture({
       setTipo('correctivo')
       setSeveridad('amarillo')
       setSelectedEquipoId(AREA_LEVEL)
+      setSapAviso('')
+      setSapOrden('')
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 3500)
       await loadEntries()
@@ -256,7 +269,7 @@ export function QuickInterventionCapture({
     } finally {
       setSaving(false)
     }
-  }, [hallazgo, titulo, tipo, severidad, selectedEquipoId, user, plantLineId, areaNodeId, loadEntries])
+  }, [hallazgo, titulo, tipo, severidad, selectedEquipoId, sapAviso, sapOrden, user, plantLineId, areaNodeId, loadEntries])
 
   const busy = refining || suggesting
 
@@ -324,23 +337,18 @@ export function QuickInterventionCapture({
             </div>
           )}
 
-          {/* Equipo del área (opcional) — solo si la línea tiene areaNodeId linkeado */}
+          {/* Equipo del área (opcional, con buscador) — solo si la línea tiene areaNodeId */}
           {areaNodeId && (
             <div className="space-y-1">
               <label className="text-[11px] font-medium text-muted-foreground">
                 Equipo <span className="text-muted-foreground/60">(opcional)</span>
               </label>
-              <Select value={selectedEquipoId} onValueChange={setSelectedEquipoId}>
-                <SelectTrigger className="text-sm bg-background/60">
-                  <SelectValue placeholder="Área general" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AREA_LEVEL}>Área general (sin equipo específico)</SelectItem>
-                  {flatEquipos.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <EquipoCombobox
+                options={equipoOptions}
+                value={selectedEquipoId}
+                onChange={setSelectedEquipoId}
+                placeholder="Área general · escribí para buscar equipo…"
+              />
               {loadingEquip && (
                 <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" /> Cargando equipos del área…
@@ -397,6 +405,17 @@ export function QuickInterventionCapture({
                   </button>
                 )
               })}
+            </div>
+          </div>
+
+          {/* Trazabilidad SAP (opcional) */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+              <FileText className="h-3 w-3" /> SAP <span className="text-muted-foreground/60">(opcional — si lo dejás vacío queda "SAP pendiente")</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="N° Aviso" className="text-sm bg-background/60" inputMode="numeric" />
+              <Input value={sapOrden} onChange={(e) => setSapOrden(e.target.value)} placeholder="N° Orden (OT)" className="text-sm bg-background/60" inputMode="numeric" />
             </div>
           </div>
 
@@ -484,7 +503,22 @@ export function QuickInterventionCapture({
                       {e.tecnico && (<><span>·</span><span>{e.tecnico}</span></>)}
                       {e.shiftId && (<><span>·</span><span>{e.shiftId}</span></>)}
                     </p>
+                    {/* SAP */}
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {e.sapOrden
+                        ? <Badge variant="outline" className="text-[9px] text-sky-300 border-sky-500/40">OT {e.sapOrden}</Badge>
+                        : <Badge variant="outline" className="text-[9px] text-amber-300 border-amber-500/40">SAP pendiente</Badge>}
+                      {e.sapAviso && <Badge variant="outline" className="text-[9px] text-muted-foreground border-border/50">Aviso {e.sapAviso}</Badge>}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry(e)}
+                    title="Editar intervención"
+                    className="shrink-0 p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                 </li>
                 )
               })}
@@ -598,6 +632,16 @@ export function QuickInterventionCapture({
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de edición de intervención */}
+      <InterventionEditDialog
+        entry={editingEntry}
+        plantLineId={plantLineId}
+        equipoOptions={equipoOptions}
+        isAdmin={isAdmin}
+        onClose={() => setEditingEntry(null)}
+        onSaved={() => { setEditingEntry(null); void loadEntries() }}
+      />
     </div>
   )
 }
