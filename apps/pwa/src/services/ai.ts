@@ -672,6 +672,24 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
 
 // ===== REFINAMIENTO DE TEXTO (BOTÓN MÁGICO) =====
 
+/**
+ * Glosario de términos VÁLIDOS de la planta (áreas, equipos, marcas) que la IA
+ * NO debe "corregir" al limpiar transcripciones. Clave para que no cambie
+ * "Acopio" (un área) por "acoplamiento", "Yal" por "ya", etc.
+ * Ampliar con los nombres reales de equipos a medida que aparezcan.
+ */
+export const PLANT_GLOSSARY = [
+  // Plantas / áreas
+  'Acopio', 'Riles', 'Yal', 'Chonchi', 'Eviscerado', 'Filete', 'Empaque',
+  'Frigorífico', 'Cámaras', 'Antecámara', 'Sacrificio', 'Emparrillado', 'Túneles',
+  'Sala de Máquinas', 'Sala de Caldera', 'Sala de Freón', 'Subestación', 'Pontón',
+  'Caseta de Agua de Mar', 'Agua de Mar',
+  // Equipos / marcas / términos técnicos
+  'Baader', 'Marelec', 'grader', 'fileteadora', 'glaseador', 'enzunchadora',
+  'empacadora', 'rodamiento', 'chumacera', 'sello mecánico', 'variador de frecuencia',
+  'bomba de agua de mar', 'sistema de bombeo de peces', 'DAF', 'filtro tornillo',
+]
+
 // Extender refineText para soportar contexto de transcripción
 export async function refineText(text: string, isTranscriptionCleanup = false): Promise<string> {
   if (!isAIConfigured()) {
@@ -683,15 +701,18 @@ export async function refineText(text: string, isTranscriptionCleanup = false): 
   }
 
   try {
-    const prompt = isTranscriptionCleanup 
-      ? `Eres un experto técnico industrial.
-Tu tarea es corregir la transcripción de voz a texto de un reporte de mantenimiento.
-El texto original puede tener errores fonéticos, palabras mal interpretadas o muletillas dado que fue dictado.
-1. Corrije los errores técnicos (Ej: "bomba centriguga" -> "bomba centrífuga").
-2. Hazlo CONCISO y PRECISO.
-3. Mantén el sentido original pero con lenguaje profesional.
-4. NO agregues introducciones ni explicaciones.
-5. NO uses comillas.
+    const prompt = isTranscriptionCleanup
+      ? `Eres un experto técnico de mantenimiento de una planta procesadora de salmón.
+Corrige la transcripción de voz a texto de un reporte de mantenimiento (puede tener errores fonéticos o muletillas porque fue dictado).
+
+TÉRMINOS VÁLIDOS DE LA PLANTA — si aparecen (o algo que suene parecido), MANTENLOS tal cual; NO los "corrijas" a otra palabra:
+${PLANT_GLOSSARY.join(', ')}.
+Ejemplo CRÍTICO: "acopio" es un ÁREA de la planta — NUNCA lo cambies a "acoplamiento".
+
+Reglas:
+1. Corrige solo errores fonéticos obvios que NO estén en la lista de arriba (Ej: "bomba centriguga" -> "bomba centrífuga").
+2. Conciso y profesional, mantén el sentido original.
+3. NO agregues introducciones, explicaciones ni comillas.
 
 Texto original transcrito: "${text}"
 
