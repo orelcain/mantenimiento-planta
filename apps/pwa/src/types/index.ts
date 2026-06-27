@@ -172,6 +172,9 @@ export interface MaintenanceLogEntry {
   areaNodeId?: string   // nodo de jerarquía 'area' (cuando esté linkeado)
   shiftId?: string      // turno en que se registró (best-effort: 'Turno día'/'Turno noche')
   origen?: 'captura_rapida' | 'ficha_nfpa' | 'incidencia' // de dónde nació la entrada
+  // ── Trazabilidad SAP ── Si falta `sapOrden` ⇒ "SAP pendiente" (falta crear la OT en SAP).
+  sapAviso?: string     // N° de aviso SAP
+  sapOrden?: string     // N° de orden de trabajo (OT) SAP
   createdAt: Date
 }
 
