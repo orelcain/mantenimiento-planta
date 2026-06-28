@@ -6,9 +6,9 @@
  * - Mes:    mes visible en el calendario.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
-import { TrendingUp, AlertTriangle } from 'lucide-react'
+import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
@@ -157,6 +157,30 @@ export function PlantKPIBoard({
     effectiveMonth,
     graderSummaries,
   )
+
+  // Diagnóstico "¿qué Baader arrastra el OEE?" — A×R por máquina (la Calidad es
+  // de línea, no por máquina). Identifica la peor y su pérdida dominante.
+  const machineDiag = useMemo(() => {
+    if (!kpis || kpis.graderOnly) return null
+    const withData = kpis.machines
+      .filter((m) => m.availability !== null && m.performance !== null && (m.totalCycles ?? 0) > 0)
+      .map((m) => {
+        const a = m.availability as number
+        const p = m.performance as number
+        return {
+          id: m.machineid,
+          name: m.machineName,
+          oeeMaq: a * p,
+          dominant: (1 - a) >= (1 - p) ? ('disponibilidad' as const) : ('rendimiento' as const),
+        }
+      })
+    if (withData.length < 2) return null
+    const sorted = [...withData].sort((x, y) => x.oeeMaq - y.oeeMaq)
+    const worst = sorted[0]!
+    const best = sorted[sorted.length - 1]!
+    if (best.oeeMaq - worst.oeeMaq < 0.05) return null // sin diferencia material entre máquinas
+    return { worst }
+  }, [kpis])
 
   if (!enabled) return null
 
@@ -340,6 +364,17 @@ export function PlantKPIBoard({
             </>
             )}
 
+            {/* Diagnóstico: ¿qué Baader arrastra el OEE? (A×R por máquina) */}
+            {machineDiag && (
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-300/90 bg-amber-500/[0.06] border border-amber-500/20 rounded-md px-2 py-1.5">
+                <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>
+                  <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} — OEE máq (A×R) {pct(machineDiag.worst.oeeMaq, 0)} · pérdida dominante:{' '}
+                  <b>{machineDiag.worst.dominant === 'disponibilidad' ? 'Disponibilidad (paros)' : 'Rendimiento (micro-paradas / velocidad)'}</b>.
+                </span>
+              </div>
+            )}
+
             {/* ── Detalle por máquina (solo con Shoplogix) ──
                 Mobile: machineName más estrecho (w-16) + ocultar pz/min target
                 que es info no crítica en mobile. Desktop: ancho completo.
@@ -350,12 +385,17 @@ export function PlantKPIBoard({
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
                 const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin paros'
+                const isWorst     = machineDiag?.worst.id === m.machineid
                 return (
                 <div
                   key={m.machineid}
-                  className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
-                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros`}
+                  className={cn(
+                    'flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20',
+                    isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
+                  )}
+                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más arrastra el OEE del grupo' : ''}`}
                 >
+                  {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
                     className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
                     title={`${m.machineName} — Evisceradora Baader 142 N°${idx + 1}`}
