@@ -90,7 +90,7 @@ function barWidth(v: number | null, max = 1): string {
 // ── Tooltips ──────────────────────────────────────────────────────────────────
 
 const DEFS = {
-  oee:     { desc: 'Mide el % del tiempo planificado en que la planta produce a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial' },
+  oee:     { desc: 'OEE de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nMide el % del tiempo planificado en que las Baader producen a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n(A·R de las Baader · Q = calidad del Grader)\n\nNO incluye: bombeo, chiller, desangrador, cintas, Marel, corte ni etiquetado.\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial\n(el 85% es para una máquina/cuello de botella, no para un OEE de línea).' },
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
@@ -195,6 +195,10 @@ export function PlantKPIBoard({
             ))}
           </div>
         </div>
+        {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
+        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">
+          Alcance: las 3 Baader (eviscerado de máquina) + calidad del Grader — <b className="font-medium">no toda el área</b>.
+        </p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
