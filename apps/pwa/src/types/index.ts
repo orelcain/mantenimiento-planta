@@ -178,6 +178,22 @@ export interface MaintenanceLogEntry {
   createdAt: Date
 }
 
+// Paro de etapa de la línea (colección plana `paros`) — captura MANUAL de
+// detenciones de las etapas NO instrumentadas (bombeo, chiller, cintas, Marel,
+// corte…). Base para cuantificar la DISPONIBILIDAD del área (Pareto por etapa)
+// sin telemetría. Ver docs/OEE_AREA_ROADMAP.md (Fase B).
+export interface ParoEtapa {
+  id: string
+  plantLineId: string   // línea/área del módulo Análisis (ej. 'chonchi-eviscerado')
+  etapa: string         // etapa que se detuvo (ej. 'Bombeo', 'Chiller', 'Cinta elevadora')
+  duracionMin: number   // duración del paro en minutos
+  causa: string         // por qué se detuvo
+  fecha: Date
+  tecnico?: string
+  shiftId?: string      // turno (best-effort)
+  createdAt: Date
+}
+
 // Medición de comportamiento (colección plana `mediciones`) — series por equipo.
 // Bitácora oportunista (sin cadencia) para los equipos seguidos; base de tendencias.
 export interface Medicion {
