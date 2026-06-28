@@ -19,6 +19,7 @@ import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/gra
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
+import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -839,6 +840,15 @@ export function AnalisisGraderWizardPage() {
             onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
           />
         </div>
+      )}
+
+      {/* Paros de etapa de la línea (Fase B OEE de área) — captura manual de
+          detenciones de etapas no instrumentadas. Disponible en cualquier línea activa. */}
+      {!lineConfig.comingSoon && (
+        <ParoEtapaCapture
+          plantLineId={lineId}
+          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+        />
       )}
     </div>
   )

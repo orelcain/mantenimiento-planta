@@ -554,6 +554,24 @@ service cloud.firestore {
     }
 
     // ============================================
+    // PAROS — Detenciones de etapa de la línea (captura manual, Fase B OEE de área)
+    // Colección plana; un doc por paro, referenciada por plantLineId + etapa.
+    // ============================================
+    match /paros/{paroId} {
+      allow read: if isActiveUser();
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.plantLineId is string
+        && request.resource.data.plantLineId.size() > 0
+        && request.resource.data.etapa is string
+        && request.resource.data.etapa.size() > 0
+        && request.resource.data.duracionMin is number
+        && request.resource.data.duracionMin >= 0;
+      allow update: if isTechnician() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // WORK ORDERS — Órdenes de trabajo por equipo (Centro Técnico Documental)
     // Colección plana; un doc por OT, referenciada por equipmentId.
     // ============================================
