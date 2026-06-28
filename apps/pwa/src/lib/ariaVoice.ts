@@ -8,6 +8,7 @@
  * ARIA es mujer: se excluyen voces masculinas en ambos motores.
  */
 import { getAriaConfig } from '@/services/ariaThinkingTracker'
+import { normalizeForSpeech } from '@/lib/speechNormalize'
 
 export interface VoicePref {
   voiceURI?: string
@@ -225,6 +226,7 @@ interface SpeakOpts { onend?: () => void; onerror?: () => void }
 /** Habla con una voz/velocidad explícitas (para "Probar voz"). */
 export function speakWith(text: string, voiceURI: string | undefined, rate: number, opts: SpeakOpts = {}): void {
   stopSpeaking()
+  text = normalizeForSpeech(text) // números/símbolos/acrónimos → forma hablada en español (la voz, no el texto del chat)
   const r = rate || 1.0
   if (isGcloudVoice(voiceURI)) {
     void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, opts)
