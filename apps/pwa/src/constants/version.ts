@@ -2,13 +2,13 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.75.5' as const
+export const APP_VERSION = '3.75.15' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-06-27' as const
+export const VERSION_DATE = '2026-06-28' as const
 
 /**
  * Nombre de la versión (opcional)
