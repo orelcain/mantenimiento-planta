@@ -20,6 +20,7 @@ import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsP
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
+import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -840,6 +841,18 @@ export function AnalisisGraderWizardPage() {
             onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
           />
         </div>
+      )}
+
+      {/* OEE de Línea estimado (Fase C) — combina Baader (Shoplogix) + paros de
+          etapa (manual) + calidad Grader. Solo en líneas con Baader+Grader. */}
+      {lineConfig.hasGraderData && (
+        <LineOeeCard
+          plantLineId={lineId}
+          plantSlug={lineConfig.plantSlug}
+          graderSummaries={calendarSummaries}
+          currentMonth={calendarMonth}
+          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+        />
       )}
 
       {/* Paros de etapa de la línea (Fase B OEE de área) — captura manual de
