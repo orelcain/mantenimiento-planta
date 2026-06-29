@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.77.0' as const
+export const APP_VERSION = '3.78.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-06-29' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(aria): KPIs de turno (OEE/disponibilidad/MTTR/MTBF) consultables por ARIA' as const
+export const VERSION_NAME = 'feat(aria): selector de voz curado (Chirp-HD-F recomendada + Neural2-A) con velocidad por preset' as const
 
 /**
  * Nota:

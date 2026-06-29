@@ -35,6 +35,17 @@ let currentAudio: HTMLAudioElement | null = null
 const DEFAULT_GCLOUD_VOICE = 'gcloud:es-US-Chirp-HD-F'
 const DEFAULT_GCLOUD_RATE = 0.96
 
+/**
+ * Voces curadas que se ofrecen en Configuración → ARIA. Cada una con su velocidad
+ * recomendada (se aplica al elegirla). La primera es la recomendada/por defecto.
+ * Se acotó a estas dos tras la comparación de Orel (el resto del catálogo Google se
+ * dejó fuera para no saturar el selector).
+ */
+export const ARIA_VOICE_OPTIONS: { uri: string; label: string; rate: number }[] = [
+  { uri: 'gcloud:es-US-Chirp-HD-F', label: 'ARIA · Chirp-HD-F — recomendada (es-US)', rate: 0.96 },
+  { uri: 'gcloud:es-US-Neural2-A', label: 'ARIA · Neural2-A — alternativa, más suave (es-US)', rate: 1.08 },
+]
+
 // Voz local Chatterbox = la voz clonada elegida para ARIA (ref_clip4_voz). Corre en el
 // stack local (GPU, :8801) y se reproduce con <audio> (GET, sin CORS). Si está arriba se
 // prefiere; si no, cae a Google neuronal y luego al navegador.
@@ -180,19 +191,16 @@ export function isPiperVoice(uri?: string): boolean {
 interface GVoice { name: string; languageCodes: string[]; ssmlGender: string }
 let gcloudCache: { uri: string; label: string }[] | null = null
 
-function gTier(name: string): string {
-  if (name.includes('Chirp3') || name.includes('Chirp')) return 'Chirp'
-  if (name.includes('Neural2')) return 'Neural2'
-  if (name.includes('Studio')) return 'Studio'
-  if (name.includes('Wavenet')) return 'WaveNet'
-  return 'Standard'
-}
 function gLang(name: string): string {
   const m = name.match(/^([a-z]{2}-[A-Z]{2})/)
   return (m && m[1]) || 'es-US'
 }
 
-/** Voces femeninas de Google Cloud (latinas primero). [] si la key no sirve. */
+/**
+ * Voces Google ofrecidas en el selector: solo las CURADAS (ARIA_VOICE_OPTIONS),
+ * confirmando contra la API que existen (si la key no sirve → []). El resto del
+ * catálogo Google se dejó fuera a propósito para no saturar el selector.
+ */
 export async function getGoogleVoices(): Promise<{ uri: string; label: string }[]> {
   if (gcloudCache) return gcloudCache
   if (!GOOGLE_TTS_KEY) return []
@@ -203,19 +211,10 @@ export async function getGoogleVoices(): Promise<{ uri: string; label: string }[
     )
     if (!r.ok) return []
     const d = (await r.json()) as { voices?: GVoice[] }
-    const fems = (d.voices || []).filter(
-      (v) => v.ssmlGender === 'FEMALE' && v.languageCodes.some((l) => l.startsWith('es-')),
-    )
-    const rank = (v: GVoice) => {
-      const lat = v.languageCodes.some((l) => ['es-US', 'es-MX', 'es-419'].includes(l)) ? 0 : 1
-      const tierOrder = ['Chirp', 'Neural2', 'Studio', 'WaveNet', 'Standard'].indexOf(gTier(v.name))
-      return lat * 10 + tierOrder
-    }
-    fems.sort((a, b) => rank(a) - rank(b))
-    gcloudCache = fems.map((v) => ({
-      uri: GCLOUD_PREFIX + v.name,
-      label: `${v.name} (${gLang(v.name)}) · ${gTier(v.name)}`,
-    }))
+    const available = new Set((d.voices || []).map((v) => GCLOUD_PREFIX + v.name))
+    gcloudCache = ARIA_VOICE_OPTIONS
+      .filter((o) => available.has(o.uri))
+      .map((o) => ({ uri: o.uri, label: o.label }))
     return gcloudCache
   } catch {
     return []
