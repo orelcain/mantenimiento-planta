@@ -15,7 +15,7 @@ import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { Activity, AlertCircle, ArrowLeft, CheckCircle2, Clock, GitBranch, SlidersHorizontal, History } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { GateChangeModal } from '@/components/grader/modals/GateChangeModal'
-import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -40,7 +40,9 @@ export function GraderQuickChangePage() {
   const liveShift = useMemo(() => {
     if (paramTurno) return null
     const today = todayKey()
-    const now = new Date()
+    // wall-clock-as-UTC: igual que CurrentShiftChip, para no clasificar mal el
+    // turno vivo por el offset del huso fuera de UTC (ver nowAsWallClockUTC).
+    const now = nowAsWallClockUTC()
     for (const sched of DEFAULT_SHIFT_SCHEDULE) {
       const win = computeShiftTimeWindow(today, sched.shiftId, DEFAULT_SHIFT_SCHEDULE, now)
       if (win.status === 'live') {

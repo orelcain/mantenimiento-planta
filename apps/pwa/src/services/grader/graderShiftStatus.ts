@@ -32,6 +32,27 @@ function dateKeyPlusDays(dateKey: string, days: number): string {
 }
 
 /**
+ * Convierte un instante "real" (hora local del navegador) al marco
+ * wall-clock-as-UTC que usa este módulo: toma los componentes de hora LOCAL
+ * (año/mes/día/hora/min/seg) y los reinterpreta como si fueran UTC.
+ *
+ * Necesario porque `computeShiftTimeWindow` construye los límites del turno con
+ * la convención wall-clock-as-UTC (sufijo `.000Z` sobre la hora de pizarra,
+ * misma convención que Shoplogix). Si se compara contra un `now` en UTC real,
+ * fuera de UTC el turno vivo queda mal clasificado por el offset del huso: p. ej.
+ * 16:40 local en Chile (UTC-4) se compararían contra "19:00 UTC end" y el turno
+ * día caería erróneamente como `closed`. Pasar siempre el `now` por aquí evita
+ * ese sesgo. (No usar para `detectShiftStatusFromData`, que compara contra un
+ * timestamp ISO real de Firestore y por tanto trabaja en UTC real.)
+ */
+export function nowAsWallClockUTC(now: Date = new Date()): Date {
+  return new Date(Date.UTC(
+    now.getFullYear(), now.getMonth(), now.getDate(),
+    now.getHours(), now.getMinutes(), now.getSeconds(),
+  ))
+}
+
+/**
  * Detecta estado del turno a partir de la fecha y el horario configurado.
  *
  * Reglas:
@@ -46,7 +67,7 @@ export function computeShiftTimeWindow(
   dateKey: string,
   shiftId: string,
   schedule: GraderShiftSchedule[] = DEFAULT_SHIFT_SCHEDULE,
-  now: Date = new Date(),
+  now: Date = nowAsWallClockUTC(),
 ): ShiftTimeWindow {
   const entry = schedule.find(s => s.shiftId === shiftId)
 

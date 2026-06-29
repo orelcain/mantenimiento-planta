@@ -295,6 +295,9 @@ export function AnalisisGraderTurnoPage() {
   // en vez de las 9h reales del turno noche (23:00 → 07:45).
   const plantSchedule = plantLineCfg.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
 
+  // Nota: estas llamadas omiten `now` a propósito — el default de
+  // computeShiftTimeWindow ya es `nowAsWallClockUTC()`, así la detección de
+  // turno vivo es correcta fuera de UTC (no hace falta convertir aquí).
   const [shiftWindow, setShiftWindow] = useState<ShiftTimeWindow | null>(
     () => dateKey && shiftLabel
       ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)

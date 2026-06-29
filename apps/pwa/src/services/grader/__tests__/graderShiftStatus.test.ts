@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeShiftTimeWindow, detectShiftStatusFromData } from '../graderShiftStatus'
+import { computeShiftTimeWindow, detectShiftStatusFromData, nowAsWallClockUTC } from '../graderShiftStatus'
 import type { GraderShiftSchedule } from '../types'
 
 const SCHEDULE: GraderShiftSchedule[] = [
@@ -56,8 +56,11 @@ describe('computeShiftTimeWindow — Turno noche (cruza medianoche)', () => {
 })
 
 describe('computeShiftTimeWindow — shiftId desconocido', () => {
-  it('retorna closed para shift no encontrado', () => {
-    const now = new Date('2026-04-17T12:00:00')
+  it('retorna closed para shift no encontrado (fuera de la ventana de 24h)', () => {
+    // shiftId desconocido → branch !entry usa la ventana del día de producción
+    // (08:00→08:00, 24h). `now` dos días después cae fuera → closed. Con margen
+    // amplio para no depender del huso del runner.
+    const now = new Date('2026-04-19T12:00:00')
     const result = computeShiftTimeWindow('2026-04-17', 'Turno X', SCHEDULE, now)
     expect(result.status).toBe('closed')
   })
@@ -82,8 +85,9 @@ describe('detectShiftStatusFromData', () => {
 })
 
 describe('computeShiftTimeWindow — edge cases', () => {
-  it('schedule vacío retorna closed', () => {
-    const now = new Date('2026-04-17T12:00:00')
+  it('schedule vacío retorna closed (fuera de la ventana de 24h)', () => {
+    // schedule vacío → branch !entry (ventana 08:00→08:00); `now` fuera → closed.
+    const now = new Date('2026-04-19T12:00:00')
     const result = computeShiftTimeWindow('2026-04-17', 'Turno día', [], now)
     expect(result.status).toBe('closed')
   })
@@ -105,5 +109,29 @@ describe('computeShiftTimeWindow — edge cases', () => {
     const r10 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h10)
     const r14 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h14)
     expect(r10.remainingMin!).toBeGreaterThan(r14.remainingMin!)
+  })
+})
+
+describe('nowAsWallClockUTC', () => {
+  it('reinterpreta los componentes de hora LOCAL como si fueran UTC', () => {
+    // Independiente del huso del runner: los getUTC* del resultado deben
+    // coincidir con los getLocal* de la entrada.
+    const real = new Date('2026-04-17T16:40:30')
+    const wall = nowAsWallClockUTC(real)
+    expect(wall.getUTCFullYear()).toBe(real.getFullYear())
+    expect(wall.getUTCMonth()).toBe(real.getMonth())
+    expect(wall.getUTCDate()).toBe(real.getDate())
+    expect(wall.getUTCHours()).toBe(real.getHours())
+    expect(wall.getUTCMinutes()).toBe(real.getMinutes())
+    expect(wall.getUTCSeconds()).toBe(real.getSeconds())
+  })
+
+  it('hace que la detección de turno vivo sea correcta fuera de UTC (regresión Chile UTC-4)', () => {
+    // 16:40 "de pizarra" cae dentro del turno día (07:00–19:00). Sin la
+    // conversión, en Chile (UTC-4) ese instante se compararía contra "19:00 UTC
+    // end" y el turno día caería erróneamente como `closed`.
+    const wall = nowAsWallClockUTC(new Date('2026-04-17T16:40:00'))
+    const tw = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, wall)
+    expect(tw.status).toBe('live')
   })
 })
