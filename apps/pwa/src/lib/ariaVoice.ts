@@ -8,6 +8,7 @@
  * ARIA es mujer: se excluyen voces masculinas en ambos motores.
  */
 import { getAriaConfig } from '@/services/ariaThinkingTracker'
+import { normalizeForSpeech, plainForSpeech } from '@/lib/speechNormalize'
 
 export interface VoicePref {
   voiceURI?: string
@@ -26,13 +27,70 @@ const GOOGLE_TTS_KEY =
 let pref: VoicePref = { rate: 1.0 }
 let currentAudio: HTMLAudioElement | null = null
 
+// Voz neuronal por defecto de ARIA en producción (Google Cloud, español latino, femenina).
+// Elegida por Orel comparando contra la voz local Chatterbox: Chirp-HD-F a 0.96 (enérgica
+// pero calmada, pega con el avatar joven). Se usa cuando hay key de Google TTS y el admin
+// no eligió explícitamente otra voz cloud/local. Cambiable en Configuración → ARIA sin deploy.
+// (Alternativa que Orel valoró: gcloud:es-US-Neural2-A a 1.08 — más suave.)
+const DEFAULT_GCLOUD_VOICE = 'gcloud:es-US-Chirp-HD-F'
+const DEFAULT_GCLOUD_RATE = 0.96
+
+// Voz local Chatterbox = la voz clonada elegida para ARIA (ref_clip4_voz). Corre en el
+// stack local (GPU, :8801) y se reproduce con <audio> (GET, sin CORS). Si está arriba se
+// prefiere; si no, cae a Google neuronal y luego al navegador.
+const CHATTERBOX_PREFIX = 'chatterbox:'
+export const CHATTERBOX_SERVER = 'http://127.0.0.1:8801'
+export function isChatterboxVoice(uri?: string): boolean {
+  return !!uri && uri.startsWith(CHATTERBOX_PREFIX)
+}
+async function isChatterboxUp(): Promise<boolean> {
+  try {
+    const r = await fetch(`${CHATTERBOX_SERVER}/health`, { signal: AbortSignal.timeout(1200) })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+// ── Estado "hablando" (para el avatar de video) ─────────────────────
+// El motor por defecto (Web Speech API) no expone un stream de audio analizable,
+// así que el avatar engancha aquí: notificamos true al empezar a hablar (cualquier
+// motor) y false al terminar/cancelar. Cubre los 3 motores vía speakWith.
+type SpeakingListener = (speaking: boolean) => void
+const speakingListeners = new Set<SpeakingListener>()
+/** Suscribe a cambios de "ARIA está hablando". Devuelve la función de baja. */
+export function onSpeakingChange(fn: SpeakingListener): () => void {
+  speakingListeners.add(fn)
+  return () => { speakingListeners.delete(fn) }
+}
+function emitSpeaking(v: boolean): void {
+  speakingListeners.forEach((fn) => {
+    try { fn(v) } catch { /* un listener roto no debe cortar la voz */ }
+  })
+}
+
 // ── Carga / set de la preferencia ──────────────────────────────────
 export async function loadVoicePref(): Promise<VoicePref> {
+  let rateFromConfig = true
   try {
     const cfg = await getAriaConfig()
+    rateFromConfig = cfg.speechRate !== undefined
     pref = { voiceURI: cfg.voiceURI, rate: cfg.speechRate ?? 1.0 }
   } catch {
-    /* default */
+    rateFromConfig = false
+  }
+  // Preferencia automática de motor cuando el admin no eligió uno cloud/local:
+  //   1) Chatterbox local (la voz elegida de ARIA) si su server está arriba
+  //   2) Google Cloud neuronal por defecto (Chirp-HD-F @ 0.96) si hay key
+  //   3) (si no) voz del navegador
+  if (!isGcloudVoice(pref.voiceURI) && !isPiperVoice(pref.voiceURI) && !isChatterboxVoice(pref.voiceURI)) {
+    if (await isChatterboxUp()) {
+      pref.voiceURI = CHATTERBOX_PREFIX + 'local'
+    } else if (GOOGLE_TTS_KEY) {
+      pref.voiceURI = DEFAULT_GCLOUD_VOICE
+      // Aplicar la velocidad por defecto de la voz elegida, salvo que el admin haya fijado una.
+      if (!rateFromConfig) pref.rate = DEFAULT_GCLOUD_RATE
+    }
   }
   return pref
 }
@@ -183,6 +241,7 @@ async function speakGoogle(text: string, voiceName: string, rate: number, opts: 
     if (!d.audioContent) { opts.onerror?.(); return }
     const audio = new Audio('data:audio/mp3;base64,' + d.audioContent)
     currentAudio = audio
+    audio.onplaying = () => emitSpeaking(true)
     audio.onended = () => { currentAudio = null; opts.onend?.() }
     audio.onerror = () => { currentAudio = null; opts.onerror?.() }
     await audio.play()
@@ -218,6 +277,7 @@ export function stopSpeaking(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel()
   }
+  emitSpeaking(false)
 }
 
 interface SpeakOpts { onend?: () => void; onerror?: () => void }
@@ -225,9 +285,33 @@ interface SpeakOpts { onend?: () => void; onerror?: () => void }
 /** Habla con una voz/velocidad explícitas (para "Probar voz"). */
 export function speakWith(text: string, voiceURI: string | undefined, rate: number, opts: SpeakOpts = {}): void {
   stopSpeaking()
+  text = normalizeForSpeech(plainForSpeech(text)) // 1) quita tabla/emojis/markdown 2) números/acrónimos → forma hablada
   const r = rate || 1.0
+  // Notificamos al avatar el FIN del habla en cualquier motor (onend/onerror). El INICIO
+  // se emite cuando el audio realmente empieza a sonar (onplaying/onstart) — así la boca
+  // se mueve sincronizada con la voz, no antes (Chatterbox tarda ~3s en sintetizar).
+  const wrapped: SpeakOpts = {
+    onend: () => { emitSpeaking(false); opts.onend?.() },
+    onerror: () => { emitSpeaking(false); opts.onerror?.() },
+  }
+  if (isChatterboxVoice(voiceURI)) {
+    const url = `${CHATTERBOX_SERVER}/tts?text=${encodeURIComponent(text)}`
+    const audio = new Audio(url)
+    currentAudio = audio
+    const fallback = () => {
+      // Si el server local cayó, no quedarse mudo: usar la voz neuronal de Google.
+      currentAudio = null
+      if (GOOGLE_TTS_KEY) void speakGoogle(text, DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r, wrapped)
+      else wrapped.onerror?.()
+    }
+    audio.onplaying = () => emitSpeaking(true)
+    audio.onended = () => { currentAudio = null; wrapped.onend?.() }
+    audio.onerror = fallback
+    audio.play().catch(fallback)
+    return
+  }
   if (isGcloudVoice(voiceURI)) {
-    void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, opts)
+    void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, wrapped)
     return
   }
   if (isPiperVoice(voiceURI)) {
@@ -238,12 +322,13 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     const url = `${PIPER_SERVER}/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}&rate=${lengthScale.toFixed(2)}`
     const audio = new Audio(url)
     currentAudio = audio
-    audio.onended = () => { currentAudio = null; opts.onend?.() }
-    audio.onerror = () => { currentAudio = null; opts.onerror?.() }
-    audio.play().catch(() => opts.onerror?.())
+    audio.onplaying = () => emitSpeaking(true)
+    audio.onended = () => { currentAudio = null; wrapped.onend?.() }
+    audio.onerror = () => { currentAudio = null; wrapped.onerror?.() }
+    audio.play().catch(() => wrapped.onerror?.())
     return
   }
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { opts.onerror?.(); return }
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { wrapped.onerror?.(); return }
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'es-CL'
   const v = (voiceURI && !isPiperVoice(voiceURI))
@@ -252,8 +337,9 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
   const chosen = v || pickDefaultFemaleVoice()
   if (chosen) { u.voice = chosen; u.lang = chosen.lang }
   u.rate = r
-  u.onend = () => opts.onend?.()
-  u.onerror = () => opts.onerror?.()
+  u.onstart = () => emitSpeaking(true)
+  u.onend = () => wrapped.onend?.()
+  u.onerror = () => wrapped.onerror?.()
   window.speechSynthesis.speak(u)
 }
 

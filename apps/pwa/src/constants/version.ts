@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.75.15' as const
+export const APP_VERSION = '3.76.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-06-28' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(repuestos): retirar pestaña "Por equipo" — paridad Wave 1-2-3 completa' as const
+export const VERSION_NAME = 'feat(aria): avatar de video web-native en el chat + voz fonética en español' as const
 
 /**
  * Nota:
