@@ -81,8 +81,23 @@ jobs:
       - name: Deploy to Firebase Hosting
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only hosting --project mantenimiento-planta-771a3 --non-interactive
+          set +e
+          out=$(GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only hosting --project mantenimiento-planta-771a3 --non-interactive 2>&1)
+          code=$?
+          set -e
           rm -f /tmp/sa.json
+          echo "$out"
+          if [ "$code" -ne 0 ]; then
+            # No-op benigno: firebase-tools devuelve HTTP 400 "is the current active
+            # version" cuando el contenido construido es idéntico al que ya está live
+            # (p. ej. merges que no tocan las Mini Apps). El sitio ya está al día →
+            # lo tratamos como éxito. Cualquier OTRO error sí falla el job.
+            if echo "$out" | grep -q "is the current active version"; then
+              echo "::notice::Hosting ya está al día (versión construida = activa). No-op tratado como éxito."
+              exit 0
+            fi
+            exit "$code"
+          fi
 
       - name: Notificar deploy exitoso (ntfy)
         if: success()
