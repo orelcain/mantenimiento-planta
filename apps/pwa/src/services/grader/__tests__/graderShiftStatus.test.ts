@@ -18,7 +18,9 @@ describe('computeShiftTimeWindow — Turno día', () => {
   })
 
   it('retorna future cuando now es antes del inicio', () => {
-    const now = new Date('2026-04-17T06:00:00')
+    // `Z` (UTC) para que sea independiente del huso del runner: computeShiftTimeWindow
+    // compara contra límites wall-clock-as-UTC, así 06:00 < 07:00 (inicio) → future.
+    const now = new Date('2026-04-17T06:00:00Z')
     const result = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, now)
     expect(result.status).toBe('future')
     expect(result.progressPct).toBeNull()
@@ -93,9 +95,11 @@ describe('computeShiftTimeWindow — edge cases', () => {
   })
 
   it('progressPct es monótonamente creciente durante el turno', () => {
-    const h7 = new Date('2026-04-17T07:00:00')
-    const h12 = new Date('2026-04-17T12:00:00')
-    const h18 = new Date('2026-04-17T18:00:00')
+    // `Z` (UTC): los tres caen dentro del turno día (07:00–19:00) en cualquier huso,
+    // así el progreso es monótono (sin `Z`, fuera de UTC h18 se salía de la ventana).
+    const h7 = new Date('2026-04-17T07:00:00Z')
+    const h12 = new Date('2026-04-17T12:00:00Z')
+    const h18 = new Date('2026-04-17T18:00:00Z')
     const r7  = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h7)
     const r12 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h12)
     const r18 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h18)
