@@ -27,6 +27,23 @@ const GOOGLE_TTS_KEY =
 let pref: VoicePref = { rate: 1.0 }
 let currentAudio: HTMLAudioElement | null = null
 
+// ── Estado "hablando" (para el avatar de video) ─────────────────────
+// El motor por defecto (Web Speech API) no expone un stream de audio analizable,
+// así que el avatar engancha aquí: notificamos true al empezar a hablar (cualquier
+// motor) y false al terminar/cancelar. Cubre los 3 motores vía speakWith.
+type SpeakingListener = (speaking: boolean) => void
+const speakingListeners = new Set<SpeakingListener>()
+/** Suscribe a cambios de "ARIA está hablando". Devuelve la función de baja. */
+export function onSpeakingChange(fn: SpeakingListener): () => void {
+  speakingListeners.add(fn)
+  return () => { speakingListeners.delete(fn) }
+}
+function emitSpeaking(v: boolean): void {
+  speakingListeners.forEach((fn) => {
+    try { fn(v) } catch { /* un listener roto no debe cortar la voz */ }
+  })
+}
+
 // ── Carga / set de la preferencia ──────────────────────────────────
 export async function loadVoicePref(): Promise<VoicePref> {
   try {
@@ -219,6 +236,7 @@ export function stopSpeaking(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel()
   }
+  emitSpeaking(false)
 }
 
 interface SpeakOpts { onend?: () => void; onerror?: () => void }
@@ -228,8 +246,15 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
   stopSpeaking()
   text = normalizeForSpeech(text) // números/símbolos/acrónimos → forma hablada en español (la voz, no el texto del chat)
   const r = rate || 1.0
+  // Envolvemos los callbacks para notificar al avatar el fin del habla en cualquier
+  // motor (onend o onerror). El inicio se emite justo antes de reproducir.
+  const wrapped: SpeakOpts = {
+    onend: () => { emitSpeaking(false); opts.onend?.() },
+    onerror: () => { emitSpeaking(false); opts.onerror?.() },
+  }
+  emitSpeaking(true)
   if (isGcloudVoice(voiceURI)) {
-    void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, opts)
+    void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, wrapped)
     return
   }
   if (isPiperVoice(voiceURI)) {
@@ -240,12 +265,12 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     const url = `${PIPER_SERVER}/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}&rate=${lengthScale.toFixed(2)}`
     const audio = new Audio(url)
     currentAudio = audio
-    audio.onended = () => { currentAudio = null; opts.onend?.() }
-    audio.onerror = () => { currentAudio = null; opts.onerror?.() }
-    audio.play().catch(() => opts.onerror?.())
+    audio.onended = () => { currentAudio = null; wrapped.onend?.() }
+    audio.onerror = () => { currentAudio = null; wrapped.onerror?.() }
+    audio.play().catch(() => wrapped.onerror?.())
     return
   }
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { opts.onerror?.(); return }
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { wrapped.onerror?.(); return }
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'es-CL'
   const v = (voiceURI && !isPiperVoice(voiceURI))
@@ -254,8 +279,8 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
   const chosen = v || pickDefaultFemaleVoice()
   if (chosen) { u.voice = chosen; u.lang = chosen.lang }
   u.rate = r
-  u.onend = () => opts.onend?.()
-  u.onerror = () => opts.onerror?.()
+  u.onend = () => wrapped.onend?.()
+  u.onerror = () => wrapped.onerror?.()
   window.speechSynthesis.speak(u)
 }
 

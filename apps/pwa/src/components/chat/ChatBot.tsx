@@ -5,13 +5,14 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
 import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
+import { AriaAvatar } from './AriaAvatar'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
 function formatMessage(text: string): string {
@@ -973,6 +974,17 @@ export function ChatBot() {
   useEffect(() => { convoModeRef.current = convoMode }, [convoMode])
   const prevLoadingRef = useRef(false)
 
+  // Avatar de video + auto-leer respuestas. Preferencia POR DISPOSITIVO en localStorage
+  // (igual que aria_chat_width): settings/ariaConfig es global/admin, esto es personal.
+  const [avatarShow, setAvatarShow] = useState<boolean>(() => {
+    try { return localStorage.getItem('aria_avatar_show') !== '0' } catch { return true } // default ON
+  })
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
+    try { return localStorage.getItem('aria_avatar_autospeak') === '1' } catch { return false } // default OFF
+  })
+  useEffect(() => { try { localStorage.setItem('aria_avatar_show', avatarShow ? '1' : '0') } catch { /* ignore */ } }, [avatarShow])
+  useEffect(() => { try { localStorage.setItem('aria_avatar_autospeak', autoSpeak ? '1' : '0') } catch { /* ignore */ } }, [autoSpeak])
+
   // ─── Chat width (resizable) ──────────────────────────────
   const MIN_WIDTH = 380
   const MAX_WIDTH = 900
@@ -1060,11 +1072,13 @@ export function ChatBot() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcript, isListening])
 
-  // Modo conversación: al terminar la respuesta, leerla en voz alta y volver a escuchar
+  // Al terminar una respuesta, leerla en voz alta si está el modo conversación
+  // (manos libres → re-escucha) o el toggle "🔊 Escuchar" (auto-lee, sin re-escuchar).
+  // En ambos casos, speak() anima el avatar de video vía onSpeakingChange.
   useEffect(() => {
     const wasLoading = prevLoadingRef.current
     prevLoadingRef.current = isLoading
-    if (!convoModeRef.current || !wasLoading || isLoading) return
+    if ((!convoModeRef.current && !autoSpeak) || !wasLoading || isLoading) return
     const last = messages[messages.length - 1]
     const text = last && last.role === 'assistant' ? last.content : ''
     const plain = text
@@ -1076,7 +1090,7 @@ export function ChatBot() {
     } else {
       relisten()
     }
-  }, [isLoading, messages, startListening])
+  }, [isLoading, messages, startListening, autoSpeak])
 
   const toggleConvo = () => {
     if (convoMode) {
@@ -1463,6 +1477,30 @@ export function ChatBot() {
                   <Brain className="w-4 h-4" />
                 </button>
               )}
+              {/* 👁 Ver — mostrar/ocultar el avatar de video de ARIA */}
+              <button
+                onClick={() => setAvatarShow(v => !v)}
+                className={`p-1.5 rounded-md transition-colors ${
+                  avatarShow
+                    ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                    : 'hover:bg-background text-muted-foreground hover:text-foreground'
+                }`}
+                title={avatarShow ? 'Ocultar avatar de ARIA' : 'Mostrar avatar de ARIA'}
+              >
+                {avatarShow ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+              {/* 🔊 Escuchar — auto-leer las respuestas de ARIA en voz alta */}
+              <button
+                onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
+                className={`p-1.5 rounded-md transition-colors ${
+                  autoSpeak
+                    ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                    : 'hover:bg-background text-muted-foreground hover:text-foreground'
+                }`}
+                title={autoSpeak ? 'Auto-leer respuestas: ACTIVO — click para silenciar' : 'Auto-leer respuestas en voz alta'}
+              >
+                {autoSpeak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
               <button
                 onClick={clearHistory}
                 className="p-1.5 rounded-md hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
@@ -1479,6 +1517,9 @@ export function ChatBot() {
               </button>
             </div>
           </div>
+
+          {/* Avatar de video de ARIA (idle ↔ habla, técnica blob-load + lockstep) */}
+          <AriaAvatar visible={avatarShow} />
 
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" onClick={handleInternalLinkClick}>
