@@ -2,9 +2,9 @@
  * speechNormalize — normaliza texto en español para TTS de ARIA (ariaVoice).
  *
  * La VOZ recibe el texto crudo del chat, que trae dígitos, símbolos y acrónimos
- * que las voces (Web Speech / Piper / Google) pronuncian mal: "552", "1 incidencia",
- * "MTTR", "%". Esto los convierte a su forma hablada en español, con género/apócope
- * correctos ("una incidencia", "un equipo", "veintiún equipos").
+ * que las voces (Web Speech / Piper / Google / Chatterbox) pronuncian mal: "552",
+ * "1 incidencia", "MTTR", "%". Esto los convierte a su forma hablada en español,
+ * con género/apócope correctos ("una incidencia", "un equipo", "veintiún equipos").
  *
  * Solo afecta lo que se HABLA — el texto que se MUESTRA en el chat no cambia.
  */
@@ -74,6 +74,34 @@ function numWord(tok: string): string {
   let w = numToWordsEs(parseInt(ent, 10))
   if (dec != null) w += ' coma ' + dec.split('').map((d) => numToWordsEs(+d)).join(' ')
   return w
+}
+
+/**
+ * Limpia el texto para que sea LEÍBLE en voz: quita lo que suena absurdo o rompe
+ * algunos motores (Chatterbox falla con emojis y con selectores de variación huérfanos).
+ * Saca tablas markdown (filas con `|`), separadores, viñetas, encabezados, markdown
+ * inline, links internos `[[..]]`, el bloque [SUGERENCIAS] y los emojis. Deja la prosa.
+ */
+export function plainForSpeech(text: string): string {
+  let s = text
+  s = s.replace(/\n?\[SUGERENCIAS\][\s\S]*$/i, '')        // bloque de sugerencias al final
+  s = s.replace(/^\s*\|.*\|\s*$/gm, ' ')                  // filas de tabla markdown (multilínea)
+  s = s.replace(/^\s*\|?[\s:|-]{3,}\|?\s*$/gm, ' ')        // separadores ---|---
+  s = s.replace(/\|/g, ' ')                               // pipes sueltos (tabla en 1 línea)
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1') // negrita/itálica
+  s = s.replace(/`([^`]+)`/g, '$1')                       // código inline
+  s = s.replace(/\[\[[^\]]*\]\]/g, ' ')                   // links internos [[..]]
+  s = s.replace(/^\s{0,3}#{1,6}\s+/gm, '')                // encabezados
+  s = s.replace(/^\s*[-*•]\s+/gm, '')                     // viñetas
+  // Emojis/pictogramas + selector de variación (U+FE0F) y ZWJ (U+200D) huérfanos: el glifo
+  // rompe Chatterbox y suena mal en cualquier motor; los format-chars sueltos también lo rompen.
+  // Clase para los rangos pictográficos + alternación para los format-chars (evita la regla
+  // no-misleading-character-class, que solo aplica a clases).
+  s = s.replace(
+    /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}]|\u{FE0F}|\u{200D}/gu,
+    '',
+  )
+  return s.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '. ').replace(/\.\s*\.+/g, '.').trim()
 }
 
 /** Convierte dígitos/símbolos/acrónimos a su forma hablada en español. */

@@ -100,36 +100,34 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
   if (!visible) return null
 
   return (
-    <div className="flex justify-center py-2 border-b border-border bg-muted/30">
-      <div
-        className={`relative w-[108px] h-[136px] rounded-xl overflow-hidden bg-black border transition-shadow duration-300 ${
-          isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgba(46,117,182,0.45)]' : 'border-border shadow'
+    <div
+      className={`relative w-full aspect-[7/9] rounded-xl overflow-hidden bg-black border transition-shadow duration-300 ${
+        isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgba(46,117,182,0.45)]' : 'border-border shadow'
+      }`}
+    >
+      <video
+        ref={idleRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        muted
+        loop
+        playsInline
+        preload="auto"
+      />
+      <video
+        ref={talkRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        muted
+        loop
+        playsInline
+        preload="auto"
+        style={{ opacity: 0 }}
+      />
+      <span
+        className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
+          isSpeaking ? 'bg-primary animate-pulse' : 'bg-green-500'
         }`}
-      >
-        <video
-          ref={idleRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          muted
-          loop
-          playsInline
-          preload="auto"
-        />
-        <video
-          ref={talkRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          muted
-          loop
-          playsInline
-          preload="auto"
-          style={{ opacity: 0 }}
-        />
-        <span
-          className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
-            isSpeaking ? 'bg-primary animate-pulse' : 'bg-green-500'
-          }`}
-          title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
-        />
-      </div>
+        title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
+      />
     </div>
   )
 }

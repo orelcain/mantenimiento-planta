@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeForSpeech, numToWordsEs } from './speechNormalize'
+import { normalizeForSpeech, numToWordsEs, plainForSpeech } from './speechNormalize'
 
 describe('numToWordsEs', () => {
   it('rango común de conteos y minutos', () => {
@@ -32,5 +32,24 @@ describe('normalizeForSpeech', () => {
   it('tags largos dígito a dígito', () => {
     expect(normalizeForSpeech('Revisa el equipo 720004608.'))
       .toBe('Revisa el equipo siete dos cero cero cero cuatro seis cero ocho.')
+  })
+})
+
+describe('plainForSpeech', () => {
+  const wrench = String.fromCodePoint(0x1F527)   // 🔧
+  const vs16 = String.fromCodePoint(0xFE0F)      // selector de variación (invisible)
+  const yellow = String.fromCodePoint(0x1F7E1)   // 🟡
+
+  it('quita emojis y el selector de variación huérfano (rompen Chatterbox)', () => {
+    expect(plainForSpeech(`${wrench}${vs16} Estado de equipos`)).toBe('Estado de equipos')
+    expect(plainForSpeech(`${yellow} Pendiente`)).toBe('Pendiente')
+  })
+  it('quita tablas markdown y deja la prosa', () => {
+    const t = 'Incidencias:\n| Estado | Prioridad |\n|---|---|\n| Pendiente | Media |\nNo hay críticas.'
+    expect(plainForSpeech(t)).toBe('Incidencias:. No hay críticas.')
+  })
+  it('quita markdown inline, links y bloque de sugerencias', () => {
+    expect(plainForSpeech('Listo.\n[SUGERENCIAS]: a, b')).toBe('Listo.')
+    expect(plainForSpeech('La **bomba** en `mantención`.')).toBe('La bomba en mantención.')
   })
 })

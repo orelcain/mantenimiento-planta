@@ -332,7 +332,7 @@ function MessageBubble({
       </div>
 
       <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-        isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+        isUser ? 'bg-primary text-primary-foreground' : 'bg-background border border-border/60 text-foreground'
       }`}>
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(msg.content)) }} />
         {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
@@ -448,7 +448,7 @@ function StreamingBubble({ content }: { content: string }) {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-muted text-foreground">
+      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-background border border-border/60 text-foreground">
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(content)) }} />
         <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
       </div>
@@ -463,7 +463,7 @@ function LoadingIndicator() {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="bg-muted rounded-lg px-3 py-2 flex gap-1.5 items-center">
+      <div className="bg-background border border-border/60 rounded-lg px-3 py-2 flex gap-1.5 items-center">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Consultando datos de la planta...</span>
       </div>
@@ -988,7 +988,7 @@ export function ChatBot() {
   // ─── Chat width (resizable) ──────────────────────────────
   const MIN_WIDTH = 380
   const MAX_WIDTH = 900
-  const DEFAULT_WIDTH = 532
+  const DEFAULT_WIDTH = 820
 
   const [chatWidth, setChatWidth] = useState<number>(() => {
     try {
@@ -1365,7 +1365,7 @@ export function ChatBot() {
       {isOpen && (
         <div
           style={{ width: chatWidth }}
-          className="fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden"
+          className="fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden"
         >
           {/* Resize handle (left edge) */}
           <div
@@ -1518,9 +1518,14 @@ export function ChatBot() {
             </div>
           </div>
 
-          {/* Avatar de video de ARIA (idle ↔ habla, técnica blob-load + lockstep) */}
-          <AriaAvatar visible={avatarShow} />
-
+          {/* Cuerpo: avatar al costado izquierdo + mensajes a la derecha */}
+          <div className="flex flex-1 overflow-hidden">
+          {/* Avatar de video de ARIA — riel izquierdo (idle ↔ habla, blob-load + lockstep) */}
+          {avatarShow && (
+            <div className="shrink-0 w-80 border-r border-border bg-background/40 flex flex-col items-stretch p-3">
+              <AriaAvatar visible={avatarShow} />
+            </div>
+          )}
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" onClick={handleInternalLinkClick}>
             {messages.map((msg, idx) => {
@@ -1572,6 +1577,7 @@ export function ChatBot() {
             {/* Loading: solo si no hay streaming aún y no hay countdown */}
             {isLoading && !streamingContent && retryCountdown === 0 && !agentStatus && <LoadingIndicator />}
             <div ref={messagesEndRef} />
+          </div>
           </div>
 
           {/* Sugerencias rápidas */}
