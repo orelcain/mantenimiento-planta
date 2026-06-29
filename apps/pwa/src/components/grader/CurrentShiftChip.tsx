@@ -14,7 +14,7 @@ import { Activity, ChevronRight, Sun, Moon, Sunrise, Sunset, Clock, PauseCircle 
 import { cn } from '@/lib/utils'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
-import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
@@ -92,13 +92,11 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
   // Nota: el módulo usa convención wall-clock-as-UTC (los startHour/endHour se
   // interpretan como UTC aunque representen hora local). Para que la comparación
   // sea consistente, convertimos `now` a un Date que represente la hora local
-  // como si fuera UTC. Sin esto, las 16:40 local en Chile (UTC-4) se comparan
-  // contra "19:00 UTC end" y el turno día queda erróneamente como `closed`.
+  // como si fuera UTC vía `nowAsWallClockUTC`. Sin esto, las 16:40 local en Chile
+  // (UTC-4) se comparan contra "19:00 UTC end" y el turno día queda erróneamente
+  // como `closed`.
   const live = useMemo(() => {
-    const nowWallUTC = new Date(Date.UTC(
-      now.getFullYear(), now.getMonth(), now.getDate(),
-      now.getHours(), now.getMinutes(), now.getSeconds(),
-    ))
+    const nowWallUTC = nowAsWallClockUTC(now)
     const todayKey = localDateKey(now)
     const ydayKey = previousDateKey(now)
     const filtered = schedule.filter((s) => preferredShiftIds.includes(s.shiftId))
