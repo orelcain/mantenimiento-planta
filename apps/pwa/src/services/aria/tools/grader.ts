@@ -8,6 +8,8 @@ import { registerTool } from './registry'
 import { getCurrentShift } from '../../chatbot'
 import { listDailySummariesByRange } from '../../grader/graderDailySummary.service'
 import type { GraderDailySummary } from '../../grader/types'
+import { getLatestTurnoKPIs } from '../../grader/turnoKpis'
+import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { PLANT_LINES } from '@/config/plantLines'
 
 // ─── Detección de planta desde texto libre ────────────────────────────
@@ -73,6 +75,24 @@ function fmtMin(sec: number | undefined): string {
   const h = Math.floor(min / 60)
   const m = min % 60
   return `${h}h ${m}min`
+}
+
+/** Fracción 0–1 → porcentaje con 1 decimal (para OEE/disponibilidad/rendimiento/calidad). */
+function fmtFracPct(frac: number | null | undefined): string {
+  if (frac === null || frac === undefined || !isFinite(frac)) return '—'
+  return `${(frac * 100).toFixed(1)}%`
+}
+
+/** Minutos (MTTR) con 1 decimal. */
+function fmtMinReliab(min: number | undefined): string {
+  if (min === undefined || !isFinite(min) || min <= 0) return '—'
+  return `${min.toFixed(1)} min`
+}
+
+/** Horas (MTBF) con 1 decimal; <1h se muestra en minutos. */
+function fmtHours(h: number | undefined): string {
+  if (h === undefined || !isFinite(h) || h <= 0) return '—'
+  return h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)} h`
 }
 
 function summarizeShift(s: GraderDailySummary): string {
@@ -599,6 +619,70 @@ registerTool({
   },
 })
 
+// ─── shift.kpis (OEE / disponibilidad / MTTR / MTBF del turno) ─────────
+
+registerTool({
+  name: 'shift.kpis',
+  category: 'shift',
+  description:
+    'KPIs de eficiencia y confiabilidad del último turno con actividad: OEE, disponibilidad, rendimiento, calidad, MTTR, MTBF, averías macro y micro-detenciones. Mismos números que el board Análisis de Turno. Por defecto Planta Principal (Chonchi); detecta Yal.',
+  params: [
+    {
+      name: 'plantSlug',
+      type: 'string',
+      enum: ['chonchi', 'yal'],
+      required: false,
+      default: 'chonchi',
+      description: 'Planta Shoplogix (chonchi = principal, yal)',
+    },
+  ],
+  triggers: [
+    /\b(oee|disponibilidad|mttr|mtbf|confiabilidad|aver[ií]as?|micro-?detenci[oó]n|tiempo\s+entre\s+fallas|indicadores\s+de\s+rendimiento|rendimiento\s+de\s+m[aá]quina|eficiencia\s+(del|de\s+(la|el))\s+(turno|planta|l[ií]nea))\b/i,
+    /\bc[oó]mo\s+(va|est[aá]|anda)\s+(el\s+)?(oee|la\s+disponibilidad|la\s+confiabilidad|la\s+planta|la\s+l[ií]nea)\b/i,
+  ],
+  execute: async (params) => {
+    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
+    const plantLabel = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    // Calidad (1−P0%) del Grader. Primero ventana reciente (operación viva, barato);
+    // si no hay turno reciente, ampliamos para ubicar el último turno DISPONIBLE.
+    let graderSummaries = await listDailySummariesByRange(daysAgo(8), todayKey()).catch(() => [] as GraderDailySummary[])
+    let k = await getLatestTurnoKPIs(plantSlug, graderSummaries)
+    if (!k) {
+      // Sin turno con actividad reciente → ampliar para ubicar el último turno disponible
+      // (histórico); allowEmpty para, en último caso, reportar el turno en inicio (0%).
+      graderSummaries = await listDailySummariesByRange(daysAgo(210), todayKey()).catch(() => [] as GraderDailySummary[])
+      k = await getLatestTurnoKPIs(plantSlug, graderSummaries, true)
+    }
+    if (!k) {
+      return {
+        ok: true,
+        data: { plantSlug, count: 0 },
+        summary: `Aún no hay datos de turno (Shoplogix) para ${plantLabel} en los últimos días. El OEE/disponibilidad/MTTR se calculan cuando se carga el turno; es normal si el turno está en curso o no se ha sincronizado.`,
+        label: `KPIs de turno · ${plantLabel}`,
+      }
+    }
+    const oeeNote = k.oee === null ? ' (falta calidad del Grader para cerrar el OEE)' : ''
+    const qNote = k.quality === null ? ' (sin datos Grader)' : ''
+    const lines = [
+      `KPIs del turno ${k.shiftId} (${k.dateKey}) · ${plantLabel} — ${k.machines.length} máquina(s):`,
+      `- OEE: ${fmtFracPct(k.oee)}${oeeNote}`,
+      `- Disponibilidad: ${fmtFracPct(k.availability)}`,
+      `- Rendimiento: ${fmtFracPct(k.performance)}`,
+      `- Calidad: ${fmtFracPct(k.quality)}${qNote}`,
+      `- MTTR (averías macro): ${fmtMinReliab(k.mttrMin)}`,
+      `- MTBF: ${fmtHours(k.mtbfHours)}`,
+      `- Averías macro (≥5 min): ${k.failureCount}`,
+      `- Micro-detenciones (<5 min): ${k.microCount}${k.microMin > 0 ? ` (${fmtMinReliab(k.microMin)} en total)` : ''}`,
+    ]
+    return {
+      ok: true,
+      data: { plantSlug, kpis: k },
+      summary: lines.join('\n'),
+      label: `KPIs de turno · ${plantLabel}`,
+    }
+  },
+})
+
 // ─── Inferencia de params adicionales desde texto libre ────────────────
 
 /**
@@ -648,6 +732,10 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
   ) {
     const plant = detectPlantLineId(userMessage)
     if (plant) params.plantLineId = plant
+  }
+  // shift.kpis usa PlantSlug (chonchi/yal), no plantLineId.
+  if (toolName === 'shift.kpis' && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
+    params.plantSlug = 'yal'
   }
   return params
 }
