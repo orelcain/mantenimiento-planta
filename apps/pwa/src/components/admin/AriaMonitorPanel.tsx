@@ -19,7 +19,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { Brain, Save, RefreshCw, Users, BarChart3, Settings2, AlertTriangle, Volume2, Play } from 'lucide-react'
-import { setVoicePref, getSpanishVoices, pickDefaultFemaleVoice, getPiperVoices, getGoogleVoices, speakWith, stopSpeaking } from '@/lib/ariaVoice'
+import { setVoicePref, getGoogleVoices, speakWith, stopSpeaking, ARIA_VOICE_OPTIONS } from '@/lib/ariaVoice'
 import { 
   getAriaConfig,
   saveAriaConfig,
@@ -46,39 +46,23 @@ export function AriaMonitorPanel() {
   const [history, setHistory] = useState<DailyUsageSummary[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [isSaving, setIsSaving] = useState(false)
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
-  const [piperVoices, setPiperVoices] = useState<{ uri: string; label: string }[]>([])
   const [gcloudVoices, setGcloudVoices] = useState<{ uri: string; label: string }[]>([])
 
-  // Cargar voces en español del navegador/SO (se cargan async)
+  // Cargar las voces Google curadas de ARIA (si la API/clave están habilitadas)
   useEffect(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-    const load = () => setVoices(getSpanishVoices()) // solo femeninas (ARIA es mujer)
-    load()
-    window.speechSynthesis.onvoiceschanged = load
-    return () => { window.speechSynthesis.onvoiceschanged = null }
-  }, [])
-
-  // Cargar voces Piper del servidor local (si está corriendo)
-  useEffect(() => {
-    getPiperVoices().then(setPiperVoices)
+    getGoogleVoices().then(setGcloudVoices)
     return () => stopSpeaking()
   }, [])
 
-  // Cargar voces Google Cloud TTS (si la API/clave están habilitadas)
+  // Normaliza la voz a la recomendada (Chirp-HD-F) si la config no trae una de las
+  // voces curadas — así el selector y el guardado quedan consistentes.
   useEffect(() => {
-    getGoogleVoices().then(setGcloudVoices)
-  }, [])
-
-  // Asegura una voz femenina seleccionada una vez cargadas voces + config
-  useEffect(() => {
-    if (voices.length > 0 && !config.voiceURI) {
-      const def = pickDefaultFemaleVoice()
-      if (def) {
-        setConfig(prev => prev.voiceURI ? prev : { ...prev, voiceURI: def.voiceURI, voiceName: def.name })
-      }
-    }
-  }, [voices, config.voiceURI])
+    if (ARIA_VOICE_OPTIONS.some(o => o.uri === config.voiceURI)) return
+    const def = ARIA_VOICE_OPTIONS[0]!
+    setConfig(prev => (ARIA_VOICE_OPTIONS.some(o => o.uri === prev.voiceURI)
+      ? prev
+      : { ...prev, voiceURI: def.uri, voiceName: def.label, speechRate: prev.speechRate ?? def.rate }))
+  }, [config.voiceURI])
 
   const handleTestVoice = () => {
     speakWith(
@@ -238,72 +222,41 @@ export function AriaMonitorPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {voices.length === 0 && piperVoices.length === 0 && gcloudVoices.length === 0 ? (
+          {gcloudVoices.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Este navegador no reporta voces en español. Se usará la voz por
-              defecto del sistema (es-CL).
+              Google Cloud TTS no está disponible (revisa la API key). ARIA usará la voz
+              del navegador como respaldo automático.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-muted-foreground block mb-1">
-                  Voz (del navegador / Windows)
+                  Voz de ARIA
                 </label>
                 <select
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={config.voiceURI ?? ''}
+                  value={ARIA_VOICE_OPTIONS.some(o => o.uri === config.voiceURI) ? config.voiceURI : ARIA_VOICE_OPTIONS[0]!.uri}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                     const uri = e.target.value
-                    // La voz puede venir de cualquiera de los 3 motores.
-                    const browser = voices.find((x) => x.voiceURI === uri)
-                    const other = [...gcloudVoices, ...piperVoices].find((x) => x.uri === uri)
+                    const preset = ARIA_VOICE_OPTIONS.find((o) => o.uri === uri)
                     setConfig(prev => ({
                       ...prev,
-                      voiceURI: uri || undefined,
-                      voiceName: browser?.name ?? other?.label,
+                      voiceURI: uri,
+                      voiceName: preset?.label,
+                      // Cada voz trae su velocidad recomendada (ajustable abajo).
+                      speechRate: preset ? preset.rate : prev.speechRate,
                     }))
                   }}
                 >
-                  <option value="">Voz femenina por defecto</option>
-                  {gcloudVoices.length > 0 && (
-                    <optgroup label="Google Cloud (neuronal — todos los usuarios)">
-                      {gcloudVoices.map((v) => (
-                        <option key={v.uri} value={v.uri}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {voices.some((v) => v.localService) && (
-                    <optgroup label="Instaladas (suenan en este equipo)">
-                      {voices.filter((v) => v.localService).map((v) => (
-                        <option key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} ({v.lang})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {voices.some((v) => !v.localService) && (
-                    <optgroup label="Online — requieren Edge o instalarlas en Windows">
-                      {voices.filter((v) => !v.localService).map((v) => (
-                        <option key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} ({v.lang})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {piperVoices.length > 0 && (
-                    <optgroup label="Piper local (servidor)">
-                      {piperVoices.map((v) => (
-                        <option key={v.uri} value={v.uri}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  {ARIA_VOICE_OPTIONS.map((o) => (
+                    <option key={o.uri} value={o.uri}>
+                      {o.label} · {o.rate.toFixed(2)}x
+                    </option>
+                  ))}
                 </select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Solo voces femeninas (ARIA es mujer). Las Piper requieren el servidor local activo.
+                  Voz neuronal de Google (para todos los usuarios). Al elegirla se aplica su
+                  velocidad recomendada; puedes ajustarla con el control de la derecha.
                 </p>
               </div>
               <div>
