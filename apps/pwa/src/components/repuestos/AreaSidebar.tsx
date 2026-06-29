@@ -8,8 +8,9 @@
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, ChevronsLeft, ChevronsDownUp, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
+import { ChevronRight, ChevronsLeft, ChevronsDownUp, Layers, Loader2, List, X, Star, Cog, Search } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
+import { useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
 
 /** Un equipo (hoja) es favorito si su clave (linkedMachineId || nodeId) está en el set. */
 function isLeafFav(leaf: EquipmentLeaf, equipFavKeys?: Set<string>): boolean {
@@ -44,6 +45,8 @@ interface AreaSidebarProps {
   onToggleFavoritesOnly?: () => void
   /** Clic en un equipo (hoja) → filtrar la tabla a ese equipo. Si no se pasa, selecciona el área padre. */
   onSelectEquipment?: (areaNode: AreaTreeNode, leaf: EquipmentLeaf) => void
+  /** Buscar un equipo en TODA la planta (cache global) y seleccionarlo. Habilita el buscador del sidebar. */
+  onSelectEquipmentGlobal?: (eq: GlobalEquipmentResult) => void
   /** Clave del equipo seleccionado (linkedMachineId || nodeId) para resaltarlo. */
   selectedEquipKey?: string | null
   /** Claves de equipos favoritos (linkedMachineId || nodeId) para la estrella + filtro de favoritos. */
@@ -282,11 +285,23 @@ function AreaRow({
 }
 
 export function AreaSidebar({
-  selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, equipFavKeys, onToggleEquipFav, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
+  selectedAreaId, onSelectArea, onSelectEquipment, onSelectEquipmentGlobal, selectedEquipKey, equipFavKeys, onToggleEquipFav, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
   favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onCollapseAll, onShowAll, showingAll,
   mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
   const { areaTree, loading, expandNode } = useHierarchyAreaTree()
+
+  // ── Buscador de equipos (cache global de toda la planta) ──
+  // El árbol es lazy: solo trae hojas al expandir un área. Para encontrar CUALQUIER
+  // equipo sin navegar a mano, se busca sobre el cache global de `hierarchy`.
+  const [equipSearch, setEquipSearch] = useState('')
+  const { results: equipResults, loading: equipSearchLoading } = useGlobalEquipmentSearch(equipSearch)
+  const searching = equipSearch.trim().length >= 2
+  const handlePickEquipment = useCallback((eq: GlobalEquipmentResult) => {
+    onSelectEquipmentGlobal?.(eq)
+    setEquipSearch('')
+    onMobileClose?.()
+  }, [onSelectEquipmentGlobal, onMobileClose])
 
   // ── Ancho ajustable (desktop): se arrastra el borde derecho, se recuerda. ──
   const MIN_W = 220, MAX_W = 560
@@ -399,8 +414,67 @@ export function AreaSidebar({
         </div>
       </div>
 
+      {onSelectEquipmentGlobal && (
+        <div className="border-b border-border px-2 py-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={equipSearch}
+              onChange={(e) => setEquipSearch(e.target.value)}
+              placeholder="Buscar equipo en toda la planta…"
+              className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-7 text-xs text-foreground outline-none transition-colors focus:border-primary/50"
+            />
+            {equipSearch && (
+              <button
+                onClick={() => setEquipSearch('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+                aria-label="Limpiar búsqueda de equipo"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto py-1">
-        {loading ? (
+        {searching ? (
+          equipSearchLoading && equipResults.length === 0 ? (
+            <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando equipos…
+            </div>
+          ) : equipResults.length === 0 ? (
+            <div className="px-3 py-4 text-xs text-muted-foreground">Sin equipos para «{equipSearch.trim()}».</div>
+          ) : (
+            <div className="space-y-0.5 px-1">
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {equipResults.length} equipo{equipResults.length === 1 ? '' : 's'}
+              </div>
+              {equipResults.map((eq) => {
+                const isSel = !!selectedEquipKey && (selectedEquipKey === eq.id || selectedEquipKey === eq.linkedMachineId)
+                return (
+                  <button
+                    key={eq.id}
+                    onClick={() => handlePickEquipment(eq)}
+                    className={[
+                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                      isSel ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground',
+                    ].join(' ')}
+                    title={eq.nombre}
+                  >
+                    <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-cyan-500/70'].join(' ')} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] leading-tight">{eq.alias || eq.nombre}</span>
+                      {eq.codigo && (
+                        <span className="block truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{eq.codigo}</span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )
+        ) : loading ? (
           <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando áreas…
           </div>

@@ -32,23 +32,40 @@ function toDate(v: unknown): Date {
 export async function getMaintenanceLog(equipmentId: string): Promise<MaintenanceLogEntry[]> {
   const q = query(collection(db, COLLECTION), where('equipmentId', '==', equipmentId))
   const snap = await getDocs(q)
-  const entries: MaintenanceLogEntry[] = snap.docs.map((d) => {
-    const data = d.data() as Record<string, unknown>
-    return {
-      id: d.id,
-      equipmentId: String(data.equipmentId ?? ''),
-      hierarchyNodeId: data.hierarchyNodeId as string | undefined,
-      fecha: toDate(data.fecha),
-      tipo: (data.tipo as MaintenanceLogEntry['tipo']) ?? 'inspeccion',
-      tecnico: data.tecnico as string | undefined,
-      hallazgo: String(data.hallazgo ?? ''),
-      severidad: (data.severidad as MaintenanceLogEntry['severidad']) ?? 'verde',
-      incidenciaId: data.incidenciaId as string | undefined,
-      proximaInspeccion: data.proximaInspeccion as string | undefined,
-      checklist: Array.isArray(data.checklist) ? (data.checklist as MaintenanceLogEntry['checklist']) : undefined,
-      createdAt: toDate(data.createdAt),
-    }
-  })
+  const entries = snap.docs.map((d) => mapEntry(d.id, d.data() as Record<string, unknown>))
+  return entries.sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
+}
+
+// Mapea un doc Firestore de maintenanceLog a MaintenanceLogEntry (orden por fecha lo hace el caller).
+function mapEntry(id: string, data: Record<string, unknown>): MaintenanceLogEntry {
+  return {
+    id,
+    equipmentId: String(data.equipmentId ?? ''),
+    hierarchyNodeId: data.hierarchyNodeId as string | undefined,
+    fecha: toDate(data.fecha),
+    tipo: (data.tipo as MaintenanceLogEntry['tipo']) ?? 'inspeccion',
+    tecnico: data.tecnico as string | undefined,
+    hallazgo: String(data.hallazgo ?? ''),
+    severidad: (data.severidad as MaintenanceLogEntry['severidad']) ?? 'verde',
+    incidenciaId: data.incidenciaId as string | undefined,
+    proximaInspeccion: data.proximaInspeccion as string | undefined,
+    checklist: Array.isArray(data.checklist) ? (data.checklist as MaintenanceLogEntry['checklist']) : undefined,
+    plantLineId: data.plantLineId as string | undefined,
+    areaNodeId: data.areaNodeId as string | undefined,
+    shiftId: data.shiftId as string | undefined,
+    origen: data.origen as MaintenanceLogEntry['origen'],
+    sapAviso: data.sapAviso as string | undefined,
+    sapOrden: data.sapOrden as string | undefined,
+    createdAt: toDate(data.createdAt),
+  }
+}
+
+// Intervenciones registradas contra una línea/área del módulo Análisis de Turno
+// (Captura Rápida). where simple sobre plantLineId → índice de campo único auto.
+export async function getMaintenanceLogByPlantLine(plantLineId: string): Promise<MaintenanceLogEntry[]> {
+  const q = query(collection(db, COLLECTION), where('plantLineId', '==', plantLineId))
+  const snap = await getDocs(q)
+  const entries = snap.docs.map((d) => mapEntry(d.id, d.data() as Record<string, unknown>))
   return entries.sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
 }
 
@@ -69,6 +86,12 @@ export async function addMaintenanceLogEntry(
   if (entry.tecnico) payload.tecnico = entry.tecnico
   if (entry.incidenciaId) payload.incidenciaId = entry.incidenciaId
   if (entry.proximaInspeccion) payload.proximaInspeccion = entry.proximaInspeccion
+  if (entry.plantLineId) payload.plantLineId = entry.plantLineId
+  if (entry.areaNodeId) payload.areaNodeId = entry.areaNodeId
+  if (entry.shiftId) payload.shiftId = entry.shiftId
+  if (entry.origen) payload.origen = entry.origen
+  if (entry.sapAviso) payload.sapAviso = entry.sapAviso
+  if (entry.sapOrden) payload.sapOrden = entry.sapOrden
   if (entry.checklist && entry.checklist.length > 0) {
     // Saneado: Firestore no acepta `undefined` (omitir `valor` si no hay).
     payload.checklist = entry.checklist.map((t) => {
@@ -81,10 +104,13 @@ export async function addMaintenanceLogEntry(
   await setDoc(doc(db, COLLECTION, id), payload)
 }
 
-// Editar una entrada (admin). Solo campos básicos; no reprograma inspección.
+// Editar una entrada. Permite cambiar fecha/hora, tipo, condición, texto, el
+// equipo asignado y la trazabilidad SAP. Los campos string se pueden limpiar
+// mandando '' (queda vacío → p.ej. "SAP pendiente" si se borra la OT).
 export async function updateMaintenanceLogEntry(
   id: string,
-  patch: Partial<Pick<MaintenanceLogEntry, 'fecha' | 'tipo' | 'severidad' | 'tecnico' | 'hallazgo'>>,
+  patch: Partial<Pick<MaintenanceLogEntry,
+    'fecha' | 'tipo' | 'severidad' | 'tecnico' | 'hallazgo' | 'equipmentId' | 'hierarchyNodeId' | 'sapAviso' | 'sapOrden'>>,
 ): Promise<void> {
   const clean: Record<string, unknown> = {}
   if (patch.fecha) clean.fecha = Timestamp.fromDate(patch.fecha)
@@ -92,6 +118,10 @@ export async function updateMaintenanceLogEntry(
   if (patch.severidad) clean.severidad = patch.severidad
   if (patch.tecnico !== undefined) clean.tecnico = patch.tecnico
   if (patch.hallazgo !== undefined) clean.hallazgo = patch.hallazgo
+  if (patch.equipmentId) clean.equipmentId = patch.equipmentId
+  if (patch.hierarchyNodeId !== undefined) clean.hierarchyNodeId = patch.hierarchyNodeId
+  if (patch.sapAviso !== undefined) clean.sapAviso = patch.sapAviso
+  if (patch.sapOrden !== undefined) clean.sapOrden = patch.sapOrden
   await updateDoc(doc(db, COLLECTION, id), clean)
 }
 

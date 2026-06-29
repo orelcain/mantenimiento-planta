@@ -672,6 +672,24 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
 
 // ===== REFINAMIENTO DE TEXTO (BOTÓN MÁGICO) =====
 
+/**
+ * Glosario de términos VÁLIDOS de la planta (áreas, equipos, marcas) que la IA
+ * NO debe "corregir" al limpiar transcripciones. Clave para que no cambie
+ * "Acopio" (un área) por "acoplamiento", "Yal" por "ya", etc.
+ * Ampliar con los nombres reales de equipos a medida que aparezcan.
+ */
+export const PLANT_GLOSSARY = [
+  // Plantas / áreas
+  'Acopio', 'Riles', 'Yal', 'Chonchi', 'Eviscerado', 'Filete', 'Empaque',
+  'Frigorífico', 'Cámaras', 'Antecámara', 'Sacrificio', 'Emparrillado', 'Túneles',
+  'Sala de Máquinas', 'Sala de Caldera', 'Sala de Freón', 'Subestación', 'Pontón',
+  'Caseta de Agua de Mar', 'Agua de Mar',
+  // Equipos / marcas / términos técnicos
+  'Baader', 'Marelec', 'grader', 'fileteadora', 'glaseador', 'enzunchadora',
+  'empacadora', 'rodamiento', 'chumacera', 'sello mecánico', 'variador de frecuencia',
+  'bomba de agua de mar', 'sistema de bombeo de peces', 'DAF', 'filtro tornillo',
+]
+
 // Extender refineText para soportar contexto de transcripción
 export async function refineText(text: string, isTranscriptionCleanup = false): Promise<string> {
   if (!isAIConfigured()) {
@@ -683,15 +701,18 @@ export async function refineText(text: string, isTranscriptionCleanup = false): 
   }
 
   try {
-    const prompt = isTranscriptionCleanup 
-      ? `Eres un experto técnico industrial.
-Tu tarea es corregir la transcripción de voz a texto de un reporte de mantenimiento.
-El texto original puede tener errores fonéticos, palabras mal interpretadas o muletillas dado que fue dictado.
-1. Corrije los errores técnicos (Ej: "bomba centriguga" -> "bomba centrífuga").
-2. Hazlo CONCISO y PRECISO.
-3. Mantén el sentido original pero con lenguaje profesional.
-4. NO agregues introducciones ni explicaciones.
-5. NO uses comillas.
+    const prompt = isTranscriptionCleanup
+      ? `Eres un experto técnico de mantenimiento de una planta procesadora de salmón.
+Corrige la transcripción de voz a texto de un reporte de mantenimiento (puede tener errores fonéticos o muletillas porque fue dictado).
+
+TÉRMINOS VÁLIDOS DE LA PLANTA — si aparecen (o algo que suene parecido), MANTENLOS tal cual; NO los "corrijas" a otra palabra:
+${PLANT_GLOSSARY.join(', ')}.
+Ejemplo CRÍTICO: "acopio" es un ÁREA de la planta — NUNCA lo cambies a "acoplamiento".
+
+Reglas:
+1. Corrige solo errores fonéticos obvios que NO estén en la lista de arriba (Ej: "bomba centriguga" -> "bomba centrífuga").
+2. Conciso y profesional, mantén el sentido original.
+3. NO agregues introducciones, explicaciones ni comillas.
 
 Texto original transcrito: "${text}"
 
@@ -720,6 +741,163 @@ Responde SOLO con el texto técnico mejorado. Sin comillas ni puntos finales.`
   } catch (error) {
     logger.error('Error refinando texto con IA:', error instanceof Error ? error : new Error(String(error)))
     return text
+  }
+}
+
+// ===== CAPTURA RÁPIDA DE INTERVENCIÓN (Análisis de Turno · Fase 3) =====
+
+export type InterventionTipo = 'correctivo' | 'preventivo' | 'predictivo' | 'inspeccion'
+export type InterventionSeveridad = 'verde' | 'amarillo' | 'rojo'
+
+export interface InterventionSuggestion {
+  titulo: string
+  tipo: InterventionTipo
+  severidad: InterventionSeveridad
+}
+
+/**
+ * Desde el relato de una intervención (dictado/limpiado), sugiere campos
+ * estructurados para `maintenanceLog`: título conciso, tipo de mantención y
+ * condición/severidad (1/2/3 → verde/amarillo/rojo). Todo editable por el
+ * técnico antes de guardar. Robusto: ante fallo devuelve un default neutro.
+ */
+export async function suggestInterventionFields(hallazgo: string): Promise<InterventionSuggestion | null> {
+  if (!isAIConfigured() || !hallazgo || hallazgo.trim().length < 8) return null
+
+  try {
+    const prompt = `Eres un planificador de mantenimiento industrial. A partir del relato de una intervención de mantención en planta, devuelve campos estructurados.
+
+Relato: "${hallazgo}"
+
+Reglas:
+- "titulo": frase técnica MUY concisa (máx 6 palabras), formato falla/acción + componente. Ej: "Cambio de rodamiento en bomba".
+- "tipo": uno de correctivo | preventivo | predictivo | inspeccion.
+   · correctivo = se reparó/atendió una falla ya ocurrida.
+   · preventivo = mantención planificada para evitar falla (lubricación, cambio por horas).
+   · predictivo = medición/diagnóstico de condición (vibración, termografía, análisis).
+   · inspeccion = revisión/chequeo sin intervención mayor.
+- "severidad": condición resultante. verde = sin riesgo / resuelto; amarillo = atención / seguimiento; rojo = crítico / equipo comprometido.
+
+Responde SOLO con JSON:
+{"titulo": "...", "tipo": "correctivo", "severidad": "verde"}`
+
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, max_tokens: 200 }
+    )
+    const jsonStr = (content || '{}').replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(jsonStr) as Partial<InterventionSuggestion>
+
+    const tipos: InterventionTipo[] = ['correctivo', 'preventivo', 'predictivo', 'inspeccion']
+    const sevs: InterventionSeveridad[] = ['verde', 'amarillo', 'rojo']
+    return {
+      titulo: (parsed.titulo || '').toString().replace(/^"|"$/g, '').replace(/\.$/, '').trim(),
+      tipo: tipos.includes(parsed.tipo as InterventionTipo) ? (parsed.tipo as InterventionTipo) : 'correctivo',
+      severidad: sevs.includes(parsed.severidad as InterventionSeveridad) ? (parsed.severidad as InterventionSeveridad) : 'amarillo',
+    }
+  } catch (error) {
+    logger.error('Error sugiriendo campos de intervención con IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
+  }
+}
+
+// ===== ANÁLISIS IA + PREDICTIVO POR ÁREA (Fase 3b) =====
+
+export interface AreaInterventionInput {
+  fecha: Date
+  tipo: string
+  severidad: string
+  hallazgo: string
+  tecnico?: string
+}
+
+export interface AreaInsights {
+  resumen: string                 // 1-2 frases del estado de mantención del área
+  riesgo: 'bajo' | 'medio' | 'alto' | 'critico'
+  patrones: Array<{ descripcion: string; frecuencia: number; recomendacion: string }>
+  equiposAVigilar: string[]       // componentes/equipos mencionados de forma recurrente
+  proximaAccion: string           // acción preventiva sugerida (RCM)
+  confianza: number               // 0..1
+}
+
+/** Nº mínimo de intervenciones para que el análisis sea significativo. */
+export const MIN_AREA_INTERVENTIONS = 3
+
+/**
+ * Análisis RCM/predictivo a NIVEL DE ÁREA sobre las intervenciones capturadas
+ * (`maintenanceLog` de una línea/área de Análisis de Turno). Complementa a
+ * `analyzeRecurrentIssues`/`predictNextFailure` (que son por equipo/incidente):
+ * aquí la unidad es el ÁREA, alimentada por la Captura Rápida de Intervención.
+ *
+ * Demuestra el aporte de Mantención: detecta patrones recurrentes, equipos a
+ * vigilar y la próxima acción preventiva → de "registramos" a "optimizamos".
+ * Robusto: ante datos insuficientes o fallo devuelve null (el caller guía).
+ */
+export async function analyzeAreaInterventions(
+  entries: AreaInterventionInput[],
+  areaLabel: string,
+): Promise<AreaInsights | null> {
+  if (!isAIConfigured() || entries.length < MIN_AREA_INTERVENTIONS) return null
+
+  try {
+    // Resumen compacto y ordenado (más reciente primero), acotado para el prompt.
+    const sorted = [...entries].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 60)
+    const summary = sorted.map((e) => ({
+      fecha: e.fecha.toISOString().slice(0, 10),
+      tipo: e.tipo,
+      condicion: e.severidad, // verde/amarillo/rojo = Cond 1/2/3
+      hallazgo: e.hallazgo,
+    }))
+
+    const prompt = `Eres un ingeniero de confiabilidad (RCM) analizando el historial de intervenciones de mantención de un ÁREA de planta: "${areaLabel}".
+
+Intervenciones (más reciente primero):
+${JSON.stringify(summary, null, 2)}
+
+Analiza y entrega:
+1. Estado general de mantención del área (resumen breve, 1-2 frases).
+2. Nivel de riesgo del área (bajo/medio/alto/critico) según frecuencia y condición de las intervenciones.
+3. Patrones recurrentes (fallas/equipos que se repiten) con su frecuencia y una recomendación preventiva por patrón.
+4. Equipos o componentes a vigilar (nombres/menciones que se repiten en los hallazgos).
+5. La PRÓXIMA acción preventiva concreta recomendada (enfoque RCM, evitar recurrencia).
+
+Responde SOLO con JSON:
+{
+  "resumen": "string",
+  "riesgo": "bajo|medio|alto|critico",
+  "patrones": [{ "descripcion": "string", "frecuencia": number, "recomendacion": "string" }],
+  "equiposAVigilar": ["string"],
+  "proximaAccion": "string",
+  "confianza": 0.0-1.0
+}`
+
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 1200 },
+    )
+    const jsonStr = (content || '{}').replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(jsonStr) as Partial<AreaInsights>
+
+    const riesgos: AreaInsights['riesgo'][] = ['bajo', 'medio', 'alto', 'critico']
+    return {
+      resumen: (parsed.resumen || '').toString().trim(),
+      riesgo: riesgos.includes(parsed.riesgo as AreaInsights['riesgo']) ? (parsed.riesgo as AreaInsights['riesgo']) : 'medio',
+      patrones: Array.isArray(parsed.patrones)
+        ? parsed.patrones.slice(0, 6).map((p) => ({
+            descripcion: String(p?.descripcion ?? '').trim(),
+            frecuencia: Number(p?.frecuencia) || 0,
+            recomendacion: String(p?.recomendacion ?? '').trim(),
+          })).filter((p) => p.descripcion)
+        : [],
+      equiposAVigilar: Array.isArray(parsed.equiposAVigilar)
+        ? parsed.equiposAVigilar.map((s) => String(s).trim()).filter(Boolean).slice(0, 8)
+        : [],
+      proximaAccion: (parsed.proximaAccion || '').toString().trim(),
+      confianza: typeof parsed.confianza === 'number' ? Math.max(0, Math.min(1, parsed.confianza)) : 0.5,
+    }
+  } catch (error) {
+    logger.error('Error analizando intervenciones del área con IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
   }
 }
 

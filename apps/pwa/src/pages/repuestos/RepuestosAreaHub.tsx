@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin, Boxes } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -145,6 +145,27 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqLoading])
 
+  // Equipos agrupados por MODELO: quita el sufijo de línea " N1/N2/N3" del nombre.
+  // Todas las instancias del mismo modelo comparten repuestos (N:M), así el picker
+  // de "+ Repuesto" muestra una sola fila "KNURO · 6 equipos" en vez de las 6 hojas,
+  // y al elegirla asocia el material a TODAS las instancias.
+  const equipoModelGroups = useMemo(() => {
+    const stripInstance = (s: string) => s.replace(/\s+[Nn][°º]?\s*\d+\s*$/, '').trim()
+    const groups = new Map<string, { key: string; label: string; nodeIds: string[]; codigos: string[] }>()
+    for (const e of (getGlobalEquipmentCache() || [])) {
+      if (e.oculto) continue
+      const display = e.alias || e.nombre || e.id
+      const labelBase = stripInstance(display) || display
+      const key = normalizeForSearch(labelBase)
+      let g = groups.get(key)
+      if (!g) { g = { key, label: labelBase, nodeIds: [], codigos: [] }; groups.set(key, g) }
+      g.nodeIds.push(e.id)
+      if (e.codigo) g.codigos.push(e.codigo)
+    }
+    return [...groups.values()]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eqLoading])
+
   const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
@@ -247,8 +268,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [createTargetMachine, setCreateTargetMachine] = useState<Machine | null>(null)
+  /** Equipos destino del nuevo repuesto (N:M): nodeIds + códigos + etiqueta legible. */
+  const [createTargetEquipos, setCreateTargetEquipos] = useState<{ nodeIds: string[]; codigos: string[]; label: string } | null>(null)
   const [createPicker, setCreatePicker] = useState(false)
+  /** El "+ Repuesto" en curso es un material transversal (sin equipo): insumo/herramienta. */
+  const [createTransversal, setCreateTransversal] = useState(false)
+  /** Búsqueda del equipo destino en el picker de "+ Repuesto" (sobre toda la planta). */
+  const [createEquipoQuery, setCreateEquipoQuery] = useState('')
+  /** Modelos de equipo seleccionados en el picker (claves de equipoModelGroups) — multi N:M. */
+  const [createEquipoSel, setCreateEquipoSel] = useState<Set<string>>(new Set())
   const [savingRep, setSavingRep] = useState(false)
   // Asignar SAP a una pieza de despiece (sin SAP → ordenable). Fase 6.
   const [asignarSapOpen, setAsignarSapOpen] = useState(false)
@@ -847,13 +875,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [allRepuestos],
   )
 
-  // Máquinas (equipos) del área seleccionada — destino para "+ Repuesto".
-  const areaMachines = useMemo(() => {
-    if (showingAll) return machines
-    if (!selectedAreaId) return []
-    return machines.filter((m) => machineInArea(m.id, selectedAreaId))
-  }, [machines, showingAll, selectedAreaId, machineInArea])
-
   // Refrescar catálogo tras una mutación (invalida cache de módulo + recarga).
   const refreshCatalog = useCallback(async () => {
     invalidateGlobalRepuestosCache()
@@ -1046,35 +1067,93 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
   }, [actionTarget, crudDelete, colPathOf, refreshCatalog, toast])
 
-  // "+ Repuesto": elige equipo destino del área (o directo si hay uno solo).
+  // Índice para detectar duplicados al crear (por SAP exacto o nombre normalizado).
+  const dupIndex = useMemo(() => {
+    const bySap = new Map<string, { id: string; textoBreve: string; codigoSAP: string }>()
+    const byName = new Map<string, { id: string; textoBreve: string; codigoSAP: string }>()
+    for (const r of allRepuestos) {
+      const sap = (r.repuesto.codigoSAP || '').trim()
+      const entry = { id: r.repuesto.id, textoBreve: r.repuesto.textoBreve, codigoSAP: sap }
+      if (sap && !bySap.has(sap)) bySap.set(sap, entry)
+      const nm = normalizeForSearch(r.repuesto.textoBreve)
+      if (nm && !byName.has(nm)) byName.set(nm, entry)
+    }
+    return { bySap, byName }
+  }, [allRepuestos])
+
+  const checkDuplicate = useCallback(({ codigoSAP, textoBreve }: { codigoSAP: string; textoBreve: string }) => {
+    const sap = codigoSAP.trim()
+    if (sap && dupIndex.bySap.has(sap)) return dupIndex.bySap.get(sap)!
+    const nm = normalizeForSearch(textoBreve)
+    if (nm.length >= 4 && dupIndex.byName.has(nm)) return dupIndex.byName.get(nm)!
+    return null
+  }, [dupIndex])
+
+  // "+ Repuesto": si estás filtrando un EQUIPO puntual (ej. GRADER), asocia el nuevo
+  // repuesto automáticamente a ese modelo y salta el picker. Si no, abre el picker
+  // (material transversal o buscar el equipo destino en toda la planta).
   const startCreate = useCallback(() => {
-    if (areaMachines.length === 0) {
-      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'El repuesto se crea asociado a un equipo del área.' })
-      return
+    if (selectedEquipMachineId) {
+      const group = equipoModelGroups.find((g) => g.nodeIds.includes(selectedEquipMachineId))
+      if (group) {
+        setCreateTransversal(false)
+        setCreateTargetEquipos({ nodeIds: group.nodeIds, codigos: group.codigos, label: group.label })
+        setCreateOpen(true)
+        return
+      }
     }
-    if (areaMachines.length === 1 && areaMachines[0]) {
-      setCreateTargetMachine(areaMachines[0])
-      setCreateOpen(true)
-    } else {
-      setCreatePicker(true)
-    }
-  }, [areaMachines, toast])
+    setCreateEquipoQuery('')
+    setCreateEquipoSel(new Set())
+    setCreatePicker(true)
+  }, [selectedEquipMachineId, equipoModelGroups])
 
   const handleCreateSubmit = useCallback(
     async (payload: RepuestoFormData) => {
-      if (!createTargetMachine) return
       setSavingRep(true)
       try {
-        // Modelo plano: el repuesto nace asociado al nodo-equipo elegido (equipos:[nodeId]).
-        const node = (getGlobalEquipmentCache() || []).find((e) => e.id === createTargetMachine.id)
-        await crudCreate('repuestos', payload, {
-          equipos: [createTargetMachine.id],
-          equiposCodigos: [node?.codigo || `s/c:${createTargetMachine.nombre}`],
-          parentRepuestoId: null,
-          origen: { tipo: 'manual' },
-        })
-        toast({ title: 'Repuesto creado', variant: 'success' })
+        const tieneSap = !!payload.codigoSAP?.trim()
+        const equipos = createTargetEquipos?.nodeIds ?? []
+        if (createTransversal || equipos.length === 0) {
+          // Material transversal (insumo/herramienta/…): no pertenece a ningún equipo.
+          await crudCreate('repuestos', payload, {
+            equipos: [],
+            equiposCodigos: [],
+            parentRepuestoId: null,
+            clase: payload.clase || 'insumo',
+            tieneSap,
+            origen: { tipo: 'manual' },
+          })
+          toast({ title: 'Material transversal creado', variant: 'success' })
+        } else {
+          // Modelo plano N:M: el repuesto nace asociado a TODAS las instancias del/los modelo(s).
+          await crudCreate('repuestos', payload, {
+            equipos,
+            equiposCodigos: createTargetEquipos?.codigos ?? [],
+            parentRepuestoId: null,
+            clase: payload.clase || 'repuesto',
+            tieneSap,
+            origen: { tipo: 'manual' },
+          })
+          toast({ title: equipos.length > 1 ? `Repuesto creado (${equipos.length} equipos)` : 'Repuesto creado', variant: 'success' })
+        }
+        // Stock + ubicación de bodega (vive en `bodega` por SAP), si se ingresó algo.
+        const sap = payload.codigoSAP?.trim()
+        if (sap && ((payload.stockInicial ?? 0) > 0 || (payload.stockMinimo ?? 0) > 0 || (payload.ubicacionBodega ?? '').trim())) {
+          try {
+            await saveStock(sap, {
+              stockActual: payload.stockInicial ?? 0,
+              stockMinimo: payload.stockMinimo ?? 0,
+              ubicacionBodega: (payload.ubicacionBodega ?? '').trim(),
+              unidad: 'pzas',
+            })
+          } catch (e) {
+            toast({ variant: 'destructive', title: 'Material creado, pero el stock no se guardó', description: e instanceof Error ? e.message : 'Cárgalo luego en Bodega.' })
+          }
+        }
         setCreateOpen(false)
+        setCreateTransversal(false)
+        setCreateTargetEquipos(null)
+        setCreateEquipoSel(new Set())
         await refreshCatalog()
       } catch (err) {
         toast({ variant: 'destructive', title: 'Error al crear', description: err instanceof Error ? err.message : '' })
@@ -1082,7 +1161,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         setSavingRep(false)
       }
     },
-    [createTargetMachine, crudCreate, refreshCatalog, toast],
+    [createTargetEquipos, createTransversal, crudCreate, saveStock, refreshCatalog, toast],
   )
 
   // Datos del repuesto/equipo objetivo de la acción en curso.
@@ -1197,6 +1276,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
         onSelectEquipment={(node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id, leaf.alias || leaf.nombre, node.id)}
+        onSelectEquipmentGlobal={(eq) => handleFavEquipClick(eq.id, eq.alias || eq.nombre, eq.parentId)}
         selectedEquipKey={selectedEquipKey}
         equipFavKeys={equipFavKeys}
         onToggleEquipFav={(leaf) => handleEquipStar(leaf.linkedMachineId || leaf.id, undefined, leaf.alias || leaf.nombre)}
@@ -1870,25 +1950,96 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         </DialogContent>
       </Dialog>
 
-      {/* Selector de equipo destino para "+ Repuesto" */}
-      <Dialog open={createPicker} onOpenChange={(o) => !o && setCreatePicker(false)}>
+      {/* Selector de destino para "+ Repuesto": material transversal o uno/varios MODELOS de equipo */}
+      <Dialog open={createPicker} onOpenChange={(o) => { if (!o) { setCreatePicker(false); setCreateEquipoQuery(''); setCreateEquipoSel(new Set()) } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">¿A qué equipo?</DialogTitle>
-            <DialogDescription>El nuevo repuesto se asociará al equipo seleccionado del área.</DialogDescription>
+            <DialogTitle className="text-base">¿Qué vas a crear?</DialogTitle>
+            <DialogDescription>Un material transversal (insumo, herramienta…) o un repuesto asociado a uno o varios equipos. Marca los modelos y pulsa Continuar.</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
-            {areaMachines.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setCreateTargetMachine(m); setCreatePicker(false); setCreateOpen(true) }}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
-              >
-                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
-                <span className="truncate">{m.nombre || m.id}</span>
-              </button>
-            ))}
+
+          <button
+            onClick={() => { setCreateTransversal(true); setCreateTargetEquipos(null); setCreateEquipoSel(new Set()); setCreatePicker(false); setCreateEquipoQuery(''); setCreateOpen(true) }}
+            className="flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
+          >
+            <Boxes className="h-4 w-4 shrink-0 text-primary" />
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium text-foreground">Material transversal</span>
+              <span className="text-[11px] text-muted-foreground">Insumo, herramienta, químico… sin equipo</span>
+            </span>
+          </button>
+
+          <div className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">O asociar a equipos</div>
+          <Input
+            value={createEquipoQuery}
+            onChange={(e) => setCreateEquipoQuery(e.target.value)}
+            placeholder="Buscar equipo en toda la planta…"
+            autoFocus
+          />
+          <div className="mt-1 max-h-[38vh] space-y-1 overflow-y-auto">
+            {(() => {
+              // Match por tokens (AND) sobre MODELOS agrupados: "bomba nh3" → "BOMBA FLUJO NH3".
+              const terms = normalizeForSearch(createEquipoQuery).split(/\s+/).filter(Boolean)
+              let groups = equipoModelGroups
+              if (terms.length) {
+                groups = groups.filter((g) => {
+                  const hay = normalizeForSearch(`${g.label} ${g.codigos.join(' ')}`)
+                  return terms.every((t) => hay.includes(t))
+                })
+              } else if (selectedAreaId && !showingAll) {
+                groups = groups.filter((g) => g.nodeIds.some((id) => machineInArea(id, selectedAreaId)))
+              } else {
+                groups = []
+              }
+              groups = groups.slice(0, 50)
+              if (!groups.length) {
+                return (
+                  <p className="px-1 py-3 text-center text-xs text-muted-foreground">
+                    {terms.length ? 'Sin equipos que coincidan.' : 'Escribe el nombre o código del equipo…'}
+                  </p>
+                )
+              }
+              return groups.map((g) => {
+                const checked = createEquipoSel.has(g.key)
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => setCreateEquipoSel((prev) => { const n = new Set(prev); if (checked) n.delete(g.key); else n.add(g.key); return n })}
+                    className={['flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', checked ? 'border-primary/50 bg-primary/10' : 'border-border bg-card hover:bg-muted/40 hover:border-primary/40'].join(' ')}
+                  >
+                    <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
+                      {checked && <Check className="h-3 w-3" />}
+                    </span>
+                    <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{g.label}</span>
+                    {g.nodeIds.length > 1
+                      ? <span className="shrink-0 text-[10px] text-muted-foreground">· {g.nodeIds.length} equipos</span>
+                      : g.codigos[0] && <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{g.codigos[0]}</span>}
+                  </button>
+                )
+              })
+            })()}
           </div>
+
+          {createEquipoSel.size > 0 && (() => {
+            const sel = equipoModelGroups.filter((g) => createEquipoSel.has(g.key))
+            const nodeIds = sel.flatMap((g) => g.nodeIds)
+            const codigos = sel.flatMap((g) => g.codigos)
+            const label = sel.length === 1 ? (sel[0]?.label ?? '') : `${sel.length} modelos`
+            return (
+              <Button
+                className="mt-1 w-full"
+                onClick={() => {
+                  setCreateTransversal(false)
+                  setCreateTargetEquipos({ nodeIds, codigos, label })
+                  setCreatePicker(false); setCreateEquipoQuery(''); setCreateEquipoSel(new Set())
+                  setCreateOpen(true)
+                }}
+              >
+                Continuar · {nodeIds.length} equipo{nodeIds.length === 1 ? '' : 's'}
+              </Button>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -2014,12 +2165,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         )
       })(addToListRowKey)}
 
-      {/* Crear repuesto */}
+      {/* Crear repuesto / material transversal */}
       <RepuestoFormModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => { setCreateOpen(false); setCreateTransversal(false) }}
         mode="create"
-        machineName={createTargetMachine?.nombre ?? ''}
+        machineName={createTransversal || !createTargetEquipos ? '' : `${createTargetEquipos.label}${createTargetEquipos.nodeIds.length > 1 ? ` · ${createTargetEquipos.nodeIds.length} equipos` : ''}`}
+        transversal={createTransversal}
+        defaultClase={createTransversal ? 'insumo' : 'repuesto'}
+        onCheckDuplicate={checkDuplicate}
+        onChangeTarget={() => { setCreateOpen(false); setCreateEquipoQuery(''); setCreateEquipoSel(new Set()); setCreatePicker(true) }}
         onSubmit={handleCreateSubmit}
         loading={savingRep}
       />

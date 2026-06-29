@@ -1,22 +1,31 @@
 import * as React from 'react'
-import { Mic, StopCircle } from 'lucide-react'
+import { Mic, StopCircle, Loader2 } from 'lucide-react'
 import { Textarea, TextareaProps } from './textarea'
 import { Button } from './button'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
+import { useWhisperDictation } from '@/hooks/useWhisperDictation'
 
 
 export interface SpeechTextareaProps extends TextareaProps {}
 
 const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps>(
   ({ className, value, onChange, ...props }, ref) => {
-    const [isListening, setIsListening] = React.useState(false)
-    const [isSupported, setIsSupported] = React.useState(true)
+    const [isListening, setIsListening] = React.useState(false)        // Web Speech (fallback)
+    const [webSpeechSupported, setWebSpeechSupported] = React.useState(false)
     const recognitionRef = React.useRef<SpeechRecognition | null>(null)
     const innerRef = React.useRef<HTMLTextAreaElement>(null)
 
     // Sincronizar ref externa
     React.useImperativeHandle(ref, () => innerRef.current!)
+
+    // Refs estables para que el appender no se recree en cada cambio de `value`.
+    const valueRef = React.useRef(value)
+    const onChangeRef = React.useRef(onChange)
+    const nameRef = React.useRef(props.name)
+    valueRef.current = value
+    onChangeRef.current = onChange
+    nameRef.current = props.name
 
     // Auto-ajuste de altura (al cambiar valor externamente, ej: AI)
     React.useEffect(() => {
@@ -27,49 +36,44 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       }
     }, [value])
 
-    const handleTranscript = React.useCallback((text: string) => {
-      const currentValue = String(value || '')
-      // Concatenar con un espacio si no está vacío
-      const newValue = currentValue.trim()
-        ? `${currentValue} ${text}`
-        : text
-
-      // Crear evento sintético compatible con React
+    // Agrega texto reconocido al valor actual (sintetiza un onChange compatible con React).
+    const appendText = React.useCallback((text: string) => {
+      const current = String(valueRef.current || '')
+      const newValue = current.trim() ? `${current} ${text}` : text
       const event = {
-        target: { value: newValue, name: props.name },
-        currentTarget: { value: newValue, name: props.name }
+        target: { value: newValue, name: nameRef.current },
+        currentTarget: { value: newValue, name: nameRef.current },
       } as React.ChangeEvent<HTMLTextAreaElement>
+      onChangeRef.current?.(event)
+    }, [])
 
-      onChange?.(event)
-    }, [value, onChange, props.name])
+    // ── Dictado preciso: grabación + Groq Whisper (preferido) ──
+    const whisper = useWhisperDictation(appendText)
 
+    // ── Web Speech API (fallback si el navegador no soporta grabación/Whisper) ──
     React.useEffect(() => {
       if (typeof window === 'undefined') return
+      if (whisper.supported) return // Whisper preferido → no montar Web Speech
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       if (!SpeechRecognition) {
-        setIsSupported(false)
+        setWebSpeechSupported(false)
         return
       }
+      setWebSpeechSupported(true)
 
       const recognition = new SpeechRecognition()
-      recognition.continuous = true // Permitir dictado continuo hasta que el usuario pare
-      recognition.interimResults = true // Necesario para que Android no cierre prematuramente
-      recognition.lang = 'es-ES'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'es-CL' // español de Chile (antes es-ES)
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let newText = ''
-        // Iterar solo sobre los nuevos resultados
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i]!
-          if (result.isFinal) {
-            newText += result[0]!.transcript + ' '
-          }
+          if (result.isFinal) newText += result[0]!.transcript + ' '
         }
-        
-        if (newText) {
-          handleTranscript(newText.trim())
-        }
+        if (newText) appendText(newText.trim())
       }
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -80,23 +84,14 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
         }
       }
 
-      recognition.onend = () => {
-        setIsListening(false)
-      }
-
+      recognition.onend = () => setIsListening(false)
       recognitionRef.current = recognition
-    }, [handleTranscript])
+    }, [appendText, whisper.supported])
 
-    const toggleListening = (e: React.MouseEvent) => {
-      e.preventDefault() // Evitar submit del form
+    const toggleWebSpeech = () => {
       if (!recognitionRef.current) return
-
       if (isListening) {
-        try {
-          recognitionRef.current.stop()
-        } catch {
-          // Ignorar error si ya estaba detenido
-        }
+        try { recognitionRef.current.stop() } catch { /* ya detenido */ }
         setIsListening(false)
       } else {
         try {
@@ -109,13 +104,24 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       }
     }
 
+    const useWhisper = whisper.supported
+    const showButton = useWhisper || webSpeechSupported
+    const busy = whisper.isTranscribing
+    const active = useWhisper ? whisper.isRecording : isListening
+
+    const handleMicClick = (e: React.MouseEvent) => {
+      e.preventDefault() // Evitar submit del form
+      if (busy) return
+      if (useWhisper) whisper.toggle()
+      else toggleWebSpeech()
+    }
+
     return (
       <div className="relative">
         <Textarea
           ref={innerRef}
           value={value}
           onChange={(e) => {
-            // Ajuste inmediato al escribir
             e.target.style.height = 'auto'
             e.target.style.height = `${e.target.scrollHeight}px`
             onChange?.(e)
@@ -123,22 +129,33 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
           className={cn("pr-12 resize-none overflow-hidden", className)}
           {...props}
         />
-        {isSupported && (
+        {showButton && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className={cn(
               "absolute right-2 top-2 h-8 w-8 p-0 rounded-full",
-              isListening 
-                ? "bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 animate-pulse" 
-                : "text-muted-foreground hover:text-foreground"
+              busy
+                ? "text-sky-500"
+                : active
+                ? "bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 animate-pulse"
+                : "text-muted-foreground hover:text-foreground",
             )}
-            onClick={toggleListening}
-            title={isListening ? "Detener dictado" : "Dictar por voz"}
+            onClick={handleMicClick}
+            disabled={busy}
+            title={
+              busy
+                ? "Transcribiendo…"
+                : active
+                ? (useWhisper ? "Detener y transcribir" : "Detener dictado")
+                : whisper.error || (useWhisper ? "Grabar y transcribir por voz" : "Dictar por voz")
+            }
           >
-            {isListening ? (
-              <StopCircle className="h-4 w-4 animate-pulse fill-current" /> 
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : active ? (
+              <StopCircle className="h-4 w-4 animate-pulse fill-current" />
             ) : (
               <Mic className="h-4 w-4" />
             )}

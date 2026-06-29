@@ -164,6 +164,33 @@ export interface MaintenanceLogEntry {
   incidenciaId?: string
   proximaInspeccion?: string // ISO date
   checklist?: ChecklistResultado[] // resultados del protocolo de inspección por familia
+  // ── Captura Rápida por área (Análisis de Turno · Fase 3) ──
+  // Enriquecen la entrada para agregar por planta/área/turno en la Lente de
+  // Mantención (líneas sin Grader/Shoplogix: Acopio, Riles). Opcionales: las
+  // entradas NFPA 70B clásicas (por equipo) no los traen.
+  plantLineId?: string  // ej. 'acopio-general' — línea/área del módulo Análisis
+  areaNodeId?: string   // nodo de jerarquía 'area' (cuando esté linkeado)
+  shiftId?: string      // turno en que se registró (best-effort: 'Turno día'/'Turno noche')
+  origen?: 'captura_rapida' | 'ficha_nfpa' | 'incidencia' // de dónde nació la entrada
+  // ── Trazabilidad SAP ── Si falta `sapOrden` ⇒ "SAP pendiente" (falta crear la OT en SAP).
+  sapAviso?: string     // N° de aviso SAP
+  sapOrden?: string     // N° de orden de trabajo (OT) SAP
+  createdAt: Date
+}
+
+// Paro de etapa de la línea (colección plana `paros`) — captura MANUAL de
+// detenciones de las etapas NO instrumentadas (bombeo, chiller, cintas, Marel,
+// corte…). Base para cuantificar la DISPONIBILIDAD del área (Pareto por etapa)
+// sin telemetría. Ver docs/OEE_AREA_ROADMAP.md (Fase B).
+export interface ParoEtapa {
+  id: string
+  plantLineId: string   // línea/área del módulo Análisis (ej. 'chonchi-eviscerado')
+  etapa: string         // etapa que se detuvo (ej. 'Bombeo', 'Chiller', 'Cinta elevadora')
+  duracionMin: number   // duración del paro en minutos
+  causa: string         // por qué se detuvo
+  fecha: Date
+  tecnico?: string
+  shiftId?: string      // turno (best-effort)
   createdAt: Date
 }
 

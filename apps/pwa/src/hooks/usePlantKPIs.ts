@@ -1,15 +1,13 @@
 /**
- * usePlantKPIs / usePlantKPIsForPeriod
+ * usePlantKPIs / usePlantKPIsForPeriod — hooks React del board "Indicadores de
+ * Rendimiento" (Análisis de Turno).
  *
- * OEE = Disponibilidad × Rendimiento × Calidad
- *   A = shiftRuntime promedio de las Baaders
- *   P = overallRatio promedio (capped 1.0)
- *   Q = 1 − P0Pct (solo si hay Grader data)
+ * Las FÓRMULAS (OEE = Disponibilidad×Rendimiento×Calidad, MTTR/MTBF de averías
+ * macro) viven en `services/grader/plantKpiCompute` — fuente única compartida con
+ * el servicio `turnoKpis` que alimenta a ARIA, para que el chatbot reporte los
+ * MISMOS números que el board.
  *
- * MTTR = Σ durationSec de eventos downtime / n_paros  (min)
- * MTBF = uptimeSec total / n_paros                    (horas)
- *
- * usePlantKPIsForPeriod agrega múltiples turnos para Día/Semana/Mes.
+ * usePlantKPIs: un turno auto-detectado. usePlantKPIsForPeriod: agrega Día/Semana/Mes.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -17,49 +15,18 @@ import {
   listShoplogixShiftIdsForDay,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
+import { avg, computeMachineKPI, aggregateShifts } from '@/services/grader/plantKpiCompute'
+import type { MachineKPI, PlantKPIs } from '@/services/grader/plantKpiCompute'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from '@/services/grader/types'
 
+// Re-export para consumidores que importaban estos tipos desde el hook.
+export type { MachineKPI, PlantKPIs }
+
 // ── Tipos públicos ────────────────────────────────────────────────────────────
 
 export type KpiPeriod = 'day' | 'week' | 'month'
-
-export interface MachineKPI {
-  machineid: string
-  machineName: string
-  availability: number
-  performance: number
-  mttrMin: number
-  mtbfHours: number
-  failureCount: number
-  shoplogixTargetCpm: number | null
-  /** Total de ciclos de la máquina en el período. Útil para detectar
-   *  períodos sin producción real donde A/P son matemáticamente válidos
-   *  pero no representan un día productivo. */
-  totalCycles: number
-}
-
-export interface PlantKPIs {
-  dateKey: string
-  shiftId: string
-  /** Etiqueta legible del período: "lun 29 abr", "22–28 abr", "Abril 2026" */
-  periodLabel: string
-  /** Turnos agregados en este período */
-  shiftsCount: number
-  /** null = sin datos Shoplogix (solo Grader) */
-  availability: number | null
-  /** null = sin datos Shoplogix (solo Grader) */
-  performance: number | null
-  quality: number | null
-  oee: number | null
-  mttrMin: number
-  mtbfHours: number
-  failureCount: number
-  machines: MachineKPI[]
-  /** true cuando solo hay calidad Grader, sin datos Shoplogix */
-  graderOnly?: boolean
-}
 
 export interface UsePlantKPIsResult {
   loading: boolean
@@ -69,10 +36,6 @@ export interface UsePlantKPIsResult {
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
 
-function avg(arr: number[]): number {
-  return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
-}
-
 function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
 }
@@ -81,112 +44,6 @@ const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
-
-function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
-  const downtimes    = m.states.filter((s) => s.type === 'downtime')
-  const uptimeSec    = m.shiftRuntimeBreakdown.uptimeSec
-  const totalDtSec   = downtimes.reduce((a, s) => a + s.durationSec, 0)
-  const firstInterval = m.intervals.find((iv) => iv.expectedCycles > 0)
-  return {
-    machineid:          m.machineid,
-    machineName:        m.machineName,
-    availability:       m.shiftRuntime,
-    performance:        Math.min(1, m.overallRatio),
-    mttrMin:            downtimes.length > 0 ? totalDtSec / downtimes.length / 60 : 0,
-    mtbfHours:          downtimes.length > 0 ? uptimeSec / downtimes.length / 3600 : uptimeSec / 3600,
-    failureCount:       downtimes.length,
-    shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
-    totalCycles:        m.totalCycles ?? 0,
-  }
-}
-
-/** Agrega un array de {dateKey, shiftId, machines} en un PlantKPIs único. */
-function aggregateShifts(
-  shifts: { dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[],
-  periodLabel: string,
-  graderSummaries: GraderDailySummary[],
-): PlantKPIs | null {
-  if (shifts.length === 0) return null
-
-  // Agrupar instancias de cada máquina a lo largo de los turnos
-  const byMachine = new Map<string, { machine: UpstreamMachineShift; dateKey: string; shiftId: string }[]>()
-  for (const s of shifts) {
-    for (const m of s.machines) {
-      const list = byMachine.get(m.machineName) ?? []
-      list.push({ machine: m, dateKey: s.dateKey, shiftId: s.shiftId })
-      byMachine.set(m.machineName, list)
-    }
-  }
-
-  const machineKPIs: MachineKPI[] = []
-  for (const [, entries] of byMachine) {
-    const ms = entries.map(e => e.machine)
-    const allDowntimes  = ms.flatMap(m => m.states.filter(s => s.type === 'downtime'))
-    const totalDtSec    = allDowntimes.reduce((a, s) => a + s.durationSec, 0)
-    const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
-    const nFailures     = allDowntimes.length
-    const firstInterval = ms[0]?.intervals.find(iv => iv.expectedCycles > 0)
-    machineKPIs.push({
-      machineid:          ms[0]!.machineid,
-      machineName:        ms[0]!.machineName,
-      availability:       avg(ms.map(m => m.shiftRuntime)),
-      performance:        Math.min(1, avg(ms.map(m => m.overallRatio))),
-      mttrMin:            nFailures > 0 ? totalDtSec / nFailures / 60 : 0,
-      mtbfHours:          nFailures > 0 ? totalUptimeSec / nFailures / 3600 : totalUptimeSec / 3600,
-      failureCount:       nFailures,
-      shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
-      totalCycles:        ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0),
-    })
-  }
-
-  const availability = avg(machineKPIs.map(m => m.availability))
-  const performance  = avg(machineKPIs.map(m => m.performance))
-
-  // Calidad: promedio de (1 − P0%) de los turnos con Grader data
-  // Mapeo Shoplogix → Grader: "Turno 1" = noche, "Turno 2" = día
-  // Turno 1 puede estar guardado en Grader bajo el día ANTERIOR (cruza medianoche)
-  const SLX_TO_GRADER: Record<string, string> = {
-    'Turno 1': 'Turno noche',
-    'Turno 2': 'Turno día',
-    'Turno noche': 'Turno noche',
-    'Turno día':   'Turno día',
-  }
-  function prevDay(dk: string): string {
-    const d = new Date(`${dk}T12:00:00`)
-    d.setDate(d.getDate() - 1)
-    return d.toISOString().slice(0, 10)
-  }
-  function findGraderSummary(s: { dateKey: string; shiftId: string }): GraderDailySummary | undefined {
-    const graderShiftId = SLX_TO_GRADER[s.shiftId] ?? s.shiftId
-    // Busca en el mismo día; si es turno noche, también en el día anterior
-    return graderSummaries.find(g => g.dateKey === s.dateKey && g.shiftId === graderShiftId)
-      ?? (graderShiftId === 'Turno noche'
-        ? graderSummaries.find(g => g.dateKey === prevDay(s.dateKey) && g.shiftId === 'Turno noche')
-        : undefined)
-  }
-  const qualityValues = shifts
-    .map(s => findGraderSummary(s))
-    .filter((g): g is GraderDailySummary => g !== undefined && typeof g.pointZeroPct === 'number')
-    .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
-  const quality = qualityValues.length > 0 ? avg(qualityValues) : null
-  const oee     = quality !== null ? availability * performance * quality : null
-
-  const first = shifts[0]!
-  return {
-    dateKey:      first.dateKey,
-    shiftId:      first.shiftId,
-    periodLabel,
-    shiftsCount:  shifts.length,
-    availability,
-    performance,
-    quality,
-    oee,
-    mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
-    mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
-    failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
-    machines:     machineKPIs,
-  }
-}
 
 /** Genera lista de dateKeys para el período dado. */
 function getDateKeys(period: KpiPeriod, anchor: string, currentMonth: Date): string[] {
@@ -299,6 +156,8 @@ export function usePlantKPIs(
           mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
           mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
           failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
+          microCount:   machineKPIs.reduce((a, m) => a + m.microCount, 0),
+          microMin:     machineKPIs.reduce((a, m) => a + m.microMin, 0),
           machines:     machineKPIs,
         }
         if (!cancelled) setState({ loading: false, error: null, kpis })
@@ -338,8 +197,6 @@ type SlxLoad =
  *      plantSlug / period / anchorDateKey / currentMonth.
  *   2. useMemo: agrega calidad (Q = 1 − P0%) desde graderSummaries. Se
  *      re-ejecuta cuando llegan nuevos summaries SIN re-fetchear Shoplogix.
- *      Esto resuelve la race condition donde Q llegaba como null porque
- *      graderSummaries aún estaba vacío cuando el effect corrió.
  */
 export function usePlantKPIsForPeriod(
   plantSlug: PlantSlug,
@@ -429,7 +286,7 @@ export function usePlantKPIsForPeriod(
           dateKey: anchor, shiftId: '', periodLabel: label,
           shiftsCount: graderForPeriod.length,
           availability: null, performance: null, quality, oee: null,
-          mttrMin: 0, mtbfHours: 0, failureCount: 0, machines: [],
+          mttrMin: 0, mtbfHours: 0, failureCount: 0, microCount: 0, microMin: 0, machines: [],
           graderOnly: true,
         },
       }

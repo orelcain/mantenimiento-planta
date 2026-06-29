@@ -6,9 +6,9 @@
  * - Mes:    mes visible en el calendario.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
-import { TrendingUp, AlertTriangle } from 'lucide-react'
+import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
@@ -90,12 +90,12 @@ function barWidth(v: number | null, max = 1): string {
 // ── Tooltips ──────────────────────────────────────────────────────────────────
 
 const DEFS = {
-  oee:     { desc: 'Mide el % del tiempo planificado en que la planta produce a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial' },
+  oee:     { desc: 'OEE de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nMide el % del tiempo planificado en que las Baader producen a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n(A·R de las Baader · Q = calidad del Grader)\n\nNO incluye: bombeo, chiller, desangrador, cintas, Marel, corte ni etiquetado.\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial\n(el 85% es para una máquina/cuello de botella, no para un OEE de línea).' },
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
-  mttr:    { desc: 'Duración promedio de cada paro.\n\nMTTR = Σ duración / N° paros\n\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
-  mtbf:    { desc: 'Tiempo promedio entre paros.\n\nMTBF = Uptime / N° paros\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
+  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (paro relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
+  mtbf:    { desc: 'Tiempo medio entre averías macro.\n\nMTBF = Uptime / N° averías macro\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
 }
 
 // ── KPICard ───────────────────────────────────────────────────────────────────
@@ -158,6 +158,30 @@ export function PlantKPIBoard({
     graderSummaries,
   )
 
+  // Diagnóstico "¿qué Baader arrastra el OEE?" — A×R por máquina (la Calidad es
+  // de línea, no por máquina). Identifica la peor y su pérdida dominante.
+  const machineDiag = useMemo(() => {
+    if (!kpis || kpis.graderOnly) return null
+    const withData = kpis.machines
+      .filter((m) => m.availability !== null && m.performance !== null && (m.totalCycles ?? 0) > 0)
+      .map((m) => {
+        const a = m.availability as number
+        const p = m.performance as number
+        return {
+          id: m.machineid,
+          name: m.machineName,
+          oeeMaq: a * p,
+          dominant: (1 - a) >= (1 - p) ? ('disponibilidad' as const) : ('rendimiento' as const),
+        }
+      })
+    if (withData.length < 2) return null
+    const sorted = [...withData].sort((x, y) => x.oeeMaq - y.oeeMaq)
+    const worst = sorted[0]!
+    const best = sorted[sorted.length - 1]!
+    if (best.oeeMaq - worst.oeeMaq < 0.05) return null // sin diferencia material entre máquinas
+    return { worst }
+  }, [kpis])
+
   if (!enabled) return null
 
   return (
@@ -195,6 +219,10 @@ export function PlantKPIBoard({
             ))}
           </div>
         </div>
+        {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
+        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">
+          Alcance: las 3 Baader (eviscerado de máquina) + calidad del Grader — <b className="font-medium">no toda el área</b>.
+        </p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
@@ -296,8 +324,9 @@ export function PlantKPIBoard({
               />
             </div>
 
-            {/* ── Fila 2: MTTR · MTBF · Paros (ocultar si solo Grader) ── */}
+            {/* ── Fila 2: MTTR · MTBF · Averías macro (ocultar si solo Grader) ── */}
             {!kpis.graderOnly && (
+            <>
             <div className="grid grid-cols-3 gap-1.5">
               <KPICard
                 label="MTTR ↓"
@@ -315,14 +344,35 @@ export function PlantKPIBoard({
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
                 barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
               />
-              <div className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors">
-                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">N° Paros</div>
+              <div
+                className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors"
+                title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
+              >
+                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
                 <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight">
-                  eventos · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
+                  paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
+            {/* Micro-detenciones: se reportan aparte para no inflar el MTTR */}
+            {kpis.microCount > 0 && (
+              <p className="text-[10px] text-muted-foreground/70 leading-tight px-0.5">
+                + {kpis.microCount.toLocaleString('es-CL')} micro-detenciones (&lt;5min, {fmtMin(kpis.microMin)} total) — aparte, no inflan el MTTR.
+              </p>
+            )}
+            </>
+            )}
+
+            {/* Diagnóstico: ¿qué Baader arrastra el OEE? (A×R por máquina) */}
+            {machineDiag && (
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-300/90 bg-amber-500/[0.06] border border-amber-500/20 rounded-md px-2 py-1.5">
+                <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
+                <span>
+                  <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} — OEE máq (A×R) {pct(machineDiag.worst.oeeMaq, 0)} · pérdida dominante:{' '}
+                  <b>{machineDiag.worst.dominant === 'disponibilidad' ? 'Disponibilidad (paros)' : 'Rendimiento (micro-paradas / velocidad)'}</b>.
+                </span>
+              </div>
             )}
 
             {/* ── Detalle por máquina (solo con Shoplogix) ──
@@ -335,12 +385,17 @@ export function PlantKPIBoard({
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
                 const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin paros'
+                const isWorst     = machineDiag?.worst.id === m.machineid
                 return (
                 <div
                   key={m.machineid}
-                  className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
-                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros`}
+                  className={cn(
+                    'flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20',
+                    isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
+                  )}
+                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más arrastra el OEE del grupo' : ''}`}
                 >
+                  {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
                     className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
                     title={`${m.machineName} — Evisceradora Baader 142 N°${idx + 1}`}
