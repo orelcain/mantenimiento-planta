@@ -31,7 +31,6 @@ import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import type { User, UserRole, Zone } from '@/types'
 import { getUserById } from '@/services/auth'
 import { MobileHomeGrid } from '@/components/home/MobileHomeGrid'
-import { AriaAvisaCard } from '@/components/home/AriaAvisaCard'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -258,9 +257,6 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       )}
-
-      {/* ARIA te avisa — KPIs de turno fuera de umbral (proactivo) */}
-      <AriaAvisaCard />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
