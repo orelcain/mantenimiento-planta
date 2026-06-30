@@ -6,7 +6,7 @@
  * availColor, etc.). Aquí se centralizan para que los AVISOS PROACTIVOS de ARIA
  * (`proactiveAlerts`) disparen exactamente con el mismo criterio con que la app pinta
  * un KPI en amarillo/rojo — regla del CLAUDE.md: un concepto se evalúa igual en todos
- * lados. (Pendiente: migrar también `PlantKPIBoard` a estas constantes.)
+ * lados. `PlantKPIBoard` también colorea (texto y barras) leyendo de aquí.
  *
  * Semáforo del board, traducido a alerta:
  *   - 🟢 verde  → 'good'     (no alerta)
@@ -35,6 +35,13 @@ export const KPI_CUTOFFS = {
   // MTBF (h, mayor es mejor): 🟢≥2 · 🟡≥1 · 🔴<1
   mtbfHours: { warnBelow: 2, critBelow: 1 },
 } as const
+
+/**
+ * Corte EXTRA del OEE que SOLO usa el board (no los avisos): por encima de este valor el
+ * OEE se pinta 🟢 "clase mundial" (emerald); entre `KPI_CUTOFFS.oee.warnBelow` (0.65) y este,
+ * 🔵 "aceptable" (sky, NO alerta). Los avisos proactivos no distinguen este tramo extra.
+ */
+export const OEE_GOOD = 0.85
 
 /** Tono para KPIs donde MÁS ALTO es mejor. `null`/no-finito → 'good' (sin dato, no alerta). */
 export function toneHigherBetter(v: number | null | undefined, warnBelow: number, critBelow: number): KpiTone {
