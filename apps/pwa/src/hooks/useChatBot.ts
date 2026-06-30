@@ -10,6 +10,7 @@ import { getAllAgents, type AIAgent } from '@/services/aiAgents'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { showLocalNotification, areNotificationsEnabled } from '@/services/notifications'
+import { getKpiTurnoAlerts, formatKpiAlertsMessage } from '@/services/aria/proactiveAlerts'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissionsStore } from '@/store/permissionsStore'
 
@@ -200,6 +201,30 @@ export function useChatBot() {
             tag: 'aria-proactive',
           })
           setHasUnread(true)
+        }
+      }
+
+      // #5b — KPIs de turno fuera de umbral (OEE/disponibilidad/MTTR/MTBF). Una vez al
+      // día: marca el chequeo aunque no haya avisos, para no releer Firestore en cada apertura.
+      const kpiAlertKey = `aria_kpialert_${userId}_${new Date().toISOString().slice(0, 10)}`
+      if (!localStorage.getItem(kpiAlertKey)) {
+        const kpiAlerts = await getKpiTurnoAlerts('chonchi')
+        localStorage.setItem(kpiAlertKey, '1')
+        const kpiMsg = formatKpiAlertsMessage(kpiAlerts)
+        if (kpiMsg) {
+          setMessages(prev => [...prev, {
+            id: generateId(),
+            role: 'assistant',
+            content: kpiMsg,
+            timestamp: new Date(),
+          }])
+          if (!isOpenRef.current && areNotificationsEnabled()) {
+            showLocalNotification('ARIA — KPIs del turno', {
+              body: kpiMsg.replace(/[*#_`]/g, '').slice(0, 200),
+              tag: 'aria-kpi',
+            })
+            setHasUnread(true)
+          }
         }
       }
 
