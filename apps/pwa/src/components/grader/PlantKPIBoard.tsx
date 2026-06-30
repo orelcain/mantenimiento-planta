@@ -14,6 +14,7 @@ import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 
 interface Props {
   plantSlug: PlantSlug
@@ -46,39 +47,42 @@ function fmtHours(v: number): string {
 
 // ── Colores ───────────────────────────────────────────────────────────────────
 
+// Cortes de color centralizados en `kpiThresholds` (misma fuente que los avisos de ARIA).
+// OEE tiene un 4º tono "sky" (aceptable, no alerta) entre OEE_GOOD y oee.warnBelow.
+
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= 0.85) return 'text-emerald-400'
-  if (v >= 0.65) return 'text-sky-400'
-  if (v >= 0.50) return 'text-amber-400'
+  if (v >= OEE_GOOD) return 'text-emerald-400'
+  if (v >= KPI_CUTOFFS.oee.warnBelow) return 'text-sky-400'
+  if (v >= KPI_CUTOFFS.oee.critBelow) return 'text-amber-400'
   return 'text-rose-400'
 }
 
 function availColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= 0.85) return 'text-emerald-400'
-  if (v >= 0.70) return 'text-amber-400'
+  if (v >= KPI_CUTOFFS.availability.warnBelow) return 'text-emerald-400'
+  if (v >= KPI_CUTOFFS.availability.critBelow) return 'text-amber-400'
   return 'text-rose-400'
 }
 
 function perfColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
-  if (v >= 0.90) return 'text-emerald-400'
-  if (v >= 0.75) return 'text-amber-400'
+  if (v >= KPI_CUTOFFS.performance.warnBelow) return 'text-emerald-400'
+  if (v >= KPI_CUTOFFS.performance.critBelow) return 'text-amber-400'
   return 'text-rose-400'
 }
 
 function mttrColor(min: number): string {
   if (min === 0) return 'text-muted-foreground'
-  if (min <= 5)  return 'text-emerald-400'
-  if (min <= 15) return 'text-amber-400'
+  if (min <= KPI_CUTOFFS.mttrMin.warnAbove) return 'text-emerald-400'
+  if (min <= KPI_CUTOFFS.mttrMin.critAbove) return 'text-amber-400'
   return 'text-rose-400'
 }
 
 function mtbfColor(h: number): string {
   if (h === 0)  return 'text-muted-foreground'
-  if (h >= 2)   return 'text-emerald-400'
-  if (h >= 1)   return 'text-amber-400'
+  if (h >= KPI_CUTOFFS.mtbfHours.warnBelow) return 'text-emerald-400'
+  if (h >= KPI_CUTOFFS.mtbfHours.critBelow) return 'text-amber-400'
   return 'text-rose-400'
 }
 
@@ -283,7 +287,7 @@ export function PlantKPIBoard({
                 valueColor={oeeColor(kpis.oee)}
                 barValue={kpis.oee}
                 barColor={kpis.oee !== null
-                  ? (kpis.oee >= 0.85 ? 'bg-emerald-500' : kpis.oee >= 0.65 ? 'bg-sky-500' : kpis.oee >= 0.5 ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.oee >= OEE_GOOD ? 'bg-emerald-500' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-sky-500' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : 'bg-muted'}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (plantSlug === 'yal' ? 'A·P solamente' : 'Sin Q') : undefined}
               />
@@ -294,7 +298,7 @@ export function PlantKPIBoard({
                 valueColor={availColor(kpis.availability)}
                 barValue={kpis.availability}
                 barColor={kpis.availability !== null
-                  ? (kpis.availability >= 0.85 ? 'bg-emerald-500' : kpis.availability >= 0.70 ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.availability >= KPI_CUTOFFS.availability.warnBelow ? 'bg-emerald-500' : kpis.availability >= KPI_CUTOFFS.availability.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -305,7 +309,7 @@ export function PlantKPIBoard({
                 valueColor={perfColor(kpis.performance)}
                 barValue={kpis.performance}
                 barColor={kpis.performance !== null
-                  ? (kpis.performance >= 0.90 ? 'bg-emerald-500' : kpis.performance >= 0.75 ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.performance >= KPI_CUTOFFS.performance.warnBelow ? 'bg-emerald-500' : kpis.performance >= KPI_CUTOFFS.performance.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -314,11 +318,11 @@ export function PlantKPIBoard({
                 tooltip={DEFS.quality.desc}
                 value={kpis.quality !== null ? pct(kpis.quality) : 'N/A'}
                 valueColor={kpis.quality !== null
-                  ? (kpis.quality >= 0.95 ? 'text-emerald-400' : kpis.quality >= 0.85 ? 'text-amber-400' : 'text-rose-400')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'text-emerald-400' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'text-amber-400' : 'text-rose-400')
                   : 'text-muted-foreground'}
                 barValue={kpis.quality}
                 barColor={kpis.quality !== null
-                  ? (kpis.quality >= 0.95 ? 'bg-emerald-500' : kpis.quality >= 0.85 ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-emerald-500' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : undefined}
                 note={kpis.quality === null ? (plantSlug === 'yal' ? 'No clasifica' : 'Sin Grader') : undefined}
               />
@@ -334,7 +338,7 @@ export function PlantKPIBoard({
                 value={fmtMin(kpis.mttrMin)}
                 valueColor={mttrColor(kpis.mttrMin)}
                 barValue={kpis.mttrMin > 0 ? Math.min(1, kpis.mttrMin / 30) : null}
-                barColor={kpis.mttrMin <= 5 ? 'bg-emerald-500' : kpis.mttrMin <= 15 ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.mttrMin <= KPI_CUTOFFS.mttrMin.warnAbove ? 'bg-emerald-500' : kpis.mttrMin <= KPI_CUTOFFS.mttrMin.critAbove ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
                 label="MTBF ↑"
@@ -342,7 +346,7 @@ export function PlantKPIBoard({
                 value={fmtHours(kpis.mtbfHours)}
                 valueColor={mtbfColor(kpis.mtbfHours)}
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
-                barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <div
                 className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors"
