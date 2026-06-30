@@ -46,6 +46,11 @@ import { aggregateAttribution, type AggregatedAttribution } from '@/services/gra
 import type { GraderDailySummary } from '@/services/grader/types'
 import { PauseKpiDashboard } from '@/components/grader/PauseKpiDashboard'
 import { MaintenanceImpactCard } from '@/components/grader/MaintenanceImpactCard'
+import { MaintenanceWorkCard } from '@/components/grader/MaintenanceWorkCard'
+import { useAppStore } from '@/store'
+import { getExecutions, getOverdueTasks } from '@/services/preventive'
+import { computeMaintenanceWork } from '@/services/grader/maintenanceWork'
+import type { PreventiveExecution } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -85,6 +90,27 @@ export function AnalisisGraderPeriodoPage() {
 
   // Resúmenes del rango — alimentan las cards de Impacto de Mantención y Tiempo muerto.
   const [allSummaries, setAllSummaries] = useState<GraderDailySummary[]>([])
+
+  // Trabajo de Mantención (TPM): incidencias (del store) + preventivas (cumplidas/vencidas).
+  const incidents = useAppStore((s) => s.incidents)
+  const [executions, setExecutions] = useState<PreventiveExecution[]>([])
+  const [overdueCount, setOverdueCount] = useState(0)
+  const [workReady, setWorkReady] = useState(false)
+  useEffect(() => {
+    let active = true
+    Promise.all([getExecutions().catch(() => [] as PreventiveExecution[]), getOverdueTasks().catch(() => [])])
+      .then(([exes, overdue]) => {
+        if (!active) return
+        setExecutions(exes)
+        setOverdueCount(overdue.length)
+        setWorkReady(true)
+      })
+    return () => { active = false }
+  }, [])
+  const work = useMemo(
+    () => (workReady ? computeMaintenanceWork(incidents, executions, overdueCount, { start: range.start, end: range.end }) : null),
+    [workReady, incidents, executions, overdueCount, range],
+  )
 
   // Cargar benchmark una sola vez al montar
   useEffect(() => {
@@ -399,7 +425,11 @@ export function AnalisisGraderPeriodoPage() {
             summaries={allSummaries}
             periodLabel={range.label}
             rangeLabel={`${range.start} → ${range.end}`}
+            work={work}
           />
+
+          {/* ── Trabajo de Mantención (TPM): correctivo → causa raíz → prevención ── */}
+          <MaintenanceWorkCard work={work} />
 
           {/* ── Tiempo muerto del período ──────────────────────────────── */}
           <PauseKpiDashboard summaries={allSummaries} />
