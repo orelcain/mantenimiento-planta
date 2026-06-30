@@ -13,7 +13,6 @@ import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
-import { AriaAvisaCard } from './AriaAvisaCard'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -443,9 +442,6 @@ export function MobileHomeGrid() {
           {ROLE_LABEL[role]}
         </span>
       </div>
-
-      {/* ARIA te avisa — avisos proactivos (KPI/preventiva/equipo/incidencia) */}
-      <AriaAvisaCard />
 
       {/* Grupos */}
       {groups.map((group) => {

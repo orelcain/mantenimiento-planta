@@ -158,7 +158,7 @@ export function formatAlertsMessage(alerts: AriaAlert[]): string | null {
   return [
     `⚠️ **Atención — ${plural(alerts.length, 'aviso', 'avisos')} de Mantención**`,
     lines.join('\n') + more,
-    `Toca un aviso en el panel para ir al detalle.`,
+    `Pregúntame por cualquiera si quieres el detalle.`,
   ].join('\n')
 }
 
