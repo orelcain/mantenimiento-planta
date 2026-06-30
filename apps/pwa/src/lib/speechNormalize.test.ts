@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeForSpeech, numToWordsEs, plainForSpeech } from './speechNormalize'
+import { normalizeForSpeech, numToWordsEs, plainForSpeech, splitForTTS } from './speechNormalize'
 
 describe('numToWordsEs', () => {
   it('rango común de conteos y minutos', () => {
@@ -51,5 +51,33 @@ describe('plainForSpeech', () => {
   it('quita markdown inline, links y bloque de sugerencias', () => {
     expect(plainForSpeech('Listo.\n[SUGERENCIAS]: a, b')).toBe('Listo.')
     expect(plainForSpeech('La **bomba** en `mantención`.')).toBe('La bomba en mantención.')
+  })
+})
+
+describe('splitForTTS', () => {
+  it('separa por frases (. ! ? …) conservando el cierre', () => {
+    expect(splitForTTS('Revisé la bomba principal. Está en condición dos. Conviene cambiar el rodamiento.'))
+      .toEqual(['Revisé la bomba principal.', 'Está en condición dos.', 'Conviene cambiar el rodamiento.'])
+  })
+  it('une fragmentos muy cortos al trozo previo (no corta la prosodia)', () => {
+    // "Sí." es <18 chars → se pega a la frase siguiente.
+    expect(splitForTTS('Sí. Revisa la bomba 720004607 esta semana.'))
+      .toEqual(['Sí. Revisa la bomba 720004607 esta semana.'])
+    // Varias frases cortas seguidas se agrupan en un solo trozo.
+    expect(splitForTTS('Hola. ¿Cómo vas? Bien!')).toEqual(['Hola. ¿Cómo vas? Bien!'])
+  })
+  it('parte frases muy largas por comas para que el 1er trozo sea corto', () => {
+    const larga = 'En el turno hay cuatro incidencias abiertas, tres de prioridad media y una baja, ' +
+      'el OEE fue de setenta por ciento, la disponibilidad noventa y uno por ciento y el MTTR un minuto cuarenta.'
+    const out = splitForTTS(larga, 80)
+    expect(out.length).toBeGreaterThan(1)
+    expect(out.every((s) => s.length <= 100)).toBe(true) // acotado (no exacto: corta en límites de coma)
+    expect(out.join(' ')).toContain('cuatro incidencias abiertas')
+  })
+  it('sin puntuación devuelve el texto entero como único trozo', () => {
+    expect(splitForTTS('hola que tal')).toEqual(['hola que tal'])
+  })
+  it('texto vacío no rompe', () => {
+    expect(splitForTTS('')).toEqual([''])
   })
 })

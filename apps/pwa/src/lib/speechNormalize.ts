@@ -104,6 +104,42 @@ export function plainForSpeech(text: string): string {
   return s.replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '. ').replace(/\.\s*\.+/g, '.').trim()
 }
 
+/**
+ * Trocea texto YA normalizado en frases para reproducir el TTS EN CADENA. Esto baja
+ * mucho la latencia percibida: se sintetiza y suena la 1ª frase (~1-2 s) mientras se
+ * precargan las siguientes, en vez de esperar a sintetizar toda la respuesta (con
+ * Chirp-HD-F una respuesta larga tardaba 10-15 s en empezar a sonar).
+ *
+ * - Une fragmentos muy cortos (<18 chars) al anterior para no cortar la prosodia.
+ * - Parte frases muy largas (> maxLen) por comas para acotar la 1ª espera.
+ * Devuelve siempre al menos un trozo (el texto entero si no hay puntuación).
+ */
+export function splitForTTS(text: string, maxLen = 200): string[] {
+  const pieces = (text.match(/[^.!?…\n]+[.!?…]*/g) || [text])
+    .map((s) => s.trim())
+    .filter(Boolean)
+  // 1) une fragmentos minúsculos al trozo previo (p.ej. "Sí." + "Revisa la bomba.")
+  const merged: string[] = []
+  for (const p of pieces) {
+    const prev = merged[merged.length - 1]
+    if (prev && (p.length < 18 || prev.length < 18)) merged[merged.length - 1] = `${prev} ${p}`
+    else merged.push(p)
+  }
+  // 2) parte frases largas por comas para que el 1er trozo sea corto = sintetiza rápido
+  const out: string[] = []
+  for (const s of merged) {
+    if (s.length <= maxLen) { out.push(s); continue }
+    let buf = ''
+    for (const seg of s.split(/,\s*/)) {
+      const cand = buf ? `${buf}, ${seg}` : seg
+      if (cand.length > maxLen && buf) { out.push(buf); buf = seg }
+      else buf = cand
+    }
+    if (buf) out.push(buf)
+  }
+  return out.length ? out : [text.trim() || text]
+}
+
 /** Convierte dígitos/símbolos/acrónimos a su forma hablada en español. */
 export function normalizeForSpeech(text: string): string {
   let s = text

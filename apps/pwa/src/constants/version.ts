@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.79.0' as const
+export const APP_VERSION = '3.80.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-06-29' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader): detección de turno vivo wall-clock-as-UTC + tests verdes' as const
+export const VERSION_NAME = 'perf(voz): TTS de ARIA por frases en cadena (1ª frase ~1.4s vs 5-15s)' as const
 
 /**
  * Nota:
