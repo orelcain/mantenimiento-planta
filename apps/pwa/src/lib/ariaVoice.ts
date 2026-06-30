@@ -8,7 +8,7 @@
  * ARIA es mujer: se excluyen voces masculinas en ambos motores.
  */
 import { getAriaConfig } from '@/services/ariaThinkingTracker'
-import { normalizeForSpeech, plainForSpeech } from '@/lib/speechNormalize'
+import { normalizeForSpeech, plainForSpeech, splitForTTS } from '@/lib/speechNormalize'
 
 export interface VoicePref {
   voiceURI?: string
@@ -26,6 +26,9 @@ const GOOGLE_TTS_KEY =
 
 let pref: VoicePref = { rate: 1.0 }
 let currentAudio: HTMLAudioElement | null = null
+// Secuencia de habla: cada speak()/stopSpeaking() la incrementa. La cadena de frases
+// en curso compara su número; si cambió, abandona (la superó otra orden o un stop).
+let speakSeq = 0
 
 // Voz neuronal por defecto de ARIA en producción (Google Cloud, español latino, femenina).
 // Elegida por Orel comparando contra la voz local Chatterbox: Chirp-HD-F a 0.96 (enérgica
@@ -224,10 +227,29 @@ export function isGcloudVoice(uri?: string): boolean {
   return !!uri && uri.startsWith(GCLOUD_PREFIX)
 }
 
-async function speakGoogle(text: string, voiceName: string, rate: number, opts: SpeakOpts): Promise<void> {
-  try {
+// ── Reproducción EN CADENA por frases (baja la latencia) ────────────
+// En vez de sintetizar toda la respuesta antes de sonar (Chirp-HD-F: 5-15 s), se
+// trocea por frases: se reproduce la 1ª en cuanto está (~1-2 s) y se precargan las
+// siguientes mientras suena. Cada motor expone un "fetcher": frase → URL de audio.
+type AudioFetcher = (sentence: string) => Promise<string>
+
+function safeRevoke(url: string): void {
+  try { URL.revokeObjectURL(url) } catch { /* ignore */ }
+}
+
+/** base64 (Google) → Blob URL, para no crear data: URLs gigantes. */
+function b64ToBlobUrl(b64: string, mime: string): string {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+}
+
+/** Fetcher de Google Cloud TTS: sintetiza UNA frase y devuelve su Blob URL. */
+function googleFetcher(voiceName: string, rate: number): AudioFetcher {
+  return async (sentence: string) => {
     const body = {
-      input: { text },
+      input: { text: sentence },
       voice: { languageCode: gLang(voiceName), name: voiceName },
       audioConfig: { audioEncoding: 'MP3', speakingRate: Math.max(0.5, Math.min(2, rate)) },
     }
@@ -235,18 +257,84 @@ async function speakGoogle(text: string, voiceName: string, rate: number, opts: 
       `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_KEY}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     )
-    if (!r.ok) { opts.onerror?.(); return }
+    if (!r.ok) throw new Error(`google tts ${r.status}`)
     const d = (await r.json()) as { audioContent?: string }
-    if (!d.audioContent) { opts.onerror?.(); return }
-    const audio = new Audio('data:audio/mp3;base64,' + d.audioContent)
-    currentAudio = audio
-    audio.onplaying = () => emitSpeaking(true)
-    audio.onended = () => { currentAudio = null; opts.onend?.() }
-    audio.onerror = () => { currentAudio = null; opts.onerror?.() }
-    await audio.play()
-  } catch {
-    opts.onerror?.()
+    if (!d.audioContent) throw new Error('google tts vacío')
+    return b64ToBlobUrl(d.audioContent, 'audio/mp3')
   }
+}
+
+/** Fetcher para servidores locales (Chatterbox/Piper) que devuelven audio por GET. */
+function httpGetFetcher(makeUrl: (sentence: string) => string): AudioFetcher {
+  return async (sentence: string) => {
+    const r = await fetch(makeUrl(sentence))
+    if (!r.ok) throw new Error(`tts ${r.status}`)
+    return URL.createObjectURL(await r.blob())
+  }
+}
+
+/**
+ * Reproduce las frases en orden con un fetch "1 adelante" (precarga la siguiente
+ * mientras suena la actual). Emite "hablando" cuando suena la 1ª frase y onend al
+ * terminar todas. Si la 1ª frase falla antes de sonar nada, llama onFirstFail
+ * (p.ej. Chatterbox caído → caer a Google) sin quedarse mudo.
+ */
+async function playChunks(
+  sentences: string[],
+  fetcher: AudioFetcher,
+  wrapped: SpeakOpts,
+  onFirstFail?: () => void,
+): Promise<void> {
+  const myseq = ++speakSeq
+  let started = false
+  let nextP: Promise<string> | null = fetcher(sentences[0]!)
+  const dropPrefetch = () => { if (nextP) { void nextP.then(safeRevoke).catch(() => {}); nextP = null } }
+  for (let i = 0; i < sentences.length; i++) {
+    let url: string | null = null
+    try { url = nextP ? await nextP : null } catch { url = null }
+    if (myseq !== speakSeq) { if (url) safeRevoke(url); return }            // superado/stop
+    nextP = i + 1 < sentences.length ? fetcher(sentences[i + 1]!) : null     // precarga la siguiente
+    if (!url) {
+      if (i === 0 && !started && onFirstFail) { dropPrefetch(); onFirstFail(); return }
+      continue                                                              // salta una frase fallida del medio
+    }
+    await new Promise<void>((resolve) => {
+      const audio = new Audio(url!)
+      currentAudio = audio
+      audio.onplaying = () => { if (!started) { started = true; emitSpeaking(true) } }
+      audio.onended = () => { safeRevoke(url!); resolve() }
+      audio.onerror = () => { safeRevoke(url!); resolve() }
+      audio.play().catch(() => { safeRevoke(url!); resolve() })
+    })
+    if (myseq !== speakSeq) { dropPrefetch(); return }                      // stop mientras sonaba
+  }
+  if (myseq !== speakSeq) return
+  currentAudio = null
+  wrapped.onend?.()
+}
+
+/** Habla por frases con la Web Speech API (encadena utterances; arregla el corte de Chrome en textos largos). */
+function speakBrowserChunks(sentences: string[], voiceURI: string | undefined, rate: number, wrapped: SpeakOpts): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { wrapped.onerror?.(); return }
+  const myseq = ++speakSeq
+  const v = (voiceURI && !isPiperVoice(voiceURI))
+    ? window.speechSynthesis.getVoices().find((x) => x.voiceURI === voiceURI && !isMaleName(x.name))
+    : undefined
+  const chosen = v || pickDefaultFemaleVoice()
+  let started = false
+  let idx = 0
+  const next = () => {
+    if (myseq !== speakSeq) return
+    if (idx >= sentences.length) { wrapped.onend?.(); return }
+    const u = new SpeechSynthesisUtterance(sentences[idx++]!)
+    if (chosen) { u.voice = chosen; u.lang = chosen.lang } else u.lang = 'es-CL'
+    u.rate = rate
+    u.onstart = () => { if (!started) { started = true; emitSpeaking(true) } }
+    u.onend = () => next()
+    u.onerror = () => next()
+    window.speechSynthesis.speak(u)
+  }
+  next()
 }
 
 // ── Resolución / aplicación (navegador) ─────────────────────────────
@@ -269,6 +357,7 @@ export function applyVoicePref(u: SpeechSynthesisUtterance): void {
 
 // ── API unificada de habla ──────────────────────────────────────────
 export function stopSpeaking(): void {
+  speakSeq++ // invalida cualquier cadena de frases en curso
   if (currentAudio) {
     currentAudio.pause()
     currentAudio = null
@@ -286,6 +375,10 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
   stopSpeaking()
   text = normalizeForSpeech(plainForSpeech(text)) // 1) quita tabla/emojis/markdown 2) números/acrónimos → forma hablada
   const r = rate || 1.0
+  // Troceo por frases: la 1ª suena en ~1-2 s y las demás se precargan mientras suena,
+  // en vez de esperar a sintetizar toda la respuesta (con Chirp-HD-F una respuesta larga
+  // tardaba 10-15 s en empezar). Engine-agnóstico: Google/Chatterbox/Piper/navegador.
+  const sentences = splitForTTS(text)
   // Notificamos al avatar el FIN del habla en cualquier motor (onend/onerror). El INICIO
   // se emite cuando el audio realmente empieza a sonar (onplaying/onstart) — así la boca
   // se mueve sincronizada con la voz, no antes (Chatterbox tarda ~3s en sintetizar).
@@ -294,23 +387,16 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     onerror: () => { emitSpeaking(false); opts.onerror?.() },
   }
   if (isChatterboxVoice(voiceURI)) {
-    const url = `${CHATTERBOX_SERVER}/tts?text=${encodeURIComponent(text)}`
-    const audio = new Audio(url)
-    currentAudio = audio
-    const fallback = () => {
-      // Si el server local cayó, no quedarse mudo: usar la voz neuronal de Google.
-      currentAudio = null
-      if (GOOGLE_TTS_KEY) void speakGoogle(text, DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r, wrapped)
+    const chatterbox = httpGetFetcher((s) => `${CHATTERBOX_SERVER}/tts?text=${encodeURIComponent(s)}`)
+    // Si el server local cayó (1ª frase falla), no quedarse mudo: caer a la voz de Google.
+    void playChunks(sentences, chatterbox, wrapped, () => {
+      if (GOOGLE_TTS_KEY) void playChunks(sentences, googleFetcher(DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r), wrapped)
       else wrapped.onerror?.()
-    }
-    audio.onplaying = () => emitSpeaking(true)
-    audio.onended = () => { currentAudio = null; wrapped.onend?.() }
-    audio.onerror = fallback
-    audio.play().catch(fallback)
+    })
     return
   }
   if (isGcloudVoice(voiceURI)) {
-    void speakGoogle(text, voiceURI!.slice(GCLOUD_PREFIX.length), r, wrapped)
+    void playChunks(sentences, googleFetcher(voiceURI!.slice(GCLOUD_PREFIX.length), r), wrapped, () => wrapped.onerror?.())
     return
   }
   if (isPiperVoice(voiceURI)) {
@@ -318,28 +404,13 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     // En Piper, length-scale alto = más lento; invertimos para que el slider
     // (mayor = más rápida) sea coherente con el navegador.
     const lengthScale = Math.max(0.5, Math.min(2, 1 / r))
-    const url = `${PIPER_SERVER}/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}&rate=${lengthScale.toFixed(2)}`
-    const audio = new Audio(url)
-    currentAudio = audio
-    audio.onplaying = () => emitSpeaking(true)
-    audio.onended = () => { currentAudio = null; wrapped.onend?.() }
-    audio.onerror = () => { currentAudio = null; wrapped.onerror?.() }
-    audio.play().catch(() => wrapped.onerror?.())
+    const piper = httpGetFetcher(
+      (s) => `${PIPER_SERVER}/tts?text=${encodeURIComponent(s)}&voice=${encodeURIComponent(voice)}&rate=${lengthScale.toFixed(2)}`,
+    )
+    void playChunks(sentences, piper, wrapped, () => wrapped.onerror?.())
     return
   }
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) { wrapped.onerror?.(); return }
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'es-CL'
-  const v = (voiceURI && !isPiperVoice(voiceURI))
-    ? window.speechSynthesis.getVoices().find((x) => x.voiceURI === voiceURI && !isMaleName(x.name))
-    : undefined
-  const chosen = v || pickDefaultFemaleVoice()
-  if (chosen) { u.voice = chosen; u.lang = chosen.lang }
-  u.rate = r
-  u.onstart = () => emitSpeaking(true)
-  u.onend = () => wrapped.onend?.()
-  u.onerror = () => wrapped.onerror?.()
-  window.speechSynthesis.speak(u)
+  speakBrowserChunks(sentences, voiceURI, r, wrapped)
 }
 
 /** Habla con la preferencia guardada (usado por el ChatBot). */
