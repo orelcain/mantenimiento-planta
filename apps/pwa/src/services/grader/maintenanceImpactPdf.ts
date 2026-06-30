@@ -11,14 +11,27 @@
 
 import type { MaintenanceReliability } from './graderReliability'
 import { formatReliabilityDuration as fmt } from './graderReliability'
+import { maintenanceWorkHeadline, type MaintenanceWork } from './maintenanceWork'
 
 interface AutoTableDoc {
   lastAutoTable: { finalY: number }
 }
 
+/** jsPDF helvetica no renderiza tildes; el PDF se escribe en ASCII. */
+function noAccents(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+function fmtWorkMin(min: number): string {
+  if (min < 60) return `${Math.round(min)} min`
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return m ? `${h}h ${m}min` : `${h}h`
+}
+
 export async function exportMaintenanceImpactPDF(
   rel: MaintenanceReliability,
   opts: { periodLabel: string; rangeLabel?: string; lineLabel?: string },
+  work?: MaintenanceWork,
 ): Promise<void> {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import('jspdf'),
@@ -99,6 +112,41 @@ export async function exportMaintenanceImpactPDF(
       headStyles: { fillColor: [100, 116, 139] },
       styles: { fontSize: 8.5, cellPadding: 1.5 },
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      margin: { left: MARGIN, right: MARGIN },
+    })
+    y = doc.lastAutoTable.finalY + 6
+  }
+
+  // ── Trabajo de Mantención (TPM): del correctivo a la prevención ──
+  if (work && (work.totalIncidencias > 0 || work.correctivasResueltas > 0 || work.preventivasCumplidas > 0 || work.preventivasVencidas > 0)) {
+    const pageH = doc.internal.pageSize.getHeight()
+    if (y > pageH - 60) { doc.addPage(); y = 16 }
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Trabajo de Mantencion (TPM): del correctivo a la prevencion', MARGIN, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    const hlLines = doc.splitTextToSize(noAccents(maintenanceWorkHeadline(work)), pageW - MARGIN * 2) as string[]
+    doc.text(hlLines, MARGIN, y)
+    y += hlLines.length * 4 + 2
+    const p = (v: number | null): string => (v == null ? '—' : `${Math.round(v)} %`)
+    autoTable(doc, {
+      startY: y,
+      head: [['Indicador del ciclo de mejora', 'Valor']],
+      body: [
+        ['Correctivas resueltas', `${work.correctivasResueltas}  (MTTR ${work.mttrCorrectivoMin != null ? fmtWorkMin(work.mttrCorrectivoMin) : '—'})`],
+        ['Con causa raiz documentada', `${work.conCausaRaiz} de ${work.correctivasResueltas}  (${p(work.causaRaizPct)})`],
+        ['Preventivas cumplidas', String(work.preventivasCumplidas)],
+        ['Preventivas vencidas', String(work.preventivasVencidas)],
+        ['Cumplimiento preventivo', p(work.cumplimientoPct)],
+        ['Trabajo proactivo (madurez TPM)', `${p(work.proactivoPct)}${work.proactivoTrend === 'mejor' ? '  (en alza)' : work.proactivoTrend === 'peor' ? '  (a la baja)' : ''}`],
+        ['Equipos recurrentes (>=2 incidencias)', String(work.equiposRecurrentes)],
+      ],
+      theme: 'striped',
+      headStyles: { fillColor: [14, 165, 233] },
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: { 1: { halign: 'right', cellWidth: 70 } },
       margin: { left: MARGIN, right: MARGIN },
     })
     y = doc.lastAutoTable.finalY + 6

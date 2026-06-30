@@ -24,6 +24,7 @@ import {
   type MaintenanceReliability,
 } from '@/services/grader/graderReliability'
 import { exportMaintenanceImpactPDF } from '@/services/grader/maintenanceImpactPdf'
+import type { MaintenanceWork } from '@/services/grader/maintenanceWork'
 
 interface Props {
   summaries: GraderDailySummary[]
@@ -31,6 +32,8 @@ interface Props {
   periodLabel?: string
   /** Rango de fechas para el reporte (ej. "2026-05-26 → 2026-06-25"). */
   rangeLabel?: string
+  /** Trabajo de Mantención (TPM) del período — se agrega al PDF si viene. */
+  work?: MaintenanceWork | null
 }
 
 function KpiCard({
@@ -58,7 +61,7 @@ function trendDirection(trend: MaintenanceReliability['trend']): { down: boolean
   return { down: deltaPct <= 0, deltaPct }
 }
 
-export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel }: Props) {
+export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work }: Props) {
   const [loaded, setLoaded] = useState<Array<{ summary: GraderDailySummary; pauses: Pause[] }> | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -95,7 +98,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel }: Pr
         periodLabel: periodLabel || 'Período',
         rangeLabel,
         lineLabel: 'Análisis de Turno',
-      })
+      }, work ?? undefined)
     } finally {
       setExporting(false)
     }
