@@ -2629,6 +2629,353 @@ async function tgHandleKpi(chatId, topicId) {
   await sendTelegramMessage(msg, chatId, { topicId })
 }
 
+// ==================== ARIA — CHAT NATURAL (TELEGRAM) ====================
+// Texto libre o nota de voz en chat privado → ARIA interpreta la intención con
+// Groq, consulta Firestore (SOLO LECTURA) y responde en lenguaje natural.
+// Comandos y Mini App siguen igual; esto agrega la capa conversacional para
+// consultar la app sin abrirla. Requiere secret GROQ_API_KEY en el webhook.
+
+const ARIA_MODEL = process.env.ARIA_MODEL || 'llama-3.3-70b-versatile'
+const ARIA_HISTORY_LIMIT = 12
+const ARIA_CACHE_TTL_MS = 10 * 60 * 1000
+
+const ARIA_PERSONA =
+  'Sos ARIA, la asistente de Mantención de la planta Antarfood (proceso de salmón). ' +
+  'Hablás español chileno cercano y profesional. Respuestas BREVES para chat móvil ' +
+  '(máximo ~8 líneas), viñetas simples si ayudan, emojis con moderación. ' +
+  'Tu misión es dar acceso rápido a los datos de la app de mantenimiento y ' +
+  'evidenciar con datos el aporte de Mantención al proceso.'
+
+const ariaEscapeHtml = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** Llamada interna a Groq chat completions (misma key secret que groqProxy) */
+async function ariaGroqChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
+  const body = { model: ARIA_MODEL, messages, temperature, max_tokens: maxTokens }
+  if (json) body.response_format = { type: 'json_object' }
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const errorText = await response.text()
+    logger.error('ARIA Groq error', { status: response.status, body: errorText })
+    throw new Error(`Groq ${response.status}`)
+  }
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || ''
+}
+
+/** Transcribe una nota de voz de Telegram (OGG/OPUS) con Groq Whisper */
+async function ariaTranscribeVoice(buffer) {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
+  const form = new FormData()
+  form.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'voz.ogg')
+  form.append('model', 'whisper-large-v3-turbo')
+  form.append('language', 'es')
+  form.append('temperature', '0')
+  form.append('response_format', 'json')
+  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  })
+  if (!response.ok) {
+    const errorText = await response.text()
+    logger.error('ARIA Whisper error', { status: response.status, body: errorText })
+    throw new Error(`Whisper ${response.status}`)
+  }
+  const data = await response.json()
+  return (data.text || '').trim()
+}
+
+// ---- Memoria conversacional corta (colección telegramAriaSessions) ----
+
+async function ariaLoadHistory(chatId) {
+  try {
+    const doc = await db.collection('telegramAriaSessions').doc(String(chatId)).get()
+    const turns = doc.exists ? (doc.data().turns || []) : []
+    return turns.slice(-ARIA_HISTORY_LIMIT).map((t) => ({ role: t.role, content: t.content }))
+  } catch (_) { return [] }
+}
+
+async function ariaSaveTurns(chatId, userText, assistantText) {
+  try {
+    const ref = db.collection('telegramAriaSessions').doc(String(chatId))
+    const doc = await ref.get()
+    const prev = doc.exists ? (doc.data().turns || []) : []
+    const turns = [
+      ...prev,
+      { role: 'user', content: String(userText).slice(0, 1000), ts: Date.now() },
+      { role: 'assistant', content: String(assistantText).slice(0, 1500), ts: Date.now() },
+    ].slice(-ARIA_HISTORY_LIMIT * 2)
+    await ref.set({ turns, updatedAt: FieldValue.serverTimestamp() })
+  } catch (err) { logger.warn('ariaSaveTurns error', { error: err?.message }) }
+}
+
+// ---- Recolectores de datos (SOLO LECTURA) — texto plano para el LLM ----
+
+async function ariaDataTurno() {
+  const incSnap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso']).get()
+  const criticas = incSnap.docs.filter((d) => d.data().prioridad === 'critica').length
+  const altas = incSnap.docs.filter((d) => d.data().prioridad === 'alta').length
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+  let prevCount = 0
+  try {
+    const prevSnap = await db.collection('preventive_tasks')
+      .where('nextExecution', '>=', today).where('nextExecution', '<', tomorrow).get()
+    prevCount = prevSnap.size
+  } catch (_) { /* puede no existir */ }
+
+  let fuera = []
+  try {
+    const eqSnap = await db.collection('equipment').where('estado', '==', 'fuera_servicio').get()
+    fuera = eqSnap.docs.map((d) => d.data().nombre || d.data().codigo)
+  } catch (_) { /* ignore */ }
+
+  return [
+    `Incidencias abiertas: ${incSnap.size} (críticas ${criticas}, altas ${altas}, media/baja ${incSnap.size - criticas - altas})`,
+    `Preventivos programados hoy: ${prevCount}`,
+    `Equipos fuera de servicio: ${fuera.length ? fuera.join(', ') : 'ninguno'}`,
+  ].join('\n')
+}
+
+async function ariaDataKpi() {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  let creadasHoy = 0, resueltasHoy = 0
+  try { creadasHoy = (await db.collection('incidents').where('createdAt', '>=', today).get()).size } catch (_) { /* ignore */ }
+  try {
+    resueltasHoy = (await db.collection('incidents')
+      .where('status', 'in', ['resuelta', 'cerrada']).where('updatedAt', '>=', today).get()).size
+  } catch (_) { /* ignore */ }
+  const abiertas = (await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso']).get()).size
+
+  let operativos = 0, enMant = 0, fuera = 0
+  try {
+    const eqSnap = await db.collection('equipment').get()
+    eqSnap.forEach((doc) => {
+      const e = doc.data().estado
+      if (e === 'operativo') operativos++
+      else if (e === 'en_mantenimiento') enMant++
+      else if (e === 'fuera_servicio') fuera++
+    })
+  } catch (_) { /* ignore */ }
+
+  return [
+    `Incidencias creadas hoy: ${creadasHoy} · resueltas hoy: ${resueltasHoy} · abiertas total: ${abiertas}`,
+    `Equipos: ${operativos} operativos, ${enMant} en mantenimiento, ${fuera} fuera de servicio`,
+  ].join('\n')
+}
+
+async function ariaDataEstado() {
+  const snap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .orderBy('createdAt', 'desc').limit(10).get()
+  if (snap.empty) return 'No hay incidencias activas.'
+  const lines = snap.docs.map((d) => {
+    const x = d.data()
+    return `- [${x.prioridad}] ${x.titulo || 'Sin título'} (${x.status})`
+  })
+  return `Incidencias activas (últimas ${snap.size}):\n${lines.join('\n')}`
+}
+
+async function ariaDataSensores() {
+  const rtdb = getRtdb()
+  const snapshot = await rtdb.ref('sensors').once('value')
+  if (!snapshot.exists()) return 'No hay sensores conectados.'
+  const lines = []
+  for (const [equipId, sensor] of Object.entries(snapshot.val() || {})) {
+    if (!sensor || typeof sensor !== 'object') continue
+    let line = `- ${equipId}: ${sensor.online === true ? 'online' : 'OFFLINE'}`
+    if (sensor.temperatura?.value !== undefined) line += ` · temp ${sensor.temperatura.value}${sensor.temperatura.unit || '°C'} (${sensor.temperatura.status || '?'})`
+    if (sensor.humedad?.value !== undefined) line += ` · humedad ${sensor.humedad.value}${sensor.humedad.unit || '%'} (${sensor.humedad.status || '?'})`
+    lines.push(line)
+  }
+  return lines.length ? `Sensores en tiempo real:\n${lines.join('\n')}` : 'No hay datos de sensores.'
+}
+
+async function ariaDataEquipo(consulta) {
+  const query = String(consulta || '').trim()
+  if (!query) {
+    const snap = await db.collection('equipment').orderBy('nombre').limit(15).get()
+    if (snap.empty) return 'No hay equipos registrados.'
+    return 'Equipos registrados (primeros 15):\n' +
+      snap.docs.map((d) => `- ${d.data().nombre || d.data().codigo} [${d.data().estado || '?'}]`).join('\n')
+  }
+  const upper = query.toUpperCase()
+  let snap = await db.collection('equipment')
+    .where('nombre', '>=', upper).where('nombre', '<=', upper + '').limit(5).get()
+  if (snap.empty) {
+    snap = await db.collection('equipment')
+      .where('codigo', '>=', upper).where('codigo', '<=', upper + '').limit(5).get()
+  }
+  if (snap.empty) {
+    // Fallback: substring sobre el listado (colección chica)
+    const all = await db.collection('equipment').get()
+    const hits = all.docs.filter((d) => {
+      const x = d.data()
+      return `${x.nombre || ''} ${x.codigo || ''}`.toUpperCase().includes(upper)
+    }).slice(0, 5)
+    if (!hits.length) return `No encontré equipos con "${query}".`
+    snap = { docs: hits }
+  }
+  return snap.docs.map((d) => {
+    const x = d.data()
+    return [
+      `Equipo: ${x.nombre || 'Sin nombre'}${x.codigo ? ` (${x.codigo})` : ''}`,
+      `  Estado: ${x.estado || '?'} · Criticidad: ${x.criticidad || 'N/A'}`,
+      x.marca ? `  Marca/Modelo: ${x.marca} ${x.modelo || ''}` : null,
+      x.hierarchyPath ? `  Ubicación: ${x.hierarchyPath}` : null,
+    ].filter(Boolean).join('\n')
+  }).join('\n\n')
+}
+
+// Cache warm del maestro de repuestos (evita 7,6k lecturas por consulta)
+let _ariaRepuestosCache = { at: 0, items: [] }
+let _ariaBodegaCache = { at: 0, bySap: new Map() }
+
+async function ariaGetRepuestos() {
+  if (Date.now() - _ariaRepuestosCache.at < ARIA_CACHE_TTL_MS && _ariaRepuestosCache.items.length) {
+    return _ariaRepuestosCache.items
+  }
+  const snap = await db.collection('repuestos')
+    .select('textoBreve', 'descripcion', 'codigoSAP', 'clase', 'equiposCodigos', 'valorUnitario', 'tieneSap')
+    .get()
+  const items = snap.docs.map((d) => {
+    const x = d.data()
+    return {
+      textoBreve: x.textoBreve || '', descripcion: x.descripcion || '',
+      codigoSAP: x.codigoSAP || '', clase: x.clase || '',
+      equiposCodigos: Array.isArray(x.equiposCodigos) ? x.equiposCodigos : [],
+      valorUnitario: x.valorUnitario,
+      _blob: `${x.textoBreve || ''} ${x.descripcion || ''} ${x.codigoSAP || ''} ${(x.equiposCodigos || []).join(' ')}`.toUpperCase(),
+    }
+  })
+  _ariaRepuestosCache = { at: Date.now(), items }
+  return items
+}
+
+async function ariaGetBodega() {
+  if (Date.now() - _ariaBodegaCache.at < ARIA_CACHE_TTL_MS && _ariaBodegaCache.bySap.size) {
+    return _ariaBodegaCache.bySap
+  }
+  const bySap = new Map()
+  try {
+    const snap = await db.collection('bodega').get()
+    snap.forEach((d) => {
+      const x = d.data()
+      if (x.codigoSAP) bySap.set(String(x.codigoSAP), x)
+    })
+  } catch (_) { /* ignore */ }
+  _ariaBodegaCache = { at: Date.now(), bySap }
+  return bySap
+}
+
+async function ariaDataRepuestos(consulta) {
+  const query = String(consulta || '').trim()
+  if (!query) return 'Falta el término de búsqueda del repuesto.'
+  const [items, bodega] = await Promise.all([ariaGetRepuestos(), ariaGetBodega()])
+  const terms = query.toUpperCase().split(/\s+/).filter((t) => t.length >= 2)
+  if (!terms.length) return 'Término de búsqueda muy corto.'
+  const hits = items.filter((r) => terms.every((t) => r._blob.includes(t))).slice(0, 8)
+  if (!hits.length) return `No encontré repuestos con "${query}" en el maestro.`
+  const lines = hits.map((r) => {
+    const stock = r.codigoSAP ? bodega.get(String(r.codigoSAP)) : null
+    return [
+      `- ${r.textoBreve || r.descripcion || 'Sin nombre'}`,
+      r.codigoSAP ? `  SAP ${r.codigoSAP}` : '  (sin SAP)',
+      r.clase ? ` · ${r.clase}` : '',
+      r.equiposCodigos.length ? ` · equipos: ${r.equiposCodigos.slice(0, 3).join(', ')}` : '',
+      stock ? ` · stock bodega: ${stock.stockActual ?? '?'} ${stock.unidad || ''} (${stock.ubicacionBodega || 's/ubicación'})` : '',
+    ].join('')
+  })
+  return `Repuestos encontrados (${hits.length}, maestro SAP):\n${lines.join('\n')}`
+}
+
+// ---- Orquestador del chat natural ----
+
+const ARIA_ROUTER_SPEC =
+  'Clasificá el último mensaje del usuario y respondé SOLO un objeto JSON válido: ' +
+  '{"accion": string, "consulta": string, "respuesta": string}\n' +
+  'Acciones disponibles (todas de solo lectura):\n' +
+  '- "kpi": indicadores de hoy (incidencias creadas/resueltas/abiertas, estado de equipos)\n' +
+  '- "turno": resumen del turno (incidencias abiertas por prioridad, preventivos de hoy, equipos fuera de servicio)\n' +
+  '- "estado": lista de incidencias activas\n' +
+  '- "sensores": lecturas de sensores en tiempo real\n' +
+  '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
+  '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
+  '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA\n' +
+  'Si el usuario pide algo que requiere ESCRIBIR datos (crear incidencia, pedir repuesto, editar), usá "charla" y explicá en "respuesta" que por ahora solo consultás información, y que eso se hace en la app o con los flujos del grupo.'
+
+async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
+  await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
+  const history = await ariaLoadHistory(chatId)
+
+  // 1) Router: intención + término de búsqueda
+  let route = { accion: 'charla', consulta: '', respuesta: '' }
+  try {
+    const raw = await ariaGroqChat(
+      [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}` }, ...history, { role: 'user', content: userText }],
+      { json: true, temperature: 0.1, maxTokens: 300 }
+    )
+    route = { ...route, ...JSON.parse(raw) }
+  } catch (err) {
+    logger.warn('ARIA router fallback a charla', { error: err?.message })
+  }
+
+  // 2) Datos + composición de la respuesta
+  let reply = ''
+  if (route.accion === 'charla' && route.respuesta) {
+    reply = route.respuesta
+  } else {
+    let datos = ''
+    try {
+      switch (route.accion) {
+        case 'kpi': datos = await ariaDataKpi(); break
+        case 'turno': datos = await ariaDataTurno(); break
+        case 'estado': datos = await ariaDataEstado(); break
+        case 'sensores': datos = await ariaDataSensores(); break
+        case 'equipo': datos = await ariaDataEquipo(route.consulta || userText); break
+        case 'repuestos': datos = await ariaDataRepuestos(route.consulta || userText); break
+        default: datos = ''
+      }
+    } catch (err) {
+      logger.error('ARIA data error', { accion: route.accion, error: err?.message })
+      datos = `(error al consultar los datos: ${err?.message})`
+    }
+    try {
+      reply = await ariaGroqChat(
+        [
+          {
+            role: 'system',
+            content: `${ARIA_PERSONA}\n\nRespondé al usuario usando SOLO estos datos reales de la app. ` +
+              'NO inventes cifras ni nombres; si un dato no está, decilo. Texto plano, sin markdown.\n\n' +
+              `DATOS:\n${datos || '(sin datos para esta consulta)'}`,
+          },
+          ...history,
+          { role: 'user', content: userText },
+        ],
+        { temperature: 0.3, maxTokens: 600 }
+      )
+    } catch (err) {
+      logger.error('ARIA compose error', { error: err?.message })
+      reply = datos // degradación elegante: entrego los datos crudos
+    }
+  }
+
+  reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Probá de nuevo en un rato.'
+  await sendTelegramMessage(ariaEscapeHtml(reply), chatId, { topicId })
+  await ariaSaveTurns(chatId, userText, reply)
+}
+
 // ==================== MENÚ INTERACTIVO (INLINE KEYBOARDS) ====================
 
 const PWA_URL  = 'https://orelcain.github.io/mantenimiento-planta/'
@@ -3094,7 +3441,9 @@ async function cbComando(chatId, messageId, params, topicId) {
  * Webhook de Telegram — recibe mensajes/comandos del bot.
  * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
  */
-exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
+exports.telegramWebhook = onRequest(
+  { region: 'us-central1', secrets: ['GROQ_API_KEY'], timeoutSeconds: 120 },
+  async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed')
     return
@@ -3167,6 +3516,33 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
       return
     }
 
+    // ---- Nota de voz → ARIA (solo chat privado) ----
+    if ((message.voice || message.audio) && chatType === 'private') {
+      const voiceFileId = message.voice?.file_id || message.audio?.file_id
+      const voiceDur = message.voice?.duration || message.audio?.duration || 0
+      if (voiceDur > 120) {
+        await sendTelegramMessage('🎙️ El audio es muy largo (máx. 2 minutos).', chatId, { topicId: incomingTopicId })
+        res.status(200).send('ok')
+        return
+      }
+      try {
+        await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
+        const voiceBuffer = await downloadTelegramFile(voiceFileId)
+        const transcript = await ariaTranscribeVoice(voiceBuffer)
+        if (!transcript) {
+          await sendTelegramMessage('🎙️ No logré entender el audio. Probá de nuevo.', chatId, { topicId: incomingTopicId })
+        } else {
+          await sendTelegramMessage(`🎙️ <i>«${ariaEscapeHtml(transcript)}»</i>`, chatId, { topicId: incomingTopicId })
+          await tgHandleAriaChat(chatId, transcript, fromName, incomingTopicId)
+        }
+      } catch (error) {
+        logger.error('ARIA voice error', error)
+        await sendTelegramMessage('❌ Error procesando el audio. Intentá de nuevo.', chatId, { topicId: incomingTopicId })
+      }
+      res.status(200).send('ok')
+      return
+    }
+
     const text = (message.text || '').trim()
     if (!text) {
       res.status(200).send('ok')
@@ -3197,6 +3573,9 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
       if (chatType === 'private') {
         await sendTelegramMessage('Usá /abrir para abrir el catálogo.', chatId, { topicId: incomingTopicId })
       }
+    } else if (chatType === 'private') {
+      // Texto libre en privado → ARIA (chat natural, consultas de solo lectura)
+      await tgHandleAriaChat(chatId, text, fromName, incomingTopicId)
     }
   } catch (error) {
     logger.error('Error handling Telegram command', error)
