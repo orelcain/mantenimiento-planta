@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram TANDA B — voz de respuesta + vision + graficos
+
+- VOZ DE RESPUESTA: nota de voz entrante → ademas del texto, ARIA responde con NOTA DE VOZ propia. `ariaTts` (Google Cloud TTS es-US-Neural2-A, OGG_OPUS, limpia emojis, max 850 chars) + `ariaGetGcpToken` (metadata server en GCF, JWT manual con GOOGLE_APPLICATION_CREDENTIALS en local) + `sendTelegramVoice` (multipart sendVoice). API texttospeech ya estaba habilitada en el proyecto (sintesis validada standalone: 19KB OGG).
+- VISION: foto en privado (autorizados) → `ariaHandleFoto`: descarga la mayor resolucion → `ariaGroqVision` (Groq meta-llama/llama-4-scout-17b-16e-instruct, validado standalone) describe equipo/falla → borrador de incidencia con `fotoFileId` → al confirmar, `ariaCrearIncidencia` sube la foto a Storage (uploadPhotoToStorage) y la cuelga en `fotos`. Grupos siguen con tgHandlePhoto clasico.
+- GRAFICOS: accion `grafico` (grader|incidencias) → QuickChart (line piezas+microdetenciones / bar incidencias 14 dias) → sendTelegramPhoto. Validado: URL renderiza PNG 90KB con datos reales. Nota: QuickChart es servicio externo; solo van conteos agregados, sin datos sensibles.
+- `tgHandleAriaChat` ahora retorna el texto de respuesta (lo usa el TTS del webhook).
+- Verificacion: dry-run graficos OK (routing directo y por seguimiento) · vision standalone OK · TTS standalone OK · sintaxis OK. Voz end-to-end y foto end-to-end quedan para prueba en vivo de Orel (requieren updates reales de Telegram).
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
+
 ## 2026-07-04 · claude · ARIA Telegram TANDA A — whitelist + memoria + cerrar incidencias + alertas DM
 
 - SEGURIDAD (lo importante): whitelist `telegramAriaUsers/{telegramUserId}` — antes CUALQUIER usuario de Telegram en privado podia leer datos de planta y crear incidencias. No autorizado → mensaje cortes + aviso UNA vez al admin (ARIA_ADMIN_CHAT_ID=52949422) con el id listo para habilitar. Gate en texto y voz.
