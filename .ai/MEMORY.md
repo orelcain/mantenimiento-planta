@@ -42,6 +42,27 @@ cuantificar/demostrar/optimizar ese valor, replantearlo para que sí lo haga. Me
 - Ficha `RepuestoDetailPanel`: "dónde se usa" N:M, manuales heredados (`useManualesDeEquipos`), flujos asignar-SAP y asignar-equipo, "Solicitar" solo con SAP.
 - `BodegaView` abre en filtro "configurados".
 
+## Regla de diseño: preparación MULTI-PLANTA (decisión Orel 2026-07-04)
+
+Hoy la app es de UNA planta (Antarfood Chonchi, ecosistema AquaChile). En el futuro puede haber
+otra planta AquaChile (Quellón, Puerto Montt) u otra empresa. Decisión de arquitectura:
+
+- **Misma empresa, otra planta → multi-tenant en esta base** (campo `plantId`), porque habilita
+  comparativas entre plantas (benchmarking del aporte de Mantención = META GRANDE).
+- **Otra empresa → proyecto Firebase SEPARADO siempre** (aislamiento de datos no negociable);
+  el código se parametriza (white-label), no se comparte base.
+
+Hábitos OBLIGATORIOS desde ya (costo ~cero hoy, ahorran la migración mañana):
+1. Toda colección o feature NUEVA incluye `plantId: 'chonchi'` desde su nacimiento.
+2. NO hardcodear "Antarfood"/"Chonchi" en código/prompts nuevos — usar/crear config central
+   (doc `config`) cuando se toquen esas zonas.
+3. Al diseñar queries nuevas, no asumir que "todo el contenido de la colección es de esta planta":
+   dejar el filtro por `plantId` aunque hoy tenga un solo valor.
+
+Semillas que ya existen: `maintenanceLog.plantLineId`, `shoplogixShiftDelayChecks.plant/plantLabel`,
+`hierarchy` clonable por planta. NO refactorizar lo existente todavía (YAGNI) — la migración se
+decide cuando la segunda planta sea real.
+
 ## Convenciones de código
 
 - Stack: React + Vite + TypeScript + Tailwind + Firebase (Firestore/Storage/Auth Google). Radix UI. lucide-react.
