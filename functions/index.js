@@ -2916,11 +2916,14 @@ async function ariaLoadSession(chatId) {
 
 const ARIA_ADMIN_CHAT_ID = process.env.ARIA_ADMIN_CHAT_ID || '52949422' // Orel
 
+/** @returns {{ok: boolean, rol: string|null}} autorización + rol (admin ve módulos en desarrollo) */
 async function ariaUsuarioAutorizado(telegramUserId, fromName, username) {
   try {
     const ref = db.collection('telegramAriaUsers').doc(String(telegramUserId))
     const doc = await ref.get()
-    if (doc.exists && doc.data().autorizado === true) return true
+    if (doc.exists && doc.data().autorizado === true) {
+      return { ok: true, rol: doc.data().rol || 'tecnico' }
+    }
     const esNuevo = !doc.exists
     // Registrar el intento; avisar al admin solo la primera vez por usuario
     await ref.set({
@@ -2938,11 +2941,52 @@ async function ariaUsuarioAutorizado(telegramUserId, fromName, username) {
         ARIA_ADMIN_CHAT_ID
       )
     }
-    return false
+    return { ok: false, rol: null }
   } catch (err) {
     logger.error('ariaUsuarioAutorizado error', { error: err?.message })
-    return false // ante la duda, cerrado
+    return { ok: false, rol: null } // ante la duda, cerrado
   }
+}
+
+// ---- Conocimiento de la app (catálogo ariaKnowledge/appModules) ----
+// ARIA es el PIVOTE de la app: conoce todos los módulos y orienta al usuario.
+// Los módulos "en desarrollo" solo se mencionan a admins.
+// Regenerar el catálogo con: node scripts/sync-aria-app-modules.js
+
+let _ariaModulosCache = { at: 0, modulos: [] }
+
+async function ariaGetAppModules() {
+  if (Date.now() - _ariaModulosCache.at < ARIA_CACHE_TTL_MS && _ariaModulosCache.modulos.length) {
+    return _ariaModulosCache.modulos
+  }
+  try {
+    const doc = await db.collection('ariaKnowledge').doc('appModules').get()
+    _ariaModulosCache = { at: Date.now(), modulos: doc.exists ? (doc.data().modulos || []) : [] }
+  } catch (err) {
+    logger.warn('ariaGetAppModules error', { error: err?.message })
+  }
+  return _ariaModulosCache.modulos
+}
+
+/** Bloque de system-prompt con el mapa de la app, filtrado por rol */
+async function ariaAppKnowledgeBlock(esAdmin) {
+  const modulos = await ariaGetAppModules()
+  if (!modulos.length) return ''
+  const baseUrl = 'https://orelcain.github.io/mantenimiento-planta'
+  const linea = (m) => `- ${m.nombre} (${baseUrl}${m.ruta}): ${m.descripcion || m.grupo}`
+  const prod = modulos.filter((m) => m.estado === 'produccion')
+  const dev = modulos.filter((m) => m.estado === 'desarrollo')
+  let block = '\n\nMAPA DE LA APP DE MANTENIMIENTO (sos el pivote de la app: cuando corresponda, ' +
+    'orientá al usuario sobre qué módulo usar e incluí el link):\n' + prod.map(linea).join('\n')
+  if (esAdmin) {
+    block += '\n\nMÓDULOS EN DESARROLLO (este usuario es ADMIN y sí puede verlos; aclarale que están en desarrollo):\n' +
+      dev.map(linea).join('\n')
+  } else {
+    block += '\n\nIMPORTANTE: existen módulos de la app en desarrollo que NO debés listar, recomendar ni linkear a este usuario. ' +
+      'Si pregunta por uno, respondé simple: "ese módulo está en desarrollo, pronto va a estar disponible" — y si vos manejás esos DATOS ' +
+      'por chat (ej. tareas planificadas, incidencias, kpis), ofrecé dárselos vos directamente aquí mismo.'
+  }
+  return block
 }
 
 const ARIA_MSG_NO_AUTORIZADO =
@@ -3398,7 +3442,7 @@ const ARIA_ROUTER_SPEC =
   '- "brief": brief/resumen matinal completo de Mantención a demanda (todo junto: turno, alertas, gantt, stock, grader)\n' +
   '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
-  '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA. ' +
+  '- "charla": saludo, agradecimiento, pregunta general O pregunta sobre la APP misma (qué módulos hay, dónde se hace algo, cómo usar una función) — escribí la respuesta directa en "respuesta" como ARIA usando el MAPA DE LA APP. ' +
   'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
   '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
   '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
@@ -3411,9 +3455,12 @@ const ARIA_ROUTER_SPEC =
   '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
   'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
 
-async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId) {
+async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId, esAdmin = false) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
-  const { history, pending, notas } = await ariaLoadSession(chatId)
+  const [{ history, pending, notas }, appBlock] = await Promise.all([
+    ariaLoadSession(chatId),
+    ariaAppKnowledgeBlock(esAdmin),
+  ])
 
   // El router necesita saber si hay un borrador esperando confirmación:
   // sin esto, un "sí dale" re-extrae del historial (incluso reportes cancelados).
@@ -3450,7 +3497,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   } else {
     try {
       const raw = await ariaGroqChat(
-        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${notasHint}` }, ...history, { role: 'user', content: userText }],
+        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${notasHint}${appBlock}` }, ...history, { role: 'user', content: userText }],
         { json: true, temperature: 0.1, maxTokens: 300 }
       )
       route = { ...route, ...JSON.parse(raw) }
@@ -3580,7 +3627,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         [
           {
             role: 'system',
-            content: `${ARIA_PERSONA}${notasHint}\n\nRespondé al usuario usando SOLO estos datos reales de la app. ` +
+            content: `${ARIA_PERSONA}${notasHint}${appBlock}\n\nRespondé al usuario usando SOLO estos datos reales de la app. ` +
               'NO inventes cifras ni nombres; si un dato no está, decilo. Texto plano, sin markdown.\n\n' +
               `DATOS:\n${datos || '(sin datos para esta consulta)'}`,
           },
@@ -4138,7 +4185,8 @@ exports.telegramWebhook = onRequest(
     if (message.photo && message.photo.length > 0) {
       if (chatType === 'private') {
         // Privado → ARIA la mira con visión y propone incidencia (autorizados)
-        if (await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)) {
+        const authFoto = await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)
+        if (authFoto.ok) {
           await ariaHandleFoto(chatId, message, fromName)
         } else {
           await sendTelegramMessage(ARIA_MSG_NO_AUTORIZADO, chatId, {})
@@ -4153,7 +4201,8 @@ exports.telegramWebhook = onRequest(
 
     // ---- Nota de voz → ARIA (solo chat privado, usuarios autorizados) ----
     if ((message.voice || message.audio) && chatType === 'private') {
-      if (!(await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username))) {
+      const authVoz = await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)
+      if (!authVoz.ok) {
         await sendTelegramMessage(ARIA_MSG_NO_AUTORIZADO, chatId, {})
         res.status(200).send('ok')
         return
@@ -4173,7 +4222,7 @@ exports.telegramWebhook = onRequest(
           await sendTelegramMessage('🎙️ No logré entender el audio. Probá de nuevo.', chatId, { topicId: incomingTopicId })
         } else {
           await sendTelegramMessage(`🎙️ <i>«${ariaEscapeHtml(transcript)}»</i>`, chatId, { topicId: incomingTopicId })
-          const respuesta = await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId)
+          const respuesta = await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId, authVoz.rol === 'admin')
           // Voz entra → voz sale: nota de voz de ARIA además del texto
           if (respuesta) {
             try {
@@ -4224,8 +4273,9 @@ exports.telegramWebhook = onRequest(
       }
     } else if (chatType === 'private') {
       // Texto libre en privado → ARIA (chat natural, solo usuarios autorizados)
-      if (await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)) {
-        await tgHandleAriaChat(chatId, text, fromName, telegramUserId, incomingTopicId)
+      const authTexto = await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)
+      if (authTexto.ok) {
+        await tgHandleAriaChat(chatId, text, fromName, telegramUserId, incomingTopicId, authTexto.rol === 'admin')
       } else {
         await sendTelegramMessage(ARIA_MSG_NO_AUTORIZADO, chatId, { topicId: incomingTopicId })
       }
