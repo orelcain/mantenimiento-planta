@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA chat natural en Telegram (voz incluida)
+
+- Hecho: capa conversacional de ARIA en `telegramWebhook` (functions/index.js, seccion "ARIA — CHAT NATURAL"). Texto libre o nota de voz en chat PRIVADO → router de intenciones (Groq llama-3.3-70b, JSON) → recolectores de datos SOLO LECTURA (kpi/turno/estado/sensores/equipo/repuestos) → respuesta natural compuesta por Groq con persona ARIA. Memoria conversacional corta en `telegramAriaSessions/{chatId}` (12 turnos). Voz: `message.voice` → downloadTelegramFile → Groq Whisper large-v3-turbo (patron de whisperProxy).
+- IMPORTANTE: `ariaDataRepuestos` lee el MAESTRO `repuestos` (+stock `bodega`) con cache warm 10 min — los handlers legacy `tgHandleRepuesto`/`tgHandleRepuestosMaquina` leen `machines/*/repuestos` (colecciones YA BORRADAS en Fase 5) y estan rotos silenciosamente; quedan desconectados como estaban, reemplazados en la practica por ARIA.
+- Webhook: + secrets ['GROQ_API_KEY'] + timeoutSeconds 120. Grupos: sin cambios (texto libre sigue ignorado; comandos/Mini App igual).
+- Verificacion: `node --check` OK + dry-run local invocando `exports.telegramWebhook` con updates simulados (fetch de Telegram interceptado; Firestore y Groq REALES): persona OK, turno con datos reales OK, busqueda Baader en maestro OK, rechazo de escritura OK (0.8–4.1s). Doc de prueba `telegramAriaSessions/999000111` borrado. Voz NO probada localmente (requiere update real de Telegram) → probar con el primer audio de Orel.
+- Estado: EN REVISION (rama feat/aria-telegram-chat-natural → PR). Tras merge: deploy manual `npx firebase-tools deploy --only functions:telegramWebhook`.
+- Sigue: fase escritura con confirmacion (crear incidencia por voz); brief matinal 7AM a Telegram (reutilizar avisos proactivos).
+
 ## 2026-06-21 · claude · CTD órdenes de trabajo — Camino B (PR #98, DESPLEGADO + reglas)
 
 - **PR #98 MERGEADO** (`d1120891`): 4.ª dimensión de gestión de activos = **órdenes de trabajo**.
