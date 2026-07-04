@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram TANDA A — whitelist + memoria + cerrar incidencias + alertas DM
+
+- SEGURIDAD (lo importante): whitelist `telegramAriaUsers/{telegramUserId}` — antes CUALQUIER usuario de Telegram en privado podia leer datos de planta y crear incidencias. No autorizado → mensaje cortes + aviso UNA vez al admin (ARIA_ADMIN_CHAT_ID=52949422) con el id listo para habilitar. Gate en texto y voz.
+- CONFIRMACION DETERMINISTA: con accion pendiente, "si/dale/confirmo/creala..." (≤40 chars) va DIRECTO a confirmar sin pasar por el LLM (el router se confundia con "si, creala" y re-armaba el borrador). Negaciones → cancelar. LLM fuera de la ruta critica.
+- Cerrar incidencias: accion `incidencia_cerrar` (busca en abiertas por referencia; 1 match → confirmacion → status resuelta + resolucion "via ARIA"; multiples → lista para elegir).
+- Memoria larga: acciones `recordar`/`olvidar` → array `notas` (max 20) en la sesion; se inyecta en router y composer ("que equipo es mi prioritario?" → "Baader 200" OK).
+- Alertas DM: acciones `alertas_activar/desactivar` (flag `alertas`); `onIncidentCreated` ahora tambien DM a suscritos en criticas/altas (salta al reportante). Refactor: `ariaLoadSession` (1 lectura: turns+pending+notas), pending generalizado con `kind` crear|cerrar.
+- Verificacion dry-run: rechazo no-autorizado + aviso admin OK · recordar OK · alertas OK · crear+confirmar (0.4s determinista) OK · cerrar+confirmar OK · nota recordada OK. Datos de prueba borrados.
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + onIncidentCreated; seed telegramAriaUsers/52949422 autorizado + alertas:true.
+
 ## 2026-07-04 · claude · ARIA Telegram — crear incidencias con confirmacion
 
 - Hecho: primera ESCRITURA de ARIA, con puerta de confirmacion obligatoria. Router: acciones `incidencia_crear` (borrador con descripcion+prioridad deducida → `pendingIncident` en la sesion, TTL 10 min), `confirmar` (crea doc en `incidents` con la MISMA forma que tgHandleIncidencia → dispara onIncidentCreated normal) y `cancelar`. CLAVE: el router recibe el ESTADO (hay/no hay borrador pendiente) inyectado en el system prompt — sin eso un "si dale" re-extraia reportes del historial incluso cancelados. `tgHandleAriaChat` ahora recibe `telegramUserId`.
