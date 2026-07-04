@@ -13,6 +13,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram — brief matinal 7AM + brief a demanda
+
+- Hecho: `ariaComponerBrief()` (junta turno/kpi/gantt/stock-bajo/preventivos/grader/solicitudes en paralelo → Groq redacta brief ~16 lineas con persona ARIA, fallback datos crudos) + `exports.ariaDailyBrief` onSchedule 07:00 America/Santiago → envia a chats con `briefDiario==true` en `telegramAriaSessions`. Router: acciones `brief` (a demanda), `brief_activar`/`brief_desactivar` (toggle conversacional del flag, unica escritura y es config del propio chat). FIX: `ariaSaveTurns` ahora set con merge:true para no pisar flags.
+- Verificacion: dry-run local — brief completo con datos reales (5 gantt atrasadas, 1 preventivo vencido, stock bajo, grader 14.019 piezas) en 5.7s; activar/desactivar OK incluyendo "mejor desactivalo" resuelto por contexto. Doc de prueba borrado.
+- Nota: Orel YA usa ARIA en vivo (chat 52949422, 24 turnos). Tras el deploy se suscribe su chat al brief (briefDiario=true).
+- Estado: EN REVISION (rama feat/aria-telegram-brief-matinal → PR). Post-merge: deploy telegramWebhook + ariaDailyBrief (funcion NUEVA).
+
 ## 2026-07-04 · claude · ARIA Telegram — 6 fuentes de datos nuevas
 
 - Hecho: ampliado el router/recolectores de ARIA en `telegramWebhook`: `historial` (maintenanceLog, filtro por texto), `grader` (graderDailySummaries ultimos 2: piezas/peso/compuertas/microdetenciones), `gantt` (ganttTasks con cache 10min: abiertas/ATRASADAS/proximas, fallback si el filtro no calza), `stockbajo` (bodega stockActual<=stockMinimo cruzado con maestro), `solicitudes` (solicitudes_repuestos), `preventivos` (preventiveTasks activos con estado VENCIDA/al dia). Helper `ariaToDate` (Timestamp|string|Date) + `ariaFmtFecha`.

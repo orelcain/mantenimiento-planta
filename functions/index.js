@@ -2713,7 +2713,8 @@ async function ariaSaveTurns(chatId, userText, assistantText) {
       { role: 'user', content: String(userText).slice(0, 1000), ts: Date.now() },
       { role: 'assistant', content: String(assistantText).slice(0, 1500), ts: Date.now() },
     ].slice(-ARIA_HISTORY_LIMIT * 2)
-    await ref.set({ turns, updatedAt: FieldValue.serverTimestamp() })
+    // merge:true — el doc también guarda flags de configuración (ej. briefDiario)
+    await ref.set({ turns, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
   } catch (err) { logger.warn('ariaSaveTurns error', { error: err?.message }) }
 }
 
@@ -3029,6 +3030,66 @@ async function ariaDataPreventivos() {
   return `Preventivos activos (${snap.size}):\n${lines.join('\n')}`
 }
 
+// ---- Brief matinal de Mantención ----
+
+/** Junta todas las fuentes y redacta el brief con la persona de ARIA */
+async function ariaComponerBrief() {
+  const seguro = (p) => p.catch((e) => `(sin datos: ${e?.message})`)
+  const [turno, kpi, gantt, stock, prev, grader, solicitudes] = await Promise.all([
+    seguro(ariaDataTurno()),
+    seguro(ariaDataKpi()),
+    seguro(ariaDataGantt('')),
+    seguro(ariaDataStockBajo()),
+    seguro(ariaDataPreventivos()),
+    seguro(ariaDataGrader()),
+    seguro(ariaDataSolicitudes()),
+  ])
+  const fecha = new Date().toLocaleDateString('es-CL', {
+    timeZone: 'America/Santiago', weekday: 'long', day: 'numeric', month: 'long',
+  })
+  const datos = [
+    `== TURNO ==\n${turno}`, `== KPI ==\n${kpi}`, `== GANTT ==\n${gantt}`,
+    `== STOCK BAJO ==\n${stock}`, `== PREVENTIVOS ==\n${prev}`,
+    `== GRADER ==\n${grader}`, `== SOLICITUDES ==\n${solicitudes}`,
+  ].join('\n\n')
+
+  try {
+    const texto = await ariaGroqChat(
+      [
+        {
+          role: 'system',
+          content: `${ARIA_PERSONA}\n\nRedactá el BRIEF MATINAL de Mantención con estos datos reales. ` +
+            'Formato: texto plano, máximo ~16 líneas. Estructura: 1) saludo de UNA línea, SIN repetir la fecha (ya va en el encabezado); ' +
+            '2) estado general (incidencias, equipos); 3) ALERTAS — lo accionable primero: tareas Gantt atrasadas, ' +
+            'preventivos vencidos, stock bajo mínimo (solo cantidades y los 2-3 más importantes); ' +
+            '4) Grader del último turno en una línea; 5) cierre breve. NO inventes datos.\n\n' +
+            `DATOS:\n${datos}`,
+        },
+        { role: 'user', content: `Redactá el brief de hoy ${fecha}.` },
+      ],
+      { temperature: 0.3, maxTokens: 700 }
+    )
+    return `☀️ Brief de Mantención — ${fecha}\n\n${String(texto || '').trim()}`
+  } catch (err) {
+    logger.error('ariaComponerBrief error', { error: err?.message })
+    return `☀️ Brief de Mantención — ${fecha} (datos crudos)\n\n${datos}`
+  }
+}
+
+/** Brief matinal automático 7:00 AM a los chats suscritos (briefDiario=true) */
+exports.ariaDailyBrief = onSchedule(
+  { schedule: '0 7 * * *', timeZone: 'America/Santiago', region: 'us-central1', secrets: ['GROQ_API_KEY'], timeoutSeconds: 300 },
+  async () => {
+    const subs = await db.collection('telegramAriaSessions').where('briefDiario', '==', true).get()
+    if (subs.empty) { logger.info('ariaDailyBrief: sin suscriptores'); return }
+    const brief = await ariaComponerBrief()
+    for (const doc of subs.docs) {
+      await sendTelegramMessage(ariaEscapeHtml(brief), doc.id)
+    }
+    logger.info(`ariaDailyBrief enviado a ${subs.size} chat(s)`)
+  }
+)
+
 // ---- Orquestador del chat natural ----
 
 const ARIA_ROUTER_SPEC =
@@ -3047,6 +3108,9 @@ const ARIA_ROUTER_SPEC =
   '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
   '- "solicitudes": solicitudes de repuestos a bodega y su estado\n' +
   '- "preventivos": tareas preventivas activas y cuándo tocan\n' +
+  '- "brief": brief/resumen matinal completo de Mantención a demanda (todo junto: turno, alertas, gantt, stock, grader)\n' +
+  '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
+  '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
   '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA. ' +
   'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores; y que entendés notas de voz.\n' +
   'Si el usuario pide algo que requiere ESCRIBIR datos (crear incidencia, pedir repuesto, editar), usá "charla" y explicá en "respuesta" que por ahora solo consultás información, y que eso se hace en la app o con los flujos del grupo.'
@@ -3069,7 +3133,16 @@ async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
 
   // 2) Datos + composición de la respuesta
   let reply = ''
-  if (route.accion === 'charla' && route.respuesta) {
+  if (route.accion === 'brief') {
+    reply = await ariaComponerBrief()
+  } else if (route.accion === 'brief_activar' || route.accion === 'brief_desactivar') {
+    const activar = route.accion === 'brief_activar'
+    await db.collection('telegramAriaSessions').doc(String(chatId))
+      .set({ briefDiario: activar }, { merge: true })
+    reply = activar
+      ? '✅ Listo. Te voy a mandar el brief de Mantención todos los días a las 7:00 AM. Si te aburro, decime "desactiva el brief" nomás 😉'
+      : 'Listo, no te mando más el brief automático. Igual me lo podés pedir cuando quieras con "dame el brief".'
+  } else if (route.accion === 'charla' && route.respuesta) {
     reply = route.respuesta
   } else {
     let datos = ''
