@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA = PIVOTE de la app (mapa de modulos con conciencia de rol)
+
+- Vision de Orel: ARIA es el centro/pivote — debe saber de TODO lo de la PWA y omitir los modulos ocultos/en desarrollo.
+- Catalogo: `scripts/sync-aria-app-modules.js` parsea ALL_NAV_ITEMS de MainLayout.tsx (flag inDevelopment) + descripciones curadas → doc `ariaKnowledge/appModules` (21 modulos: 11 produccion, 10 desarrollo). RE-CORRER el script cuando cambien los modulos del sidebar.
+- Functions: `ariaGetAppModules` (cache 10min) + `ariaAppKnowledgeBlock(esAdmin)` inyectado en router y composer. `ariaUsuarioAutorizado` ahora devuelve {ok, rol}; rol admin → ve modulos en desarrollo (marcados como tal); no-admin → NO se listan/linkean; si pregunta por uno: "en desarrollo, pronto disponible" + ofrecer los datos por chat.
+- Verificacion dry-run: tecnico+repuestos → link correcto OK · tecnico+gantt(oculto) → sin link oculto, ofrece datos y redirige a modulo de produccion OK · admin → lista los 10 en desarrollo OK.
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
+
 ## 2026-07-04 · claude · ARIA Telegram TANDA B — voz de respuesta + vision + graficos
 
 - VOZ DE RESPUESTA: nota de voz entrante → ademas del texto, ARIA responde con NOTA DE VOZ propia. `ariaTts` (Google Cloud TTS es-US-Neural2-A, OGG_OPUS, limpia emojis, max 850 chars) + `ariaGetGcpToken` (metadata server en GCF, JWT manual con GOOGLE_APPLICATION_CREDENTIALS en local) + `sendTelegramVoice` (multipart sendVoice). API texttospeech ya estaba habilitada en el proyecto (sintesis validada standalone: 19KB OGG).
