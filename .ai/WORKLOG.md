@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram — 6 fuentes de datos nuevas
+
+- Hecho: ampliado el router/recolectores de ARIA en `telegramWebhook`: `historial` (maintenanceLog, filtro por texto), `grader` (graderDailySummaries ultimos 2: piezas/peso/compuertas/microdetenciones), `gantt` (ganttTasks con cache 10min: abiertas/ATRASADAS/proximas, fallback si el filtro no calza), `stockbajo` (bodega stockActual<=stockMinimo cruzado con maestro), `solicitudes` (solicitudes_repuestos), `preventivos` (preventiveTasks activos con estado VENCIDA/al dia). Helper `ariaToDate` (Timestamp|string|Date) + `ariaFmtFecha`.
+- FIX legacy: `ariaDataTurno` (y el tgHandleTurno original) consultaban `preventive_tasks` que NO existe — la coleccion real es `preventiveTasks` con campo `proximaEjecucion` (string o Timestamp); ahora los preventivos del turno cuentan bien.
+- FIX router: para gantt el LLM ponia "atrasadas" como filtro de texto → 0 matches; ahora el filtro cae a todas las tareas si no calza y el spec del router lo prohibe.
+- Verificacion: dry-run local (Telegram interceptado, Firestore+Groq reales): capacidades OK, historial 3 registros reales OK, grader 08-05 (14.019 piezas) OK, gantt 5 atrasadas reales OK, stock bajo 62 items OK, preventivos 1 vencido OK. Doc de prueba borrado.
+- Estado: EN REVISION (rama feat/aria-telegram-mas-fuentes → PR). Post-merge: deploy `functions:telegramWebhook`.
+
 ## 2026-07-04 · claude · ARIA chat natural en Telegram (voz incluida)
 
 - Hecho: capa conversacional de ARIA en `telegramWebhook` (functions/index.js, seccion "ARIA — CHAT NATURAL"). Texto libre o nota de voz en chat PRIVADO → router de intenciones (Groq llama-3.3-70b, JSON) → recolectores de datos SOLO LECTURA (kpi/turno/estado/sensores/equipo/repuestos) → respuesta natural compuesta por Groq con persona ARIA. Memoria conversacional corta en `telegramAriaSessions/{chatId}` (12 turnos). Voz: `message.voice` → downloadTelegramFile → Groq Whisper large-v3-turbo (patron de whisperProxy).
