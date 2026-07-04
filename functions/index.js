@@ -3030,6 +3030,46 @@ async function ariaDataPreventivos() {
   return `Preventivos activos (${snap.size}):\n${lines.join('\n')}`
 }
 
+// ---- Acción pendiente de confirmación (borrador de incidencia) ----
+
+const ARIA_PENDING_TTL_MS = 10 * 60 * 1000
+
+async function ariaGetPending(chatId) {
+  try {
+    const doc = await db.collection('telegramAriaSessions').doc(String(chatId)).get()
+    const p = doc.exists ? doc.data().pendingIncident : null
+    if (!p) return null
+    if (Date.now() - (p.at || 0) > ARIA_PENDING_TTL_MS) return null // expirado
+    return p
+  } catch (_) { return null }
+}
+
+async function ariaSetPending(chatId, pending) {
+  await db.collection('telegramAriaSessions').doc(String(chatId))
+    .set({ pendingIncident: pending || FieldValue.delete() }, { merge: true })
+}
+
+/** Crea la incidencia con la MISMA forma que tgHandleIncidencia (trigger de avisos incluido) */
+async function ariaCrearIncidencia(pending, fromName, telegramUserId) {
+  const id = `tg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  await db.collection('incidents').doc(id).set({
+    id,
+    tipo: 'correctivo',
+    titulo: pending.descripcion.substring(0, 100),
+    descripcion: pending.descripcion,
+    prioridad: pending.prioridad,
+    status: 'pendiente',
+    fotos: [],
+    reportadoPor: `telegram:${telegramUserId}`,
+    creadoPor: `telegram:${telegramUserId}`,
+    creadoPorNombre: fromName,
+    origen: 'telegram',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  return id
+}
+
 // ---- Brief matinal de Mantención ----
 
 /** Junta todas las fuentes y redacta el brief con la persona de ARIA */
@@ -3094,7 +3134,7 @@ exports.ariaDailyBrief = onSchedule(
 
 const ARIA_ROUTER_SPEC =
   'Clasificá el último mensaje del usuario y respondé SOLO un objeto JSON válido: ' +
-  '{"accion": string, "consulta": string, "respuesta": string}\n' +
+  '{"accion": string, "consulta": string, "respuesta": string, "prioridad": string}\n' +
   'Acciones disponibles (todas de solo lectura):\n' +
   '- "kpi": indicadores de hoy (incidencias creadas/resueltas/abiertas, estado de equipos)\n' +
   '- "turno": resumen del turno (incidencias abiertas por prioridad, preventivos de hoy, equipos fuera de servicio)\n' +
@@ -3112,18 +3152,29 @@ const ARIA_ROUTER_SPEC =
   '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
   '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA. ' +
-  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores; y que entendés notas de voz.\n' +
-  'Si el usuario pide algo que requiere ESCRIBIR datos (crear incidencia, pedir repuesto, editar), usá "charla" y explicá en "respuesta" que por ahora solo consultás información, y que eso se hace en la app o con los flujos del grupo.'
+  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal; crear incidencias (con confirmación); y que entendés notas de voz.\n' +
+  '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
+  '- "confirmar": el usuario confirma la acción pendiente (sí, dale, confirmo, hazlo, ok créala)\n' +
+  '- "cancelar": el usuario cancela o descarta la acción pendiente (no, cancela, olvídalo, mejor no)\n' +
+  'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos, cerrar incidencias) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
 
-async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
+async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
-  const history = await ariaLoadHistory(chatId)
+  const [history, pending] = await Promise.all([ariaLoadHistory(chatId), ariaGetPending(chatId)])
+
+  // El router necesita saber si hay un borrador esperando confirmación:
+  // sin esto, un "sí dale" re-extrae del historial (incluso reportes cancelados).
+  const pendingHint = pending
+    ? `\n\nESTADO ACTUAL: hay una incidencia PENDIENTE de confirmación: "${pending.descripcion}" (prioridad ${pending.prioridad}). ` +
+      'Si el usuario asiente o acepta → accion "confirmar". Si rechaza, duda o cambia de tema → "cancelar".'
+    : '\n\nESTADO ACTUAL: no hay ninguna acción pendiente de confirmación — NO uses "confirmar" ni "cancelar"; ' +
+      'un "sí/dale" suelto sin reporte nuevo es "charla".'
 
   // 1) Router: intención + término de búsqueda
-  let route = { accion: 'charla', consulta: '', respuesta: '' }
+  let route = { accion: 'charla', consulta: '', respuesta: '', prioridad: '' }
   try {
     const raw = await ariaGroqChat(
-      [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}` }, ...history, { role: 'user', content: userText }],
+      [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}` }, ...history, { role: 'user', content: userText }],
       { json: true, temperature: 0.1, maxTokens: 300 }
     )
     route = { ...route, ...JSON.parse(raw) }
@@ -3133,7 +3184,27 @@ async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
 
   // 2) Datos + composición de la respuesta
   let reply = ''
-  if (route.accion === 'brief') {
+  if (route.accion === 'incidencia_crear') {
+    const descripcion = String(route.consulta || '').trim()
+    const prioridad = PRIORITY_LABELS.includes(route.prioridad) ? route.prioridad : 'media'
+    if (!descripcion) {
+      reply = 'Contame qué pasó (equipo, qué falla y dónde) y armo la incidencia para que la confirmes.'
+    } else {
+      await ariaSetPending(chatId, { descripcion, prioridad, at: Date.now() })
+      reply = `Voy a crear esta incidencia:\n\n📋 ${descripcion}\n🎯 Prioridad: ${prioridad}\n👤 Reporta: ${fromName}\n\n¿La creo? (sí / no)`
+    }
+  } else if (route.accion === 'confirmar') {
+    if (!pending) {
+      reply = 'No tengo ninguna acción pendiente de confirmar. Si querés reportar algo, contame qué pasó.'
+    } else {
+      const newId = await ariaCrearIncidencia(pending, fromName, telegramUserId)
+      await ariaSetPending(chatId, null)
+      reply = `✅ Incidencia creada (prioridad ${pending.prioridad}):\n📋 ${pending.descripcion}\n🔗 https://orelcain.github.io/mantenimiento-planta/incidents/${newId}`
+    }
+  } else if (route.accion === 'cancelar') {
+    await ariaSetPending(chatId, null)
+    reply = 'Listo, descarté el borrador. ¿Algo más?'
+  } else if (route.accion === 'brief') {
     reply = await ariaComponerBrief()
   } else if (route.accion === 'brief_activar' || route.accion === 'brief_desactivar') {
     const activar = route.accion === 'brief_activar'
@@ -3748,7 +3819,7 @@ exports.telegramWebhook = onRequest(
           await sendTelegramMessage('🎙️ No logré entender el audio. Probá de nuevo.', chatId, { topicId: incomingTopicId })
         } else {
           await sendTelegramMessage(`🎙️ <i>«${ariaEscapeHtml(transcript)}»</i>`, chatId, { topicId: incomingTopicId })
-          await tgHandleAriaChat(chatId, transcript, fromName, incomingTopicId)
+          await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId)
         }
       } catch (error) {
         logger.error('ARIA voice error', error)
@@ -3790,7 +3861,7 @@ exports.telegramWebhook = onRequest(
       }
     } else if (chatType === 'private') {
       // Texto libre en privado → ARIA (chat natural, consultas de solo lectura)
-      await tgHandleAriaChat(chatId, text, fromName, incomingTopicId)
+      await tgHandleAriaChat(chatId, text, fromName, telegramUserId, incomingTopicId)
     }
   } catch (error) {
     logger.error('Error handling Telegram command', error)
