@@ -2725,14 +2725,17 @@ async function ariaDataTurno() {
   const criticas = incSnap.docs.filter((d) => d.data().prioridad === 'critica').length
   const altas = incSnap.docs.filter((d) => d.data().prioridad === 'alta').length
 
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+  // OJO: la colección real es `preventiveTasks` (el handler legacy consultaba
+  // `preventive_tasks`, que no existe); proximaEjecucion puede ser string o Timestamp.
   let prevCount = 0
   try {
-    const prevSnap = await db.collection('preventive_tasks')
-      .where('nextExecution', '>=', today).where('nextExecution', '<', tomorrow).get()
-    prevCount = prevSnap.size
-  } catch (_) { /* puede no existir */ }
+    const prevSnap = await db.collection('preventiveTasks').where('activo', '==', true).get()
+    const finHoy = new Date(); finHoy.setHours(23, 59, 59, 999)
+    prevCount = prevSnap.docs.filter((d) => {
+      const fecha = ariaToDate(d.data().proximaEjecucion)
+      return fecha && fecha <= finHoy
+    }).length
+  } catch (_) { /* ignore */ }
 
   let fuera = []
   try {
@@ -2900,6 +2903,132 @@ async function ariaDataRepuestos(consulta) {
   return `Repuestos encontrados (${hits.length}, maestro SAP):\n${lines.join('\n')}`
 }
 
+/** Normaliza fechas de Firestore: Timestamp | string 'YYYY-MM-DD' | Date → Date|null */
+function ariaToDate(v) {
+  if (!v) return null
+  if (typeof v.toDate === 'function') return v.toDate()
+  if (v instanceof Date) return v
+  if (typeof v === 'string') { const d = new Date(v); return isNaN(d) ? null : d }
+  if (typeof v === 'object' && v._seconds !== undefined) return new Date(v._seconds * 1000)
+  return null
+}
+
+const ariaFmtFecha = (v) => {
+  const d = ariaToDate(v)
+  return d ? d.toLocaleDateString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric' }) : '?'
+}
+
+async function ariaDataHistorial(consulta) {
+  const snap = await db.collection('maintenanceLog').orderBy('fecha', 'desc').limit(50).get()
+  if (snap.empty) return 'No hay registros en el historial de mantención.'
+  let rows = snap.docs.map((d) => d.data())
+  const q = String(consulta || '').trim().toUpperCase()
+  if (q) {
+    rows = rows.filter((x) =>
+      `${x.equipmentId || ''} ${x.plantLineId || ''} ${x.areaNodeId || ''} ${x.tecnico || ''} ${x.hallazgo || ''} ${x.tipo || ''}`
+        .toUpperCase().includes(q))
+  }
+  if (!rows.length) return `Sin registros de mantención que calcen con "${consulta}".`
+  const lines = rows.slice(0, 10).map((x) =>
+    `- ${ariaFmtFecha(x.fecha)} [${x.tipo || '?'}·${x.severidad || '?'}] ${x.hallazgo || 'sin detalle'} — ${x.tecnico || '?'} (${x.plantLineId || x.equipmentId || '?'}${x.shiftId ? `, ${x.shiftId}` : ''})`)
+  return `Historial de mantención (${rows.length} registros, muestro ${lines.length}):\n${lines.join('\n')}`
+}
+
+async function ariaDataGrader() {
+  const snap = await db.collection('graderDailySummaries').orderBy('dateKey', 'desc').limit(2).get()
+  if (snap.empty) return 'No hay resúmenes del Grader.'
+  const bloques = snap.docs.map((d) => {
+    const x = d.data()
+    const gates = Array.isArray(x.gateDistribution)
+      ? x.gateDistribution.map((g) => `G${g.gate}: ${g.pct}%`).join(' · ')
+      : 's/d'
+    return [
+      `Turno ${x.dateKey} (${x.shiftId || '?'}):`,
+      `  Piezas: ${x.totalPieces ?? 's/d'} · peso prom: ${x.avgWeightGrams ? (x.avgWeightGrams / 1000).toFixed(2) + ' kg' : 's/d'}`,
+      `  Distribución compuertas: ${gates}${x.p0Pct !== undefined ? ` · P0: ${x.p0Pct}%` : ''}`,
+      `  Microdetenciones: ${x.microDetentionsCount ?? 0} (${Math.round((x.microDetentionsTotalSec || 0) / 60)} min) · duración turno: ${x.durationMinutes ?? '?'} min`,
+    ].join('\n')
+  })
+  return `Grader — últimos resúmenes:\n${bloques.join('\n')}`
+}
+
+let _ariaGanttCache = { at: 0, items: [] }
+async function ariaGetGantt() {
+  if (Date.now() - _ariaGanttCache.at < ARIA_CACHE_TTL_MS && _ariaGanttCache.items.length) {
+    return _ariaGanttCache.items
+  }
+  const snap = await db.collection('ganttTasks')
+    .select('titulo', 'status', 'prioridad', 'endDate', 'progress', 'responsibleName', 'projectName', 'equipmentNombre', 'hierarchyPath')
+    .get()
+  _ariaGanttCache = { at: Date.now(), items: snap.docs.map((d) => d.data()) }
+  return _ariaGanttCache.items
+}
+
+async function ariaDataGantt(consulta) {
+  const todas = await ariaGetGantt()
+  const q = String(consulta || '').trim().toUpperCase()
+  let items = todas
+  if (q) {
+    const filtradas = todas.filter((x) =>
+      `${x.titulo || ''} ${x.projectName || ''} ${x.responsibleName || ''} ${x.equipmentNombre || ''} ${x.hierarchyPath || ''}`
+        .toUpperCase().includes(q))
+    // Si el "filtro" no calza con nada (ej. el router pasó "atrasadas"), usar todo
+    if (filtradas.length) items = filtradas
+  }
+  const abiertas = items.filter((x) => x.status !== 'completada' && (x.progress ?? 0) < 100)
+  if (!abiertas.length) return q ? `Sin tareas Gantt abiertas que calcen con "${consulta}".` : 'No hay tareas Gantt abiertas.'
+  const ahora = new Date()
+  const atrasadas = abiertas.filter((x) => { const f = ariaToDate(x.endDate); return f && f < ahora })
+  const fmt = (x) => `- ${x.titulo || 'Sin título'} [${x.status || '?'} ${x.progress ?? 0}%] vence ${ariaFmtFecha(x.endDate)} — ${x.responsibleName || '?'}${x.projectName ? ` (${x.projectName})` : ''}`
+  const porVencer = abiertas
+    .filter((x) => !atrasadas.includes(x))
+    .sort((a, b) => (ariaToDate(a.endDate) || 0) - (ariaToDate(b.endDate) || 0))
+    .slice(0, 8)
+  let out = `Tareas Gantt abiertas: ${abiertas.length} (atrasadas: ${atrasadas.length})\n`
+  if (atrasadas.length) out += `ATRASADAS:\n${atrasadas.slice(0, 8).map(fmt).join('\n')}\n`
+  if (porVencer.length) out += `Próximas:\n${porVencer.map(fmt).join('\n')}`
+  return out.trim()
+}
+
+async function ariaDataStockBajo() {
+  const [items, bodega] = await Promise.all([ariaGetRepuestos(), ariaGetBodega()])
+  const porSap = new Map(items.filter((r) => r.codigoSAP).map((r) => [String(r.codigoSAP), r]))
+  const bajos = []
+  for (const [sap, b] of bodega.entries()) {
+    const min = Number(b.stockMinimo || 0)
+    const actual = Number(b.stockActual ?? NaN)
+    if (min > 0 && !isNaN(actual) && actual <= min) {
+      const rep = porSap.get(sap)
+      bajos.push(`- ${rep?.textoBreve || rep?.descripcion || 'SAP ' + sap}: ${actual} ${b.unidad || ''} (mín ${min})${b.ubicacionBodega ? ` — ${b.ubicacionBodega}` : ''}`)
+    }
+  }
+  if (!bajos.length) return 'Ningún repuesto está en o bajo su stock mínimo (de los que tienen mínimo definido).'
+  return `Repuestos en o bajo stock mínimo (${bajos.length}):\n${bajos.slice(0, 15).join('\n')}`
+}
+
+async function ariaDataSolicitudes() {
+  const snap = await db.collection('solicitudes_repuestos').orderBy('createdAt', 'desc').limit(10).get()
+  if (snap.empty) return 'No hay solicitudes de repuestos registradas.'
+  const lines = snap.docs.map((d) => {
+    const x = d.data()
+    return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] ${x.textoBreve || x.codigoSAP || '?'} x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}`
+  })
+  return `Solicitudes de repuestos (últimas ${snap.size}):\n${lines.join('\n')}`
+}
+
+async function ariaDataPreventivos() {
+  const snap = await db.collection('preventiveTasks').where('activo', '==', true).get()
+  if (snap.empty) return 'No hay tareas preventivas activas.'
+  const ahora = new Date()
+  const lines = snap.docs.map((d) => {
+    const x = d.data()
+    const prox = ariaToDate(x.proximaEjecucion)
+    const estado = prox && prox < ahora ? 'VENCIDA' : 'al día'
+    return `- ${x.nombre || 'Sin nombre'} [${x.tipo || '?'}] cada ${x.frecuenciaDias || '?'} días · próxima: ${ariaFmtFecha(x.proximaEjecucion)} (${estado})${x.checklist?.length ? ` · checklist ${x.checklist.length} ítems` : ''}`
+  })
+  return `Preventivos activos (${snap.size}):\n${lines.join('\n')}`
+}
+
 // ---- Orquestador del chat natural ----
 
 const ARIA_ROUTER_SPEC =
@@ -2912,7 +3041,14 @@ const ARIA_ROUTER_SPEC =
   '- "sensores": lecturas de sensores en tiempo real\n' +
   '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
   '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
-  '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA\n' +
+  '- "historial": historial/bitácora de intervenciones de mantención (inspecciones, capturas rápidas) — término opcional en "consulta" (equipo, área, técnico)\n' +
+  '- "grader": resumen de los últimos turnos del Grader (piezas, peso, compuertas, microdetenciones)\n' +
+  '- "gantt": tareas planificadas del Gantt (abiertas, atrasadas, próximas a vencer) — "consulta" SOLO si nombran un proyecto/responsable/equipo específico; NO pongas palabras de estado como "atrasadas" o "pendientes"\n' +
+  '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
+  '- "solicitudes": solicitudes de repuestos a bodega y su estado\n' +
+  '- "preventivos": tareas preventivas activas y cuándo tocan\n' +
+  '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA. ' +
+  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores; y que entendés notas de voz.\n' +
   'Si el usuario pide algo que requiere ESCRIBIR datos (crear incidencia, pedir repuesto, editar), usá "charla" y explicá en "respuesta" que por ahora solo consultás información, y que eso se hace en la app o con los flujos del grupo.'
 
 async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
@@ -2945,6 +3081,12 @@ async function tgHandleAriaChat(chatId, userText, fromName, topicId) {
         case 'sensores': datos = await ariaDataSensores(); break
         case 'equipo': datos = await ariaDataEquipo(route.consulta || userText); break
         case 'repuestos': datos = await ariaDataRepuestos(route.consulta || userText); break
+        case 'historial': datos = await ariaDataHistorial(route.consulta || ''); break
+        case 'grader': datos = await ariaDataGrader(); break
+        case 'gantt': datos = await ariaDataGantt(route.consulta || ''); break
+        case 'stockbajo': datos = await ariaDataStockBajo(); break
+        case 'solicitudes': datos = await ariaDataSolicitudes(); break
+        case 'preventivos': datos = await ariaDataPreventivos(); break
         default: datos = ''
       }
     } catch (err) {
