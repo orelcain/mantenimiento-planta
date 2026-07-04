@@ -13,6 +13,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram — crear incidencias con confirmacion
+
+- Hecho: primera ESCRITURA de ARIA, con puerta de confirmacion obligatoria. Router: acciones `incidencia_crear` (borrador con descripcion+prioridad deducida → `pendingIncident` en la sesion, TTL 10 min), `confirmar` (crea doc en `incidents` con la MISMA forma que tgHandleIncidencia → dispara onIncidentCreated normal) y `cancelar`. CLAVE: el router recibe el ESTADO (hay/no hay borrador pendiente) inyectado en el system prompt — sin eso un "si dale" re-extraia reportes del historial incluso cancelados. `tgHandleAriaChat` ahora recibe `telegramUserId`.
+- Verificacion: dry-run — borrador critica desde "se solto la correa..., es urgente" OK; cancelar OK; "si dale" tras cancelar RE-PROPONE el borrador (pide confirmacion de nuevo, no crea directo — aceptado como UX valida); crear tras "si, confirmo" creo incidencia real (borrada tras la prueba junto con la sesion de test).
+- Estado: EN REVISION (rama feat/aria-telegram-crear-incidencias → PR). Post-merge: deploy telegramWebhook.
+- Sigue: verificar brief 7AM de manana; posible siguiente: adjuntar foto a incidencia via ARIA, cerrar/comentar incidencias con confirmacion.
+
 ## 2026-07-04 · claude · ARIA Telegram — brief matinal 7AM + brief a demanda
 
 - Hecho: `ariaComponerBrief()` (junta turno/kpi/gantt/stock-bajo/preventivos/grader/solicitudes en paralelo → Groq redacta brief ~16 lineas con persona ARIA, fallback datos crudos) + `exports.ariaDailyBrief` onSchedule 07:00 America/Santiago → envia a chats con `briefDiario==true` en `telegramAriaSessions`. Router: acciones `brief` (a demanda), `brief_activar`/`brief_desactivar` (toggle conversacional del flag, unica escritura y es config del propio chat). FIX: `ariaSaveTurns` ahora set con merge:true para no pisar flags.
