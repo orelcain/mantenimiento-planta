@@ -2654,12 +2654,27 @@ const ARIA_CACHE_TTL_MS = 10 * 60 * 1000
 const ARIA_PERSONA =
   'Sos ARIA, la asistente de Mantención de la planta Antarfood (proceso de salmón). ' +
   'Hablás español chileno cercano y profesional. Respuestas BREVES para chat móvil ' +
-  '(máximo ~8 líneas), viñetas simples si ayudan, emojis con moderación. ' +
+  '(máximo ~8 líneas), emojis con moderación. ' +
+  'FORMATO: usá **negrita** para títulos y nombres clave, `código` para códigos SAP/tags/valores exactos, ' +
+  'y viñetas con "- " para listas. Nada de tablas, encabezados # ni links markdown (pegá las URLs directas). ' +
   'Tu misión es dar acceso rápido a los datos de la app de mantenimiento y ' +
   'evidenciar con datos el aporte de Mantención al proceso.'
 
 const ariaEscapeHtml = (v) => String(v ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * Markdown liviano → HTML de Telegram, a prueba de balas: se escapa TODO el
+ * HTML primero y recién después se convierten **negrita**, `código` y viñetas.
+ * Un formato mal cerrado queda como texto literal, nunca rompe el sendMessage.
+ */
+function ariaFormatTelegram(text) {
+  let t = ariaEscapeHtml(text)
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+  t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>')
+  t = t.replace(/^\s*[-*]\s+/gm, '• ')
+  return t
+}
 
 /** Llamada interna a Groq chat completions (misma key secret que groqProxy) */
 async function ariaGroqChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
@@ -2751,6 +2766,7 @@ async function ariaGetGcpToken() {
 async function ariaTts(text) {
   // Quitar emojis/símbolos que el TTS lee mal; acotar largo (costo + naturalidad)
   const limpio = String(text)
+    .replace(/\*\*|[*`_#]/g, '')
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{FE0F}]/gu, '')
     .replace(/\s+/g, ' ').trim().slice(0, 850)
   if (!limpio) throw new Error('texto vacío para TTS')
@@ -2833,7 +2849,7 @@ async function ariaHandleFoto(chatId, message, fromName) {
       fotoFileId: largest.file_id, at: Date.now(),
     })
     const replyTexto = `📸 Esto veo:\n${desc}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`
-    await sendTelegramMessage(`📸 Esto veo:\n${ariaEscapeHtml(desc)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`, chatId, {})
+    await sendTelegramMessage(`📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`, chatId, {})
     await ariaSaveTurns(chatId, caption ? `[foto] ${caption}` : '[foto]', replyTexto)
   } catch (err) {
     logger.error('ariaHandleFoto error', { error: err?.message })
@@ -3390,7 +3406,7 @@ async function ariaComponerBrief() {
         {
           role: 'system',
           content: `${ARIA_PERSONA}\n\nRedactá el BRIEF MATINAL de Mantención con estos datos reales. ` +
-            'Formato: texto plano, máximo ~16 líneas. Estructura: 1) saludo de UNA línea, SIN repetir la fecha (ya va en el encabezado); ' +
+            'Formato: máximo ~16 líneas, con **negrita** en los títulos de sección y viñetas "- ". Estructura: 1) saludo de UNA línea, SIN repetir la fecha (ya va en el encabezado); ' +
             '2) estado general (incidencias, equipos); 3) ALERTAS — lo accionable primero: tareas Gantt atrasadas, ' +
             'preventivos vencidos, stock bajo mínimo (solo cantidades y los 2-3 más importantes); ' +
             '4) Grader del último turno en una línea; 5) cierre breve. NO inventes datos.\n\n' +
@@ -3415,7 +3431,7 @@ exports.ariaDailyBrief = onSchedule(
     if (subs.empty) { logger.info('ariaDailyBrief: sin suscriptores'); return }
     const brief = await ariaComponerBrief()
     for (const doc of subs.docs) {
-      await sendTelegramMessage(ariaEscapeHtml(brief), doc.id)
+      await sendTelegramMessage(ariaFormatTelegram(brief), doc.id)
     }
     logger.info(`ariaDailyBrief enviado a ${subs.size} chat(s)`)
   }
@@ -3443,6 +3459,7 @@ const ARIA_ROUTER_SPEC =
   '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
   '- "charla": saludo, agradecimiento, pregunta general O pregunta sobre la APP misma (qué módulos hay, dónde se hace algo, cómo usar una función) — escribí la respuesta directa en "respuesta" como ARIA usando el MAPA DE LA APP. ' +
+  'Cuando la respuesta incluya una enumeración (módulos, equipos, ítems), formateala SIEMPRE como lista: una línea por ítem con "- " y el nombre en **negrita**. ' +
   'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
   '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
   '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
@@ -3515,7 +3532,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       reply = 'Contame qué pasó (equipo, qué falla y dónde) y armo la incidencia para que la confirmes.'
     } else {
       await ariaSetPending(chatId, { kind: 'crear', descripcion, prioridad, at: Date.now() })
-      reply = `Voy a crear esta incidencia:\n\n📋 ${descripcion}\n🎯 Prioridad: ${prioridad}\n👤 Reporta: ${fromName}\n\n¿La creo? (sí / no)`
+      reply = `**Voy a crear esta incidencia:**\n\n📋 ${descripcion}\n🎯 Prioridad: **${prioridad}**\n👤 Reporta: ${fromName}\n\n¿La creo? (sí / no)`
     }
   } else if (route.accion === 'incidencia_cerrar') {
     const referencia = String(route.consulta || '').trim().toUpperCase()
@@ -3535,7 +3552,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         hits.slice(0, 5).map((x) => `- ${x.titulo || 'Sin título'} [${x.prioridad}]`).join('\n')
     } else {
       await ariaSetPending(chatId, { kind: 'cerrar', incidentId: hits[0].id, titulo: hits[0].titulo || 'Sin título', at: Date.now() })
-      reply = `Voy a marcar como RESUELTA esta incidencia:\n\n📋 ${hits[0].titulo || 'Sin título'} [${hits[0].prioridad}]\n\n¿Confirmás? (sí / no)`
+      reply = `**Voy a marcar como RESUELTA esta incidencia:**\n\n📋 ${hits[0].titulo || 'Sin título'} [${hits[0].prioridad}]\n\n¿Confirmás? (sí / no)`
     }
   } else if (route.accion === 'confirmar') {
     if (!pending) {
@@ -3643,7 +3660,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   }
 
   reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Probá de nuevo en un rato.'
-  await sendTelegramMessage(ariaEscapeHtml(reply), chatId, { topicId })
+  await sendTelegramMessage(ariaFormatTelegram(reply), chatId, { topicId })
   await ariaSaveTurns(chatId, userText, reply)
   return reply
 }
