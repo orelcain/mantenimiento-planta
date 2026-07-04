@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA vision con OCR + adjuntar foto a repuesto del maestro
+
+- Origen: Orel mostro screenshot real — foto de un conector con SAP "3300031966" impreso en la etiqueta; ARIA lo describio pero IGNORO el codigo, y al preguntarle "que codigo detectas?" respondio "revise la foto de nuevo, no veo ninguno" (FALSO — no tiene acceso a re-examinar la imagen en el chat de seguimiento, solo al texto guardado en history).
+- FIX 1 OCR: `ariaGroqVision` ahora pide JSON {descripcion, codigos[], falla} — instruccion explicita de leer etiquetas/tags (SAP 8-10 digitos, part numbers). Antes solo pedia describir el equipo/falla, nunca leer texto.
+- FIX 2 honestidad: instruccion en ARIA_PERSONA — nunca decir que "revisaste de nuevo" una foto ya analizada (no hay re-acceso a la imagen); responder en base al analisis guardado en history, u ofrecer que reenvien la foto.
+- FIX 3 (feature nueva): `ariaBuscarCodigoEnMaestro` matchea el/los codigos detectados contra `repuestos` (SAP exacto por digitos, o texto libre). Si hay match → nuevo pending `kind:'adjuntar_foto_repuesto'` → confirmar sube la foto a Storage (carpeta `repuestos/`, antes hardcodeaba `incidents/` — corregido con parametro `carpeta` en `uploadPhotoToStorage`) y hace `arrayUnion` en `fotosReales` del repuesto real. Si no hay match → sigue el flujo de incidencia de antes (con nota del codigo visible sin coincidencia, si aplica).
+- BUG real cazado en el dry-run: `FieldValue.serverTimestamp()` NO se puede usar dentro de un elemento de `arrayUnion` (Firestore lo rechaza) — cambiado a `new Date()`, igual patron que los otros usos de fotosReales/imagenesManual en el codigo existente.
+- Verificacion end-to-end con el MISMO SAP real del caso reportado (3300031966, "CONECTOR TEE 10MM", ya en el maestro): foto generada con PIL replicando la etiqueta → vision detecto conector+codigo+match real → confirmar escribio fotosReales de verdad (verificado leyendo el doc, luego revertido a []) → storage path correcto `repuestos/{id}/...`. Camino sin match (foto de falla sin codigo) verificado sigue creando incidencia normal.
+- Limitacion conocida (no arreglada, documentada): bajo fallback al modelo 8B (cuota Groq 70B agotada durante el test), la respuesta a "que codigo viste?" en el chat de seguimiento fue imprecisa (dijo que no detecto el codigo, pese a estar en el history) — ya NO alucina "revise de nuevo", pero el modelo chico no siempre recupera bien el dato del historial. Con el modelo 70B (cuota normal) deberia responder mejor; queda como limitacion de calidad del fallback, no de arquitectura.
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
+
 ## 2026-07-04 · claude · ARIA APRENDE — hechos globales + lagunas + fallback de modelos
 
 - Vision de Orel: ARIA no debe decir "no tengo informacion" y quedarse ahi — debe poder APRENDER.

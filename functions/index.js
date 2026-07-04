@@ -1980,10 +1980,10 @@ async function downloadTelegramFile(fileId) {
 }
 
 /** Sube buffer JPEG a Firebase Storage y retorna URL de descarga con token */
-async function uploadPhotoToStorage(incidentId, buffer, idx) {
+async function uploadPhotoToStorage(incidentId, buffer, idx, carpeta = 'incidents') {
   const bucket = getStorageBucket()
   const token = randomUUID()
-  const filename = `incidents/${incidentId}/telegram_${Date.now()}_${idx + 1}.jpg`
+  const filename = `${carpeta}/${incidentId}/telegram_${Date.now()}_${idx + 1}.jpg`
   const file = bucket.file(filename)
   await file.save(buffer, {
     contentType: 'image/jpeg',
@@ -2657,6 +2657,9 @@ const ARIA_PERSONA =
   '(máximo ~8 líneas), emojis con moderación. ' +
   'FORMATO: usá **negrita** para títulos y nombres clave, `código` para códigos SAP/tags/valores exactos, ' +
   'y viñetas con "- " para listas. Nada de tablas, encabezados # ni links markdown (pegá las URLs directas). ' +
+  'HONESTIDAD CON FOTOS: solo podés ver una foto en el momento en que te la mandan. Si después te preguntan de nuevo por algo de esa foto, ' +
+  'NUNCA digas que la "revisaste de nuevo" — respondé en base a lo que ya describiste en tu análisis anterior (está en el historial), ' +
+  'y si no alcanza, decí que no lo detectaste en ese análisis y pedí que reenvíen la foto para mirarla de nuevo.\n' +
   'Tu misión es dar acceso rápido a los datos de la app de mantenimiento y ' +
   'evidenciar con datos el aporte de Mantención al proceso.'
 
@@ -2844,14 +2847,21 @@ async function sendTelegramVoice(chatId, buffer, opts = {}) {
 
 // ---- Visión (Groq llama-4-scout) ----
 
-/** Describe una imagen de planta con el modelo de visión de Groq */
+/**
+ * Describe una imagen de planta con el modelo de visión de Groq.
+ * Devuelve {descripcion, codigos[], falla} — sin pedir explícitamente los
+ * códigos/etiquetas impresas, el modelo tiende a describir el equipo y
+ * pasar por alto el texto de las etiquetas (SAP, tags de inventario).
+ */
 async function ariaGroqVision(imageBase64, mime, hint) {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
   const prompt =
-    'Sos ARIA, asistente de mantención de una planta de proceso de salmón. Mirá la foto y describí en 2-3 frases: ' +
-    'qué equipo/componente se ve y si hay una falla o daño visible (correa cortada, fuga, óxido, cable suelto, desgaste, etc.). ' +
-    'Si no se aprecia una falla, decilo con claridad. Respondé en español, texto plano.' +
+    'Sos ARIA, asistente de mantención de una planta de proceso de salmón. Analizá la foto y respondé SOLO ' +
+    'un objeto JSON válido: {"descripcion": string, "codigos": string[], "falla": boolean}\n' +
+    '- "descripcion": 2-3 frases — qué equipo/componente se ve y si hay falla/daño visible (correa cortada, fuga, óxido, cable suelto, desgaste). Si no hay falla, decilo con claridad.\n' +
+    '- "codigos": TODO texto impreso en etiquetas/tags que parezca un código (códigos SAP —usualmente 8-10 dígitos—, part numbers, códigos de fabricante, tags de inventario). Mirá con atención las etiquetas blancas/amarillas pegadas al componente. Array vacío si no hay ninguno legible.\n' +
+    '- "falla": true si hay daño/falla visible, false si no.' +
     (hint ? `\nContexto del usuario: ${hint}` : '')
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -2865,16 +2875,63 @@ async function ariaGroqVision(imageBase64, mime, hint) {
           { type: 'image_url', image_url: { url: `data:${mime};base64,${imageBase64}` } },
         ],
       }],
-      temperature: 0.2,
-      max_tokens: 400,
+      temperature: 0.1,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
     }),
   })
   if (!r.ok) throw new Error(`Groq vision ${r.status}: ${(await r.text()).slice(0, 150)}`)
   const d = await r.json()
-  return (d.choices?.[0]?.message?.content || '').trim()
+  const raw = (d.choices?.[0]?.message?.content || '').trim()
+  try {
+    const parsed = JSON.parse(raw)
+    return {
+      descripcion: String(parsed.descripcion || '').trim(),
+      codigos: Array.isArray(parsed.codigos) ? parsed.codigos.map(String).filter(Boolean).slice(0, 5) : [],
+      falla: parsed.falla === true,
+    }
+  } catch (_) {
+    // El modelo a veces devuelve texto plano pese al response_format — degradar sin perder la descripción
+    return { descripcion: raw, codigos: [], falla: false }
+  }
 }
 
-/** Foto en privado → ARIA la mira y propone incidencia con la foto adjunta */
+/** Busca un código detectado en la foto contra el maestro (SAP exacto o texto libre) */
+async function ariaBuscarCodigoEnMaestro(codigo) {
+  const items = await ariaGetRepuestos()
+  const soloDigitos = codigo.replace(/\D/g, '')
+  if (soloDigitos.length >= 6) {
+    const bySap = items.find((r) => r.codigoSAP && String(r.codigoSAP) === soloDigitos)
+    if (bySap) return bySap
+  }
+  const upper = codigo.toUpperCase()
+  return items.find((r) => r._blob.includes(upper)) || null
+}
+
+/** Sube la foto a Storage y la agrega a fotosReales del repuesto (escritura confirmada) */
+async function ariaAdjuntarFotoARepuesto(codigoSAP, fileId) {
+  const snap = await db.collection('repuestos').where('codigoSAP', '==', codigoSAP).limit(1).get()
+  if (snap.empty) throw new Error(`no encontré el repuesto SAP ${codigoSAP} al confirmar`)
+  const doc = snap.docs[0]
+  const buffer = await downloadTelegramFile(fileId)
+  const url = await uploadPhotoToStorage(doc.id, buffer, 0, 'repuestos')
+  await doc.ref.update({
+    // FieldValue.serverTimestamp() no se puede usar DENTRO de un elemento de arrayUnion
+    // (Firestore lo rechaza) — se usa Date() normal, igual que uploadPhotoToStorage/tgHandlePhoto.
+    fotosReales: FieldValue.arrayUnion({
+      id: randomUUID(), url, descripcion: 'Foto vía ARIA (Telegram)', orden: 0, esPrincipal: false,
+      tipo: 'real', createdAt: new Date(),
+    }),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  return doc.data()
+}
+
+/**
+ * Foto en privado → ARIA la mira (descripción + OCR de códigos) y ofrece:
+ * 1) si detecta un código que existe en el maestro → adjuntar la foto a ESE repuesto
+ * 2) si no hay match (o no hay código) y parece falla → crear incidencia con la foto
+ */
 async function ariaHandleFoto(chatId, message, fromName) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
   try {
@@ -2885,15 +2942,35 @@ async function ariaHandleFoto(chatId, message, fromName) {
       return
     }
     const caption = (message.caption || '').trim()
-    const desc = await ariaGroqVision(buffer.toString('base64'), 'image/jpeg', caption)
-    const descripcion = (caption ? `${caption} — ` : '') + desc
-    await ariaSetPending(chatId, {
-      kind: 'crear', descripcion: descripcion.slice(0, 800), prioridad: 'media',
-      fotoFileId: largest.file_id, at: Date.now(),
-    })
-    const replyTexto = `📸 Esto veo:\n${desc}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`
-    await sendTelegramMessage(`📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`, chatId, {})
-    await ariaSaveTurns(chatId, caption ? `[foto] ${caption}` : '[foto]', replyTexto)
+    const { descripcion: desc, codigos } = await ariaGroqVision(buffer.toString('base64'), 'image/jpeg', caption)
+
+    let match = null
+    for (const c of codigos) {
+      match = await ariaBuscarCodigoEnMaestro(c)
+      if (match) break
+    }
+
+    let reply, replyHtml
+    if (match) {
+      await ariaSetPending(chatId, {
+        kind: 'adjuntar_foto_repuesto', codigoSAP: match.codigoSAP, nombreRepuesto: match.textoBreve || match.descripcion,
+        fotoFileId: largest.file_id, at: Date.now(),
+      })
+      reply = `**Esto veo:**\n${desc}\n\n📎 Encontré ese código en el maestro: **${match.textoBreve || match.descripcion}** (SAP \`${match.codigoSAP}\`).\n\n¿Agrego esta foto como referencia de ese repuesto? (sí / no)`
+      replyHtml = `📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}\n\n📎 Encontré ese código en el maestro: <b>${ariaEscapeHtml(match.textoBreve || match.descripcion)}</b> (SAP <code>${ariaEscapeHtml(match.codigoSAP)}</code>).\n\n¿Agrego esta foto como referencia de ese repuesto? (sí / no)`
+    } else {
+      const descripcion = (caption ? `${caption} — ` : '') + desc +
+        (codigos.length ? ` (código visible: ${codigos.join(', ')}, sin coincidencia en el maestro)` : '')
+      await ariaSetPending(chatId, {
+        kind: 'crear', descripcion: descripcion.slice(0, 800), prioridad: 'media',
+        fotoFileId: largest.file_id, at: Date.now(),
+      })
+      const notaCodigo = codigos.length ? `\n\n🔎 Vi el código "${codigos[0]}" pero no está en el maestro de repuestos.` : ''
+      reply = `**Esto veo:**\n${desc}${notaCodigo}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`
+      replyHtml = `📸 <b>Esto veo:</b>\n${ariaEscapeHtml(desc)}${ariaEscapeHtml(notaCodigo)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`
+    }
+    await sendTelegramMessage(replyHtml, chatId, {})
+    await ariaSaveTurns(chatId, caption ? `[foto] ${caption}` : '[foto]', reply)
   } catch (err) {
     logger.error('ariaHandleFoto error', { error: err?.message })
     await sendTelegramMessage('❌ No pude analizar la foto. Intentá de nuevo.', chatId, {})
@@ -3586,7 +3663,9 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   // El router necesita saber si hay un borrador esperando confirmación:
   // sin esto, un "sí dale" re-extrae del historial (incluso reportes cancelados).
   const pendingDesc = pending
-    ? (pending.kind === 'cerrar' ? `CERRAR la incidencia "${pending.titulo}"` : `CREAR la incidencia "${pending.descripcion}" (prioridad ${pending.prioridad})`)
+    ? (pending.kind === 'cerrar' ? `CERRAR la incidencia "${pending.titulo}"`
+      : pending.kind === 'adjuntar_foto_repuesto' ? `AGREGAR la foto como referencia del repuesto "${pending.nombreRepuesto}" (SAP ${pending.codigoSAP})`
+        : `CREAR la incidencia "${pending.descripcion}" (prioridad ${pending.prioridad})`)
     : ''
   const pendingHint = pending
     ? `\n\nESTADO ACTUAL: hay una acción PENDIENTE de confirmación: ${pendingDesc}. ` +
@@ -3679,6 +3758,16 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       })
       await ariaSetPending(chatId, null)
       reply = `✅ Incidencia marcada como resuelta:\n📋 ${pending.titulo}`
+    } else if (pending.kind === 'adjuntar_foto_repuesto') {
+      try {
+        await ariaAdjuntarFotoARepuesto(pending.codigoSAP, pending.fotoFileId)
+        await ariaSetPending(chatId, null)
+        reply = `✅ Foto agregada al repuesto **${pending.nombreRepuesto}** (SAP \`${pending.codigoSAP}\`). Ya la vas a ver en su ficha del módulo Repuestos.`
+      } catch (err) {
+        logger.error('ariaAdjuntarFotoARepuesto error', { error: err?.message })
+        await ariaSetPending(chatId, null)
+        reply = '❌ No pude adjuntar la foto al repuesto. Probá de nuevo en un rato.'
+      }
     } else {
       const newId = await ariaCrearIncidencia(pending, fromName, telegramUserId)
       await ariaSetPending(chatId, null)
