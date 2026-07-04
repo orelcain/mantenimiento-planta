@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA APRENDE — hechos globales + lagunas + fallback de modelos
+
+- Vision de Orel: ARIA no debe decir "no tengo informacion" y quedarse ahi — debe poder APRENDER.
+- HECHOS GLOBALES: "aprende: X" (SOLO admin; atajo DETERMINISTA por prefijo, el 8B lo ruteaba mal) → `ariaKnowledge/hechos` (cap 60) → inyectado en router+composer para TODOS los usuarios. "recuerda que X" (nota personal) tambien determinista. Verificado: enseñar → usar el hecho en la respuesta siguiente (con razonamiento encima).
+- LAGUNAS: cuando la respuesta contiene "no encontre/no tengo/etc" (heuristica, excluyendo acciones de control) → log en `ariaGaps` (pregunta+accion+respuesta). Accion `lagunas`: "que no has sabido responder?" → lista para decidir que enseñarle.
+- Composer: si los datos no alcanzan → decir QUE dato falta + (admin) ofrecer "aprende: ..." / (tecnico) sugerir pedirselo a Orel.
+- REPUESTOS enriquecidos: cantidadPorMaquina + stock bodega SIEMPRE (o "sin registro en bodega") + valorUnitario + ubicacionEnPlanta + nota explicativa.
+- FALLBACK DE MODELOS (hallazgo: cuota Groq diaria AGOTADA en pleno test, 98k/100k TPD): cadena Groq 70B → Groq 8B-instant (cuota separada) → Gemini 2.5 flash (secret GEMINI_API_KEY sumado a telegramWebhook y ariaDailyBrief). ARIA no queda muda. Fallback 8B validado en vivo; Gemini queda validado por codigo (espejo de geminiProxy).
+- Limpieza: hecho de prueba INVENTADO borrado de ariaKnowledge/hechos + lagunas/sesion/usuario de test.
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + ariaDailyBrief.
+
 ## 2026-07-04 · claude · ARIA Telegram — respuestas FORMATEADAS (markdown→HTML Telegram)
 
 - Pedido de Orel: respuestas con formato (las listas salian como parrafo plano).

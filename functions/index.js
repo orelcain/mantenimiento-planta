@@ -2676,11 +2676,12 @@ function ariaFormatTelegram(text) {
   return t
 }
 
-/** Llamada interna a Groq chat completions (misma key secret que groqProxy) */
-async function ariaGroqChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
+const ARIA_MODEL_FALLBACK = process.env.ARIA_MODEL_FALLBACK || 'llama-3.1-8b-instant'
+
+async function _ariaGroqChatRaw(model, messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
-  const body = { model: ARIA_MODEL, messages, temperature, max_tokens: maxTokens }
+  const body = { model, messages, temperature, max_tokens: maxTokens }
   if (json) body.response_format = { type: 'json_object' }
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -2689,11 +2690,53 @@ async function ariaGroqChat(messages, { temperature = 0.3, maxTokens = 600, json
   })
   if (!response.ok) {
     const errorText = await response.text()
-    logger.error('ARIA Groq error', { status: response.status, body: errorText })
+    logger.error('ARIA Groq error', { model, status: response.status, body: errorText.slice(0, 300) })
     throw new Error(`Groq ${response.status}`)
   }
   const data = await response.json()
   return data.choices?.[0]?.message?.content || ''
+}
+
+/** Último recurso: Gemini flash (misma key secret que geminiProxy) */
+async function _ariaGeminiChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY no configurado')
+  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
+  const contents = messages.filter((m) => m.role !== 'system').map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }))
+  const body = {
+    contents: contents.length ? contents : [{ role: 'user', parts: [{ text: ' ' }] }],
+    generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
+  }
+  if (system) body.systemInstruction = { parts: [{ text: system }] }
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 150)}`)
+  const d = await r.json()
+  return d.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || ''
+}
+
+/**
+ * Chat con CADENA DE FALLBACK: Groq 70B → Groq 8B (cuota separada) → Gemini
+ * flash. ARIA no queda muda aunque se agoten las cuotas gratis de Groq.
+ */
+async function ariaGroqChat(messages, opts = {}) {
+  try {
+    return await _ariaGroqChatRaw(ARIA_MODEL, messages, opts)
+  } catch (err) {
+    if (!/429|413|5\d\d/.test(String(err?.message))) throw err
+    try {
+      logger.warn(`ARIA: ${ARIA_MODEL} sin cuota — fallback ${ARIA_MODEL_FALLBACK}`)
+      return await _ariaGroqChatRaw(ARIA_MODEL_FALLBACK, messages, opts)
+    } catch (err2) {
+      if (!/429|413|5\d\d/.test(String(err2?.message))) throw err2
+      logger.warn('ARIA: Groq agotado — fallback Gemini flash')
+      return await _ariaGeminiChat(messages, opts)
+    }
+  }
 }
 
 /** Transcribe una nota de voz de Telegram (OGG/OPUS) con Groq Whisper */
@@ -3005,6 +3048,58 @@ async function ariaAppKnowledgeBlock(esAdmin) {
   return block
 }
 
+// ---- Hechos enseñados (conocimiento GLOBAL, ariaKnowledge/hechos) ----
+// "aprende: ..." (solo admin) guarda hechos de la planta que ARIA usa con todos.
+
+let _ariaHechosCache = { at: 0, hechos: [] }
+
+async function ariaGetHechos() {
+  if (Date.now() - _ariaHechosCache.at < ARIA_CACHE_TTL_MS && _ariaHechosCache.hechos.length) {
+    return _ariaHechosCache.hechos
+  }
+  try {
+    const doc = await db.collection('ariaKnowledge').doc('hechos').get()
+    _ariaHechosCache = { at: Date.now(), hechos: doc.exists ? (doc.data().hechos || []) : [] }
+  } catch (err) { logger.warn('ariaGetHechos error', { error: err?.message }) }
+  return _ariaHechosCache.hechos
+}
+
+async function ariaAddHecho(texto, por) {
+  const hechos = [...(await ariaGetHechos()), { texto: String(texto).slice(0, 300), por, en: Date.now() }].slice(-60)
+  await db.collection('ariaKnowledge').doc('hechos').set({ hechos, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+  _ariaHechosCache = { at: Date.now(), hechos }
+}
+
+async function ariaHechosBlock() {
+  const hechos = await ariaGetHechos()
+  if (!hechos.length) return ''
+  return '\n\nHECHOS DE ESTA PLANTA ENSEÑADOS POR EL EQUIPO (dato verificado, usalos con confianza):\n' +
+    hechos.map((h) => `- ${h.texto}`).join('\n')
+}
+
+// ---- Lagunas: registro de lo que ARIA no supo responder (ariaGaps) ----
+
+function ariaLogLaguna(chatId, pregunta, accion, respuesta) {
+  db.collection('ariaGaps').add({
+    chatId: String(chatId),
+    pregunta: String(pregunta).slice(0, 300),
+    accion: accion || '?',
+    respuesta: String(respuesta).slice(0, 300),
+    fecha: FieldValue.serverTimestamp(),
+  }).catch(() => {})
+}
+
+async function ariaDataLagunas() {
+  const snap = await db.collection('ariaGaps').orderBy('fecha', 'desc').limit(12).get()
+  if (snap.empty) return 'No tengo lagunas registradas — hasta ahora he podido responder todo (o nadie preguntó lo difícil 😄).'
+  const lines = snap.docs.map((d) => {
+    const x = d.data()
+    return `- ${ariaFmtFecha(x.fecha)} [${x.accion}] "${x.pregunta}"`
+  })
+  return `Preguntas que no pude responder bien (últimas ${snap.size}):\n${lines.join('\n')}\n` +
+    '(el admin puede enseñarme el dato que falta con "aprende: ...")'
+}
+
 const ARIA_MSG_NO_AUTORIZADO =
   '🔒 Hola! Soy ARIA, la asistente de Mantención de Antarfood. ' +
   'Tu usuario no está habilitado para conversar conmigo. ' +
@@ -3158,7 +3253,7 @@ async function ariaGetRepuestos() {
     return _ariaRepuestosCache.items
   }
   const snap = await db.collection('repuestos')
-    .select('textoBreve', 'descripcion', 'codigoSAP', 'clase', 'equiposCodigos', 'valorUnitario', 'tieneSap')
+    .select('textoBreve', 'descripcion', 'codigoSAP', 'clase', 'equiposCodigos', 'valorUnitario', 'tieneSap', 'cantidadPorMaquina', 'ubicacionEnPlanta')
     .get()
   const items = snap.docs.map((d) => {
     const x = d.data()
@@ -3167,6 +3262,8 @@ async function ariaGetRepuestos() {
       codigoSAP: x.codigoSAP || '', clase: x.clase || '',
       equiposCodigos: Array.isArray(x.equiposCodigos) ? x.equiposCodigos : [],
       valorUnitario: x.valorUnitario,
+      cantidadPorMaquina: x.cantidadPorMaquina,
+      ubicacionEnPlanta: x.ubicacionEnPlanta || '',
       _blob: `${x.textoBreve || ''} ${x.descripcion || ''} ${x.codigoSAP || ''} ${(x.equiposCodigos || []).join(' ')}`.toUpperCase(),
     }
   })
@@ -3204,11 +3301,15 @@ async function ariaDataRepuestos(consulta) {
       `- ${r.textoBreve || r.descripcion || 'Sin nombre'}`,
       r.codigoSAP ? `  SAP ${r.codigoSAP}` : '  (sin SAP)',
       r.clase ? ` · ${r.clase}` : '',
+      r.cantidadPorMaquina ? ` · ${r.cantidadPorMaquina} por máquina` : '',
       r.equiposCodigos.length ? ` · equipos: ${r.equiposCodigos.slice(0, 3).join(', ')}` : '',
-      stock ? ` · stock bodega: ${stock.stockActual ?? '?'} ${stock.unidad || ''} (${stock.ubicacionBodega || 's/ubicación'})` : '',
+      stock ? ` · stock bodega: ${stock.stockActual ?? '?'} ${stock.unidad || ''} (${stock.ubicacionBodega || 's/ubicación'})` : ' · sin registro en bodega',
+      r.valorUnitario ? ` · $${Number(r.valorUnitario).toLocaleString('es-CL')}` : '',
+      r.ubicacionEnPlanta ? ` · ubicación: ${r.ubicacionEnPlanta}` : '',
     ].join('')
   })
-  return `Repuestos encontrados (${hits.length}, maestro SAP):\n${lines.join('\n')}`
+  return `Repuestos encontrados (${hits.length}, maestro SAP):\n${lines.join('\n')}\n` +
+    '(nota: "cantidad por máquina" = cuántas lleva el equipo; "stock bodega" = existencias; si un dato no aparece, no está cargado en el maestro)'
 }
 
 /** Normaliza fechas de Firestore: Timestamp | string 'YYYY-MM-DD' | Date → Date|null */
@@ -3425,7 +3526,7 @@ async function ariaComponerBrief() {
 
 /** Brief matinal automático 7:00 AM a los chats suscritos (briefDiario=true) */
 exports.ariaDailyBrief = onSchedule(
-  { schedule: '0 7 * * *', timeZone: 'America/Santiago', region: 'us-central1', secrets: ['GROQ_API_KEY'], timeoutSeconds: 300 },
+  { schedule: '0 7 * * *', timeZone: 'America/Santiago', region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY'], timeoutSeconds: 300 },
   async () => {
     const subs = await db.collection('telegramAriaSessions').where('briefDiario', '==', true).get()
     if (subs.empty) { logger.info('ariaDailyBrief: sin suscriptores'); return }
@@ -3465,8 +3566,10 @@ const ARIA_ROUTER_SPEC =
   '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
   '- "confirmar": el usuario confirma la acción pendiente (sí, dale, confirmo, hazlo, ok créala)\n' +
   '- "cancelar": el usuario cancela o descarta la acción pendiente (no, cancela, olvídalo, mejor no)\n' +
-  '- "recordar": el usuario te pide que recuerdes/anotes un dato o preferencia sobre él o su trabajo ("recuerda que...", "para que sepas...") — poné el hecho en "consulta"\n' +
+  '- "recordar": el usuario te pide que recuerdes/anotes un dato o preferencia PERSONAL suya ("recuerda que...", "para que sepas...") — poné el hecho en "consulta"\n' +
   '- "olvidar": el usuario pide que borres tus notas sobre él\n' +
+  '- "aprender": el usuario te ENSEÑA un hecho general de la planta para que lo sepas con TODOS ("aprende:", "aprende que", "para que aprendas") — poné el hecho completo en "consulta"\n' +
+  '- "lagunas": el usuario pregunta qué no supiste responder, qué te falta saber o qué preguntas quedaron sin respuesta\n' +
   '- "alertas_activar": pide recibir aviso inmediato cuando entre una incidencia crítica o alta\n' +
   '- "alertas_desactivar": pide dejar de recibir esos avisos inmediatos\n' +
   '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
@@ -3474,9 +3577,10 @@ const ARIA_ROUTER_SPEC =
 
 async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId, esAdmin = false) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
-  const [{ history, pending, notas }, appBlock] = await Promise.all([
+  const [{ history, pending, notas }, appBlock, hechosBlock] = await Promise.all([
     ariaLoadSession(chatId),
     ariaAppKnowledgeBlock(esAdmin),
+    ariaHechosBlock(),
   ])
 
   // El router necesita saber si hay un borrador esperando confirmación:
@@ -3507,14 +3611,23 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     }
   }
 
+  // 0.5) Atajos DETERMINISTAS de enseñanza (el LLM chico los rutea mal):
+  // "aprende: X" / "aprende que X" → hecho global · "recuerda que X" → nota personal
+  const mAprende = userText.match(/^\s*aprende(?:\s*:\s*|\s+que\s+)(.+)/is)
+  const mRecuerda = userText.match(/^\s*(?:recuerda|recordá|recorda)(?:\s*:\s*|\s+que\s+)(.+)/is)
+
   // 1) Router: intención + término de búsqueda
   let route = { accion: 'charla', consulta: '', respuesta: '', prioridad: '' }
   if (accionDirecta) {
     route.accion = accionDirecta
+  } else if (mAprende) {
+    route = { accion: 'aprender', consulta: mAprende[1].trim(), respuesta: '', prioridad: '' }
+  } else if (mRecuerda) {
+    route = { accion: 'recordar', consulta: mRecuerda[1].trim(), respuesta: '', prioridad: '' }
   } else {
     try {
       const raw = await ariaGroqChat(
-        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${notasHint}${appBlock}` }, ...history, { role: 'user', content: userText }],
+        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${notasHint}${appBlock}${hechosBlock}` }, ...history, { role: 'user', content: userText }],
         { json: true, temperature: 0.1, maxTokens: 300 }
       )
       route = { ...route, ...JSON.parse(raw) }
@@ -3583,6 +3696,17 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   } else if (route.accion === 'olvidar') {
     await db.collection('telegramAriaSessions').doc(String(chatId)).set({ notas: [] }, { merge: true })
     reply = '🧠 Listo, borré mis notas sobre vos. Empezamos de cero.'
+  } else if (route.accion === 'aprender') {
+    const hecho = String(route.consulta || '').trim().slice(0, 300)
+    if (!esAdmin) {
+      reply = 'Los hechos globales de la planta me los enseña el admin (Orel). ' +
+        'Si es algo tuyo personal, decime **"recuerda que..."** y lo anoto en tus notas 😉'
+    } else if (!hecho) {
+      reply = '¿Qué querés que aprenda? Decímelo así: **aprende: los cilindros de la grader van 2 por lado**'
+    } else {
+      await ariaAddHecho(hecho, fromName)
+      reply = `📚 **Aprendido para siempre:**\n"${hecho}"\n\nDesde ahora lo uso en mis respuestas con todo el equipo.`
+    }
   } else if (route.accion === 'alertas_activar' || route.accion === 'alertas_desactivar') {
     const activar = route.accion === 'alertas_activar'
     await db.collection('telegramAriaSessions').doc(String(chatId)).set({ alertas: activar }, { merge: true })
@@ -3633,6 +3757,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         case 'stockbajo': datos = await ariaDataStockBajo(); break
         case 'solicitudes': datos = await ariaDataSolicitudes(); break
         case 'preventivos': datos = await ariaDataPreventivos(); break
+        case 'lagunas': datos = await ariaDataLagunas(); break
         default: datos = ''
       }
     } catch (err) {
@@ -3644,9 +3769,13 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         [
           {
             role: 'system',
-            content: `${ARIA_PERSONA}${notasHint}${appBlock}\n\nRespondé al usuario usando SOLO estos datos reales de la app. ` +
-              'NO inventes cifras ni nombres; si un dato no está, decilo. Texto plano, sin markdown.\n\n' +
-              `DATOS:\n${datos || '(sin datos para esta consulta)'}`,
+            content: `${ARIA_PERSONA}${notasHint}${appBlock}${hechosBlock}\n\nRespondé al usuario usando SOLO estos datos reales de la app ` +
+              '(más los HECHOS enseñados si aplican). NO inventes cifras ni nombres. ' +
+              'Si los datos NO alcanzan para responder, decí exactamente QUÉ dato falta' +
+              (esAdmin
+                ? ' y ofrecé aprenderlo: "si me lo decís con \'aprende: ...\' lo guardo para siempre".'
+                : ' y sugerí pedirle al admin (Orel) que me enseñe ese dato.') +
+              `\n\nDATOS:\n${datos || '(sin datos para esta consulta)'}`,
           },
           ...history,
           { role: 'user', content: userText },
@@ -3660,6 +3789,16 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   }
 
   reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Probá de nuevo en un rato.'
+
+  // Registro de lagunas: si ARIA quedó corta, la pregunta se guarda en ariaGaps
+  // para revisarla ("qué no has sabido responder?") y enseñarle el dato que falta.
+  const ACCIONES_SIN_LAGUNA = new Set(['confirmar', 'cancelar', 'aprender', 'lagunas', 'recordar', 'olvidar',
+    'brief', 'brief_activar', 'brief_desactivar', 'alertas_activar', 'alertas_desactivar'])
+  if (!ACCIONES_SIN_LAGUNA.has(route.accion) &&
+      /(no encontr|no tengo|no hay (datos|registros|informaci)|sin datos|no cuento con|no s[eé]\b|no dispon)/i.test(reply)) {
+    ariaLogLaguna(chatId, userText, route.accion, reply)
+  }
+
   await sendTelegramMessage(ariaFormatTelegram(reply), chatId, { topicId })
   await ariaSaveTurns(chatId, userText, reply)
   return reply
@@ -4131,7 +4270,7 @@ async function cbComando(chatId, messageId, params, topicId) {
  * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
  */
 exports.telegramWebhook = onRequest(
-  { region: 'us-central1', secrets: ['GROQ_API_KEY'], timeoutSeconds: 120 },
+  { region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY'], timeoutSeconds: 120 },
   async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed')
