@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 · claude · ARIA Telegram — respuestas FORMATEADAS (markdown→HTML Telegram)
+
+- Pedido de Orel: respuestas con formato (las listas salian como parrafo plano).
+- `ariaFormatTelegram(text)`: markdown liviano → HTML de Telegram A PRUEBA DE BALAS (escapa TODO el HTML primero, despues convierte **negrita**→<b>, `codigo`→<code>, "- "→"• "); formato mal cerrado queda literal, nunca rompe sendMessage (validado con test unitario: XSS escapado, markdown roto inofensivo).
+- Persona + router: instrucciones de formato (negritas en nombres clave, viñetas en enumeraciones, `code` para SAP/tags). Aplica a: respuestas del chat, brief matinal (prompt + envio scheduled), borradores de incidencia (crear/cerrar en negrita), vision (titulo <b>).
+- TTS: se limpian los marcadores de markdown antes de sintetizar (la voz no lee "asterisco").
+- Verificacion: unit test del conversor OK (3 casos) + dry-run: borrador con <b> OK, lista de modulos con nombres en negrita OK.
+- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + ariaDailyBrief (usa el conversor en el envio).
+
 ## 2026-07-04 · claude · ARIA = PIVOTE de la app (mapa de modulos con conciencia de rol)
 
 - Vision de Orel: ARIA es el centro/pivote — debe saber de TODO lo de la PWA y omitir los modulos ocultos/en desarrollo.
