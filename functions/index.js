@@ -2705,6 +2705,194 @@ async function ariaTranscribeVoice(buffer) {
   return (data.text || '').trim()
 }
 
+// ---- Voz de respuesta (Google Cloud Text-to-Speech) ----
+
+let _gcpTokenCache = { token: null, exp: 0 }
+
+/** Access token GCP: metadata server en Cloud Functions; JWT manual en local */
+async function ariaGetGcpToken() {
+  if (_gcpTokenCache.token && Date.now() < _gcpTokenCache.exp) return _gcpTokenCache.token
+  try {
+    const r = await fetch(
+      'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+      { headers: { 'Metadata-Flavor': 'Google' }, signal: AbortSignal.timeout(3000) }
+    )
+    if (r.ok) {
+      const d = await r.json()
+      _gcpTokenCache = { token: d.access_token, exp: Date.now() + (d.expires_in - 120) * 1000 }
+      return d.access_token
+    }
+  } catch (_) { /* fuera de GCP: cae al JWT manual */ }
+  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+  if (!keyPath) throw new Error('sin credenciales GCP')
+  const sa = require(require('path').resolve(keyPath))
+  const crypto = require('crypto')
+  const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const now = Math.floor(Date.now() / 1000)
+  const header = b64url({ alg: 'RS256', typ: 'JWT' })
+  const claims = b64url({
+    iss: sa.client_email, scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
+  })
+  const signer = crypto.createSign('RSA-SHA256')
+  signer.update(`${header}.${claims}`)
+  const jwt = `${header}.${claims}.${signer.sign(sa.private_key, 'base64url')}`
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  })
+  const d = await r.json()
+  if (!d.access_token) throw new Error('token GCP: ' + JSON.stringify(d).slice(0, 150))
+  _gcpTokenCache = { token: d.access_token, exp: Date.now() + (d.expires_in - 120) * 1000 }
+  return d.access_token
+}
+
+/** Sintetiza texto → OGG/OPUS con la voz de ARIA (es-US femenina) */
+async function ariaTts(text) {
+  // Quitar emojis/símbolos que el TTS lee mal; acotar largo (costo + naturalidad)
+  const limpio = String(text)
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{FE0F}]/gu, '')
+    .replace(/\s+/g, ' ').trim().slice(0, 850)
+  if (!limpio) throw new Error('texto vacío para TTS')
+  const token = await ariaGetGcpToken()
+  const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      input: { text: limpio },
+      voice: { languageCode: 'es-US', name: 'es-US-Neural2-A' },
+      audioConfig: { audioEncoding: 'OGG_OPUS', speakingRate: 1.08 },
+    }),
+  })
+  if (!r.ok) throw new Error(`TTS ${r.status}: ${(await r.text()).slice(0, 150)}`)
+  const d = await r.json()
+  return Buffer.from(d.audioContent, 'base64')
+}
+
+/** Envía una nota de voz a Telegram (multipart) */
+async function sendTelegramVoice(chatId, buffer, opts = {}) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  const form = new FormData()
+  form.append('chat_id', String(chatId))
+  form.append('voice', new Blob([buffer], { type: 'audio/ogg' }), 'aria.ogg')
+  if (opts.topicId) form.append('message_thread_id', String(opts.topicId))
+  try {
+    const r = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendVoice`, { method: 'POST', body: form })
+    if (!r.ok) logger.error('sendVoice error', { status: r.status, body: (await r.text()).slice(0, 200) })
+  } catch (err) { logger.error('sendVoice fetch error', err) }
+}
+
+// ---- Visión (Groq llama-4-scout) ----
+
+/** Describe una imagen de planta con el modelo de visión de Groq */
+async function ariaGroqVision(imageBase64, mime, hint) {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
+  const prompt =
+    'Sos ARIA, asistente de mantención de una planta de proceso de salmón. Mirá la foto y describí en 2-3 frases: ' +
+    'qué equipo/componente se ve y si hay una falla o daño visible (correa cortada, fuga, óxido, cable suelto, desgaste, etc.). ' +
+    'Si no se aprecia una falla, decilo con claridad. Respondé en español, texto plano.' +
+    (hint ? `\nContexto del usuario: ${hint}` : '')
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${imageBase64}` } },
+        ],
+      }],
+      temperature: 0.2,
+      max_tokens: 400,
+    }),
+  })
+  if (!r.ok) throw new Error(`Groq vision ${r.status}: ${(await r.text()).slice(0, 150)}`)
+  const d = await r.json()
+  return (d.choices?.[0]?.message?.content || '').trim()
+}
+
+/** Foto en privado → ARIA la mira y propone incidencia con la foto adjunta */
+async function ariaHandleFoto(chatId, message, fromName) {
+  await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
+  try {
+    const largest = message.photo[message.photo.length - 1]
+    const buffer = await downloadTelegramFile(largest.file_id)
+    if (buffer.length > 3.5 * 1024 * 1024) {
+      await sendTelegramMessage('📸 La foto es muy pesada para analizarla. Probá con una más liviana.', chatId, {})
+      return
+    }
+    const caption = (message.caption || '').trim()
+    const desc = await ariaGroqVision(buffer.toString('base64'), 'image/jpeg', caption)
+    const descripcion = (caption ? `${caption} — ` : '') + desc
+    await ariaSetPending(chatId, {
+      kind: 'crear', descripcion: descripcion.slice(0, 800), prioridad: 'media',
+      fotoFileId: largest.file_id, at: Date.now(),
+    })
+    const replyTexto = `📸 Esto veo:\n${desc}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`
+    await sendTelegramMessage(`📸 Esto veo:\n${ariaEscapeHtml(desc)}\n\n¿Creo una incidencia con esta foto adjunta? (sí / no)`, chatId, {})
+    await ariaSaveTurns(chatId, caption ? `[foto] ${caption}` : '[foto]', replyTexto)
+  } catch (err) {
+    logger.error('ariaHandleFoto error', { error: err?.message })
+    await sendTelegramMessage('❌ No pude analizar la foto. Intentá de nuevo.', chatId, {})
+  }
+}
+
+// ---- Gráficos (QuickChart → sendPhoto) ----
+
+function ariaQuickChartUrl(config) {
+  return `https://quickchart.io/chart?w=820&h=420&bkg=white&c=${encodeURIComponent(JSON.stringify(config))}`
+}
+
+async function ariaGraficoGrader() {
+  const snap = await db.collection('graderDailySummaries').orderBy('dateKey', 'desc').limit(14).get()
+  if (snap.empty) return null
+  const rows = snap.docs.map((d) => d.data()).reverse()
+  const config = {
+    type: 'line',
+    data: {
+      labels: rows.map((x) => (x.dateKey || '').slice(5)),
+      datasets: [
+        { label: 'Piezas', data: rows.map((x) => x.totalPieces || 0), borderColor: '#2563eb', fill: false, yAxisID: 'y' },
+        { label: 'Microdetenciones', data: rows.map((x) => x.microDetentionsCount || 0), borderColor: '#dc2626', fill: false, yAxisID: 'y1' },
+      ],
+    },
+    options: {
+      title: { display: true, text: 'Grader — piezas y microdetenciones por turno' },
+      scales: { yAxes: [{ id: 'y', position: 'left' }, { id: 'y1', position: 'right', gridLines: { drawOnChartArea: false } }] },
+    },
+  }
+  return { url: ariaQuickChartUrl(config), caption: `📊 Grader — últimos ${rows.length} turnos registrados` }
+}
+
+async function ariaGraficoIncidencias() {
+  const desde = new Date(); desde.setDate(desde.getDate() - 14); desde.setHours(0, 0, 0, 0)
+  const snap = await db.collection('incidents').where('createdAt', '>=', desde).get()
+  const porDia = new Map()
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(desde); d.setDate(d.getDate() + i)
+    porDia.set(d.toLocaleDateString('es-CL', { timeZone: 'America/Santiago', month: '2-digit', day: '2-digit' }), 0)
+  }
+  snap.forEach((doc) => {
+    const f = ariaToDate(doc.data().createdAt)
+    if (!f) return
+    const k = f.toLocaleDateString('es-CL', { timeZone: 'America/Santiago', month: '2-digit', day: '2-digit' })
+    if (porDia.has(k)) porDia.set(k, porDia.get(k) + 1)
+  })
+  const config = {
+    type: 'bar',
+    data: {
+      labels: [...porDia.keys()],
+      datasets: [{ label: 'Incidencias', data: [...porDia.values()], backgroundColor: '#f59e0b' }],
+    },
+    options: { title: { display: true, text: 'Incidencias creadas — últimos 14 días' } },
+  }
+  return { url: ariaQuickChartUrl(config), caption: `📊 Incidencias de los últimos 14 días (total: ${snap.size})` }
+}
+
 // ---- Memoria conversacional corta (colección telegramAriaSessions) ----
 
 /** Carga toda la sesión ARIA en UNA lectura: historial + acción pendiente + notas */
@@ -3116,6 +3304,16 @@ async function ariaCrearIncidencia(pending, fromName, telegramUserId) {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   })
+  // Foto adjunta (flujo visión): subir a Storage y colgarla en el doc
+  if (pending.fotoFileId) {
+    try {
+      const buffer = await downloadTelegramFile(pending.fotoFileId)
+      const url = await uploadPhotoToStorage(id, buffer, 0)
+      await db.collection('incidents').doc(id).update({ fotos: [url] })
+    } catch (err) {
+      logger.warn('No se pudo adjuntar la foto a la incidencia', { id, error: err?.message })
+    }
+  }
   return id
 }
 
@@ -3201,7 +3399,7 @@ const ARIA_ROUTER_SPEC =
   '- "brief_activar": el usuario pide recibir el brief automático cada mañana\n' +
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
   '- "charla": saludo, agradecimiento o pregunta general que no necesita datos — escribí la respuesta directa en "respuesta" como ARIA. ' +
-  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas de incidencias críticas; crear y cerrar incidencias (siempre con confirmación); recordar datos que te pidan; y que entendés notas de voz.\n' +
+  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
   '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
   '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
   '- "confirmar": el usuario confirma la acción pendiente (sí, dale, confirmo, hazlo, ok créala)\n' +
@@ -3210,6 +3408,7 @@ const ARIA_ROUTER_SPEC =
   '- "olvidar": el usuario pide que borres tus notas sobre él\n' +
   '- "alertas_activar": pide recibir aviso inmediato cuando entre una incidencia crítica o alta\n' +
   '- "alertas_desactivar": pide dejar de recibir esos avisos inmediatos\n' +
+  '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
   'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
 
 async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId) {
@@ -3329,6 +3528,20 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   } else if (route.accion === 'cancelar') {
     await ariaSetPending(chatId, null)
     reply = 'Listo, descarté el borrador. ¿Algo más?'
+  } else if (route.accion === 'grafico') {
+    const cual = /incidencia/i.test(route.consulta || userText) ? 'incidencias' : 'grader'
+    try {
+      const g = cual === 'incidencias' ? await ariaGraficoIncidencias() : await ariaGraficoGrader()
+      if (g) {
+        await sendTelegramPhoto(chatId, g.url, g.caption, null, { topicId })
+        reply = 'Ahí te va el gráfico 📊 ¿Querés que te lo comente?'
+      } else {
+        reply = `No hay datos suficientes para el gráfico de ${cual}.`
+      }
+    } catch (err) {
+      logger.error('ARIA grafico error', { error: err?.message })
+      reply = 'No pude generar el gráfico ahora. Intentá de nuevo en un rato.'
+    }
   } else if (route.accion === 'brief') {
     reply = await ariaComponerBrief()
   } else if (route.accion === 'brief_activar' || route.accion === 'brief_desactivar') {
@@ -3385,6 +3598,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   reply = String(reply || '').trim() || 'No pude procesar la consulta 😕 Probá de nuevo en un rato.'
   await sendTelegramMessage(ariaEscapeHtml(reply), chatId, { topicId })
   await ariaSaveTurns(chatId, userText, reply)
+  return reply
 }
 
 // ==================== MENÚ INTERACTIVO (INLINE KEYBOARDS) ====================
@@ -3922,7 +4136,17 @@ exports.telegramWebhook = onRequest(
   try {
     // ---- Foto ----
     if (message.photo && message.photo.length > 0) {
-      await tgHandlePhoto(chatId, message, fromName, telegramUserId, incomingTopicId)
+      if (chatType === 'private') {
+        // Privado → ARIA la mira con visión y propone incidencia (autorizados)
+        if (await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)) {
+          await ariaHandleFoto(chatId, message, fromName)
+        } else {
+          await sendTelegramMessage(ARIA_MSG_NO_AUTORIZADO, chatId, {})
+        }
+      } else {
+        // Grupos: flujo clásico foto→adjuntar a incidencia
+        await tgHandlePhoto(chatId, message, fromName, telegramUserId, incomingTopicId)
+      }
       res.status(200).send('ok')
       return
     }
@@ -3949,7 +4173,16 @@ exports.telegramWebhook = onRequest(
           await sendTelegramMessage('🎙️ No logré entender el audio. Probá de nuevo.', chatId, { topicId: incomingTopicId })
         } else {
           await sendTelegramMessage(`🎙️ <i>«${ariaEscapeHtml(transcript)}»</i>`, chatId, { topicId: incomingTopicId })
-          await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId)
+          const respuesta = await tgHandleAriaChat(chatId, transcript, fromName, telegramUserId, incomingTopicId)
+          // Voz entra → voz sale: nota de voz de ARIA además del texto
+          if (respuesta) {
+            try {
+              const audio = await ariaTts(respuesta)
+              await sendTelegramVoice(chatId, audio, { topicId: incomingTopicId })
+            } catch (ttsErr) {
+              logger.warn('TTS de respuesta falló (solo texto)', { error: ttsErr?.message })
+            }
+          }
         }
       } catch (error) {
         logger.error('ARIA voice error', error)
