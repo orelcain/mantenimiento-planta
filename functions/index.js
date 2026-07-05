@@ -2647,7 +2647,10 @@ async function tgHandleKpi(chatId, topicId) {
 // Comandos y Mini App siguen igual; esto agrega la capa conversacional para
 // consultar la app sin abrirla. Requiere secret GROQ_API_KEY en el webhook.
 
-const ARIA_MODEL = process.env.ARIA_MODEL || 'llama-3.3-70b-versatile'
+// llama-3.3-70b-versatile se apaga el 16-ago-2026 (deprecación anunciada por Groq);
+// gpt-oss-120b es el sucesor que el propio Groq recomienda: mismo tope de requests/día
+// pero el doble de tokens/día (200K vs 100K) y benchmarks a la par de o4-mini.
+const ARIA_MODEL = process.env.ARIA_MODEL || 'openai/gpt-oss-120b'
 const ARIA_HISTORY_LIMIT = 12
 const ARIA_CACHE_TTL_MS = 10 * 60 * 1000
 
@@ -2679,8 +2682,6 @@ function ariaFormatTelegram(text) {
   return t
 }
 
-const ARIA_MODEL_FALLBACK = process.env.ARIA_MODEL_FALLBACK || 'llama-3.1-8b-instant'
-
 async function _ariaGroqChatRaw(model, messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
@@ -2700,21 +2701,23 @@ async function _ariaGroqChatRaw(model, messages, { temperature = 0.3, maxTokens 
   return data.choices?.[0]?.message?.content || ''
 }
 
-/** Último recurso: Gemini flash (misma key secret que geminiProxy) */
-async function _ariaGeminiChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
+const ARIA_GEMINI_MODEL = process.env.ARIA_GEMINI_MODEL || 'gemini-3.5-flash'
+
+/** Gemini (misma key secret que geminiProxy) — 2do eslabón, gratis, y motor de la visión */
+async function _ariaGeminiChat(messages, { temperature = 0.3, maxTokens = 600, json = false, model = ARIA_GEMINI_MODEL } = {}) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurado')
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
   const contents = messages.filter((m) => m.role !== 'system').map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
+    parts: Array.isArray(m.content) ? m.content : [{ text: m.content }],
   }))
   const body = {
     contents: contents.length ? contents : [{ role: 'user', parts: [{ text: ' ' }] }],
     generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
   }
   if (system) body.systemInstruction = { parts: [{ text: system }] }
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   })
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 150)}`)
@@ -2722,9 +2725,29 @@ async function _ariaGeminiChat(messages, { temperature = 0.3, maxTokens = 600, j
   return d.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || ''
 }
 
+const ARIA_DEEPSEEK_MODEL = process.env.ARIA_DEEPSEEK_MODEL || 'deepseek-v4-flash'
+
+/** DeepSeek (misma key secret que deepseekProxy) — último recurso, paga centavos */
+async function _ariaDeepSeekChat(messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY no configurado')
+  const body = { model: ARIA_DEEPSEEK_MODEL, messages, temperature, max_tokens: maxTokens }
+  if (json) body.response_format = { type: 'json_object' }
+  const r = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${(await r.text()).slice(0, 150)}`)
+  const d = await r.json()
+  return d.choices?.[0]?.message?.content || ''
+}
+
 /**
- * Chat con CADENA DE FALLBACK: Groq 70B → Groq 8B (cuota separada) → Gemini
- * flash. ARIA no queda muda aunque se agoten las cuotas gratis de Groq.
+ * Chat con CADENA DE FALLBACK, 3 proveedores independientes (nunca el mismo
+ * dos veces): Groq gpt-oss-120b → Gemini 3.5 Flash (gratis) → DeepSeek
+ * v4-flash (paga centavos, último recurso). ARIA no queda muda aunque se
+ * agote la cuota gratis de Groq Y de Gemini el mismo día.
  */
 async function ariaGroqChat(messages, opts = {}) {
   try {
@@ -2732,12 +2755,11 @@ async function ariaGroqChat(messages, opts = {}) {
   } catch (err) {
     if (!/429|413|5\d\d/.test(String(err?.message))) throw err
     try {
-      logger.warn(`ARIA: ${ARIA_MODEL} sin cuota — fallback ${ARIA_MODEL_FALLBACK}`)
-      return await _ariaGroqChatRaw(ARIA_MODEL_FALLBACK, messages, opts)
-    } catch (err2) {
-      if (!/429|413|5\d\d/.test(String(err2?.message))) throw err2
-      logger.warn('ARIA: Groq agotado — fallback Gemini flash')
+      logger.warn(`ARIA: ${ARIA_MODEL} sin cuota — fallback Gemini`)
       return await _ariaGeminiChat(messages, opts)
+    } catch (err2) {
+      logger.warn(`ARIA: Gemini falló (${err2?.message}) — fallback DeepSeek`)
+      return await _ariaDeepSeekChat(messages, opts)
     }
   }
 }
@@ -2845,17 +2867,17 @@ async function sendTelegramVoice(chatId, buffer, opts = {}) {
   } catch (err) { logger.error('sendVoice fetch error', err) }
 }
 
-// ---- Visión (Groq llama-4-scout) ----
+// ---- Visión (Gemini — Groq se quedó sin modelos de visión gratis: ----
+// ---- llama-4-maverick murió en marzo-2026, llama-4-scout muere 17-jul-2026) ----
 
 /**
- * Describe una imagen de planta con el modelo de visión de Groq.
- * Devuelve {descripcion, codigos[], falla} — sin pedir explícitamente los
- * códigos/etiquetas impresas, el modelo tiende a describir el equipo y
- * pasar por alto el texto de las etiquetas (SAP, tags de inventario).
+ * Describe una imagen de planta con Gemini (multimodal nativo, gratis, sin
+ * fecha de baja anunciada — a diferencia de los modelos de visión de Groq).
+ * Devuelve {descripcion, codigos[], falla}: se pide explícitamente leer
+ * códigos/etiquetas impresas, porque sin esa instrucción el modelo tiende a
+ * describir el equipo y pasar por alto el texto (SAP, tags de inventario).
  */
 async function ariaGroqVision(imageBase64, mime, hint) {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
   const prompt =
     'Sos ARIA, asistente de mantención de una planta de proceso de salmón. Analizá la foto y respondé SOLO ' +
     'un objeto JSON válido: {"descripcion": string, "codigos": string[], "falla": boolean}\n' +
@@ -2863,28 +2885,12 @@ async function ariaGroqVision(imageBase64, mime, hint) {
     '- "codigos": TODO texto impreso en etiquetas/tags que parezca un código (códigos SAP —usualmente 8-10 dígitos—, part numbers, códigos de fabricante, tags de inventario). Mirá con atención las etiquetas blancas/amarillas pegadas al componente. Array vacío si no hay ninguno legible.\n' +
     '- "falla": true si hay daño/falla visible, false si no.' +
     (hint ? `\nContexto del usuario: ${hint}` : '')
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: `data:${mime};base64,${imageBase64}` } },
-        ],
-      }],
-      temperature: 0.1,
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    }),
-  })
-  if (!r.ok) throw new Error(`Groq vision ${r.status}: ${(await r.text()).slice(0, 150)}`)
-  const d = await r.json()
-  const raw = (d.choices?.[0]?.message?.content || '').trim()
+  const raw = await _ariaGeminiChat(
+    [{ role: 'user', content: [{ text: prompt }, { inlineData: { mimeType: mime, data: imageBase64 } }] }],
+    { temperature: 0.1, maxTokens: 1000, json: true } // Gemini 3.5 gasta parte del presupuesto "pensando" antes de responder
+  )
   try {
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(raw.trim())
     return {
       descripcion: String(parsed.descripcion || '').trim(),
       codigos: Array.isArray(parsed.codigos) ? parsed.codigos.map(String).filter(Boolean).slice(0, 5) : [],
@@ -2892,7 +2898,7 @@ async function ariaGroqVision(imageBase64, mime, hint) {
     }
   } catch (_) {
     // El modelo a veces devuelve texto plano pese al response_format — degradar sin perder la descripción
-    return { descripcion: raw, codigos: [], falla: false }
+    return { descripcion: raw.trim(), codigos: [], falla: false }
   }
 }
 
@@ -3603,7 +3609,7 @@ async function ariaComponerBrief() {
 
 /** Brief matinal automático 7:00 AM a los chats suscritos (briefDiario=true) */
 exports.ariaDailyBrief = onSchedule(
-  { schedule: '0 7 * * *', timeZone: 'America/Santiago', region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY'], timeoutSeconds: 300 },
+  { schedule: '0 7 * * *', timeZone: 'America/Santiago', region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'], timeoutSeconds: 300 },
   async () => {
     const subs = await db.collection('telegramAriaSessions').where('briefDiario', '==', true).get()
     if (subs.empty) { logger.info('ariaDailyBrief: sin suscriptores'); return }
@@ -4359,7 +4365,7 @@ async function cbComando(chatId, messageId, params, topicId) {
  * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
  */
 exports.telegramWebhook = onRequest(
-  { region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY'], timeoutSeconds: 120 },
+  { region: 'us-central1', secrets: ['GROQ_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'], timeoutSeconds: 120 },
   async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed')
