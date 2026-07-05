@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-05 - claude - ARIA Telegram - MODO LOTE de fotos (varias fotos en una sola pasada)
+
+- Origen: Orel mando varias fotos pidiendo lista de SAP + agregar como referencia a sus repuestos, pero se procesaban una por una (conversacion completa por foto: vision + confirmar) - lento y consume mas tokens que lo necesario.
+- FIX: fotos mandadas como ALBUM de Telegram (message.media_group_id presente) se encolan en silencio en `telegramAriaSessions.fotoBatch` (cap 8, TTL 20min) en vez de analizarse al toque - solo un ack breve en la primera foto del grupo ("van N... decime hazme la lista"). Fotos SUELTAS (sin media_group_id) siguen el flujo instantaneo de siempre, sin cambios.
+- Nueva accion del router `fotos_lote`: cuando el usuario pide la lista/resumen/que agregue "las fotos" (plural) o dice "listo" - dispara `ariaGroqVisionLote()`, UNA sola llamada a Gemini con TODAS las imagenes del lote a la vez (en vez de N llamadas separadas), pide un JSON array indexado 1..N. Cada resultado se matchea contra el maestro (mismo `ariaBuscarCodigoEnMaestro` de siempre) - arma UNA lista consolidada (SAP+nombre si matchea, o "sin match"/"sin codigo") y UNA sola confirmacion para adjuntar TODAS las que matchearon.
+- Nuevo pending kind `adjuntar_fotos_lote` (array de {fileId, codigoSAP, nombreRepuesto}) - al confirmar, `Promise.allSettled` adjunta todas en paralelo (reusa `ariaAdjuntarFotoARepuesto`), reporta ok/fallidas.
+- HALLAZGO Y FIX GENERAL (no especifico del lote): el router estaba fallando "Failed to generate JSON... max completion tokens reached" con gpt-oss-120b bajo el system prompt grande de hoy (persona+router+app+hechos) - subido maxTokens del router de 300 a 700 (gpt-oss-120b tambien gasta presupuesto "pensando" antes del JSON, igual que Gemini/DeepSeek). Sin esto, CUALQUIER consulta con contexto largo podia fallar silenciosamente y caer a una respuesta charla generica/alucinada.
+- HALLAZGO Y FIX: el router no tenia forma de saber que habia fotos en el lote esperando - "hazme la lista" se clasificaba mal como charla generica (alucino una lista de modulos de la app en vez de fotos). Agregado `fotoBatchHint` (mismo patron que `pendingHint`) inyectado en el prompt del router cuando `fotoBatchCount > 0`.
+- Verificacion end-to-end con datos reales: album de 3 fotos (2 con SAP reales del maestro - 3300031966 CONECTOR TEE 10MM y 3100000109 SOLUCION PH 4.01 - y 1 sin codigo) -> encoladas en silencio (solo ack en la 1a) -> "hazme la lista" ruteo correcto a fotos_lote, UNA llamada Gemini, lista consolidada correcta -> "si, agregalas" adjunto las 2 en paralelo, verificado en Firestore (1 escritura exacta por item, sin duplicados), revertido tras la prueba.
+- Estado: EN REVISION -> PR. Post-merge: deploy telegramWebhook.
+
 ## 2026-07-04 - claude - Seguridad: parche echarts CVE-2026-45249 (XSS)
 
 - Contexto: Dependabot alert #178 (moderada, abierta desde 2026-07-01) llevaba toda la sesion pendiente en cada PR de este repo. Revisada a pedido de Orel.
