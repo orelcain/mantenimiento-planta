@@ -392,11 +392,12 @@ service cloud.firestore {
           // Admin puede crear/sembrar cualquier perfil
           isAdmin()
           ||
-          // Auto-creación: solo tu propio doc, sin poder auto-asignarse admin
+          // Auto-creación: solo tu propio doc. No puede auto-asignarse admin NI
+          // supervisor (eso lo eleva un admin manualmente). Endurecido 2026-07-05.
           (
             isOwner(userId)
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.rol in ['supervisor', 'tecnico', 'usuario']
+            && request.resource.data.rol in ['tecnico', 'usuario']
             && request.resource.data.activo == true
           )
         );
@@ -1480,8 +1481,11 @@ service cloud.firestore {
     }
 
     // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
+    // Lectura pública (mini-app sin login). Escritura pública pero acotada a
+    // <1MB por doc para limitar abuso/costos. Endurecido 2026-07-05.
     match /animelists/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isValidDocSize();
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
