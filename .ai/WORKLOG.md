@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-04 - claude - Seguridad: parche echarts CVE-2026-45249 (XSS)
+
+- Contexto: Dependabot alert #178 (moderada, abierta desde 2026-07-01) llevaba toda la sesion pendiente en cada PR de este repo. Revisada a pedido de Orel.
+- CVE-2026-45249 / GHSA-fgmj-fm8m-jvvx: XSS en Apache ECharts < 6.1.0, en el tooltip de series tipo "Lines" cuando no se especifica tooltip.formatter y series.data[i].name trae HTML crudo (se renderiza via innerHTML). Severidad media (CVSS 6.1).
+- Verificado que el codebase NO usa series tipo "Lines" actualmente (sin matches de type:'lines' en apps/pwa/src) - riesgo practico bajo hoy, pero se parcha igual.
+- Fix: package.json ya pedia "^6.0.0" (rango correcto); solo el lockfile tenia fijado 6.0.0 (vulnerable). `pnpm update echarts@6.1.0 --filter @mantenimiento/pwa` actualizo package.json a ^6.1.0 y el lockfile a la version parchada.
+- Verificacion: tsc --noEmit limpio, `vite build` completo sin errores (chunk de echarts bundlea normal, ~1.14MB sin cambios de tamaño relevantes).
+- Estado: EN REVISION -> PR. Frontend puro, deploy via GitHub Actions al mergear a main.
+
 ## 2026-07-04 - claude - Chatbot IA de la PWA (in-app) - mismo arreglo de deprecaciones + bug estructural encontrado
 
 - Contexto: al revisar la actualizacion de modelos de ARIA-Telegram, se reviso tambien el chatbot IN-APP de la PWA (aiAgents.ts + ai.ts, distinto sistema, usado por ChatBot.tsx via useChatBot.ts) - resultado: encontrado MAS roto de lo esperado, no solo modelos viejos.
