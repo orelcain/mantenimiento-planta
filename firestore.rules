@@ -11,6 +11,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Usuario autenticado NO anónimo (email/password, custom token de la Mini
+    // App de Telegram, etc.). Los anónimos solo acceden al catálogo (abajo).
+    function isNotAnonymous() {
+      return isAuthenticated()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Colecciones del catálogo que la Mini App de Telegram (mant.html) lee con
+    // login anónimo: hierarchy, users, insumos, stockAuditLog, machineCategories,
+    // machines, repuestos, manuales. Todo lo demás exige usuario no-anónimo.
+    function isCatalogReader() {
+      return isAuthenticated();
+    }
+
     function userDocExists() {
       return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -340,7 +354,7 @@ service cloud.firestore {
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
     match /hierarchy/{nodeId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
@@ -362,12 +376,12 @@ service cloud.firestore {
 
       // Repuestos propios del equipo SAP (Fase 2)
       match /repuestos/{repuestoId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create, update: if isTechnician();
         allow delete: if isSupervisor();
 
         match /historial/{historialId} {
-          allow read: if isAuthenticated();
+          allow read: if isNotAnonymous();
           allow create: if isTechnician();
           allow update, delete: if isAdmin();
         }
@@ -378,7 +392,7 @@ service cloud.firestore {
     // USUARIOS - Validación de perfiles
     // ============================================
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       
       allow create: if isAuthenticated()
         && isValidDocSize()
@@ -483,7 +497,7 @@ service cloud.firestore {
     // ZONAS
     // ============================================
     match /zones/{zoneId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
@@ -700,7 +714,7 @@ service cloud.firestore {
     
     // Predicciones de falla
     match /failurePredictions/{predictionId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin() && isValidFailurePrediction();
       allow update: if isTechnician();
       allow delete: if isAdmin();
@@ -708,7 +722,7 @@ service cloud.firestore {
 
     // Análisis de causa raíz
     match /rootCauseAnalysis/{analysisId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor() && isValidRootCauseAnalysis();
       allow update: if isSupervisor();
       allow delete: if isAdmin();
@@ -720,7 +734,7 @@ service cloud.firestore {
     
     // Repuestos
     match /spareParts/{partId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if (isAdmin() || isSupervisor()) && isValidSparePart();
       allow update: if isTechnician();
       allow delete: if isAdmin();
@@ -728,7 +742,7 @@ service cloud.firestore {
 
     // Movimientos de inventario
     match /inventoryMovements/{movementId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidInventoryMovement();
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -736,14 +750,14 @@ service cloud.firestore {
 
     // Bodega de repuestos — stock overlay por código SAP
     match /bodega/{codigoSAP} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidBodega();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Movimientos de bodega (entradas, salidas, ajustes)
       match /movimientos/{movId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isTechnician();
         allow update: if isAdmin();
         allow delete: if isAdmin();
@@ -752,14 +766,14 @@ service cloud.firestore {
 
     // Inventarios periódicos de bodega
     match /bodega_inventarios/{inventarioId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor() && isValidBodegaInventario();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Conteos individuales por SAP
       match /conteos/{conteoId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isTechnician();
         allow update: if isTechnician();
         allow delete: if isAdmin();
@@ -769,7 +783,7 @@ service cloud.firestore {
     // Solicitudes de repuesto (área-first F6) — cualquier usuario autenticado solicita;
     // técnicos+ avanzan el estado (pendiente→aprobada→entregada); admin elimina.
     match /solicitudes_repuestos/{solicitudId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated()
         && request.resource.data.solicitadoPor == request.auth.uid
         && request.resource.data.estado == 'pendiente'
@@ -785,7 +799,7 @@ service cloud.firestore {
     // Update completo (cambia familia/status/etc.) requiere supervisor + isValidInsumo.
     // ============================================
     match /insumos/{insumoId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create: if isSupervisor() && isValidDocSize() && isValidInsumo();
       allow update: if isValidDocSize() && (
         // Técnicos: solo campos de conteo de stock
@@ -803,7 +817,7 @@ service cloud.firestore {
     // PREFERENCIAS DE USUARIO (favoritos, watchlist)
     // ============================================
     match /user_preferences/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
 
@@ -822,7 +836,7 @@ service cloud.firestore {
     // Create por cualquier autenticado (queda registro de quién lo hizo).
     // ============================================
     match /stockAuditLog/{logId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
@@ -840,7 +854,7 @@ service cloud.firestore {
     // EVIDENCIAS FOTOGRÁFICAS
     // ============================================
     match /photoEvidence/{evidenceId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       
       allow create: if isAuthenticated()
         && request.resource.data.titulo is string
@@ -860,7 +874,7 @@ service cloud.firestore {
     // CONFIGURACIÓN
     // ============================================
     match /settings/{settingId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow write: if isAdmin();
     }
 
@@ -868,7 +882,7 @@ service cloud.firestore {
     // ARIA – Mission Control Logs
     // ============================================
     match /ariaMissionLogs/{date}/entries/{entryId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
@@ -887,21 +901,21 @@ service cloud.firestore {
 
     // ARIA – Collective learning entries (escrito principalmente por admin SDK / Cloud Functions)
     match /ariaLearning/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
     // ARIA – Acciones ejecutadas por ARIA (historial)
     match /ariaActions/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidAriaAction();
       allow update, delete: if isAdmin();
     }
 
     // ARIA – Feedback (thumbs up/down)
     match /ariaFeedback/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidAriaFeedback();
       allow update, delete: if isAdmin();
     }
@@ -909,7 +923,7 @@ service cloud.firestore {
     // ARIA – Knowledge base
     // Update restringido a campos de feedback (reinforce/weaken) — bloquea envenenamiento del contenido
     match /ariaKnowledge/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidAriaKnowledge();
       allow update: if isAdmin()
         || (isAuthenticated()
@@ -920,7 +934,7 @@ service cloud.firestore {
     // ARIA – Equipment problem patterns
     // Update restringido a campos de tracking — bloquea modificación arbitraria de patrones
     match /ariaEquipmentPatterns/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidAriaEquipmentPattern();
       allow update: if isAdmin()
         || (isAuthenticated()
@@ -930,7 +944,7 @@ service cloud.firestore {
 
     // ARIA – User corrections
     match /ariaCorrections/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidAriaCorrection();
       allow update, delete: if isAdmin();
     }
@@ -939,7 +953,7 @@ service cloud.firestore {
     // REPUESTOS - CATEGORÍAS DE MÁQUINAS
     // ============================================
     match /machineCategories/{categoryId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create: if isAdmin() && isValidMachineCategory();
       allow update, delete: if isAdmin();
     }
@@ -948,26 +962,26 @@ service cloud.firestore {
     // REPUESTOS - MÁQUINAS
     // ============================================
     match /machines/{machineId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create: if isAdmin() && isValidMachine();
       allow update, delete: if isAdmin();
 
       // Configuración por máquina (tags, etc.)
       match /settings/{settingId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create, update: if isTechnician();
         allow delete: if isAdmin();
       }
 
       // Repuestos por máquina
       match /repuestos/{repuestoId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create, update: if isTechnician();
         allow delete: if isSupervisor();
 
         // Historial de repuestos (subcolección)
         match /historial/{historialId} {
-          allow read: if isAuthenticated();
+          allow read: if isNotAnonymous();
           allow create: if isTechnician();
           allow update, delete: if isAdmin();
         }
@@ -980,13 +994,13 @@ service cloud.firestore {
     // Reemplaza machines/{id}/repuestos y hierarchy/{id}/repuestos (Fases 2-3).
     // ============================================
     match /repuestos/{repuestoId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create, update: if isTechnician();
       allow delete: if isSupervisor();
 
       // Historial de cambios por repuesto
       match /historial/{historialId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isTechnician();
         allow update, delete: if isAdmin();
       }
@@ -994,12 +1008,12 @@ service cloud.firestore {
 
     // Compatibilidad legacy (Baader 200)
     match /repuestosBaader200/{repuestoId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isTechnician();
       allow delete: if isAdmin();
 
       match /historial/{historialId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isTechnician();
         allow update, delete: if isAdmin();
       }
@@ -1009,13 +1023,13 @@ service cloud.firestore {
     // CATÁLOGO DE BASES - MOTORES Y BOMBAS
     // ============================================
     match /plantAssets/{assetId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isTechnician();
       allow delete: if isAdmin();
     }
 
     match /plantMaps/{mapId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update, delete: if isSupervisor();
     }
 
@@ -1023,30 +1037,30 @@ service cloud.firestore {
     // SISTEMA DE MAPAS - UBICACIONES Y VERSIONES
     // ============================================
     match /mapLocations/{locationId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin() && isValidMapLocation();
       allow update, delete: if isAdmin();
     }
 
     match /mapVersions/{versionId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update, delete: if isAdmin();
     }
 
     match /mapMarkers/{markerId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isTechnician();
       allow delete: if isSupervisor();
     }
 
     match /inspections/{inspectionId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidInspection();
       allow update: if isTechnician();
       allow delete: if isSupervisor();
 
       match /items/{itemId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create, update: if isTechnician();
         allow delete: if isSupervisor();
       }
@@ -1054,7 +1068,7 @@ service cloud.firestore {
 
     // Colección separada de items de inspección
     match /inspectionItems/{itemId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isTechnician();
       allow delete: if isSupervisor();
     }
@@ -1063,7 +1077,7 @@ service cloud.firestore {
     // ETT - Especificaciones Técnicas del Trabajo
     // ============================================
     match /ett/{ettId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -1123,7 +1137,7 @@ service cloud.firestore {
     }
 
     match /graderAnalysisSessions/{sessionId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor()
         && request.resource.data.createdBy == request.auth.uid;
       allow update: if isSupervisor();
@@ -1150,7 +1164,7 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Uploads (calendario)
     match /graderUploads/{uploadId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor()
         && request.resource.data.createdBy == request.auth.uid;
       allow update: if isSupervisor()
@@ -1161,48 +1175,48 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Configuracion por dispositivo
     match /graderDeviceConfigs/{deviceId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
     }
 
     // ANÁLISIS GRADER - Configuracion global del modulo
     match /graderModuleConfigs/{configId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
     }
 
     // ANÁLISIS GRADER - Tags de pausa (CRUD admin)
     match /graderPauseTags/{tagId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ANÁLISIS GRADER - Resumenes diarios
     match /graderDailySummaries/{summaryId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isSupervisor();
 
       // Registros pieza a pieza (subcollection)
       match /pieceRecords/{recordId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isSupervisor();
         allow delete: if isSupervisor();
       }
 
       // Aggregates pre-computados por minuto (subcollection meta/timeline)
       match /meta/{docId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow write: if isSupervisor();
       }
 
       // Historial de anotaciones de pausas (M13) — audit trail inmutable
       // Solo admins pueden crear entradas; nadie puede actualizar ni borrar.
       match /pauseHistory/{entryId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isAdmin()
           && request.resource.data.pauseId is string
           && request.resource.data.action in ['tag', 'clear_tag', 'range']
@@ -1215,13 +1229,13 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Turnos (uploads + acciones live)
     match /graderShifts/{shiftId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
 
       // Log cronológico de cambios de configuración de gates (FASE 27)
       match /configHistory/{snapshotId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow create: if isSupervisor(); // solo supervisores gestionan config de gates
         allow update, delete: if isAdmin(); // snapshots son inmutables una vez creados
       }
@@ -1231,7 +1245,7 @@ service cloud.firestore {
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================
     match /graderGatesTemplates/{templateId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor()
         && request.resource.data.createdBy == request.auth.uid;
       allow update: if isSupervisor();
@@ -1240,21 +1254,21 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Mediciones de velocidad de cintas (FASE 5)
     match /beltSpeedMeasurements/{measurementId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
     }
 
     // ANÁLISIS GRADER - Mediciones de flipper con slow-mo (FASE 5)
     match /flipperTimingMeasurements/{measurementId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
     }
 
     // ANÁLISIS GRADER - Audit trail de cambios de configuración física (FASE 6)
     match /graderConfigChangeLog/{entryId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
     }
@@ -1272,7 +1286,7 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
     match /flipperZ2Captures/{captureId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor()
         && request.resource.data.measuredBy == request.auth.uid
         && request.resource.data.delayFlipperOpenMs is number
@@ -1287,26 +1301,26 @@ service cloud.firestore {
     // GANTT - Planificación de mantenimiento
     // ============================================
     match /calendario_mantencion_state/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isTechnician();
       allow delete: if isAdmin();
     }
 
     match /ganttTasks/{taskId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidGanttTask();
       allow update: if isTechnician();
       allow delete: if isSupervisor();
     }
 
     match /ganttProjects/{projectId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isSupervisor() && isValidGanttProject();
       allow update, delete: if isSupervisor();
     }
 
     match /ganttTaskComments/{commentId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isTechnician() && isValidGanttComment();
       allow update, delete: if isSupervisor();
     }
@@ -1315,7 +1329,7 @@ service cloud.firestore {
     // CÓDIGOS DE INVITACIÓN
     // ============================================
     match /inviteCodes/{codeId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin() && isValidInviteCode();
       // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
       allow update: if isAdmin()
@@ -1329,7 +1343,7 @@ service cloud.firestore {
     // ROLES PERSONALIZADOS
     // ============================================
     match /roles/{roleId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAdmin() && isValidRole();
       allow update, delete: if isAdmin();
     }
@@ -1338,7 +1352,7 @@ service cloud.firestore {
     // CACHE - Datos temporales (estado DM puerto, etc.)
     // ============================================
     match /cache/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -1354,7 +1368,7 @@ service cloud.firestore {
     }
 
     match /hmi-knuro-history/{entryId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
@@ -1382,7 +1396,7 @@ service cloud.firestore {
     }
 
     match /baader200-history/{entryId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
@@ -1397,7 +1411,7 @@ service cloud.firestore {
     // SIDEBAR CONFIG — Orden personalizado del sidebar
     // ============================================
     match /sidebarConfig/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update: if isAdmin() && isValidSidebarConfig();
       allow delete: if isAdmin();
     }
@@ -1408,7 +1422,7 @@ service cloud.firestore {
     // Cualquier user autenticado puede leer (HomeRedirect lee defaultRoute
     // al entrar a `/`). Solo admin escribe.
     match /appConfig/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow create, update, delete: if isAdmin();
     }
 
@@ -1430,22 +1444,22 @@ service cloud.firestore {
     // Ver: docs/SHOPLOGIX_API.md + docs/SHOPLOGIX_INTEGRATION_PLAN.md
     // ============================================
     match /shoplogix/{plantSlug} {
-      allow read: if isAuthenticated();
+      allow read: if isNotAnonymous();
       allow write: if false;  // solo via Admin SDK (Cloud Function)
 
       match /shifts/{shiftId} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow write: if false;
 
         match /machines/{machineid} {
-          allow read: if isAuthenticated();
+          allow read: if isNotAnonymous();
           allow write: if false;
         }
       }
 
       // Velocidad nameplate Baader 142 — editable por admins desde el cliente
       match /machineCapacity/{machineid} {
-        allow read: if isAuthenticated();
+        allow read: if isNotAnonymous();
         allow write: if isAdmin();
       }
     }
@@ -1514,7 +1528,7 @@ service cloud.firestore {
     // MANUALES — Documentación técnica (F4 2026-05-04)
     // ============================================
     match /manuales/{manualId} {
-      allow read: if isAuthenticated();
+      allow read: if isCatalogReader();
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isAdmin();
     }
