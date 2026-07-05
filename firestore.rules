@@ -1,5 +1,5 @@
 rules_version = '2';
-// Version: v1.3.1 - Updated: 2026-04-26
+// Version: v1.4.0 - Updated: 2026-07-05
 // Sistema de jerarquías anidadas de 8 niveles con validación mejorada
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,17 +12,18 @@ service cloud.firestore {
     }
 
     // Usuario autenticado NO anónimo (email/password, custom token de la Mini
-    // App de Telegram, etc.). Los anónimos solo acceden al catálogo (abajo).
+    // App de Telegram, etc.).
     function isNotAnonymous() {
       return isAuthenticated()
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // Colecciones del catálogo que la Mini App de Telegram (mant.html) lee con
-    // login anónimo: hierarchy, users, insumos, stockAuditLog, machineCategories,
-    // machines, repuestos, manuales. Todo lo demás exige usuario no-anónimo.
+    // Colecciones del catálogo que la Mini App de Telegram (mant.html) lee:
+    // hierarchy, users, insumos, stockAuditLog, machineCategories, machines,
+    // repuestos, manuales. La Mini App se autentica con custom token de
+    // mintTelegramAuthToken (NO anónimo) → cerrado a anónimos 2026-07-05.
     function isCatalogReader() {
-      return isAuthenticated();
+      return isNotAnonymous();
     }
 
     function userDocExists() {

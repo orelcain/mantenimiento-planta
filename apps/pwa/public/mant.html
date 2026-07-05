@@ -1043,9 +1043,28 @@ async function init(){
   if (IS_PREVIEW) {
     setLoadingMsg('Modo preview…')
     try {
-      await auth.signInAnonymously()
+      // Las reglas de Firestore/Storage ya no permiten lecturas anónimas
+      // (auditoría 2026-07-05) → el preview necesita sesión real: un custom
+      // token en el fragment (#token=…, lo genera "🔗 URL preview" dentro de
+      // la Mini App) o una sesión previa persistida en este navegador.
+      await new Promise(resolve => {
+        const unsub = auth.onAuthStateChanged(() => { unsub(); resolve() })
+      })
+      const fragParams = new URLSearchParams(location.hash.startsWith('#') ? location.hash.slice(1) : '')
+      const fragToken = fragParams.get('token')
+      if (fragToken){
+        setLoadingMsg('Autenticando preview…')
+        await auth.signInWithCustomToken(fragToken)
+        // Sacar el token de la URL (que no quede en historial ni se comparta)
+        try { history.replaceState(null, '', location.pathname + location.search) } catch {}
+      }
+      const fbUser = auth.currentUser
+      if (!fbUser || fbUser.isAnonymous){
+        setLoadingError('El preview requiere sesión. Abrí la Mini App desde Telegram, tap "🔗 URL preview" y usá esa URL (incluye tu token de acceso, válido ~1h).')
+        return
+      }
       const previewUid = new URLSearchParams(location.search).get('uid')
-      uid = previewUid || auth.currentUser?.uid || 'preview'
+      uid = previewUid || fbUser.uid
       userRole = 'admin'
       isAuthorized = true
       isLinked = true
@@ -3523,16 +3542,41 @@ async function copyPwaInstallUrl(){
   }
 }
 
-function copyPreviewUrl(){
-  const base = 'https://mantenimiento-planta-771a3.web.app/mant.html'
-  const url = `${base}?preview=1&uid=${uid}`
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).then(() => {
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      tgApp?.showAlert?.('URL copiada al portapapeles.\n\nÁbrela en el navegador de tu PC para ver la preview con tus datos reales.')
-    }).catch(() => tgApp?.showAlert?.(`Copiá esta URL:\n${url}`))
-  } else {
-    tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
+// La URL de preview lleva un custom token en el fragment (#token=…): desde que
+// las reglas bloquean lecturas anónimas, el preview en navegador se autentica
+// igual que la Mini App (mint con el initData actual). Token válido ~1h.
+async function copyPreviewUrl(){
+  if (!tgApp?.initData){
+    tgApp?.showAlert?.('Solo funciona desde el bot Telegram con red.')
+    return
+  }
+  setStatus('loading', 'Generando URL…')
+  try {
+    const resp = await fetch(`${CF_BASE}/mintTelegramAuthToken`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ initData: tgApp.initData }),
+    })
+    if (!resp.ok){
+      tgApp?.showAlert?.('Error generando token de preview. Probá de nuevo.')
+      updateNetworkStatus()
+      return
+    }
+    const data = await resp.json()
+    updateNetworkStatus()
+    const base = 'https://mantenimiento-planta-771a3.web.app/mant.html'
+    const url = `${base}?preview=1&uid=${uid}#token=${encodeURIComponent(data.token)}`
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        tgApp?.HapticFeedback?.notificationOccurred('success')
+        tgApp?.showAlert?.('URL copiada al portapapeles.\n\nÁbrela en el navegador de tu PC para ver la preview con tus datos reales. Válida ~1h; si expira, generá otra.')
+      }).catch(() => tgApp?.showAlert?.(`Copiá esta URL:\n${url}`))
+    } else {
+      tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
+    }
+  } catch(err){
+    console.error('preview url error', err)
+    tgApp?.showAlert?.('Error: ' + (err.message || 'desconocido'))
+    updateNetworkStatus()
   }
 }
 
