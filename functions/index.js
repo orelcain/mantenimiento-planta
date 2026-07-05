@@ -2902,6 +2902,41 @@ async function ariaGroqVision(imageBase64, mime, hint) {
   }
 }
 
+/**
+ * Analiza VARIAS fotos en UNA sola llamada a Gemini (en vez de N llamadas
+ * separadas) — reduce el overhead conversacional del modo lote. Devuelve un
+ * array de {descripcion, codigos, falla} en el MISMO orden que `imagenes`.
+ */
+async function ariaGroqVisionLote(imagenes) {
+  const n = imagenes.length
+  const prompt =
+    `Sos ARIA, asistente de mantención de una planta de proceso de salmón. Te mando ${n} fotos, numeradas del 1 al ${n} en ESE ORDEN. ` +
+    'Para CADA foto, analizá igual que si fuera una sola: qué equipo/componente se ve, si hay falla/daño visible, y TODO texto impreso en etiquetas ' +
+    'que parezca un código (SAP —usualmente 8-10 dígitos—, part numbers, tags de inventario). ' +
+    `Respondé SOLO un objeto JSON válido: {"items": [{"indice": number, "descripcion": string, "codigos": string[], "falla": boolean}, ...]} ` +
+    `con EXACTAMENTE ${n} elementos, uno por foto, "indice" = posición de la foto (1 a ${n}).`
+  const parts = [{ text: prompt }, ...imagenes.map((img) => ({ inlineData: { mimeType: img.mime, data: img.base64 } }))]
+  try {
+    const raw = await _ariaGeminiChat(
+      [{ role: 'user', content: parts }],
+      { temperature: 0.1, maxTokens: Math.min(300 + n * 250, 4000), json: true }
+    )
+    const parsed = JSON.parse(raw.trim())
+    const items = Array.isArray(parsed.items) ? parsed.items : []
+    return imagenes.map((_, i) => {
+      const it = items.find((x) => x.indice === i + 1) || items[i] || {}
+      return {
+        descripcion: String(it.descripcion || '').trim() || '(sin descripción)',
+        codigos: Array.isArray(it.codigos) ? it.codigos.map(String).filter(Boolean).slice(0, 5) : [],
+        falla: it.falla === true,
+      }
+    })
+  } catch (err) {
+    logger.error('ariaGroqVisionLote error', { error: err?.message })
+    return imagenes.map(() => ({ descripcion: '(no pude analizar esta foto en el lote)', codigos: [], falla: false }))
+  }
+}
+
 /** Busca un código detectado en la foto contra el maestro (SAP exacto o texto libre) */
 async function ariaBuscarCodigoEnMaestro(codigo) {
   const items = await ariaGetRepuestos()
@@ -2983,6 +3018,46 @@ async function ariaHandleFoto(chatId, message, fromName) {
   }
 }
 
+// ---- Modo LOTE: fotos enviadas como álbum (message.media_group_id) ----
+// Se encolan en silencio (sin analizarlas todavía) y se procesan todas
+// juntas en UNA llamada de visión cuando el usuario pide la lista — evita
+// N conversaciones completas (visión + confirmar) para N fotos.
+
+const ARIA_FOTO_BATCH_MAX = 8
+const ARIA_FOTO_BATCH_TTL_MS = 20 * 60 * 1000
+
+async function ariaQueueFotoLote(chatId, message) {
+  const largest = message.photo[message.photo.length - 1]
+  const ref = db.collection('telegramAriaSessions').doc(String(chatId))
+  const doc = await ref.get()
+  let batch = Array.isArray(doc.data()?.fotoBatch) ? doc.data().fotoBatch : []
+  if (batch.length && Date.now() - (batch[0].at || 0) > ARIA_FOTO_BATCH_TTL_MS) batch = [] // lote viejo abandonado
+
+  if (batch.length >= ARIA_FOTO_BATCH_MAX) {
+    await sendTelegramMessage(
+      `📸 Ya tengo ${ARIA_FOTO_BATCH_MAX} fotos en el lote (el máximo). Pedime **"hazme la lista"** antes de mandar más.`,
+      chatId, {}
+    )
+    return
+  }
+
+  const esGrupoNuevo = !batch.length || batch[batch.length - 1].mediaGroupId !== message.media_group_id
+  batch.push({
+    fileId: largest.file_id,
+    caption: (message.caption || '').trim(),
+    mediaGroupId: message.media_group_id || null,
+    at: batch.length ? batch[0].at : Date.now(),
+  })
+  await ref.set({ fotoBatch: batch }, { merge: true })
+
+  if (esGrupoNuevo) {
+    await sendTelegramMessage(
+      `📸 Recibiendo tus fotos (van ${batch.length}). Mandá más o decime **"hazme la lista"** cuando termines.`,
+      chatId, {}
+    )
+  }
+}
+
 // ---- Gráficos (QuickChart → sendPhoto) ----
 
 function ariaQuickChartUrl(config) {
@@ -3049,7 +3124,8 @@ async function ariaLoadSession(chatId) {
   let pending = data.pendingIncident || null
   if (pending && Date.now() - (pending.at || 0) > ARIA_PENDING_TTL_MS) pending = null
   const notas = Array.isArray(data.notas) ? data.notas.slice(0, 20) : []
-  return { history, pending, notas }
+  const fotoBatchCount = Array.isArray(data.fotoBatch) ? data.fotoBatch.length : 0
+  return { history, pending, notas, fotoBatchCount }
 }
 
 // ---- Autorización de usuarios de ARIA (whitelist `telegramAriaUsers`) ----
@@ -3644,7 +3720,7 @@ const ARIA_ROUTER_SPEC =
   '- "brief_desactivar": el usuario pide dejar de recibir el brief automático\n' +
   '- "charla": saludo, agradecimiento, pregunta general O pregunta sobre la APP misma (qué módulos hay, dónde se hace algo, cómo usar una función) — escribí la respuesta directa en "respuesta" como ARIA usando el MAPA DE LA APP. ' +
   'Cuando la respuesta incluya una enumeración (módulos, equipos, ítems), formateala SIEMPRE como lista: una línea por ítem con "- " y el nombre en **negrita**. ' +
-  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
+  'Si preguntan qué sabés hacer, contá tus capacidades: turno, KPIs, incidencias, equipos, repuestos y stock, historial de mantención, Grader, Gantt, preventivos, solicitudes, sensores, brief matinal, alertas inmediatas, gráficos de tendencia; crear y cerrar incidencias (siempre con confirmación); mirar fotos que te manden (visión) y proponer la incidencia con la foto adjunta; si mandan VARIAS fotos juntas (álbum) las junto en un lote y con "hazme la lista" las proceso todas de una y las adjunto a sus repuestos; recordar datos que te pidan; entendés notas de voz y respondés con voz cuando te hablan.\n' +
   '- "incidencia_crear": el usuario REPORTA una falla/problema NUEVO en su último mensaje (verbos típicos: anota, registra, reporta, crea una incidencia) — poné la descripción completa en "consulta" y la prioridad deducida en "prioridad" (critica|alta|media|baja; default "media"). NO resucites reportes ya cancelados del historial. NO se crea de inmediato: se pide confirmación.\n' +
   '- "incidencia_cerrar": el usuario pide cerrar/resolver/dar por lista una incidencia — poné en "consulta" la referencia a cuál (palabras del título). También pide confirmación.\n' +
   '- "confirmar": el usuario confirma la acción pendiente (sí, dale, confirmo, hazlo, ok créala)\n' +
@@ -3656,11 +3732,12 @@ const ARIA_ROUTER_SPEC =
   '- "alertas_activar": pide recibir aviso inmediato cuando entre una incidencia crítica o alta\n' +
   '- "alertas_desactivar": pide dejar de recibir esos avisos inmediatos\n' +
   '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
+  '- "fotos_lote": el usuario pide procesar/listar/resumir las FOTOS que mandó (en plural: "las fotos", "todas", "la lista de sap", "agrega las fotos a sus repuestos") o dice "listo"/"ya está" después de mandar varias fotos juntas\n' +
   'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
 
 async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId, esAdmin = false) {
   await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
-  const [{ history, pending, notas }, appBlock, hechosBlock] = await Promise.all([
+  const [{ history, pending, notas, fotoBatchCount }, appBlock, hechosBlock] = await Promise.all([
     ariaLoadSession(chatId),
     ariaAppKnowledgeBlock(esAdmin),
     ariaHechosBlock(),
@@ -3671,7 +3748,8 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   const pendingDesc = pending
     ? (pending.kind === 'cerrar' ? `CERRAR la incidencia "${pending.titulo}"`
       : pending.kind === 'adjuntar_foto_repuesto' ? `AGREGAR la foto como referencia del repuesto "${pending.nombreRepuesto}" (SAP ${pending.codigoSAP})`
-        : `CREAR la incidencia "${pending.descripcion}" (prioridad ${pending.prioridad})`)
+        : pending.kind === 'adjuntar_fotos_lote' ? `AGREGAR ${pending.items.length} fotos del lote a sus repuestos`
+          : `CREAR la incidencia "${pending.descripcion}" (prioridad ${pending.prioridad})`)
     : ''
   const pendingHint = pending
     ? `\n\nESTADO ACTUAL: hay una acción PENDIENTE de confirmación: ${pendingDesc}. ` +
@@ -3680,6 +3758,11 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       'un "sí/dale" suelto sin reporte nuevo es "charla".'
   const notasHint = notas.length
     ? `\n\nNOTAS GUARDADAS DE ESTE USUARIO (tenelas en cuenta):\n${notas.map((n) => `- ${n}`).join('\n')}`
+    : ''
+  const fotoBatchHint = fotoBatchCount > 0
+    ? `\n\nESTADO ACTUAL: el usuario tiene ${fotoBatchCount} foto(s) en un LOTE esperando ser procesadas (las mandó como álbum). ` +
+      'Si pide una lista/resumen de esas fotos, que las agregue a sus repuestos, o dice algo tipo "listo"/"ya está"/"eso es todo" ' +
+      'refiriéndose a las fotos que mandó, usá accion "fotos_lote" — NO "charla".'
     : ''
 
   // 0) Con acción pendiente, confirmar/cancelar se resuelve DETERMINISTA:
@@ -3712,8 +3795,8 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   } else {
     try {
       const raw = await ariaGroqChat(
-        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${notasHint}${appBlock}${hechosBlock}` }, ...history, { role: 'user', content: userText }],
-        { json: true, temperature: 0.1, maxTokens: 300 }
+        [{ role: 'system', content: `${ARIA_PERSONA}\n\n${ARIA_ROUTER_SPEC}${pendingHint}${fotoBatchHint}${notasHint}${appBlock}${hechosBlock}` }, ...history, { role: 'user', content: userText }],
+        { json: true, temperature: 0.1, maxTokens: 700 } // gpt-oss-120b (y otros modelos nuevos) gastan presupuesto "pensando" antes del JSON; el system prompt ya creció bastante (persona+router+app+hechos)
       )
       route = { ...route, ...JSON.parse(raw) }
     } catch (err) {
@@ -3774,6 +3857,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         await ariaSetPending(chatId, null)
         reply = '❌ No pude adjuntar la foto al repuesto. Probá de nuevo en un rato.'
       }
+    } else if (pending.kind === 'adjuntar_fotos_lote') {
+      const resultados = await Promise.allSettled(
+        pending.items.map((it) => ariaAdjuntarFotoARepuesto(it.codigoSAP, it.fileId))
+      )
+      const ok = resultados.filter((r) => r.status === 'fulfilled').length
+      const fail = resultados.length - ok
+      await ariaSetPending(chatId, null)
+      reply = `✅ Agregadas ${ok} foto${ok === 1 ? '' : 's'} a sus repuestos.` + (fail ? ` ⚠️ ${fail} fallaron — probá esas de nuevo.` : '')
     } else {
       const newId = await ariaCrearIncidencia(pending, fromName, telegramUserId)
       await ariaSetPending(chatId, null)
@@ -3824,6 +3915,57 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     } catch (err) {
       logger.error('ARIA grafico error', { error: err?.message })
       reply = 'No pude generar el gráfico ahora. Intentá de nuevo en un rato.'
+    }
+  } else if (route.accion === 'fotos_lote') {
+    const sessionRef = db.collection('telegramAriaSessions').doc(String(chatId))
+    const sessionDoc = await sessionRef.get()
+    const batch = Array.isArray(sessionDoc.data()?.fotoBatch) ? sessionDoc.data().fotoBatch : []
+    if (!batch.length) {
+      reply = 'No tengo fotos pendientes en el lote. Mandame varias fotos juntas (como álbum) y después pedime la lista.'
+    } else {
+      await callTelegramApi('sendChatAction', { chat_id: chatId, action: 'typing' })
+      try {
+        const buffers = []
+        for (const item of batch) buffers.push(await downloadTelegramFile(item.fileId))
+        const totalBytes = buffers.reduce((s, b) => s + b.length, 0)
+        if (totalBytes > 15 * 1024 * 1024) {
+          reply = `El lote pesa mucho (${(totalBytes / 1024 / 1024).toFixed(1)} MB) para analizarlo junto. Probá con menos fotos o más livianas.`
+        } else {
+          const imagenes = buffers.map((b) => ({ base64: b.toString('base64'), mime: 'image/jpeg' }))
+          const resultados = await ariaGroqVisionLote(imagenes)
+
+          const matches = []
+          const lineas = []
+          for (let i = 0; i < resultados.length; i++) {
+            const r = resultados[i]
+            let match = null
+            for (const c of r.codigos) {
+              match = await ariaBuscarCodigoEnMaestro(c)
+              if (match) break
+            }
+            if (match) {
+              matches.push({ fileId: batch[i].fileId, codigoSAP: match.codigoSAP, nombreRepuesto: match.textoBreve || match.descripcion })
+              lineas.push(`${i + 1}. **${match.textoBreve || match.descripcion}** — SAP \`${match.codigoSAP}\``)
+            } else if (r.codigos.length) {
+              lineas.push(`${i + 1}. ${r.descripcion} — código "${r.codigos[0]}" sin match en el maestro`)
+            } else {
+              lineas.push(`${i + 1}. ${r.descripcion} — sin código visible`)
+            }
+          }
+
+          await sessionRef.set({ fotoBatch: [] }, { merge: true }) // el lote ya se analizó, que no se mezcle con el próximo
+
+          if (matches.length) {
+            await ariaSetPending(chatId, { kind: 'adjuntar_fotos_lote', items: matches, at: Date.now() })
+            reply = `**Lote de ${resultados.length} fotos:**\n${lineas.join('\n')}\n\n¿Agrego las ${matches.length} que matchearon a sus repuestos? (sí / no)`
+          } else {
+            reply = `**Lote de ${resultados.length} fotos:**\n${lineas.join('\n')}\n\nNinguna matcheó un código del maestro — no hay nada para adjuntar automáticamente.`
+          }
+        }
+      } catch (err) {
+        logger.error('ARIA fotos_lote error', { error: err?.message })
+        reply = '❌ No pude procesar el lote de fotos. Probá de nuevo.'
+      }
     }
   } else if (route.accion === 'brief') {
     reply = await ariaComponerBrief()
@@ -4438,7 +4580,13 @@ exports.telegramWebhook = onRequest(
         // Privado → ARIA la mira con visión y propone incidencia (autorizados)
         const authFoto = await ariaUsuarioAutorizado(telegramUserId, fromName, message.from?.username)
         if (authFoto.ok) {
-          await ariaHandleFoto(chatId, message, fromName)
+          // Fotos mandadas como álbum (media_group_id) → modo lote, en silencio.
+          // Fotos sueltas → flujo instantáneo de siempre (visión + confirmar ya).
+          if (message.media_group_id) {
+            await ariaQueueFotoLote(chatId, message)
+          } else {
+            await ariaHandleFoto(chatId, message, fromName)
+          }
         } else {
           await sendTelegramMessage(ARIA_MSG_NO_AUTORIZADO, chatId, {})
         }
