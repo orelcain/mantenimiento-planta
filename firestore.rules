@@ -744,7 +744,7 @@ service cloud.firestore {
     // Movimientos de inventario
     match /inventoryMovements/{movementId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidInventoryMovement();
+      allow create: if isNotAnonymous() && isValidInventoryMovement();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -827,7 +827,10 @@ service cloud.firestore {
     // ============================================
     match /audit_log/{logId} {
       allow read: if isSupervisor();
-      allow create: if isAuthenticated() && isValidDocSize();
+      // Anti-forgery: el autor registrado debe ser el uid real (no se puede
+      // registrar una acción "a nombre de" otro usuario). Endurecido 2026-07-05.
+      allow create: if isNotAnonymous() && isValidDocSize()
+        && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
@@ -838,7 +841,9 @@ service cloud.firestore {
     // ============================================
     match /stockAuditLog/{logId} {
       allow read: if isCatalogReader();
-      allow create: if isAuthenticated() && isValidDocSize();
+      // Anti-forgery: el conteo queda a nombre del uid real que lo registró.
+      allow create: if isNotAnonymous() && isValidDocSize()
+        && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
@@ -847,7 +852,7 @@ service cloud.firestore {
     // ============================================
     match /trash/{trashId} {
       allow read: if isSupervisor();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isNotAnonymous() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -857,7 +862,7 @@ service cloud.firestore {
     match /photoEvidence/{evidenceId} {
       allow read: if isNotAnonymous();
       
-      allow create: if isAuthenticated()
+      allow create: if isNotAnonymous()
         && request.resource.data.titulo is string
         && request.resource.data.titulo.size() >= 1
         && request.resource.data.status in ['pendiente', 'en_proceso', 'verificada']
@@ -884,7 +889,7 @@ service cloud.firestore {
     // ============================================
     match /ariaMissionLogs/{date}/entries/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isNotAnonymous() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -903,21 +908,21 @@ service cloud.firestore {
     // ARIA – Collective learning entries (escrito principalmente por admin SDK / Cloud Functions)
     match /ariaLearning/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isNotAnonymous() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
     // ARIA – Acciones ejecutadas por ARIA (historial)
     match /ariaActions/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidAriaAction();
+      allow create: if isNotAnonymous() && isValidAriaAction();
       allow update, delete: if isAdmin();
     }
 
     // ARIA – Feedback (thumbs up/down)
     match /ariaFeedback/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidAriaFeedback();
+      allow create: if isNotAnonymous() && isValidAriaFeedback();
       allow update, delete: if isAdmin();
     }
 
@@ -925,9 +930,9 @@ service cloud.firestore {
     // Update restringido a campos de feedback (reinforce/weaken) — bloquea envenenamiento del contenido
     match /ariaKnowledge/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidAriaKnowledge();
+      allow create: if isNotAnonymous() && isValidAriaKnowledge();
       allow update: if isAdmin()
-        || (isAuthenticated()
+        || (isNotAnonymous()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['confidence', 'usageCount', 'updatedAt']));
       allow delete: if isAdmin();
     }
@@ -936,9 +941,9 @@ service cloud.firestore {
     // Update restringido a campos de tracking — bloquea modificación arbitraria de patrones
     match /ariaEquipmentPatterns/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidAriaEquipmentPattern();
+      allow create: if isNotAnonymous() && isValidAriaEquipmentPattern();
       allow update: if isAdmin()
-        || (isAuthenticated()
+        || (isNotAnonymous()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['occurrences', 'lastOccurrence', 'updatedAt', 'commonSolution', 'avgResolutionHours', 'relatedSpares']));
       allow delete: if isAdmin();
     }
@@ -946,7 +951,7 @@ service cloud.firestore {
     // ARIA – User corrections
     match /ariaCorrections/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidAriaCorrection();
+      allow create: if isNotAnonymous() && isValidAriaCorrection();
       allow update, delete: if isAdmin();
     }
 
