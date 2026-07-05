@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-05 - claude - Seguridad: cierre de lecturas anónimas (PR #146) + proveedor anónimo OFF
+
+- Hecho: cerrado el trade-off que quedó abierto en el PR #145 (las 8 colecciones del catálogo —incl. `users` con PII— y todo Storage eran legibles por cualquier sesión anónima). Hallazgo clave: el flujo REAL de la Mini App mant.html YA usaba custom token (initData → mintTelegramAuthToken → signInWithCustomToken) en prod; el ÚNICO `signInAnonymously` del repo estaba en el modo preview (`?preview=1`, herramienta de admin).
+- Cambios (PR #146, mergeado 5dbd5321): (1) mant.html preview ya no usa anónimo — acepta `#token=<custom token>` en el fragment (igual que la PWA standalone) o sesión persistida, con error claro si no hay sesión; el botón "🔗 URL preview" ahora mintea token con el initData actual y copia la URL con `#token=…` (~1h). (2) `firestore.rules`: `isCatalogReader()` → `isNotAnonymous()` (v1.4.0). (3) `storage.rules`: lectura global exige no-anónimo (se mantienen públicos deliberados models3d y baader200-images).
+- Post-merge: proveedor ANÓNIMO DESHABILITADO en Firebase Auth vía Identity Toolkit Admin API v2 con la SA (PATCH 200; signUp anónimo ahora da ADMIN_ONLY_OPERATION). Reversible en consola si hiciera falta.
+- Archivos: apps/pwa/public/mant.html, firestore.rules, storage.rules.
+- Verificación end-to-end real: sesión anónima REST → 403 en repuestos/users/hierarchy y Storage list; flujo custom token (initData forjado con el bot token local, HMAC validado por la función de prod) → 200 en las 8 colecciones del catálogo + Storage; sin auth → 403. Preview local en navegador: sin token → error claro; con token → app carga, `isAnonymous:false`. Prod verificado en ambos hosts (web.app y GitHub Pages) sirviendo el mant.html nuevo. Usuario de prueba tg_990001112223 borrado (doc + Auth). Deploy Pages falló 1 vez por flakiness de GitHub ("try again later") → rerun OK.
+- HALLAZGO: la API key web ya está RESTRINGIDA por referrers (bloqueó localhost:5877, permite localhost:5173 y los hosts de prod) → el punto 1 de la auditoría 2026-07-05 (el único que quedaba manual de Orel) parece CERRADO.
+- Estado: HECHO (desplegado + verificado).
+- Sigue: nada pendiente de la auditoría 2026-07-05; opcional revisar si la alerta secret-scanning #1 de GitHub se puede cerrar ahora que la key está restringida.
+
 ## 2026-07-05 - claude - ARIA Telegram - MODO LOTE de fotos (varias fotos en una sola pasada)
 
 - Origen: Orel mando varias fotos pidiendo lista de SAP + agregar como referencia a sus repuestos, pero se procesaban una por una (conversacion completa por foto: vision + confirmar) - lento y consume mas tokens que lo necesario.
