@@ -147,11 +147,11 @@ function convertToGeminiFormat(messages: Array<{ role: string; content: string }
 }
 
 /**
- * Llamada a Gemini 2.0 Flash (non-streaming) — para razonamiento y análisis
+ * Llamada a Gemini (non-streaming) — para razonamiento y análisis
  */
 export async function callGemini(
   messages: Array<{ role: string; content: string }>,
-  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
+  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number; model?: string },
 ): Promise<{ content: string; tokens: number }> {
   // Seguridad: usar Cloud Function proxy (key nunca llega al browser)
   try {
@@ -164,7 +164,7 @@ export async function callGemini(
 
     const result = await geminiProxyFn({
       messages,
-      model: 'gemini-2.5-flash',
+      model: opts?.model || 'gemini-3.5-flash',
       temperature: opts?.temperature ?? 0.1,
       max_tokens: opts?.max_tokens || 2048,
       systemInstruction: systemInstruction?.parts?.[0]?.text,
@@ -259,7 +259,7 @@ export async function callGeminiVision(
 export async function callGeminiStream(
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
-  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
+  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number; model?: string },
 ): Promise<{ content: string; tokens: number }> {
   // Seguridad: streaming via proxy no soportado, usamos non-streaming
   const result = await callGemini(messages, opts)

@@ -76,7 +76,6 @@ export interface MissionLog {
 // ═══════════════════════════════════════════════════════════════════════
 
 const GROQ_API_KEY = ''   // BLOQUEADO: usar Cloud Function groqProxy
-const GEMINI_API_KEY = '' // BLOQUEADO: usar Cloud Function geminiProxy
 const DEEPSEEK_API_KEY = '' // BLOQUEADO: usar Cloud Function deepseekProxy
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -89,9 +88,9 @@ function registerDefaults() {
   const defaults: AIAgent[] = [
     {
       id: 'gemini-flash',
-      name: 'Gemini 2.5 Flash',
+      name: 'Gemini 3.5 Flash',
       provider: 'gemini',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       emoji: '⚡',
       capabilities: ['general', 'vision', 'reasoning', 'code', 'analysis'],
       priority: 90,
@@ -99,15 +98,19 @@ function registerDefaults() {
       dailyLimit: 1500,
       streaming: true,
       thinking: true,
-      status: GEMINI_API_KEY ? 'online' : 'disabled',
+      // Las keys reales viven en el servidor (Cloud Functions secrets); las
+      // constantes locales de arriba están BLOQUEADAS a propósito. El status
+      // arranca online y el sistema de rate-limit/error ya existente
+      // (markRateLimited/markAgentError) lo degrada solo si una llamada real falla.
+      status: 'online',
       usedToday: 0,
       tokensToday: 0,
     },
     {
       id: 'deepseek-r1',
-      name: 'DeepSeek R1',
+      name: 'DeepSeek V4 Flash',
       provider: 'deepseek',
-      model: 'deepseek-reasoner',
+      model: 'deepseek-v4-flash', // deepseek-reasoner (alias legacy) se apaga 24-jul-2026
       emoji: '🧠',
       capabilities: ['reasoning', 'code', 'analysis'],
       priority: 95,
@@ -115,15 +118,15 @@ function registerDefaults() {
       dailyLimit: 500,
       streaming: true,
       thinking: true,
-      status: DEEPSEEK_API_KEY ? 'online' : 'disabled',
+      status: 'online',
       usedToday: 0,
       tokensToday: 0,
     },
     {
       id: 'qwen-qwq',
-      name: 'Qwen QwQ-32B',
+      name: 'Qwen 3.6 27B',
       provider: 'groq',
-      model: 'qwen-qwq-32b',
+      model: 'qwen/qwen3.6-27b', // qwen-qwq-32b YA fue decomisionado por Groq
       emoji: '🔮',
       capabilities: ['reasoning', 'code', 'analysis'],
       priority: 80,
@@ -131,15 +134,15 @@ function registerDefaults() {
       dailyLimit: 14400,
       streaming: true,
       thinking: true,
-      status: GROQ_API_KEY ? 'online' : 'disabled',
+      status: 'online',
       usedToday: 0,
       tokensToday: 0,
     },
     {
       id: 'llama-versatile',
-      name: 'Llama 3.3 70B',
+      name: 'GPT-OSS 120B',
       provider: 'groq',
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b', // llama-3.3-70b-versatile se apaga 16-ago-2026
       emoji: '🦙',
       capabilities: ['general', 'speed', 'code', 'analysis'],
       priority: 70,
@@ -147,7 +150,7 @@ function registerDefaults() {
       dailyLimit: 14400,
       streaming: true,
       thinking: false,
-      status: GROQ_API_KEY ? 'online' : 'disabled',
+      status: 'online',
       usedToday: 0,
       tokensToday: 0,
     },
@@ -388,6 +391,16 @@ export function updateProviderKey(provider: string, key: string) {
 }
 
 /**
+ * Algunos modelos de razonamiento (ej. Qwen 3.6) devuelven su "pensamiento"
+ * inline entre <think>...</think> dentro del mismo texto (a diferencia de
+ * DeepSeek/Gemini, que lo separan en un campo aparte). Sin este filtro, ese
+ * texto crudo se mostraría tal cual en el chat.
+ */
+function stripThinkTags(content: string): string {
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+}
+
+/**
  * Llama a un agente específico por su ID.
  * Para Gemini usa las funciones de ai.ts; para el resto usa OpenAI-compatible.
  */
@@ -408,7 +421,7 @@ export async function callAgent(
 
     if (agent.provider === 'gemini') {
       const { callGemini } = await import('./ai')
-      result = await callGemini(messages, opts)
+      result = await callGemini(messages, { ...opts, model: agent.model })
     } else if (agent.provider === 'groq' || agent.provider === 'deepseek') {
       // Usar Cloud Functions proxy (no exponer keys en el browser)
       const { httpsCallable, getFunctions } = await import('firebase/functions')
@@ -423,12 +436,13 @@ export async function callAgent(
         max_tokens: opts.max_tokens || 2048,
       })
       const data = cfResult.data as { content: string; tokens?: number }
-      result = { content: data.content || '', tokens: data.tokens || 0 }
+      result = { content: stripThinkTags(data.content || ''), tokens: data.tokens || 0 }
     } else {
       const url = PROVIDER_URLS[agent.provider]
       const key = PROVIDER_KEYS[agent.provider]
       if (!url || !key) throw new Error(`Provider ${agent.provider} no configurado`)
       result = await callOpenAICompatible(url, key, agent.model, messages, opts, agent.name)
+      result = { ...result, content: stripThinkTags(result.content) }
     }
 
     recordAgentUsage(agentId, result.tokens)
@@ -468,7 +482,16 @@ export async function callAgentStream(
 
     if (agent.provider === 'gemini') {
       const { callGeminiStream } = await import('./ai')
-      result = await callGeminiStream(messages, onChunk, opts)
+      result = await callGeminiStream(messages, onChunk, { ...opts, model: agent.model })
+    } else if (agent.provider === 'groq' || agent.provider === 'deepseek') {
+      // El streaming directo a Groq/DeepSeek necesitaría la key en el browser,
+      // que ya no existe (vive en el secret del servidor). Igual que Gemini,
+      // se degrada a no-streaming vía el proxy seguro y se entrega todo de una.
+      // callAgent ya registra el uso y maneja errores — se retorna directo
+      // para no duplicar recordAgentUsage.
+      const proxyResult = await callAgent(agentId, messages, opts)
+      onChunk(proxyResult.content)
+      return proxyResult
     } else {
       const url = PROVIDER_URLS[agent.provider]
       const key = PROVIDER_KEYS[agent.provider]
@@ -653,14 +676,13 @@ function applyAgentsConfig(config: AgentsConfig) {
   }
 
   for (const agent of agents.values()) {
-    // Check disabled
+    // Check disabled — las keys reales viven siempre en el servidor (Cloud
+    // Functions secrets), así que la única fuente de verdad para "disabled"
+    // es la lista explícita del admin (o un 402 real de markAgentError).
     if (config.disabledAgents.includes(agent.id)) {
       agent.status = 'disabled'
     } else if (agent.status === 'disabled') {
-      // Re-enable si tiene key (env var O Firestore)
-      const hasKey = !!PROVIDER_KEYS[agent.provider]
-        || (agent.provider === 'gemini' && !!GEMINI_API_KEY)
-      if (hasKey) agent.status = 'online'
+      agent.status = 'online'
     }
     // Priority override
     if (config.priorityOverrides[agent.id] != null) {
