@@ -1,9 +1,12 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permitir lectura SOLO autenticados (antes público)
+    // Lectura SOLO autenticados NO anónimos (la Mini App de Telegram usa
+    // custom token de mintTelegramAuthToken; anónimos cerrados 2026-07-05).
+    // Excepciones públicas deliberadas más abajo: models3d, baader200-images.
     match /{allPaths=**} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // Planos de Aguas — fotos referenciales por bajada (PWA + QR)
