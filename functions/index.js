@@ -25,6 +25,26 @@ const ALLOWED_ORIGINS = [
   'http://localhost:4173',
 ]
 
+// ── Gate para endpoints HTTP administrativos (setup/diagnóstico manual) ──────
+// Estos endpoints no los llama la PWA; son herramientas manuales one-shot.
+// Fail-closed: sin ADMIN_SETUP_KEY configurada NO se ejecutan (503).
+// Con key configurada exigen ?key=<valor> o header x-admin-key.
+// Configurar ADMIN_SETUP_KEY dentro del secret FUNCTIONS_ENV (GitHub → Settings
+// → Secrets → Actions) para que llegue a producción.
+function requireAdminKey(req, res) {
+  const expected = process.env.ADMIN_SETUP_KEY
+  if (!expected) {
+    res.status(503).json({ error: 'ADMIN_KEY_NOT_CONFIGURED', message: 'Configurar ADMIN_SETUP_KEY en FUNCTIONS_ENV' })
+    return false
+  }
+  const got = req.get('x-admin-key') || req.query.key
+  if (got !== expected) {
+    res.status(403).json({ error: 'FORBIDDEN' })
+    return false
+  }
+  return true
+}
+
 // RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
 let _rtdb = null
 function getRtdb() {
@@ -4514,6 +4534,16 @@ exports.telegramWebhook = onRequest(
     return
   }
 
+  // Anti-spoofing: si TELEGRAM_WEBHOOK_SECRET está configurado, exigir que el
+  // header coincida (Telegram lo envía cuando se registró setWebhook con
+  // secret_token). Condicional para no romper el bot si aún no se re-registró.
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (webhookSecret && req.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
+    logger.warn('telegramWebhook: secret_token inválido o ausente — rechazado')
+    res.status(401).send('unauthorized')
+    return
+  }
+
   const update = req.body
 
   // ---- Callback queries (botones inline) ----
@@ -4731,6 +4761,7 @@ exports.onGraderSummaryCreated = onDocumentCreated('graderDailySummaries/{summar
  * GET https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/setTelegramWebhook
  */
 exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!requireAdminKey(req, res)) return
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
@@ -4740,14 +4771,20 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
   const webhookUrl =
     'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/telegramWebhook'
 
+  // Registrar secret_token: Telegram lo reenviará en cada update como header
+  // X-Telegram-Bot-Api-Secret-Token, y telegramWebhook lo valida (anti-spoofing).
+  const webhookBody = { url: webhookUrl }
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (webhookSecret) webhookBody.secret_token = webhookSecret
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/setWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: webhookUrl }),
+      body: JSON.stringify(webhookBody),
     })
     const result = await response.json()
-    res.json({ webhookUrl, telegram: result })
+    res.json({ webhookUrl, secretTokenSet: Boolean(webhookSecret), telegram: result })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -4773,6 +4810,7 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
  * GET /setBotCommands — ejecutar una sola vez tras deploy. Idempotente.
  */
 exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!requireAdminKey(req, res)) return
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
@@ -4804,6 +4842,7 @@ exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) =
  * Pre-req: el grupo debe tener "Temas" habilitados y el bot debe ser admin.
  */
 exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!requireAdminKey(req, res)) return
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) {
@@ -5023,6 +5062,7 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
  * No requiere autenticación — solo funciona con el chatId ya configurado en .env.
  */
 exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!requireAdminKey(req, res)) return
   // Acepta chatId desde query param (ej: ?chatId=-1003969255842) o desde .env
   const chatId = req.query.chatId || process.env.TELEGRAM_CHAT_ID
   if (!chatId) {
@@ -5111,6 +5151,7 @@ exports.shoplogixSyncHttp = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') {
       res.status(500).json({
@@ -5370,6 +5411,7 @@ exports.shoplogixCleanupLegacy = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const { plantSlug = 'chonchi', from, to } = req.query || {}
     // dryRun=true por defecto: requiere pasar explícitamente dryRun=false para borrar
     const dryRun = req.query.dryRun !== 'false'
@@ -5470,6 +5512,7 @@ exports.shoplogixDumpShift = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const { plantSlug = 'yal', dateKey, shiftId } = req.query || {}
     if (!dateKey) { res.status(400).json({ error: 'dateKey requerido' }); return }
 
@@ -5527,6 +5570,7 @@ exports.shoplogixBackfillRange = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const { plantSlug = 'chonchi', from, to } = req.query || {}
     if (!from || !to) {
       res.status(400).json({ error: 'BAD_REQUEST', message: 'Requiere from=YYYY-MM-DD y to=YYYY-MM-DD' })
@@ -5613,6 +5657,7 @@ exports.shoplogixProbe = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') {
       res.status(500).json({ error: 'NO_AUTH' })
