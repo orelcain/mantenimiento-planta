@@ -115,14 +115,19 @@ function snapCycles(s: UpstreamLineSnapshot): number {
  * ahora (o, si ninguno produce, el de más ciclos). Devuelve el mismo snapshot
  * que renderiza el board → los números CUADRAN.
  */
-async function loadLiveShift(plantSlug: PlantSlug): Promise<UpstreamLineSnapshot | null> {
+interface LiveShift { snapshot: UpstreamLineSnapshot; syncedAt: Date | null }
+
+async function loadLiveShift(plantSlug: PlantSlug): Promise<LiveShift | null> {
   const dk = todayKey()
-  const snaps = await Promise.all(
+  // forceServer=true → lectura fresca del servidor (no caché local), para que
+  // "en vivo" sea lo más actual posible dado el sync de Shoplogix (~cada 5 min).
+  const results = await Promise.all(
     SLX_SHIFT_CANDIDATES.map(sid =>
-      loadShoplogixShift(dk, sid, plantSlug).then(r => r.snapshot).catch(() => null),
+      loadShoplogixShift(dk, sid, plantSlug, true).catch(() => ({ snapshot: null, syncedAt: null })),
     ),
   )
-  const valid = snaps.filter((s): s is UpstreamLineSnapshot => {
+  const valid = results.filter((r): r is LiveShift => {
+    const s = r.snapshot
     if (!s) return false
     const cyc = snapCycles(s)
     if (cyc <= 0) return false
@@ -130,25 +135,32 @@ async function loadLiveShift(plantSlug: PlantSlug): Promise<UpstreamLineSnapshot
     return true
   })
   if (valid.length === 0) return null
-  const producing = valid.filter(s => (s.machinesProducing || 0) > 0)
+  const producing = valid.filter(r => (r.snapshot.machinesProducing || 0) > 0)
   const pool = producing.length > 0 ? producing : valid
-  pool.sort((a, b) => snapCycles(b) - snapCycles(a))
+  pool.sort((a, b) => snapCycles(b.snapshot) - snapCycles(a.snapshot))
   return pool[0]!
 }
 
-/** Formatea el snapshot vivo: línea + desglose por máquina (piezas, ritmo, uptime). */
-function formatLiveShift(s: UpstreamLineSnapshot, plantLbl: string): string {
-  const totalCycles = snapCycles(s)
-  const totalPieces = s.machines.reduce((acc, m) => acc + (m.totalPieces || 0), 0)
+/**
+ * Formatea el snapshot vivo como NOTAS para que ARIA las interprete (no como
+ * respuesta final). Clave de negocio: en eviscerado 1 ciclo del Baader = 1
+ * pescado → reportamos ciclos COMO piezas (el campo totalPieces del snapshot
+ * está casi vacío y NO es el conteo de pescados). Se omite el conteo
+ * instantáneo "produciendo X/N" (es el estado del último instante sincronizado
+ * y engaña); en su lugar, uptime por máquina + antigüedad del dato.
+ */
+function formatLiveShift(s: UpstreamLineSnapshot, syncedAt: Date | null, plantLbl: string): string {
+  const piezas = snapCycles(s)
   const cyclesPerMin = s.lineThroughputActual ? s.lineThroughputActual / 60 : 0
+  const freshMin = syncedAt ? Math.max(0, Math.round((Date.now() - syncedAt.getTime()) / 60000)) : null
   const lines: string[] = [
-    `📡 Turno EN CURSO ${s.shiftId} · ${plantLbl} (${s.dateKey}) — datos vivos de Shoplogix:`,
-    `- **Línea**: ${fmtNum(totalCycles)} ciclos · ${fmtNum(totalPieces)} piezas · ${fmtNum(cyclesPerMin, 1)} pz/min · disponibilidad ${fmtFracPct(s.lineAvailability)} · ${s.machinesProducing}/${s.machines.length} máquinas produciendo`,
+    `Turno EN CURSO ${s.shiftId} · ${plantLbl} (${s.dateKey})${freshMin !== null ? ` · dato de Shoplogix de hace ~${freshMin} min` : ''}:`,
+    `- Línea: ${fmtNum(piezas)} piezas (= ciclos de eviscerado) · ${fmtNum(cyclesPerMin, 1)} pz/min · disponibilidad de línea ${fmtFracPct(s.lineAvailability)}`,
   ]
   for (const m of s.machines) {
     const microMin = Math.round((m.shiftRuntimeBreakdown?.downtimeSec || 0) / 60)
     lines.push(
-      `- **${m.machineName}**: ${fmtNum(m.totalCycles)}/${fmtNum(m.expectedTotalCycles)} ciclos (${fmtFracPct(m.overallRatio)} del objetivo) · uptime ${fmtFracPct(m.shiftRuntime)}${microMin > 0 ? ` · micro-detención ${microMin} min` : ''}`,
+      `- ${m.machineName}: ${fmtNum(m.totalCycles)} piezas (${fmtFracPct(m.overallRatio)} del objetivo de ${fmtNum(m.expectedTotalCycles)}) · uptime ${fmtFracPct(m.shiftRuntime)}${microMin > 0 ? ` · ${microMin} min en micro-detención` : ''}`,
     )
   }
   return lines.join('\n')
@@ -231,15 +243,15 @@ registerTool({
         const slug: PlantSlug = plantLineId
           ? ((PLANT_LINES.find(p => p.id === plantLineId)?.plantSlug as PlantSlug) || 'chonchi')
           : 'chonchi'
-        const snap = await loadLiveShift(slug)
-        if (snap) {
+        const live = await loadLiveShift(slug)
+        if (live) {
           const plantLbl = plantLineId
             ? getPlantLabel(plantLineId)
             : (slug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)')
           return {
             ok: true,
             data: { date: today, plantLineId, source: 'shoplogix-live', count: 0 },
-            summary: `Aún no se ha subido el Excel del Grader${plantSuffix} (se carga al cierre), pero el turno está EN CURSO. ${formatLiveShift(snap, plantLbl)}\n\nEl P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.`,
+            summary: `Aún no se ha subido el Excel del Grader${plantSuffix} (se carga al cierre), pero el turno está EN CURSO. ${formatLiveShift(live.snapshot, live.syncedAt, plantLbl)}\n\n(El P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.)`,
             label: `Turno en curso (Shoplogix)${plantSuffix}`,
           }
         }
@@ -788,8 +800,8 @@ registerTool({
   execute: async (params) => {
     const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
     const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
-    const snap = await loadLiveShift(plantSlug)
-    if (!snap) {
+    const live = await loadLiveShift(plantSlug)
+    if (!live) {
       return {
         ok: true,
         data: { plantSlug, count: 0 },
@@ -797,25 +809,25 @@ registerTool({
         label: `Turno en vivo · ${plantLbl}`,
       }
     }
+    const s = live.snapshot
     return {
       ok: true,
       data: {
         plantSlug,
-        shiftId: snap.shiftId,
-        dateKey: snap.dateKey,
-        totalCycles: snapCycles(snap),
-        machinesProducing: snap.machinesProducing,
-        lineAvailability: snap.lineAvailability,
-        machines: snap.machines.map(m => ({
+        shiftId: s.shiftId,
+        dateKey: s.dateKey,
+        syncedAtMinAgo: live.syncedAt ? Math.round((Date.now() - live.syncedAt.getTime()) / 60000) : null,
+        piezasLinea: snapCycles(s), // 1 ciclo = 1 pescado
+        lineAvailability: s.lineAvailability,
+        machines: s.machines.map(m => ({
           name: m.machineName,
-          cycles: m.totalCycles,
-          expected: m.expectedTotalCycles,
-          pieces: m.totalPieces,
-          overallRatio: m.overallRatio,
+          piezas: m.totalCycles,
+          objetivo: m.expectedTotalCycles,
+          pctObjetivo: m.overallRatio,
           uptime: m.shiftRuntime,
         })),
       },
-      summary: formatLiveShift(snap, plantLbl),
+      summary: formatLiveShift(s, live.syncedAt, plantLbl),
       label: `Turno en vivo · ${plantLbl}`,
     }
   },
