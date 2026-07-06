@@ -53,6 +53,11 @@ interface RepuestoDetailPanelProps {
   onToggleFavorite?: () => void
   /** Abrir el gestor de listas con nombre para este repuesto. */
   onAddToList?: () => void
+  /**
+   * Guardar nombres comunes (apodos). Solo admin. En desktop también se editan
+   * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
+   */
+  onSaveApodos?: (apodos: string[]) => Promise<void>
 }
 
 /** Botón de acción compacto del panel (icono + etiqueta). */
@@ -102,7 +107,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onGallery, onManual, isFavorite, onToggleFavorite, onAddToList }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onGallery, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -143,6 +148,25 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
     setEditLoc(true)
   }, [item])
 
+  // ── Nombres comunes (apodos) ──
+  const [editApodos, setEditApodos] = useState(false)
+  const [apodosVal, setApodosVal] = useState('')
+  const [savingApodos, setSavingApodos] = useState(false)
+
+  const startEditApodos = useCallback(() => {
+    setApodosVal((item?.nombresComunes ?? []).join(', '))
+    setEditApodos(true)
+  }, [item])
+
+  const saveApodos = useCallback(async () => {
+    if (!onSaveApodos) return
+    setSavingApodos(true)
+    try {
+      await onSaveApodos(apodosVal.split(',').map((s) => s.trim()).filter(Boolean))
+      setEditApodos(false)
+    } finally { setSavingApodos(false) }
+  }, [onSaveApodos, apodosVal])
+
   const saveLoc = useCallback(async () => {
     if (!item) return
     setSavingLoc(true)
@@ -158,7 +182,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
-  useEffect(() => { setEditLoc(false) }, [sap])
+  useEffect(() => { setEditLoc(false); setEditApodos(false) }, [sap])
 
   useEffect(() => {
     setMovs(null); setShowMovs(false)
@@ -380,6 +404,46 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           <Field label="Tipo" value={item.tipo?.trim() || 'Sin clasificar'} />
           <Field label="Fabricante" value={item.codigoFabricante ?? '-'} />
           <Field label="Unidad" value={item.unidad ?? '-'} />
+          {/* Nombres comunes (apodos) — editable acá porque la columna de la tabla solo existe en lg+ */}
+          <div className="py-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Nombres comunes</span>
+              {!editApodos && (
+                <span className="flex min-w-0 items-center gap-1.5 text-right text-[13px] font-medium text-foreground">
+                  <span className="min-w-0 truncate" title={(item.nombresComunes ?? []).join(', ')}>
+                    {(item.nombresComunes && item.nombresComunes.length) ? item.nombresComunes.join(', ') : '—'}
+                  </span>
+                  {onSaveApodos && (
+                    <button onClick={startEditApodos} className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-primary" title="Editar nombres comunes" aria-label="Editar nombres comunes">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+            {editApodos && (
+              <div className="mt-2 space-y-2">
+                <Input
+                  autoFocus
+                  value={apodosVal}
+                  onChange={(e) => setApodosVal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveApodos()
+                    else if (e.key === 'Escape') setEditApodos(false)
+                  }}
+                  placeholder="apodos, separados por coma"
+                  className="h-8 text-xs"
+                  disabled={savingApodos}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-7 flex-1" onClick={saveApodos} disabled={savingApodos}>
+                    {savingApodos ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Guardar'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setEditApodos(false)} disabled={savingApodos}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tarjeta de stock */}

@@ -158,7 +158,13 @@ export function RepuestoPhotosModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          // Con el lightbox abierto ENCIMA, un tap/Esc sobre él contaría como
+          // "interacción afuera" del Dialog y cerraría este modal por debajo
+          onInteractOutside={(e) => { if (lightboxIndex !== null) e.preventDefault() }}
+          onEscapeKeyDown={(e) => { if (lightboxIndex !== null) e.preventDefault() }}
+        >
           <DialogHeader>
             <DialogTitle className="text-base truncate">
               Fotos — {repuestoName}

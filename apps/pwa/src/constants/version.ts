@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.83.0' as const
+export const APP_VERSION = '3.84.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-07-05' as const
+export const VERSION_DATE = '2026-07-06' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): Trabajo de Mantención (TPM) — correctivo→causa raíz→prevención en el reporte de impacto' as const
+export const VERSION_NAME = 'fix(ui): el visor de imágenes ahora se puede cerrar en móvil (quedaba sin pointer-events bajo un Dialog modal)' as const
 
 /**
  * Nota:

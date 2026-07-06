@@ -11,6 +11,8 @@ import type { GraderDailySummary } from '../../grader/types'
 import { getLatestTurnoKPIs } from '../../grader/turnoKpis'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { PLANT_LINES } from '@/config/plantLines'
+import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 
 // ─── Detección de planta desde texto libre ────────────────────────────
 
@@ -95,6 +97,75 @@ function fmtHours(h: number | undefined): string {
   return h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)} h`
 }
 
+// ─── Turno EN VIVO desde Shoplogix (misma fuente que el board Análisis de Turno) ──
+
+/** Candidatos de shiftId que Shoplogix puede usar en un día (orden cronológico). */
+const SLX_SHIFT_CANDIDATES = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
+/** Umbral anti-ruido para el bucket 'Unscheduled' (ciclos sueltos de arranque/parada). */
+const UNSCHEDULED_MIN_CYCLES = 50
+
+function snapCycles(s: UpstreamLineSnapshot): number {
+  return s.machines.reduce((acc, m) => acc + (m.totalCycles || 0), 0)
+}
+
+/**
+ * Resuelve y carga el turno EN CURSO (más activo) de una planta para hoy,
+ * replicando la lógica de `subscribeShoplogixShiftAuto` del board pero en una
+ * sola lectura: prueba todos los candidatos y elige el que está produciendo
+ * ahora (o, si ninguno produce, el de más ciclos). Devuelve el mismo snapshot
+ * que renderiza el board → los números CUADRAN.
+ */
+interface LiveShift { snapshot: UpstreamLineSnapshot; syncedAt: Date | null }
+
+async function loadLiveShift(plantSlug: PlantSlug): Promise<LiveShift | null> {
+  const dk = todayKey()
+  // forceServer=true → lectura fresca del servidor (no caché local), para que
+  // "en vivo" sea lo más actual posible dado el sync de Shoplogix (~cada 5 min).
+  const results = await Promise.all(
+    SLX_SHIFT_CANDIDATES.map(sid =>
+      loadShoplogixShift(dk, sid, plantSlug, true).catch(() => ({ snapshot: null, syncedAt: null })),
+    ),
+  )
+  const valid = results.filter((r): r is LiveShift => {
+    const s = r.snapshot
+    if (!s) return false
+    const cyc = snapCycles(s)
+    if (cyc <= 0) return false
+    if (s.shiftId === 'Unscheduled' && cyc < UNSCHEDULED_MIN_CYCLES) return false
+    return true
+  })
+  if (valid.length === 0) return null
+  const producing = valid.filter(r => (r.snapshot.machinesProducing || 0) > 0)
+  const pool = producing.length > 0 ? producing : valid
+  pool.sort((a, b) => snapCycles(b.snapshot) - snapCycles(a.snapshot))
+  return pool[0]!
+}
+
+/**
+ * Formatea el snapshot vivo como NOTAS para que ARIA las interprete (no como
+ * respuesta final). Clave de negocio: en eviscerado 1 ciclo del Baader = 1
+ * pescado → reportamos ciclos COMO piezas (el campo totalPieces del snapshot
+ * está casi vacío y NO es el conteo de pescados). Se omite el conteo
+ * instantáneo "produciendo X/N" (es el estado del último instante sincronizado
+ * y engaña); en su lugar, uptime por máquina + antigüedad del dato.
+ */
+function formatLiveShift(s: UpstreamLineSnapshot, syncedAt: Date | null, plantLbl: string): string {
+  const piezas = snapCycles(s)
+  const cyclesPerMin = s.lineThroughputActual ? s.lineThroughputActual / 60 : 0
+  const freshMin = syncedAt ? Math.max(0, Math.round((Date.now() - syncedAt.getTime()) / 60000)) : null
+  const lines: string[] = [
+    `Turno EN CURSO ${s.shiftId} · ${plantLbl} (${s.dateKey})${freshMin !== null ? ` · dato de Shoplogix de hace ~${freshMin} min` : ''}:`,
+    `- Línea: ${fmtNum(piezas)} piezas (= ciclos de eviscerado) · ${fmtNum(cyclesPerMin, 1)} pz/min · disponibilidad de línea ${fmtFracPct(s.lineAvailability)}`,
+  ]
+  for (const m of s.machines) {
+    const microMin = Math.round((m.shiftRuntimeBreakdown?.downtimeSec || 0) / 60)
+    lines.push(
+      `- ${m.machineName}: ${fmtNum(m.totalCycles)} piezas (${fmtFracPct(m.overallRatio)} del objetivo de ${fmtNum(m.expectedTotalCycles)}) · uptime ${fmtFracPct(m.shiftRuntime)}${microMin > 0 ? ` · ${microMin} min en micro-detención` : ''}`,
+    )
+  }
+  return lines.join('\n')
+}
+
 function summarizeShift(s: GraderDailySummary): string {
   const parts: string[] = []
   const tag = s.turnoLabel ? `, ${s.turnoLabel}` : ''
@@ -165,10 +236,30 @@ registerTool({
     const summaries = await listDailySummariesByRange(today, today, plantLineId)
     const plantSuffix = plantLineId ? ` · ${getPlantLabel(plantLineId)}` : ''
     if (summaries.length === 0) {
+      // Fallback: el Excel del Grader se sube al CIERRE, pero Shoplogix tiene el
+      // turno EN CURSO. Usamos el MISMO snapshot vivo que renderiza el board
+      // (loadLiveShift) → los números cuadran con Análisis de Turno.
+      try {
+        const slug: PlantSlug = plantLineId
+          ? ((PLANT_LINES.find(p => p.id === plantLineId)?.plantSlug as PlantSlug) || 'chonchi')
+          : 'chonchi'
+        const live = await loadLiveShift(slug)
+        if (live) {
+          const plantLbl = plantLineId
+            ? getPlantLabel(plantLineId)
+            : (slug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)')
+          return {
+            ok: true,
+            data: { date: today, plantLineId, source: 'shoplogix-live', count: 0 },
+            summary: `Aún no se ha subido el Excel del Grader${plantSuffix} (se carga al cierre), pero el turno está EN CURSO. ${formatLiveShift(live.snapshot, live.syncedAt, plantLbl)}\n\n(El P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.)`,
+            label: `Turno en curso (Shoplogix)${plantSuffix}`,
+          }
+        }
+      } catch { /* si Shoplogix falla, caemos al mensaje informativo de abajo */ }
       return {
         ok: true,
         data: { date: today, plantLineId, count: 0 },
-        summary: `Aún no hay datos de Grader cargados para hoy (${today})${plantSuffix}. El Excel del turno se carga al cierre, así que es normal si el turno está en curso.`,
+        summary: `Aún no hay datos de Grader ni de Shoplogix para hoy (${today})${plantSuffix}. El Excel del turno se carga al cierre, así que es normal si el turno recién comienza.`,
         label: `Turnos hoy${plantSuffix}`,
       }
     }
@@ -683,6 +774,65 @@ registerTool({
   },
 })
 
+// ─── shift.live (producción EN VIVO del turno en curso, desde Shoplogix) ──────
+
+registerTool({
+  name: 'shift.live',
+  category: 'shift',
+  description:
+    'Producción EN VIVO del turno en curso desde Shoplogix — lo MISMO que muestra el board Análisis de Turno: piezas/ciclos totales y por cada máquina Baader, velocidad (pz/min), % del objetivo, uptime por máquina, disponibilidad de línea, máquinas produciendo y micro-detenciones. Detecta planta (yal/chonchi). Úsalo para "cuántas piezas llevan", "velocidad de las baader", "cómo va la producción ahora", "en vivo/tiempo real".',
+  params: [
+    {
+      name: 'plantSlug',
+      type: 'string',
+      enum: ['chonchi', 'yal'],
+      required: false,
+      default: 'chonchi',
+      description: 'Planta Shoplogix (chonchi = principal, yal)',
+    },
+  ],
+  triggers: [
+    /\b(cu[aá]nt[ao]s?\s+(piezas|ciclos|pescados))\b/i,
+    /\b(velocidad|ritmo|pz\/?min|piezas?\/?min|ciclos?\/?min|throughput\s+actual)\b/i,
+    /\b(en\s+vivo|tiempo\s+real|ahora\s+mismo|producci[oó]n\s+(actual|ahora|en\s+vivo|en\s+tiempo\s+real))\b/i,
+    /\bc[oó]mo\s+(va|est[aá]|anda)\s+(la\s+)?(producci[oó]n|l[ií]nea|planta)\b/i,
+  ],
+  execute: async (params) => {
+    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
+    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const live = await loadLiveShift(plantSlug)
+    if (!live) {
+      return {
+        ok: true,
+        data: { plantSlug, count: 0 },
+        summary: `No hay datos vivos de Shoplogix para ${plantLbl} en este momento (turno sin iniciar o sincronización pendiente).`,
+        label: `Turno en vivo · ${plantLbl}`,
+      }
+    }
+    const s = live.snapshot
+    return {
+      ok: true,
+      data: {
+        plantSlug,
+        shiftId: s.shiftId,
+        dateKey: s.dateKey,
+        syncedAtMinAgo: live.syncedAt ? Math.round((Date.now() - live.syncedAt.getTime()) / 60000) : null,
+        piezasLinea: snapCycles(s), // 1 ciclo = 1 pescado
+        lineAvailability: s.lineAvailability,
+        machines: s.machines.map(m => ({
+          name: m.machineName,
+          piezas: m.totalCycles,
+          objetivo: m.expectedTotalCycles,
+          pctObjetivo: m.overallRatio,
+          uptime: m.shiftRuntime,
+        })),
+      },
+      summary: formatLiveShift(s, live.syncedAt, plantLbl),
+      label: `Turno en vivo · ${plantLbl}`,
+    }
+  },
+})
+
 // ─── Inferencia de params adicionales desde texto libre ────────────────
 
 /**
@@ -733,8 +883,8 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
     const plant = detectPlantLineId(userMessage)
     if (plant) params.plantLineId = plant
   }
-  // shift.kpis usa PlantSlug (chonchi/yal), no plantLineId.
-  if (toolName === 'shift.kpis' && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
+  // shift.kpis y shift.live usan PlantSlug (chonchi/yal), no plantLineId.
+  if ((toolName === 'shift.kpis' || toolName === 'shift.live') && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
     params.plantSlug = 'yal'
   }
   return params

@@ -402,7 +402,9 @@ function expandWithSynonyms(terms: string[]): string[] {
 
 // ─── Detección de intención ──────────────────────────────────────────
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
-  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo', 'tenemos', 'hay'],
+  // OJO: no incluir palabras genéricas como 'tenemos'/'hay' — enrutaban por error
+  // frases como "pero tenemos la data de shoplogix" a búsqueda de repuestos (2026-07-06).
+  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo'],
   incidencias: ['incidencia', 'incidencias', 'problema', 'problemas', 'falla', 'fallas', 'reporte', 'reportes', 'pendiente', 'pendientes', 'abierta', 'abiertas', 'resuelta', 'resueltas', 'crítica', 'critica', 'alta', 'prioridad'],
   equipos: ['equipo', 'equipos', 'máquina', 'maquina', 'máquinas', 'maquinas', 'operativo', 'mantenimiento', 'fuera de servicio', 'criticidad'],
   sensores: ['sensor', 'sensores', 'temperatura', 'humedad', 'lectura', 'iot', 'esp32', 'telemetría', 'telemetria', 'alerta'],
@@ -1722,6 +1724,15 @@ REGLAS CRÍTICAS para responder sobre repuestos (OBLIGATORIO):
 - Si no hay coincidencias, explica que no se encontraron y sugiere buscar por código SAP o fabricante.
 - JAMÁS filtres ni omitas resultados por tu cuenta. Si el sistema encontró N coincidencias, tú DEBES mostrar las N.
 - NUNCA uses la palabra "disponible" para filtrar resultados. Usa "en catálogo" o "encontrado".
+
+📊 CÓMO PRESENTAR DATOS DE PRODUCCIÓN / TURNO / KPIs (turno, piezas, ciclos, OEE, uptime, velocidad, Shoplogix, Análisis de Turno):
+- Los resultados de las herramientas son DATOS CRUDOS para que TÚ los interpretes, NO tu respuesta final. JAMÁS copies el desglose textual campo por campo — para eso el usuario lee la pantalla solo.
+- Primero PIENSA: ¿el turno va bien o mal vs el objetivo? ¿qué máquina destaca o preocupa? ¿hay algo accionable o que avisar?
+- Responde como un JEFE DE TURNO experto hablando con un colega: natural, breve, con criterio. LIDERA con la conclusión y el número clave (ej: "Vamos bien en Yal: ~9.500 piezas, 86% del objetivo. La Evisceradora 2 viene un poco floja con más micro-detenciones.").
+- Da el dato clave + tu lectura, no todos los campos. Ofrece el detalle por máquina SOLO si lo piden.
+- En eviscerado, 1 ciclo = 1 pescado → habla de "piezas", no de "ciclos".
+- Si el dato viene de Shoplogix en vivo, recuerda que se sincroniza cada ~5 min (no es el instante exacto); si es relevante, dilo con naturalidad.
+- Excepción: para REPUESTOS sí enumera TODO (ver regla de repuestos arriba).
 
 MÓDULOS DE LA APP (tienes acceso completo a todos):
 
