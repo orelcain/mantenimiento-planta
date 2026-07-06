@@ -165,10 +165,39 @@ registerTool({
     const summaries = await listDailySummariesByRange(today, today, plantLineId)
     const plantSuffix = plantLineId ? ` · ${getPlantLabel(plantLineId)}` : ''
     if (summaries.length === 0) {
+      // Fallback Shoplogix: el Excel del Grader se sube al CIERRE del turno, pero
+      // Shoplogix tiene la producción del turno EN CURSO. Si no hay Grader,
+      // respondemos con los KPIs vivos de Shoplogix en vez de "no hay datos".
+      try {
+        const slug: PlantSlug = plantLineId
+          ? ((PLANT_LINES.find(p => p.id === plantLineId)?.plantSlug as PlantSlug) || 'chonchi')
+          : 'chonchi'
+        const graderRecent = await listDailySummariesByRange(daysAgo(8), today)
+          .catch(() => [] as GraderDailySummary[])
+        const k = await getLatestTurnoKPIs(slug, graderRecent, true)
+        if (k) {
+          const plantLbl = plantLineId
+            ? getPlantLabel(plantLineId)
+            : (slug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)')
+          return {
+            ok: true,
+            data: { date: today, plantLineId, source: 'shoplogix', count: 0, kpis: k },
+            summary: [
+              `Aún no se ha subido el Excel del Grader para hoy${plantSuffix}, pero el turno está EN CURSO y Shoplogix sí tiene datos vivos:`,
+              `Turno ${k.shiftId} (${k.dateKey}) · ${plantLbl} — ${k.machines.length} máquina(s):`,
+              `- OEE: ${fmtFracPct(k.oee)}${k.oee === null ? ' (falta calidad del Grader para cerrarlo)' : ''}`,
+              `- Disponibilidad: ${fmtFracPct(k.availability)} · Rendimiento: ${fmtFracPct(k.performance)}`,
+              `- MTTR (averías macro): ${fmtMinReliab(k.mttrMin)} · Averías ${k.failureCount} · Micro-detenciones ${k.microCount}`,
+              `El P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.`,
+            ].join('\n'),
+            label: `Turno en curso (Shoplogix)${plantSuffix}`,
+          }
+        }
+      } catch { /* si Shoplogix falla, caemos al mensaje informativo de abajo */ }
       return {
         ok: true,
         data: { date: today, plantLineId, count: 0 },
-        summary: `Aún no hay datos de Grader cargados para hoy (${today})${plantSuffix}. El Excel del turno se carga al cierre, así que es normal si el turno está en curso.`,
+        summary: `Aún no hay datos de Grader ni de Shoplogix para hoy (${today})${plantSuffix}. El Excel del turno se carga al cierre, así que es normal si el turno recién comienza.`,
         label: `Turnos hoy${plantSuffix}`,
       }
     }
