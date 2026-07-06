@@ -64,6 +64,17 @@ function isFem(w: string): boolean {
   return /(a|as)$/.test(wl)
 }
 function numWord(tok: string): string {
+  // es-CL: el PUNTO es separador de MILES y la COMA es decimal. "10.280" son diez
+  // mil doscientos ochenta (no "diez coma..."). Detectamos miles como uno o más
+  // grupos de EXACTAMENTE 3 dígitos tras punto ("10.280", "1.234.567"), con
+  // decimal opcional por coma ("10.280,5"). Así no se confunde con "87.3" (que
+  // es decimal estilo US: 1 dígito tras el punto).
+  const miles = /^(\d{1,3}(?:\.\d{3})+)(?:,(\d+))?$/.exec(tok)
+  if (miles) {
+    let w = numToWordsEs(parseInt(miles[1]!.replace(/\./g, ''), 10))
+    if (miles[2] != null) w += ' coma ' + miles[2].split('').map((d) => numToWordsEs(+d)).join(' ')
+    return w
+  }
   const m = /^(\d+)(?:[.,](\d+))?$/.exec(tok)
   if (!m) return tok
   const ent = m[1]!
@@ -148,8 +159,10 @@ export function normalizeForSpeech(text: string): string {
   }
   s = s.replace(/%/g, ' por ciento').replace(/°C/g, ' grados').replace(/º/g, ' grados')
   s = s.replace(/\bmin\b/g, 'minutos').replace(/\bhrs?\b/g, 'horas')
-  // número + (opcional) palabra siguiente → decide género/apócope de "uno"
-  s = s.replace(/(\d+(?:[.,]\d+)?)(\s+[A-Za-zÁÉÍÓÚáéíóúñÑ]+)?/g, (_m, num: string, nxt?: string) => {
+  // número + (opcional) palabra siguiente → decide género/apócope de "uno".
+  // El 1er grupo captura miles es-CL ("10.280", "1.234.567", "10.280,5") o un
+  // entero/decimal simple ("45", "87.3", "86,0").
+  s = s.replace(/(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)(\s+[A-Za-zÁÉÍÓÚáéíóúñÑ]+)?/g, (_m, num: string, nxt?: string) => {
     let w = numWord(num)
     const tail = nxt ?? ''
     if (w.endsWith('uno') && tail.trim()) {
