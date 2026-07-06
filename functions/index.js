@@ -2917,7 +2917,7 @@ async function ariaGroqVision(imageBase64, mime, hint) {
     (hint ? `\nContexto del usuario: ${hint}` : '')
   const raw = await _ariaGeminiChat(
     [{ role: 'user', content: [{ text: prompt }, { inlineData: { mimeType: mime, data: imageBase64 } }] }],
-    { temperature: 0.1, maxTokens: 1000, json: true } // Gemini 3.5 gasta parte del presupuesto "pensando" antes de responder
+    { temperature: 0.1, maxTokens: 1600, json: true } // Gemini 3.5 gasta parte del presupuesto "pensando"; con 1000 el JSON llegaba truncado a veces (caso golillas 06-jul)
   )
   try {
     const parsed = JSON.parse(raw.trim())
@@ -2927,8 +2927,22 @@ async function ariaGroqVision(imageBase64, mime, hint) {
       falla: parsed.falla === true,
     }
   } catch (_) {
-    // El modelo a veces devuelve texto plano pese al response_format — degradar sin perder la descripción
-    return { descripcion: raw.trim(), codigos: [], falla: false }
+    // JSON truncado/malformado: rescatar descripcion+codigos con regex antes de
+    // degradar a texto crudo (el 06-jul un JSON truncado se mostró literal al
+    // usuario y se perdió un SAP ya leído)
+    const mDesc = raw.match(/"descripcion"\s*:\s*"((?:[^"\\]|\\.)*)/)
+    const mCods = raw.match(/"codigos"\s*:\s*\[([^\]]*)/)
+    const codigos = mCods
+      ? [...mCods[1].matchAll(/"((?:[^"\\]|\\.)+)"/g)].map((m) => m[1]).slice(0, 5)
+      : []
+    if (mDesc) {
+      return {
+        descripcion: mDesc[1].replace(/\\n/g, ' ').replace(/\\"/g, '"').trim(),
+        codigos,
+        falla: /"falla"\s*:\s*true/.test(raw),
+      }
+    }
+    return { descripcion: raw.trim(), codigos, falla: false }
   }
 }
 
@@ -3921,7 +3935,7 @@ const ARIA_ROUTER_SPEC =
   '- "alertas_desactivar": pide dejar de recibir esos avisos inmediatos\n' +
   '- "grafico": el usuario pide un gráfico/tendencia/curva — poné en "consulta" exactamente "grader" o "incidencias" según el tema\n' +
   '- "fotos_lote": el usuario pide procesar/listar/resumir las FOTOS que mandó (en plural: "las fotos", "todas", "la lista de sap", "agrega las fotos a sus repuestos") o dice "listo"/"ya está" después de mandar varias fotos juntas\n' +
-  '- "repuesto_agregar": el usuario pide AGREGAR/crear un repuesto/material/insumo en el maestro, o vincularlo a un equipo (típico tras mandar UNA foto: "agrégalo a los repuestos del compresor GA90", "crea este aceite como repuesto de la grader", "súmalo al equipo X") — poné en "consulta" el nombre corto del material (ej: "aceite Roto-Inject") y en "equipo" el equipo que menciona (vacío si no nombra ninguno)\n' +
+  '- "repuesto_agregar": el usuario pide AGREGAR/crear un repuesto/material/insumo en el maestro, vincularlo a un equipo, O agregar la foto que mandó a un repuesto EXISTENTE que nombra por código o nombre (típico tras mandar UNA foto: "agrégalo a los repuestos del compresor GA90", "crea este aceite como repuesto de la grader", "agrégale esta foto también, va en el repuesto SAP 3300104630") — poné en "consulta" el nombre corto del material o el código SAP que nombre, y en "equipo" el equipo que menciona (vacío si no nombra ninguno)\n' +
   'Cualquier OTRA escritura (pedir repuestos a bodega, editar datos maestros existentes) NO está disponible: usá "charla" y explicá en "respuesta" que eso se hace en la app.'
 
 async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topicId, esAdmin = false) {
@@ -4150,10 +4164,33 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         matchExistente = await ariaBuscarCodigoEnMaestro(c)
         if (matchExistente) break
       }
+      // ¿Nombró un SAP explícito? ("agrégale esta foto, va en el repuesto SAP 3300104630")
+      // Match EXACTO por codigoSAP (no por blob: los códigos de equipo vinculados
+      // aparecen en el blob de sus materiales y darían falso positivo)
+      const mSap = `${route.consulta || ''} ${userText}`.match(/\b(\d{6,12})\b/)
+      let repuestoPorSap = null
+      if (mSap) {
+        const maestro = await ariaGetRepuestos()
+        repuestoPorSap = maestro.find((r) => r.codigoSAP && String(r.codigoSAP) === mSap[1]) || null
+      }
+      const existente = repuestoPorSap || matchExistente
       const equipo = equipoTexto ? await ariaBuscarEquipoEnJerarquia(equipoTexto) : { mejor: null, candidatos: [], exacto: false }
-      if (equipoTexto && !equipo.mejor) {
+      if (repuestoPorSap && !equipoTexto && ultimaFoto?.fileId) {
+        // foto extra para un repuesto existente nombrado por SAP → adjuntar directo
+        await ariaSetPending(chatId, {
+          kind: 'adjuntar_foto_repuesto', codigoSAP: repuestoPorSap.codigoSAP,
+          nombreRepuesto: repuestoPorSap.textoBreve || repuestoPorSap.descripcion,
+          fotoFileId: ultimaFoto.fileId, at: Date.now(),
+        })
+        reply = `Ese SAP es **${repuestoPorSap.textoBreve || repuestoPorSap.descripcion}** (\`${repuestoPorSap.codigoSAP}\`).\n\n¿Le agrego la foto que me mandaste? (sí / no)`
+      } else if (repuestoPorSap && !equipoTexto) {
+        // SAP existente pero sin foto vigente ni equipo: no hay acción clara — pedirla
+        reply = `Ese SAP ya está en el maestro: **${repuestoPorSap.textoBreve || repuestoPorSap.descripcion}** (\`${repuestoPorSap.codigoSAP}\`). Mandame la foto y decime "agrégala al SAP ${repuestoPorSap.codigoSAP}", o decime a qué equipo lo vinculo.`
+      } else if (equipoTexto && !equipo.mejor) {
         reply = `No encontré el equipo "${equipoTexto}" en la jerarquía SAP. Decime el nombre como figura en la app (o su código) y lo intento de nuevo.`
-      } else if (matchExistente && matchExistente.codigoSAP && equipo.mejor) {
+      } else if (existente && existente.codigoSAP && equipo.mejor) {
+        // renombrar para el bloque de abajo sin tocar su lógica
+        const matchExistente = existente
         await ariaSetPending(chatId, {
           kind: 'repuesto_ligar', codigoSAP: matchExistente.codigoSAP,
           nombreRepuesto: matchExistente.textoBreve || matchExistente.descripcion,
@@ -4167,11 +4204,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
           '\n\n¿Confirmás? (sí / no)'
       } else {
         const clase = ariaDeducirClase(`${nombre} ${ultimaFoto?.descripcion || ''}`)
+        // SAP tipeado por el usuario (si no existe en el maestro) gana; si no,
         // código OCR sin match en el maestro → candidato a SAP del material nuevo
-        let codigoNuevo = ''
-        for (const c of ultimaFoto?.codigos || []) {
-          const digits = String(c).replace(/\D/g, '')
-          if (digits.length >= 6 && digits.length <= 12) { codigoNuevo = digits; break }
+        let codigoNuevo = mSap && !repuestoPorSap ? mSap[1] : ''
+        if (!codigoNuevo) {
+          for (const c of ultimaFoto?.codigos || []) {
+            const digits = String(c).replace(/\D/g, '')
+            if (digits.length >= 6 && digits.length <= 12) { codigoNuevo = digits; break }
+          }
         }
         // aviso de posibles duplicados por nombre (que Orel decida antes de crear)
         const items = await ariaGetRepuestos()
@@ -4189,7 +4229,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
           : '🔧 Sin equipo vinculado (lo podés vincular después en la app)'
         reply = '**Voy a crear este material en el maestro:**\n\n' +
           `📦 ${nombre}\n` +
-          `🏷️ Clase: **${clase}** · ${codigoNuevo ? `SAP \`${codigoNuevo}\` (leído de la foto)` : 'sin código SAP'}\n` +
+          `🏷️ Clase: **${clase}** · ${codigoNuevo ? `SAP \`${codigoNuevo}\`${mSap && !repuestoPorSap ? '' : ' (leído de la foto)'}` : 'sin código SAP'}\n` +
           `${lineaEquipo}\n` +
           (ultimaFoto ? '📸 Con la foto que me mandaste\n' : '') +
           (parecidos.length ? `\n⚠️ Ojo, hay parecidos en el maestro: ${parecidos.map((p) => `${p.textoBreve || p.descripcion}${p.codigoSAP ? ` (SAP ${p.codigoSAP})` : ''}`).join(' · ')} — si es uno de esos, decime "no" y lo vinculamos en vez de duplicar.\n` : '') +
