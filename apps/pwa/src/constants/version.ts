@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.83.0' as const
+export const APP_VERSION = '3.84.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-07-06' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): Trabajo de Mantención (TPM) — correctivo→causa raíz→prevención en el reporte de impacto' as const
+export const VERSION_NAME = 'fix(repuestos): nombres comunes editables desde el panel de detalle (antes solo columna desktop lg+, sin camino en móvil)' as const
 
 /**
  * Nota:

@@ -1,10 +1,8 @@
 {
-  "version": "3.83.0",
-  "buildDate": "2026-06-30",
-  "buildTimestamp": 1782821069489,
+  "version": "3.84.0",
+  "buildDate": "2026-07-06",
+  "buildTimestamp": 1783290000000,
   "features": [
-    "Panel Admin: el panel de módulos del sidebar ahora lista los 19 items en dos secciones (En desarrollo / En producción)",
-    "Panel Admin: se puede mostrar u ocultar cualquier módulo a conveniencia (antes solo los ocultos en desarrollo)",
-    "Panel Admin: Panel Admin queda fijo (no ocultable) como salvaguarda anti-bloqueo"
+    "Repuestos: los nombres comunes (apodos) ahora se editan desde el panel de detalle del repuesto, también en móvil (antes solo existía la columna de la tabla en pantallas grandes)"
   ]
 }

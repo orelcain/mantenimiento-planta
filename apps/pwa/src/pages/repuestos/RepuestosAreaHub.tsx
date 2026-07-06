@@ -909,13 +909,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [selectedRep, resolveSources, crudUpdate, colPathOf, refreshCatalog],
   )
 
-  // ── Nombres comunes (apodos): edición inline en la tabla ──
+  // ── Nombres comunes (apodos): edición inline en la tabla (lg+) y desde el
+  // panel de detalle (único camino en móvil, donde la columna no existe) ──
   const [editApodosKey, setEditApodosKey] = useState<string | null>(null)
   const [editApodosVal, setEditApodosVal] = useState('')
   const [savingApodos, setSavingApodos] = useState(false)
-  const saveApodos = useCallback(
-    async (row: AreaRepuestoRow) => {
-      const arr = editApodosVal.split(',').map((s) => s.trim()).filter(Boolean)
+  const persistApodos = useCallback(
+    async (row: AreaRepuestoRow, arr: string[]) => {
       setSavingApodos(true)
       try {
         const sources = resolveSources(row)
@@ -928,10 +928,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         toast({ variant: 'destructive', title: 'No se pudo guardar', description: 'Reintenta en un momento.' })
       } finally {
         setSavingApodos(false)
-        setEditApodosKey(null)
       }
     },
-    [editApodosVal, resolveSources, crudUpdate, colPathOf, refreshCatalog, toast],
+    [resolveSources, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+  const saveApodos = useCallback(
+    async (row: AreaRepuestoRow) => {
+      await persistApodos(row, editApodosVal.split(',').map((s) => s.trim()).filter(Boolean))
+      setEditApodosKey(null)
+    },
+    [editApodosVal, persistApodos],
   )
 
   // Asignar código SAP a una pieza de despiece (sin SAP). Si el SAP ya existe en
@@ -1899,6 +1905,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
+          onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
         />
       )}
 
