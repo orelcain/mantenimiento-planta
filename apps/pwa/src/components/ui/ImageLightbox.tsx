@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
 interface ImageLightboxProps {
@@ -198,15 +199,24 @@ export function ImageLightbox({ photos, initialIndex = 0, onClose }: ImageLightb
     setIndex(i => dir === 'prev' ? Math.max(0, i - 1) : Math.min(photos.length - 1, i + 1))
   }
 
-  return (
+  // Portal a <body> + pointer-events explícito: cuando el lightbox se abre desde
+  // dentro de un Dialog modal de Radix, Radix deja el <body> con
+  // pointer-events:none mientras el modal está abierto — el lightbox se veía
+  // pero NINGÚN tap le llegaba (en desktop nadie lo notó porque Esc funciona;
+  // en móvil no hay Esc y quedabas atrapado).
+  return createPortal(
     <div
       className="fixed inset-0 z-[9999] bg-black/95 flex flex-col select-none"
+      style={{ pointerEvents: 'auto' }}
       ref={containerRef}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/60 text-white">
+      {/* Top bar (padding extra arriba por el notch/barra de estado en PWA instalada) */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-black/60 text-white"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+      >
         <span className="text-sm font-medium">
           {photos.length > 1 ? `${index + 1} / ${photos.length}` : 'Vista de imagen'}
         </span>
@@ -319,6 +329,7 @@ export function ImageLightbox({ photos, initialIndex = 0, onClose }: ImageLightb
           {Math.round(zoom * 100)}%
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
