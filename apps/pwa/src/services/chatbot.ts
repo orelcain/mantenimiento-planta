@@ -402,7 +402,9 @@ function expandWithSynonyms(terms: string[]): string[] {
 
 // ─── Detección de intención ──────────────────────────────────────────
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
-  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo', 'tenemos', 'hay'],
+  // OJO: no incluir palabras genéricas como 'tenemos'/'hay' — enrutaban por error
+  // frases como "pero tenemos la data de shoplogix" a búsqueda de repuestos (2026-07-06).
+  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo'],
   incidencias: ['incidencia', 'incidencias', 'problema', 'problemas', 'falla', 'fallas', 'reporte', 'reportes', 'pendiente', 'pendientes', 'abierta', 'abiertas', 'resuelta', 'resueltas', 'crítica', 'critica', 'alta', 'prioridad'],
   equipos: ['equipo', 'equipos', 'máquina', 'maquina', 'máquinas', 'maquinas', 'operativo', 'mantenimiento', 'fuera de servicio', 'criticidad'],
   sensores: ['sensor', 'sensores', 'temperatura', 'humedad', 'lectura', 'iot', 'esp32', 'telemetría', 'telemetria', 'alerta'],
