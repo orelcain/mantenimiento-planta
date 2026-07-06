@@ -33,6 +33,18 @@ describe('normalizeForSpeech', () => {
     expect(normalizeForSpeech('Revisa el equipo 720004608.'))
       .toBe('Revisa el equipo siete dos cero cero cero cuatro seis cero ocho.')
   })
+  it('separador de miles es-CL (punto) se lee como número completo', () => {
+    expect(normalizeForSpeech('Llevamos 10.280 piezas.'))
+      .toBe('Llevamos diez mil doscientos ochenta piezas.')
+    expect(normalizeForSpeech('9.500 ciclos.'))
+      .toBe('nueve mil quinientos ciclos.')
+    expect(normalizeForSpeech('Total 1.234.567 piezas.'))
+      .toBe('Total un millón doscientos treinta y cuatro mil quinientos sesenta y siete piezas.')
+  })
+  it('miles con decimal por coma', () => {
+    expect(normalizeForSpeech('Van 10.280,5 kg.'))
+      .toBe('Van diez mil doscientos ochenta coma cinco kg.')
+  })
 })
 
 describe('plainForSpeech', () => {
