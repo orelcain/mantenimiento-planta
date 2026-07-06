@@ -141,6 +141,34 @@ async function loadLiveShift(plantSlug: PlantSlug): Promise<LiveShift | null> {
   return pool[0]!
 }
 
+/** Etiqueta legible del turno. 'Unscheduled' de Shoplogix = producción registrada
+ * sin turno asignado (fiel al registro; NO se define horario manual). */
+function shiftLabel(shiftId: string): string {
+  return shiftId === 'Unscheduled' ? 'Sin turno asignado' : shiftId
+}
+
+/** Rango horario real del turno (cruza medianoche → muestra día). */
+function fmtShiftRange(s: UpstreamLineSnapshot): string {
+  const m = s.machines[0]
+  const start = m?.scheduledStart ?? m?.shiftStart
+  const end = m?.scheduledEnd ?? m?.shiftEnd
+  if (!(start instanceof Date) || !(end instanceof Date) || isNaN(start.getTime()) || isNaN(end.getTime())) return '—'
+  const t = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const dt = (d: Date) => d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  return start.toDateString() === end.toDateString() ? `${t(start)}–${t(end)}` : `${dt(start)} → ${dt(end)}`
+}
+
+/** Carga TODOS los buckets de turno con producción (>0 ciclos) de una planta/día,
+ * incluido 'Unscheduled'. Fiel a lo que Shoplogix registró. */
+async function loadAllShiftBuckets(plantSlug: PlantSlug, dk: string): Promise<LiveShift[]> {
+  const results = await Promise.all(
+    SLX_SHIFT_CANDIDATES.map(sid =>
+      loadShoplogixShift(dk, sid, plantSlug, true).catch(() => ({ snapshot: null, syncedAt: null })),
+    ),
+  )
+  return results.filter((r): r is LiveShift => !!r.snapshot && snapCycles(r.snapshot) > 0)
+}
+
 /**
  * Formatea el snapshot vivo como NOTAS para que ARIA las interprete (no como
  * respuesta final). Clave de negocio: en eviscerado 1 ciclo del Baader = 1
@@ -833,6 +861,67 @@ registerTool({
   },
 })
 
+// ─── shift.dayProduction (registro FIEL de un día: todos los turnos + sin turno) ──
+
+registerTool({
+  name: 'shift.dayProduction',
+  category: 'shift',
+  description:
+    'Producción registrada en Shoplogix para una planta en un día (default hoy; entiende "ayer"/"anoche"/"madrugada"), sumando TODOS los turnos INCLUIDO lo "sin turno asignado" (Unscheduled). Fiel al registro directo de Shoplogix — NO impone horarios. Úsalo para "cuánto se registró hoy/anoche en total", "producción de la madrugada", "qué se pasó sin turno", "producción del día completo". Detecta planta (yal/chonchi).',
+  params: [
+    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal'], required: false, default: 'chonchi', description: 'Planta' },
+    { name: 'date', type: 'date', required: false, description: 'Fecha YYYY-MM-DD (default hoy)' },
+  ],
+  triggers: [
+    /\b(en\s+total|producci[oó]n\s+total|total\s+del\s+d[ií]a|todos?\s+los\s+turnos|d[ií]a\s+completo)\b/i,
+    /\b(anoche|madrugada|de\s+noche|nocturn[ao]|sin\s+turno|unscheduled)\b/i,
+    /\bcu[aá]nt[ao]s?\s+(piezas|ciclos)?\s*(se\s+)?(registr|proces|pas|pescamos|pesc[oó])/i,
+  ],
+  execute: async (params) => {
+    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
+    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const dk = (typeof params.date === 'string' && params.date) || todayKey()
+    const buckets = await loadAllShiftBuckets(plantSlug, dk)
+    if (buckets.length === 0) {
+      return {
+        ok: true,
+        data: { plantSlug, date: dk, count: 0 },
+        summary: `No hay producción registrada en Shoplogix para ${plantLbl} el ${dk}.`,
+        label: `Producción ${plantLbl} · ${dk}`,
+      }
+    }
+    const sorted = [...buckets].sort((a, b) => {
+      const sa = a.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
+      const sb = b.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
+      return sa - sb
+    })
+    const total = sorted.reduce((acc, b) => acc + snapCycles(b.snapshot), 0)
+    const lines = [
+      `Producción registrada en ${plantLbl} el ${dk} (fiel a Shoplogix, TODOS los turnos):`,
+      `- TOTAL: ${fmtNum(total)} piezas`,
+    ]
+    for (const b of sorted) {
+      const s = b.snapshot
+      lines.push(`- ${shiftLabel(s.shiftId)} (${fmtShiftRange(s)}): ${fmtNum(snapCycles(s))} piezas`)
+    }
+    return {
+      ok: true,
+      data: {
+        plantSlug,
+        date: dk,
+        totalPiezas: total,
+        turnos: sorted.map(b => ({
+          turno: shiftLabel(b.snapshot.shiftId),
+          piezas: snapCycles(b.snapshot),
+          rango: fmtShiftRange(b.snapshot),
+        })),
+      },
+      summary: lines.join('\n'),
+      label: `Producción ${plantLbl} · ${dk}`,
+    }
+  },
+})
+
 // ─── Inferencia de params adicionales desde texto libre ────────────────
 
 /**
@@ -883,9 +972,18 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
     const plant = detectPlantLineId(userMessage)
     if (plant) params.plantLineId = plant
   }
-  // shift.kpis y shift.live usan PlantSlug (chonchi/yal), no plantLineId.
-  if ((toolName === 'shift.kpis' || toolName === 'shift.live') && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
+  // shift.kpis, shift.live y shift.dayProduction usan PlantSlug (chonchi/yal).
+  if ((toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction')
+      && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
     params.plantSlug = 'yal'
+  }
+  // shift.dayProduction: fecha relativa. "anoche"/"madrugada" → ayer (Shoplogix
+  // lumpea la producción nocturna que cruza medianoche en el bucket del día que
+  // arrancó la ventana, típicamente ayer).
+  if (toolName === 'shift.dayProduction') {
+    const lower = userMessage.toLowerCase()
+    if (/\b(anteayer|antier|anteanoche)\b/.test(lower)) params.date = daysAgo(2)
+    else if (/\b(ayer|anoche|madrugada|de\s+noche)\b/.test(lower)) params.date = daysAgo(1)
   }
   return params
 }
