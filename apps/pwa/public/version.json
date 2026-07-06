@@ -1,8 +1,8 @@
 {
-  "version": "3.84.0",
+  "version": "3.84.1",
   "buildDate": "2026-07-06",
-  "buildTimestamp": 1783290000000,
+  "buildTimestamp": 1783294000000,
   "features": [
-    "Repuestos: los nombres comunes (apodos) ahora se editan desde el panel de detalle del repuesto, también en móvil (antes solo existía la columna de la tabla en pantallas grandes)"
+    "Visor de imágenes: ya se puede cerrar en móvil — al abrirlo desde el modal de Fotos quedaba sin recibir taps (pointer-events bloqueados por el modal); además la barra de cierre respeta el notch (safe-area)"
   ]
 }

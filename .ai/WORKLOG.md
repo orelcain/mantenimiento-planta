@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-06 - claude - PWA: el visor de imágenes no se podía CERRAR en móvil — v3.84.1
+
+- Origen: Orel en móvil — "hago click en las imágenes de un repuesto, se ven bien pero no me deja salir". CAUSA RAÍZ: `RepuestoPhotosModal` abre `ImageLightbox` estando un **Dialog modal de Radix** abierto; Radix deja `<body>` con `pointer-events: none` mientras el modal vive, y el lightbox (que NO estaba portaleado y no re-habilitaba pointer-events) se veía encima pero **ningún tap le llegaba**. En desktop nadie lo notó porque Esc sí funciona (teclado no depende de pointer-events); en móvil no hay Esc → atrapado.
+- FIX en `ImageLightbox` (arregla TODOS los usos, 8 consumidores): (1) `createPortal(…, document.body)` — inmune además a ancestros con transform/overflow; (2) `style={{ pointerEvents: 'auto' }}` en la raíz — anula el `none` heredado del lock de Radix; (3) barra superior con `paddingTop: max(0.75rem, env(safe-area-inset-top))` — la X no queda bajo el notch/barra de estado en PWA instalada (mismo remedio que ya usaba mant.html en su lightbox).
+- FIX en `RepuestoPhotosModal`: `onInteractOutside`/`onEscapeKeyDown` con `preventDefault` mientras el lightbox esté abierto — sin esto, al re-habilitar los taps, tocar el lightbox contaba como "interacción afuera" del Dialog y cerraba el modal de fotos por debajo (y Esc cerraba ambos a la vez).
+- Versión: 3.84.1 (version.ts + package.json + version.json — package.json editado SIN BOM esta vez, lección del hotfix #151).
+- Archivos: apps/pwa/src/components/ui/ImageLightbox.tsx, apps/pwa/src/components/repuestos/RepuestoPhotosModal.tsx, apps/pwa/src/constants/version.ts, apps/pwa/package.json, apps/pwa/public/version.json.
+- Verificación: `npx tsc --noEmit` OK + `npx eslint` (2 archivos) OK. Prueba táctil real la hace Orel en su celular (abrir Fotos de un repuesto → tocar imagen → X cierra). Trabajado en worktree `D:\a\wt-lightbox-fix` (otra sesión estaba activa en el checkout principal — anti-colisión).
+- Estado: EN REVISIÓN → PR → merge → deploy GitHub Actions.
+
 ## 2026-07-06 - claude - PWA: nombres comunes editables desde el panel de detalle (fix móvil) — v3.84.0
 
 - Origen: Orel quiso ponerle nombre común a la parada de emergencia del desangrador (SAP 3300104630) desde el celular y la opción no existía: la ÚNICA edición de `nombresComunes` era la columna "Apodos" de la tabla del hub, que es `hidden lg:table-cell` (solo ≥1024px). En móvil ni se ve ni hay alternativa.
