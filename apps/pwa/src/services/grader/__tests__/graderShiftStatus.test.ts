@@ -116,6 +116,66 @@ describe('computeShiftTimeWindow — edge cases', () => {
   })
 })
 
+describe('computeShiftTimeWindow — realBounds (horario real Shoplogix manda)', () => {
+  // Caso real 2026-07: chonchi "Turno 2" según Shoplogix es 09:00–17:15, pero
+  // el schedule de la app decía otra cosa. Con realBounds la ventana viene de
+  // los scheduledStart/End sincronizados y el schedule se ignora.
+  const bounds = {
+    startAt: new Date('2026-07-06T09:00:00.000Z'),
+    endAt:   new Date('2026-07-06T17:15:00.000Z'),
+  }
+
+  it('usa los bounds reales aunque el schedule diga otra cosa', () => {
+    const now = new Date('2026-07-06T10:00:00Z')
+    const r = computeShiftTimeWindow('2026-07-06', 'Turno 2', SCHEDULE, now, bounds)
+    expect(r.status).toBe('live')
+    expect(r.startAt).toBe('2026-07-06T09:00:00.000Z')
+    expect(r.endAt).toBe('2026-07-06T17:15:00.000Z')
+  })
+
+  it('closed pasado el fin real (aunque el schedule lo tendría vivo)', () => {
+    // 18:00: dentro del "Turno día" 07–19 del SCHEDULE, pero el turno real
+    // (09:00–17:15) ya cerró → debe ganar la realidad.
+    const now = new Date('2026-07-06T18:00:00Z')
+    const r = computeShiftTimeWindow('2026-07-06', 'Turno 2', SCHEDULE, now, bounds)
+    expect(r.status).toBe('closed')
+  })
+
+  it('future antes del inicio real', () => {
+    const now = new Date('2026-07-06T08:00:00Z')
+    const r = computeShiftTimeWindow('2026-07-06', 'Turno 2', SCHEDULE, now, bounds)
+    expect(r.status).toBe('future')
+  })
+
+  it('funciona para nombres que el schedule NO conoce (ej. "Turno 1 Lunes")', () => {
+    const t1l = {
+      startAt: new Date('2026-07-06T00:00:00.000Z'),
+      endAt:   new Date('2026-07-06T06:56:00.000Z'),
+    }
+    const now = new Date('2026-07-06T03:00:00Z')
+    const r = computeShiftTimeWindow('2026-07-06', 'Turno 1 Lunes', SCHEDULE, now, t1l)
+    expect(r.status).toBe('live')
+    expect(r.progressPct).toBeGreaterThan(30)
+    expect(r.progressPct).toBeLessThan(60)
+  })
+
+  it('bounds inválidos (end <= start) caen al schedule', () => {
+    const bad = { startAt: new Date('2026-07-06T09:00:00Z'), endAt: new Date('2026-07-06T09:00:00Z') }
+    const now = new Date('2026-07-06T12:00:00Z')
+    const r = computeShiftTimeWindow('2026-07-06', 'Turno día', SCHEDULE, now, bad)
+    // schedule "Turno día" 07–19 → live
+    expect(r.status).toBe('live')
+    expect(r.endAt).toContain('19:00')
+  })
+
+  it('null se comporta igual que omitir el parámetro', () => {
+    const now = new Date('2026-07-06T12:00:00Z')
+    const a = computeShiftTimeWindow('2026-07-06', 'Turno día', SCHEDULE, now, null)
+    const b = computeShiftTimeWindow('2026-07-06', 'Turno día', SCHEDULE, now)
+    expect(a).toEqual(b)
+  })
+})
+
 describe('nowAsWallClockUTC', () => {
   it('reinterpreta los componentes de hora LOCAL como si fueran UTC', () => {
     // Independiente del huso del runner: los getUTC* del resultado deben

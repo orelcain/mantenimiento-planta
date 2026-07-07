@@ -20,10 +20,10 @@ import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
-import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
-import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { getShiftDisplayDateKey, getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
@@ -54,7 +54,7 @@ import { subscribeMarelHgCapture, type MarelHgCapture } from '@/services/grader/
 import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import { deriveYalSuggestions } from '@/services/grader/graderInsightsYal'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
-import { listShoplogixShiftIdsForDay } from '@/services/shoplogix/shoplogixShift.service'
+import { listShiftInfosForDay } from '@/services/shoplogix/shoplogixShift.service'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
@@ -290,10 +290,66 @@ export function AnalisisGraderTurnoPage() {
   // las 3 Baaders y no hay clasificación por calidad.
   const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
 
-  // Schedule efectivo de la planta — Yal define T1/T2/T3, Chonchi día/noche.
-  // Sin esto el chart de Yal Turno 3 caería al fallback 08:00→08:00 (24h)
-  // en vez de las 9h reales del turno noche (23:00 → 07:45).
+  // Schedule efectivo de la planta — FALLBACK cuando aún no hay datos Shoplogix
+  // del turno. La fuente de verdad de horarios son los scheduledStart/End del
+  // doc sincronizado (ver realShiftBounds abajo): los horarios los define
+  // Shoplogix y CAMBIAN (decisión PR #157).
   const plantSchedule = plantLineCfg.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
+
+  // Bounds REALES del turno según Shoplogix. Cuando el snapshot trae
+  // scheduledStart/End derivados de intervals (scheduleSource='intervals'),
+  // mandan sobre el schedule configurado — así el estado live/closed y el
+  // progreso reflejan el horario real aunque la planta cambie sus turnos.
+  const MIN_VALID_BOUND_MS = 86_400_000  // > epoch+1día = timestamp real
+  const realShiftBounds = useMemo(() => {
+    for (const x of upstreamLine.snapshot?.machines ?? []) {
+      if (x.scheduleSource !== 'intervals') continue
+      // El snapshot puede venir de un candidato con otro nombre (mapeo
+      // día/noche→Turno 1/2), pero SIEMPRE debe ser del día consultado —
+      // descarta snapshots obsoletos del turno anterior en transición de URL.
+      if (dateKey && x.dateKey && x.dateKey !== dateKey) continue
+      if (!x.scheduledStart || !x.scheduledEnd) continue
+      if (x.scheduledStart.getTime() <= MIN_VALID_BOUND_MS) continue
+      if (x.scheduledEnd.getTime() <= x.scheduledStart.getTime()) continue
+      return { startAt: x.scheduledStart, endAt: x.scheduledEnd }
+    }
+    return null
+  }, [upstreamLine.snapshot, dateKey, MIN_VALID_BOUND_MS])
+
+  // Ventana efectiva del turno.
+  //
+  // OJO con turnos EN CURSO: el scheduledEnd del doc Shoplogix crece con cada
+  // sync (se deriva del último interval) → siempre va ~5-10 min detrás de
+  // `now`. Usar los bounds crudos marcaría "cerrado" un turno vivo. Regla:
+  //   - now dentro de [start, end + 30min de rezago] → turno probablemente
+  //     en curso: preferir la ventana del schedule si también lo ve vivo
+  //     (conoce la hora de fin PLANEADA → progreso útil); si el schedule no
+  //     reconoce el turno, extender el fin real hasta `now`.
+  //   - fuera de ese rango → bounds reales completos mandan (turno cerrado o
+  //     futuro con horario fiel a Shoplogix).
+  const computeEffectiveWindow = useCallback((): ShiftTimeWindow | null => {
+    if (!dateKey || !shiftLabel) return null
+    const schedTw = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
+    if (!realShiftBounds) return schedTw
+
+    const nowMs = nowAsWallClockUTC().getTime()
+    const startMs = realShiftBounds.startAt.getTime()
+    const endMs = realShiftBounds.endAt.getTime()
+    const SYNC_LAG_MS = 30 * 60_000
+
+    const probablyOngoing = startMs <= nowMs && nowMs <= endMs + SYNC_LAG_MS
+    if (probablyOngoing) {
+      if (schedTw.status === 'live') return schedTw
+      const tw = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, {
+        startAt: realShiftBounds.startAt,
+        endAt: new Date(Math.max(endMs, nowMs)),
+      })
+      // Fin extendido hasta `now` = fin PLANEADO desconocido → progreso y
+      // restante no significan nada (darían 100%/0 todo el turno). elapsed sí vale.
+      return endMs < nowMs ? { ...tw, progressPct: null, remainingMin: null } : tw
+    }
+    return computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, realShiftBounds)
+  }, [dateKey, shiftLabel, plantSchedule, realShiftBounds])
 
   // Nota: estas llamadas omiten `now` a propósito — el default de
   // computeShiftTimeWindow ya es `nowAsWallClockUTC()`, así la detección de
@@ -304,14 +360,10 @@ export function AnalisisGraderTurnoPage() {
       : null,
   )
 
-  // Sincronizar cuando cambia la URL
+  // Sincronizar cuando cambia la URL o llegan los bounds reales de Shoplogix
   useEffect(() => {
-    setShiftWindow(
-      dateKey && shiftLabel
-        ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-        : null,
-    )
-  }, [dateKey, shiftLabel, plantSchedule])
+    setShiftWindow(computeEffectiveWindow())
+  }, [computeEffectiveWindow])
 
   // Cuota del turno actual — leída del shiftSchedule guardado en Firestore.
   // Editable inline desde la propia ShiftQuotaCard en el detalle del turno.
@@ -366,14 +418,10 @@ export function AnalisisGraderTurnoPage() {
   useEffect(() => {
     if (shiftWindow?.status !== 'live') return
     const id = setInterval(() => {
-      setShiftWindow(
-        dateKey && shiftLabel
-          ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-          : null,
-      )
+      setShiftWindow(computeEffectiveWindow())
     }, 60_000)
     return () => clearInterval(id)
-  }, [shiftWindow?.status, dateKey, shiftLabel, plantSchedule])
+  }, [shiftWindow?.status, computeEffectiveWindow])
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
 
@@ -551,35 +599,58 @@ export function AnalisisGraderTurnoPage() {
       ).catch(() => [] as Array<{ dateKey: string; shiftId: string }>)
       if (cancelled) return
 
-      // 2. Shoplogix ±10 días en paralelo (solo plantas SLX-aware como Yal)
-      const slxByDay = new Map<string, string[]>()
+      // 2. Shoplogix ±10 días en paralelo (solo plantas SLX-aware como Yal).
+      // Descubrimiento dinámico: trae CUALQUIER nombre de turno que Shoplogix
+      // haya emitido (incl. variantes nuevas tipo "Turno 1 Lunes") con su
+      // horario REAL (scheduledStart) y ciclos.
+      type SlxNavInfo = { shiftId: string; scheduledStart?: Date | null; totalCycles?: number | null }
+      const slxByDay = new Map<string, SlxNavInfo[]>()
       if (isSlxAware) {
         const baseTs = new Date(`${dateKey}T12:00:00Z`).getTime()
-        const queries: Array<Promise<{ dk: string; ids: string[] }>> = []
+        const queries: Array<Promise<{ dk: string; infos: SlxNavInfo[] }>> = []
         for (let d = -SLX_NEARBY_DAYS; d <= SLX_NEARBY_DAYS; d++) {
           const dk = new Date(baseTs + d * 86_400_000).toISOString().slice(0, 10)
           queries.push(
-            listShoplogixShiftIdsForDay(dk, plantLineCfg.plantSlug)
-              .then(ids => ({ dk, ids }))
-              .catch(() => ({ dk, ids: [] as string[] })),
+            listShiftInfosForDay(dk, plantLineCfg.plantSlug)
+              .then(infos => ({ dk, infos: infos as SlxNavInfo[] }))
+              .catch(() => ({ dk, infos: [] as SlxNavInfo[] })),
           )
         }
         const results = await Promise.all(queries)
         if (cancelled) return
-        for (const { dk, ids } of results) slxByDay.set(dk, ids)
+        for (const { dk, infos } of results) {
+          // "Unscheduled" = producción SIN turno configurado en Shoplogix.
+          // Se muestra en el carrusel SOLO si tiene producción significativa
+          // (caso real Yal 2026-07-05: 11.6k ciclos nocturnos sin turno) — el
+          // Unscheduled vacío/ruido sigue fuera para no saltar a vistas vacías.
+          const kept = infos.filter(i => i.shiftId !== 'Unscheduled'
+            || (i.totalCycles ?? 0) >= SLX_NOISE_THRESHOLD
+            || (dk === dateKey && shiftLabel === 'Unscheduled'))
+          slxByDay.set(dk, kept)
+        }
       }
 
-      // 3. Helpers de orden y filtrado
-      const shiftRank = (id: string) => {
-        const m = id.match(/^Turno (\d+)$/)
-        if (m) return parseInt(m[1]!, 10)
-        return id.includes('día') ? 100 : 101
+      // 3. Posición cronológica dentro del día = minutos del inicio REAL
+      //    (scheduledStart de Shoplogix). Para entradas sin horario (Excel,
+      //    docs legacy sin doc padre) se estima por nombre con los horarios
+      //    vigentes: T3/T1L madrugada 00:00 · día 07:00 · T1 07:45 · T2 14:45.
+      //    OJO: post 2026-05 el T3 es la MADRUGADA de su propio dateKey → va
+      //    PRIMERO en el día, no al final (antes shiftRank lo ponía último y
+      //    las flechas prev/next quedaban invertidas en Yal).
+      const fallbackStartMin = (id: string): number => {
+        if (/^Turno 3/.test(id)) return 0
+        if (id === 'Turno 1 Lunes') return 1
+        if (id === 'Turno día') return 7 * 60
+        if (/^Turno 1/.test(id)) return 7 * 60 + 45
+        if (/^Turno 2/.test(id)) return 14 * 60 + 45
+        if (id === 'Turno noche') return 14 * 60 + 46
+        if (id === 'Unscheduled') return 24 * 60
+        return 12 * 60
       }
-      // "Unscheduled" en Shoplogix son intervalos sin turno asignado — generalmente
-      // ruido (0 ciclos). Excluido del carrusel para evitar saltos a vista vacía.
-      // Excepción: si el shift actual ES "Unscheduled", lo dejamos.
-      const dropUnscheduled = (id: string) =>
-        id !== 'Unscheduled' || shiftLabel === 'Unscheduled'
+      const startMinOf = (e: SlxNavInfo): number =>
+        e.scheduledStart
+          ? e.scheduledStart.getUTCHours() * 60 + e.scheduledStart.getUTCMinutes()
+          : fallbackStartMin(e.shiftId)
 
       // 4. Agrupar Excel por día
       const excelByDay = new Map<string, string[]>()
@@ -588,36 +659,53 @@ export function AnalisisGraderTurnoPage() {
         excelByDay.get(s.dateKey)!.push(s.shiftId)
       }
 
-      // 5. Construir flat ordenado cronológicamente (Excel + SLX deduped)
+      // 5. Merge por día: Excel manda; un turno SLX cuyo inicio real cae
+      //    DENTRO de la ventana horaria de un label Excel presente es el
+      //    MISMO período → se omite (dedup por solapamiento horario, no por
+      //    nombre — los nombres/horarios de Shoplogix cambian). El turno
+      //    actualmente abierto nunca se dropea (la cadena debe contenerlo
+      //    para que las flechas funcionen).
+      const excelWindowOf = (label: string): { start: number; end: number } | null => {
+        const entry = plantSchedule.find(p => p.shiftId === label)
+        if (!entry) return null
+        return {
+          start: entry.startHour * 60 + entry.startMinute,
+          end: entry.endHour * 60 + entry.endMinute,
+        }
+      }
+      const inWindow = (m: number, w: { start: number; end: number }): boolean => {
+        if (w.start === w.end) return false
+        return w.start < w.end ? (m >= w.start && m < w.end) : (m >= w.start || m < w.end)
+      }
+
       const allDays = new Set<string>([...excelByDay.keys(), ...slxByDay.keys()])
       const sortedDays = [...allDays].sort()
       const seen = new Set<string>()
       const flat: Array<{ dateKey: string; shiftId: string }> = []
 
       for (const dk of sortedDays) {
-        const excelShifts = (excelByDay.get(dk) ?? []).sort((a, b) => shiftRank(a) - shiftRank(b))
-        const slxShifts = (slxByDay.get(dk) ?? []).filter(dropUnscheduled).sort((a, b) => shiftRank(a) - shiftRank(b))
+        const excelShifts = excelByDay.get(dk) ?? []
+        const excelWindows = excelShifts
+          .map(excelWindowOf)
+          .filter((w): w is { start: number; end: number } => w !== null)
 
-        const hasExcelDay = excelShifts.some(s => s === 'Turno día' || s === 'Turno 1' || s === 'Turno 2')
-        const hasExcelNight = excelShifts.some(s => s === 'Turno noche' || s === 'Turno 3')
-
-        // Mezcla cronológica dentro del día: ranks 1/2/'Turno día'/100 vs 3/'Turno noche'/101
-        const merged: string[] = [...excelShifts]
-        for (const s of slxShifts) {
-          const isDayShift = s === 'Turno 1' || s === 'Turno 2' || s === 'Turno día'
-          const isNightShift = s === 'Turno 3' || s === 'Turno noche'
-          if (isDayShift && hasExcelDay) continue
-          if (isNightShift && hasExcelNight) continue
-          if (merged.includes(s)) continue
-          merged.push(s)
+        const entries: SlxNavInfo[] = excelShifts.map(s => ({ shiftId: s }))
+        for (const info of slxByDay.get(dk) ?? []) {
+          if (entries.some(e => e.shiftId === info.shiftId)) continue
+          const isCurrent = dk === dateKey && info.shiftId === shiftLabel
+          if (!isCurrent && excelWindows.length > 0
+              && excelWindows.some(w => inWindow(startMinOf(info), w))) {
+            continue
+          }
+          entries.push(info)
         }
-        merged.sort((a, b) => shiftRank(a) - shiftRank(b))
+        entries.sort((a, b) => startMinOf(a) - startMinOf(b))
 
-        for (const s of merged) {
-          const key = `${dk}__${s}`
+        for (const e of entries) {
+          const key = `${dk}__${e.shiftId}`
           if (seen.has(key)) continue
           seen.add(key)
-          flat.push({ dateKey: dk, shiftId: s })
+          flat.push({ dateKey: dk, shiftId: e.shiftId })
         }
       }
 
@@ -635,7 +723,7 @@ export function AnalisisGraderTurnoPage() {
     })
 
     return () => { cancelled = true }
-  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug, plantLineCfg.isClassificationPlant])
+  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug, plantLineCfg.isClassificationPlant, plantSchedule])
 
   const goToShift = useCallback((target: { dateKey: string; shiftId: string }) => {
     // BUGFIX: preservar ?linea= para mantener la planta activa al navegar

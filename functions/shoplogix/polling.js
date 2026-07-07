@@ -18,6 +18,10 @@
  */
 
 // ── Configuración de turnos (Chile, wall-clock local) ────────────────────────
+// OJO: esto SOLO regula la CADENCIA de polling (fases startup/colación/cierre).
+// Los turnos REALES y sus horarios los define Shoplogix y se derivan de los
+// intervals en syncDay (deriveShiftGroups) — no de esta tabla. `currentShift`
+// cubre las 24h, así el wakeup sincroniza siempre aunque los horarios cambien.
 
 const SHIFT_SCHEDULE = {
   'Turno día':   { startH: 7,  startM: 0, endH: 19, endM: 0 },
@@ -33,15 +37,35 @@ const LUNCH_WINDOWS = {
 const SHIFT_DURATION_MIN = 12 * 60
 
 /**
- * Chile es UTC-3 (verano) o UTC-4 (invierno). Para simplicidad usamos -3 fijo
- * (OK para turnos de planta; la diferencia de 1h rara vez afecta decisiones
- * de polling).
+ * Offset UTC real de Chile continental (America/Santiago) para un instante dado.
+ * Chile alterna UTC-3 (verano, ~sep→abr) y UTC-4 (invierno, ~abr→sep).
+ *
+ * IMPORTANTE: antes se usaba -3 FIJO. En invierno eso corría el reloj de pared
+ * 1 hora: `currentDateKey()` (sync.js) cambiaba de día a las 07:00 REALES en vez
+ * de las 08:00, y la última hora de la ventana del día anterior (07:00–08:00
+ * wall) quedaba sin re-sincronizar — pérdida silenciosa de la cola de turnos
+ * nocturnos que terminan pasadas las 07:00.
  */
-const CHILE_UTC_OFFSET_HOURS = 3
+function chileUtcOffsetHours(now = new Date()) {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+  const parts = {}
+  for (const p of dtf.formatToParts(now)) parts[p.type] = p.value
+  const wallAsUtcMs = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour) % 24, Number(parts.minute),
+  )
+  // offset = UTC − wall clock (Chile: 3 en verano, 4 en invierno)
+  return Math.round((now.getTime() - wallAsUtcMs) / 3600000)
+}
 
-/** Retorna Date "wall clock Chile" equivalente a `now` en UTC. */
+/** Retorna Date "wall clock Chile" equivalente a `now` en UTC (DST-aware). */
 function toChileWall(now) {
-  return new Date(now.getTime() - CHILE_UTC_OFFSET_HOURS * 3600 * 1000)
+  return new Date(now.getTime() - chileUtcOffsetHours(now) * 3600 * 1000)
 }
 
 /**
@@ -133,6 +157,7 @@ module.exports = {
   SHIFT_SCHEDULE,
   LUNCH_WINDOWS,
   SHIFT_DURATION_MIN,
+  chileUtcOffsetHours,
   toChileWall,
   currentShift,
   isLunchWindow,

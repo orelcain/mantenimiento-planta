@@ -99,6 +99,19 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     hasGraderData: true,
     shoplogixEnabled: true,
     isClassificationPlant: true,   // Marelec MS4/12 con 12 gates por calibre+calidad
+    // FALLBACK de horarios — la VERDAD son los scheduledStart/End de los docs
+    // Shoplogix sincronizados (los horarios los define Shoplogix y CAMBIAN).
+    // Chonchi dejó de emitir "Turno día/noche": desde 2026-05 emite
+    // Turno 1 (21:30–05:45), Turno 2 (09:00–17:15 u 08:00–15:15) y
+    // "Turno 1 Lunes" (madrugada del lunes). Se mantienen día/noche como
+    // ventanas anchas para clasificar el Excel del Grader.
+    defaultShiftSchedule: [
+      { shiftId: 'Turno día',     startHour: 7,  startMinute: 0,  endHour: 19, endMinute: 0  },
+      { shiftId: 'Turno noche',   startHour: 19, startMinute: 0,  endHour: 7,  endMinute: 0  },
+      { shiftId: 'Turno 1',       startHour: 21, startMinute: 30, endHour: 5,  endMinute: 45 },
+      { shiftId: 'Turno 1 Lunes', startHour: 0,  startMinute: 0,  endHour: 7,  endMinute: 0  },
+      { shiftId: 'Turno 2',       startHour: 9,  startMinute: 0,  endHour: 17, endMinute: 15 },
+    ],
   },
   {
     id: 'yal-eviscerado',
@@ -111,19 +124,18 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     shoplogixEnabled: true,
     isClassificationPlant: false,  // Yal solo eviscera, no clasifica. Las gates del
                                    // Excel son las que alimentan las 3 Baaders.
-    // Yal opera con 3 turnos en Shoplogix (T1/T2/T3) además de los labels del Grader.
-    // Horarios confirmados en Shoplogix UI (1 May 2026):
-    //   Turno 1:   07:45 – 15:15  (mañana)
-    //   Turno 2:   15:15 – 00:00  (tarde, llega a medianoche)
-    //   Turno 3:   23:00 – 07:45  (noche, cruza medianoche)
-    //   Turno 3*:  variante 23:00 – 06:15 (mismo bound efectivo, segundo "Turno 3")
-    // Mantener entries de "Turno día/noche" para compatibilidad con Grader Excel.
+    // FALLBACK de horarios — la VERDAD son los scheduledStart/End de los docs
+    // Shoplogix sincronizados (los horarios los define Shoplogix y CAMBIAN;
+    // p.ej. el T2 de Yal ha arrancado 14:45, 15:15 y 16:15 según el día, y el
+    // T3 pasó de 23:00–07:45 a 00:00–~07:00; el T1 no se emite desde mayo).
+    // Valores = última realidad observada (2026-07). Mantener entries de
+    // "Turno día/noche" para compatibilidad con Grader Excel.
     defaultShiftSchedule: [
       { shiftId: 'Turno día',   startHour: 7,  startMinute: 0,  endHour: 14, endMinute: 45 },
       { shiftId: 'Turno noche', startHour: 14, startMinute: 45, endHour: 0,  endMinute: 0  },
       { shiftId: 'Turno 1',     startHour: 7,  startMinute: 45, endHour: 15, endMinute: 15 },
-      { shiftId: 'Turno 2',     startHour: 15, startMinute: 15, endHour: 0,  endMinute: 0  },
-      { shiftId: 'Turno 3',     startHour: 23, startMinute: 0,  endHour: 7,  endMinute: 45 },
+      { shiftId: 'Turno 2',     startHour: 14, startMinute: 45, endHour: 0,  endMinute: 0  },
+      { shiftId: 'Turno 3',     startHour: 0,  startMinute: 0,  endHour: 7,  endMinute: 0  },
     ],
   },
   {

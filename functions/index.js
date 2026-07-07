@@ -6059,11 +6059,10 @@ exports.shoplogixProbe = onRequest(
       return
     }
     const { plantSlug = 'yal', dateKey } = req.query || {}
-    const dk = dateKey || (() => {
-      const d = new Date()
-      const chile = new Date(d.getTime() - 3 * 3600 * 1000)
-      return `${chile.getUTCFullYear()}-${String(chile.getUTCMonth() + 1).padStart(2, '0')}-${String(chile.getUTCDate()).padStart(2, '0')}`
-    })()
+    // Mismo "día de sync" (DST-aware, ancla 08:00) que usa syncDay — con el
+    // offset -3 fijo de antes el probe consultaba una ventana distinta a la
+    // que el sync escribió y el debug concluía "no hay datos" en falso.
+    const dk = dateKey || shoplogixSyncMod.currentDateKey()
 
     // Una máquina de Yal para probar params específicos por máquina
     const machineid = (require('./shoplogix/machines').PLANT_MACHINES[plantSlug] || [])[0]?.machineid

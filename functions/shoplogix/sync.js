@@ -23,7 +23,7 @@ const { PLANT_MACHINES } = require('./machines')
 const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
-const { pauseBetweenMachines, currentShift } = require('./polling')
+const { pauseBetweenMachines, currentShift, toChileWall } = require('./polling')
 
 /** Plantas activas — usada en wakeup scheduler. */
 const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
@@ -132,13 +132,18 @@ function deriveShiftGroups(machineProductionResponses) {
  *
  * Ancla en 08:00 Chile (igual que fullDayWindow): si son las 00:00-07:59
  * Chile, el "día de sync" es ayer. Esto garantiza que turnos que cruzan
- * medianoche (Yal Turno 3: 22:00→06:15) caigan en la ventana correcta.
+ * medianoche (Yal Turno 3: 00:00→~07:00) caigan en la ventana correcta.
  * Sin este ajuste, a las 02:00 Chile se intentaría sincronizar "hoy" cuya
- * ventana empieza en 08:00 → los intervalos del Turno 3 (23:00-06:15)
- * quedarían fuera de la ventana y el turno aparecería vacío.
+ * ventana empieza en 08:00 → los intervalos del Turno 3 quedarían fuera
+ * de la ventana y el turno aparecería vacío.
+ *
+ * Usa `toChileWall` (DST-aware): con el offset -3 fijo de antes, en invierno
+ * (UTC-4) el cambio de día ocurría a las 07:00 REALES y la franja 07:00-08:00
+ * wall del día anterior nunca se volvía a sincronizar (cola de turnos
+ * nocturnos perdida en silencio).
  */
 function currentDateKey(now = new Date()) {
-  const chileNow = new Date(now.getTime() - 3 * 3600 * 1000)
+  const chileNow = toChileWall(now)
   const minutesOfDay = chileNow.getUTCHours() * 60 + chileNow.getUTCMinutes()
   // Antes de las 08:00 Chile → el "día de sync" es el día anterior
   const dateRef = minutesOfDay < 8 * 60
@@ -156,14 +161,17 @@ function currentDateKey(now = new Date()) {
 function currentShiftKey(now = new Date()) {
   const ctx = currentShift(now)
   if (!ctx) return null
-  const chileNow = new Date(now.getTime() - 3 * 3600 * 1000)
-  let dateDay = chileNow.getUTCDate()
-  if (ctx.shiftId === 'Turno noche' && chileNow.getUTCHours() < 7) {
-    dateDay = new Date(chileNow.getTime() - 24 * 3600 * 1000).getUTCDate()
-  }
-  const year = chileNow.getUTCFullYear()
-  const month = chileNow.getUTCMonth() + 1
-  const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(dateDay).padStart(2, '0')}`
+  const chileNow = toChileWall(now)
+  // Madrugada del turno noche → el turno pertenece al día ANTERIOR. Derivar
+  // año/mes/día completos del Date desplazado (antes solo se recalculaba el
+  // día y en la madrugada del 1° de mes salía "2026-08-31" en vez de
+  // "2026-07-31" — hasta el año quedaba mal cada 1° de enero).
+  const dateRef = ctx.shiftId === 'Turno noche' && chileNow.getUTCHours() < 7
+    ? new Date(chileNow.getTime() - 24 * 3600 * 1000)
+    : chileNow
+  const year = dateRef.getUTCFullYear()
+  const month = dateRef.getUTCMonth() + 1
+  const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(dateRef.getUTCDate()).padStart(2, '0')}`
   return { dateKey, shiftId: ctx.shiftId }
 }
 

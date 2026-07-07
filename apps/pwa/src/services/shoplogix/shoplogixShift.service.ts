@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
+import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit, where, documentId } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -409,9 +409,10 @@ export async function loadShoplogixShift(
  *
  * Para que el panel de upstream funcione cuando el Grader Excel etiqueta
  * "Turno día"/"Turno noche" en Yal, mapeamos al equivalente Shoplogix por
- * overlap horario:
- *   T1 (07:45-15:15) + T2 (15:15-00:00) componen "Turno día"
- *   T3 (23:00-07:45) compone "Turno noche"
+ * overlap horario. OJO: los horarios REALES los define Shoplogix y CAMBIAN
+ * (obs. 2026-07: Yal T2 14:45→00:00 o 16:15→00:00, T3 00:00→06:55; ya no
+ * existe T1 en Yal). Este mapa es solo de NOMBRES; los horarios reales vienen
+ * de scheduledStart/End en los docs (ver `listShiftInfosForDay`).
  *
  * Fallback `Unscheduled`: cuando Shoplogix no logra atribuir intervals a un
  * turno específico, la producción real cae en intervals "Unscheduled".
@@ -420,13 +421,19 @@ export async function loadShoplogixShift(
  */
 const SHIFT_CANDIDATES_BY_PLANT: Record<PlantSlug, Record<string, string[]>> = {
   chonchi: {
-    // Chonchi (Grader labels nativos): solo el doc exacto.
-    'Turno día':   ['Turno día'],
-    'Turno noche': ['Turno noche'],
-    // Variantes Shoplogix (defensivo, casi nunca usadas en chonchi)
-    'Turno 1':     ['Turno 1', 'Turno 1*'],
+    // Chonchi: Shoplogix DEJÓ de emitir "Turno día/noche" (verificado en
+    // Firestore: desde 2026-05 solo emite "Turno 1" 21:30→05:45,
+    // "Turno 2" 09:00→17:15 u 08:00→15:15, y "Turno 1 Lunes" 00:00→~07:00
+    // los lunes). El Grader Excel sigue etiquetando día/noche → mapear por
+    // solapamiento horario REAL:
+    //   "Turno 2" (09:00-17:15) compone el día
+    //   "Turno 1" (21:30-05:45) + "Turno 1 Lunes" (madrugada lunes) componen la noche
+    'Turno día':   ['Turno día', 'Turno 2', 'Turno 2*'],
+    'Turno noche': ['Turno noche', 'Turno 1', 'Turno 1*', 'Turno 1 Lunes'],
+    'Turno 1':       ['Turno 1', 'Turno 1*'],
+    'Turno 1 Lunes': ['Turno 1 Lunes'],
     'Turno 2':     ['Turno 2', 'Turno 2*'],
-    'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
+    'Turno 3':     ['Turno 3', 'Turno 3*'],
   },
   yal: {
     // Yal: Shoplogix usa Turno 1/2/3, el Grader Excel suele etiquetar día/noche.
@@ -488,8 +495,9 @@ export function subscribeShoplogixShiftAuto(
   // Caso Yal Turno 3: el wrapper en paralelo permite que "Unscheduled" gane si
   // "Turno 3"/"Turno 3*" están vacíos. Cuando alguno tenga data, ese gana.
   const winner: { idx: number | null } = { idx: null }
-  const heard: boolean[] = candidates.map(() => false)
+  const heard: boolean[] = []
   const unsubs: Array<() => void> = []
+  const subscribedIds = new Set<string>()
 
   /**
    * Umbral de validez para fallback `Unscheduled`. Sin esto, días donde la
@@ -499,7 +507,11 @@ export function subscribeShoplogixShiftAuto(
    */
   const UNSCHEDULED_MIN_CYCLES = 50
 
-  candidates.forEach((candidateId, idx) => {
+  const subscribeCandidate = (candidateId: string) => {
+    if (subscribedIds.has(candidateId)) return
+    subscribedIds.add(candidateId)
+    const idx = heard.length
+    heard.push(false)
     const u = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
       if (!active) return
       heard[idx] = true
@@ -530,7 +542,25 @@ export function subscribeShoplogixShiftAuto(
       // Otros candidatos sin data: silencioso, esperar al ganador o que cambien
     })
     unsubs.push(u)
-  })
+  }
+
+  candidates.forEach(subscribeCandidate)
+
+  // Descubrimiento dinámico: Shoplogix inventa variantes de nombre que la lista
+  // estática no conoce (caso real 2026-07: "Turno 1 Lunes" en chonchi). Sumamos
+  // como candidatos los docs del día cuyo nombre EXTIENDE al turno pedido
+  // (prefijo estricto) — nunca turnos de otra ventana horaria. Como se agregan
+  // después, solo ganan si los candidatos estáticos no traen producción.
+  listShiftInfosForDay(dateKey, plantSlug)
+    .then((infos) => {
+      if (!active) return
+      for (const info of infos) {
+        if (info.shiftId === 'Unscheduled') continue  // política por planta, ya cubierta arriba
+        if (!info.shiftId.startsWith(shiftId)) continue
+        subscribeCandidate(info.shiftId)
+      }
+    })
+    .catch(() => { /* descubrimiento es best-effort */ })
 
   return () => {
     active = false
@@ -538,19 +568,111 @@ export function subscribeShoplogixShiftAuto(
   }
 }
 
-/** Shift IDs que puede devolver Shoplogix — en orden cronológico dentro de un día. */
-const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
+/**
+ * Shift IDs conocidos — SOLO para el fallback de sondeo cuando el rango de docs
+ * padre no devuelve nada (docs muy viejos, pre-syncDay, sin doc padre).
+ * La fuente de verdad de "qué turnos existen" es el descubrimiento dinámico
+ * (`listShiftInfosForDay`): los nombres y horarios los define Shoplogix y CAMBIAN
+ * (caso real 2026-07: apareció "Turno 1 Lunes" en chonchi).
+ */
+const FALLBACK_CANDIDATE_SHIFT_IDS: string[] = [
+  'Turno 1', 'Turno 1*', 'Turno 1 Lunes', 'Turno 2', 'Turno 2*',
+  'Turno 3', 'Turno 3*', 'Turno día', 'Turno noche', 'Unscheduled',
+]
+
+/**
+ * Info de un turno que EXISTE en Firestore para un día, con su horario REAL
+ * (scheduledStart/End derivados de los intervals de Shoplogix por syncDay).
+ * Esta es la fuente de verdad de horarios de turno — no los schedules
+ * hardcodeados de la app.
+ */
+// Fin de rango para queries por documentId con prefijo: U+F8FF es el último
+// code point privado BMP — ordena después de cualquier nombre de turno real.
+const SHIFT_DOC_RANGE_END = String.fromCharCode(0xf8ff)
+
+export interface ShoplogixShiftDayInfo {
+  dateKey: string
+  shiftId: string
+  /** Horario real del turno según Shoplogix (wall-clock-as-UTC). Null en docs legacy sin doc padre. */
+  scheduledStart: Date | null
+  scheduledEnd: Date | null
+  /** Suma de totalCycles del resumen de máquinas del doc padre. Null si el padre no lo trae. */
+  totalCycles: number | null
+  lastSyncAt: Date | null
+}
+
+function parentDocToDayInfo(id: string, data: FirestoreData): ShoplogixShiftDayInfo | null {
+  // id = `${dateKey}_${shiftId}` — dateKey son siempre 10 chars YYYY-MM-DD
+  const m = id.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/)
+  if (!m) return null
+  const machines = Array.isArray(data.machines) ? (data.machines as FirestoreData[]) : null
+  const totalCycles = machines
+    ? machines.reduce((a, x) => a + (typeof x.totalCycles === 'number' ? x.totalCycles : 0), 0)
+    : null
+  return {
+    dateKey: m[1]!,
+    shiftId: m[2]!,
+    scheduledStart: data.scheduledStart != null ? toDateSafe(data.scheduledStart) : null,
+    scheduledEnd:   data.scheduledEnd   != null ? toDateSafe(data.scheduledEnd)   : null,
+    totalCycles,
+    lastSyncAt:     data.lastSyncAt     != null ? toDateSafe(data.lastSyncAt)     : null,
+  }
+}
+
+/**
+ * DESCUBRIMIENTO DINÁMICO: turnos que existen en Firestore para un día, leyendo
+ * los docs padre por rango de documentId. Descubre CUALQUIER nombre de turno que
+ * Shoplogix emita (incluye variantes nuevas como "Turno 1 Lunes") y devuelve el
+ * horario real de cada uno.
+ *
+ * Los docs padre existen desde la era syncDay (~2026-04). Para días sin docs
+ * padre (data muy vieja) cae al sondeo por candidatos conocidos leyendo la
+ * subcolección machines (sin horarios).
+ *
+ * Orden: por scheduledStart ascendente; los sin horario al final.
+ */
+export async function listShiftInfosForDay(
+  dateKey: string,
+  plantSlug: PlantSlug = 'chonchi',
+): Promise<ShoplogixShiftDayInfo[]> {
+  const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+  const snap = await getDocs(query(
+    shiftsRef,
+    where(documentId(), '>=', `${dateKey}_`),
+    where(documentId(), '<=', `${dateKey}_` + SHIFT_DOC_RANGE_END),
+  )).catch(() => null)
+
+  if (snap && !snap.empty) {
+    const infos = snap.docs
+      .map(d => parentDocToDayInfo(d.id, d.data() as FirestoreData))
+      .filter((x): x is ShoplogixShiftDayInfo => x !== null)
+    return infos.sort((a, b) => {
+      const ta = a.scheduledStart?.getTime() ?? Number.MAX_SAFE_INTEGER
+      const tb = b.scheduledStart?.getTime() ?? Number.MAX_SAFE_INTEGER
+      return ta - tb || a.shiftId.localeCompare(b.shiftId)
+    })
+  }
+
+  // Fallback legacy: sondear candidatos conocidos vía subcolección machines.
+  const checks = FALLBACK_CANDIDATE_SHIFT_IDS.map(async (shiftId) => {
+    const ref = collection(db, `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}/machines`)
+    const s = await getDocs(query(ref, limit(1))).catch(() => null)
+    return s && !s.empty ? shiftId : null
+  })
+  const found = (await Promise.all(checks)).filter((id): id is string => id !== null)
+  return found.map(shiftId => ({
+    dateKey, shiftId,
+    scheduledStart: null, scheduledEnd: null,
+    totalCycles: null, lastSyncAt: null,
+  }))
+}
 
 /**
  * Devuelve los IDs de documentos shift que existen en Firestore para un mes completo.
  *
- * Problema: el CF escribe sólo en `shifts/{id}/machines` (subcolección) sin crear
- * el documento padre. Queries sobre la colección `shifts` devuelven vacío aunque
- * haya datos. Tampoco funciona where(documentId(), '>=' / '<') en subcolecciones.
- *
- * Solución: reutilizar listShoplogixShiftIdsForDay (que lee machines directamente)
- * para todos los días del mes en paralelo real (Promise.all).
- * 30 días × 5 candidatos = 150 reads, pero todos simultáneos → ~400 ms total.
+ * Implementación: UNA query de rango sobre los docs padre del mes (el CF syncDay
+ * SÍ crea docs padre desde ~2026-04). Fallback al sondeo por día×candidato para
+ * data vieja sin docs padre.
  *
  * Retorna array de doc IDs, ej: ['2026-04-29_Turno 2', '2026-04-30_Turno 2'].
  * Retorna null sólo si hay error de red para que el caller haga fallback.
@@ -564,6 +686,18 @@ export async function listShoplogixShiftDocIdsForMonth(
     const daysInMonth  = new Date(year, month + 1, 0).getDate()
     const monthPrefix  = `${year}-${String(month + 1).padStart(2, '0')}`
 
+    const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+    const snap = await getDocs(query(
+      shiftsRef,
+      where(documentId(), '>=', `${monthPrefix}-01_`),
+      where(documentId(), '<=', `${monthPrefix}-${String(daysInMonth).padStart(2, '0')}_` + SHIFT_DOC_RANGE_END),
+    )).catch(() => null)
+
+    if (snap && !snap.empty) {
+      return snap.docs.map(d => d.id)
+    }
+
+    // Fallback legacy (meses sin docs padre): sondeo por día en paralelo.
     const perDay = Array.from({ length: daysInMonth }, (_, i) => {
       const dk = `${monthPrefix}-${String(i + 1).padStart(2, '0')}`
       return listShoplogixShiftIdsForDay(dk, plantSlug)
@@ -580,18 +714,13 @@ export async function listShoplogixShiftDocIdsForMonth(
 
 /**
  * Devuelve los shiftIds disponibles en Firestore para un día dado.
- * Verifica existencia con una lectura de 1 doc por candidato (lecturas en paralelo).
- * Útil para construir navegación prev/next cuando no hay Excel.
+ * Wrapper de compatibilidad sobre `listShiftInfosForDay` (descubrimiento
+ * dinámico) — descubre cualquier nombre de turno que Shoplogix emita.
  */
 export async function listShoplogixShiftIdsForDay(
   dateKey: string,
   plantSlug: PlantSlug = 'chonchi',
 ): Promise<string[]> {
-  const checks = CANDIDATE_SHIFT_IDS.map(async (shiftId) => {
-    const ref = collection(db, `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}/machines`)
-    const snap = await getDocs(query(ref, limit(1))).catch(() => null)
-    return snap && !snap.empty ? shiftId : null
-  })
-  const results = await Promise.all(checks)
-  return results.filter((id): id is string => id !== null)
+  const infos = await listShiftInfosForDay(dateKey, plantSlug)
+  return infos.map(i => i.shiftId)
 }

@@ -94,11 +94,17 @@ export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
   }
 }
 
-// Mapeo Shoplogix → Grader: "Turno 1" = noche, "Turno 2" = día.
-// Turno 1 puede estar guardado en Grader bajo el día ANTERIOR (cruza medianoche).
+// Mapeo Shoplogix → Grader por solapamiento horario (obs. 2026-07):
+//   chonchi: "Turno 2" 09:00-17:15 = día · "Turno 1" 21:30-05:45 y
+//            "Turno 1 Lunes" madrugada = noche
+//   yal:     "Turno 3" 00:00-06:55 = noche · "Turno 2" tarde = día
+// Los turnos nocturnos pueden estar guardados en Grader bajo el día ANTERIOR
+// (cruzan medianoche). Nombres NO listados pasan tal cual (fallback identidad).
 const SLX_TO_GRADER: Record<string, string> = {
   'Turno 1': 'Turno noche',
+  'Turno 1 Lunes': 'Turno noche',
   'Turno 2': 'Turno día',
+  'Turno 3': 'Turno noche',
   'Turno noche': 'Turno noche',
   'Turno día': 'Turno día',
 }

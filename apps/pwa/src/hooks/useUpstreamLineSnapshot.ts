@@ -71,6 +71,12 @@ export function useUpstreamLineSnapshot(
 
     setLoading(true)
     setError(null)
+    // Reset inmediato al cambiar de turno: sin esto, el snapshot del turno
+    // ANTERIOR queda visible (y sus scheduledStart/End alimentan cálculos de
+    // ventana) hasta que la nueva suscripción emite.
+    setSnapshot(null)
+    setSource('none')
+    setSyncedAt(null)
 
     // Suscripción en tiempo real: el hook se actualiza automáticamente cada
     // vez que el Cloud Function escribe a Firestore (cada ~5 min en turno activo).

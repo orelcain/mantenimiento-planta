@@ -1,9 +1,11 @@
 /**
  * CurrentShiftChip — atajo siempre visible al turno en proceso de la planta.
  *
- * Itera sobre el schedule de la planta (default + override Firestore), prueba
- * dateKey=hoy y dateKey=ayer para cada entry, y elige el turno cuyo
- * `computeShiftTimeWindow` retorne `status === 'live'`.
+ * FUENTE DE VERDAD: los docs Shoplogix del día (hoy + ayer) con sus horarios
+ * REALES (scheduledStart/End). Shoplogix indica qué turno está en curso; los
+ * horarios los define Shoplogix y CAMBIAN (decisión PR #157). El schedule
+ * configurado/hardcodeado queda como FALLBACK cuando aún no hay docs (ej.
+ * primer sync del turno pendiente, Firestore frío).
  *
  * Click → navega a /analisis-grader/turno/<dateKey>__<shiftId>?linea=<id>.
  * Auto-refresh cada 60s. Si no hay turno activo, muestra etiqueta sutil.
@@ -18,6 +20,7 @@ import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/gra
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
+import { listShiftInfosForDay, type ShoplogixShiftDayInfo } from '@/services/shoplogix/shoplogixShift.service'
 import type { GraderShiftSchedule } from '@/services/grader/types'
 
 /** Snapshot considerado "stale" después de N minutos sin sync. */
@@ -75,20 +78,46 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
     return () => clearInterval(id)
   }, [])
 
-  // Nomenclatura preferida por planta — Yal y otras plantas no-clasificadoras
-  // operan con turnos numerados (T1/T2/T3) que vienen de Shoplogix; Chonchi
-  // (clasificadora) usa Día/Noche del Excel del Grader.
-  // El `defaultShiftSchedule` de Yal incluye ambas variantes por compatibilidad,
-  // así que filtramos solo las preferidas para no caer en "Turno noche" cuando
-  // el operador-real está en "Turno 2".
+  // Nomenclatura preferida por planta — SOLO para el fallback por schedule
+  // (cuando aún no hay docs Shoplogix del día). La detección primaria usa los
+  // nombres REALES que emite Shoplogix, sean cuales sean.
   const preferredShiftIds = useMemo(() => {
     return cfg.isClassificationPlant === false
       ? ['Turno 1', 'Turno 2', 'Turno 3']
       : ['Turno día', 'Turno noche']
   }, [cfg.isClassificationPlant])
 
-  // Encontrar el turno con status === 'live' entre los preferidos (prueba hoy
-  // y ayer por turnos que cruzan medianoche).
+  // Docs Shoplogix de hoy + ayer con horarios reales (ayer cubre turnos que
+  // cruzan medianoche, ej. chonchi "Turno 1" 21:30→05:45). Re-descubre cada
+  // 5 min: el doc de un turno nuevo aparece a los pocos minutos del primer sync.
+  const [dayInfos, setDayInfos] = useState<ShoplogixShiftDayInfo[]>([])
+  useEffect(() => {
+    if (!cfg.shoplogixEnabled) { setDayInfos([]); return }
+    let cancelled = false
+    const load = () => {
+      const nowD = new Date()
+      const todayKey = localDateKey(nowD)
+      const ydayKey = previousDateKey(nowD)
+      Promise.all([
+        listShiftInfosForDay(ydayKey, cfg.plantSlug),
+        listShiftInfosForDay(todayKey, cfg.plantSlug),
+      ])
+        .then(([yday, today]) => { if (!cancelled) setDayInfos([...yday, ...today]) })
+        .catch(() => { /* fallback por schedule sigue funcionando */ })
+    }
+    load()
+    const id = setInterval(load, 5 * 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [cfg.plantSlug, cfg.shoplogixEnabled])
+
+  // Encontrar el turno en curso.
+  //
+  // 1) VERDAD SHOPLOGIX: doc del día cuyo horario real contiene `now`. Como
+  //    en un turno EN CURSO el scheduledEnd crece con cada sync (se deriva del
+  //    último interval), toleramos un rezago de sync de 30 min.
+  // 2) FALLBACK: iterar el schedule configurado (comportamiento histórico),
+  //    para cuando el primer sync del turno aún no escribe el doc.
+  //
   // Nota: el módulo usa convención wall-clock-as-UTC (los startHour/endHour se
   // interpretan como UTC aunque representen hora local). Para que la comparación
   // sea consistente, convertimos `now` a un Date que represente la hora local
@@ -97,8 +126,40 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
   // como `closed`.
   const live = useMemo(() => {
     const nowWallUTC = nowAsWallClockUTC(now)
+    const nowMs = nowWallUTC.getTime()
     const todayKey = localDateKey(now)
     const ydayKey = previousDateKey(now)
+
+    // 1) Docs reales — iterar del más reciente al más viejo (si T2 recién cerró
+    //    y T3 recién abrió, ambos caen en la tolerancia → gana el que arrancó último).
+    const SYNC_LAG_MS = 30 * 60_000
+    for (let i = dayInfos.length - 1; i >= 0; i--) {
+      const info = dayInfos[i]!
+      if (info.shiftId === 'Unscheduled') continue  // no es un turno real
+      if (!info.scheduledStart || !info.scheduledEnd) continue
+      const startMs = info.scheduledStart.getTime()
+      const endMs   = info.scheduledEnd.getTime()
+      if (startMs > nowMs || nowMs > endMs + SYNC_LAG_MS) continue
+
+      // Para progreso/restante preferir la ventana del schedule si reconoce el
+      // turno Y ya está en rango (tiene la hora de fin PLANEADA; el doc solo
+      // conoce el fin hasta el último sync). Si el schedule no lo reconoce o
+      // discrepa, usar los bounds reales extendidos hasta `now` — y en ese
+      // caso el fin planeado es desconocido → progreso/restante = null (si no,
+      // marcarían 100%/0 durante todo el turno). elapsed sí es correcto.
+      const schedTw = computeShiftTimeWindow(info.dateKey, info.shiftId, schedule, nowWallUTC)
+      let tw = schedTw
+      if (schedTw.status !== 'live') {
+        tw = computeShiftTimeWindow(info.dateKey, info.shiftId, schedule, nowWallUTC, {
+          startAt: info.scheduledStart,
+          endAt: new Date(Math.max(endMs, nowMs)),
+        })
+        if (endMs < nowMs) tw = { ...tw, progressPct: null, remainingMin: null }
+      }
+      return { dateKey: info.dateKey, shiftId: info.shiftId, tw }
+    }
+
+    // 2) Fallback por schedule configurado/hardcodeado
     const filtered = schedule.filter((s) => preferredShiftIds.includes(s.shiftId))
     for (const dateKey of [todayKey, ydayKey]) {
       for (const s of filtered) {
@@ -109,7 +170,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
       }
     }
     return null
-  }, [now, schedule, preferredShiftIds])
+  }, [now, schedule, preferredShiftIds, dayInfos])
 
   // Cargar snapshot Shoplogix del turno candidato para verificar producción real.
   // El hook acepta null/undefined → no fetchea cuando no hay turno candidato.
@@ -161,7 +222,9 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
   const href = `/analisis-grader/turno/${live.dateKey}__${encodeURIComponent(live.shiftId)}${linea}`
 
   const elapsedLabel = fmtElapsed(live.tw.elapsedMin)
-  const progressPct = live.tw.progressPct != null ? Math.round(live.tw.progressPct) : 0
+  // null = fin planeado desconocido (turno detectado por datos reales cuyo
+  // nombre no está en el schedule) → se omite el % en vez de inventar 0/100.
+  const progressPct = live.tw.progressPct != null ? Math.round(live.tw.progressPct) : null
 
   // Estado ámbar: horario nominal del turno está activo PERO no hay producción real.
   // Frecuente en temporada baja, paros prolongados o plantas sin datos sincronizados.
@@ -214,7 +277,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
           En curso · {meta.label}
         </span>
         <span className="text-[10px] text-emerald-300/80 tabular-nums">
-          {elapsedLabel} transcurridos · {progressPct}%
+          {elapsedLabel} transcurridos{progressPct != null ? ` · ${progressPct}%` : ''}
         </span>
       </span>
       <ChevronRight className="h-3.5 w-3.5 text-emerald-400/60 group-hover:text-emerald-400 transition-colors shrink-0" />
