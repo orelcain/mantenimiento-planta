@@ -13,6 +13,7 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { PLANT_LINES } from '@/config/plantLines'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
+import { computeMachineKPI } from '@/services/grader/plantKpiCompute'
 
 // ─── Detección de planta desde texto libre ────────────────────────────
 
@@ -922,6 +923,102 @@ registerTool({
   },
 })
 
+// ─── shift.stops (por qué está detenida + averías/MTTR + causas, EN VIVO) ──────
+
+registerTool({
+  name: 'shift.stops',
+  category: 'shift',
+  description:
+    'Detenciones y confiabilidad EN VIVO del turno en curso desde Shoplogix, cuadra con el board Análisis de Turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "MTTR/confiabilidad en vivo", "motivo de las paradas", "cuánto tiempo detenida".',
+  params: [
+    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal'], required: false, default: 'chonchi', description: 'Planta' },
+  ],
+  triggers: [
+    /\bpor\s+qu[eé]\b.*\b(detenid|parad|par[oó]|frenad|fren[oó])/i,
+    /\b(fallas?|aver[ií]as?|detenci[oó]n(es)?|paros?|micro-?detenci|mttr|mtbf|confiabilidad)\b/i,
+    /\b(motivo|causa|raz[oó]n)\b.*\b(parad|detenci|par[oó]|fren)/i,
+    /\b(falta\s+de\s+(mmpp|materia\s+prima)|atascamiento|energ[ií]a)\b/i,
+  ],
+  execute: async (params) => {
+    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
+    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const live = await loadLiveShift(plantSlug)
+    if (!live) {
+      return {
+        ok: true,
+        data: { plantSlug, count: 0 },
+        summary: `No hay datos vivos de Shoplogix para ${plantLbl} en este momento (turno sin iniciar o sync pendiente).`,
+        label: `Detenciones · ${plantLbl}`,
+      }
+    }
+    const s = live.snapshot
+    const freshMin = live.syncedAt ? Math.max(0, Math.round((Date.now() - live.syncedAt.getTime()) / 60000)) : null
+
+    // Estado ACTUAL por máquina (último state = el vigente).
+    const ahora = s.machines.map(m => {
+      const last = m.states[m.states.length - 1]
+      if (!last) return `${m.machineName}: sin datos`
+      if (last.type === 'uptime') return `${m.machineName}: produciendo ✅`
+      if ((last.name || '').trim() === 'Micro Detencion') return `${m.machineName}: en micro-detención`
+      const causa = (last.reason || '').trim()
+      return `${m.machineName}: DETENIDA${causa ? ` — ${causa}` : ' (motivo sin registrar)'}`
+    })
+
+    // Confiabilidad (MISMAS funciones que el board → cuadra).
+    const kpis = s.machines.map(computeMachineKPI)
+    const failures = kpis.reduce((a, k) => a + k.failureCount, 0)
+    const macroMinTotal = kpis.reduce((a, k) => a + k.mttrMin * k.failureCount, 0)
+    const mttr = failures > 0 ? macroMinTotal / failures : 0
+    const micro = kpis.reduce((a, k) => a + k.microCount, 0)
+    const microMin = kpis.reduce((a, k) => a + k.microMin, 0)
+
+    // Separar DETENCIONES operativas (downtime = paros/fallas) de PAUSAS
+    // programadas (break = colación/reunión). El usuario pregunta "por qué está
+    // detenida" = paros, no colación.
+    const stopSec = new Map<string, number>()
+    let breakSec = 0
+    for (const m of s.machines) {
+      for (const st of m.states) {
+        if (st.type === 'downtime') {
+          const key = (st.reason || st.name || 'sin motivo').trim()
+          stopSec.set(key, (stopSec.get(key) || 0) + (st.durationSec || 0))
+        } else if (st.type === 'break') {
+          breakSec += st.durationSec || 0
+        }
+      }
+    }
+    const pareto = [...stopSec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+
+    const lines: string[] = [
+      `Detenciones y confiabilidad · ${plantLbl} · turno EN CURSO ${s.shiftId}${freshMin !== null ? ` (dato de hace ~${freshMin} min)` : ''}:`,
+      `- Estado ahora: ${ahora.join(' · ')}`,
+      `- Averías macro: ${failures} · MTTR ${mttr > 0 ? `${mttr.toFixed(1)} min` : '—'} · Micro-detenciones: ${micro}${microMin > 0 ? ` (${Math.round(microMin)} min)` : ''}`,
+    ]
+    if (pareto.length) {
+      lines.push('- Causas de detención (paros operativos, por tiempo):')
+      for (const [causa, sec] of pareto) lines.push(`  · ${causa}: ${fmtMin(sec)}`)
+    }
+    if (breakSec > 0) lines.push(`- Pausas programadas (colación/reunión): ${fmtMin(breakSec)}`)
+
+    return {
+      ok: true,
+      data: {
+        plantSlug,
+        shiftId: s.shiftId,
+        estadoActual: ahora,
+        averiasMacro: failures,
+        mttrMin: mttr,
+        microCount: micro,
+        microMin,
+        pausasProgramadasMin: Math.round(breakSec / 60),
+        causasDetencion: pareto.map(([causa, sec]) => ({ causa, minutos: Math.round(sec / 60) })),
+      },
+      summary: lines.join('\n'),
+      label: `Detenciones · ${plantLbl}`,
+    }
+  },
+})
+
 // ─── Inferencia de params adicionales desde texto libre ────────────────
 
 /**
@@ -972,8 +1069,8 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
     const plant = detectPlantLineId(userMessage)
     if (plant) params.plantLineId = plant
   }
-  // shift.kpis, shift.live y shift.dayProduction usan PlantSlug (chonchi/yal).
-  if ((toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction')
+  // shift.kpis, shift.live, shift.dayProduction y shift.stops usan PlantSlug.
+  if ((toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction' || toolName === 'shift.stops')
       && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
     params.plantSlug = 'yal'
   }
