@@ -53,6 +53,39 @@ export function nowAsWallClockUTC(now: Date = new Date()): Date {
 }
 
 /**
+ * Bounds REALES de un turno según Shoplogix (scheduledStart/End del doc
+ * sincronizado, en el marco wall-clock-as-UTC). Cuando están disponibles,
+ * MANDAN sobre cualquier schedule configurado/hardcodeado: los horarios de
+ * turno los define Shoplogix y varían (decisión PR #157).
+ */
+export interface RealShiftBounds {
+  startAt: Date
+  endAt: Date
+}
+
+function windowFromBounds(startDate: Date, endDate: Date, now: Date): ShiftTimeWindow {
+  const durationMin = (endDate.getTime() - startDate.getTime()) / 60_000
+  const elapsedMs = now.getTime() - startDate.getTime()
+  const elapsedMin = Math.max(0, elapsedMs / 60_000)
+
+  let status: ShiftStatus
+  if (now.getTime() < startDate.getTime()) status = 'future'
+  else if (now.getTime() > endDate.getTime()) status = 'closed'
+  else status = 'live'
+
+  return {
+    status,
+    startAt: startDate.toISOString(),
+    endAt: endDate.toISOString(),
+    progressPct: status === 'live' && durationMin > 0
+      ? Math.min(100, Math.max(0, (elapsedMin / durationMin) * 100))
+      : null,
+    elapsedMin,
+    remainingMin: status === 'live' ? Math.max(0, durationMin - elapsedMin) : null,
+  }
+}
+
+/**
  * Detecta estado del turno a partir de la fecha y el horario configurado.
  *
  * Reglas:
@@ -62,13 +95,27 @@ export function nowAsWallClockUTC(now: Date = new Date()): Date {
  *
  * Para turnos de noche que cruzan medianoche (endHour < startHour),
  * endAt se ubica en dateKey+1.
+ *
+ * @param realBounds — scheduledStart/End reales del doc Shoplogix. Si vienen
+ *   válidos, la ventana se construye desde ellos y el `schedule` se ignora
+ *   (la verdad de horarios es Shoplogix, no la config de la app).
  */
 export function computeShiftTimeWindow(
   dateKey: string,
   shiftId: string,
   schedule: GraderShiftSchedule[] = DEFAULT_SHIFT_SCHEDULE,
   now: Date = nowAsWallClockUTC(),
+  realBounds?: RealShiftBounds | null,
 ): ShiftTimeWindow {
+  if (
+    realBounds &&
+    !isNaN(realBounds.startAt.getTime()) &&
+    !isNaN(realBounds.endAt.getTime()) &&
+    realBounds.endAt.getTime() > realBounds.startAt.getTime()
+  ) {
+    return windowFromBounds(realBounds.startAt, realBounds.endAt, now)
+  }
+
   const entry = schedule.find(s => s.shiftId === shiftId)
 
   if (!entry) {

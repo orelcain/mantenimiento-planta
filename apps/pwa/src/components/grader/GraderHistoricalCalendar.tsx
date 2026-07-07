@@ -625,7 +625,7 @@ function buildDayTimelineBlocks(
       if (sepIdx < 0) continue
       const cfDateKey = mapKey.slice(0, sepIdx)
       const shiftId   = mapKey.slice(sepIdx + 2)
-      const visualDay = isMidnightShift(shiftId) ? addDaysToDateKey(cfDateKey, 1) : cfDateKey
+      const visualDay = isMidnightShift(shiftId, cfDateKey) ? addDaysToDateKey(cfDateKey, 1) : cfDateKey
       if (visualDay !== slideKey) continue
       visualShifts.push({ shiftId, cfDateKey, mapKey })
     }
@@ -810,17 +810,19 @@ function slxDisplayShifts(
   const { ownDay, prevDay } = cfKeysForVisualDay(visualDay)
   const collected: SlxDisplayShift[] = []
 
-  // Shifts cuyo dateKey CF == ownDay (todos excepto Turno 3, que viene del día anterior).
+  // Shifts cuyo dateKey CF == ownDay. Los "Turno 3" de la era legacy
+  // (dateKey < cutover 2026-05-01) pertenecen visualmente al día siguiente
+  // y se saltan aquí; los nuevos (dateKey = día calendario real) se quedan.
   for (const k of slxByShift.keys()) {
     if (!k.startsWith(`${ownDay}__`)) continue
     const shiftId = k.slice(`${ownDay}__`.length)
-    if (isMidnightShift(shiftId)) continue
+    if (isMidnightShift(shiftId, ownDay)) continue
     collected.push({ shiftId, cfDateKey: ownDay, slxKey: k })
   }
 
-  // Turno 3 visual del día Y → dateKey CF = Y-1
+  // Turno 3 visual del día Y → dateKey CF = Y-1 (SOLO era legacy pre-cutover)
   const t3Key = `${prevDay}__Turno 3`
-  if (slxByShift.has(t3Key)) {
+  if (isMidnightShift('Turno 3', prevDay) && slxByShift.has(t3Key)) {
     collected.push({ shiftId: 'Turno 3', cfDateKey: prevDay, slxKey: t3Key })
   }
 
@@ -837,12 +839,17 @@ function slxDisplayShifts(
   const deduped = collected
     .filter(c => !(c.shiftId === 'Turno día'   && (hasT2 || dropLegacyForNonClassif)))
     .filter(c => !(c.shiftId === 'Turno noche' && (hasT1or3 || dropLegacyForNonClassif)))
+    // 'Unscheduled' = producción sin turno configurado en Shoplogix: se muestra
+    // FIEL solo si es significativa (≥umbral de ruido) — nunca disfrazada.
+    .filter(c => c.shiftId !== 'Unscheduled'
+      || isSignificantCycleCount(slxByShift.get(c.slxKey)?.totalCycles))
 
-  // Orden calendárico (Turno 3 madrugada va primero, luego día, luego noche)
+  // Orden calendárico (madrugadas primero, luego día, tarde y noche)
   const ord: Record<string, number> = {
-    'Turno 3': 1,
+    'Turno 3': 1, 'Turno 1 Lunes': 1,
     'Turno 1': 2, 'Turno día':  2,
     'Turno 2': 3, 'Turno noche': 3,
+    'Unscheduled': 8,
   }
   return deduped.sort((a, b) => (ord[a.shiftId] ?? 9) - (ord[b.shiftId] ?? 9))
 }
@@ -1796,6 +1803,29 @@ export function GraderHistoricalCalendar({
       // ── Fase 2: clasificar en "vacío confirmado" vs "a cargar" ────────────────
       const emptyKeys: string[] = []
       const toLoad: Array<{ dk: string; dkMs: number; shiftId: string }> = []
+
+      // Nombres REALES fuera de la lista base — Shoplogix inventa variantes
+      // ("Turno 1 Lunes") y registra producción sin turno ("Unscheduled").
+      // Se cargan bajo su propio key `${dk}__${shiftId}`; sin esto, la Fase 1
+      // los descubre pero la Fase 2 los descartaba en silencio y el calendario
+      // no los mostraba nunca. Se omiten los que ya cubre algún candidato de
+      // la lista base (loadOne los resuelve como fallback del turno nombrado).
+      if (existingDocIds) {
+        const coveredByBase = new Set(
+          monthShiftIds.flatMap(base => getSlxShiftCandidates(base, plantSlug)),
+        )
+        for (const docId of existingDocIds) {
+          const m = docId.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/)
+          if (!m) continue
+          const dk = m[1]!
+          const sid = m[2]!
+          if (monthShiftIds.includes(sid) || coveredByBase.has(sid)) continue
+          const key = `${dk}__${sid}`
+          if (slxMonthQueuedRef.current.has(key)) continue
+          slxMonthQueuedRef.current.add(key)
+          toLoad.push({ dk, dkMs: new Date(`${dk}T12:00:00`).getTime(), shiftId: sid })
+        }
+      }
 
       for (let day = daysInMonth; day >= 1; day--) {   // reverso → días recientes primero
         const dk   = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`

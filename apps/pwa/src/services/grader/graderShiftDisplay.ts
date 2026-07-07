@@ -1,21 +1,21 @@
 /**
- * Helpers de DISPLAY de turnos — convención calendárica vs convención CF.
+ * Helpers de DISPLAY de turnos.
  *
- * El Cloud Function de Shoplogix sync guarda los shifts en Firestore con la
- * convención del "día laboral" (08:00→08:00). Esto significa que:
+ * HISTORIA: una versión temprana del CF derivaba el dateKey desde la VENTANA
+ * de consulta (08:00→08:00), lo que dejaba al Turno 3 (madrugada) guardado
+ * bajo el día anterior, y estos helpers desplazaban su día visual +1 para
+ * alinear con Shoplogix UI. El CF se corrigió (`shiftDateKeyFromStart`:
+ * dateKey = día calendario donde ARRANCA el turno) y los datos viejos se
+ * re-backfillearon.
  *
- *   - Turno 1 (07:45–14:45) → dateKey = día calendárico ✓ (coincide)
- *   - Turno 2 (14:45–00:00) → dateKey = día calendárico ✓ (coincide)
- *   - Turno 3 (00:00–07:45) → dateKey = día anterior ❌ (NO coincide)
+ * VERIFICADO contra Firestore prod (2026-07-07, ambas plantas, desde el
+ * primer doc 2026-04-24 hasta hoy): TODOS los docs `Turno 3` tienen
+ * scheduledStart 00:00 del MISMO día de su dateKey. La "era legacy"
+ * (dateKey = día-1) NO existe en los datos → ya no se desplaza nada.
+ * Seguir desplazando mostraba cada T3 bajo el día equivocado (+1).
  *
- * Shoplogix UI, en cambio, usa la convención calendárica: el Turno 3 cuyo
- * horario real es 00:00–07:45 del 27 de abril se llama "Turno 3 del 27 abril",
- * pero en nuestro Firestore está guardado como `2026-04-26_Turno 3`.
- *
- * Estos helpers ALINEAN el display con Shoplogix sin tocar el data layer:
- * la URL, la clave Firestore y la lógica de carga conservan la convención CF
- * (dateKey = día anterior para Turno 3). Solo el display visible al usuario
- * (etiquetas, agrupación visual en el calendario) usa la convención calendárica.
+ * Los helpers se conservan como puntos de paso (hoy identidad) por si algún
+ * día reaparece data con otra convención.
  */
 
 /**
@@ -30,7 +30,7 @@
  *   getShiftDisplayDateKey('2026-04-26', 'Turno 2') // → '2026-04-26'
  */
 export function getShiftDisplayDateKey(dateKey: string, shiftId: string): string {
-  if (!isMidnightShift(shiftId)) return dateKey
+  if (!isMidnightShift(shiftId, dateKey)) return dateKey
   const d = new Date(`${dateKey}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + 1)
   return d.toISOString().slice(0, 10)
@@ -47,22 +47,28 @@ export function getShiftDisplayDateKey(dateKey: string, shiftId: string): string
  * que pertenecen a ese día calendáricamente.
  */
 export function getCfDateKeyForDisplayDay(displayDay: string, shiftId: string): string {
-  if (!isMidnightShift(shiftId)) return displayDay
   const d = new Date(`${displayDay}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
+  const prevDay = d.toISOString().slice(0, 10)
+  return isMidnightShift(shiftId, prevDay) ? prevDay : displayDay
 }
 
 /**
- * Detecta si un shiftId corresponde a un turno que cruza la medianoche EMPEZANDO
- * a las 00:00 (es decir, una "madrugada" cuyo dateKey CF apunta al día anterior).
+ * ¿Este (shiftId, dateKey CF) está guardado bajo el día ANTERIOR al que
+ * ocurre visualmente?
  *
- * Por ahora hardcodeado a "Turno 3" (la convención de Yal en Shoplogix). Si en
- * el futuro otras plantas tienen otros nombres, esto se extiende leyendo la
- * config de plantLines.
+ * Respuesta actual: NUNCA. Verificado contra Firestore prod (2026-07-07,
+ * ambas plantas, todo el histórico existente desde 2026-04-24): el dateKey
+ * de TODOS los docs (incluido Turno 3) es el día calendario donde arranca el
+ * turno (`shiftDateKeyFromStart` en el CF). El desplazamiento +1 que hacía
+ * esta función databa de una convención vieja del CF cuyos docs ya no existen
+ * — mantenerlo mostraba cada Turno 3 bajo el día equivocado.
+ *
+ * Se conserva la firma (con `cfDateKey` opcional) como punto de paso por si
+ * reaparece data con otra convención.
  */
-export function isMidnightShift(shiftId: string): boolean {
-  return shiftId === 'Turno 3'
+export function isMidnightShift(_shiftId: string, _cfDateKey?: string): boolean {
+  return false
 }
 
 /**
@@ -196,7 +202,37 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     iconName: 'Moon',
     emoji: '🌙',
     isDayLike: false,
-    scheduleHint: '23:00–07:45',
+    scheduleHint: '00:00–07:00',
+  },
+  // Variante que Shoplogix emite en chonchi los lunes (madrugada 00:00→~07:00).
+  // El nombre y horario los define Shoplogix — no asumir que la lista es fija.
+  'Turno 1 Lunes': {
+    label: 'Turno 1 Lunes — Madrugada',
+    shortLabel: 'T1L',
+    period: 'noche',
+    textColorClass: 'text-indigo-400',
+    bgColorClass: 'bg-indigo-500/10',
+    borderColorClass: 'border-indigo-500/30',
+    iconName: 'Sunrise',
+    emoji: '🌄',
+    isDayLike: false,
+    scheduleHint: '00:00–07:00 (lunes)',
+  },
+  // Producción que Shoplogix registró SIN turno asignado (turno no configurado
+  // en Shoplogix para esa ventana — caso real: pesca nocturna del domingo
+  // 2026-07-05 en Yal, 11.6k ciclos). Se muestra FIEL, nunca disfrazado de
+  // un turno con nombre (decisión PR #157).
+  'Unscheduled': {
+    label: 'Sin turno asignado',
+    shortLabel: 'S/T',
+    period: 'desconocido',
+    textColorClass: 'text-slate-300',
+    bgColorClass: 'bg-slate-500/10',
+    borderColorClass: 'border-slate-500/30',
+    iconName: 'Clock',
+    emoji: '⏱',
+    isDayLike: false,
+    scheduleHint: 'ventana sin turno configurado',
   },
   'Turno día': {
     label: 'Turno día',

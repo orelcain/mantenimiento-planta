@@ -29,10 +29,11 @@ if (!VALID_PLANTS.includes(plantSlug)) {
   process.exit(1)
 }
 
-/** Ayer en Chile (UTC-3 fijo) como YYYY-MM-DD. */
+/** Ayer en Chile (DST-aware, America/Santiago) como YYYY-MM-DD. */
 function yesterdayChile() {
-  const chileNow = new Date(Date.now() - 3 * 3600 * 1000 - 24 * 3600 * 1000)
-  return chileNow.toISOString().slice(0, 10)
+  const { toChileWall } = require('../shoplogix/polling')
+  const wall = toChileWall(new Date())
+  return new Date(wall.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
 const dateKey = process.argv[3] || yesterdayChile()
