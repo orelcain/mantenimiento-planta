@@ -3719,6 +3719,96 @@ async function ariaDataGrader() {
   return `Grader — últimos resúmenes:\n${bloques.join('\n')}`
 }
 
+// ---- produccion: turno EN VIVO desde Shoplogix (paridad con la PWA) ----
+// Lee shoplogix/{plant}/shifts/{dk}_{shiftId}/machines (Admin SDK) y reporta
+// piezas (=ciclos), estado/uptime por Baader, averías y causas de detención.
+// Réplica server-side de los tools shift.live/shift.stops de la PWA.
+const SLX_CANDS = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
+const SLX_MAINT_EXCLUDED = new Set(['FALTA MMPP', 'CONTRASTACION', 'CAMBIO LOTE/MMPP', 'AJUSTE OPERADOR'])
+
+function slxTodayKeyChile() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+// % uptime real desde states (uptime / (tracked − planned downtime)), igual que la PWA.
+function slxUptimeFromStates(states) {
+  let up = 0, tracked = 0, planned = 0
+  for (const s of states || []) {
+    const d = Number(s.durationSec || 0)
+    tracked += d
+    if (s.type === 'uptime') up += d
+    if (s.type === 'break' && String(s.reason || '').toLowerCase().includes('planned downtime')) planned += d
+  }
+  const denom = tracked - planned
+  return denom > 0 ? up / denom : 0
+}
+
+async function ariaDataProduccionVivo(consulta) {
+  const plantSlug = /\byal\b/i.test(consulta || '') ? 'yal' : 'chonchi'
+  const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+  const dk = slxTodayKeyChile()
+  const loaded = (await Promise.all(SLX_CANDS.map(async (sid) => {
+    try {
+      const snap = await db.collection(`shoplogix/${plantSlug}/shifts/${dk}_${sid}/machines`).get()
+      if (snap.empty) return null
+      const machines = snap.docs.map((d) => d.data())
+      const cycles = machines.reduce((a, m) => a + Number(m.totalCycles || 0), 0)
+      return { shiftId: sid, machines, cycles }
+    } catch { return null }
+  }))).filter(Boolean)
+  const valid = loaded.filter((x) => x.cycles > 0 && !(x.shiftId === 'Unscheduled' && x.cycles < 50))
+  if (!valid.length) return `No hay producción viva de Shoplogix para ${plantLbl} en este momento (turno sin iniciar o sincronización pendiente).`
+  valid.sort((a, b) => b.cycles - a.cycles)
+  const shift = valid[0]
+  const total = shift.cycles
+
+  const perMachine = shift.machines
+    .slice()
+    .sort((a, b) => String(a.machineName || '').localeCompare(String(b.machineName || '')))
+    .map((m) => {
+      const states = Array.isArray(m.states) ? m.states : []
+      const last = states[states.length - 1]
+      let estado = 'produciendo'
+      if (last && last.type !== 'uptime') {
+        estado = String(last.name || '').trim() === 'Micro Detencion'
+          ? 'en micro-detención'
+          : `DETENIDA${String(last.reason || '').trim() ? ` (${String(last.reason).trim()})` : ''}`
+      }
+      const up = Math.round(slxUptimeFromStates(states) * 100)
+      return `  · ${m.machineName}: ${Number(m.totalCycles || 0).toLocaleString('es-CL')} piezas · uptime ${up}% · ${estado}`
+    })
+
+  let macroCount = 0, microCount = 0
+  const causeSec = new Map()
+  let breakSec = 0
+  for (const m of shift.machines) {
+    for (const s of (m.states || [])) {
+      if (s.type === 'downtime') {
+        const key = String(s.reason || s.name || 'sin motivo').trim()
+        causeSec.set(key, (causeSec.get(key) || 0) + Number(s.durationSec || 0))
+        const r = String(s.reason || '').trim().toUpperCase()
+        const isMaint = !(r && SLX_MAINT_EXCLUDED.has(r))
+        if (isMaint) { if (String(s.name || '').trim() === 'Micro Detencion') microCount++; else macroCount++ }
+      } else if (s.type === 'break') {
+        breakSec += Number(s.durationSec || 0)
+      }
+    }
+  }
+  const pareto = [...causeSec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([c, sec]) => `${c}: ${Math.round(sec / 60)} min`)
+
+  const shiftLbl = shift.shiftId === 'Unscheduled' ? 'Sin turno asignado' : shift.shiftId
+  return [
+    `Producción EN VIVO · ${plantLbl} · turno ${shiftLbl} (${dk}):`,
+    `Total: ${total.toLocaleString('es-CL')} piezas (= ciclos de eviscerado).`,
+    ...perMachine,
+    `Averías macro: ${macroCount} · Micro-detenciones: ${microCount}.`,
+    pareto.length ? `Causas de detención: ${pareto.join(' · ')}.` : '',
+    breakSec > 0 ? `Pausas programadas (colación/reunión): ${Math.round(breakSec / 60)} min.` : '',
+  ].filter(Boolean).join('\n')
+}
+
 let _ariaGanttCache = { at: 0, items: [] }
 async function ariaGetGantt() {
   if (Date.now() - _ariaGanttCache.at < ARIA_CACHE_TTL_MS && _ariaGanttCache.items.length) {
@@ -3912,7 +4002,8 @@ const ARIA_ROUTER_SPEC =
   '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
   '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
   '- "historial": historial/bitácora de intervenciones de mantención (inspecciones, capturas rápidas) — término opcional en "consulta" (equipo, área, técnico)\n' +
-  '- "grader": resumen de los últimos turnos del Grader (piezas, peso, compuertas, microdetenciones)\n' +
+  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina Baader, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá la planta en "consulta" (yal/chonchi).\n' +
+  '- "grader": resumen de los últimos turnos CERRADOS del Grader (Excel: piezas, peso, compuertas, P0%, microdetenciones). Para el turno EN CURSO usá "produccion", no "grader".\n' +
   '- "gantt": tareas planificadas del Gantt (abiertas, atrasadas, próximas a vencer) — "consulta" SOLO si nombran un proyecto/responsable/equipo específico; NO pongas palabras de estado como "atrasadas" o "pendientes"\n' +
   '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
   '- "solicitudes": solicitudes de repuestos a bodega y su estado\n' +
@@ -4312,6 +4403,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         case 'equipo': datos = await ariaDataEquipo(route.consulta || userText); break
         case 'repuestos': datos = await ariaDataRepuestos(route.consulta || userText); break
         case 'historial': datos = await ariaDataHistorial(route.consulta || ''); break
+        case 'produccion': datos = await ariaDataProduccionVivo(route.consulta || userText); break
         case 'grader': datos = await ariaDataGrader(); break
         case 'gantt': datos = await ariaDataGantt(route.consulta || ''); break
         case 'stockbajo': datos = await ariaDataStockBajo(); break
