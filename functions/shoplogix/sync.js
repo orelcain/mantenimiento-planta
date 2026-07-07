@@ -294,11 +294,26 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         const TOLERANCE_MS = 5 * 60 * 1000
         const groupStartMs = group.scheduledStart.getTime() - TOLERANCE_MS
         const groupEndMs   = group.scheduledEnd.getTime()   + TOLERANCE_MS
+
+        // EXCEPCIÓN — grupo "Unscheduled": filtrar por ETIQUETA, no por ventana.
+        //
+        // El grupo Unscheduled abarca del primer al último interval sin turno
+        // del día; cuando la planta está ociosa al inicio Y al final de la
+        // ventana (caso típico), sus bounds ABRAZAN toda la ventana y el filtro
+        // temporal se tragaba también los intervals etiquetados de los turnos
+        // reales de en medio → DOBLE CONTEO garantizado (caso real Yal
+        // 2026-07-06: doc Unscheduled con 35.510 ciclos = Turno 2 20.4k +
+        // Turno 3 15.5k duplicados; el 2026-07-02 igual: 8.181 ≈ el mismo
+        // Turno 2 de 8.169). Para turnos NOMBRADOS el filtro temporal sigue
+        // siendo necesario (etiquetado inconsistente entre máquinas, ver
+        // arriba); para Unscheduled la etiqueta es exacta por definición.
+        const isUnscheduledGroup = group.shiftId === 'Unscheduled'
         const filteredProd = {
           ...rawProd,
           machineProduction: (rawProd.machineProduction || [])
             .filter(iv => {
               if (!iv.start) return false
+              if (isUnscheduledGroup) return iv.shift === 'Unscheduled'
               const ivStartMs = parseShoplogixTime(iv.start).getTime()
               return ivStartMs >= groupStartMs && ivStartMs <= groupEndMs
             }),
