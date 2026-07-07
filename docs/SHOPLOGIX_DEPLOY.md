@@ -206,6 +206,19 @@ Con `SHOPLOGIX_USER` + `SHOPLOGIX_PASS` configurados:
 
 El modo activo se loguea en cada sync: `modo auth: bearer` o `modo auth: cookie`.
 
+> **⚠️ ESTADO REAL 2026-07-07: el ROPC está ROTO — todo corre en modo cookie.**
+> `connect/token` responde `400 invalid_client` al grant `password` del client
+> `SAAS139`. Verificado: el discovery OIDC aún lista `password` como grant
+> soportado y el client_id del authorize sigue siendo `SAAS139` → lo más
+> probable es que el client se volvió **confidencial** (exige `client_secret`,
+> que no tenemos). El auto-login queda en backoff de 6 h (no martilla el
+> identity server) y el sync vive del fallback `SHOPLOGIX_COOKIE`.
+> **Si la cookie expira, el wakeup manda alerta por Telegram** (dedupe 6 h) con
+> el procedimiento de renovación del §3.
+> Salidas posibles: (a) automatizar `authorization_code + PKCE` scripteando el
+> form de login (no requiere secret — Fase 2b.1c), o (b) pedir a Shoplogix /
+> account manager AquaChile el acceso API oficial (Fase 2b.2, ideal).
+
 ### Tokens almacenados en Firestore
 
 Los tokens OAuth se guardan en `system/shoplogixToken`:

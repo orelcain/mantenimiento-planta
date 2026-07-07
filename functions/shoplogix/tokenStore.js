@@ -132,12 +132,38 @@ async function getValidAccessToken(db, creds, log = console) {
     throw err
   }
 
+  // Backoff tras fallo de ROPC: desde ~2026-07 el token endpoint responde
+  // 400 invalid_client al grant password del client SAAS139 (lo volvieron
+  // confidencial). Sin backoff, cada wakeup (cada 5 min) martillaba el
+  // identity server con logins condenados a fallar antes de caer a la cookie.
+  // Reintentamos como mucho cada ROPC_BACKOFF_MS por si lo rehabilitan.
+  const ROPC_BACKOFF_MS = 6 * 60 * 60 * 1000
+  let ropcFailedAt = 0
+  try {
+    const snap = await db.doc(TOKEN_DOC).get()
+    ropcFailedAt = snap.exists ? (snap.data()?.ropc_failed_at?.toDate?.()?.getTime() ?? 0) : 0
+  } catch (_) { /* lectura falló — intentar login igual */ }
+  if (Date.now() - ropcFailedAt < ROPC_BACKOFF_MS) {
+    const err = new Error('[tokenStore] ROPC en backoff (último intento falló hace <6h) — usar fallback cookie')
+    err.code = 'AUTH_EXPIRED'
+    throw err
+  }
+
   try {
     const tokens = await loginWithPassword({ user: creds.user, password: creds.password })
     await saveToken(db, tokens, 'ropc')
     log.info('[tokenStore] re-login ROPC exitoso')
     return tokens.access_token
   } catch (e) {
+    if (e.code === 'LOGIN_FAILED') {
+      // Marcar el fallo para activar el backoff (merge: no pisa tokens si los hubiera)
+      try {
+        await db.doc(TOKEN_DOC).set({
+          ropc_failed_at: new Date(),
+          ropc_error: String(e.message || '').slice(0, 200),
+        }, { merge: true })
+      } catch (_) { /* best-effort */ }
+    }
     // Propagar LOGIN_FAILED o AUTH_EXPIRED
     const err = new Error(`[tokenStore] Re-login falló: ${e.message}`)
     err.code = e.code ?? 'AUTH_EXPIRED'

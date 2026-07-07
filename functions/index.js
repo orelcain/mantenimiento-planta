@@ -5584,15 +5584,18 @@ exports.shoplogixSyncHttp = onRequest(
 )
 
 /**
- * Wakeup scheduler — dispara cada hora durante ventana operativa.
+ * Wakeup scheduler — dispara cada 5 minutos.
  * Fase 2b.1: auto-login integrado. Si AUTH_EXPIRED y hay credenciales,
- * limpia el token guardado y el próximo ciclo (en 60min) hará re-login.
+ * limpia el token guardado y el próximo ciclo hará re-login.
+ *
+ * Además del día actual, re-sincroniza días RECIENTES en cadencias bajas
+ * (auto-corrección de etiquetado retroactivo — ver extraDateKeys abajo).
  */
 exports.shoplogixSyncWakeup = onSchedule(
   {
     schedule: 'every 5 minutes',
     timeZone: 'America/Santiago',
-    timeoutSeconds: 180,
+    timeoutSeconds: 420,   // hoy + hasta 2 días extra de re-sync en el disparo de las 12:00
     memory: '256MiB',
     retryCount: 1,
     secrets: ['SHOPLOGIX_COOKIE'],
@@ -5605,11 +5608,35 @@ exports.shoplogixSyncWakeup = onSchedule(
       return
     }
 
-    // Jitter anti-bot: delay aleatorio 0-120s para que las queries nunca lleguen
-    // en el mismo segundo (Cloud Scheduler dispara exacto, pero Shoplogix verá
-    // timestamps variables → patrón más humano).
-    const jitterMs = Math.floor(Math.random() * 120_000)
-    logger.info(`[shoplogixSyncWakeup] jitter ${Math.round(jitterMs / 1000)}s`)
+    // ── Re-sync móvil: auto-corrección de etiquetado retroactivo ────────────
+    // Shoplogix puede configurar/etiquetar turnos DESPUÉS de ocurridos (caso
+    // real: el "Turno 3 - 6 Jul 2026" de Yal se configuró el lunes; la pesca
+    // del domingo quedó como "Unscheduled" y el día ya estaba congelado —
+    // cada dateKey deja de re-sincronizarse a las 08:00 del día siguiente).
+    // Para que esas correcciones lleguen solas a la app:
+    //   - AYER se re-sincroniza una vez por hora (disparo del minuto :00)
+    //   - HACE 2 y 3 días, una vez al día (disparo de las 12:00 Chile)
+    // Cambios más antiguos → backfill manual (shoplogixBackfillRange).
+    const wallNow = shoplogixPolling.toChileWall(new Date())
+    const baseKey = shoplogixSyncMod.currentDateKey()
+    const minusDays = (dk, n) => {
+      const d = new Date(`${dk}T12:00:00Z`)
+      d.setUTCDate(d.getUTCDate() - n)
+      return d.toISOString().slice(0, 10)
+    }
+    const extraDateKeys = []
+    if (wallNow.getUTCMinutes() < 5) extraDateKeys.push(minusDays(baseKey, 1))
+    if (wallNow.getUTCHours() === 12 && wallNow.getUTCMinutes() < 5) {
+      extraDateKeys.push(minusDays(baseKey, 2), minusDays(baseKey, 3))
+    }
+
+    // Jitter anti-bot: delay aleatorio para que las queries nunca lleguen en el
+    // mismo segundo (Cloud Scheduler dispara exacto, pero Shoplogix verá
+    // timestamps variables → patrón más humano). Acotado cuando hay días extra
+    // para no arriesgar el timeout.
+    const jitterMs = Math.floor(Math.random() * (extraDateKeys.length > 0 ? 30_000 : 120_000))
+    logger.info(`[shoplogixSyncWakeup] jitter ${Math.round(jitterMs / 1000)}s` +
+      (extraDateKeys.length ? ` · re-sync extra: ${extraDateKeys.join(', ')}` : ''))
     await new Promise(r => setTimeout(r, jitterMs))
 
     const auth = await resolveShoplogixAuth(logger)
@@ -5619,31 +5646,39 @@ exports.shoplogixSyncWakeup = onSchedule(
     }
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
-    // Sincroniza todas las plantas activas en paralelo (full-day — detecta turnos reales)
-    const settled = await Promise.allSettled(
-      shoplogixSyncMod.ACTIVE_PLANTS.map((plantSlug) =>
-        shoplogixSyncMod.syncDay({
-          db,
-          accessToken: auth.accessToken,
-          cookie:      auth.cookie,
-          plantSlug,
-          logger,
-        })
-      )
-    )
-
     let authExpired = false
-    for (const outcome of settled) {
-      if (outcome.status === 'fulfilled') {
-        logger.info('[shoplogixSyncWakeup] OK', { result: outcome.value, authMode: auth.mode })
-      } else {
-        const err = outcome.reason
-        if (err?.code === 'AUTH_EXPIRED') {
-          authExpired = true
+    const runDay = async (dateKey) => {
+      // dateKey undefined = día actual. Plantas en paralelo, días en secuencia.
+      const settled = await Promise.allSettled(
+        shoplogixSyncMod.ACTIVE_PLANTS.map((plantSlug) =>
+          shoplogixSyncMod.syncDay({
+            db,
+            accessToken: auth.accessToken,
+            cookie:      auth.cookie,
+            plantSlug,
+            dateKey,
+            logger,
+          })
+        )
+      )
+      for (const outcome of settled) {
+        if (outcome.status === 'fulfilled') {
+          logger.info('[shoplogixSyncWakeup] OK', { result: outcome.value, authMode: auth.mode })
         } else {
-          logger.error('[shoplogixSyncWakeup] error planta', { err: err?.message })
+          const err = outcome.reason
+          if (err?.code === 'AUTH_EXPIRED') {
+            authExpired = true
+          } else {
+            logger.error('[shoplogixSyncWakeup] error planta', { err: err?.message, dateKey: dateKey ?? 'hoy' })
+          }
         }
       }
+    }
+
+    await runDay(undefined)
+    for (const dk of extraDateKeys) {
+      if (authExpired) break
+      await runDay(dk)
     }
 
     if (authExpired) {
@@ -5652,6 +5687,29 @@ exports.shoplogixSyncWakeup = onSchedule(
         logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Bearer) — token limpiado, re-login en próximo ciclo')
       } else {
         logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Cookie) — refrescar SHOPLOGIX_COOKIE manualmente')
+      }
+
+      // Alerta operacional por Telegram (dedupe 6h): sin auth NO entran más
+      // datos de turnos y nadie lo nota hasta mirar la app. El ROPC está roto
+      // (invalid_client — el grant password del client SAAS139 quedó
+      // confidencial), así que TODO cuelga de la cookie: avisar de inmediato.
+      try {
+        const alertRef = db.doc('system/shoplogixAuthAlert')
+        const snap = await alertRef.get()
+        const lastAt = snap.exists ? (snap.data().lastAt?.toDate?.()?.getTime() ?? 0) : 0
+        if (Date.now() - lastAt > 6 * 3600 * 1000) {
+          await alertRef.set({ lastAt: new Date(), mode: auth.mode }, { merge: true })
+          await sendTelegramMessage(
+            '🚨 <b>Shoplogix sync CAÍDO — sesión expirada</b>\n\n' +
+            (auth.mode === 'cookie'
+              ? 'La cookie <code>SHOPLOGIX_COOKIE</code> expiró. Renovar (2 min): abrir saas139.shoplogix.com logueado → DevTools → Red → cualquier <code>query.axd</code> → copiar header <code>Cookie</code> → actualizar el secret en GCP → redeploy de shoplogixSyncWakeup. Detalle: docs/SHOPLOGIX_DEPLOY.md §3.'
+              : 'Token Bearer inválido y sin recuperación automática (ROPC roto).') +
+            '\n\n⚠️ Mientras tanto NO están entrando datos de turnos a la app.',
+          )
+          logger.info('[shoplogixSyncWakeup] alerta Telegram de auth caída enviada')
+        }
+      } catch (e) {
+        logger.warn('[shoplogixSyncWakeup] alerta Telegram falló:', e.message)
       }
     }
   },
