@@ -85,8 +85,9 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
       ? `${summary.durationMinutes} min`
       : '—'
 
-  // Metadata canónica del turno (label, ícono, color) — single source of truth
-  const shiftMeta = getShiftMeta(summary.shiftId)
+  // Metadata canónica del turno (label, ícono, color) — single source of truth.
+  // Horario real (summary/shiftWindow) → período/ícono por HORA, no por nombre.
+  const shiftMeta = getShiftMeta(summary.shiftId, summary.startAt ?? shiftWindow.startAt)
   const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
     : shiftMeta.iconName === 'Sunset' ? Sunset
     : shiftMeta.iconName === 'Moon' ? Moon
