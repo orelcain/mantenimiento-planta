@@ -30,6 +30,7 @@ const WELCOME_MESSAGE: ChatMessage = {
     '• 🔧 **Crear incidencias** — describe la falla y yo genero el reporte\n' +
     '• 📷 **Adjuntar fotos** — envía una imagen directamente desde el chat\n' +
     '• 🔍 **Buscar repuestos** — por nombre, código SAP o fabricante\n' +
+    '• 📦 **Crear/vincular repuestos** — "crea el repuesto X para el equipo Y, SAP ..." y te confirmo antes de guardar\n' +
     '• 📋 **Actualizar estado** — resolver, cerrar o cambiar incidencias por voz\n' +
     '• 👷 **Asignar técnicos** — sugiero al técnico más adecuado\n' +
     '• ⚙️ **Estado de equipos** — criticidad y disponibilidad\n' +
