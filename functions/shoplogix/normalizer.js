@@ -68,6 +68,67 @@ function normalizeState(raw) {
 }
 
 /**
+ * Recorta un state a la intersección con [windowStart, windowEnd] y recalcula
+ * durationSec desde el tramo recortado. Sin esto, un state que CRUZA el límite
+ * de turno (ej. un downtime que arranca en el turno anterior y sigue en este)
+ * se incluía COMPLETO en los dos documentos de turno adyacentes — duplicación
+ * real confirmada contra Firestore (downtime "LOGICA" de 7.9h contado 2 veces).
+ * Si el state ya cae íntegro dentro de la ventana, se devuelve sin modificar.
+ */
+function clipStateToWindow(s, windowStart, windowEnd) {
+  const clippedStartMs = Math.max(s.startAt.getTime(), windowStart.getTime())
+  const clippedEndMs   = Math.min(s.endAt.getTime(),   windowEnd.getTime())
+  if (clippedStartMs === s.startAt.getTime() && clippedEndMs === s.endAt.getTime()) return s
+  return {
+    ...s,
+    startAt: new Date(clippedStartMs),
+    endAt: new Date(clippedEndMs),
+    durationSec: Math.max(0, Math.round((clippedEndMs - clippedStartMs) / 1000)),
+  }
+}
+
+/**
+ * Normaliza un comentario crudo de Shoplogix, preservando la correlación
+ * temporal/razón que trae de fábrica ({text, start, end, matchField:"reason",
+ * matchValue:"FALTA MMPP", key/displayId}) — antes se descartaba todo salvo el
+ * texto. `key`/`displayId` identifican el comentario de forma estable para
+ * poder dedupear cuando summary y production devuelven el mismo comentario.
+ * Devuelve null si no hay texto útil (se descarta, igual que antes).
+ */
+function normalizeComment(raw) {
+  if (typeof raw === 'string') {
+    const text = raw.trim()
+    return text ? { key: text, text, startAt: null, endAt: null, reasonField: '', reasonValue: '' } : null
+  }
+  if (!raw || typeof raw !== 'object') return null
+  const text = raw.text ?? raw.comment ?? raw.message ?? raw.body
+  if (typeof text !== 'string' || !text.trim()) return null
+  return {
+    key: String(raw.key ?? raw.displayId ?? `${text}|${raw.start ?? ''}`),
+    text,
+    startAt: raw.start ? parseShoplogixTime(raw.start) : null,
+    endAt: raw.end ? parseShoplogixTime(raw.end) : null,
+    reasonField: String(raw.matchField ?? ''),
+    reasonValue: String(raw.matchValue ?? ''),
+  }
+}
+
+/**
+ * Normaliza y dedupea comentarios crudos (summary + production pueden traer
+ * el mismo comentario) por su `key`/`displayId` estable — primera ocurrencia
+ * gana. Sin esto se duplicaban comentarios cuando ambos endpoints los traían.
+ */
+function normalizeComments(rawComments) {
+  const byKey = new Map()
+  for (const raw of rawComments || []) {
+    const c = normalizeComment(raw)
+    if (!c) continue
+    if (!byKey.has(c.key)) byKey.set(c.key, c)
+  }
+  return [...byKey.values()]
+}
+
+/**
  * Combina production + summary → documento Firestore para 1 máquina/turno.
  *
  * Cambios clave vs v1:
@@ -124,7 +185,9 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
 
   const allStates = (summary.machineStates || []).map(normalizeState)
   const states = ssValid && seValid
-    ? allStates.filter(s => s.endAt.getTime() > shiftStart.getTime() && s.startAt.getTime() < shiftEnd.getTime())
+    ? allStates
+        .filter(s => s.endAt.getTime() > shiftStart.getTime() && s.startAt.getTime() < shiftEnd.getTime())
+        .map(s => clipStateToWindow(s, shiftStart, shiftEnd))
     : allStates
 
   // "Planned Downtime" (type='break', reason contains 'planned downtime') =
@@ -178,9 +241,9 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     states,
     threshold,
     productionUnit: summary.productionUnits || production.productionUnits || '',
-    comments: [...(summary.comments || []), ...(production.comments || [])],
+    comments: normalizeComments([...(summary.comments || []), ...(production.comments || [])]),
     source: 'shoplogix',
-    sourceVersion: 2,
+    sourceVersion: 3,
     syncedAt: syncedAt || new Date(),
   }
 }
@@ -189,6 +252,9 @@ module.exports = {
   colorFromRatio,
   normalizeInterval,
   normalizeState,
+  clipStateToWindow,
+  normalizeComment,
+  normalizeComments,
   normalizeShift,
   findMachineInfo,
 }

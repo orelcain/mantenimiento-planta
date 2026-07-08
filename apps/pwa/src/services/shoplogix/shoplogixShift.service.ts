@@ -15,6 +15,7 @@ import type {
   UpstreamLineSnapshot,
   UpstreamProductionInterval,
   UpstreamMachineState,
+  UpstreamShiftComment,
 } from './types'
 import { buildLineSnapshot } from './shoplogixNormalizer'
 import type { PlantSlug } from './shoplogixMachines'
@@ -31,17 +32,41 @@ function toDateSafe(v: unknown): Date {
   return new Date(0)  // fallback — doc corrupto
 }
 
-/** Convierte item de comments a string legible (Shoplogix a veces trae objetos). */
-function coerceComment(c: unknown): string {
-  if (typeof c === 'string') return c
-  if (c && typeof c === 'object') {
-    // Típicos campos que usa Shoplogix
-    const obj = c as Record<string, unknown>
-    const text = obj.text ?? obj.comment ?? obj.message ?? obj.body
-    if (typeof text === 'string') return text
-    return ''  // objeto sin texto útil → omitir
+/**
+ * Deserializa un comentario guardado en Firestore a `UpstreamShiftComment`.
+ *
+ * Dos shapes posibles en docs reales:
+ *   - LEGADO (docs sincronizados antes de este fix): string plano, sin
+ *     start/end/reason. Se usa el rango del turno (`fallbackStart/End`) como
+ *     placeholder — el comentario sigue visible, solo sin correlación a un
+ *     state específico (queda "huérfano" al intentar emparejar en la UI).
+ *   - NUEVO: objeto normalizado por `normalizeComments` en el sync
+ *     (`{key,text,startAt,endAt,reasonField,reasonValue}`, con Dates ya
+ *     convertidos por Firestore a Timestamp) o el shape crudo de Shoplogix
+ *     si algún doc viejo quedó con el objeto sin procesar.
+ */
+function deserializeComment(c: unknown, fallbackStart: Date, fallbackEnd: Date): UpstreamShiftComment | null {
+  if (typeof c === 'string') {
+    const text = c.trim()
+    return text ? { key: text, text, startAt: fallbackStart, endAt: fallbackEnd, reasonField: '', reasonValue: '' } : null
   }
-  return ''
+  if (!c || typeof c !== 'object') return null
+  const obj = c as Record<string, unknown>
+  const text = (obj.text ?? obj.comment ?? obj.message ?? obj.body) as string | undefined
+  if (typeof text !== 'string' || !text.trim()) return null
+  // Campos ya normalizados (startAt/endAt/reasonField/reasonValue) tienen prioridad;
+  // si el doc quedó con el shape crudo de Shoplogix (start/end/matchField/matchValue,
+  // ej. de un sync intermedio), se leen esos como fallback.
+  const startRaw = obj.startAt ?? obj.start
+  const endRaw   = obj.endAt   ?? obj.end
+  return {
+    key: String(obj.key ?? obj.displayId ?? `${text}|${String(startRaw ?? '')}`),
+    text,
+    startAt: startRaw != null ? toDateSafe(startRaw) : fallbackStart,
+    endAt:   endRaw   != null ? toDateSafe(endRaw)   : fallbackEnd,
+    reasonField: String(obj.reasonField ?? obj.matchField ?? ''),
+    reasonValue: String(obj.reasonValue ?? obj.matchValue ?? ''),
+  }
 }
 
 function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
@@ -242,7 +267,11 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     states,
     threshold:           Number(raw.threshold ?? 15),
     productionUnit:      String(raw.productionUnit ?? ''),
-    comments:            Array.isArray(raw.comments) ? raw.comments.map(coerceComment).filter(Boolean) : [],
+    comments:            Array.isArray(raw.comments)
+      ? raw.comments
+          .map(c => deserializeComment(c, scheduledStart, scheduledEnd))
+          .filter((c): c is UpstreamShiftComment => c !== null)
+      : [],
     source:              'shoplogix',
     sourceVersion:       Number(raw.sourceVersion ?? 1),
     syncedAt:            toDateSafe(raw.syncedAt),

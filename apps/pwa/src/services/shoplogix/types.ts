@@ -24,10 +24,18 @@ export interface ShoplogixProductionInterval {
   totalDuration: number;       // ms (300000 = 5 min)
 }
 
+/**
+ * Comentario crudo de Shoplogix. En la práctica siempre viene como objeto rico
+ * ({text, start, end, matchField:"reason", matchValue:"FALTA MMPP", key/displayId, ...})
+ * pero se tipa como unknown para tolerar el shape string[] legado que también
+ * se ha visto en docs viejos. Ver `UpstreamShiftComment` para el tipo normalizado.
+ */
+export type ShoplogixRawComment = string | Record<string, unknown>;
+
 export interface ShoplogixProductionMachine {
   machineId: string;
   machineName: string;
-  comments: string[];
+  comments: ShoplogixRawComment[];
   currentShiftStart: ShoplogixTimestamp;
   currentShiftEnd: ShoplogixTimestamp;
   finishedGoodUnits: string;
@@ -79,7 +87,7 @@ export interface ShoplogixSummaryMachine {
   expectedRuntime: number;     // fracción del día (0..1)
   actualRuntime: number;
   machineStates: ShoplogixMachineState[];
-  comments: string[];
+  comments: ShoplogixRawComment[];
   cameras: unknown[];
   autoEnforceStatusReasons: boolean;
 }
@@ -127,6 +135,28 @@ export interface UpstreamMachineState {
   reason: string;              // "COLACION" | "REUNION INICIO TURNO" | "" (sin categorizar)
   color: string;               // "#ff0000" (con #, listo para CSS)
   isCurrent: boolean;
+}
+
+/**
+ * Comentario de operador normalizado, con la correlación temporal/razón que
+ * Shoplogix ya trae de fábrica (antes se descartaba y quedaba solo el texto,
+ * lo que hacía imposible saber a qué paro/razón pertenecía cada comentario).
+ * `startAt`/`endAt`/`reasonValue` pueden faltar en comentarios legado
+ * (docs sincronizados antes de este fix, guardados como string plano) — en
+ * ese caso se rellenan con los bounds del turno como placeholder (ver
+ * deserializeComment en shoplogixShift.service.ts) y el comentario se trata
+ * como "huérfano" al intentar emparejarlo con un state.
+ */
+export interface UpstreamShiftComment {
+  /** Id estable para dedupe (raw.key ?? raw.displayId, o sintético si faltan ambos). */
+  key: string;
+  text: string;
+  startAt: Date;
+  endAt: Date;
+  /** raw.matchField — típicamente "reason". Vacío si no viene. */
+  reasonField: string;
+  /** raw.matchValue — la razón/estado que este comentario justifica (ej "FALTA MMPP"). */
+  reasonValue: string;
 }
 
 /** Datos de un turno para una máquina upstream. */
@@ -198,7 +228,7 @@ export interface UpstreamMachineShift {
   // Meta
   threshold: number;           // % tolerancia coloreo de barras
   productionUnit: string;      // "Eviscerado"
-  comments: string[];
+  comments: UpstreamShiftComment[];
 
   // Sync
   source: 'shoplogix';
