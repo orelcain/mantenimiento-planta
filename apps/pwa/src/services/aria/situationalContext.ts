@@ -17,6 +17,7 @@
  * Reusa el Tool Registry de Sprint 1+2 — cada query es una tool ya probada.
  */
 import { executeTool } from './tools'
+import { getActivePlantLineId } from './activePlant'
 import { logger } from '@/lib/logger'
 
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 min
@@ -64,6 +65,14 @@ function safeNumber(v: unknown, fallback = 0): number {
   return typeof v === 'number' && isFinite(v) ? v : fallback
 }
 
+/** Ventana horaria genérica — fallback local si el turno vivo de Shoplogix no llega a tiempo. */
+function localShiftLabel(): { label: string; range: string } {
+  const h = new Date().getHours()
+  if (h >= 6 && h < 14) return { label: 'Turno Mañana', range: '06:00–14:00' }
+  if (h >= 14 && h < 22) return { label: 'Turno Tarde', range: '14:00–22:00' }
+  return { label: 'Turno Noche', range: '22:00–06:00' }
+}
+
 // ─── Build snapshot ────────────────────────────────────────────────────
 
 /**
@@ -76,11 +85,16 @@ export async function buildSituationalSnapshot(force = false): Promise<Situation
     return cache.snapshot
   }
 
+  // Planta ACTIVA del board (?linea=) → ARIA consulta la MISMA planta que el
+  // usuario está mirando, en vez de asumir siempre Chonchi.
+  const activePlant = getActivePlantLineId()
+  const plantParam = activePlant ? { plantLineId: activePlant } : {}
+
   // Las 4 tools en paralelo con timeout suave
   const FAIL_RESULT = { ok: false as const, error: 'timeout' }
   const [shiftRes, graderRes, incidentsRes, equipmentRes] = await Promise.all([
-    withTimeout(executeTool('shift.current'), QUERY_TIMEOUT_MS, FAIL_RESULT),
-    withTimeout(executeTool('shift.today'), QUERY_TIMEOUT_MS, FAIL_RESULT),
+    withTimeout(executeTool('shift.current', plantParam), QUERY_TIMEOUT_MS, FAIL_RESULT),
+    withTimeout(executeTool('shift.today', plantParam), QUERY_TIMEOUT_MS, FAIL_RESULT),
     withTimeout(executeTool('incidents.open', { limit: 5 }), QUERY_TIMEOUT_MS, FAIL_RESULT),
     withTimeout(
       executeTool('equipment.status', { estado: 'fuera_servicio' }),
@@ -89,11 +103,14 @@ export async function buildSituationalSnapshot(force = false): Promise<Situation
     ),
   ])
 
-  // ── Shift (siempre disponible, no toca Firestore) ──
+  // ── Shift ──
+  // shift.current ahora consulta Shoplogix (turno real). Si excede el timeout,
+  // caemos a una ventana horaria local para que la línea NUNCA quede vacía.
   const shiftData = (shiftRes.ok && (shiftRes.data as Record<string, unknown>)) || {}
+  const localShift = localShiftLabel()
   const shift = {
-    label: String(shiftData.label || 'Turno desconocido'),
-    range: String(shiftData.range || '—'),
+    label: String(shiftData.label || localShift.label),
+    range: String(shiftData.range || localShift.range),
     hora: String(shiftData.hora || new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })),
   }
 
@@ -102,7 +119,15 @@ export async function buildSituationalSnapshot(force = false): Promise<Situation
   if (graderRes.ok) {
     const data = (graderRes.data as Record<string, unknown>) || {}
     const count = safeNumber(data.count)
-    if (count === 0) {
+    const liveTotal = safeNumber(data.liveTotalPieces)
+    if (count === 0 && liveTotal > 0) {
+      // Excel aún sin subir, pero Shoplogix ya tiene el DÍA COMPLETO sumado.
+      const nT = Array.isArray(data.liveTurnos) ? data.liveTurnos.length : 0
+      graderToday = {
+        hasData: true,
+        text: `${liveTotal.toLocaleString('es-CL')} piezas registradas HOY en Shoplogix — DÍA COMPLETO, suma de los ${nT} turno(s) del día (incluye el turno en curso y "sin turno asignado"). El Excel del Grader aún no se sube → el P0%/calidad se calcula al cierre. Este número YA es el acumulado del día; si te piden "cuánto va hoy" o "suma de los turnos", es éste.`,
+      }
+    } else if (count === 0) {
       graderToday = {
         hasData: false,
         text: 'Excel del Grader sin subir aún (turno en curso). OJO: NO digas que "no hay datos" — para el turno EN CURSO hay datos VIVOS de Shoplogix; consultá la producción/KPIs del turno actual antes de responder.',

@@ -15,6 +15,7 @@ import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { computeMachineKPI } from '@/services/grader/plantKpiCompute'
 import { isMaintenanceMacro, isMaintenanceMicro } from '@/services/grader/shoplogixMaintenance'
+import { getActivePlantLineId, getActivePlantSlug } from '../activePlant'
 
 // ─── Detección de planta desde texto libre ────────────────────────────
 
@@ -223,18 +224,48 @@ function summarizeShift(s: GraderDailySummary): string {
 registerTool({
   name: 'shift.current',
   category: 'shift',
-  description: 'Devuelve el turno actual según hora local (mañana 06-14, tarde 14-22, noche 22-06)',
-  params: [],
+  description:
+    'Turno EN CURSO real. Prioriza el turno vivo de Shoplogix (shiftId + horario REALES, que cambian según el día); si no hay dato vivo, cae a la ventana horaria genérica (mañana 06-14, tarde 14-22, noche 22-06). Detecta la planta activa del board (?linea=).',
+  params: [
+    {
+      name: 'plantLineId',
+      type: 'string',
+      required: false,
+      description: 'Planta (yal-eviscerado, chonchi-eviscerado, chonchi-filete)',
+    },
+  ],
   triggers: [
     /\b(turno\s+actual|qu[eé]\s+turno|en\s+qu[eé]\s+turno|hora\s+actual)\b/i,
   ],
-  execute: () => {
-    const shift = getCurrentShift()
+  execute: async (params) => {
     const hora = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const plantLineId = (params.plantLineId as string | undefined) ?? getActivePlantLineId()
+    // Fuente de verdad: el turno EN CURSO que Shoplogix registra (shiftId +
+    // horario reales). Los horarios CAMBIAN y el hardcode local los desfasa.
+    if (plantLineId) {
+      try {
+        const slug: PlantSlug =
+          (PLANT_LINES.find(p => p.id === plantLineId)?.plantSlug as PlantSlug) || 'chonchi'
+        const live = await loadLiveShift(slug)
+        if (live) {
+          const s = live.snapshot
+          const label = shiftLabel(s.shiftId)
+          const range = fmtShiftRange(s)
+          const plantLbl = getPlantLabel(plantLineId)
+          return {
+            ok: true,
+            data: { shift: s.shiftId, label, range, hora, plantLineId, source: 'shoplogix' },
+            summary: `Turno EN CURSO (Shoplogix): ${label}${range !== '—' ? ` (${range})` : ''} · ${plantLbl}. Hora local ${hora}.`,
+            label: 'Turno actual',
+          }
+        }
+      } catch { /* sin dato vivo → ventana genérica abajo */ }
+    }
+    const shift = getCurrentShift()
     return {
       ok: true,
-      data: { shift: shift.shift, label: shift.label, range: shift.range, hora },
-      summary: `${shift.label} (${shift.range}). Hora actual: ${hora}.`,
+      data: { shift: shift.shift, label: shift.label, range: shift.range, hora, source: 'local' },
+      summary: `${shift.label} (${shift.range}). Hora actual: ${hora}. (Ventana horaria genérica — sin turno vivo de Shoplogix confirmado.)`,
       label: 'Turno actual',
     }
   },
@@ -266,23 +297,50 @@ registerTool({
     const summaries = await listDailySummariesByRange(today, today, plantLineId)
     const plantSuffix = plantLineId ? ` · ${getPlantLabel(plantLineId)}` : ''
     if (summaries.length === 0) {
-      // Fallback: el Excel del Grader se sube al CIERRE, pero Shoplogix tiene el
-      // turno EN CURSO. Usamos el MISMO snapshot vivo que renderiza el board
-      // (loadLiveShift) → los números cuadran con Análisis de Turno.
+      // Fallback: el Excel del Grader se sube al CIERRE, pero Shoplogix ya
+      // registró producción hoy. Sumamos TODOS los turnos del día (incluido
+      // "sin turno") — NO un solo turno vivo — para que ARIA pueda responder el
+      // acumulado del día en curso. Los números cuadran con Análisis de Turno.
       try {
         const slug: PlantSlug = plantLineId
           ? ((PLANT_LINES.find(p => p.id === plantLineId)?.plantSlug as PlantSlug) || 'chonchi')
-          : 'chonchi'
-        const live = await loadLiveShift(slug)
-        if (live) {
+          : (getActivePlantSlug() || 'chonchi')
+        const buckets = await loadAllShiftBuckets(slug, today)
+        if (buckets.length > 0) {
           const plantLbl = plantLineId
             ? getPlantLabel(plantLineId)
             : (slug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)')
+          const sorted = [...buckets].sort((a, b) => {
+            const sa = a.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
+            const sb = b.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
+            return sa - sb
+          })
+          const total = sorted.reduce((acc, b) => acc + snapCycles(b.snapshot), 0)
+          const turnos = sorted.map(b => ({
+            turno: shiftLabel(b.snapshot.shiftId),
+            piezas: snapCycles(b.snapshot),
+            rango: fmtShiftRange(b.snapshot),
+            enCurso: (b.snapshot.machinesProducing || 0) > 0,
+          }))
+          const lines = [
+            `Aún no se ha subido el Excel del Grader${plantSuffix} (se carga al cierre), pero Shoplogix ya registró producción HOY (${today}) en ${plantLbl}. Acumulado del DÍA COMPLETO (todos los turnos, incluido "sin turno asignado"):`,
+            `- TOTAL DÍA: ${fmtNum(total)} piezas (= ciclos de eviscerado)`,
+            ...turnos.map(t => `- ${t.turno}${t.rango !== '—' ? ` (${t.rango})` : ''}: ${fmtNum(t.piezas)} piezas${t.enCurso ? ' · ← EN CURSO' : ''}`),
+            '',
+            '(El P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.)',
+          ]
           return {
             ok: true,
-            data: { date: today, plantLineId, source: 'shoplogix-live', count: 0 },
-            summary: `Aún no se ha subido el Excel del Grader${plantSuffix} (se carga al cierre), pero el turno está EN CURSO. ${formatLiveShift(live.snapshot, live.syncedAt, plantLbl)}\n\n(El P0%/calidad se calcula al cierre, cuando se sube el Excel del Grader.)`,
-            label: `Turno en curso (Shoplogix)${plantSuffix}`,
+            data: {
+              date: today,
+              plantLineId,
+              source: 'shoplogix-live',
+              count: 0,
+              liveTotalPieces: total,
+              liveTurnos: turnos,
+            },
+            summary: lines.join('\n'),
+            label: `Producción de hoy (Shoplogix)${plantSuffix}`,
           }
         }
       } catch { /* si Shoplogix falla, caemos al mensaje informativo de abajo */ }
@@ -1158,19 +1216,27 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
       }
     }
   }
-  // Detección de planta para tools que aceptan plantLineId
+  // Detección de planta para tools que aceptan plantLineId.
+  // Prioridad: lo que el usuario nombra en el texto > la planta ACTIVA del
+  // board (?linea=). Antes, sin mención explícita se asumía siempre Chonchi.
   if (
     toolName === 'shift.today' ||
+    toolName === 'shift.current' ||
     toolName === 'shift.lastByPlant' ||
     toolName === 'period.kpi'
   ) {
-    const plant = detectPlantLineId(userMessage)
+    const plant = detectPlantLineId(userMessage) ?? getActivePlantLineId()
     if (plant) params.plantLineId = plant
   }
   // shift.kpis, shift.live, shift.dayProduction y shift.stops usan PlantSlug.
-  if ((toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction' || toolName === 'shift.stops')
-      && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
-    params.plantSlug = 'yal'
+  // Texto explícito > planta activa del board.
+  if (toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction' || toolName === 'shift.stops') {
+    if (/\b(yal|planta\s+yal)\b/i.test(userMessage)) params.plantSlug = 'yal'
+    else if (/\b(chonchi|p\.?\s*principal|planta\s+principal)\b/i.test(userMessage)) params.plantSlug = 'chonchi'
+    else {
+      const activeSlug = getActivePlantSlug()
+      if (activeSlug) params.plantSlug = activeSlug
+    }
   }
   // shift.dayProduction / shift.stops: fecha relativa. "anoche"/"madrugada" →
   // ayer (Shoplogix lumpea la producción nocturna que cruza medianoche en el
