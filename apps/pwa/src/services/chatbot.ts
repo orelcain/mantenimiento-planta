@@ -1836,6 +1836,18 @@ import {
   type PendingAction,
   type IncidentDraft,
 } from './chatActions'
+import {
+  detectRepuestoAction,
+  buildRepuestoDraft,
+  buildEditDraft,
+  formatRepuestoDraftForDisplay,
+  executeCreateRepuesto,
+  executeVincularRepuesto,
+  executeEditRepuesto,
+  saveUltimoRepuesto,
+  loadUltimoRepuesto,
+  type RepuestoDraft,
+} from './repuestoActions'
 
 export { type PendingAction, type IncidentDraft }
 
@@ -2231,13 +2243,105 @@ export async function sendChatMessage(
       }
     }
 
+    // ── Repuesto: crear nuevo o vincular uno existente al equipo ──────
+    if (isConfirm && pendingAction.type === 'create_repuesto' && userId) {
+      const draft = pendingAction.data as unknown as RepuestoDraft
+      const result = draft.modo === 'vincular'
+        ? await executeVincularRepuesto(draft, userId, userName || '')
+        : await executeCreateRepuesto(draft, userId, userName || '')
+
+      if (result.success) {
+        const repId = (draft.modo === 'vincular' ? draft.existenteId : (result as { repuestoId?: string }).repuestoId) || undefined
+        if (repId) {
+          saveUltimoRepuesto(userId, { id: repId, codigoSAP: draft.codigoSAP, nombre: draft.existenteNombre || draft.nombre })
+        }
+        await logAriaAction({
+          userId,
+          actionType: 'create_repuesto',
+          description: draft.modo === 'vincular'
+            ? `Repuesto vinculado: "${draft.existenteNombre}" → ${draft.equipoNombre}`
+            : `Repuesto creado: "${draft.nombre}"${draft.codigoSAP ? ` (SAP ${draft.codigoSAP})` : ''}`,
+          resultId: repId,
+          success: true,
+          metadata: { draft: JSON.stringify(draft) },
+        })
+        const reply = draft.modo === 'vincular'
+          ? `✅ **${draft.existenteNombre}** (SAP \`${draft.codigoSAP}\`) quedó vinculado a **${draft.equipoNombre}**.\n\nLo ves en su ficha en el módulo Repuestos.`
+          : `✅ **¡Repuesto creado!**\n\n📦 ${draft.nombre}\n🏷️ Clase: ${draft.clase}${draft.codigoSAP ? `\n🔖 SAP: ${draft.codigoSAP}` : ''}${draft.equipoNombre ? `\n🏭 Vinculado a: ${draft.equipoNombre}` : ''}\n\nYa lo puedes ver en el módulo Repuestos.\n\n💡 Si tienes el código de fabricante a mano, decime "el código de fabricante es ___" y se lo agrego.`
+        return {
+          reply,
+          context: '',
+          actions: [{ label: 'Ver repuestos', route: '/repuestos', icon: 'Package' }],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'completed', resultId: repId },
+        }
+      } else {
+        await logAriaAction({ userId, actionType: 'create_repuesto', description: `Error: ${result.error}`, success: false })
+        return {
+          reply: `❌ Error: ${result.error}\n\nIntenta de nuevo o hazlo manualmente desde el módulo Repuestos.`,
+          context: '',
+          actions: [{ label: 'Ir a Repuestos', route: '/repuestos', icon: 'Package' }],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'cancelled' },
+        }
+      }
+    }
+
+    // ── Repuesto: editar código de fabricante ─────────────────────────
+    if (isConfirm && pendingAction.type === 'edit_repuesto' && userId) {
+      const draft = pendingAction.data as unknown as RepuestoDraft
+      const result = await executeEditRepuesto(draft, userId, userName || '')
+      if (result.success) {
+        if (draft.existenteId) {
+          saveUltimoRepuesto(userId, { id: draft.existenteId, codigoSAP: draft.codigoSAP, nombre: draft.existenteNombre || draft.nombre })
+        }
+        await logAriaAction({
+          userId,
+          actionType: 'edit_repuesto',
+          description: `Código de fabricante actualizado: "${draft.existenteNombre}" → ${draft.codigoFabricante}`,
+          resultId: draft.existenteId,
+          success: true,
+          metadata: { draft: JSON.stringify(draft) },
+        })
+        return {
+          reply: `✅ Listo: **${draft.existenteNombre}** (SAP \`${draft.codigoSAP}\`) quedó con código de fabricante \`${draft.codigoFabricante}\`.\n\nLo ves en su ficha en el módulo Repuestos.`,
+          context: '',
+          actions: [{ label: 'Ver repuestos', route: '/repuestos', icon: 'Package' }],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'completed', resultId: draft.existenteId },
+        }
+      } else {
+        await logAriaAction({ userId, actionType: 'edit_repuesto', description: `Error: ${result.error}`, success: false })
+        return {
+          reply: `❌ Error: ${result.error}\n\nIntenta de nuevo.`,
+          context: '',
+          actions: [],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'cancelled' },
+        }
+      }
+    }
+
     if (isCancel) {
+      const esRepuesto = pendingAction.type === 'create_repuesto' || pendingAction.type === 'edit_repuesto'
       return {
-        reply: '👍 Cancelado. No se creó ninguna incidencia. ¿En qué más puedo ayudarte?',
+        reply: esRepuesto
+          ? '👍 Cancelado. No se hizo ningún cambio en el maestro de repuestos. ¿En qué más puedo ayudarte?'
+          : '👍 Cancelado. No se creó ninguna incidencia. ¿En qué más puedo ayudarte?',
         context: '',
         actions: [],
         typoCorrections: [],
         pendingAction: { ...pendingAction, status: 'cancelled' },
+      }
+    }
+
+    if (isModify && (pendingAction.type === 'create_repuesto' || pendingAction.type === 'edit_repuesto')) {
+      return {
+        reply: '✏️ Mejor decime "no" para descartar este borrador y volvé a describirlo — por ejemplo con el SAP correcto o el equipo exacto.',
+        context: '',
+        actions: [],
+        typoCorrections: [],
+        pendingAction, // se mantiene en confirming
       }
     }
 
@@ -2330,8 +2434,81 @@ export async function sendChatMessage(
     }
   }
 
+  // Repuestos: intención más específica (SAP/código de fabricante/"repuesto") que
+  // se chequea ANTES de la detección de incidencias, más amplia y con triggers
+  // que podrían solaparse ("hay que reemplazar/cambiar X").
+  const repuestoActionType = detectRepuestoAction(userMessage)
+
+  if (repuestoActionType === 'create_repuesto' && userId) {
+    const { draft, missingFields } = await buildRepuestoDraft(userMessage)
+    if (missingFields.includes('nombre')) {
+      return {
+        reply: '¿Qué material agrego? Decime por ejemplo: **"crea el repuesto sello mecánico 32mm para la bomba X, SAP 3300123456"** (el SAP es opcional).',
+        context: '',
+        actions: [],
+        typoCorrections,
+      }
+    }
+    if (missingFields.includes('equipo')) {
+      return {
+        reply: `No encontré el equipo "${draft.equipoTexto}" en la jerarquía. Decime el nombre como figura en la app, o seguí sin vincularlo (lo podés hacer después desde la ficha).`,
+        context: '',
+        actions: [],
+        typoCorrections,
+      }
+    }
+    const newPendingAction: PendingAction = {
+      id: `action_${Date.now()}`,
+      type: 'create_repuesto',
+      status: 'confirming',
+      data: draft as unknown as Record<string, unknown>,
+      missingFields: [],
+      createdAt: Date.now(),
+    }
+    const draftDisplay = formatRepuestoDraftForDisplay(draft)
+    const intro = draft.modo === 'vincular'
+      ? '🤖 Ese material YA existe en el maestro — mejor lo vinculo en vez de duplicarlo:'
+      : '🤖 Voy a crear este material en el maestro:'
+    return {
+      reply: `${intro}\n\n${draftDisplay}\n\n¿Confirmas? (Sí / No)`,
+      context: '',
+      actions: [{ label: 'Ver repuestos', route: '/repuestos', icon: 'Package' }],
+      typoCorrections,
+      pendingAction: newPendingAction,
+    }
+  }
+
+  if (repuestoActionType === 'edit_repuesto' && userId) {
+    const ultimoRepuesto = loadUltimoRepuesto(userId)
+    const { draft, error } = await buildEditDraft(userMessage, ultimoRepuesto)
+    if (!draft) {
+      return {
+        reply: error || 'No pude entender qué editar del repuesto.',
+        context: '',
+        actions: [],
+        typoCorrections,
+      }
+    }
+    const newPendingAction: PendingAction = {
+      id: `action_${Date.now()}`,
+      type: 'edit_repuesto',
+      status: 'confirming',
+      data: draft as unknown as Record<string, unknown>,
+      missingFields: [],
+      createdAt: Date.now(),
+    }
+    const draftDisplay = formatRepuestoDraftForDisplay(draft)
+    return {
+      reply: `🤖 Voy a actualizar:\n\n${draftDisplay}\n\n¿Confirmas? (Sí / No)`,
+      context: '',
+      actions: [{ label: 'Ver repuestos', route: '/repuestos', icon: 'Package' }],
+      typoCorrections,
+      pendingAction: newPendingAction,
+    }
+  }
+
   const detectedActionType = detectAction(userMessage)
-  
+
   if (detectedActionType === 'create_incident' && userId) {
     // Construir borrador de incidencia desde el texto
     const { draft, equipment, equipmentCandidates } = await buildIncidentDraft(userMessage, userId)

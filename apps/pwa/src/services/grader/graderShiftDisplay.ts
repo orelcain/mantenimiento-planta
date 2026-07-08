@@ -279,8 +279,53 @@ const FALLBACK_META: ShiftMeta = {
  * lugar de hardcodear strings/iconos. Soporta legacy ("Turno día/noche")
  * y nuevo formato Shoplogix ("Turno 1/2/3").
  */
-export function getShiftMeta(shiftId: string): ShiftMeta {
-  return SHIFT_META_TABLE[shiftId] ?? FALLBACK_META
+/**
+ * Deriva el período conceptual desde la hora de INICIO real del turno.
+ * Convención documentada arriba: mañana 06–12 · tarde 12–19 · noche/madrugada
+ * el resto (19–06). La madrugada (00–06) cuenta como "noche".
+ */
+function periodFromStartHour(hour: number): 'mañana' | 'tarde' | 'noche' {
+  if (hour >= 6 && hour < 12) return 'mañana'
+  if (hour >= 12 && hour < 19) return 'tarde'
+  return 'noche'
+}
+
+/** Campos VISUALES por período (ícono/color/emoji) — misma paleta que SHIFT_META_TABLE. */
+const VISUAL_BY_PERIOD: Record<'mañana' | 'tarde' | 'noche',
+  Pick<ShiftMeta, 'period' | 'textColorClass' | 'bgColorClass' | 'borderColorClass' | 'iconName' | 'emoji' | 'isDayLike'>> = {
+  'mañana': { period: 'mañana', textColorClass: 'text-amber-400',  bgColorClass: 'bg-amber-500/10',  borderColorClass: 'border-amber-500/30',  iconName: 'Sun',    emoji: '☀',  isDayLike: true  },
+  'tarde':  { period: 'tarde',  textColorClass: 'text-orange-400', bgColorClass: 'bg-orange-500/10', borderColorClass: 'border-orange-500/30', iconName: 'Sunset', emoji: '🌅', isDayLike: true  },
+  'noche':  { period: 'noche',  textColorClass: 'text-indigo-400', bgColorClass: 'bg-indigo-500/10', borderColorClass: 'border-indigo-500/30', iconName: 'Moon',   emoji: '🌙', isDayLike: false },
+}
+
+/**
+ * Metadata de display de un turno.
+ *
+ * @param shiftId — nombre que emite Shoplogix ("Turno 1/2/3", "Turno día/noche",
+ *   "Turno 1 Lunes", "Unscheduled"). Determina label/shortLabel (fieles a Shoplogix).
+ * @param scheduledStart — horario REAL de inicio del turno (wall-clock-as-UTC).
+ *   Cuando se pasa y es válido, el PERÍODO/ícono/color/emoji se derivan de la HORA
+ *   real, no del nombre. Necesario porque Shoplogix REUSA nombres para horarios
+ *   distintos (caso real Yal 2026-07-08: la madrugada 00:00–06:45 vino como
+ *   "Turno 1" — sin este fix la app la pintaba "mañana ☀ 07:45–14:45", mintiendo).
+ *   El label sigue diciendo "Turno 1" (fiel a Shoplogix) pero con 🌙 noche.
+ *   Si se omite o es inválido → cae a la tabla por nombre (comportamiento previo).
+ */
+export function getShiftMeta(shiftId: string, scheduledStart?: string | Date | null): ShiftMeta {
+  const base = SHIFT_META_TABLE[shiftId] ?? FALLBACK_META
+  if (scheduledStart == null) return base
+  const d = scheduledStart instanceof Date ? scheduledStart : new Date(scheduledStart)
+  if (isNaN(d.getTime())) return base
+  // Hora en UTC porque los scheduledStart se guardan wall-clock-as-UTC (hora de
+  // pizarra con sufijo .000Z — ver graderShiftStatus.ts). NO usar getHours() local.
+  const hour = d.getUTCHours()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    ...base,
+    ...VISUAL_BY_PERIOD[periodFromStartHour(hour)],
+    // scheduleHint honesto: hora real de inicio (el rango del nombre mentía).
+    scheduleHint: `desde ${pad(hour)}:${pad(d.getUTCMinutes())}`,
+  }
 }
 
 /** Atajo: solo el label corto ("T1", "Día", "Noche"). */

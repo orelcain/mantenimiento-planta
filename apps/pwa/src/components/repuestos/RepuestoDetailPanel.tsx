@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
@@ -41,10 +41,8 @@ interface RepuestoDetailPanelProps {
   onDeleteRepuesto?: () => void
   /** Ver/editar ficha técnica. */
   onSpecs?: () => void
-  /** Ver fotos (reales + de manual). */
+  /** Ver fotos (reales + de manual + galería heredada). Unifica el antiguo botón "Galería". */
   onPhotos?: () => void
-  /** Ver/editar galería. */
-  onGallery?: () => void
   /** Ver vínculos al manual. */
   onManual?: () => void
   /** ¿el repuesto está en favoritos? */
@@ -107,7 +105,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onGallery, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -310,11 +308,10 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         )}
 
         {/* Acciones de consulta (todos los usuarios) */}
-        {(onSpecs || onPhotos || onGallery || onManual) && (
-          <div className="mb-3 grid grid-cols-4 gap-1.5">
+        {(onSpecs || onPhotos || onManual) && (
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
             {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} />}
             {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} />}
-            {onGallery && <ActionBtn icon={Images} label="Galería" onClick={onGallery} />}
             {onManual && <ActionBtn icon={BookOpen} label="Manual" onClick={onManual} />}
           </div>
         )}
