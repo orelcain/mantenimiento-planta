@@ -505,7 +505,14 @@ function buildDayTimelineBlocks(
       endFrac   = 1
     } else {
       startFrac = startMin / 1440
-      endFrac   = endMin   / 1440
+      // Turno que termina exactamente al cruzar medianoche (ej. Yal Turno 2
+      // con scheduledEnd=00:00 del día siguiente): getUTCHours()*60+getUTCMinutes()
+      // da 0, indistinguible de "inicio de día" — sin este chequeo por día
+      // calendario completo, el fallback de abajo colapsaba el bloque a un
+      // tramo de ~2% de ancho en vez de estirarlo hasta el borde derecho.
+      const startDay = Math.floor(startD.getTime() / 86_400_000)
+      const endDay   = Math.floor(endD.getTime()   / 86_400_000)
+      endFrac = endDay > startDay ? 1 : endMin / 1440
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
     }
 
@@ -526,7 +533,12 @@ function buildDayTimelineBlocks(
         const effEndMin   = effEnd.getUTCHours()   * 60 + effEnd.getUTCMinutes()
         if (direction === 'same') {
           startFrac = effStartMin / 1440
-          endFrac   = effEndMin   / 1440
+          // Mismo chequeo por día calendario que en el cálculo base: un fin
+          // efectivo exactamente a medianoche del día siguiente da effEndMin=0
+          // (indistinguible de "inicio de día") si no se compara la fecha completa.
+          const effStartDay = Math.floor(effStart.getTime() / 86_400_000)
+          const effEndDay   = Math.floor(effEnd.getTime()   / 86_400_000)
+          endFrac = effEndDay > effStartDay ? 1 : effEndMin / 1440
         } else if (direction === 'enters') {
           endFrac = Math.min(effEndMin / 1440, 1)
         } else if (direction === 'exits') {

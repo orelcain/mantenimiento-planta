@@ -12,9 +12,11 @@ import type {
   ShoplogixSummaryMachine,
   ShoplogixProductionInterval,
   ShoplogixMachineState,
+  ShoplogixRawComment,
   UpstreamMachineShift,
   UpstreamProductionInterval,
   UpstreamMachineState,
+  UpstreamShiftComment,
   UpstreamLineSnapshot,
   UpstreamMachineInfo,
   UpstreamColor,
@@ -91,6 +93,41 @@ export function normalizeState(raw: ShoplogixMachineState): UpstreamMachineState
     color,
     isCurrent: raw.current === true,
   };
+}
+
+/**
+ * Normaliza un comentario crudo, preservando la correlación temporal/razón
+ * que Shoplogix ya trae ({text, start, end, matchField, matchValue, key/displayId}).
+ * Mirror de `normalizeComment` en functions/shoplogix/normalizer.js.
+ */
+export function normalizeComment(raw: ShoplogixRawComment): UpstreamShiftComment | null {
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    return text ? { key: text, text, startAt: new Date(0), endAt: new Date(0), reasonField: '', reasonValue: '' } : null;
+  }
+  const text = (raw.text ?? raw.comment ?? raw.message ?? raw.body) as string | undefined;
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const start = raw.start as string | undefined;
+  const end = raw.end as string | undefined;
+  return {
+    key: String(raw.key ?? raw.displayId ?? `${text}|${start ?? ''}`),
+    text,
+    startAt: start ? parseShoplogixTime(start) : new Date(0),
+    endAt: end ? parseShoplogixTime(end) : new Date(0),
+    reasonField: String(raw.matchField ?? ''),
+    reasonValue: String(raw.matchValue ?? ''),
+  };
+}
+
+/** Normaliza y dedupea comentarios crudos por su `key`/`displayId` estable. */
+export function normalizeComments(rawComments: ShoplogixRawComment[] | undefined): UpstreamShiftComment[] {
+  const byKey = new Map<string, UpstreamShiftComment>();
+  for (const raw of rawComments ?? []) {
+    const c = normalizeComment(raw);
+    if (!c) continue;
+    if (!byKey.has(c.key)) byKey.set(c.key, c);
+  }
+  return [...byKey.values()];
 }
 
 // ============================================================================
@@ -216,7 +253,7 @@ export function normalizeShift(params: {
     states,
     threshold,
     productionUnit: summary.productionUnits || production.productionUnits || '',
-    comments: [...(summary.comments ?? []), ...(production.comments ?? [])],
+    comments: normalizeComments([...(summary.comments ?? []), ...(production.comments ?? [])]),
     source: 'shoplogix',
     sourceVersion: 1,
     syncedAt: params.syncedAt ?? new Date(),
