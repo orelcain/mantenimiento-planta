@@ -13,6 +13,25 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-07 - claude - ARIA Telegram: fix crear/vincular repuesto por foto (match SAP + criterio LLM)
+
+- Origen: Orel reportó que ARIA no pudo crear un repuesto que le mandó con 2 fotos. Revisé la conversación REAL en Firestore (`telegramAriaSessions/52949422`, 24 turnos) + reproduje con datos del maestro. Caso: cilindro neumático CRDSNU-32-105, **SAP `3300138398` (no existe = nuevo)**, para equipo Knuro. Etiqueta traía 4 códigos: `3300138398`, `CRDSNU-32-105-PPV-A-MQ-A1`, `552791`, `51051200`.
+- **5 fallas encadenadas** (todas verificadas contra Firestore):
+  1. **Falso positivo de match** (raíz): `ariaBuscarCodigoEnMaestro` hacía `_blob.includes()` con un número de fabricante (`552791`) → pegaba con OTRO cilindro (`3300138378` CRDSNU-32-**200**, cuyo textoBreve contiene "552791"). ARIA ofrecía el SAP equivocado.
+  2. **Perdía el SAP corregido**: al confirmar sin repetir dígitos, re-deducía desde la foto con el mismo loop bugueado → recaía en el `...378`.
+  3. **Regex agarraba el número rechazado**: en "no es 3300138378, es 3300138398" tomaba el primer número (`...378`).
+  4. **Lote de fotos fallaba en silencio**: `ariaGroqVisionLote` reventaba entero y lo presentaba como "ninguna matcheó" (no reintentaba ni caía a de-a-una).
+  5. **Caption de la foto ignorado**: "Crea ese repuesto para Knuro" como caption no se enrutaba (solo describía).
+- FIX (functions/index.js, ~261/-85):
+  - **SAP vs código de fabricante**: SAP del maestro = **10 dígitos exactos** (verificado: 3768/3782; el resto legacy 7-8). Helpers `ariaEsCodigoSap`/`ariaSapDeCodigos`. `ariaBuscarCodigoEnMaestro` ahora: número → SOLO igualdad exacta de `codigoSAP` (nunca por texto); alfanumérico (part number con letras) → sí por texto. Fin del falso positivo.
+  - **`ariaDecidirRepuesto`** (criterio LLM + validación determinista): el SAP de la etiqueta manda; "existe" solo si ese SAP está EXACTO en el maestro. Entiende "no es X, es Y" (prefiere el SAP != al pendiente) y "termina en 8398" (elige el código de la foto que termina así). Si NO hay SAP claro → pide criterio al modelo (`ariaGroqChat` JSON) con candidatos parecidos, y **valida su salida contra el maestro** (nunca inventa un existente; ante cualquier fallo → "preguntar", nunca escritura equivocada).
+  - **Handler `repuesto_agregar` reescrito** sobre `ariaDecidirRepuesto`. `ariaNombreRepuestoDesde` arma nombre limpio (sustantivo + part number) en vez de la frase larga.
+  - **Lote robusto**: `ariaGroqVisionLote` cae a análisis de-a-una si el conjunto falla; el handler avisa con honestidad si TODO falló y NO vacía el lote (file_id vivos, reintentable).
+  - **Caption accionable delegado al router**: foto + "créalo como repuesto del Knuro" ahora se resuelve usando la última foto. `ariaHandleFoto` además, si lee un SAP claro que no está en el maestro, propone crearlo como repuesto (antes empujaba a incidencia).
+- Verificación: `node --check` OK. Dry-run SOLO-LECTURA contra maestro real (7662 docs): las 4 variantes de la conversación real ("Crea ese repuesto para Knuro" / "sí confirmo, tipo cilindro, Knuro" / "no es 378, es 398" / "termina en 8398") → **todas resuelven crear_nuevo SAP 3300138398** con nombre "CILINDRO CRDSNU-32-105-PPV-A-MQ-A1", y `552791`→null (falso positivo eliminado). La rama de criterio LLM NO se probó en vivo (las keys son secrets de Firebase, no están en `.env` local) — es fallback guardado por validación determinista.
+- Archivos: functions/index.js (M).
+- Estado: EN REVISIÓN → rama fix/aria-repuesto-foto-criterio (sin PR aún). Deploy = MANUAL (`npx firebase-tools deploy --only functions:telegramWebhook`) tras visto bueno de Orel; probar en vivo re-enviando la foto del cilindro.
+
 ## 2026-07-07 - claude - UX Análisis de Turno: quitar ruido por duplicación + fix header sticky
 
 - Origen: Orel mostró screenshot del dashboard (Planta Yal) y preguntó si había "mucho ruido". Diagnóstico (workflow 3 lentes + lectura de código): el ruido era REPETICIÓN, no exceso de datos. Los mismos 4 KPIs del mes salían DOS veces — arriba en "Resumen del mes" (`GraderMonthlyStatsPanel`, panel sticky de la col derecha) y otra vez abajo en "Vista panorámica" col 1 "Métricas del mes" (`GraderHistoricalCalendar`): uptime promedio, Ciclos Baader, Turnos T1/T2/T3, Mejor/Peor turno. Además: las cards Mejor/Peor del panel superior quedaban CORTADAS por el header sticky global.
