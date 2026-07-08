@@ -7,7 +7,7 @@
  */
 import { useState, useRef, useCallback } from 'react'
 import { Camera, Trash2, Loader2, ImageOff, Plus } from 'lucide-react'
-import type { ImagenRepuesto } from '@/types/repuestos'
+import type { ImagenRepuesto, MachineImage } from '@/types/repuestos'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,8 @@ interface RepuestoPhotosModalProps {
   onOpenChange: (open: boolean) => void
   fotosReales: ImagenRepuesto[]
   imagenesManual: ImagenRepuesto[]
+  /** Galería heredada (campo `gallery` del doc, ex-botón "Galería"). Solo lectura. */
+  gallery?: MachineImage[]
   repuestoName: string
   /** Habilita subir / eliminar fotos reales. */
   isAdmin?: boolean
@@ -49,6 +51,7 @@ export function RepuestoPhotosModal({
   onOpenChange,
   fotosReales: fotosRealesProp,
   imagenesManual,
+  gallery = [],
   repuestoName,
   isAdmin,
   machineId,
@@ -77,7 +80,8 @@ export function RepuestoPhotosModal({
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
 
   const allPhotos = [...fotosReales, ...imagenesManual]
-  const allPhotoUrls = allPhotos.map((p) => p.url).filter((u): u is string => !!u)
+  // El lightbox indexa sobre TODAS las imágenes visibles: fotos reales + manual + galería heredada.
+  const allPhotoUrls = [...allPhotos.map((p) => p.url), ...gallery.map((g) => g.url)].filter((u): u is string => !!u)
 
   const canEdit = !!(isAdmin && machineId && repuestoId && onSaveFotos)
 
@@ -326,7 +330,39 @@ export function RepuestoPhotosModal({
               </div>
             )}
 
-            {allPhotos.length === 0 && !canEdit && (
+            {/* ── Galería heredada (ex-botón "Galería") — solo lectura ── */}
+            {gallery.length > 0 && (
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">
+                  Galería (fotos anteriores)
+                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                    ({gallery.length}) — solo lectura
+                  </span>
+                </h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {gallery.map((img, idx) => (
+                    <div
+                      key={img.id || `gallery-${idx}`}
+                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
+                      onClick={() => {
+                        if (!img.url) return
+                        const i = allPhotoUrls.indexOf(img.url)
+                        setLightboxIndex(i >= 0 ? i : 0)
+                      }}
+                    >
+                      <img
+                        src={img.url}
+                        alt={`Galería ${idx + 1}`}
+                        className="h-full w-full object-cover transition group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/20" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {allPhotos.length === 0 && gallery.length === 0 && !canEdit && (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 No hay fotos disponibles para este repuesto.
               </div>

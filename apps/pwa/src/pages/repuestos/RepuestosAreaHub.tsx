@@ -36,7 +36,6 @@ import { useToast } from '@/hooks/useToast'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
-import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
@@ -46,8 +45,8 @@ import { CLASE_LABEL, type MaterialClase, type Machine, type RepuestoFormData, t
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
 // equipo (eran machine-bound) reimplementados sobre el modelo plano.
-type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'delete'
-type SortCol = 'codigoSAP' | 'textoBreve' | 'equipo' | 'stock' | 'tipo'
+type RepAction = 'edit' | 'specs' | 'photos' | 'manual' | 'delete'
+type SortCol = 'codigoSAP' | 'codigoFabricante' | 'textoBreve' | 'equipo' | 'stock' | 'tipo'
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
@@ -758,6 +757,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     const val = (r: AreaRepuestoRow): string | number => {
       switch (repSortColumn) {
         case 'codigoSAP': return r.codigoSAP || ''
+        case 'codigoFabricante': return r.codigoFabricante || ''
         case 'textoBreve': return r.textoBreve || r.alias || ''
         case 'equipo': return r.equipos[0]?.machineName || ''
         case 'stock': return r.bodegaId ? r.stockActual : -1
@@ -1029,16 +1029,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       if (!actionTarget) return
       await crudUpdate(colPathOf(actionTarget.source.machineId), repuestoId, { technicalSpecs: specs }, actionTarget.source.repuesto)
       toast({ title: 'Ficha técnica actualizada', variant: 'success' })
-      await refreshCatalog()
-    },
-    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
-  )
-
-  const handleSaveGallery = useCallback(
-    async (repuestoId: string, gallery: MachineImage[]) => {
-      if (!actionTarget) return
-      await crudUpdate(colPathOf(actionTarget.source.machineId), repuestoId, { gallery }, actionTarget.source.repuesto)
-      toast({ title: 'Galería actualizada', variant: 'success' })
       await refreshCatalog()
     },
     [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
@@ -1675,6 +1665,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                       <tr>
                         <th className="w-12 px-2 py-2" aria-label="Foto" />
                         {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
+                        {renderSortTh('codigoFabricante', 'Cód. Fabricante', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
                         <th className="hidden px-3 py-2 font-semibold lg:table-cell">Nombre común</th>
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
@@ -1699,7 +1690,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                           <Fragment key={r.rowKey}>
                           {showDespieceDivider && (
                             <tr className="bg-muted/30">
-                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -1745,6 +1736,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                 </span>
                               ) : '-'}
                             </td>
+                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">
+                              {r.codigoFabricante
+                                ? <span className="text-muted-foreground">{r.codigoFabricante}</span>
+                                : <span className="text-muted-foreground/30">—</span>}
+                            </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 {r.clase && (
@@ -1773,6 +1769,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   </button>
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
+                                {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground/80">Fab {r.codigoFabricante}</span></span>}
                                 {r.ubicacionBodega && <span> · 📍 {r.ubicacionBodega}</span>}
                               </div>
                             </td>
@@ -1900,7 +1897,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onDeleteRepuesto={isAdmin ? () => startAction('delete') : undefined}
           onSpecs={() => startAction('specs')}
           onPhotos={() => startAction('photos')}
-          onGallery={() => startAction('gallery')}
           onManual={() => startAction('manual')}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
@@ -2209,26 +2205,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         />
       )}
 
-      {/* Galería */}
-      {actionTarget?.kind === 'gallery' && actionRep && (
-        <RepuestoGalleryModal
-          open
-          onOpenChange={(o) => !o && setActionTarget(null)}
-          repuesto={actionRep}
-          machineId={actionMachineId}
-          machineName={actionTarget.source.machineName}
-          onSave={handleSaveGallery}
-          readOnly={!isAdmin}
-        />
-      )}
-
-      {/* Fotos (lectura para todos; editable para admin) */}
+      {/* Fotos (lectura para todos; editable para admin) — unifica lo que antes
+          eran dos botones: "Fotos" (fotosReales + imágenes de manual, editable) y
+          "Galería" (campo `gallery`, ahora sección solo-lectura dentro de este modal). */}
       {actionTarget?.kind === 'photos' && actionRep && (
         <RepuestoPhotosModal
           open
           onOpenChange={(o) => !o && setActionTarget(null)}
           fotosReales={actionRep.fotosReales || []}
           imagenesManual={actionRep.imagenesManual || []}
+          gallery={actionRep.gallery || []}
           repuestoName={actionRep.textoBreve || actionRep.codigoSAP || 'Repuesto'}
           isAdmin={isAdmin}
           machineId={actionMachineId}
