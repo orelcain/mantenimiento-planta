@@ -145,7 +145,10 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
   const t3Shifts = slxStats?.t3ShiftsWithData ?? stats?.t3Shifts ?? 0
 
   return (
-    <div className="space-y-2 lg:sticky lg:top-4">
+    // top-[4.5rem]: el header global es sticky h-14 (56px) con z-30; si el panel
+    // se fija en top-4 (16px) queda DEBAJO del header y sus cards superiores
+    // (Mejor/Peor turno) aparecen cortadas al scrollear. 4.5rem = 56px header + 16px gap.
+    <div className="space-y-2 lg:sticky lg:top-[4.5rem]">
 
       {/* ── Header ── */}
       <div>

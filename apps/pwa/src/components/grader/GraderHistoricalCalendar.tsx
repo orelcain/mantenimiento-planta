@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity, TrendingUp, TrendingDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity } from 'lucide-react'
 import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
@@ -4041,45 +4041,29 @@ export function GraderHistoricalCalendar({
             <CardContent className="px-6 pb-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                {/* ── Col 1: KPIs mensuales Shoplogix ── */}
+                {/* ── Col 1: Rendimiento POR BAADER (desglose por máquina) ──
+                    Antes era "Métricas del mes" y repetía uptime/ciclos/turnos/
+                    mejor-peor que ya viven en el "Resumen del mes" (panel superior).
+                    Ahora muestra SOLO lo que ese panel no tiene: el reparto por
+                    cada Evisceradora (horas-máquina, %uptime y MTTR). */}
                 <div className="space-y-3">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                    Métricas del mes
+                    Por Baader · {monthNames[currentMonth.getMonth()]}
                     <InfoTooltip
-                      title="Métricas del mes"
-                      text="Todas las cifras de esta vista panorámica vienen de Shoplogix (lectura directa de las Baader 142). No depende del Excel del Grader — refleja la operación física de la línea upstream."
+                      title="Rendimiento por Baader"
+                      text="Desglose de cada Evisceradora Baader 142 en el mes: horas-máquina procesando, % uptime y MTTR (macro/micro). Los KPIs agregados del mes (uptime promedio, ciclos, mejor/peor turno) están en el Resumen del mes, arriba — acá no se repiten."
                       iconSize={11}
                     />
                   </p>
-                  {/* Avg uptime destacado + horas procesadas */}
-                  <div className="space-y-0.5">
+                  {/* Horas-máquina totales — ancla de la columna (número único,
+                      no está en el panel superior). */}
+                  {slxMonthlyStats.totalUptimeSec > 0 && (
                     <div className="flex items-baseline gap-2">
-                      <span className={cn(
-                        'text-3xl font-bold tabular-nums',
-                        slxMonthlyStats.avgUptimePct >= 70 ? 'text-emerald-400' :
-                        slxMonthlyStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400',
-                      )}>
-                        {slxMonthlyStats.avgUptimePct.toFixed(0)}%
+                      <span className="text-2xl font-bold tabular-nums text-foreground/90">
+                        {fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)}
                       </span>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        uptime promedio
-                        <InfoTooltip
-                          title="Uptime promedio del mes"
-                          text="% de tiempo del turno en que las Baader 142 estuvieron procesando piezas activamente. Excluye paros programados, colación y micro-detenciones."
-                          formula="uptime = tiempo_procesando / tiempo_turno"
-                          example="70%+ verde · 40-69% ámbar · <40% rojo"
-                          iconSize={11}
-                        />
-                      </span>
-                    </div>
-                    {/* Horas-máquina totales: suma del uptimeSec de las 3 Baaders
-                        para todos los turnos del mes. Coherente con `totalCycles`
-                        (que también suma las 3). NO es el "tiempo de operación de
-                        la línea" — si las 3 Baaders procesan 1h en paralelo, esto
-                        marca 3h porque cada máquina produjo 1h de piezas. */}
-                    {slxMonthlyStats.totalUptimeSec > 0 && (
-                      <p className="text-[10px] text-muted-foreground/70 tabular-nums flex items-center gap-1">
-                        {fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)} máquina · procesando
+                        horas-máquina · procesando
                         <InfoTooltip
                           title="Horas-máquina del mes"
                           text="Suma de tiempo procesando de las 3 Baader 142 a lo largo del mes (M0+M1+M2). Si las 3 trabajan 1 hora en paralelo, esto cuenta 3 horas-máquina."
@@ -4087,162 +4071,54 @@ export function GraderHistoricalCalendar({
                           example={`${fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)} = capacidad total de procesamiento usada · coherente con ${slxMonthlyStats.totalCycles.toLocaleString('es-CL')} ciclos del mes (suma de las 3 máquinas).`}
                           iconSize={10}
                         />
-                      </p>
-                    )}
-                    {/* Desglose por Baader individual: horas + % uptime + ciclos.
-                        Permite ver si una máquina trabajó significativamente más
-                        o menos que las demás. */}
-                    {slxMonthlyStats.perMachineMonth.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-0.5">
-                        {slxMonthlyStats.perMachineMonth.map((pm) => {
-                          const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
-                          const uptimeColor =
-                            pm.avgUptimePct >= 70 ? 'text-emerald-300'
-                            : pm.avgUptimePct >= 40 ? 'text-amber-300'
-                            : 'text-rose-300'
-                          // MTTR = total seg / N° eventos. 0 si no hubo eventos.
-                          const mttrMacroSec = pm.maintMacroCount > 0
-                            ? pm.maintMacroSec / pm.maintMacroCount : 0
-                          const mttrMicroSec = pm.maintMicroCount > 0
-                            ? pm.maintMicroSec / pm.maintMicroCount : 0
-                          const fmtMttr = (sec: number) => {
-                            if (sec <= 0) return '—'
-                            if (sec < 60) return `${Math.round(sec)}s`
-                            const m = Math.floor(sec / 60)
-                            const s = Math.round(sec % 60)
-                            return s === 0 ? `${m}m` : `${m}m${s}s`
-                          }
-                          return (
-                            <div
-                              key={pm.machineid}
-                              className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
-                              title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}\n\nMTTR macro: ${fmtMttr(mttrMacroSec)} (${pm.maintMacroCount} ev · ${fmtSecPanoramic(pm.maintMacroSec)} total)\nMTTR micro: ${fmtMttr(mttrMicroSec)} (${pm.maintMicroCount} ev · ${fmtSecPanoramic(pm.maintMicroSec)} total)`}
-                            >
-                              <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground/70 font-medium">{shortName}</span>
-                                <span className="text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
-                                <span className={cn(uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
-                              </div>
-                              {(pm.maintMacroCount > 0 || pm.maintMicroCount > 0) && (
-                                <div className="flex items-center gap-1 text-[8px] text-muted-foreground/80">
-                                  <span className="text-amber-400/80">🔧</span>
-                                  <span>mac {fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50">·{pm.maintMacroCount}</span></span>
-                                  <span className="text-muted-foreground/40">|</span>
-                                  <span>mic {fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50">·{pm.maintMicroCount}</span></span>
-                                </div>
-                              )}
+                      </span>
+                    </div>
+                  )}
+                  {/* Desglose por Baader individual: horas + % uptime + MTTR.
+                      Permite ver si una máquina trabajó significativamente más
+                      o menos que las demás. */}
+                  {slxMonthlyStats.perMachineMonth.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {slxMonthlyStats.perMachineMonth.map((pm) => {
+                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const uptimeColor =
+                          pm.avgUptimePct >= 70 ? 'text-emerald-300'
+                          : pm.avgUptimePct >= 40 ? 'text-amber-300'
+                          : 'text-rose-300'
+                        // MTTR = total seg / N° eventos. 0 si no hubo eventos.
+                        const mttrMacroSec = pm.maintMacroCount > 0
+                          ? pm.maintMacroSec / pm.maintMacroCount : 0
+                        const mttrMicroSec = pm.maintMicroCount > 0
+                          ? pm.maintMicroSec / pm.maintMicroCount : 0
+                        const fmtMttr = (sec: number) => {
+                          if (sec <= 0) return '—'
+                          if (sec < 60) return `${Math.round(sec)}s`
+                          const m = Math.floor(sec / 60)
+                          const s = Math.round(sec % 60)
+                          return s === 0 ? `${m}m` : `${m}m${s}s`
+                        }
+                        return (
+                          <div
+                            key={pm.machineid}
+                            className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
+                            title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}\n\nMTTR macro: ${fmtMttr(mttrMacroSec)} (${pm.maintMacroCount} ev · ${fmtSecPanoramic(pm.maintMacroSec)} total)\nMTTR micro: ${fmtMttr(mttrMicroSec)} (${pm.maintMicroCount} ev · ${fmtSecPanoramic(pm.maintMicroSec)} total)`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground/70 font-medium">{shortName}</span>
+                              <span className="text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
+                              <span className={cn(uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  {/* Mini KPIs */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div className="rounded bg-muted/40 px-2 py-1.5">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        Ciclos Baader
-                        <InfoTooltip
-                          title="Ciclos Baader del mes"
-                          text="Suma de piezas evisceradas por las 3 Baader 142 durante todos los turnos del mes. 1 ciclo = 1 pez procesado."
-                          iconSize={10}
-                        />
-                      </p>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {slxMonthlyStats.totalCycles >= 1000
-                          ? `${(slxMonthlyStats.totalCycles / 1000).toFixed(1)}k`
-                          : slxMonthlyStats.totalCycles.toLocaleString('es-CL')}
-                      </p>
-                    </div>
-                    <div className="rounded bg-muted/40 px-2 py-1.5">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        {plantLine.isClassificationPlant === false ? 'Turnos T1/T2/T3' : 'Turnos D/N'}
-                        <InfoTooltip
-                          title="Turnos con data"
-                          text={plantLine.isClassificationPlant === false
-                            ? "Conteo de turnos del mes según la nomenclatura real de Shoplogix: T1 (mañana, 07:45-15:15), T2 (tarde, 15:15-00:00), T3 (madrugada, 23:00-07:45). Solo cuenta turnos con producción significativa."
-                            : "Conteo de turnos del mes con producción significativa. D = Turno día (07-19), N = Turno noche (19-07)."}
-                          iconSize={10}
-                        />
-                      </p>
-                      {plantLine.isClassificationPlant === false ? (
-                        <p className="text-sm font-semibold tabular-nums">
-                          <span className="text-amber-400/90">{slxMonthlyStats.t1ShiftsWithData ?? 0}</span>
-                          <span className="text-muted-foreground/60 mx-0.5">/</span>
-                          <span className="text-orange-400/90">{slxMonthlyStats.t2ShiftsWithData ?? 0}</span>
-                          <span className="text-muted-foreground/60 mx-0.5">/</span>
-                          <span className="text-indigo-400/90">{slxMonthlyStats.t3ShiftsWithData ?? 0}</span>
-                        </p>
-                      ) : (
-                        <p className="text-sm font-semibold tabular-nums">
-                          <span className="text-amber-400">{slxMonthlyStats.dayShiftsWithData}</span>
-                          <span className="text-muted-foreground mx-0.5">/</span>
-                          <span className="text-indigo-400">{slxMonthlyStats.nightShiftsWithData}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {/* Mejor / Único turno — colapsa a "Único" cuando solo 1
-                       turno existe en el mes para evitar mostrar Mejor=Peor.  */}
-                  {slxMonthlyStats.bestShift && (() => {
-                    const isOnlyOne = slxMonthlyStats.turnosWithData === 1
-                      || (slxMonthlyStats.worstShift != null
-                        && slxMonthlyStats.bestShift.dateKey === slxMonthlyStats.worstShift.dateKey
-                        && slxMonthlyStats.bestShift.shiftId === slxMonthlyStats.worstShift.shiftId)
-                    return (
-                      <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 space-y-0.5">
-                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                          <TrendingUp className="h-3 w-3 text-emerald-400" />
-                          {isOnlyOne ? 'Único turno cargado' : 'Mejor turno'}
-                          <InfoTooltip
-                            title={isOnlyOne ? 'Único turno con data' : 'Mejor turno del mes'}
-                            text={isOnlyOne
-                              ? 'Solo hay un turno con producción significativa en el mes — por eso no hay Mejor vs Peor.'
-                              : 'Turno del mes con mayor % de uptime (más tiempo procesando ininterrumpidamente). Tiene en cuenta solo Shoplogix, no requiere Excel del Grader.'}
-                            iconSize={10}
-                          />
-                        </div>
-                        <p className="text-xs font-semibold text-emerald-400">
-                          {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
-                          {' · '}<span title={getShiftMeta(slxMonthlyStats.bestShift.shiftId).label}>
-                            {getShiftMeta(slxMonthlyStats.bestShift.shiftId).emoji} {getShiftMeta(slxMonthlyStats.bestShift.shiftId).shortLabel}
-                          </span>
-                          {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
-                          <span className="text-muted-foreground font-normal">
-                            {' · '}{slxMonthlyStats.bestShift.totalCycles >= 1000
-                              ? `${(slxMonthlyStats.bestShift.totalCycles / 1000).toFixed(1)}k`
-                              : slxMonthlyStats.bestShift.totalCycles} cic
-                          </span>
-                        </p>
-                      </div>
-                    )
-                  })()}
-                  {/* Peor turno — solo si difiere del mejor (más de 1 turno cargado) */}
-                  {slxMonthlyStats.worstShift && slxMonthlyStats.bestShift && slxMonthlyStats.turnosWithData > 1
-                    && !(slxMonthlyStats.bestShift.dateKey === slxMonthlyStats.worstShift.dateKey
-                         && slxMonthlyStats.bestShift.shiftId === slxMonthlyStats.worstShift.shiftId) && (
-                    <div className="rounded border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 space-y-0.5">
-                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                        <TrendingDown className="h-3 w-3 text-rose-400" />
-                        Peor turno
-                        <InfoTooltip
-                          title="Peor turno del mes"
-                          text="Turno con menor % de uptime — más tiempo parado, en break o con micro-detenciones. Útil para identificar el día/turno a auditar primero."
-                          iconSize={10}
-                        />
-                      </div>
-                      <p className="text-xs font-semibold text-rose-400">
-                        {getShiftDisplayDateKey(slxMonthlyStats.worstShift.dateKey, slxMonthlyStats.worstShift.shiftId).slice(5)}
-                        {' · '}<span title={getShiftMeta(slxMonthlyStats.worstShift.shiftId).label}>
-                          {getShiftMeta(slxMonthlyStats.worstShift.shiftId).emoji} {getShiftMeta(slxMonthlyStats.worstShift.shiftId).shortLabel}
-                        </span>
-                        {' · '}<span className="font-bold">{slxMonthlyStats.worstShift.uptimePct.toFixed(0)}%</span>
-                        <span className="text-muted-foreground font-normal">
-                          {' · '}{slxMonthlyStats.worstShift.totalCycles >= 1000
-                            ? `${(slxMonthlyStats.worstShift.totalCycles / 1000).toFixed(1)}k`
-                            : slxMonthlyStats.worstShift.totalCycles} cic
-                        </span>
-                      </p>
+                            {(pm.maintMacroCount > 0 || pm.maintMicroCount > 0) && (
+                              <div className="flex items-center gap-1 text-[8px] text-muted-foreground/80">
+                                <span className="text-amber-400/80">🔧</span>
+                                <span>mac {fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50">·{pm.maintMacroCount}</span></span>
+                                <span className="text-muted-foreground/40">|</span>
+                                <span>mic {fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50">·{pm.maintMicroCount}</span></span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
