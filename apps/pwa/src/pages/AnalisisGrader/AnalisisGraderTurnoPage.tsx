@@ -1069,7 +1069,13 @@ export function AnalisisGraderTurnoPage() {
   // Metadata canónica del turno (label, shortLabel, ícono, color, schedule).
   // Single source of truth — todos los componentes que muestren este turno
   // deben usar getShiftMeta para evitar mezclar denominaciones.
-  const shiftMeta = useMemo(() => getShiftMeta(shiftLabel ?? ''), [shiftLabel])
+  // Se pasa el horario REAL (summary/shiftWindow) para que el período/ícono se
+  // deriven de la HORA y no del nombre — Shoplogix reusa "Turno 1" para la
+  // madrugada de Yal, que sin esto se pintaba "mañana ☀" siendo 00:00–06:45.
+  const shiftMeta = useMemo(
+    () => getShiftMeta(shiftLabel ?? '', summary?.startAt ?? shiftWindow?.startAt),
+    [shiftLabel, summary?.startAt, shiftWindow?.startAt],
+  )
 
   // Horario start–end real del turno (HH:mm → HH:mm). Fuente preferida:
   //   1. summary.startAt / endAt (cuando hay Excel cargado)

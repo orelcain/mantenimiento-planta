@@ -156,16 +156,19 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         })
         if (endMs < nowMs) tw = { ...tw, progressPct: null, remainingMin: null }
       }
-      return { dateKey: info.dateKey, shiftId: info.shiftId, tw }
+      // scheduledStart REAL (no tw.startAt, que en la rama live puede ser la
+      // hora del schedule) → getShiftMeta deriva el período por la hora real.
+      return { dateKey: info.dateKey, shiftId: info.shiftId, tw, scheduledStart: info.scheduledStart }
     }
 
-    // 2) Fallback por schedule configurado/hardcodeado
+    // 2) Fallback por schedule configurado/hardcodeado (sin doc real → sin
+    //    scheduledStart; getShiftMeta cae al nombre, coherente con el schedule).
     const filtered = schedule.filter((s) => preferredShiftIds.includes(s.shiftId))
     for (const dateKey of [todayKey, ydayKey]) {
       for (const s of filtered) {
         const tw = computeShiftTimeWindow(dateKey, s.shiftId, schedule, nowWallUTC)
         if (tw.status === 'live') {
-          return { dateKey, shiftId: s.shiftId, tw }
+          return { dateKey, shiftId: s.shiftId, tw, scheduledStart: null as Date | null }
         }
       }
     }
@@ -209,7 +212,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
     )
   }
 
-  const meta = getShiftMeta(live.shiftId)
+  const meta = getShiftMeta(live.shiftId, live.scheduledStart)
   const ShiftIcon = meta.iconName === 'Sun' ? Sun
     : meta.iconName === 'Sunset' ? Sunset
     : meta.iconName === 'Moon' ? Moon
