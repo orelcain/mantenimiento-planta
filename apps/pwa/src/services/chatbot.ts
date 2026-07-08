@@ -9,8 +9,10 @@ import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ar
 import { orchestrateStream, detectTaskType, type AgentStatusEvent } from './ariaOrchestrator'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
-import { buildAriaContext } from './aria/contextEngine'
+import { buildAriaContext, buildToolCatalog } from './aria/contextEngine'
+import { getTool } from './aria/tools'
 import { buildSituationalContextBlock } from './aria/situationalContext'
+import { buildAppKnowledgeBlock } from './aria/appKnowledge'
 import type { Incident } from '@/types'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
@@ -511,6 +513,8 @@ interface QueryAnalysis {
   resolvedQuery: string
   needsData: IntentType[]
   reasoning: string
+  /** Tools que el LLM eligió del catálogo (por intención). Vacío = solo regex. */
+  selectedTools: string[]
 }
 
 const ANALYSIS_PROMPT = `Eres un analizador de intención ultrarrápido para una app de mantenimiento industrial.
@@ -522,6 +526,7 @@ Responde SOLO con JSON válido (sin markdown, sin comentarios):
   "entities": { "machines": [...], "components": [...], "statuses": [...], "people": [...] },
   "resolvedQuery": "...",
   "needsData": [...],
+  "selectedTools": [...],
   "reasoning": "..."
 }
 
@@ -533,6 +538,7 @@ CAMPOS:
 - entities.people: personas mencionadas (ej: "Juan", "el técnico")
 - resolvedQuery: el mensaje del usuario con TODAS las referencias implícitas resueltas usando la conversación. Si el usuario dijo "y sus repuestos?" y antes hablaban de la Grader → "repuestos de la máquina Grader". Si dice "cuántos tiene?" y antes hablaban de motores de la Baader → "cuántos motores tiene la Baader"
 - needsData: qué módulos de datos necesitas para responder bien (puede ser más amplio que intents)
+- selectedTools: array con los NOMBRES EXACTOS (de la lista "TOOLS DISPONIBLES" que se te da abajo) de las tools que mejor responden el mensaje, elegidas por INTENCIÓN aunque el usuario no use las palabras exactas. 0 a 3 tools. Ej: "cuánto llevamos hoy sumando todo" → ["shift.dayProduction"]; "por qué está parada la baader" → ["shift.stops"]; "repuestos del motor" → ["repuestos.search"]. Si ninguna aplica, [].
 - reasoning: una frase breve explicando tu razonamiento
 
 REGLAS CRÍTICAS:
@@ -560,6 +566,7 @@ async function analyzeQuery(
       resolvedQuery: userMessage,
       needsData: kwIntents.filter(i => i !== 'general' && i !== 'ayuda'),
       reasoning: 'Mensaje simple, no requiere análisis profundo',
+      selectedTools: [],
     }
   }
 
@@ -576,6 +583,7 @@ async function analyzeQuery(
       resolvedQuery: userMessage,
       needsData: kwIntents,
       reasoning: 'Intención clara por keywords, sin contexto previo',
+      selectedTools: [],
     }
   }
 
@@ -586,7 +594,10 @@ async function analyzeQuery(
   ).join('\n')
 
   const messages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: ANALYSIS_PROMPT },
+    {
+      role: 'system',
+      content: `${ANALYSIS_PROMPT}\n\nTOOLS DISPONIBLES (para "selectedTools" — usa el NOMBRE EXACTO):\n${buildToolCatalog()}`,
+    },
   ]
 
   if (conversationContext) {
@@ -609,6 +620,10 @@ async function analyzeQuery(
       const validIntents = (parsed.intents || []).filter(i =>
         Object.keys(INTENT_KEYWORDS).includes(i)
       )
+      // Validar tools elegidas por el LLM contra el registry (descarta inventadas)
+      const validTools = (Array.isArray(parsed.selectedTools) ? parsed.selectedTools : [])
+        .filter((n): n is string => typeof n === 'string' && !!getTool(n))
+        .slice(0, 3)
       return {
         intents: validIntents.length > 0 ? validIntents : kwIntents,
         entities: {
@@ -622,6 +637,7 @@ async function analyzeQuery(
           Object.keys(INTENT_KEYWORDS).includes(i)
         ),
         reasoning: parsed.reasoning || '',
+        selectedTools: validTools,
       }
     }
   } catch (err) {
@@ -637,6 +653,7 @@ async function analyzeQuery(
     resolvedQuery: userMessage,
     needsData: kwIntents.filter(i => i !== 'general' && i !== 'ayuda'),
     reasoning: 'Fallback a detección por keywords',
+    selectedTools: [],
   }
 }
 
@@ -2656,6 +2673,16 @@ export async function sendChatMessage(
     logger.error('[chatbot] Error inyectando contexto situacional', err instanceof Error ? err : undefined)
   }
 
+  // Mapa de la app — ARIA "maestra": sabe qué módulos existen, qué hace cada
+  // uno y qué puede responder por chat. Filtra por rol (técnicos no ven los
+  // módulos en desarrollo). Paridad con la ARIA de Telegram (ariaKnowledge/appModules).
+  try {
+    const appMap = buildAppKnowledgeBlock(_userRole)
+    if (appMap) messages.push({ role: 'system', content: appMap })
+  } catch (err) {
+    logger.error('[chatbot] Error inyectando mapa de la app', err instanceof Error ? err : undefined)
+  }
+
   // Inyectar contexto de APRENDIZAJE (knowledge base + patrones)
   try {
     const learningCtx = await buildLearningContext(resolvedQuery, intents)
@@ -2709,7 +2736,7 @@ export async function sendChatMessage(
   // ARIA Tool Registry — datos exactos consultados via tools registradas
   // (turno actual, KPIs Grader, agregados por período, etc.)
   try {
-    const ariaCtx = await buildAriaContext(resolvedQuery)
+    const ariaCtx = await buildAriaContext(resolvedQuery, analysis.selectedTools)
     if (ariaCtx.hasResults) {
       messages.push({ role: 'system', content: ariaCtx.contextBlock })
       const okCount = ariaCtx.invocations.filter(i => i.ok).length
