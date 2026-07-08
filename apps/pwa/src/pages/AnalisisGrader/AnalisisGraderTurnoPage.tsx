@@ -60,6 +60,7 @@ import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
+import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
@@ -1356,6 +1357,15 @@ export function AnalisisGraderTurnoPage() {
           </span>
         </div>
       )}
+
+      {/* Tiempos del DÍA completo (todos los turnos) — se muestra una sola vez,
+          fuera de las ramas condicionales de abajo (con/sin Excel), para no
+          duplicar la lectura ni el render. */}
+      <DayTimeSummaryBar
+        dateKey={dateKey}
+        plantSlug={plantLineCfg.plantSlug}
+        enabled={plantLineCfg.shoplogixEnabled}
+      />
 
       {/* Estados */}
       {loading && (

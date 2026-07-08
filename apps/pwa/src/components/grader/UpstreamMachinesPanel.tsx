@@ -563,6 +563,66 @@ function StateTimeline({
 // ProductionBarsEC (Fase 3 del Synchronized Timeline). Ver
 // `./ProductionBarsEC.tsx`.
 
+/** Suma de tiempos de la LÍNEA completa (3 Baaders) para el turno. */
+interface LineTimeTotals {
+  uptimeSec: number
+  downtimeSec: number
+  breakSec: number
+  setupSec: number
+}
+
+function sumLineTimeTotals(machines: UpstreamMachineShift[]): LineTimeTotals {
+  return machines.reduce((acc, m) => {
+    const bd = m.shiftRuntimeBreakdown
+    if (!bd) return acc
+    acc.uptimeSec   += bd.uptimeSec   || 0
+    acc.downtimeSec += bd.downtimeSec || 0
+    acc.breakSec    += bd.breakSec    || 0
+    acc.setupSec    += bd.setupSec    || 0
+    return acc
+  }, { uptimeSec: 0, downtimeSec: 0, breakSec: 0, setupSec: 0 })
+}
+
+/**
+ * Resumen de TIEMPOS del turno (línea completa, suma de las 3 Baaders) en
+ * texto siempre visible. Antes esta suma solo existía escondida en el title
+ * (tooltip) de ShiftAvailabilityBar, una máquina a la vez — no había un total
+ * de línea en ningún lado. El operador pedía "tiempos del turno" sin tener
+ * que sumar a mano ni pasar el mouse.
+ */
+function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
+  if (totals.downtimeSec === 0 && totals.uptimeSec === 0 && totals.breakSec === 0) return null
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
+      <Badge
+        variant="outline"
+        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        title="Tiempo total procesando (suma de las 3 Baaders)"
+      >
+        ▲ {fmtDurationSec(totals.uptimeSec)}
+      </Badge>
+      {totals.downtimeSec > 0 && (
+        <Badge
+          variant="outline"
+          className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          title="Tiempo total de detención/paro (suma de las 3 Baaders)"
+        >
+          ⏸ {fmtDurationSec(totals.downtimeSec)}
+        </Badge>
+      )}
+      {totals.breakSec > 0 && (
+        <Badge
+          variant="outline"
+          className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
+        >
+          ☕ {fmtDurationSec(totals.breakSec)}
+        </Badge>
+      )}
+    </div>
+  )
+}
+
 /**
  * KPI row tipo Shoplogix: total / verde / amarillo / rojo.
  *
@@ -959,6 +1019,14 @@ export function UpstreamMachinesPanel({
     return computeKpis(filtered)
   }, [snapshot, windowStart, windowEnd, isLineZoomActive])
 
+  // Tiempos de línea (uptime/paro/break) — suma de las 3 Baaders. No es
+  // zoom-aware (a diferencia de lineKpis): shiftRuntimeBreakdown es un
+  // agregado del turno completo, no por-intervalo.
+  const lineTimeTotals = useMemo(() => {
+    if (!snapshot || snapshot.machines.length === 0) return null
+    return sumLineTimeTotals(snapshot.machines)
+  }, [snapshot])
+
   // Detector de microparadas anómalas — usa helper testable + umbrales
   // exportados (ver MICRO_ANOMALY_THRESHOLDS en graderUpstreamHealth.ts).
   const microAlertSet = useMemo<Set<string>>(() => {
@@ -1023,6 +1091,7 @@ export function UpstreamMachinesPanel({
           <div className="flex items-center gap-3 text-xs text-slate-500 ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
+            {lineTimeTotals && <LineTimeSummaryBadges totals={lineTimeTotals} />}
             {isLineZoomActive && (
               <Badge
                 variant="outline"
