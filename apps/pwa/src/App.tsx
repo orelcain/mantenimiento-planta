@@ -368,6 +368,14 @@ export function App() {
                 </Suspense>
               }
             />
+            <Route
+              path="/aprendizaje/grader-manual"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <AnalisisGraderAyudaPage />
+                </Suspense>
+              }
+            />
           </Route>
 
           {/* Legacy redirects — keep old URLs working */}
@@ -646,11 +654,8 @@ export function App() {
                 <AnalisisGraderPeriodoPage />
               </Suspense>
             } />
-            <Route path="analisis-grader/ayuda" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderAyudaPage />
-              </Suspense>
-            } />
+            {/* Movido al Centro de Aprendizaje — se deja redirect por links/bookmarks viejos */}
+            <Route path="analisis-grader/ayuda" element={<Navigate to="/aprendizaje/grader-manual" replace />} />
             <Route path="gantt" element={
               <Suspense fallback={<LoadingScreen />}>
                 <GanttModulePage />

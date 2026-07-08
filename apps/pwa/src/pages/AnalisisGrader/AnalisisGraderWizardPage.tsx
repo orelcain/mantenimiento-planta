@@ -627,7 +627,7 @@ export function AnalisisGraderWizardPage() {
             <BarChart3 className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Análisis </span>período
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/ayuda')} className="border-muted-foreground/30 hover:bg-muted/50">
+          <Button variant="outline" size="sm" onClick={() => navigate('/aprendizaje/grader-manual')} className="border-muted-foreground/30 hover:bg-muted/50">
             <BookOpen className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Manual &amp; </span>runbooks
           </Button>

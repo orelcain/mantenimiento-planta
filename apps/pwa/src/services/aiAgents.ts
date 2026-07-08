@@ -113,7 +113,7 @@ function registerDefaults() {
       model: 'deepseek-v4-flash', // deepseek-reasoner (alias legacy) se apaga 24-jul-2026
       emoji: '🧠',
       capabilities: ['reasoning', 'code', 'analysis'],
-      priority: 95,
+      priority: 50, // último recurso: paga centavos, solo si Groq/Gemini (gratis) fallan
       costTier: 'cheap',
       dailyLimit: 500,
       streaming: true,
