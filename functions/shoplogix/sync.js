@@ -24,6 +24,7 @@ const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift, toChileWall } = require('./polling')
+const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
 const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
@@ -99,15 +100,26 @@ function shiftDateKeyFromStart(scheduledStart) {
  * en intervals etiquetados "Unscheduled" mientras los turnos labeled tenían
  * 0 cycles. Si filtrábamos Unscheduled, descartábamos toda la producción.
  *
+ * El nombre de cada turno se CANONIZA por su hora de inicio ("el histórico
+ * manda" — ver canonicalShift.js): Shoplogix a veces etiqueta mal un turno
+ * (caso real Yal 8-jul: madrugada 00:00 vino "Turno 1" cuando 20× previas fue
+ * "Turno 3"). Se agrupa por el nombre canónico; el nombre crudo de Shoplogix se
+ * conserva en `rawShiftId` para trazabilidad.
+ *
  * @param {Array} machineProductionResponses — array de objetos raw de la API
  *   (uno por máquina), cada uno con `.machineProduction[]`.
- * @returns {Array<{shiftId, scheduledStart, scheduledEnd}>}
+ * @param {string} [plantSlug] — planta, para aplicar las reglas canónicas.
+ * @returns {Array<{shiftId, rawShiftId, scheduledStart, scheduledEnd}>}
  */
-function deriveShiftGroups(machineProductionResponses) {
+function deriveShiftGroups(machineProductionResponses, plantSlug) {
   // Usar la primera máquina que tenga intervalos (todas deberían tener los mismos shifts)
   const firstWithIntervals = machineProductionResponses.find(r => r?.machineProduction?.length > 0)
   if (!firstWithIntervals) return []
 
+  // 1. Agrupar por el nombre RAW de Shoplogix (el turno tal como viene). CLAVE:
+  //    NO canonizar por interval — el "Turno 2" de Yal va 14:45→00:00 y sus
+  //    intervals de las 22:00+ caerían en el rango "madrugada" y partirían el
+  //    turno en dos. Se agrupa por el turno completo y se canoniza después.
   const perShift = {}
   for (const iv of firstWithIntervals.machineProduction) {
     if (!iv.shift) continue          // sin etiqueta = no hay turno, descartable
@@ -118,9 +130,25 @@ function deriveShiftGroups(machineProductionResponses) {
     }
   }
 
-  return Object.entries(perShift)
-    .map(([shiftId, { first, last }]) => ({
+  // 2. Canonizar el nombre de cada grupo por su hora de INICIO. Si dos grupos
+  //    raw colapsan al mismo canónico (raro: "Turno 3" + "Turno 3*"), fusionar.
+  const byCanon = {}
+  for (const [rawShiftId, g] of Object.entries(perShift)) {
+    const scheduledStart = parseShoplogixTime(g.first.start)
+    const canon = canonicalShiftName(plantSlug, scheduledStart, rawShiftId)
+    if (!byCanon[canon]) {
+      byCanon[canon] = { first: g.first, last: g.last, rawShiftId }
+    } else {
+      if (parseShoplogixTime(g.first.start).getTime() < parseShoplogixTime(byCanon[canon].first.start).getTime()) byCanon[canon].first = g.first
+      if (parseShoplogixTime(g.last.end).getTime()   > parseShoplogixTime(byCanon[canon].last.end).getTime())   byCanon[canon].last  = g.last
+    }
+  }
+
+  return Object.entries(byCanon)
+    .map(([shiftId, { first, last, rawShiftId }]) => ({
       shiftId,
+      // rawShiftId != shiftId solo cuando se corrigió una anomalía de Shoplogix.
+      rawShiftId,
       scheduledStart: parseShoplogixTime(first.start),
       scheduledEnd:   parseShoplogixTime(last.end),
     }))
@@ -248,7 +276,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   }
 
   // 2. Derivar grupos de turno reales
-  const shiftGroups = deriveShiftGroups(productionResponses)
+  const shiftGroups = deriveShiftGroups(productionResponses, plantSlug)
 
   if (shiftGroups.length === 0) {
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${dateKey}: sin turnos detectados (sin datos aún)`)
@@ -391,6 +419,9 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set({
       dateKey:        parentShiftDateKey,
       shiftId:        group.shiftId,
+      // Nombre crudo de Shoplogix (para trazabilidad); != shiftId solo cuando se
+      // corrigió una anomalía de etiquetado (ver canonicalShift.js).
+      rawShiftId:     group.rawShiftId ?? group.shiftId,
       scheduledStart: group.scheduledStart,
       scheduledEnd:   group.scheduledEnd,
       scheduleSource: 'intervals',

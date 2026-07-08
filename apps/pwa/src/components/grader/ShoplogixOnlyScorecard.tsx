@@ -79,8 +79,12 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
   const uptimeTextColor = (pct: number) =>
     pct >= 70 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
 
-  // Metadata canónica del turno (label + ícono + color) — single source of truth
-  const shiftMeta = getShiftMeta(shiftLabel)
+  // Metadata canónica del turno (label + ícono + color) — single source of truth.
+  // Horario real de Shoplogix (scheduledStart) → período/ícono por HORA, no por nombre.
+  const shiftMeta = getShiftMeta(
+    shiftLabel,
+    snapshot.machines[0]?.scheduledStart ?? snapshot.machines[0]?.shiftStart ?? shiftWindow?.startAt,
+  )
   const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
     : shiftMeta.iconName === 'Sunset' ? Sunset
     : shiftMeta.iconName === 'Moon' ? Moon

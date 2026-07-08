@@ -58,3 +58,45 @@ describe('getShiftMeta — nombres que emite Shoplogix', () => {
     expect(getShiftMeta('Turno Nuevo X').shortLabel).toBe('?')
   })
 })
+
+describe('getShiftMeta — período derivado del HORARIO real (no del nombre)', () => {
+  it('caso Yal 2026-07-08: "Turno 1" a las 00:00 es NOCHE 🌙, no mañana ☀', () => {
+    // Shoplogix reusó "Turno 1" para la madrugada 00:00–06:45. Sin scheduledStart
+    // se pintaba "mañana ☀" (mentira); con el horario real debe ser noche 🌙.
+    const meta = getShiftMeta('Turno 1', '2026-07-08T00:00:00.000Z')
+    expect(meta.period).toBe('noche')
+    expect(meta.iconName).toBe('Moon')
+    expect(meta.isDayLike).toBe(false)
+    // El LABEL sigue fiel a Shoplogix (no inventamos "Turno 3")
+    expect(meta.label).toBe('Turno 1 — Mañana')
+    expect(meta.shortLabel).toBe('T1')
+  })
+
+  it('"Turno 2" a las 09:00 (chonchi) es MAÑANA ☀ aunque el nombre sugiera tarde', () => {
+    const meta = getShiftMeta('Turno 2', '2026-07-06T09:00:00.000Z')
+    expect(meta.period).toBe('mañana')
+    expect(meta.iconName).toBe('Sun')
+  })
+
+  it('"Turno 1" a las 21:30 (chonchi noche) es NOCHE 🌙', () => {
+    const meta = getShiftMeta('Turno 1', '2026-07-06T21:30:00.000Z')
+    expect(meta.period).toBe('noche')
+    expect(meta.iconName).toBe('Moon')
+  })
+
+  it('sin scheduledStart cae a la tabla por nombre (comportamiento previo intacto)', () => {
+    expect(getShiftMeta('Turno 1').period).toBe('mañana')
+    expect(getShiftMeta('Turno 1', null).period).toBe('mañana')
+    expect(getShiftMeta('Turno 1', 'fecha-inválida').period).toBe('mañana')
+  })
+
+  it('scheduleHint refleja la hora real de inicio (ya no el rango mentiroso del nombre)', () => {
+    expect(getShiftMeta('Turno 1', '2026-07-08T00:00:00.000Z').scheduleHint).toBe('desde 00:00')
+    expect(getShiftMeta('Turno 1').scheduleHint).toBe('07:45–14:45') // sin horario: rango del nombre
+  })
+
+  it('acepta Date además de string ISO', () => {
+    const meta = getShiftMeta('Turno 1', new Date('2026-07-08T00:00:00.000Z'))
+    expect(meta.period).toBe('noche')
+  })
+})
