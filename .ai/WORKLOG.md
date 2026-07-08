@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-07 - claude - ARIA Telegram: memoria de contexto ("ese mismo repuesto") + editar código de fabricante + fix acento
+
+- Origen: Orel probó el fix anterior EN VIVO → creó bien el cilindro SAP 3300138398 (KNURO N1). Después mandó 2 fotos con "Agrégale estas dos imágenes a ese mismo repuesto de Knuro y agrégale su código de fabricante 999 0566" → ARIA lo ignoró (volvió a "¿creo incidencia?"). Orel: "falta que ARIA siga el contexto de la conversación" + REGLA: es la MISMA ARIA, cada mejora va a Telegram Y al chat de la PWA.
+- Causas (verificadas): (a) el filtro de caption accionable NO matcheaba "Agrégale" por la tilde (é rompía `\bagreg`); (b) ARIA no recuerda el repuesto que acaba de crear → "ese mismo repuesto" no resolvía; (c) no existía capacidad de editar el código de fabricante (escritura sobre repuesto existente).
+- FIX (functions/index.js, +183):
+  - **Memoria `ultimoRepuesto`** (campo de sesión, TTL 60min): se setea al crear/vincular/adjuntar-foto/editar; se inyecta al router (`ultimoRepuestoHint`) y a `ariaDecidirRepuesto` → "ese mismo repuesto"/"al mismo"/"el que creaste" resuelven al último tocado.
+  - **Acción `repuesto_editar`** (código de fabricante hoy): resuelve el SAP objetivo (SAP explícito → ultimoRepuesto), parsea el valor (`ariaParseCodigoFabricante`, salta relleno "q es el" y corta en "al mismo"), confirma, escribe `codigoFabricante` + historial + audit_log (misma forma que la PWA). Puede sumar la última foto de paso.
+  - **Fix acento**: caption se normaliza (NFD + quita `\p{Diacritic}`) antes de detectar intención; CAPTION_ACCION ampliado (pon/actualiza/edita/cambia/codigo).
+  - **Modo "voy sumando fotos"** (`modoAdjuntarA`, TTL 10min): tras adjuntar una foto a un repuesto, las siguientes fotos SIN caption ni SAP propio se ofrecen para el mismo repuesto (con confirmación; guarda: si la foto trae SAP propio es otro ítem).
+- Verificado: `node --check` OK + dry-run SOLO-LECTURA contra maestro real: cilindro 3300138398 EXISTE (y ya tiene codFab "999 0566" — Orel lo puso a mano tras el fallo); "ese mismo repuesto"/"al mismo" (3 frases) → resuelven a 3300138398; parser código fab → "999 0566"/"LOV-13"/"ABC-1234" limpios; "Agrégale..." ahora matchea el caption. Router LLM (elegir repuesto_editar vs repuesto_agregar) no probado en vivo (keys=secrets) — handlers deterministas y seguros.
+- PWA (chat in-app): decisión de Orel = "arrancar" la escritura también en la PWA. HALLAZGO: el chat de la PWA (`chatbot.ts`+`aria/tools/*`) es hoy 100% SOLO-LECTURA (ningún write de dominio) → espejar estas escrituras = darle capacidad de escribir con confirmación (proyecto aparte). PENDIENTE fase siguiente.
+- Archivos: functions/index.js (M).
+- Estado: LISTO para deploy (commit + deploy telegramWebhook, aprobado antes). PWA = fase siguiente.
+
 ## 2026-07-07 - claude - ARIA Telegram: fix crear/vincular repuesto por foto (match SAP + criterio LLM)
 
 - Origen: Orel reportó que ARIA no pudo crear un repuesto que le mandó con 2 fotos. Revisé la conversación REAL en Firestore (`telegramAriaSessions/52949422`, 24 turnos) + reproduje con datos del maestro. Caso: cilindro neumático CRDSNU-32-105, **SAP `3300138398` (no existe = nuevo)**, para equipo Knuro. Etiqueta traía 4 códigos: `3300138398`, `CRDSNU-32-105-PPV-A-MQ-A1`, `552791`, `51051200`.
@@ -30,7 +44,7 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
   - **Caption accionable delegado al router**: foto + "créalo como repuesto del Knuro" ahora se resuelve usando la última foto. `ariaHandleFoto` además, si lee un SAP claro que no está en el maestro, propone crearlo como repuesto (antes empujaba a incidencia).
 - Verificación: `node --check` OK. Dry-run SOLO-LECTURA contra maestro real (7662 docs): las 4 variantes de la conversación real ("Crea ese repuesto para Knuro" / "sí confirmo, tipo cilindro, Knuro" / "no es 378, es 398" / "termina en 8398") → **todas resuelven crear_nuevo SAP 3300138398** con nombre "CILINDRO CRDSNU-32-105-PPV-A-MQ-A1", y `552791`→null (falso positivo eliminado). La rama de criterio LLM NO se probó en vivo (las keys son secrets de Firebase, no están en `.env` local) — es fallback guardado por validación determinista.
 - Archivos: functions/index.js (M).
-- Estado: EN REVISIÓN → rama fix/aria-repuesto-foto-criterio (sin PR aún). Deploy = MANUAL (`npx firebase-tools deploy --only functions:telegramWebhook`) tras visto bueno de Orel; probar en vivo re-enviando la foto del cilindro.
+- Estado: DESPLEGADO (Orel aprobó "commit + deploy"). Commit 0c24455b en rama fix/aria-repuesto-foto-criterio; `telegramWebhook` desplegado a mano (SA del repo) → revisión telegramwebhook-00096-pit ACTIVE, boot limpio (STARTUP probe OK), secrets GROQ v3/GEMINI v1/DEEPSEEK v2 enlazados. Falta prueba EN VIVO por Orel: reenviar la foto del cilindro con "créalo como repuesto de Knuro" (esperado: crea SAP 3300138398 en KNURO N1). PR a main pendiente (opcional; el deploy de functions es manual, no depende del merge).
 
 ## 2026-07-07 - claude - UX Análisis de Turno: quitar ruido por duplicación + fix header sticky
 
