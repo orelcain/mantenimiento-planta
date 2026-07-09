@@ -1304,131 +1304,58 @@ export function GraderHistoricalCalendar({
   // Permite ver el turno en el panel "Resumen del día" aunque el usuario no
   // haya cargado el Excel del Marelec — evita que la card desaparezca cuando
   // existen ciclos Baader medidos por Shoplogix.
+  //
+  // PRINCIPIO — reflejo puro por horario, no por nombre: antes esta función
+  // agrupaba por baldes fijos ("Turno 1"+"Turno 2" = balde "día", "Turno 3"+
+  // "Turno noche" = balde "noche") y fusionaba sus ciclos/horario en UNA sola
+  // card. Eso se rompe cada vez que Shoplogix renombra un turno recurrente
+  // (ya pasó 2 veces: PR #163/#168, y de nuevo con la madrugada de Yal
+  // etiquetada "Turno 1" en vez de "Turno 3" — el balde "día" absorbía esa
+  // madrugada junto con el Turno 2 real de la tarde, mostrando un rango
+  // fusionado 00:00→19:41 que no correspondía a ningún turno real).
+  // El nombre que Shoplogix le ponga a un turno no es dato estable — lo único
+  // confiable es su horario real (scheduledStart/End). Por eso ahora se crea
+  // UNA card por cada shiftId que Shoplogix reporte ese día, con SU PROPIO
+  // horario, sin fusionar con ningún otro — el nombre queda solo como etiqueta.
   const buildSlxVirtualSummaries = useCallback(
     (key: string, seenShifts: Set<string>): Array<{ summary: GraderDailySummary; chip: null }> => {
       if (plantLine.isClassificationPlant !== false) return []
       const out: Array<{ summary: GraderDailySummary; chip: null }> = []
-      const hasExcelDay = seenShifts.has('Turno día')
-        || seenShifts.has('Turno 1') || seenShifts.has('Turno 2')
-      const hasExcelNight = seenShifts.has('Turno noche') || seenShifts.has('Turno 3')
-      // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
-      // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
+      const prefix = `${key}__`
 
-      // Día: T1+T2 nuevos (sumados) o legacy "Turno día"
-      if (!hasExcelDay) {
-        const t1 = slxTotalsByShift.get(`${key}__Turno 1`) ?? 0
-        const t2 = slxTotalsByShift.get(`${key}__Turno 2`) ?? 0
-        const tLeg = slxTotalsByShift.get(`${key}__Turno día`) ?? 0
-        const newDayCycles = t1 + t2
+      for (const [mapKey, totalCycles] of slxTotalsByShift.entries()) {
+        if (!mapKey.startsWith(prefix)) continue
+        const shiftId = mapKey.slice(prefix.length)
+        if (seenShifts.has(shiftId)) continue // ya cubierto por Excel real
+        // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
+        // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
+        if (!isSignificantCycleCount(totalCycles)) continue
 
-        if (isSignificantCycleCount(newDayCycles)) {
-          const cT1 = slxByShift.get(`${key}__Turno 1`)
-          const cT2 = slxByShift.get(`${key}__Turno 2`)
-          const start = cT1?.scheduledStart ?? cT2?.scheduledStart ?? null
-          const end = cT2?.scheduledEnd ?? cT1?.scheduledEnd ?? null
-          const samples = [
-            t1 > 0 ? cT1?.avgShiftRuntime : null,
-            t2 > 0 ? cT2?.avgShiftRuntime : null,
-          ].filter((x): x is number => typeof x === 'number' && x > 0)
-          const avgUptime = samples.length > 0
-            ? samples.reduce((a, b) => a + b, 0) / samples.length : 0
-          // Navegación: preferir el turno con más ciclos (más representativo)
-          const navShift = t2 >= t1 && t2 > 0 ? 'Turno 2' : 'Turno 1'
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__day`,
-              dateKey: key,
-              shiftId: navShift,
-              plantLineId,
-              totalPieces: newDayCycles,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: start ? start.toISOString() : undefined,
-              endAt: end ? end.toISOString() : undefined,
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: avgUptime,
-            },
-            chip: null,
-          })
-        } else if (isSignificantCycleCount(tLeg) && plantLine.isClassificationPlant !== false) {
-          // Fallback legacy "Turno día" solo aplica a plantas clasificadoras (Chonchi).
-          // En Yal y otras no-clasificadoras la nomenclatura correcta es T1/T2/T3;
-          // un doc legacy `Turno día` ahí es ruido residual (sync mal configurado) y
-          // confunde porque pisa los turnos numerados reales.
-          const c = slxByShift.get(`${key}__Turno día`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__dia-legacy`,
-              dateKey: key,
-              shiftId: 'Turno día',
-              plantLineId,
-              totalPieces: tLeg,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
-        }
+        const c = slxByShift.get(mapKey)
+        out.push({
+          summary: {
+            id: `slx-virtual:${mapKey}`,
+            dateKey: key,
+            shiftId,
+            plantLineId,
+            totalPieces: totalCycles,
+            pointZeroPieces: 0,
+            pointZeroPct: 0,
+            startAt: c?.scheduledStart?.toISOString(),
+            endAt: c?.scheduledEnd?.toISOString(),
+            updatedBy: 'shoplogix',
+            updatedAt: '',
+            isSlxVirtual: true,
+            slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+          },
+          chip: null,
+        })
       }
 
-      // Noche: T3 (arranca en este día) o legacy "Turno noche"
-      if (!hasExcelNight) {
-        const t3 = slxTotalsByShift.get(`${key}__Turno 3`) ?? 0
-        const tLegN = slxTotalsByShift.get(`${key}__Turno noche`) ?? 0
-        if (isSignificantCycleCount(t3)) {
-          const c = slxByShift.get(`${key}__Turno 3`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__t3`,
-              dateKey: key,
-              shiftId: 'Turno 3',
-              plantLineId,
-              totalPieces: t3,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
-        } else if (isSignificantCycleCount(tLegN) && plantLine.isClassificationPlant !== false) {
-          // Mismo razonamiento que el fallback "Turno día" legacy: en plantas
-          // no-clasificadoras (Yal) la noche real es Turno 3 (madrugada) o no hay;
-          // un doc legacy `Turno noche` ahí es ruido residual del sync upstream.
-          const c = slxByShift.get(`${key}__Turno noche`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__noche-legacy`,
-              dateKey: key,
-              shiftId: 'Turno noche',
-              plantLineId,
-              totalPieces: tLegN,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
-        }
-      }
-
+      // Orden cronológico entre las cards virtuales (el orden de un Map es de
+      // inserción, no de horario) — nombres desconocidos/nuevos igual entran
+      // en su posición real por hora en vez de caer al final por sorpresa.
+      out.sort((a, b) => (a.summary.startAt ?? '').localeCompare(b.summary.startAt ?? ''))
       return out
     },
     [plantLine.isClassificationPlant, plantLineId, slxByShift, slxTotalsByShift],
