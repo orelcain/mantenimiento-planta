@@ -19,7 +19,7 @@ import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
-import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
+import { useSolicitudes, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
@@ -168,7 +168,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
-  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock } = useBodega(allRepuestos)
+  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento } = useBodega(allRepuestos)
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -264,6 +264,35 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   const { toast } = useToast()
   const { createRepuesto: crudCreate, updateRepuesto: crudUpdate, deleteRepuesto: crudDelete } = useRepuestoCrud()
+
+  // Avanzar solicitud a "entregada" → descuenta stock real de bodega (si el SAP ya está
+  // configurado ahí). Sin esto, "Entregar" era solo una etiqueta que no tocaba el inventario.
+  // Si no hay bodega configurada para el SAP, no se inventa un registro (evita el latente
+  // rechazo de firestore.rules por ubicacionBodega vacía) — solo avanza el estado igual.
+  const handleAvanzarSolicitud = useCallback(
+    async (id: string, next: SolicitudEstado) => {
+      if (next === 'entregada' && user) {
+        const sol = solicitudes.find((s) => s.id === id)
+        const item = sol ? bodegaItems.find((b) => b.codigoSAP === sol.codigoSAP) : undefined
+        if (sol && item?.bodegaId) {
+          try {
+            await registrarMovimiento(
+              item,
+              { tipo: 'salida', cantidad: sol.cantidad, motivo: `Entrega solicitud · ${sol.solicitadoPorNombre || 'usuario'}` },
+              user.id,
+              user.nombre,
+            )
+            toast({ title: 'Stock descontado', description: `-${sol.cantidad} ${item.textoBreve || item.codigoSAP}`, variant: 'success' })
+          } catch {
+            toast({ title: 'No se pudo descontar el stock', description: 'La solicitud sigue pendiente de entrega — reintenta.', variant: 'destructive' })
+            return // no avanzar a "entregada" si el descuento de stock falló
+          }
+        }
+      }
+      await avanzarEstado(id, next)
+    },
+    [solicitudes, bodegaItems, user, registrarMovimiento, avanzarEstado, toast],
+  )
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -1918,7 +1947,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onOpenChange={setSolicitudesOpen}
         solicitudes={solicitudes}
         loading={solicitudesLoading}
-        onAvanzar={avanzarEstado}
+        onAvanzar={handleAvanzarSolicitud}
       />
 
       {/* Herramientas admin de catálogo */}
