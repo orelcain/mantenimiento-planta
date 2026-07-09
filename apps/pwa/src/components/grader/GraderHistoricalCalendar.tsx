@@ -376,6 +376,7 @@ function formatShiftTimeRange(summary: GraderDailySummary): string {
           hour: '2-digit',
           minute: '2-digit',
           timeZone: 'UTC',
+          hour12: false,   // 00:00, no "12:00 a. m." (es-CL default es 12h)
         })
       : '?'
   const dayPart = (iso: string | undefined) => (iso ? iso.slice(0, 10).slice(5) : '??')
@@ -3232,23 +3233,78 @@ export function GraderHistoricalCalendar({
               // `Turno día`/`Turno noche` en Firestore — son ruido del sync
               // upstream (la planta opera con T1/T2/T3, no con Día/Noche).
               const useLegacyDayNight = plantLine.isClassificationPlant !== false
-              const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
-              const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
-              const slxLegDay   = (showSlxDay && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
-              const slxNewDay   = slxT1Cycles + slxT2Cycles  // suma "mañana+tarde"
-              const slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
-              // shiftId para navegar (preferir T2 si tiene más cycles)
-              const slxDayNav = slxT2Cycles >= slxT1Cycles && slxT2Cycles > 0
-                ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
-                : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
-                : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
-              // Noche: T3 SLX del PROPIO día (arranca 23:00 del Y).
-              const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
-              const slxLegNight = (showSlxNight && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
-              const slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
-              const slxNightNav = slxT3Cycles > 0
-                ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
-                : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
+              // Dos slots por celda: "día" (arriba) y "noche/madrugada" (abajo).
+              //
+              // Yal (no-clasificadora): asignar cada turno numérico real a su slot
+              // por HORA DE INICIO real (scheduledStart), NO por nombre. Madrugada/
+              // noche (start <12:00 o >=20:00) → slot noche; tarde (12:00-20:00) →
+              // slot día. Antes se sumaba T1+T2 en el slot día ("mañana+tarde"), y
+              // cuando Shoplogix renombró la madrugada de "Turno 3" a "Turno 1" esa
+              // madrugada cayó en el slot día y se SUMÓ con el T2 de la tarde → un
+              // solo chip (bug 2026-07-08: día 8 mostraba "T2 18.770" = 4.797+13.973
+              // en vez de dos chips T1 4.797 + T2 13.973). Bucketear por horario los
+              // separa igual que a T2+T3.
+              //
+              // Chonchi (clasificadora): mantiene el mapeo por nombre (día=T2/legado,
+              // noche=T1/T3/legado); sus turnos no cambiaron y sus horarios de noche
+              // (21:30) no encajan en la regla de madrugada de Yal.
+              const isNonClassifCal = plantLine.isClassificationPlant === false
+              let slxDayCycles = 0, slxNightCycles = 0
+              let slxDayNav: { cfDateKey: string; shiftId: string } | null = null
+              let slxNightNav: { cfDateKey: string; shiftId: string } | null = null
+              let slxDayUptimePct = 0, slxNightUptimePct = 0
+              if (isNonClassifCal) {
+                const hasExcelForShift = (sid: string) =>
+                  chipsForDay.some(c => c.role === 'primary' && c.shiftId === sid)
+                const dayBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
+                const nightBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
+                if (showSlx) {
+                  for (const sid of ['Turno 1', 'Turno 2', 'Turno 3']) {
+                    if (hasExcelForShift(sid)) continue  // ya se ve vía chip de Excel
+                    const cyc = slxTotalsByShift.get(`${dayKey}__${sid}`) ?? 0
+                    if (!(cyc > 0)) continue
+                    const cache = slxByShift.get(`${dayKey}__${sid}`)
+                    const startHour = cache?.scheduledStart?.getUTCHours() ?? 0
+                    const uptimePct = (cache?.avgShiftRuntime ?? 0) * 100
+                    const isNightStart = startHour < 12 || startHour >= 20
+                    ;(isNightStart ? nightBucket : dayBucket).push({ shiftId: sid, cycles: cyc, uptimePct })
+                  }
+                }
+                // Si más de un turno cae en el mismo slot, mostrar el de más ciclos.
+                const pickSlot = (arr: typeof dayBucket) =>
+                  arr.slice().sort((a, b) => b.cycles - a.cycles)[0] ?? null
+                const dayPick = pickSlot(dayBucket)
+                const nightPick = pickSlot(nightBucket)
+                slxDayCycles = dayPick?.cycles ?? 0
+                slxNightCycles = nightPick?.cycles ?? 0
+                slxDayNav = dayPick ? { cfDateKey: dayKey, shiftId: dayPick.shiftId } : null
+                slxNightNav = nightPick ? { cfDateKey: dayKey, shiftId: nightPick.shiftId } : null
+                slxDayUptimePct = dayPick?.uptimePct ?? 0
+                slxNightUptimePct = nightPick?.uptimePct ?? 0
+              } else {
+                const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
+                const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+                const slxLegDay   = (showSlxDay && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+                const slxNewDay   = slxT1Cycles + slxT2Cycles  // Chonchi: T1+T2 = jornada día
+                slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
+                slxDayNav = slxT2Cycles >= slxT1Cycles && slxT2Cycles > 0
+                  ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
+                  : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
+                  : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
+                const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
+                const slxLegNight = (showSlxNight && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+                slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
+                slxNightNav = slxT3Cycles > 0
+                  ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
+                  : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
+                const ut1 = slxT1Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 1`)?.avgShiftRuntime ?? 0) : null
+                const ut2 = slxT2Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 2`)?.avgShiftRuntime ?? 0) : null
+                const utLeg = slxLegDay > 0 ? (slxByShift.get(`${dayKey}__Turno día`)?.avgShiftRuntime ?? 0) : null
+                const daySamples = [ut1, ut2, utLeg].filter((x): x is number => x !== null)
+                slxDayUptimePct = daySamples.length > 0 ? (daySamples.reduce((a, b) => a + b, 0) / daySamples.length) * 100 : 0
+                const nightKey = slxT3Cycles > 0 ? `${dayKey}__Turno 3` : `${dayKey}__Turno noche`
+                if (slxNightCycles > 0) slxNightUptimePct = (slxByShift.get(nightKey)?.avgShiftRuntime ?? 0) * 100
+              }
               // Filtra ruido SLX (turnos con <SLX_NOISE_THRESHOLD ciclos).
               // Centralizado en `isSignificantCycleCount` para garantizar
               // consistencia con chips, stats mensuales, pareto y virtuals.
@@ -3263,20 +3319,6 @@ export function GraderHistoricalCalendar({
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 3`))
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 1`))
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno noche`))
-              // Uptime% desde slxByShift. Para "Día" (T1+T2) se promedia el
-              // uptime cuando hay ambos. Para "Noche" se usa T3 del propio día.
-              const slxDayUptimePct = hasSlxDay
-                ? (() => {
-                    const ut1 = slxT1Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 1`)?.avgShiftRuntime ?? 0) : null
-                    const ut2 = slxT2Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 2`)?.avgShiftRuntime ?? 0) : null
-                    const utLeg = slxLegDay > 0 ? (slxByShift.get(`${dayKey}__Turno día`)?.avgShiftRuntime ?? 0) : null
-                    const samples = [ut1, ut2, utLeg].filter((x): x is number => x !== null)
-                    return samples.length > 0 ? (samples.reduce((a, b) => a + b, 0) / samples.length) * 100 : 0
-                  })()
-                : 0
-              const slxNightShiftKey = slxT3Cycles > 0 ? `${dayKey}__Turno 3` : `${dayKey}__Turno noche`
-              const slxNightUptimePct = hasSlxNight
-                ? (slxByShift.get(slxNightShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
               // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
               const dayScanned = !hasData && !hasAnySlx && (
                 slxByShift.has(`${dayKey}__Turno 2`) ||
@@ -3967,7 +4009,7 @@ export function GraderHistoricalCalendar({
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                       <Clock className="h-3 w-3" />
                       {minStart && maxEnd
-                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`
+                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}`
                         : 'Horario no detectado'}
                     </div>
 
