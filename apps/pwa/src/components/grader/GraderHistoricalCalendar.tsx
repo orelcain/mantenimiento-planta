@@ -645,7 +645,10 @@ function buildDayTimelineBlocks(
     // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado
     // (Turno día/noche) para el mismo día visual, preferir el nuevo.
     const visualShiftIds = new Set(visualShifts.map(v => v.shiftId))
-    const hasNewDay   = visualShiftIds.has('Turno 2')
+    // 'Turno 1' cuenta como "día nuevo" además de 'Turno 2': el alias legacy
+    // 'Turno día' de Yal resuelve primero a 'Turno 1' (ver getSlxShiftCandidates),
+    // así que sin incluirlo un día con solo T1 (madrugada) dejaría pasar el alias.
+    const hasNewDay   = visualShiftIds.has('Turno 2') || visualShiftIds.has('Turno 1')
     const hasNewNight = visualShiftIds.has('Turno 1') || visualShiftIds.has('Turno 3')
 
     // Colores por turno (orden cronológico calendárico):
@@ -1320,9 +1323,19 @@ export function GraderHistoricalCalendar({
   const buildSlxVirtualSummaries = useCallback(
     (key: string, seenShifts: Set<string>): Array<{ summary: GraderDailySummary; chip: null }> => {
       if (plantLine.isClassificationPlant !== false) return []
-      const out: Array<{ summary: GraderDailySummary; chip: null }> = []
       const prefix = `${key}__`
 
+      // Nombres legacy que el loader usa como ALIAS de consulta: cuando la app
+      // pide "Turno día"/"Turno noche" en Yal, `getSlxShiftCandidates` resuelve
+      // a los datos de un turno numérico real (ej. "Turno 1"). Esos datos quedan
+      // guardados en el mapa BAJO LA CLAVE DEL ALIAS además de bajo la clave real
+      // → sin deduplicar, el mismo turno físico aparecería 2 veces (bug real
+      // 2026-07-08 Yal: "Turno 1" y "Turno día" mostraban idénticos 00:00→07:45).
+      const LEGACY_ALIAS = new Set(['Turno día', 'Turno noche'])
+
+      // 1. Recolectar candidatos (una entrada por clave del mapa de este día).
+      interface Cand { shiftId: string; mapKey: string; totalCycles: number; c: SlxShiftCache | undefined }
+      const cands: Cand[] = []
       for (const [mapKey, totalCycles] of slxTotalsByShift.entries()) {
         if (!mapKey.startsWith(prefix)) continue
         const shiftId = mapKey.slice(prefix.length)
@@ -1330,27 +1343,47 @@ export function GraderHistoricalCalendar({
         // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
         // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
         if (!isSignificantCycleCount(totalCycles)) continue
-
-        const c = slxByShift.get(mapKey)
-        out.push({
-          summary: {
-            id: `slx-virtual:${mapKey}`,
-            dateKey: key,
-            shiftId,
-            plantLineId,
-            totalPieces: totalCycles,
-            pointZeroPieces: 0,
-            pointZeroPct: 0,
-            startAt: c?.scheduledStart?.toISOString(),
-            endAt: c?.scheduledEnd?.toISOString(),
-            updatedBy: 'shoplogix',
-            updatedAt: '',
-            isSlxVirtual: true,
-            slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-          },
-          chip: null,
-        })
+        cands.push({ shiftId, mapKey, totalCycles, c: slxByShift.get(mapKey) })
       }
+
+      // 2. Deduplicar por HORARIO DE INICIO real (dos turnos físicos distintos
+      //    nunca comparten scheduledStart). Ante colisión se prefiere el nombre
+      //    REAL de Shoplogix (numérico) sobre el alias legacy — "el horario
+      //    manda, el nombre es solo etiqueta". Entradas sin scheduledStart no se
+      //    colapsan entre sí (se mantienen por su shiftId único).
+      const byStart = new Map<string, Cand>()
+      for (const cand of cands) {
+        const startKey = cand.c?.scheduledStart ? cand.c.scheduledStart.toISOString() : `no-start:${cand.shiftId}`
+        const existing = byStart.get(startKey)
+        if (!existing) {
+          byStart.set(startKey, cand)
+          continue
+        }
+        // Colisión de horario: preferir el que NO es alias legacy.
+        const existingIsAlias = LEGACY_ALIAS.has(existing.shiftId)
+        const candIsAlias     = LEGACY_ALIAS.has(cand.shiftId)
+        if (existingIsAlias && !candIsAlias) byStart.set(startKey, cand)
+        // Si ambos son alias o ambos reales, se conserva el primero (estable).
+      }
+
+      const out = [...byStart.values()].map(({ shiftId, mapKey, totalCycles, c }) => ({
+        summary: {
+          id: `slx-virtual:${mapKey}`,
+          dateKey: key,
+          shiftId,
+          plantLineId,
+          totalPieces: totalCycles,
+          pointZeroPieces: 0,
+          pointZeroPct: 0,
+          startAt: c?.scheduledStart?.toISOString(),
+          endAt: c?.scheduledEnd?.toISOString(),
+          updatedBy: 'shoplogix',
+          updatedAt: '',
+          isSlxVirtual: true,
+          slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+        } as GraderDailySummary,
+        chip: null as null,
+      }))
 
       // Orden cronológico entre las cards virtuales (el orden de un Map es de
       // inserción, no de horario) — nombres desconocidos/nuevos igual entran
@@ -1952,7 +1985,12 @@ export function GraderHistoricalCalendar({
       const dk      = key.slice(0, 10)   // 'YYYY-MM-DD'
       const shiftId = key.slice(12)      // 'Turno X' (saltar 'YYYY-MM-DD__')
       // Skip legado si ya existe nuevo formato significativo para ese día
-      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      // El alias legacy 'Turno día' de Yal resuelve PRIMERO a 'Turno 1' y si no
+      // a 'Turno 2' (getSlxShiftCandidates). Saltarlo si CUALQUIERA de los dos
+      // numéricos ya tiene datos — sin el check de 'Turno 1' se doble-contaba la
+      // madrugada en vivo (T1 con ciclos, T2 aún sin arrancar → T1≥50 y T2<50).
+      if (shiftId === 'Turno día'   && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       const uptimePct = cache.avgShiftRuntime * 100
@@ -2047,7 +2085,12 @@ export function GraderHistoricalCalendar({
       const dk      = key.slice(0, 10)
       const shiftId = key.slice(12)
       // Saltar legado si ya existe nuevo formato significativo (igual que slxMonthlyStats)
-      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      // El alias legacy 'Turno día' de Yal resuelve PRIMERO a 'Turno 1' y si no
+      // a 'Turno 2' (getSlxShiftCandidates). Saltarlo si CUALQUIERA de los dos
+      // numéricos ya tiene datos — sin el check de 'Turno 1' se doble-contaba la
+      // madrugada en vivo (T1 con ciclos, T2 aún sin arrancar → T1≥50 y T2<50).
+      if (shiftId === 'Turno día'   && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       // Fuente de states según filtro:
