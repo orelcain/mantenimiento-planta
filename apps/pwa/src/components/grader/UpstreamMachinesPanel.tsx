@@ -18,7 +18,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle, Download, MessageSquare,
+  TrendingUp, TrendingDown, Timer, Gauge, Pause, AlertTriangle, Download, MessageSquare,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -159,6 +159,26 @@ function computeKpis(intervals: UpstreamProductionInterval[]): MachineKpis {
     totalProduced: total, totalExpected: expected,
     reachedPct: expected > 0 ? total / expected : 0,
   }
+}
+
+/**
+ * Ciclo = segundos por pescado (1 ciclo = 1 pez), la "velocidad" de la Baader.
+ *   real  = tiempo REAL corriendo / piezas = uptimeSec / totalCycles
+ *   ideal = 300s (bucket 5min) / piezas objetivo del bucket = 300 / expectedCycles
+ * Es el mismo concepto que el Rendimiento, pero en tiempo/pieza (más intuitivo
+ * para el operador: "voy 0.2s lento" en vez de "rindo 91%"). Coincide con el
+ * "Ciclo" de la vista de análisis de Shoplogix. Ver project_oee_doble_conteo_shoplogix.
+ */
+function computeCiclo(
+  shift: UpstreamMachineShift,
+): { realSec: number; idealSec: number | null; deltaSec: number | null } | null {
+  const uptimeSec = shift.shiftRuntimeBreakdown?.uptimeSec ?? 0
+  const cycles = shift.totalCycles ?? 0
+  if (uptimeSec <= 0 || cycles <= 0) return null
+  const realSec = uptimeSec / cycles
+  const target = shift.intervals.find((iv) => iv.expectedCycles > 0)?.expectedCycles ?? 0
+  const idealSec = target > 0 ? 300 / target : null // bucket de 5 min = 300 s
+  return { realSec, idealSec, deltaSec: idealSec != null ? realSec - idealSec : null }
 }
 
 /** Agrega estados por reason para la leyenda. */
@@ -719,6 +739,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
   const breaks = shift.states.filter(s => s.type === 'break').length
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
+  const ciclo  = computeCiclo(shift)
 
   const ratioColor =
     shift.overallRatio >= 0.85 ? 'text-emerald-400'
@@ -823,6 +844,23 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
             <Zap className="w-3 h-3" /> {micro} micro
           </span>
         )}
+        {ciclo && (
+          <span
+            className="flex items-center gap-1"
+            title={
+              ciclo.idealSec != null
+                ? `Ciclo real ${ciclo.realSec.toFixed(1)}s/pescado · ideal ${ciclo.idealSec.toFixed(1)}s · ` +
+                  `${ciclo.deltaSec! >= 0 ? '+' : ''}${ciclo.deltaSec!.toFixed(1)}s (${ciclo.deltaSec! > 0.05 ? 'más lento' : 'en ritmo'})`
+                : `Ciclo real ${ciclo.realSec.toFixed(1)}s por pescado`
+            }
+          >
+            <Gauge className="w-3 h-3" />
+            {ciclo.realSec.toFixed(1)}s/pz
+            {ciclo.idealSec != null && ciclo.deltaSec! > 0.05 && (
+              <span className="text-amber-400">(+{ciclo.deltaSec!.toFixed(1)})</span>
+            )}
+          </span>
+        )}
         <span className="ml-auto text-[10px] text-slate-600">
           {fmtTime(shift.shiftStart)} – {fmtTime(shift.shiftEnd)}
         </span>
@@ -884,6 +922,51 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               })()}
             </div>
           </div>
+          {/* Tabla de eventos del turno — cada paro con hora inicio–fin–duración–
+              motivo (espeja la vista de análisis de Shoplogix; complemento textual
+              del Gantt visual). Solo no-uptime, orden cronológico. */}
+          {(() => {
+            const eventos = shift.states
+              .filter((s) => s.type !== 'uptime' && s.durationSec > 0) // sin uptime ni eventos 0s (ruido)
+              .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+            if (eventos.length === 0) return null
+            return (
+              <div className="mt-2">
+                <div className="text-slate-600 mb-1">Eventos del turno ({eventos.length})</div>
+                <div className="max-h-52 overflow-y-auto rounded border border-slate-800/60">
+                  <table className="w-full text-[10px] tabular-nums">
+                    <thead className="text-slate-600 sticky top-0 bg-slate-950/95 backdrop-blur">
+                      <tr>
+                        <th className="text-left  px-2 py-1 font-medium">Inicio</th>
+                        <th className="text-left  px-2 py-1 font-medium">Fin</th>
+                        <th className="text-right px-2 py-1 font-medium">Duración</th>
+                        <th className="text-left  px-2 py-1 font-medium">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eventos.map((s, i) => {
+                        const color = slxStateColor(s.type, s.reason, s.color)
+                        const motivo = s.reason || s.name || s.type
+                        return (
+                          <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-900/40">
+                            <td className="px-2 py-1 text-slate-400">{fmtTime(s.startAt)}</td>
+                            <td className="px-2 py-1 text-slate-400">{fmtTime(s.endAt)}</td>
+                            <td className="px-2 py-1 text-right text-slate-300">{fmtDurationSec(s.durationSec)}</td>
+                            <td className="px-2 py-1">
+                              <span className="inline-flex items-center gap-1.5 min-w-0">
+                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                                <span className="text-slate-300 truncate">{motivo}</span>
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
           {/* Comentarios completos en expanded (cuando hay más de 2) */}
           {shift.comments.length > 2 && (
             <div className="mt-2 space-y-0.5">
