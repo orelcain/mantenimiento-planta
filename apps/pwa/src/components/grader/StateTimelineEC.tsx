@@ -204,13 +204,13 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       // Serie visual: rectángulos coloreados de los estados
       {
         type: 'custom' as const,
-        renderItem: (_params: any, api: any) => {
+        renderItem: (params: any, api: any) => {
           const start   = api.coord([api.value(0), 0])
           const end     = api.coord([api.value(1), 0])
           const widthPx = Math.max(0, end[0] - start[0])
           const yCenter = api.size([0, 1])[1] / 2
-          return {
-            type: 'rect',
+          const rect = {
+            type: 'rect' as const,
             shape: { x: start[0], y: yCenter - height / 2, width: widthPx, height },
             style: {
               fill: api.value(2),
@@ -220,6 +220,34 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
             emphasis: { style: { opacity: 0.85 } },
             cursor: interactive ? 'pointer' : 'default',
           }
+          // Etiqueta inline de duración — solo para PAROS (downtime/break/setup,
+          // no uptime) y solo si el segmento es lo bastante ancho para leerla.
+          // Antes la duración solo se veía al hover (una barra a la vez); el
+          // operador pedía ver "tiempos de detención" sin tener que pasar el
+          // mouse por cada una. Outline de texto (textBorderColor) para
+          // legibilidad sobre cualquier color de fondo del estado.
+          const st = shift.states[params.dataIndex as number]
+          const MIN_LABEL_WIDTH = 30
+          if (st && st.type !== 'uptime' && widthPx >= MIN_LABEL_WIDTH && height >= 14) {
+            const label = {
+              type: 'text' as const,
+              style: {
+                text: fmtDurationSec(st.durationSec),
+                x: start[0] + widthPx / 2,
+                y: yCenter,
+                fill: '#fff',
+                textBorderColor: 'rgba(0,0,0,0.6)',
+                textBorderWidth: 2,
+                fontSize: Math.min(10, height - 4),
+                fontWeight: 600 as const,
+                align: 'center' as const,
+                verticalAlign: 'middle' as const,
+              },
+              silent: true,
+            }
+            return { type: 'group' as const, children: [rect, label] }
+          }
+          return rect
         },
         encode: { x: [0, 1], y: -1 },
         data: seriesData,
@@ -246,7 +274,9 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         tooltip:     { show: false },
       },
     ],
-  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive])
+  // shift.states: renderItem lo lee directo (para la etiqueta de duración) además
+  // de vía seriesData; se agrega explícito aunque cambie junto con seriesData.
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states])
 
   // onEvents mínimo y estable: solo datazoom + click, sin mouse* que causarían re-bind
   const onEvents = useMemo(() => ({

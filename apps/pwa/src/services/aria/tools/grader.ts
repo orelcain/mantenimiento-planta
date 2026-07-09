@@ -14,6 +14,7 @@ import { PLANT_LINES } from '@/config/plantLines'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { computeMachineKPI } from '@/services/grader/plantKpiCompute'
+import { isMaintenanceMacro, isMaintenanceMicro } from '@/services/grader/shoplogixMaintenance'
 
 // ─── Detección de planta desde texto libre ────────────────────────────
 
@@ -897,13 +898,25 @@ registerTool({
       return sa - sb
     })
     const total = sorted.reduce((acc, b) => acc + snapCycles(b.snapshot), 0)
+
+    // Tiempos de detención por turno + total del día. Antes esta tool solo
+    // sumaba PIEZAS; el operador pregunta también "tiempos del día y del
+    // turno del día" y no había ningún dato de duración acá.
+    const detencionSecOf = (s: UpstreamLineSnapshot) =>
+      s.machines.reduce((acc, m) =>
+        acc + m.states.filter(st => st.type === 'downtime').reduce((a, st) => a + (st.durationSec || 0), 0), 0)
+    const uptimeSecOf = (s: UpstreamLineSnapshot) =>
+      s.machines.reduce((acc, m) => acc + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0)
+    const totalDetencionSec = sorted.reduce((acc, b) => acc + detencionSecOf(b.snapshot), 0)
+
     const lines = [
       `Producción registrada en ${plantLbl} el ${dk} (fiel a Shoplogix, TODOS los turnos):`,
-      `- TOTAL: ${fmtNum(total)} piezas`,
+      `- TOTAL: ${fmtNum(total)} piezas · detención total del día ${fmtMin(totalDetencionSec)}`,
     ]
     for (const b of sorted) {
       const s = b.snapshot
-      lines.push(`- ${shiftLabel(s.shiftId)} (${fmtShiftRange(s)}): ${fmtNum(snapCycles(s))} piezas`)
+      const detSec = detencionSecOf(s)
+      lines.push(`- ${shiftLabel(s.shiftId)} (${fmtShiftRange(s)}): ${fmtNum(snapCycles(s))} piezas · detención ${fmtMin(detSec)}`)
     }
     return {
       ok: true,
@@ -911,10 +924,13 @@ registerTool({
         plantSlug,
         date: dk,
         totalPiezas: total,
+        totalDetencionMin: Math.round(totalDetencionSec / 60),
         turnos: sorted.map(b => ({
           turno: shiftLabel(b.snapshot.shiftId),
           piezas: snapCycles(b.snapshot),
           rango: fmtShiftRange(b.snapshot),
+          detencionMin: Math.round(detencionSecOf(b.snapshot) / 60),
+          uptimeMin: Math.round(uptimeSecOf(b.snapshot) / 60),
         })),
       },
       summary: lines.join('\n'),
@@ -925,36 +941,92 @@ registerTool({
 
 // ─── shift.stops (por qué está detenida + averías/MTTR + causas, EN VIVO) ──────
 
+/** Un evento de detención individual (una fila por state downtime, no agregado por causa). */
+interface StopEvent {
+  machineName: string
+  startAt: Date
+  durationSec: number
+  causa: string
+  macro: boolean
+  micro: boolean
+}
+
+/** Extrae cada detención (state.type==='downtime') de un snapshot, evento por evento. */
+export function extractStopEvents(s: UpstreamLineSnapshot): StopEvent[] {
+  const events: StopEvent[] = []
+  for (const m of s.machines) {
+    for (const st of m.states) {
+      if (st.type !== 'downtime') continue
+      events.push({
+        machineName: m.machineName,
+        startAt: st.startAt,
+        durationSec: st.durationSec || 0,
+        causa: (st.reason || st.name || 'sin motivo').trim(),
+        macro: isMaintenanceMacro(st),
+        micro: isMaintenanceMicro(st),
+      })
+    }
+  }
+  return events.sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+}
+
+const fmtHM = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })
+
 registerTool({
   name: 'shift.stops',
   category: 'shift',
   description:
-    'Detenciones y confiabilidad EN VIVO del turno en curso desde Shoplogix, cuadra con el board Análisis de Turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "MTTR/confiabilidad en vivo", "motivo de las paradas", "cuánto tiempo detenida".',
+    'Detenciones y confiabilidad desde Shoplogix, cuadra con el board Análisis de Turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, el LISTADO de cada detención individual (hora + duración + causa), y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Por defecto el turno EN CURSO; con fecha (ayer/anoche/una fecha) consulta un turno PASADO. Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "cuánto duró cada detención", "MTTR/confiabilidad", "motivo de las paradas", "cuánto tiempo detenida", "detenciones de ayer/del turno del día".',
   params: [
     { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal'], required: false, default: 'chonchi', description: 'Planta' },
+    { name: 'date', type: 'date', required: false, description: 'Fecha YYYY-MM-DD del turno a consultar (default: turno en curso/hoy)' },
   ],
   triggers: [
     /\bpor\s+qu[eé]\b.*\b(detenid|parad|par[oó]|frenad|fren[oó])/i,
     /\b(fallas?|aver[ií]as?|detenci[oó]n(es)?|paros?|micro-?detenci|mttr|mtbf|confiabilidad)\b/i,
     /\b(motivo|causa|raz[oó]n)\b.*\b(parad|detenci|par[oó]|fren)/i,
     /\b(falta\s+de\s+(mmpp|materia\s+prima)|atascamiento|energ[ií]a)\b/i,
+    // "cuánto duró/tiempo" + "cada detención" — cobertura explícita de duración
+    // por evento (antes solo se enrutaba por la palabra genérica "detención").
+    /\b(cu[aá]nto\s+(tiempo|dur[oó])|duraci[oó]n)\b.*\b(detenci|parad|par[oó]|fren|falla|aver)/i,
+    /\bcada\s+(detenci|parad|falla|aver)/i,
   ],
   execute: async (params) => {
     const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
     const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
-    const live = await loadLiveShift(plantSlug)
+    const wantsPast = typeof params.date === 'string' && params.date && params.date !== todayKey()
+
+    // Turno EN VIVO (hoy) vs turno PASADO (fecha explícita): distintas fuentes.
+    // loadLiveShift resuelve el turno más activo de HOY; para un día pasado no
+    // hay "en curso" — se toma el bucket con más ciclos de loadAllShiftBuckets
+    // (mismo patrón que shift.dayProduction).
+    let live: LiveShift | null
+    if (wantsPast) {
+      const dk = params.date as string
+      const buckets = await loadAllShiftBuckets(plantSlug, dk)
+      live = buckets.length > 0
+        ? [...buckets].sort((a, b) => snapCycles(b.snapshot) - snapCycles(a.snapshot))[0]!
+        : null
+    } else {
+      live = await loadLiveShift(plantSlug)
+    }
+
     if (!live) {
+      const dia = wantsPast ? ` el ${params.date}` : ' en este momento (turno sin iniciar o sync pendiente)'
       return {
         ok: true,
         data: { plantSlug, count: 0 },
-        summary: `No hay datos vivos de Shoplogix para ${plantLbl} en este momento (turno sin iniciar o sync pendiente).`,
+        summary: `No hay datos de Shoplogix para ${plantLbl}${dia}.`,
         label: `Detenciones · ${plantLbl}`,
       }
     }
     const s = live.snapshot
     const freshMin = live.syncedAt ? Math.max(0, Math.round((Date.now() - live.syncedAt.getTime()) / 60000)) : null
+    const tag = wantsPast ? `${s.shiftId} del ${s.dateKey}` : `EN CURSO ${s.shiftId}`
 
-    // Estado ACTUAL por máquina (último state = el vigente).
+    // Estado ACTUAL por máquina (último state = el vigente) — solo tiene
+    // sentido para el turno en vivo; en un turno pasado el "último state" es
+    // simplemente cómo cerró.
     const ahora = s.machines.map(m => {
       const last = m.states[m.states.length - 1]
       if (!last) return `${m.machineName}: sin datos`
@@ -972,9 +1044,12 @@ registerTool({
     const micro = kpis.reduce((a, k) => a + k.microCount, 0)
     const microMin = kpis.reduce((a, k) => a + k.microMin, 0)
 
-    // Separar DETENCIONES operativas (downtime = paros/fallas) de PAUSAS
-    // programadas (break = colación/reunión). El usuario pregunta "por qué está
-    // detenida" = paros, no colación.
+    // LISTADO evento-por-evento (hora + duración + causa) — antes solo se
+    // agregaba por causa (Pareto) y no se podía responder "cuánto duró CADA
+    // detención". Cada state downtime, ordenado cronológicamente.
+    const events = extractStopEvents(s)
+
+    // Pareto por causa (se mantiene para el resumen ejecutivo).
     const stopSec = new Map<string, number>()
     let breakSec = 0
     for (const m of s.machines) {
@@ -990,12 +1065,22 @@ registerTool({
     const pareto = [...stopSec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
 
     const lines: string[] = [
-      `Detenciones y confiabilidad · ${plantLbl} · turno EN CURSO ${s.shiftId}${freshMin !== null ? ` (dato de hace ~${freshMin} min)` : ''}:`,
-      `- Estado ahora: ${ahora.join(' · ')}`,
-      `- Averías macro: ${failures} · MTTR ${mttr > 0 ? `${mttr.toFixed(1)} min` : '—'} · Micro-detenciones: ${micro}${microMin > 0 ? ` (${Math.round(microMin)} min)` : ''}`,
+      `Detenciones y confiabilidad · ${plantLbl} · turno ${tag}${freshMin !== null ? ` (dato de hace ~${freshMin} min)` : ''}:`,
     ]
+    if (!wantsPast) lines.push(`- Estado ahora: ${ahora.join(' · ')}`)
+    lines.push(`- Averías macro: ${failures} · MTTR ${mttr > 0 ? `${mttr.toFixed(1)} min` : '—'} · Micro-detenciones: ${micro}${microMin > 0 ? ` (${Math.round(microMin)} min)` : ''}`)
+
+    if (events.length) {
+      lines.push(`- Detenciones (evento por evento, ${events.length} en total):`)
+      // Top 12 por duración para no saturar la respuesta; el dato completo va en `data.eventos`.
+      const topEvents = [...events].sort((a, b) => b.durationSec - a.durationSec).slice(0, 12)
+      for (const ev of topEvents) {
+        const tipo = ev.macro ? ' [avería macro]' : ev.micro ? ' [micro]' : ''
+        lines.push(`  · ${fmtHM(ev.startAt)} ${ev.machineName} — ${ev.causa}: ${fmtMin(ev.durationSec)}${tipo}`)
+      }
+    }
     if (pareto.length) {
-      lines.push('- Causas de detención (paros operativos, por tiempo):')
+      lines.push('- Causas de detención (paros operativos, por tiempo total):')
       for (const [causa, sec] of pareto) lines.push(`  · ${causa}: ${fmtMin(sec)}`)
     }
     if (breakSec > 0) lines.push(`- Pausas programadas (colación/reunión): ${fmtMin(breakSec)}`)
@@ -1005,13 +1090,22 @@ registerTool({
       data: {
         plantSlug,
         shiftId: s.shiftId,
-        estadoActual: ahora,
+        dateKey: s.dateKey,
+        estadoActual: wantsPast ? undefined : ahora,
         averiasMacro: failures,
         mttrMin: mttr,
         microCount: micro,
         microMin,
         pausasProgramadasMin: Math.round(breakSec / 60),
         causasDetencion: pareto.map(([causa, sec]) => ({ causa, minutos: Math.round(sec / 60) })),
+        eventos: events.map(ev => ({
+          maquina: ev.machineName,
+          hora: fmtHM(ev.startAt),
+          duracionMin: Math.round(ev.durationSec / 60),
+          causa: ev.causa,
+          macro: ev.macro,
+          micro: ev.micro,
+        })),
       },
       summary: lines.join('\n'),
       label: `Detenciones · ${plantLbl}`,
@@ -1074,10 +1168,14 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
       && /\b(yal|planta\s+yal)\b/i.test(userMessage)) {
     params.plantSlug = 'yal'
   }
-  // shift.dayProduction: fecha relativa. "anoche"/"madrugada" → ayer (Shoplogix
-  // lumpea la producción nocturna que cruza medianoche en el bucket del día que
-  // arrancó la ventana, típicamente ayer).
-  if (toolName === 'shift.dayProduction') {
+  // shift.dayProduction / shift.stops: fecha relativa. "anoche"/"madrugada" →
+  // ayer (Shoplogix lumpea la producción nocturna que cruza medianoche en el
+  // bucket del día que arrancó la ventana, típicamente ayer). "del día" SIN
+  // "ayer/anoche" NO cambia la fecha — el default (sin date) ya es hoy/turno
+  // en curso, que es lo correcto para "detenciones del día". Antes esto solo
+  // aplicaba a shift.dayProduction — shift.stops quedaba siempre en vivo aunque
+  // se preguntara "detenciones de ayer".
+  if (toolName === 'shift.dayProduction' || toolName === 'shift.stops') {
     const lower = userMessage.toLowerCase()
     if (/\b(anteayer|antier|anteanoche)\b/.test(lower)) params.date = daysAgo(2)
     else if (/\b(ayer|anoche|madrugada|de\s+noche)\b/.test(lower)) params.date = daysAgo(1)
