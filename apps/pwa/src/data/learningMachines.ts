@@ -76,10 +76,11 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'grader',
     name: 'Grader',
     area: 'Planta Principal',
-    description: 'Clasificador automatico por peso y tamaño.',
+    description: 'Clasificador automatico por peso y tamaño. Manual Marelec MS4/12, SOPs y runbooks Z2 (contrastacion, calibracion, mantencion, limpieza, troubleshooting).',
     icon: Scale,
     color: '#44dd88',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    customRoute: '/aprendizaje/grader-manual',
+    sections: { manual: true, procedures: true, flows: false, diagnosis: true },
   },
   {
     slug: 'baader-200',

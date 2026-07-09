@@ -68,6 +68,25 @@ function shiftWindow(dateKey, shiftId) {
 }
 
 /**
+ * Filtra comentarios crudos de Shoplogix a la ventana [startMs, endMs] de un
+ * turno específico. Sin esto, un comentario con su propio `start`/`end` fuera
+ * del turno consultado quedaba igual guardado en el doc — evidencia real:
+ * un comentario de 2026-07-08 01:00 (turno de madrugada del día 8) apareció
+ * dentro del doc "2026-07-07_Turno 2", cuyo turno real termina ~00:00.
+ *
+ * Comentarios sin campo `.start` (o legado como string plano) se CONSERVAN
+ * — no hay forma de saber si pertenecen a este turno, y descartarlos perdería
+ * datos legítimos; quedan como "huérfanos" para que la UI decida qué hacer.
+ */
+function filterCommentsToWindow(rawComments, startMs, endMs) {
+  return (rawComments || []).filter(c => {
+    if (!c || typeof c !== 'object' || !c.start) return true
+    const t = parseShoplogixTime(c.start).getTime()
+    return t >= startMs && t <= endMs
+  })
+}
+
+/**
  * Deriva el `dateKey` calendario (YYYY-MM-DD) al que pertenece un turno,
  * a partir de su `scheduledStart` real (wall-clock-as-UTC).
  *
@@ -345,6 +364,16 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
               const ivStartMs = parseShoplogixTime(iv.start).getTime()
               return ivStartMs >= groupStartMs && ivStartMs <= groupEndMs
             }),
+          comments: filterCommentsToWindow(rawProd.comments, groupStartMs, groupEndMs),
+        }
+
+        // `rawSumm.comments` sufre el mismo problema que `machineProduction` sin
+        // filtrar: es la respuesta del DÍA COMPLETO, reusada para cada turno
+        // detectado ese día. Sin este filtro, comentarios de un turno vecino
+        // (incluso del día siguiente) quedaban guardados en este turno.
+        const filteredSumm = {
+          ...rawSumm,
+          comments: filterCommentsToWindow(rawSumm.comments, groupStartMs, groupEndMs),
         }
 
         // dateKey del doc = día calendario donde ARRANCA el turno (no la ventana
@@ -362,7 +391,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
         const doc = normalizeShift({
           production:    filteredProd,
-          summary:       rawSumm,
+          summary:       filteredSumm,
           dateKey:       shiftDateKey,
           shiftId:       group.shiftId,
           shiftStartAt:  group.scheduledStart,
@@ -389,12 +418,26 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
             const ts = iv.startAt instanceof Date ? iv.startAt.getTime() : new Date(iv.startAt).getTime()
             return ts < winLo || ts > winHi
           })
-          const qualityIssues = outOfWindow.length > 0
-            ? [`${outOfWindow.length}/${(doc.intervals || []).length} intervals fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`]
-            : []
+          // Mismo chequeo para states: aunque ahora se recortan (clipStateToWindow)
+          // al límite del turno, un state que aparezca con startAt/endAt fuera de
+          // [winLo,winHi] delata un bug de filtrado/timezone que el clip no cubre
+          // (ej. shiftStart/shiftEnd mal calculados). Antes de este cambio esta
+          // duplicación era invisible: solo se validaban intervals, nunca states.
+          const statesOutOfWindow = (doc.states || []).filter(s => {
+            const startTs = s.startAt instanceof Date ? s.startAt.getTime() : new Date(s.startAt).getTime()
+            const endTs   = s.endAt   instanceof Date ? s.endAt.getTime()   : new Date(s.endAt).getTime()
+            return startTs < winLo || endTs > winHi
+          })
+          const qualityIssues = []
+          if (outOfWindow.length > 0) {
+            qualityIssues.push(`${outOfWindow.length}/${(doc.intervals || []).length} intervals fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
+          }
+          if (statesOutOfWindow.length > 0) {
+            qualityIssues.push(`${statesOutOfWindow.length}/${(doc.states || []).length} states fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
+          }
           await ref.set({ dataQualityIssues: qualityIssues }, { merge: true })
           if (qualityIssues.length > 0) {
-            logger.warn(`[syncDay][${plantSlug}] QUALITY ${machines[i].name}: ${qualityIssues[0]}`)
+            logger.warn(`[syncDay][${plantSlug}] QUALITY ${machines[i].name}: ${qualityIssues.join(' · ')}`)
           }
         } catch (qErr) {
           logger.warn(`[syncDay][${plantSlug}] quality-check err (${machines[i].name}): ${qErr.message}`)

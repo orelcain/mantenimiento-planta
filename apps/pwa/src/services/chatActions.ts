@@ -24,6 +24,8 @@ export type ActionType =
   | 'search_equipment'
   | 'search_repuestos'
   | 'navigate'
+  | 'create_repuesto'
+  | 'edit_repuesto'
 
 /** Estado de una acción pendiente */
 export type ActionStatus = 'collecting' | 'confirming' | 'executing' | 'completed' | 'cancelled'

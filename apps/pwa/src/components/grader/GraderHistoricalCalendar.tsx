@@ -376,6 +376,7 @@ function formatShiftTimeRange(summary: GraderDailySummary): string {
           hour: '2-digit',
           minute: '2-digit',
           timeZone: 'UTC',
+          hour12: false,   // 00:00, no "12:00 a. m." (es-CL default es 12h)
         })
       : '?'
   const dayPart = (iso: string | undefined) => (iso ? iso.slice(0, 10).slice(5) : '??')
@@ -505,7 +506,14 @@ function buildDayTimelineBlocks(
       endFrac   = 1
     } else {
       startFrac = startMin / 1440
-      endFrac   = endMin   / 1440
+      // Turno que termina exactamente al cruzar medianoche (ej. Yal Turno 2
+      // con scheduledEnd=00:00 del día siguiente): getUTCHours()*60+getUTCMinutes()
+      // da 0, indistinguible de "inicio de día" — sin este chequeo por día
+      // calendario completo, el fallback de abajo colapsaba el bloque a un
+      // tramo de ~2% de ancho en vez de estirarlo hasta el borde derecho.
+      const startDay = Math.floor(startD.getTime() / 86_400_000)
+      const endDay   = Math.floor(endD.getTime()   / 86_400_000)
+      endFrac = endDay > startDay ? 1 : endMin / 1440
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
     }
 
@@ -526,7 +534,12 @@ function buildDayTimelineBlocks(
         const effEndMin   = effEnd.getUTCHours()   * 60 + effEnd.getUTCMinutes()
         if (direction === 'same') {
           startFrac = effStartMin / 1440
-          endFrac   = effEndMin   / 1440
+          // Mismo chequeo por día calendario que en el cálculo base: un fin
+          // efectivo exactamente a medianoche del día siguiente da effEndMin=0
+          // (indistinguible de "inicio de día") si no se compara la fecha completa.
+          const effStartDay = Math.floor(effStart.getTime() / 86_400_000)
+          const effEndDay   = Math.floor(effEnd.getTime()   / 86_400_000)
+          endFrac = effEndDay > effStartDay ? 1 : effEndMin / 1440
         } else if (direction === 'enters') {
           endFrac = Math.min(effEndMin / 1440, 1)
         } else if (direction === 'exits') {
@@ -633,7 +646,10 @@ function buildDayTimelineBlocks(
     // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado
     // (Turno día/noche) para el mismo día visual, preferir el nuevo.
     const visualShiftIds = new Set(visualShifts.map(v => v.shiftId))
-    const hasNewDay   = visualShiftIds.has('Turno 2')
+    // 'Turno 1' cuenta como "día nuevo" además de 'Turno 2': el alias legacy
+    // 'Turno día' de Yal resuelve primero a 'Turno 1' (ver getSlxShiftCandidates),
+    // así que sin incluirlo un día con solo T1 (madrugada) dejaría pasar el alias.
+    const hasNewDay   = visualShiftIds.has('Turno 2') || visualShiftIds.has('Turno 1')
     const hasNewNight = visualShiftIds.has('Turno 1') || visualShiftIds.has('Turno 3')
 
     // Colores por turno (orden cronológico calendárico):
@@ -1292,131 +1308,88 @@ export function GraderHistoricalCalendar({
   // Permite ver el turno en el panel "Resumen del día" aunque el usuario no
   // haya cargado el Excel del Marelec — evita que la card desaparezca cuando
   // existen ciclos Baader medidos por Shoplogix.
+  //
+  // PRINCIPIO — reflejo puro por horario, no por nombre: antes esta función
+  // agrupaba por baldes fijos ("Turno 1"+"Turno 2" = balde "día", "Turno 3"+
+  // "Turno noche" = balde "noche") y fusionaba sus ciclos/horario en UNA sola
+  // card. Eso se rompe cada vez que Shoplogix renombra un turno recurrente
+  // (ya pasó 2 veces: PR #163/#168, y de nuevo con la madrugada de Yal
+  // etiquetada "Turno 1" en vez de "Turno 3" — el balde "día" absorbía esa
+  // madrugada junto con el Turno 2 real de la tarde, mostrando un rango
+  // fusionado 00:00→19:41 que no correspondía a ningún turno real).
+  // El nombre que Shoplogix le ponga a un turno no es dato estable — lo único
+  // confiable es su horario real (scheduledStart/End). Por eso ahora se crea
+  // UNA card por cada shiftId que Shoplogix reporte ese día, con SU PROPIO
+  // horario, sin fusionar con ningún otro — el nombre queda solo como etiqueta.
   const buildSlxVirtualSummaries = useCallback(
     (key: string, seenShifts: Set<string>): Array<{ summary: GraderDailySummary; chip: null }> => {
       if (plantLine.isClassificationPlant !== false) return []
-      const out: Array<{ summary: GraderDailySummary; chip: null }> = []
-      const hasExcelDay = seenShifts.has('Turno día')
-        || seenShifts.has('Turno 1') || seenShifts.has('Turno 2')
-      const hasExcelNight = seenShifts.has('Turno noche') || seenShifts.has('Turno 3')
-      // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
-      // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
+      const prefix = `${key}__`
 
-      // Día: T1+T2 nuevos (sumados) o legacy "Turno día"
-      if (!hasExcelDay) {
-        const t1 = slxTotalsByShift.get(`${key}__Turno 1`) ?? 0
-        const t2 = slxTotalsByShift.get(`${key}__Turno 2`) ?? 0
-        const tLeg = slxTotalsByShift.get(`${key}__Turno día`) ?? 0
-        const newDayCycles = t1 + t2
+      // Nombres legacy que el loader usa como ALIAS de consulta: cuando la app
+      // pide "Turno día"/"Turno noche" en Yal, `getSlxShiftCandidates` resuelve
+      // a los datos de un turno numérico real (ej. "Turno 1"). Esos datos quedan
+      // guardados en el mapa BAJO LA CLAVE DEL ALIAS además de bajo la clave real
+      // → sin deduplicar, el mismo turno físico aparecería 2 veces (bug real
+      // 2026-07-08 Yal: "Turno 1" y "Turno día" mostraban idénticos 00:00→07:45).
+      const LEGACY_ALIAS = new Set(['Turno día', 'Turno noche'])
 
-        if (isSignificantCycleCount(newDayCycles)) {
-          const cT1 = slxByShift.get(`${key}__Turno 1`)
-          const cT2 = slxByShift.get(`${key}__Turno 2`)
-          const start = cT1?.scheduledStart ?? cT2?.scheduledStart ?? null
-          const end = cT2?.scheduledEnd ?? cT1?.scheduledEnd ?? null
-          const samples = [
-            t1 > 0 ? cT1?.avgShiftRuntime : null,
-            t2 > 0 ? cT2?.avgShiftRuntime : null,
-          ].filter((x): x is number => typeof x === 'number' && x > 0)
-          const avgUptime = samples.length > 0
-            ? samples.reduce((a, b) => a + b, 0) / samples.length : 0
-          // Navegación: preferir el turno con más ciclos (más representativo)
-          const navShift = t2 >= t1 && t2 > 0 ? 'Turno 2' : 'Turno 1'
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__day`,
-              dateKey: key,
-              shiftId: navShift,
-              plantLineId,
-              totalPieces: newDayCycles,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: start ? start.toISOString() : undefined,
-              endAt: end ? end.toISOString() : undefined,
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: avgUptime,
-            },
-            chip: null,
-          })
-        } else if (isSignificantCycleCount(tLeg) && plantLine.isClassificationPlant !== false) {
-          // Fallback legacy "Turno día" solo aplica a plantas clasificadoras (Chonchi).
-          // En Yal y otras no-clasificadoras la nomenclatura correcta es T1/T2/T3;
-          // un doc legacy `Turno día` ahí es ruido residual (sync mal configurado) y
-          // confunde porque pisa los turnos numerados reales.
-          const c = slxByShift.get(`${key}__Turno día`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__dia-legacy`,
-              dateKey: key,
-              shiftId: 'Turno día',
-              plantLineId,
-              totalPieces: tLeg,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
-        }
+      // 1. Recolectar candidatos (una entrada por clave del mapa de este día).
+      interface Cand { shiftId: string; mapKey: string; totalCycles: number; c: SlxShiftCache | undefined }
+      const cands: Cand[] = []
+      for (const [mapKey, totalCycles] of slxTotalsByShift.entries()) {
+        if (!mapKey.startsWith(prefix)) continue
+        const shiftId = mapKey.slice(prefix.length)
+        if (seenShifts.has(shiftId)) continue // ya cubierto por Excel real
+        // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
+        // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
+        if (!isSignificantCycleCount(totalCycles)) continue
+        cands.push({ shiftId, mapKey, totalCycles, c: slxByShift.get(mapKey) })
       }
 
-      // Noche: T3 (arranca en este día) o legacy "Turno noche"
-      if (!hasExcelNight) {
-        const t3 = slxTotalsByShift.get(`${key}__Turno 3`) ?? 0
-        const tLegN = slxTotalsByShift.get(`${key}__Turno noche`) ?? 0
-        if (isSignificantCycleCount(t3)) {
-          const c = slxByShift.get(`${key}__Turno 3`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__t3`,
-              dateKey: key,
-              shiftId: 'Turno 3',
-              plantLineId,
-              totalPieces: t3,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
-        } else if (isSignificantCycleCount(tLegN) && plantLine.isClassificationPlant !== false) {
-          // Mismo razonamiento que el fallback "Turno día" legacy: en plantas
-          // no-clasificadoras (Yal) la noche real es Turno 3 (madrugada) o no hay;
-          // un doc legacy `Turno noche` ahí es ruido residual del sync upstream.
-          const c = slxByShift.get(`${key}__Turno noche`)
-          out.push({
-            summary: {
-              id: `slx-virtual:${key}__noche-legacy`,
-              dateKey: key,
-              shiftId: 'Turno noche',
-              plantLineId,
-              totalPieces: tLegN,
-              pointZeroPieces: 0,
-              pointZeroPct: 0,
-              startAt: c?.scheduledStart?.toISOString(),
-              endAt: c?.scheduledEnd?.toISOString(),
-              updatedBy: 'shoplogix',
-              updatedAt: '',
-              isSlxVirtual: true,
-              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
-            },
-            chip: null,
-          })
+      // 2. Deduplicar por HORARIO DE INICIO real (dos turnos físicos distintos
+      //    nunca comparten scheduledStart). Ante colisión se prefiere el nombre
+      //    REAL de Shoplogix (numérico) sobre el alias legacy — "el horario
+      //    manda, el nombre es solo etiqueta". Entradas sin scheduledStart no se
+      //    colapsan entre sí (se mantienen por su shiftId único).
+      const byStart = new Map<string, Cand>()
+      for (const cand of cands) {
+        const startKey = cand.c?.scheduledStart ? cand.c.scheduledStart.toISOString() : `no-start:${cand.shiftId}`
+        const existing = byStart.get(startKey)
+        if (!existing) {
+          byStart.set(startKey, cand)
+          continue
         }
+        // Colisión de horario: preferir el que NO es alias legacy.
+        const existingIsAlias = LEGACY_ALIAS.has(existing.shiftId)
+        const candIsAlias     = LEGACY_ALIAS.has(cand.shiftId)
+        if (existingIsAlias && !candIsAlias) byStart.set(startKey, cand)
+        // Si ambos son alias o ambos reales, se conserva el primero (estable).
       }
 
+      const out = [...byStart.values()].map(({ shiftId, mapKey, totalCycles, c }) => ({
+        summary: {
+          id: `slx-virtual:${mapKey}`,
+          dateKey: key,
+          shiftId,
+          plantLineId,
+          totalPieces: totalCycles,
+          pointZeroPieces: 0,
+          pointZeroPct: 0,
+          startAt: c?.scheduledStart?.toISOString(),
+          endAt: c?.scheduledEnd?.toISOString(),
+          updatedBy: 'shoplogix',
+          updatedAt: '',
+          isSlxVirtual: true,
+          slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+        } as GraderDailySummary,
+        chip: null as null,
+      }))
+
+      // Orden cronológico entre las cards virtuales (el orden de un Map es de
+      // inserción, no de horario) — nombres desconocidos/nuevos igual entran
+      // en su posición real por hora en vez de caer al final por sorpresa.
+      out.sort((a, b) => (a.summary.startAt ?? '').localeCompare(b.summary.startAt ?? ''))
       return out
     },
     [plantLine.isClassificationPlant, plantLineId, slxByShift, slxTotalsByShift],
@@ -2013,7 +1986,12 @@ export function GraderHistoricalCalendar({
       const dk      = key.slice(0, 10)   // 'YYYY-MM-DD'
       const shiftId = key.slice(12)      // 'Turno X' (saltar 'YYYY-MM-DD__')
       // Skip legado si ya existe nuevo formato significativo para ese día
-      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      // El alias legacy 'Turno día' de Yal resuelve PRIMERO a 'Turno 1' y si no
+      // a 'Turno 2' (getSlxShiftCandidates). Saltarlo si CUALQUIERA de los dos
+      // numéricos ya tiene datos — sin el check de 'Turno 1' se doble-contaba la
+      // madrugada en vivo (T1 con ciclos, T2 aún sin arrancar → T1≥50 y T2<50).
+      if (shiftId === 'Turno día'   && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       const uptimePct = cache.avgShiftRuntime * 100
@@ -2108,7 +2086,12 @@ export function GraderHistoricalCalendar({
       const dk      = key.slice(0, 10)
       const shiftId = key.slice(12)
       // Saltar legado si ya existe nuevo formato significativo (igual que slxMonthlyStats)
-      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      // El alias legacy 'Turno día' de Yal resuelve PRIMERO a 'Turno 1' y si no
+      // a 'Turno 2' (getSlxShiftCandidates). Saltarlo si CUALQUIERA de los dos
+      // numéricos ya tiene datos — sin el check de 'Turno 1' se doble-contaba la
+      // madrugada en vivo (T1 con ciclos, T2 aún sin arrancar → T1≥50 y T2<50).
+      if (shiftId === 'Turno día'   && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       // Fuente de states según filtro:
@@ -3250,23 +3233,78 @@ export function GraderHistoricalCalendar({
               // `Turno día`/`Turno noche` en Firestore — son ruido del sync
               // upstream (la planta opera con T1/T2/T3, no con Día/Noche).
               const useLegacyDayNight = plantLine.isClassificationPlant !== false
-              const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
-              const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
-              const slxLegDay   = (showSlxDay && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
-              const slxNewDay   = slxT1Cycles + slxT2Cycles  // suma "mañana+tarde"
-              const slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
-              // shiftId para navegar (preferir T2 si tiene más cycles)
-              const slxDayNav = slxT2Cycles >= slxT1Cycles && slxT2Cycles > 0
-                ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
-                : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
-                : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
-              // Noche: T3 SLX del PROPIO día (arranca 23:00 del Y).
-              const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
-              const slxLegNight = (showSlxNight && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
-              const slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
-              const slxNightNav = slxT3Cycles > 0
-                ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
-                : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
+              // Dos slots por celda: "día" (arriba) y "noche/madrugada" (abajo).
+              //
+              // Yal (no-clasificadora): asignar cada turno numérico real a su slot
+              // por HORA DE INICIO real (scheduledStart), NO por nombre. Madrugada/
+              // noche (start <12:00 o >=20:00) → slot noche; tarde (12:00-20:00) →
+              // slot día. Antes se sumaba T1+T2 en el slot día ("mañana+tarde"), y
+              // cuando Shoplogix renombró la madrugada de "Turno 3" a "Turno 1" esa
+              // madrugada cayó en el slot día y se SUMÓ con el T2 de la tarde → un
+              // solo chip (bug 2026-07-08: día 8 mostraba "T2 18.770" = 4.797+13.973
+              // en vez de dos chips T1 4.797 + T2 13.973). Bucketear por horario los
+              // separa igual que a T2+T3.
+              //
+              // Chonchi (clasificadora): mantiene el mapeo por nombre (día=T2/legado,
+              // noche=T1/T3/legado); sus turnos no cambiaron y sus horarios de noche
+              // (21:30) no encajan en la regla de madrugada de Yal.
+              const isNonClassifCal = plantLine.isClassificationPlant === false
+              let slxDayCycles = 0, slxNightCycles = 0
+              let slxDayNav: { cfDateKey: string; shiftId: string } | null = null
+              let slxNightNav: { cfDateKey: string; shiftId: string } | null = null
+              let slxDayUptimePct = 0, slxNightUptimePct = 0
+              if (isNonClassifCal) {
+                const hasExcelForShift = (sid: string) =>
+                  chipsForDay.some(c => c.role === 'primary' && c.shiftId === sid)
+                const dayBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
+                const nightBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
+                if (showSlx) {
+                  for (const sid of ['Turno 1', 'Turno 2', 'Turno 3']) {
+                    if (hasExcelForShift(sid)) continue  // ya se ve vía chip de Excel
+                    const cyc = slxTotalsByShift.get(`${dayKey}__${sid}`) ?? 0
+                    if (!(cyc > 0)) continue
+                    const cache = slxByShift.get(`${dayKey}__${sid}`)
+                    const startHour = cache?.scheduledStart?.getUTCHours() ?? 0
+                    const uptimePct = (cache?.avgShiftRuntime ?? 0) * 100
+                    const isNightStart = startHour < 12 || startHour >= 20
+                    ;(isNightStart ? nightBucket : dayBucket).push({ shiftId: sid, cycles: cyc, uptimePct })
+                  }
+                }
+                // Si más de un turno cae en el mismo slot, mostrar el de más ciclos.
+                const pickSlot = (arr: typeof dayBucket) =>
+                  arr.slice().sort((a, b) => b.cycles - a.cycles)[0] ?? null
+                const dayPick = pickSlot(dayBucket)
+                const nightPick = pickSlot(nightBucket)
+                slxDayCycles = dayPick?.cycles ?? 0
+                slxNightCycles = nightPick?.cycles ?? 0
+                slxDayNav = dayPick ? { cfDateKey: dayKey, shiftId: dayPick.shiftId } : null
+                slxNightNav = nightPick ? { cfDateKey: dayKey, shiftId: nightPick.shiftId } : null
+                slxDayUptimePct = dayPick?.uptimePct ?? 0
+                slxNightUptimePct = nightPick?.uptimePct ?? 0
+              } else {
+                const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
+                const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+                const slxLegDay   = (showSlxDay && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+                const slxNewDay   = slxT1Cycles + slxT2Cycles  // Chonchi: T1+T2 = jornada día
+                slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
+                slxDayNav = slxT2Cycles >= slxT1Cycles && slxT2Cycles > 0
+                  ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
+                  : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
+                  : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
+                const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
+                const slxLegNight = (showSlxNight && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+                slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
+                slxNightNav = slxT3Cycles > 0
+                  ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
+                  : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
+                const ut1 = slxT1Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 1`)?.avgShiftRuntime ?? 0) : null
+                const ut2 = slxT2Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 2`)?.avgShiftRuntime ?? 0) : null
+                const utLeg = slxLegDay > 0 ? (slxByShift.get(`${dayKey}__Turno día`)?.avgShiftRuntime ?? 0) : null
+                const daySamples = [ut1, ut2, utLeg].filter((x): x is number => x !== null)
+                slxDayUptimePct = daySamples.length > 0 ? (daySamples.reduce((a, b) => a + b, 0) / daySamples.length) * 100 : 0
+                const nightKey = slxT3Cycles > 0 ? `${dayKey}__Turno 3` : `${dayKey}__Turno noche`
+                if (slxNightCycles > 0) slxNightUptimePct = (slxByShift.get(nightKey)?.avgShiftRuntime ?? 0) * 100
+              }
               // Filtra ruido SLX (turnos con <SLX_NOISE_THRESHOLD ciclos).
               // Centralizado en `isSignificantCycleCount` para garantizar
               // consistencia con chips, stats mensuales, pareto y virtuals.
@@ -3281,20 +3319,6 @@ export function GraderHistoricalCalendar({
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 3`))
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 1`))
                 || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno noche`))
-              // Uptime% desde slxByShift. Para "Día" (T1+T2) se promedia el
-              // uptime cuando hay ambos. Para "Noche" se usa T3 del propio día.
-              const slxDayUptimePct = hasSlxDay
-                ? (() => {
-                    const ut1 = slxT1Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 1`)?.avgShiftRuntime ?? 0) : null
-                    const ut2 = slxT2Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 2`)?.avgShiftRuntime ?? 0) : null
-                    const utLeg = slxLegDay > 0 ? (slxByShift.get(`${dayKey}__Turno día`)?.avgShiftRuntime ?? 0) : null
-                    const samples = [ut1, ut2, utLeg].filter((x): x is number => x !== null)
-                    return samples.length > 0 ? (samples.reduce((a, b) => a + b, 0) / samples.length) * 100 : 0
-                  })()
-                : 0
-              const slxNightShiftKey = slxT3Cycles > 0 ? `${dayKey}__Turno 3` : `${dayKey}__Turno noche`
-              const slxNightUptimePct = hasSlxNight
-                ? (slxByShift.get(slxNightShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
               // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
               const dayScanned = !hasData && !hasAnySlx && (
                 slxByShift.has(`${dayKey}__Turno 2`) ||
@@ -3985,7 +4009,7 @@ export function GraderHistoricalCalendar({
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                       <Clock className="h-3 w-3" />
                       {minStart && maxEnd
-                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`
+                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}`
                         : 'Horario no detectado'}
                     </div>
 

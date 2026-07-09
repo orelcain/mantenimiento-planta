@@ -82,9 +82,9 @@ export function AnalisisGraderAyudaPage() {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')} className="gap-1.5 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => navigate('/aprendizaje')} className="gap-1.5 shrink-0">
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Análisis de Turno</span>
+            <span className="hidden sm:inline">Centro de Aprendizaje</span>
           </Button>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">

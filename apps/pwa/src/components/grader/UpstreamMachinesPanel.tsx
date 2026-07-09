@@ -25,9 +25,11 @@ import type {
   UpstreamMachineShift,
   UpstreamProductionInterval,
   UpstreamMachineState,
+  UpstreamShiftComment,
 } from '@/services/shoplogix/types'
 import type { Pause as GraderPause } from '@/services/grader/types'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
+import { matchCommentsToStates, type CommentStateMatch } from '@/services/shoplogix/shoplogixCommentMatch'
 import {
   reachedStatusFromPct,
   reachedStatusColor,
@@ -692,6 +694,33 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
   )
 }
 
+/** Grupo de comentarios que emparejaron con el mismo state (o huérfanos si state=null). */
+interface CommentGroup {
+  state: UpstreamMachineState | null
+  comments: UpstreamShiftComment[]
+}
+
+/**
+ * Agrupa comentarios ya emparejados (`matchCommentsToStates`) por su state —
+ * reproduce la vista "Análisis" de Shoplogix (cada fila Tipo/Razón/Comentario
+ * agrupada por el evento que la originó) en vez de una lista plana. Los
+ * huérfanos (sin state, turno sin eventos) siempre van al final.
+ */
+function groupCommentMatches(matches: CommentStateMatch[]): CommentGroup[] {
+  const orderedKeys: string[] = []
+  const byKey = new Map<string, CommentGroup>()
+  for (const { comment, state } of matches) {
+    const key = state ? `${state.startAt.getTime()}|${state.reason}|${state.name}` : '__orphan__'
+    if (!byKey.has(key)) {
+      byKey.set(key, { state, comments: [] })
+      orderedKeys.push(key)
+    }
+    byKey.get(key)!.comments.push(comment)
+  }
+  orderedKeys.sort((a, b) => (a === '__orphan__' ? 1 : b === '__orphan__' ? -1 : 0))
+  return orderedKeys.map(k => byKey.get(k)!)
+}
+
 // ============================================================================
 // MachineRow — 1 máquina
 // ============================================================================
@@ -740,6 +769,13 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   const breaks = shift.states.filter(s => s.type === 'break').length
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
   const ciclo  = computeCiclo(shift)
+
+  // Empareja cada comentario con el state (paro) que lo originó — antes se
+  // mostraban sueltos, sin relación al timeline de arriba (ver shoplogixCommentMatch.ts).
+  const commentGroups = useMemo(
+    () => groupCommentMatches(matchCommentsToStates(shift.comments, shift.states)),
+    [shift.comments, shift.states],
+  )
 
   const ratioColor =
     shift.overallRatio >= 0.85 ? 'text-emerald-400'
@@ -867,17 +903,21 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       </div>
 
       {/* Comentarios de operador — siempre visibles si existen (max 2).
-          Si hay más, el botón "y N más" abre el detalle expandido.
-          Permite leer anotaciones del turno sin hacer clic extra. */}
+          Cada uno lleva la razón/state que lo originó como prefijo (ej "[FALTA MMPP]")
+          cuando se pudo emparejar — antes era texto suelto sin relación al timeline.
+          Si hay más, el botón "y N más" abre el detalle expandido (agrupado por evento). */}
       {shift.comments.length > 0 && (
         <div className="flex items-start gap-1.5 text-[10px]">
           <MessageSquare className="w-3 h-3 text-slate-500 shrink-0 mt-px" />
           <div className="min-w-0 space-y-0.5">
-            {shift.comments.slice(0, 2).map((c, i) => (
-              <p key={i} className="text-slate-400 italic truncate" title={c}>
-                {c}
-              </p>
-            ))}
+            {shift.comments.slice(0, 2).map((c) => {
+              const label = c.reasonValue ? `[${c.reasonValue}] ${c.text}` : c.text
+              return (
+                <p key={c.key} className="text-slate-400 italic truncate" title={label}>
+                  {label}
+                </p>
+              )
+            })}
             {shift.comments.length > 2 && !expanded && (
               <button
                 onClick={onToggle}
@@ -967,15 +1007,39 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               </div>
             )
           })()}
-          {/* Comentarios completos en expanded (cuando hay más de 2) */}
+          {/* Comentarios completos en expanded (cuando hay más de 2), agrupados
+              por el state/paro que los originó — reproduce la vista "Análisis"
+              de Shoplogix (Tipo/Razón/Comentario juntos) en vez de una lista
+              plana sin relación al timeline de arriba. Huérfanos (sin state
+              matcheado) van en su propia sección al final, nunca se descartan. */}
           {shift.comments.length > 2 && (
-            <div className="mt-2 space-y-0.5">
+            <div className="mt-2 space-y-2">
               <div className="text-slate-600 mb-0.5">Todos los comentarios</div>
-              {shift.comments.map((c, i) => (
-                <p key={i} className="text-slate-300 italic text-[10px]">
-                  <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-slate-500" />
-                  {c}
-                </p>
+              {commentGroups.map((group, gi) => (
+                <div key={gi} className="space-y-0.5">
+                  <div className="flex items-center gap-1 text-slate-500">
+                    {group.state ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: group.state.color }} />
+                        <span className="truncate">
+                          {group.state.name}{group.state.reason ? ` — ${group.state.reason}` : ''}
+                        </span>
+                        <span className="text-slate-700 shrink-0">{fmtTime(group.state.startAt)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                        <span className="text-amber-500/80">Sin evento asociado</span>
+                      </>
+                    )}
+                  </div>
+                  {group.comments.map((c) => (
+                    <p key={c.key} className="text-slate-300 italic text-[10px] pl-3">
+                      <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-slate-500" />
+                      {c.text}
+                    </p>
+                  ))}
+                </div>
               ))}
             </div>
           )}

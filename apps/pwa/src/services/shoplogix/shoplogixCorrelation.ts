@@ -61,7 +61,7 @@ export interface PauseCorrelation {
 // ============================================================================
 
 /** Calcula segundos de intersección entre dos rangos temporales. */
-function overlapSec(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): number {
+export function overlapSec(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): number {
   const start = Math.max(aStart.getTime(), bStart.getTime())
   const end   = Math.min(aEnd.getTime(),   bEnd.getTime())
   return end > start ? Math.floor((end - start) / 1000) : 0

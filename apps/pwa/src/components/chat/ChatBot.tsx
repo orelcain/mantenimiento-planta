@@ -1585,8 +1585,11 @@ export function ChatBot() {
             <QuickSuggestions onSelect={handleQuickSelect} />
           )}
 
-          {/* Barra de acción pendiente */}
-          {pendingAction?.status === 'confirming' && !isLoading && (
+          {/* Barra de acción pendiente — solo incidencias (campos/selector de equipo
+              específicos de ese flujo). Crear/editar repuesto confirma por texto
+              plano ("sí"/"no"), igual que ARIA en Telegram — el mensaje del
+              asistente ya deja explícito "¿Confirmas? (Sí / No)". */}
+          {pendingAction?.status === 'confirming' && pendingAction.type === 'create_incident' && !isLoading && (
             <PendingActionBar
               onConfirm={handleConfirmAction}
               onCancel={handleCancelAction}

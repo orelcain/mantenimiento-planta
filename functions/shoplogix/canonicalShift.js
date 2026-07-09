@@ -1,36 +1,41 @@
 /**
- * Nombre CANÓNICO de turno por horario de inicio — "el histórico manda".
+ * Nombre CANÓNICO de turno — mecanismo de override, HOY SIN REGLAS ACTIVAS.
  *
- * Shoplogix es inconsistente: a veces etiqueta un turno con un nombre distinto
- * del que usó históricamente para ese mismo horario. Caso real verificado en
- * Firestore (2026-04→07): el turno de MADRUGADA de Yal (arranca 00:00) se llamó
- * "Turno 3" 20 veces, y una sola vez (8-jul-2026) Shoplogix lo etiquetó
- * "Turno 1". El operador ve "Turno 3" en el whiteboard; la app debe respetar el
- * nombre histórico, no la anomalía.
+ * HISTORIA (revertido 2026-07-08): esta función nació para "corregir" un turno
+ * de madrugada de Yal que el 8-jul Shoplogix etiquetó "Turno 1" cuando 20
+ * ocurrencias previas (abr-jul) fueron "Turno 3" — decisión tomada como
+ * "el histórico manda". ERROR: horas después, el propio WHITEBOARD de
+ * Shoplogix (la interfaz que mira el operador) confirmó "Turno 1 - 8 Jul 2026"
+ * para ESE MISMO turno — es decir, Shoplogix no tenía un dato inconsistente
+ * consigo mismo; simplemente RENOMBRÓ ese turno recurrente, y nuestra regla
+ * histórica quedó peleando contra la fuente de verdad actual. Resultado:
+ * la app mostraba "Turno 3" mientras Shoplogix decía "Turno 1" — el MISMO
+ * bug que esta función pretendía resolver, ahora en la dirección contraria.
  *
- * Regla: el nombre del turno se canoniza por su HORA de inicio (wall-clock-as-UTC),
- * según lo que esa planta ha usado históricamente. Solo se definen reglas para
- * plantas/horarios con anomalías confirmadas; sin regla, se respeta el nombre
- * que emite Shoplogix (comportamiento previo).
+ * LECCIÓN: Shoplogix puede renombrar turnos recurrentes de un día para otro
+ * (igual que cambia horarios). Un patrón histórico de N ocurrencias pasadas
+ * NO predice ni debe imponerse sobre el nombre ACTUAL de una ocurrencia
+ * nueva — eso es exactamente lo que todo este módulo (PR #157, #160) existe
+ * para evitar. La regla correcta es: SIEMPRE el nombre crudo de Shoplogix,
+ * sin importar el histórico.
  *
- * Chonchi NO tiene reglas: su etiquetado es consistente (Turno 1 21:30 noche,
- * "Turno 1 Lunes" 00:00 madrugada de lunes, Turno 2 09:00 día).
+ * Se deja el mecanismo (vacío) por si en el futuro aparece evidencia de una
+ * INCONSISTENCIA DENTRO DEL MISMO SYNC (Shoplogix literalmente contradiciéndose
+ * a sí mismo en la misma consulta) — un caso distinto y mucho más raro que
+ * justificaría una regla puntual y bien acotada, nunca una regla histórica.
  */
 
 /**
  * Reglas por planta: rangos de hora de inicio → nombre canónico.
  * `fromMin`/`toMin` en minutos desde medianoche (wall-clock-as-UTC). Un rango
  * con from > to cruza medianoche (ej. 22:00→08:00).
+ *
+ * VACÍO A PROPÓSITO — ver historia arriba. No agregar reglas basadas en
+ * patrones históricos; solo ante evidencia de auto-inconsistencia real.
  */
 const CANONICAL_SHIFTS = {
-  yal: [
-    // Madrugada/noche (arranca 22:00–08:00, típico 00:00) → "Turno 3".
-    // Histórico: 20× "Turno 3" a las 00:00; el "Turno 1" del 8-jul fue anomalía.
-    { fromMin: 22 * 60, toMin: 8 * 60, name: 'Turno 3' },
-    // Tarde (arranca 11:00–22:00, típico 14:45/15:15/16:15) → "Turno 2".
-    { fromMin: 11 * 60, toMin: 22 * 60, name: 'Turno 2' },
-  ],
-  // chonchi: sin reglas (etiquetado consistente).
+  // yal: sin reglas (ver historia arriba — la regla anterior quedó revertida).
+  // chonchi: sin reglas (etiquetado consistente, nunca las necesitó).
 }
 
 /**
