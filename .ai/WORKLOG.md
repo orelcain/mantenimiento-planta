@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-08 - claude - Repuestos: "Solicitar a bodega" cierra el círculo (entregar descuenta stock real)
+
+- Origen: tomé el TODO sin dueño de `.ai/TASKS.md` ("Solicitar a bodega end-to-end"). Diagnóstico: la creación de solicitudes (`SolicitarRepuestoModal`+`useSolicitudes.crearSolicitud`) y las notificaciones (`onSolicitudRepuestoCreated` → Telegram+FCM) ya estaban 100% cableadas. El gap real: `avanzarEstado` (pendiente→aprobada→**entregada**) solo hacía `updateDoc({estado})` — nunca tocaba `bodega`. Se podía "entregar" un repuesto sin que su stock bajara nunca, desincronizando los KPIs de Bodega de la realidad.
+- FIX (`RepuestosAreaHub.tsx`): nuevo `handleAvanzarSolicitud` que envuelve `avanzarEstado` — al pasar a "entregada", si el SAP de la solicitud ya tiene registro en `bodega` (`bodegaId`), llama a `registrarMovimiento` (la MISMA función que ya usa la vista manual de Bodega — mismo patrón, misma auditoría en la subcolección `movimientos`) con `tipo:'salida', cantidad: sol.cantidad`. Si el descuento falla → toast de error + **NO avanza el estado** (evita quedar "entregada" sin reflejo real en stock). Si el SAP nunca tuvo bodega configurada → no se inventa un registro nuevo (además de ser semánticamente correcto, evita un rechazo latente de `firestore.rules`: `isValidBodega()` exige `ubicacionBodega` no vacío, que el camino de auto-creación de `registrarMovimiento` no siempre puede garantizar). Toast de éxito (`-N unidades`) cuando el stock sí se descuenta.
+- Verificación: `tsc --noEmit` OK + `eslint` (archivo tocado) OK, ambos sobre `main` en worktree aislado. **No se pudo verificar visualmente en preview** (tope de 5 dev servers por carpeta, todos ocupados por sesiones concurrentes en este mismo repo — no se forzó cerrar ninguno).
+- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
+- Estado: HECHO — PR #175 mergeado y desplegado (GitHub Actions, 2026-07-08). Pendiente que alguien pruebe en vivo: crear solicitud de un SAP con stock en bodega → aprobar → entregar → confirmar que el stock bajó y quedó el movimiento en el historial.
+
 ## 2026-07-08 - claude - ARIA chat PWA: primera capacidad de ESCRITURA (crear/vincular repuesto + editar código de fabricante)
 
 - Origen: tras arreglar ARIA-Telegram (rama separada `fix/aria-repuesto-foto-criterio`, ver ese WORKLOG), Orel pidió llevar la MISMA mejora al chat de la PWA — pero el chat de la PWA (`chatbot.ts`+`aria/tools/*`) era 100% SOLO-LECTURA (ninguna tool escribía nada). Esta sesión le da su PRIMERA capacidad de escritura real.
