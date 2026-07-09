@@ -7,10 +7,13 @@
  * que alimenta a ARIA. Así el chatbot reporta EXACTAMENTE los mismos números
  * que muestra la app (regla del CLAUDE.md: un concepto se calcula igual en todos lados).
  *
- * OEE = Disponibilidad × Rendimiento × Calidad
- *   A = shiftRuntime promedio de las Baaders
- *   P = overallRatio promedio (cap 1.0)
+ * OEE = Disponibilidad × Rendimiento × Calidad  (estándar ISO 22400 / World-Class OEE)
+ *   A = uptime / (uptime + downtime + setup)   ← EXCLUYE colación/break (no es pérdida)
+ *   P = ciclos reales / esperados SOLO en los buckets donde produjo (velocidad real)
  *   Q = 1 − P0% (solo si hay Grader data)
+ * A y P se calculan con `availabilityISO`/`performanceISO`. NO se usa `shiftRuntime`
+ * ni `overallRatio` del normalizer: aquéllos metían la colación en A y el tiempo
+ * de paro en P (doble conteo con A). Ver project_oee_doble_conteo_shoplogix.
  *
  * MTTR/MTBF de confiabilidad: SOLO sobre averías MACRO (paros relevantes),
  * excluyendo micro-detenciones (<5min). Fuente macro/micro:
@@ -74,6 +77,42 @@ export function avg(arr: number[]): number {
   return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
 }
 
+type Breakdown = UpstreamMachineShift['shiftRuntimeBreakdown']
+type Interval = UpstreamMachineShift['intervals'][number]
+
+/**
+ * DISPONIBILIDAD estándar (A) — convención ISO 22400 / World-Class OEE.
+ *   A = uptime / (uptime + downtime + setup)
+ * El denominador es el "tiempo que la máquina DEBÍA estar produciendo". EXCLUYE
+ * la colación/break y el planned downtime: la colación es tiempo planificado de
+ * no-producción, no una pérdida de disponibilidad (decisión Orel 2026-07-09).
+ *
+ * ANTES usábamos `m.shiftRuntime` (normalizer.js), que SÍ mete la colación en el
+ * denominador (uptime/(uptime+break+downtime+setup)) → subestimaba A. Ver
+ * memoria project_oee_doble_conteo_shoplogix.
+ */
+export function availabilityISO(bd: Pick<Breakdown, 'uptimeSec' | 'downtimeSec' | 'setupSec'>): number {
+  const runTimeBase = bd.uptimeSec + bd.downtimeSec + bd.setupSec
+  return runTimeBase > 0 ? bd.uptimeSec / runTimeBase : 0
+}
+
+/**
+ * RENDIMIENTO estándar (P) — velocidad REAL cuando la máquina produce.
+ *   P = ciclos reales / ciclos esperados SOLO en los buckets donde hubo producción
+ * NO sobre todo el turno. El tiempo parado ya lo castiga la Disponibilidad;
+ * incluirlo también en P sería DOBLE CONTEO — que es justo el error del
+ * `overallRatio` (= totalCycles/expected de TODOS los buckets) que usábamos
+ * antes, y la razón por la que el "OEE" de Shoplogix es en realidad A×P sin Q.
+ * Ver memoria project_oee_doble_conteo_shoplogix (verificado con datos crudos).
+ */
+export function performanceISO(intervals: Pick<Interval, 'cycles' | 'expectedCycles'>[]): number {
+  let cyc = 0, exp = 0
+  for (const iv of intervals) {
+    if ((iv.cycles || 0) > 0) { cyc += iv.cycles || 0; exp += iv.expectedCycles || 0 }
+  }
+  return exp > 0 ? Math.min(1, cyc / exp) : 0
+}
+
 export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
   const uptimeSec = m.shiftRuntimeBreakdown.uptimeSec
   // Averías MACRO (sin micro ni paros operacionales) para MTTR/MTBF profesional.
@@ -82,8 +121,8 @@ export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
   return {
     machineid: m.machineid,
     machineName: m.machineName,
-    availability: m.shiftRuntime,
-    performance: Math.min(1, m.overallRatio),
+    availability: availabilityISO(m.shiftRuntimeBreakdown),
+    performance: performanceISO(m.intervals),
     mttrMin: macroCount > 0 ? macroSec / macroCount / 60 : 0,
     mtbfHours: macroCount > 0 ? uptimeSec / macroCount / 3600 : uptimeSec / 3600,
     failureCount: macroCount,
@@ -150,11 +189,21 @@ export function aggregateShifts(
     const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(ms.flatMap(m => m.states))
     const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
     const firstInterval = ms[0]?.intervals.find(iv => iv.expectedCycles > 0)
+    // A/P ISO agregados: sumar segundos y ciclos de TODAS las instancias del
+    // turno (no promediar ratios) → disponibilidad y rendimiento ponderados reales.
+    const aggBreakdown = ms.reduce(
+      (acc, m) => ({
+        uptimeSec:   acc.uptimeSec   + m.shiftRuntimeBreakdown.uptimeSec,
+        downtimeSec: acc.downtimeSec + m.shiftRuntimeBreakdown.downtimeSec,
+        setupSec:    acc.setupSec    + m.shiftRuntimeBreakdown.setupSec,
+      }),
+      { uptimeSec: 0, downtimeSec: 0, setupSec: 0 },
+    )
     machineKPIs.push({
       machineid: ms[0]!.machineid,
       machineName: ms[0]!.machineName,
-      availability: avg(ms.map(m => m.shiftRuntime)),
-      performance: Math.min(1, avg(ms.map(m => m.overallRatio))),
+      availability: availabilityISO(aggBreakdown),
+      performance: performanceISO(ms.flatMap(m => m.intervals)),
       mttrMin: macroCount > 0 ? macroSec / macroCount / 60 : 0,
       mtbfHours: macroCount > 0 ? totalUptimeSec / macroCount / 3600 : totalUptimeSec / 3600,
       failureCount: macroCount,
