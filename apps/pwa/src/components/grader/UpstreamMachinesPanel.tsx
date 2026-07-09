@@ -29,7 +29,7 @@ import type {
 } from '@/services/shoplogix/types'
 import type { Pause as GraderPause } from '@/services/grader/types'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
-import { matchCommentsToStates, type CommentStateMatch } from '@/services/shoplogix/shoplogixCommentMatch'
+import { matchCommentsToStates } from '@/services/shoplogix/shoplogixCommentMatch'
 import {
   reachedStatusFromPct,
   reachedStatusColor,
@@ -694,33 +694,6 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
   )
 }
 
-/** Grupo de comentarios que emparejaron con el mismo state (o huérfanos si state=null). */
-interface CommentGroup {
-  state: UpstreamMachineState | null
-  comments: UpstreamShiftComment[]
-}
-
-/**
- * Agrupa comentarios ya emparejados (`matchCommentsToStates`) por su state —
- * reproduce la vista "Análisis" de Shoplogix (cada fila Tipo/Razón/Comentario
- * agrupada por el evento que la originó) en vez de una lista plana. Los
- * huérfanos (sin state, turno sin eventos) siempre van al final.
- */
-function groupCommentMatches(matches: CommentStateMatch[]): CommentGroup[] {
-  const orderedKeys: string[] = []
-  const byKey = new Map<string, CommentGroup>()
-  for (const { comment, state } of matches) {
-    const key = state ? `${state.startAt.getTime()}|${state.reason}|${state.name}` : '__orphan__'
-    if (!byKey.has(key)) {
-      byKey.set(key, { state, comments: [] })
-      orderedKeys.push(key)
-    }
-    byKey.get(key)!.comments.push(comment)
-  }
-  orderedKeys.sort((a, b) => (a === '__orphan__' ? 1 : b === '__orphan__' ? -1 : 0))
-  return orderedKeys.map(k => byKey.get(k)!)
-}
-
 // ============================================================================
 // MachineRow — 1 máquina
 // ============================================================================
@@ -770,12 +743,30 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
   const ciclo  = computeCiclo(shift)
 
-  // Empareja cada comentario con el state (paro) que lo originó — antes se
-  // mostraban sueltos, sin relación al timeline de arriba (ver shoplogixCommentMatch.ts).
-  const commentGroups = useMemo(
-    () => groupCommentMatches(matchCommentsToStates(shift.comments, shift.states)),
-    [shift.comments, shift.states],
-  )
+  // Análisis del turno UNIFICADO: eventos (paros) cronológicos + el comentario
+  // de operador emparejado a cada evento (matchCommentsToStates, por razón +
+  // solape temporal). Reemplaza la tabla de eventos suelta + la lista de
+  // comentarios aparte → una sola tabla rica (Motivo y Comentario juntos), como
+  // la vista "Análisis" de Shoplogix. Los comentarios sin evento que calce van
+  // como huérfanos al final — nunca se descartan.
+  const analisis = useMemo(() => {
+    const eventos = shift.states
+      .filter((s) => s.type !== 'uptime' && s.durationSec > 0) // sin uptime ni eventos 0s (ruido)
+      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+    const eventoSet = new Set(eventos)
+    const byState = new Map<UpstreamMachineState, UpstreamShiftComment[]>()
+    const orphans: UpstreamShiftComment[] = []
+    for (const { comment, state } of matchCommentsToStates(shift.comments, shift.states)) {
+      if (state && eventoSet.has(state)) {
+        const arr = byState.get(state) ?? []
+        arr.push(comment)
+        byState.set(state, arr)
+      } else {
+        orphans.push(comment) // comentario huérfano o atado a uptime/evento no listado
+      }
+    }
+    return { eventos, byState, orphans }
+  }, [shift.states, shift.comments])
 
   const ratioColor =
     shift.overallRatio >= 0.85 ? 'text-emerald-400'
@@ -902,32 +893,18 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         </span>
       </div>
 
-      {/* Comentarios de operador — siempre visibles si existen (max 2).
-          Cada uno lleva la razón/state que lo originó como prefijo (ej "[FALTA MMPP]")
-          cuando se pudo emparejar — antes era texto suelto sin relación al timeline.
-          Si hay más, el botón "y N más" abre el detalle expandido (agrupado por evento). */}
-      {shift.comments.length > 0 && (
-        <div className="flex items-start gap-1.5 text-[10px]">
-          <MessageSquare className="w-3 h-3 text-slate-500 shrink-0 mt-px" />
-          <div className="min-w-0 space-y-0.5">
-            {shift.comments.slice(0, 2).map((c) => {
-              const label = c.reasonValue ? `[${c.reasonValue}] ${c.text}` : c.text
-              return (
-                <p key={c.key} className="text-slate-400 italic truncate" title={label}>
-                  {label}
-                </p>
-              )
-            })}
-            {shift.comments.length > 2 && !expanded && (
-              <button
-                onClick={onToggle}
-                className="text-slate-600 hover:text-slate-300 transition-colors"
-              >
-                y {shift.comments.length - 2} más →
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Indicador compacto de comentarios (solo colapsado) — el texto completo
+          vive en la columna "Comentario" de la tabla de eventos (expandido), para
+          no duplicar. Un click expande. */}
+      {shift.comments.length > 0 && !expanded && (
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+          title="Comentarios del operador — expandir para verlos junto a su motivo"
+        >
+          <MessageSquare className="w-3 h-3 shrink-0" />
+          {shift.comments.length} comentario{shift.comments.length !== 1 ? 's' : ''} del operador →
+        </button>
       )}
 
       {/* Detalle expandido */}
@@ -962,85 +939,73 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               })()}
             </div>
           </div>
-          {/* Tabla de eventos del turno — cada paro con hora inicio–fin–duración–
-              motivo (espeja la vista de análisis de Shoplogix; complemento textual
-              del Gantt visual). Solo no-uptime, orden cronológico. */}
-          {(() => {
-            const eventos = shift.states
-              .filter((s) => s.type !== 'uptime' && s.durationSec > 0) // sin uptime ni eventos 0s (ruido)
-              .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-            if (eventos.length === 0) return null
-            return (
-              <div className="mt-2">
-                <div className="text-slate-600 mb-1">Eventos del turno ({eventos.length})</div>
-                <div className="max-h-52 overflow-y-auto rounded border border-slate-800/60">
-                  <table className="w-full text-[10px] tabular-nums">
-                    <thead className="text-slate-600 sticky top-0 bg-slate-950/95 backdrop-blur">
-                      <tr>
-                        <th className="text-left  px-2 py-1 font-medium">Inicio</th>
-                        <th className="text-left  px-2 py-1 font-medium">Fin</th>
-                        <th className="text-right px-2 py-1 font-medium">Duración</th>
-                        <th className="text-left  px-2 py-1 font-medium">Motivo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {eventos.map((s, i) => {
-                        const color = slxStateColor(s.type, s.reason, s.color)
-                        const motivo = s.reason || s.name || s.type
-                        return (
-                          <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-900/40">
-                            <td className="px-2 py-1 text-slate-400">{fmtTime(s.startAt)}</td>
-                            <td className="px-2 py-1 text-slate-400">{fmtTime(s.endAt)}</td>
-                            <td className="px-2 py-1 text-right text-slate-300">{fmtDurationSec(s.durationSec)}</td>
-                            <td className="px-2 py-1">
-                              <span className="inline-flex items-center gap-1.5 min-w-0">
-                                <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-                                <span className="text-slate-300 truncate">{motivo}</span>
+          {/* Análisis del turno — tabla UNIFICADA que espeja la vista "Análisis"
+              de Shoplogix: cada paro con inicio → fin → duración → motivo Y el
+              comentario del operador emparejado a ese evento, todo junto. Antes
+              esto estaba partido (tabla de eventos + lista de comentarios aparte).
+              Los huérfanos (comentario sin evento que calce) van debajo. */}
+          {analisis.eventos.length > 0 && (
+            <div className="mt-2">
+              <div className="text-slate-600 mb-1">Análisis del turno ({analisis.eventos.length} eventos)</div>
+              <div className="max-h-64 overflow-y-auto rounded border border-slate-800/60">
+                <table className="w-full text-[10px] tabular-nums">
+                  <thead className="text-slate-600 sticky top-0 bg-slate-950/95 backdrop-blur">
+                    <tr>
+                      <th className="text-left  px-2 py-1 font-medium">Inicio</th>
+                      <th className="text-left  px-2 py-1 font-medium">Fin</th>
+                      <th className="text-right px-2 py-1 font-medium">Duración</th>
+                      <th className="text-left  px-2 py-1 font-medium">Motivo</th>
+                      <th className="text-left  px-2 py-1 font-medium">Comentario</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analisis.eventos.map((s, i) => {
+                      const color = slxStateColor(s.type, s.reason, s.color)
+                      const motivo = s.reason || s.name || s.type
+                      const coms = analisis.byState.get(s) ?? []
+                      const comentario = coms.map((c) => c.text).join(' · ')
+                      return (
+                        <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-900/40 align-top">
+                          <td className="px-2 py-1 text-slate-400 whitespace-nowrap">{fmtTime(s.startAt)}</td>
+                          <td className="px-2 py-1 text-slate-400 whitespace-nowrap">{fmtTime(s.endAt)}</td>
+                          <td className="px-2 py-1 text-right text-slate-300 whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
+                          <td className="px-2 py-1">
+                            <span className="inline-flex items-center gap-1.5 min-w-0">
+                              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                              <span className="text-slate-300 truncate">{motivo}</span>
+                            </span>
+                          </td>
+                          <td className="px-2 py-1">
+                            {comentario ? (
+                              <span className="text-slate-400 italic inline-flex items-start gap-1">
+                                <MessageSquare className="w-2.5 h-2.5 shrink-0 mt-0.5 text-slate-500" />
+                                <span>{comentario}</span>
                               </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            ) : (
+                              <span className="text-slate-700">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )
-          })()}
-          {/* Comentarios completos en expanded (cuando hay más de 2), agrupados
-              por el state/paro que los originó — reproduce la vista "Análisis"
-              de Shoplogix (Tipo/Razón/Comentario juntos) en vez de una lista
-              plana sin relación al timeline de arriba. Huérfanos (sin state
-              matcheado) van en su propia sección al final, nunca se descartan. */}
-          {shift.comments.length > 2 && (
-            <div className="mt-2 space-y-2">
-              <div className="text-slate-600 mb-0.5">Todos los comentarios</div>
-              {commentGroups.map((group, gi) => (
-                <div key={gi} className="space-y-0.5">
-                  <div className="flex items-center gap-1 text-slate-500">
-                    {group.state ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: group.state.color }} />
-                        <span className="truncate">
-                          {group.state.name}{group.state.reason ? ` — ${group.state.reason}` : ''}
-                        </span>
-                        <span className="text-slate-700 shrink-0">{fmtTime(group.state.startAt)}</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                        <span className="text-amber-500/80">Sin evento asociado</span>
-                      </>
-                    )}
+              {/* Comentarios sin evento que calce — nunca se descartan. */}
+              {analisis.orphans.length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  <div className="flex items-center gap-1 text-[10px] text-amber-500/80">
+                    <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                    Comentarios sin evento asociado
                   </div>
-                  {group.comments.map((c) => (
-                    <p key={c.key} className="text-slate-300 italic text-[10px] pl-3">
+                  {analisis.orphans.map((c) => (
+                    <p key={c.key} className="text-slate-400 italic text-[10px] pl-3.5">
                       <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-slate-500" />
-                      {c.text}
+                      {c.reasonValue ? `[${c.reasonValue}] ${c.text}` : c.text}
                     </p>
                   ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
