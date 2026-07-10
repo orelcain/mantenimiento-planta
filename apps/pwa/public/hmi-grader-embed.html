@@ -418,6 +418,37 @@ html.in-iframe, html.in-iframe body {
 .btn-bar.right { justify-content: flex-end; padding-right: 12px; }
 .btn-bar.right .btn { flex: 0 0 140px; }
 
+/* Fase 3 Lote 2 — footer con 2 botones separados (Monitor CPU: "Habilitar
+   vistas" a la izquierda, "Salir" a la derecha, sin compartir borde) */
+.btn-bar.split { justify-content: space-between; padding: 0 12px; }
+.btn-bar.split .btn { flex: 0 0 180px; }
+.btn-bar.split .btn + .btn { border-left: none; }
+
+/* Fase 3 Lote 2 — grilla de checkboxes (Probar Entradas / Probar Salidas) */
+.checkbox-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-auto-rows: min-content;
+  gap: 8px 20px;
+  align-content: start;
+}
+.chk-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.chk-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #F1C40F; cursor: pointer; }
+
+/* Fase 3 Lote 2 — campo "Activ Sal." (Probar Salidas) */
+.activ-sal { display: flex; align-items: center; gap: 12px; padding: 6px 24px 0; font-size: 14px; color: #ffffff; font-family: Arial, sans-serif; }
+.activ-sal input[type="text"] { width: 120px; height: 26px; border: 1px solid #F1C40F; background: #ffffff; color: #000000; padding: 0 6px; font-family: 'Courier New', monospace; }
+
+/* Fase 3 Lote 2 — métricas Monitor CPU (2 columnas) + tabla de carga por proceso (oculta hasta "Habilitar vistas") */
+.cpu-metrics { flex: 1; padding: 18px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; overflow-y: auto; align-content: start; }
+.cpu-row { display: flex; justify-content: space-between; font-size: 14px; color: #e8f1fb; font-family: Arial, sans-serif; padding: 2px 0; }
+.cpu-gap { grid-column: 1 / -1; height: 12px; }
+.cpu-loads { grid-column: 1 / -1; display: none; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 10px; }
+.cpu-loads.show { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
    Grid: rc + numpad derecha, fkeys abajo
@@ -697,8 +728,93 @@ html.in-iframe, html.in-iframe body {
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="menu-list" id="menu-list"></div>
       <div class="btn-bar">
-        <button class="btn" onclick="scrollMenu(1)">Abajo</button>
-        <button class="btn" onclick="scrollMenu(-1)">Arriba</button>
+        <button class="btn" onclick="scrollList('menu-list', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('menu-list', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Servicio — clonado de p007-p009. Lote 2: solo Probar Entradas/
+         Probar Salidas/Monitor CPU navegan de verdad; Cambiar Parametros
+         (editor gigante, lote aparte) y el resto quedan honestos como
+         "no clonada todavía". -->
+    <div class="panel" id="servicio" data-title="Servicio">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="menu-list" id="servicio-list"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="scrollList('servicio-list', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('servicio-list', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Probar Entradas — clonado de p010. Único rango (In1-In16, cabe en
+         una pantalla) — Anterior/Next existen en el chrome real pero no
+         hacen nada acá (no hay más páginas que mostrar). -->
+    <div class="panel" id="probar-entradas" data-title="Probar Entradas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="checkbox-grid" id="entradas-grid"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="al('Sin página anterior')">Anterior</button>
+        <button class="btn" onclick="al('Sin más páginas')">Next</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Probar Salidas — clonado de p011-p015 (wizard real de 5 páginas:
+         O1-24, O101-116, O117-132, O133-148, O149-164 — el Z2 real salta
+         de O24 a O101, sin O25-100 — no es un error de esta pantalla). -->
+    <div class="panel" id="probar-salidas" data-title="Probar Salidas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="checkbox-grid" id="salidas-grid"></div>
+      <div class="activ-sal">
+        <span>Activ Sal.</span>
+        <input type="text" id="activ-sal-input" placeholder="">
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="cambiarActivSal()">Cambiar</button>
+        <button class="btn" onclick="salidasPage(-1)">Anterior</button>
+        <button class="btn" onclick="salidasPage(1)">Next</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Monitor CPU — clonado de p016 (base) + p017 (tras "Habilitar
+         vistas": agrega la tabla de carga por proceso). -->
+    <div class="panel" id="monitor-cpu" data-title="Monitor CPU">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="cpu-metrics">
+        <div class="cpu-row"><span>Carga prcsador</span><span>14 %</span></div>
+        <div class="cpu-row"><span>Main board version:</span><span>V5</span></div>
+        <div class="cpu-row"><span>Tiempo entrada a salida:</span><span>56 us</span></div>
+        <div class="cpu-row"><span>Avail. Process Memory :</span><span>24896 kb</span></div>
+        <div class="cpu-row"><span>Entrada Jitter</span><span>12 us</span></div>
+        <div class="cpu-row"><span>Can frames rx / s</span><span>217</span></div>
+        <div class="cpu-row"><span>Salida jitter</span><span>45 us</span></div>
+        <div class="cpu-row"><span>Canframes tx/s [errors] :</span><span>28 [0]</span></div>
+        <div class="cpu-row"><span></span><span></span></div>
+        <div class="cpu-row"><span>CanIO output errors:</span><span>0</span></div>
+        <div class="cpu-gap"></div>
+        <div class="cpu-row"><span>Main/GUI</span><span>0.6%</span></div>
+        <div class="cpu-loads" id="cpu-loads">
+          <div class="cpu-row"><span>OpcServer</span><span>190</span></div>
+          <div class="cpu-row"><span>Pocket2</span><span>16</span></div>
+          <div class="cpu-row"><span>Sorting belt with batching</span><span>175</span></div>
+          <div class="cpu-row"><span>Pocket1</span><span>15</span></div>
+          <div class="cpu-row"><span>Z-Belt</span><span>90</span></div>
+          <div class="cpu-row"><span>*Pocket1</span><span>13</span></div>
+          <div class="cpu-row"><span>Acceleration belt 1</span><span>79</span></div>
+          <div class="cpu-row"><span>*Pocket4</span><span>13</span></div>
+          <div class="cpu-row"><span>Acceleration belt 2</span><span>74</span></div>
+          <div class="cpu-row"><span>*Pocket3</span><span>10</span></div>
+          <div class="cpu-row"><span>StaticGrader</span><span>26</span></div>
+          <div class="cpu-row"><span>*Pocket2</span><span>7</span></div>
+          <div class="cpu-row"><span>Pocket3</span><span>17</span></div>
+          <div class="cpu-row"><span>Pocket4</span><span>17</span></div>
+        </div>
+      </div>
+      <div class="btn-bar split">
+        <button class="btn" onclick="habilitarVistasCpu()">Habilitar vistas</button>
         <button class="btn" onclick="goBack()">Salir</button>
       </div>
     </div>
@@ -828,15 +944,15 @@ function buildGates() {
 buildGates();
 
 /* ══════════════════════════════════════════════════
-   MENU — Fase 3 Lote 1
-   15 ítems reales (clonados de p002-p004). `target` = id del panel al que
-   navega; null = pantalla aún no clonada (da feedback honesto en el log
-   en vez de un click muerto o de inventar contenido).
+   LISTAS DE MENÚ — Fase 3 (Menu: Lote 1, Servicio: Lote 2)
+   `target` = id del panel al que navega; null = pantalla aún no clonada
+   (da feedback honesto en el log en vez de un click muerto o de inventar
+   contenido).
 ══════════════════════════════════════════════════ */
 const MENU_ITEMS = [
   { label: 'Printers', target: null },
   { label: 'Mostrar gráfico pesaje', target: null },
-  { label: 'Servicio', target: null },           // Lote 2 del spec
+  { label: 'Servicio', target: 'servicio' },
   { label: 'Cambiar Claves', target: null },
   { label: 'Edit Species', target: null },
   { label: 'Ajustar datos', target: null },
@@ -851,9 +967,32 @@ const MENU_ITEMS = [
   { label: 'Estado', target: 'estado' },
 ];
 
-function buildMenuList() {
-  const list = document.getElementById('menu-list');
-  MENU_ITEMS.forEach((item, i) => {
+/* 15 ítems reales de Servicio (p007-p009). Cambiar Parametros es el editor
+   gigante (~24 pantallazos únicos, lote propio más adelante); Version
+   Software/Explorar CAN bus/Activar Software/Estado Certificación son P2
+   (Lote 4 del spec). */
+const SERVICIO_ITEMS = [
+  { label: 'Optimizar filtro', target: null },
+  { label: 'Ajustar unidad de peso', target: null },
+  { label: 'Traceability Settings', target: null },
+  { label: 'Show EyeSync Differences', target: null },
+  { label: 'Show Statistics', target: null },
+  { label: 'autochange BLDC', target: null },
+  { label: 'Status memory', target: null },
+  { label: 'Probar Entradas', target: 'probar-entradas' },
+  { label: 'Probar Salidas', target: 'probar-salidas' },
+  { label: 'Cambiar Parametros', target: null },
+  { label: 'Monitor CPU', target: 'monitor-cpu' },
+  { label: 'Version Software', target: null },
+  { label: 'Explorar CAN bus', target: null },
+  { label: 'Activar Software', target: null },
+  { label: 'Estado Certificación', target: null },
+];
+
+/** Construye una lista scrolleable genérica (Menu, Servicio, ...) dentro de `containerId`. */
+function buildScrollList(containerId, items) {
+  const list = document.getElementById(containerId);
+  items.forEach((item, i) => {
     const row = document.createElement('div');
     row.className = 'menu-row' + (i === 0 ? ' sel' : '');
     row.textContent = item.label;
@@ -869,11 +1008,85 @@ function buildMenuList() {
     list.appendChild(row);
   });
 }
-buildMenuList();
+buildScrollList('menu-list', MENU_ITEMS);
+buildScrollList('servicio-list', SERVICIO_ITEMS);
 
-/** Abajo/Arriba del footer de Menu: scrollea la lista una fila (~54px). */
-function scrollMenu(dir) {
-  document.getElementById('menu-list').scrollBy({ top: dir * 54, behavior: 'smooth' });
+/** Abajo/Arriba de listas scrolleables (Menu, Servicio): una fila (~54px). */
+function scrollList(containerId, dir) {
+  document.getElementById(containerId).scrollBy({ top: dir * 54, behavior: 'smooth' });
+}
+
+/* ══════════════════════════════════════════════════
+   PROBAR ENTRADAS — Fase 3 Lote 2, clonado de p010.
+   In1-16, únicos pre-marcados en el pantallazo real: In1, In3, In5.
+══════════════════════════════════════════════════ */
+function buildEntradasGrid() {
+  const grid = document.getElementById('entradas-grid');
+  const CHECKED = new Set([1, 3, 5]);
+  for (let n = 1; n <= 16; n++) {
+    const row = document.createElement('label');
+    row.className = 'chk-row';
+    row.innerHTML = `<input type="checkbox" ${CHECKED.has(n) ? 'checked' : ''}><span>In ${n}</span>`;
+    grid.appendChild(row);
+  }
+}
+buildEntradasGrid();
+
+/* ══════════════════════════════════════════════════
+   PROBAR SALIDAS — Fase 3 Lote 2, wizard real de 5 páginas
+   (clonado de p011-p015). El Z2 real salta de O24 a O101 — no hay
+   O25-O100, no es un hueco de esta clonación.
+══════════════════════════════════════════════════ */
+const SALIDAS_PAGES = [
+  { from: 1,   to: 24 },
+  { from: 101, to: 116 },
+  { from: 117, to: 132 },
+  { from: 133, to: 148 },
+  { from: 149, to: 164 },
+];
+let salidasPageIdx = 0;
+
+function renderSalidasPage() {
+  const grid = document.getElementById('salidas-grid');
+  grid.innerHTML = '';
+  const { from, to } = SALIDAS_PAGES[salidasPageIdx];
+  for (let n = from; n <= to; n++) {
+    const row = document.createElement('label');
+    row.className = 'chk-row';
+    row.innerHTML = `<input type="checkbox" data-out="${n}"><span>O ${n}</span>`;
+    grid.appendChild(row);
+  }
+}
+renderSalidasPage();
+
+/** Next/Anterior del wizard Probar Salidas — con límites (5 páginas). */
+function salidasPage(dir) {
+  const next = salidasPageIdx + dir;
+  if (next < 0) { addLog('Sin página anterior'); return; }
+  if (next >= SALIDAS_PAGES.length) { addLog('Sin más páginas'); return; }
+  salidasPageIdx = next;
+  renderSalidasPage();
+}
+
+/** "Cambiar" de Probar Salidas: si el número tipeado está en la página
+    visible, togglea su checkbox (atajo real del Z2 para no scrollear). */
+function cambiarActivSal() {
+  const input = document.getElementById('activ-sal-input');
+  const n = parseInt(input.value, 10);
+  if (!Number.isFinite(n)) { addLog('Activ Sal.: número inválido'); return; }
+  const chk = document.querySelector(`#salidas-grid input[data-out="${n}"]`);
+  if (!chk) { addLog(`O ${n} no está en esta página`); return; }
+  chk.checked = !chk.checked;
+  addLog(`O ${n} ${chk.checked ? 'activada' : 'desactivada'}`);
+}
+
+/* ══════════════════════════════════════════════════
+   MONITOR CPU — Fase 3 Lote 2, clonado de p016 (base) + p017 (tras
+   "Habilitar vistas": agrega la tabla de carga por proceso).
+══════════════════════════════════════════════════ */
+function habilitarVistasCpu() {
+  document.getElementById('cpu-loads').classList.add('show');
+  addLog('Habilitar vistas');
 }
 
 /* ══════════════════════════════════════════════════
