@@ -150,6 +150,20 @@ html.in-iframe, html.in-iframe body {
   flex: 1;
 }
 
+/* Fase 3 — separa el header (fecha/hora + indicadores) del resto del
+   contenido: en TODOS los pantallazos reales el header queda visible
+   incluso dentro de Menu/Velocidad cintas/etc — solo el tab+cuerpo+footer
+   cambian de pantalla. Los .panel (position:absolute;inset:0) ahora
+   cuelgan de #home-body (position:relative), no de #screen — así cubren
+   solo el área bajo el header, nunca lo tapan. */
+#home-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ══════════════════════════════════════
    HEADER: fecha/hora izquierda + UNDER derecha
 ══════════════════════════════════════ */
@@ -365,28 +379,44 @@ html.in-iframe, html.in-iframe body {
   z-index: 20;
 }
 .panel.active { display: flex; }
-.ph {
-  background: #0a1d45;
-  border-bottom: 1px solid #2980B9;
-  padding: 6px 10px;
-  font-size: 14px;
-  font-weight: bold;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-/* Fase 2 — breadcrumb "Home › Menu › Servicio › ...": una línea, trunca si no cabe */
-.crumb {
-  flex: 1;
+/* Fase 3 — el breadcrumb reusa el MISMO tab que "StaticGrader" en el home
+   (fiel a los pantallazos reales: Menu/Velocidad cintas/Resultados
+   Clasificación abren con un tab idéntico, solo cambia el texto) —
+   .crumb es un modificador de .title-bar con fuente más chica para que
+   quepa "Home › Menu › Servicio" sin desbordar. */
+.title-bar.crumb {
+  font-size: 16px;
+  max-width: 700px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #aaddff;
-  font-weight: normal;
-  font-size: 13px;
 }
 .pb { flex: 1; display: flex; align-items: center; justify-content: center; color: #88bbee; font-size: 14px; }
+
+/* Fase 3 — lista con scroll (Menu) */
+.menu-list { flex: 1; overflow-y: auto; background: var(--dark-zone); }
+.menu-row {
+  padding: 15px 16px;
+  font-size: 16px;
+  color: #9fb7d4;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+}
+.menu-row:hover { background: rgba(255,255,255,0.06); }
+.menu-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
+
+/* Fase 3 — tabla clave/valor (Velocidad cintas, Resultados Clasificación) */
+.kv-table { flex: 1; padding: 18px 20px; overflow-y: auto; }
+.kv-head { display: flex; justify-content: flex-end; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+.kv-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 15px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.kv-row .k { cursor: help; border-bottom: 1px dotted rgba(255,255,255,0.35); }
+.kv-gap { height: 20px; }
+.kv-note { margin-top: 16px; font-size: 11px; color: #7fa8d0; font-style: italic; line-height: 1.5; }
+
+/* Fase 3 — footer compacto alineado a la derecha (Resultados Clasificación: 1 solo botón "OK", no full-width) */
+.btn-bar.right { justify-content: flex-end; padding-right: 12px; }
+.btn-bar.right .btn { flex: 0 0 140px; }
 
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
@@ -609,6 +639,11 @@ html.in-iframe, html.in-iframe body {
       </div>
     </div>
 
+    <!-- Fase 3: todo lo de abajo del header vive en #home-body — los .panel
+         cuelgan de ACÁ (position:relative), nunca tapan .hdr de arriba
+         (fiel a los pantallazos reales: el header queda visible siempre). -->
+    <div id="home-body">
+
     <!-- V4: TÍTULO TAB PARCIAL -->
     <div class="title-row">
       <div class="title-bar">StaticGrader</div>
@@ -639,25 +674,81 @@ html.in-iframe, html.in-iframe body {
       <button class="btn" onclick="navigateTo('mn')">Menu</button>
     </div>
 
-    <!-- PANELES — Fase 2: header = breadcrumb, footer = .btn-bar compartido
-         con el home (mismas clases → F1-F4 los detecta igual, contextual al
-         panel activo). data-title = nombre real de la pantalla (breadcrumb + log). -->
+    <!-- PANELES — data-title = nombre real de la pantalla (breadcrumb + log).
+         Fase 2 (pp/pm, sin pantallazo fuente, quedan como placeholder) +
+         Fase 3 Lote 1 (mn/velocidad-cintas/resultados-clasificacion/estado,
+         clonadas contra p002-p006 reales, docs/hmi-grader/pantallas/). -->
     <div class="panel" id="pp" data-title="Cambiar programa">
-      <div class="ph"><span class="crumb"></span></div>
+      <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
       <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
     <div class="panel" id="pm" data-title="Modo presentación">
-      <div class="ph"><span class="crumb"></span></div>
-      <div class="pb">— Próxima iteración —</div>
-      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
-    </div>
-    <div class="panel" id="mn" data-title="Menu">
-      <div class="ph"><span class="crumb"></span></div>
+      <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
       <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
+    <!-- Menu — clonado de p002-p004. Lista scrolleable de 15 ítems reales.
+         Solo 3 navegan de verdad en este lote (Velocidad cintas, Resultados
+         Clasificación, Estado) — el resto da feedback "no clonada todavía"
+         en el log en vez de un click muerto (honesto sobre el alcance). -->
+    <div class="panel" id="mn" data-title="Menu">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="menu-list" id="menu-list"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="scrollMenu(1)">Abajo</button>
+        <button class="btn" onclick="scrollMenu(-1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Velocidad cintas — clonado de p005. Reporte en vivo (Reset Stats),
+         no config — los valores reales configurados viven en
+         GraderPhysicalConfig (ver nota + Pendientes de medición en terreno
+         en docs/marelec-z2/NAVEGACION.md). -->
+    <div class="panel" id="velocidad-cintas" data-title="Velocidad cintas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="kv-table">
+        <div class="kv-head">Speed (min .. max (1s))(min .. max (100ms))</div>
+        <div class="kv-row"><span class="k" data-gloss="Z-Belt">Z-Belt</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Acceleration belt 1">Acceleration belt 1</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Acceleration belt 2">Acceleration belt 2</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Sorting belt with batching">Sorting belt with batching</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <p class="kv-note">◆ Configurado en la app: Análisis de Turno → Config Física → tab Cintas (<code>GraderPhysicalConfig.belts[]</code>). Esta pantalla del Z2 es un reporte en vivo (Reset Stats), no el punto de edición.</p>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="al('Reset Stats')">Reset Stats</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Resultados Clasificación — clonado de p006. -->
+    <div class="panel" id="resultados-clasificacion" data-title="Resultados Clasificación">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="kv-table">
+        <div class="kv-row"><span>Fuera de límites</span><span>Static</span></div>
+        <div class="kv-row"><span>No leído por fotocélula</span><span>Static</span></div>
+        <div class="kv-row"><span>Too close or too long</span><span>Static</span></div>
+        <div class="kv-row"><span>Puerta no preparada</span><span>Static</span></div>
+        <div class="kv-gap"></div>
+        <div class="kv-row"><span>Peso total clasificado</span><span>0.00kg</span></div>
+        <div class="kv-row"><span>Cajas totales clasificadas</span><span>0</span></div>
+        <div class="kv-row"><span>Total unsorted pcs</span><span>0</span></div>
+      </div>
+      <div class="btn-bar right"><button class="btn" onclick="goBack()">OK</button></div>
+    </div>
+
+    <!-- Estado — SIN pantallazo fuente (ver Gaps en NAVEGACION.md): el PDF
+         nunca abrió esta pantalla. Placeholder honesto, no se inventa
+         contenido. -->
+    <div class="panel" id="estado" data-title="Estado">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="pb">— Sin pantallazo fuente: pendiente de documentar en terreno —</div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
+    </div>
+
+    </div><!-- #home-body -->
   </div><!-- #screen -->
 </div><!-- #rc-window -->
 
@@ -735,6 +826,72 @@ function buildGates() {
   }
 }
 buildGates();
+
+/* ══════════════════════════════════════════════════
+   MENU — Fase 3 Lote 1
+   15 ítems reales (clonados de p002-p004). `target` = id del panel al que
+   navega; null = pantalla aún no clonada (da feedback honesto en el log
+   en vez de un click muerto o de inventar contenido).
+══════════════════════════════════════════════════ */
+const MENU_ITEMS = [
+  { label: 'Printers', target: null },
+  { label: 'Mostrar gráfico pesaje', target: null },
+  { label: 'Servicio', target: null },           // Lote 2 del spec
+  { label: 'Cambiar Claves', target: null },
+  { label: 'Edit Species', target: null },
+  { label: 'Ajustar datos', target: null },
+  { label: 'Mostrar velocidad cintas', target: 'velocidad-cintas' },
+  { label: 'Enable/Disable Stations', target: null },
+  { label: 'Maintenance counters', target: null },
+  { label: 'Mostrar resultados clasificación', target: 'resultados-clasificacion' },
+  { label: 'Idioma', target: null },
+  { label: 'Ajustes Red', target: null },
+  { label: 'Mostrar eventos de sistema', target: null },
+  { label: 'Ajustar Fecha y hora', target: null },
+  { label: 'Estado', target: 'estado' },
+];
+
+function buildMenuList() {
+  const list = document.getElementById('menu-list');
+  MENU_ITEMS.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'menu-row' + (i === 0 ? ' sel' : '');
+    row.textContent = item.label;
+    row.addEventListener('click', () => {
+      list.querySelectorAll('.menu-row.sel').forEach(r => r.classList.remove('sel'));
+      row.classList.add('sel');
+      if (item.target && document.getElementById(item.target)) {
+        navigateTo(item.target);
+      } else {
+        addLog(`${item.label} — pantalla aún no clonada`);
+      }
+    });
+    list.appendChild(row);
+  });
+}
+buildMenuList();
+
+/** Abajo/Arriba del footer de Menu: scrollea la lista una fila (~54px). */
+function scrollMenu(dir) {
+  document.getElementById('menu-list').scrollBy({ top: dir * 54, behavior: 'smooth' });
+}
+
+/* ══════════════════════════════════════════════════
+   DICCIONARIO BILINGÜE — Fase 3 (arranca acá, se centraliza más
+   adelante junto con labelForField()/graderGlossary.ts del lado React;
+   ver docs/marelec-z2/NAVEGACION.md § Decisión de arquitectura).
+   Tooltip nativo (title=) sobre los términos en inglés reales del Z2.
+══════════════════════════════════════════════════ */
+const GLOSSARY_EN_ES = {
+  'Z-Belt': 'Cinta elevadora entre el pocket (balanza) y las cintas de aceleración. 0.42 m/s real (ver GraderPhysicalConfig).',
+  'Acceleration belt 1': 'Primera cinta de aceleración — empareja la velocidad del pez antes de entrar a la cinta de clasificación.',
+  'Acceleration belt 2': 'Segunda cinta de aceleración.',
+  'Sorting belt with batching': 'Cinta de clasificación final con 12 flippers/gates. 0.70 m/s real — es la "grading belt" de GraderPhysicalConfig.',
+};
+document.querySelectorAll('[data-gloss]').forEach(el => {
+  const text = GLOSSARY_EN_ES[el.dataset.gloss];
+  if (text) el.title = text;
+});
 
 /* Reloj */
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -858,7 +1015,7 @@ function updateIndicatorValue(ind, valueStr) {
    parámetros, "Anterior/Next/Salir" en Probar Salidas, etc). */
 function currentBtnBar() {
   const activePanel = document.querySelector('.panel.active');
-  return activePanel ? activePanel.querySelector('.btn-bar') : document.querySelector('#screen > .btn-bar');
+  return activePanel ? activePanel.querySelector('.btn-bar') : document.querySelector('#home-body > .btn-bar');
 }
 
 document.querySelectorAll('.fkey').forEach((fk, i) => {
