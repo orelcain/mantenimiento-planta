@@ -16,7 +16,7 @@
 
 const { test } = require('node:test')
 const assert = require('node:assert')
-const { isShiftAlreadyFrozen, CLOSED_SHIFT_GRACE_MS } = require('../sync')
+const { isShiftAlreadyFrozen, CLOSED_SHIFT_GRACE_MS, PARENT_SCHEMA_VERSION, aggregateStatesByReason } = require('../sync')
 
 const silentLogger = { warn() {}, info() {}, error() {} }
 
@@ -40,9 +40,10 @@ function fakeDb({ data, exists = true, throws = false }) {
   }
 }
 
-/** Doc padre "sano": sincronizado bien después del cierre, con enriquecimiento. */
+/** Doc padre "sano": sincronizado bien después del cierre, con esquema al día. */
 function healthyParentDoc() {
   return {
+    parentSchemaVersion: PARENT_SCHEMA_VERSION,
     lastSyncAt: new Date(SCHEDULED_END.getTime() + CLOSED_SHIFT_GRACE_MS + 60_000),
     machines: [
       { machineid: 'm1', status: 'ok', totalCycles: 8000, uptimeSec: 20000 },
@@ -115,6 +116,30 @@ test('NO congela docs legacy sin uptimeSec: se reescriben una vez para enriquece
   }
   const frozen = await call(fakeDb({ data }), nowAfterClose(6 * 3600_000))
   assert.strictEqual(frozen, false)
+})
+
+// ── Migración de esquema del doc padre ───────────────────────────────────────
+
+test('NO congela docs sin parentSchemaVersion (v1 implícita)', async () => {
+  const data = { ...healthyParentDoc() }
+  delete data.parentSchemaVersion
+  const frozen = await call(fakeDb({ data }), nowAfterClose(6 * 3600_000))
+  assert.strictEqual(frozen, false)
+})
+
+test('NO congela docs de una versión de esquema anterior: fuerza el repoblado', async () => {
+  // Este es el punto de todo el mecanismo: sin él, un turno congelado nunca
+  // recibiría los campos que agregue una versión futura del sync, y haría falta
+  // un backfill manual del histórico completo.
+  const data = { ...healthyParentDoc(), parentSchemaVersion: PARENT_SCHEMA_VERSION - 1 }
+  const frozen = await call(fakeDb({ data }), nowAfterClose(6 * 3600_000))
+  assert.strictEqual(frozen, false)
+})
+
+test('congela docs de una versión FUTURA (no fuerza reescritura hacia atrás)', async () => {
+  const data = { ...healthyParentDoc(), parentSchemaVersion: PARENT_SCHEMA_VERSION + 1 }
+  const frozen = await call(fakeDb({ data }), nowAfterClose(6 * 3600_000))
+  assert.strictEqual(frozen, true)
 })
 
 test('NO congela si machines viene vacío', async () => {

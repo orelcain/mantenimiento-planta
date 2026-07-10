@@ -38,26 +38,80 @@ const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
 const CLOSED_SHIFT_GRACE_MS = 2 * 60 * 60 * 1000  // 2h
 
 /**
+ * Versión del esquema del doc PADRE de turno.
+ *
+ * Un turno congelado deja de reescribirse, así que esta constante es el ÚNICO
+ * mecanismo que fuerza un repoblado del histórico. **Súbela cada vez que agregues
+ * o cambies un campo del doc padre**, o los turnos ya congelados se quedarán sin
+ * él para siempre y harán falta backfills manuales.
+ *
+ * Historial:
+ *   1 — (implícito) docs sin `parentSchemaVersion`: solo conteos por máquina.
+ *   2 — agrega por máquina: uptimeSec, shiftRuntime, overallRatio,
+ *       expectedTotalCycles, breakdown y stateAggregates.
+ */
+const PARENT_SCHEMA_VERSION = 2
+
+/**
+ * Agrega los states de una máquina por (type, name, reason), sumando duración y
+ * conteo. Es la forma comprimida de `states[]` que necesita la vista MENSUAL:
+ * el pareto de paros por razón y los totales de avería macro/micro.
+ *
+ * Deliberadamente CRUDO: no clasifica qué es avería y qué es paro operacional.
+ * Esa regla (`isMaintenanceState`) vive solo en la PWA y se aplica sobre estos
+ * agregados. Duplicarla acá sería garantía de divergencia silenciosa.
+ *
+ * Se excluye `uptime`: no aparece en el pareto (que muestra paradas) y su total
+ * ya viaja en `uptimeSec` / `breakdown`. Sacarlo baja bastante el tamaño del doc.
+ *
+ * Un turno de ~8h colapsa cientos de states (los micro-paros son 1400+ al mes)
+ * en unas 10-25 entradas por máquina.
+ */
+function aggregateStatesByReason(states) {
+  const byKey = new Map()
+  for (const s of states || []) {
+    if (s.type === 'uptime') continue
+    const name   = s.name   || ''
+    const reason = s.reason || ''
+    const key = `${s.type}|${name}|${reason}`
+    const prev = byKey.get(key)
+    if (prev) {
+      prev.durationSec += s.durationSec || 0
+      prev.count       += 1
+    } else {
+      byKey.set(key, {
+        type: s.type,
+        name,
+        reason,
+        color: s.color || '#64748b',
+        durationSec: s.durationSec || 0,
+        count: 1,
+      })
+    }
+  }
+  return [...byKey.values()].sort((a, b) => b.durationSec - a.durationSec)
+}
+
+/**
  * ¿Este turno ya quedó capturado en su forma final y no vale la pena reescribirlo?
  *
  * El wakeup corre cada 5 min y `syncDay` recorre TODOS los turnos del día — sin
  * este chequeo se reescribían turnos cerrados hace horas con datos idénticos
- * (~12k writes/día, casi todos redundantes).
+ * (~10k writes/día, casi todos redundantes).
  *
  * Devuelve true SOLO si:
  *   1. el turno cerró hace más de la gracia,
  *   2. existe doc padre con un `lastSyncAt` posterior a `scheduledEnd + gracia`
  *      (⇒ los datos finales del turno ya se guardaron al menos una vez), y
- *   3. el doc padre trae el enriquecimiento nuevo (`uptimeSec` por máquina).
+ *   3. el doc padre está al día con `PARENT_SCHEMA_VERSION`.
  *
- * El punto 3 hace de marca de versión: los docs padre escritos por la versión
- * anterior del sync se reescriben UNA vez (auto-backfill del enriquecimiento) y
- * de ahí en adelante se saltean.
+ * El punto 3 es el que permite migrar el esquema del padre sin backfill manual:
+ * los docs viejos se reescriben UNA vez y de ahí en adelante se saltean.
  *
  * Ante cualquier duda (doc ausente, sin lastSyncAt, error de lectura) devuelve
  * false → se reescribe. Nunca deja de escribir un turno que no está confirmado.
  *
- * Costo: 1 read por turno cerrado, a cambio de evitar 7 writes.
+ * Costo: 1 read por turno cerrado, a cambio de evitar 4 writes.
  */
 async function isShiftAlreadyFrozen({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, now, logger }) {
   const closedForMs = now.getTime() - scheduledEnd.getTime()
@@ -78,9 +132,14 @@ async function isShiftAlreadyFrozen({ db, plantSlug, parentShiftDateKey, shiftId
     if (!lastSyncAt || Number.isNaN(lastSyncAt.getTime())) return false
     if (lastSyncAt.getTime() < scheduledEnd.getTime() + CLOSED_SHIFT_GRACE_MS) return false
 
-    // Marca de versión: `.some` y no `.every` — una máquina que falló en el
-    // normalizer (status:'error', sin uptimeSec) no debe bloquear el freeze
-    // para siempre.
+    // Esquema al día. Docs de la versión anterior (sin el campo) → reescribir una
+    // vez. Ver PARENT_SCHEMA_VERSION: sin esto, un turno congelado nunca recibiría
+    // los campos nuevos que agregue una versión futura del sync.
+    if ((data.parentSchemaVersion ?? 1) < PARENT_SCHEMA_VERSION) return false
+
+    // Debe haber al menos una máquina con datos reales. `.some` y no `.every`:
+    // una máquina que falló en el normalizer (status:'error', sin uptimeSec) no
+    // debe bloquear el freeze para siempre.
     const machines = Array.isArray(data.machines) ? data.machines : []
     if (!machines.some(m => typeof m?.uptimeSec === 'number')) return false
 
@@ -606,9 +665,10 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         )
 
         // Agregados por máquina → doc padre. Permiten que la vista mensual
-        // resuelva uptime/OEE leyendo SOLO los docs padre (1 query de rango),
-        // sin bajar las subcolecciones `machines` de cada turno.
-        // `uptimeSec` es además la marca de versión que usa `isShiftAlreadyFrozen`.
+        // resuelva uptime / OEE / pareto de paros leyendo SOLO los docs padre
+        // (1 query de rango), sin bajar las subcolecciones `machines` de cada
+        // turno. Los `states[]` completos siguen en la subcolección y se cargan
+        // solo al abrir un día concreto (timeline).
         shiftMachineResults.push({
           machineid:   machines[i].machineid,
           name:        machines[i].name,
@@ -621,6 +681,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
           overallRatio:        doc.overallRatio,
           expectedTotalCycles: doc.expectedTotalCycles,
           breakdown:           doc.shiftRuntimeBreakdown,
+          stateAggregates:     aggregateStatesByReason(doc.states),
         })
       } catch (err) {
         logger.warn(`[syncDay][${plantSlug}] ${machines[i].name} normalizer err: ${err.message}`)
@@ -631,6 +692,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // Metadata del doc padre del turno — `parentShiftDateKey` ya se calculó
     // arriba (freeze check); reusarlo evita una segunda derivación divergente.
     const parentDoc = {
+      parentSchemaVersion: PARENT_SCHEMA_VERSION,
       dateKey:        parentShiftDateKey,
       shiftId:        group.shiftId,
       // Nombre crudo de Shoplogix (para trazabilidad); != shiftId solo cuando se
@@ -784,6 +846,8 @@ async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateK
 module.exports = {
   ACTIVE_PLANTS,
   CLOSED_SHIFT_GRACE_MS,
+  PARENT_SCHEMA_VERSION,
+  aggregateStatesByReason,
   shiftWindow,
   fullDayWindow,
   deriveShiftGroups,
