@@ -555,6 +555,45 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                 {proc.description}
               </p>
             )}
+
+            {proc.menuPath && proc.menuPath.length > 0 && (
+              <div className="mb-3 rounded-md px-3 py-2" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
+                <p className="text-[10px] uppercase tracking-[0.14em] font-bold mb-1.5" style={{ color: LC.inkLo }}>
+                  Ruta de menu
+                </p>
+                <div className="flex flex-wrap items-center gap-1 text-xs font-mono" style={{ color: LC.ink }}>
+                  {proc.menuPath.map((segment, index) => (
+                    <span key={`${segment}-${index}`} className="flex items-center gap-1">
+                      {index > 0 && <ChevronRight className="h-3 w-3" style={{ color: LC.inkLo }} />}
+                      <span className="rounded px-1.5 py-0.5" style={{ background: `${color}14`, border: `1px solid ${color}28` }}>
+                        {segment}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {proc.formula && (
+              <div className="mb-3 rounded-md p-3" style={{ background: `${color}0d`, border: `1px solid ${color}33` }}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Gauge className="h-3.5 w-3.5" style={{ color }} />
+                  <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color }}>
+                    Formula
+                  </p>
+                </div>
+                <p className="text-sm font-mono mb-2 break-all" style={{ color: LC.ink }}>{proc.formula.expression}</p>
+                <dl className="space-y-1">
+                  {Object.entries(proc.formula.variables).map(([name, meaning]) => (
+                    <div key={name} className="flex gap-2 text-xs">
+                      <dt className="font-mono font-semibold flex-shrink-0" style={{ color }}>{name}</dt>
+                      <dd className="min-w-0 flex-1" style={{ color: LC.inkMid }}>{meaning}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
             <ol className="space-y-0 mt-4 border-l" style={{ borderColor: `${color}35` }}>
               {proc.steps.map(step => (
                 <li key={step.order} className="relative flex gap-3 pb-4 pl-4 last:pb-0">
@@ -591,6 +630,25 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                 </li>
               ))}
             </ol>
+
+            {proc.successCriteria && proc.successCriteria.length > 0 && (
+              <div className="mt-4 rounded-md p-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.28)' }}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <ShieldCheck className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />
+                  <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color: '#22c55e' }}>
+                    Criterios de exito
+                  </p>
+                </div>
+                <ul className="space-y-1.5">
+                  {proc.successCriteria.map((criterion, index) => (
+                    <li key={index} className="flex gap-2 text-xs leading-relaxed" style={{ color: LC.inkMid }}>
+                      <span className="mt-[6px] h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: '#22c55e' }} />
+                      <span className="flex-1">{criterion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </article>
       ))}
@@ -839,6 +897,9 @@ function ManualList({
           </div>
 
           <div className="grid gap-3">
+            {blocks.documents.length > 0 && (
+              <ManualDocuments documents={blocks.documents} color={color} />
+            )}
             {blocks.measurements.length > 0 && (
               <ManualBlock
                 icon={Ruler}
@@ -976,6 +1037,14 @@ interface ManualContentBlocks {
   keyPoints: string[]
   notes: string[]
   images: { label: string; url: string }[]
+  /** Documentos descargables (PDF, planos): "- Etiqueta: /ruta.pdf" */
+  documents: { label: string; url: string }[]
+}
+
+/** "Etiqueta: /ruta" → {label, url}. Devuelve url vacia si la linea no trae ruta. */
+function parseLabeledUrl(value: string, fallbackLabel: string): { label: string; url: string } {
+  const match = value.match(/^(.*?):\s*(https?:\/\/\S+|\/\S+)$/)
+  return match ? { label: match[1] || fallbackLabel, url: match[2] ?? '' } : { label: value, url: '' }
 }
 
 function parseManualContent(content: string): ManualContentBlocks {
@@ -985,8 +1054,10 @@ function parseManualContent(content: string): ManualContentBlocks {
     keyPoints: [],
     notes: [],
     images: [],
+    documents: [],
   }
-  let current: keyof Omit<ManualContentBlocks, 'description' | 'images'> | 'images' | 'description' = 'description'
+  type ListKey = 'measurements' | 'keyPoints' | 'notes'
+  let current: ListKey | 'images' | 'documents' | 'description' = 'description'
   const description: string[] = []
 
   for (const raw of content.split('\n')) {
@@ -996,13 +1067,15 @@ function parseManualContent(content: string): ManualContentBlocks {
     if (line === 'Puntos clave:') { current = 'keyPoints'; continue }
     if (line === 'Notas operativas:') { current = 'notes'; continue }
     if (line === 'Referencias visuales:') { current = 'images'; continue }
+    if (line === 'Documentos:') { current = 'documents'; continue }
 
     const value = line.startsWith('- ') ? line.slice(2) : line
     if (current === 'description') {
       description.push(value)
     } else if (current === 'images') {
-      const match = value.match(/^(.*?):\s*(https?:\/\/\S+|\/\S+)$/)
-      blocks.images.push(match ? { label: match[1] || 'Imagen', url: match[2] ?? '' } : { label: value, url: '' })
+      blocks.images.push(parseLabeledUrl(value, 'Imagen'))
+    } else if (current === 'documents') {
+      blocks.documents.push(parseLabeledUrl(value, 'Documento'))
     } else {
       blocks[current].push(value)
     }
@@ -1054,6 +1127,35 @@ function ManualBlock({
           </li>
         ))}
       </ul>
+    </section>
+  )
+}
+
+/** Documentos oficiales descargables (PDF, planos) de una seccion de manual. */
+function ManualDocuments({ documents, color }: { documents: { label: string; url: string }[]; color: string }) {
+  return (
+    <section className="rounded-md p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="h-4 w-4" style={{ color }} />
+        <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
+          Documentos
+        </h4>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {documents.map((doc, index) => (
+          <a
+            key={`${doc.label}-${index}`}
+            href={doc.url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm transition hover:-translate-y-0.5"
+            style={{ background: LC.surface, border: `1px solid ${color}30`, color: LC.ink }}
+          >
+            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" style={{ color }} />
+            <span className="min-w-0 flex-1 leading-snug">{doc.label}</span>
+          </a>
+        ))}
+      </div>
     </section>
   )
 }

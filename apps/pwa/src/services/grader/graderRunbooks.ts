@@ -296,23 +296,6 @@ export const RUNBOOKS: Record<string, Runbook> = {
 // HELPERS
 // ============================================================================
 
-export function filterRunbooks(
-  runbooks: Record<string, Runbook>,
-  query: string,
-  category: RunbookCategory | 'all',
-): Runbook[] {
-  const q = query.toLowerCase().trim()
-  return Object.values(runbooks).filter(rb => {
-    if (category !== 'all' && rb.category !== category) return false
-    if (!q) return true
-    return (
-      rb.title.toLowerCase().includes(q) ||
-      rb.summary.toLowerCase().includes(q) ||
-      rb.steps.some(s => s.instruction.toLowerCase().includes(q))
-    )
-  })
-}
-
 export function findTriggeredRunbooks(dominantMatrixCause: string | null, p0Pct: number): Runbook[] {
   const causeMetricMap: Record<string, string> = {
     fuera_de_limites:     'fuera_de_limites_pct',
