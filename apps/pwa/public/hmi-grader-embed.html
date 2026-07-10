@@ -376,18 +376,17 @@ html.in-iframe, html.in-iframe body {
   align-items: center;
   flex-shrink: 0;
 }
-.pb { flex: 1; display: flex; align-items: center; justify-content: center; color: #88bbee; font-size: 14px; }
-.pf { display: flex; gap: 0; padding: 2px 0 0; background: #1A5276; flex-shrink: 0; }
-.cx {
-  border: 1px solid rgba(255,255,255,0.3);
-  padding: 2px 8px;
-  font-size: 11px;
-  cursor: pointer;
+/* Fase 2 — breadcrumb "Home › Menu › Servicio › ...": una línea, trunca si no cabe */
+.crumb {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #aaddff;
-  background: transparent;
-  outline: none;
+  font-weight: normal;
+  font-size: 13px;
 }
-.cx:hover { background: rgba(255,255,255,0.1); }
+.pb { flex: 1; display: flex; align-items: center; justify-content: center; color: #88bbee; font-size: 14px; }
 
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
@@ -634,27 +633,29 @@ html.in-iframe, html.in-iframe body {
 
     <!-- BOTONES -->
     <div class="btn-bar">
-      <button class="btn" onclick="sp('pp')">Cambiar programa</button>
-      <button class="btn" onclick="sp('pm')">Modo presentación</button>
+      <button class="btn" onclick="navigateTo('pp')">Cambiar programa</button>
+      <button class="btn" onclick="navigateTo('pm')">Modo presentación</button>
       <button class="btn" onclick="al('Centrando -> 0 <-')">-&gt; 0 &lt;-</button>
-      <button class="btn" onclick="sp('mn')">Menu</button>
+      <button class="btn" onclick="navigateTo('mn')">Menu</button>
     </div>
 
-    <!-- PANELES -->
-    <div class="panel" id="pp">
-      <div class="ph"><span>Cambiar programa</span><span class="cx" onclick="cp('pp')">✕ Volver</span></div>
+    <!-- PANELES — Fase 2: header = breadcrumb, footer = .btn-bar compartido
+         con el home (mismas clases → F1-F4 los detecta igual, contextual al
+         panel activo). data-title = nombre real de la pantalla (breadcrumb + log). -->
+    <div class="panel" id="pp" data-title="Cambiar programa">
+      <div class="ph"><span class="crumb"></span></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pp')">← Volver</button></div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
-    <div class="panel" id="pm">
-      <div class="ph"><span>Modo presentación</span><span class="cx" onclick="cp('pm')">✕ Volver</span></div>
+    <div class="panel" id="pm" data-title="Modo presentación">
+      <div class="ph"><span class="crumb"></span></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pm')">← Volver</button></div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
-    <div class="panel" id="mn">
-      <div class="ph"><span>Menu</span><span class="cx" onclick="cp('mn')">✕ Volver</span></div>
+    <div class="panel" id="mn" data-title="Menu">
+      <div class="ph"><span class="crumb"></span></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('mn')">← Volver</button></div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
   </div><!-- #screen -->
@@ -746,9 +747,54 @@ function tick() {
 }
 tick(); setInterval(tick, 1000);
 
-/* Navegación */
-function sp(id) { document.getElementById(id).classList.add('active'); }
-function cp(id) { document.getElementById(id).classList.remove('active'); }
+/* ══════════════════════════════════════════════════
+   NAVEGACIÓN — Fase 2 (motor de pantallas)
+   Stack real (push/pop) en vez de show/hide plano: permite
+   anidar pantallas (Menu > Servicio > Probar Salidas > ...)
+   sin que cada nivel tenga que saber del anterior. Solo la
+   pantalla en el TOPE del stack está visible (position:absolute
+   inset:0 sobre #screen — como en la Z2 real, pantalla completa,
+   no ventanas superpuestas).
+══════════════════════════════════════════════════ */
+let screenStack = [];
+
+function screenTitle(id) {
+  const el = document.getElementById(id);
+  return el ? (el.dataset.title || id) : id;
+}
+
+/** Recalcula el breadcrumb "Home › Menu › Servicio › ..." de la pantalla en el tope. */
+function updateBreadcrumb() {
+  const topId = screenStack[screenStack.length - 1];
+  if (!topId) return; // volvimos a home, no hay panel visible que actualizar
+  const path = ['Home', ...screenStack.map(screenTitle)].join(' › ');
+  const crumbEl = document.getElementById(topId)?.querySelector('.crumb');
+  if (crumbEl) crumbEl.textContent = path;
+}
+
+/** Navega HACIA ADELANTE a la pantalla `id` (la apila sobre la actual). */
+function navigateTo(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  document.querySelectorAll('.panel.active').forEach(p => p.classList.remove('active'));
+  screenStack.push(id);
+  el.classList.add('active');
+  updateBreadcrumb();
+  logEventToParent('nav', screenTitle(id));
+}
+
+/** Vuelve un nivel (Salir/Cancelar en el footer). Vacía el stack → home. */
+function goBack() {
+  const closingId = screenStack.pop();
+  if (!closingId) return; // ya estábamos en home
+  document.getElementById(closingId)?.classList.remove('active');
+  const parentId = screenStack[screenStack.length - 1];
+  if (parentId) {
+    document.getElementById(parentId)?.classList.add('active');
+    updateBreadcrumb();
+  }
+  logEventToParent('nav', parentId ? screenTitle(parentId) : 'Home');
+}
 
 /* Log */
 function addLog(msg) {
@@ -805,14 +851,25 @@ function updateIndicatorValue(ind, valueStr) {
   ind.insertBefore(document.createTextNode(valueStr), unit);
 }
 
-/* F-keys → click en los botones del footer */
+/* F-keys → click CONTEXTUAL: dispara el botón i-ésimo del .btn-bar que esté
+   REALMENTE visible (el de home si no hay panel abierto, o el del panel en
+   el tope del stack) — igual que la Z2 real, donde F1-F4 significan algo
+   distinto en cada pantalla ("Cancelar/Abajo/Arriba/OK" en el editor de
+   parámetros, "Anterior/Next/Salir" en Probar Salidas, etc). */
+function currentBtnBar() {
+  const activePanel = document.querySelector('.panel.active');
+  return activePanel ? activePanel.querySelector('.btn-bar') : document.querySelector('#screen > .btn-bar');
+}
+
 document.querySelectorAll('.fkey').forEach((fk, i) => {
   fk.addEventListener('click', () => {
-    const footerBtns = document.querySelectorAll('#rc-window .btn-bar .btn');
-    if (footerBtns[i]) {
-      footerBtns[i].click();
+    const bar = currentBtnBar();
+    const btns = bar ? bar.querySelectorAll('.btn') : [];
+    if (btns[i]) {
+      btns[i].click();
       addLog(`F${i + 1} pressed`);
     }
+    logEventToParent('fkey-press', 'F' + (i + 1));
   });
 });
 
@@ -1000,11 +1057,7 @@ document.querySelectorAll('.gate').forEach(g => {
     scheduleSave();
   });
 });
-document.querySelectorAll('.fkey').forEach((fk, i) => {
-  fk.addEventListener('click', () => {
-    logEventToParent('fkey-press', 'F' + (i + 1));
-  });
-});
+/* fkey-press ya se loguea en el handler contextual de F-keys (ver sección NAVEGACIÓN) */
 
 /* Detectar si estamos en iframe y aplicar clase para layout adaptado */
 if (window.parent !== window) {

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.84.1' as const
+export const APP_VERSION = '3.85.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-07-10' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(ui): el visor de imágenes ahora se puede cerrar en móvil (quedaba sin pointer-events bajo un Dialog modal)' as const
+export const VERSION_NAME = 'feat(hmi-grader): motor de navegación real (stack push/pop + breadcrumb + F-keys contextuales)' as const
 
 /**
  * Nota:
