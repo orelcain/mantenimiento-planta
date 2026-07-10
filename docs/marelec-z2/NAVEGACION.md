@@ -270,4 +270,8 @@ cola de medición en terreno).
   - **Fix de fidelidad encontrado**: el header (fecha/hora + indicadores de peso) queda visible SIEMPRE en la Z2 real, incluso dentro de sub-pantallas — el motor de Fase 2 lo tapaba. Corregido con `#home-body` (ver PR #188).
   - Arranca `GLOSSARY_EN_ES` (tooltips bilingües inline en `hmi-grader-embed.html`) — **pendiente reconciliar con `labelForField()`/`graderGlossary.ts`** del lado React en un lote posterior (no bloqueante, pero hay que evitar 3 diccionarios paralelos).
   - "Servicio" (Lote 2), "Estado" (sin pantallazo fuente) y el resto de ítems del Menu dan feedback honesto "no clonada todavía" en vez de contenido inventado.
-- ⏳ **Siguiente**: Lote 2 (Servicio → Probar entradas / Probar salidas / Monitor CPU) y Lote 3 (Static grader → Z belt → Pockets 1-4), en el orden P1 del spec.
+- ✅ **Fase 3 — Lote 2** (Servicio + Probar Entradas + Probar Salidas + Monitor CPU): [PR #189](https://github.com/orelcain/mantenimiento-planta/pull/189) (`feat/hmi-grader-lote2-servicio`, apilado sobre #188). Clonadas contra `p007.png`–`p017.png` reales.
+  - `MENU_ITEMS`/`buildMenuList` (Lote 1) generalizado a `SERVICIO_ITEMS`/`buildScrollList` — Menu y Servicio comparten la misma UX de lista.
+  - Probar Salidas es un wizard real de 5 páginas (O1-24, O101-116, O117-132, O133-148, O149-164) con campo "Activ Sal." funcional (togglea por número).
+  - "Cambiar Parametros" (el editor gigante bajo clave 8620, ~24 pantallas) queda explícitamente para un lote propio — no es parte de Lote 2 ni 3.
+- ⏳ **Siguiente**: Lote 3 (Static grader → Z belt → Pockets 1-4, `p095-p418.png`) y, aparte, el lote grande de "Cambiar Parametros" (editor árbol+lista).
