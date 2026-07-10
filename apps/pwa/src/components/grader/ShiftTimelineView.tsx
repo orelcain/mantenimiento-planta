@@ -36,6 +36,8 @@ import {
   buildPauseBoundaryMarkLines,
   buildBaaderTimelineMarkers,
   buildConfigSegmentMarkAreas,
+  computeCadenceStats,
+  buildCadenceMarkLines,
 } from './shiftTimelineHelpers'
 import {
   DEFAULT_P0_ALERT_PCT,
@@ -835,6 +837,11 @@ export function ShiftTimelineView({
     )
     const piecesAxisMax = Math.ceil(maxStackedPerMin * 1.43)
 
+    // Cadencia (pz/min): ritmo típico (mediana) + mejor sostenida 10min,
+    // calculados del turno visible (nunca hardcoded). Se cuelgan del eje
+    // secundario Pzs/min vía la serie 'Pzs productivas/min' (yAxisIndex 1).
+    const cadenceLines = buildCadenceMarkLines(computeCadenceStats(buckets))
+
     return {
       backgroundColor: 'transparent',
       // Más margen bajo para el slider de zoom
@@ -1087,6 +1094,12 @@ export function ShiftTimelineView({
           barMaxWidth: 12,
           barCategoryGap: '10%',
           z: 1,
+          markLine: cadenceLines.length > 0 ? {
+            silent: false,
+            animation: false,
+            symbol: 'none' as const,
+            data: cadenceLines,
+          } : undefined,
         },
         {
           name: 'Pzs P0/min',

@@ -303,6 +303,83 @@ export function buildMarkLines(
   return { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines }
 }
 
+// ── Cadencia (pz/min): ritmo típico + mejor sostenida 10min ──────────────────
+
+/** Tamaño de la ventana móvil (en minutos activos) para "máx sostenida". */
+const CADENCE_WINDOW_MIN = 10
+
+export interface CadenceStats {
+  /** Mediana de pz/min sobre los minutos ACTIVOS (pieces>0) del turno. Null si no hay minutos activos. */
+  typicalPzMin: number | null
+  /**
+   * Mejor promedio móvil de `CADENCE_WINDOW_MIN` minutos activos CONSECUTIVOS
+   * (consecutivos en la secuencia de minutos con producción, no en reloj —
+   * así una colación en medio del turno no castiga la lectura de "cuánto
+   * llegó a rendir de verdad" cuando la máquina SÍ estaba corriendo).
+   * Null si el turno tiene menos de `CADENCE_WINDOW_MIN` minutos activos.
+   */
+  bestSustained10MinPzMin: number | null
+}
+
+/**
+ * Calcula el ritmo típico (mediana) y la mejor cadencia sostenida (ventana
+ * móvil de 10 min) a partir de los buckets YA filtrados a minutos activos
+ * del turno visible (mismo filtro `pieces>0` que usa el chart).
+ *
+ * No usar la media para "típico": los minutos parciales/colación la arrastran
+ * hacia abajo y no representa el ritmo real de operación.
+ */
+export function computeCadenceStats(activeBuckets: TimelineBucket[]): CadenceStats {
+  if (activeBuckets.length === 0) return { typicalPzMin: null, bestSustained10MinPzMin: null }
+
+  const piecesPerMin = activeBuckets.map((b) => b.pieces)
+  const typicalPzMin = median(piecesPerMin)
+
+  let bestSustained10MinPzMin: number | null = null
+  if (piecesPerMin.length >= CADENCE_WINDOW_MIN) {
+    let windowSum = 0
+    for (let i = 0; i < CADENCE_WINDOW_MIN; i++) windowSum += piecesPerMin[i]!
+    let best = windowSum
+    for (let i = CADENCE_WINDOW_MIN; i < piecesPerMin.length; i++) {
+      windowSum += piecesPerMin[i]! - piecesPerMin[i - CADENCE_WINDOW_MIN]!
+      if (windowSum > best) best = windowSum
+    }
+    bestSustained10MinPzMin = best / CADENCE_WINDOW_MIN
+  }
+
+  return { typicalPzMin, bestSustained10MinPzMin }
+}
+
+/**
+ * Construye el markLine.data (2 líneas horizontales sobre el eje Pzs/min)
+ * a partir de `computeCadenceStats`. Sin data suficiente, cada línea se omite
+ * individualmente (nunca NaN).
+ */
+export function buildCadenceMarkLines(stats: CadenceStats): object[] {
+  const lines: object[] = []
+  if (stats.typicalPzMin != null) {
+    const v = Math.round(stats.typicalPzMin)
+    lines.push({
+      name: 'Ritmo típico',
+      yAxis: stats.typicalPzMin,
+      lineStyle: { color: '#38bdf8', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
+      label: { show: true, formatter: `típico ${v}`, color: '#38bdf8', fontSize: 10, position: 'insideEndTop' as const },
+      tooltip: { show: true, formatter: `Ritmo típico: mediana de pz/min en los minutos activos del turno (${v} pz/min).` },
+    })
+  }
+  if (stats.bestSustained10MinPzMin != null) {
+    const v = Math.round(stats.bestSustained10MinPzMin)
+    lines.push({
+      name: 'Máx sostenida (10min)',
+      yAxis: stats.bestSustained10MinPzMin,
+      lineStyle: { color: '#facc15', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
+      label: { show: true, formatter: `máx 10min ${v}`, color: '#facc15', fontSize: 10, position: 'insideEndTop' as const },
+      tooltip: { show: true, formatter: `Máx sostenida: mejor promedio móvil de 10 min activos del turno — capacidad demostrada (${v} pz/min).` },
+    })
+  }
+  return lines
+}
+
 // ── Mark areas (bandas de pausas) ─────────────────────────────────────────────
 
 /**
