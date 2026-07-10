@@ -262,3 +262,12 @@ existente, queda solo como documentación (no entra a esta cola) — no medir po
 **Sigue: Fase 2 (motor de navegación) y Fase 3 lote a lote**, en PR(s) de código separados de
 este (doc-only). Este archivo se actualiza a medida que Fase 3 avanza (diccionario bilingüe +
 cola de medición en terreno).
+
+## Progreso Fase 2 / Fase 3 (actualizado 2026-07-10)
+
+- ✅ **Fase 2 — motor de navegación**: [PR #187](https://github.com/orelcain/mantenimiento-planta/pull/187) (`feat/hmi-grader-nav-engine`). Stack push/pop real + breadcrumb (reusa el tab `.title-bar`, no un header inventado) + F-keys contextuales + `hmi:log-event` por navegación.
+- ✅ **Fase 3 — Lote 1** (Menu + Velocidad cintas + Resultados Clasificación + Estado): [PR #188](https://github.com/orelcain/mantenimiento-planta/pull/188) (`feat/hmi-grader-lote1-menu-cintas`, apilado sobre #187). Clonadas contra `p002.png`–`p006.png` reales.
+  - **Fix de fidelidad encontrado**: el header (fecha/hora + indicadores de peso) queda visible SIEMPRE en la Z2 real, incluso dentro de sub-pantallas — el motor de Fase 2 lo tapaba. Corregido con `#home-body` (ver PR #188).
+  - Arranca `GLOSSARY_EN_ES` (tooltips bilingües inline en `hmi-grader-embed.html`) — **pendiente reconciliar con `labelForField()`/`graderGlossary.ts`** del lado React en un lote posterior (no bloqueante, pero hay que evitar 3 diccionarios paralelos).
+  - "Servicio" (Lote 2), "Estado" (sin pantallazo fuente) y el resto de ítems del Menu dan feedback honesto "no clonada todavía" en vez de contenido inventado.
+- ⏳ **Siguiente**: Lote 2 (Servicio → Probar entradas / Probar salidas / Monitor CPU) y Lote 3 (Static grader → Z belt → Pockets 1-4), en el orden P1 del spec.
