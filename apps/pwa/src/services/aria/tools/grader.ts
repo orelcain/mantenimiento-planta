@@ -1037,7 +1037,8 @@ registerTool({
     })
 
     // Confiabilidad (MISMAS funciones que el board → cuadra).
-    const kpis = s.machines.map(computeMachineKPI)
+    // `map` pasa el índice como 2º arg — envolver para no colarlo como lineCpm.
+    const kpis = s.machines.map(m => computeMachineKPI(m))
     const failures = kpis.reduce((a, k) => a + k.failureCount, 0)
     const macroMinTotal = kpis.reduce((a, k) => a + k.mttrMin * k.failureCount, 0)
     const mttr = failures > 0 ? macroMinTotal / failures : 0

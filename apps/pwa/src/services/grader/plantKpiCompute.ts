@@ -44,6 +44,10 @@ export interface MachineKPI {
   shoplogixTargetCpm: number | null
   /** Total de ciclos de la máquina en el período. */
   totalCycles: number
+  /** Piezas dejadas de producir por velocidad baja (buckets productivos). */
+  lostBySpeed: number
+  /** Piezas dejadas de producir por tiempo detenido (downtime × target). */
+  lostByStops: number
 }
 
 export interface PlantKPIs {
@@ -131,10 +135,63 @@ export function targetCpmFromIntervals(intervals: Pick<Interval, 'expectedCycles
   return maxExpected > 0 ? maxExpected / 5 : null
 }
 
-export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
+/** Cadencia real EN MARCHA de una máquina (pz/min): ciclos / tiempo activo. */
+export function cadenceCpm(totalCycles: number, uptimeSec: number): number {
+  return uptimeSec > 0 ? totalCycles / (uptimeSec / 60) : 0
+}
+
+/**
+ * CADENCIA DE LA LÍNEA (pz/min) — mediana de las cadencias de las máquinas que
+ * produjeron. Es la referencia COMÚN contra la que se miden las piezas perdidas.
+ */
+export function lineCadenceCpm(cadences: number[]): number | null {
+  const activas = cadences.filter(c => c > 0).sort((a, b) => a - b)
+  if (activas.length === 0) return null
+  const mid = Math.floor(activas.length / 2)
+  return activas.length % 2 === 0 ? (activas[mid - 1]! + activas[mid]!) / 2 : activas[mid]!
+}
+
+/**
+ * PIEZAS PERDIDAS — cuánto le costó a la LÍNEA cada máquina.
+ *
+ * Se mide contra la cadencia de la línea, NO contra el target propio de cada
+ * máquina. Motivo: las 3 Baader 142 de yal no son iguales — la Evisceradora 3
+ * es el modelo antiguo (19 pz/min) y las 1 y 2 el nuevo (16 pz/min). Medir
+ * contra el target propio castiga a la de mayor capacidad: la Ev3 corre MÁS
+ * rápido que sus pares (16.2 vs 15.4 pz/min) y entrega más piezas, pero contra
+ * su target de 19 "pierde" el doble que las otras. Eso hacía que el board
+ * señalara como culpable justo a la mejor máquina.
+ *
+ * Con la línea como referencia:
+ *   - por velocidad: solo pierde la que corre MÁS LENTO que sus pares
+ *   - por paros:     el tiempo detenido, valorado a la cadencia de la línea
+ *
+ * Nota: esto mide "quién arrastra la línea", no capacidad ociosa. Que la Ev3
+ * pueda dar 19 y dé 16 es una pérdida real de la planta, pero su causa es el
+ * balance de alimentación, no la máquina.
+ */
+export function computeLostPieces(
+  totalCycles: number,
+  uptimeSec: number,
+  downtimeSec: number,
+  lineCpm: number | null,
+): { lostBySpeed: number; lostByStops: number } {
+  // Sin línea de referencia (una sola máquina) usamos su propia cadencia: no hay
+  // con quién compararla, así que no pierde nada por velocidad.
+  const ref = lineCpm ?? cadenceCpm(totalCycles, uptimeSec)
+  const uptimeMin = uptimeSec / 60
+  return {
+    lostBySpeed: Math.max(0, ref * uptimeMin - totalCycles),
+    lostByStops: (downtimeSec / 60) * ref,
+  }
+}
+
+export function computeMachineKPI(m: UpstreamMachineShift, lineCpm: number | null = null): MachineKPI {
   const uptimeSec = m.shiftRuntimeBreakdown.uptimeSec
   // Averías MACRO (sin micro ni paros operacionales) para MTTR/MTBF profesional.
   const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(m.states)
+  const targetCpm = targetCpmFromIntervals(m.intervals)
+  const lost = computeLostPieces(m.totalCycles ?? 0, uptimeSec, m.shiftRuntimeBreakdown.downtimeSec, lineCpm)
   return {
     machineid: m.machineid,
     machineName: m.machineName,
@@ -145,8 +202,9 @@ export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
     failureCount: macroCount,
     microCount,
     microMin: microSec / 60,
-    shoplogixTargetCpm: targetCpmFromIntervals(m.intervals),
+    shoplogixTargetCpm: targetCpm,
     totalCycles: m.totalCycles ?? 0,
+    ...lost,
   }
 }
 
@@ -200,35 +258,51 @@ export function aggregateShifts(
     }
   }
 
-  const machineKPIs: MachineKPI[] = []
-  for (const [, entries] of byMachine) {
+  // Paso 1: acumular por máquina. Las piezas perdidas necesitan la cadencia de
+  // la LÍNEA, que solo se conoce una vez agregadas todas → segunda pasada.
+  const acc = [...byMachine.values()].map((entries) => {
     const ms = entries.map(e => e.machine)
-    const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(ms.flatMap(m => m.states))
-    const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
-    // A/P ISO agregados: sumar segundos y ciclos de TODAS las instancias del
-    // turno (no promediar ratios) → disponibilidad y rendimiento ponderados reales.
-    const aggBreakdown = ms.reduce(
-      (acc, m) => ({
-        uptimeSec:   acc.uptimeSec   + m.shiftRuntimeBreakdown.uptimeSec,
-        downtimeSec: acc.downtimeSec + m.shiftRuntimeBreakdown.downtimeSec,
-        setupSec:    acc.setupSec    + m.shiftRuntimeBreakdown.setupSec,
+    const breakdown = ms.reduce(
+      (a, m) => ({
+        uptimeSec:   a.uptimeSec   + m.shiftRuntimeBreakdown.uptimeSec,
+        downtimeSec: a.downtimeSec + m.shiftRuntimeBreakdown.downtimeSec,
+        setupSec:    a.setupSec    + m.shiftRuntimeBreakdown.setupSec,
       }),
       { uptimeSec: 0, downtimeSec: 0, setupSec: 0 },
     )
-    machineKPIs.push({
-      machineid: ms[0]!.machineid,
-      machineName: ms[0]!.machineName,
-      availability: availabilityISO(aggBreakdown),
-      performance: performanceISO(ms.flatMap(m => m.intervals)),
+    const totalCycles = ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0)
+    return {
+      ms,
+      breakdown,
+      totalCycles,
+      intervals: ms.flatMap(m => m.intervals),
+      maintenance: computeMaintenanceTotals(ms.flatMap(m => m.states)),
+      cadence: cadenceCpm(totalCycles, breakdown.uptimeSec),
+    }
+  })
+
+  const lineCpm = lineCadenceCpm(acc.map(a => a.cadence))
+
+  // Paso 2: A/P ISO agregados — sumar segundos y ciclos de TODAS las instancias
+  // del turno (no promediar ratios) → disponibilidad y rendimiento ponderados.
+  const machineKPIs: MachineKPI[] = acc.map((a) => {
+    const { macroSec, macroCount, microSec, microCount } = a.maintenance
+    const lost = computeLostPieces(a.totalCycles, a.breakdown.uptimeSec, a.breakdown.downtimeSec, lineCpm)
+    return {
+      machineid: a.ms[0]!.machineid,
+      machineName: a.ms[0]!.machineName,
+      availability: availabilityISO(a.breakdown),
+      performance: performanceISO(a.intervals),
       mttrMin: macroCount > 0 ? macroSec / macroCount / 60 : 0,
-      mtbfHours: macroCount > 0 ? totalUptimeSec / macroCount / 3600 : totalUptimeSec / 3600,
+      mtbfHours: macroCount > 0 ? a.breakdown.uptimeSec / macroCount / 3600 : a.breakdown.uptimeSec / 3600,
       failureCount: macroCount,
       microCount,
       microMin: microSec / 60,
-      shoplogixTargetCpm: targetCpmFromIntervals(ms.flatMap(m => m.intervals)),
-      totalCycles: ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0),
-    })
-  }
+      shoplogixTargetCpm: targetCpmFromIntervals(a.intervals),
+      totalCycles: a.totalCycles,
+      ...lost,
+    }
+  })
 
   const availability = avg(machineKPIs.map(m => m.availability))
   const performance = avg(machineKPIs.map(m => m.performance))

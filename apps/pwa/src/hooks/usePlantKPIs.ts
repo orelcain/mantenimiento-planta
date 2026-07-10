@@ -15,7 +15,7 @@ import {
   listShoplogixShiftIdsForDay,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
-import { avg, computeMachineKPI, aggregateShifts } from '@/services/grader/plantKpiCompute'
+import { avg, computeMachineKPI, aggregateShifts, cadenceCpm, lineCadenceCpm } from '@/services/grader/plantKpiCompute'
 import type { MachineKPI, PlantKPIs } from '@/services/grader/plantKpiCompute'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
@@ -139,7 +139,9 @@ export function usePlantKPIs(
           return
         }
 
-        const machineKPIs  = snapshot.machines.map(computeMachineKPI)
+        // `map` pasa el índice como 2º arg — envolver para no colarlo como lineCpm.
+        const lineCpm      = lineCadenceCpm(snapshot.machines.map(m => cadenceCpm(m.totalCycles ?? 0, m.shiftRuntimeBreakdown.uptimeSec)))
+        const machineKPIs  = snapshot.machines.map(m => computeMachineKPI(m, lineCpm))
         const availability = avg(machineKPIs.map(m => m.availability))
         const performance  = avg(machineKPIs.map(m => m.performance))
         const graderSummary = graderSummaries.find(s => s.dateKey === dateKey && s.shiftId === shiftId)

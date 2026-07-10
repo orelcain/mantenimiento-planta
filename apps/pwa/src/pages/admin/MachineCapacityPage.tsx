@@ -5,7 +5,9 @@
  * (piezas/minuto según el panel de control de la Baader). Ese valor es
  * independiente del objetivo configurado en Shoplogix (expectedCycles).
  *
- * Se usa para:
+ * ESTADO REAL: hoy es solo REFERENCIA DOCUMENTAL. Ningún módulo del pipeline de
+ * KPIs importa `machineCapacity` — el Rendimiento se calcula contra el objetivo
+ * de Shoplogix. Los dos usos pensados siguen pendientes:
  *   1. Detectar si el objetivo Shoplogix supera la capacidad física → alerta ⚠.
  *   2. Componente de Rendimiento en OEE si el objetivo está mal calibrado.
  *
@@ -170,7 +172,12 @@ export function MachineCapacityPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Capacidad física máxima de cada Evisceradora según su panel de control.
-          Se usa para detectar objetivos mal calibrados en Shoplogix y para calcular el OEE real.
+          Es una <b>referencia documental</b>: hoy no alimenta el cálculo de OEE — el
+          Rendimiento se mide contra el objetivo de Shoplogix (<code>expectedCycles</code>).
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Las 3 Baader 142 no son iguales: las Evisceradoras 1 y 2 son el modelo nuevo
+          (tope 16 pz/min) y la 3 es la antigua (19 pz/min).
         </p>
         <p className="text-xs text-amber-400/80 flex items-center gap-1 mt-1">
           <AlertTriangle className="w-3 h-3" />
