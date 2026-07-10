@@ -189,15 +189,76 @@ follow-up sugerido, no bloqueante.
 
 ---
 
-## Checkpoint
+## Decisión de arquitectura (checkpoint resuelto con Orel, 2026-07-10)
 
-Este documento es el entregable de checkpoint de la **Fase 1** (`SPEC_HMI_GRADER_PANTALLAS.md`).
-**No se ha codeado ninguna pantalla nueva del simulador todavía.** Antes de pasar a Fase 2
-(motor de navegación) y Fase 3 (implementar pantallas por lotes), falta que Orel:
+**El clon del HMI es documentación/entrenamiento, NO un store de configuración paralelo.**
 
-1. Confirme o corrija el árbol y las prioridades P1/P2 de arriba.
-2. Decida la prioridad de "Sorting belt with batching" y "Acceleration belt 1/2" (hallazgo
-   fuera del spec original).
-3. Confirme si los ítems sin pantallazo explorado quedan fuera de alcance definitivamente o
-   si hay que conseguir más fuente visual (ej. pedir a Marelec/el técnico que documente esas
-   pantallas).
+Auditoría del código vivo mostró que gran parte de "guardar los parámetros reales de la Z2
+para nutrir el análisis del turno" **ya existe y está en producción** bajo
+`/analisis-grader/turno/:shiftId` → "Configuración de este turno" → tab "Análisis" → "Config
+Física":
+
+- **`GraderPhysicalConfig`** (`apps/pwa/src/services/grader/types.ts:350`, Firestore
+  `graderModuleConfigs/{plantLineId}.physicalConfig`) — ya modela timing de flipper
+  (`flipperDelayOpenMs`, `flipperMinOpenTimeMs`, `flipperDelayCloseMs`,
+  `flipperMechanicalResetS`), velocidad de las 4 cintas (`belts[]` con `speedMps` +
+  `calibrationStatus: 'estimated'|'verified'`) y posición de los 12 flippers/pockets
+  (`flipperPositions[].distanceFromSensorMeters`). Poblado con `DEFAULT_PHYSICAL_CONFIG`
+  (`graderAnalyticsThroughput.ts:111`), valores reales medidos en terreno el 2026-04-11.
+- **Motor de sugerencias** (`SuggestionsPanel`/`useSuggestionEngine`) ya lee datos reales del
+  turno y escribe de vuelta a `physicalConfig`.
+- **Medición en terreno** (`SlowMoMeasurementModal`, `TachMeasurementModal`) ya guarda a
+  Firestore (`flipperTimingMeasurements`, `beltSpeedMeasurements`) y sube el
+  `calibrationStatus` de `'estimated'` a `'verified'`.
+- **Historial de cambios** (`graderConfigChangeLog.service.ts`) y un diccionario bilingüe
+  parcial (`labelForField()` + `graderGlossary.ts`) también existen.
+
+Es decir: si el clon del HMI guardara su propia copia editable de estos mismos parámetros,
+en 3 meses habría **tres lugares** con datos de config que pueden divergir (la máquina real,
+`GraderPhysicalConfig`, y el clon). Decisión:
+
+1. **El clon es para aprender qué hace cada pantalla y para qué**, y para tener a mano los
+   valores REALES de la máquina (leídos de los pantallazos / `parameters.md`) al hacer
+   cálculos — pero es de **solo lectura** respecto a la config operativa.
+2. **Cada campo del clon que tenga contraparte en `GraderPhysicalConfig` enlaza a esa
+   contraparte** (ej. un link "Ver en Config Física") en vez de duplicar el dato o inventar
+   un segundo formulario editable.
+3. **Diccionario bilingüe único**: unificar `labelForField()` + `graderGlossary.ts` en un
+   solo diccionario (nombre real del parámetro Z2 en inglés → label en español → "qué hace"
+   cuando esté confirmado, `"sin verificar"` cuando no) — lo usan tanto el clon como Config
+   Física. Se construye de a poco, con cada pantalla que se clone en Fase 3.
+4. **Nunca escritura remota a la máquina real.** El patrón ya existente (sugerencia →
+   aplicación manual del técnico en el Z2 físico → registro en `graderConfigChangeLog`) se
+   mantiene: la app recomienda, la persona actúa físicamente.
+
+### Pendientes de medición en terreno
+
+Mecanismo acordado: al clonar cada pantalla P1 en Fase 3, si el parámetro ya existe en
+`GraderPhysicalConfig` con `calibrationStatus: 'estimated'` (o no existe pero alimentaría un
+cálculo que la app ya hace — ej. cadencia, gap, timing de gates), se agrega aquí como
+candidato, con qué cálculo mejoraría si se verifica. Si no hay conexión a ningún cálculo
+existente, queda solo como documentación (no entra a esta cola) — no medir por medir.
+
+| Parámetro Z2 | Estado hoy | Herramienta | Mejora qué cálculo |
+|---|---|---|---|
+| `belts[main].speedMps` (Sorting belt with batching, `maxSpeed`) | `estimated` en `GraderPhysicalConfig`, valor de pantallazo = 700 mm/s | Tacómetro SKF | Techo teórico de cadencia usado en el markLine "máx sostenida" (PR #185) — hoy comparamos contra la cadencia demostrada, no contra la velocidad real de línea |
+| `belts[zeta].speedMps` (Z-Belt, `maxSpeed`) | `estimated`, valor de pantallazo = 420 mm/s | Tacómetro SKF | Mismo techo teórico; Z-belt es el cuello previo a la grading belt |
+| `flipperMechanicalResetS` | Sin default — "debe medirse con slow-mo" (ya documentado así en el código) | Cámara lenta | Ciclo real del flipper vs. el ciclo software (`delayFlipperOpen+minFlipperOpenTime+delayFlipperClose=650ms`) — hoy no sabemos cuánto se aleja el mecanismo real del ciclo software |
+| RPM variadores Danfoss (Accel belt 1/2) | Solo lectura manual hoy (`BeltRpmModal`, sin verificar contra velocidad lineal real) | Tacómetro SKF + lectura display Danfoss | Confirma si `belts[accel1/accel2].vfd.effectiveMpsPerRpm` calculado es correcto |
+
+(Se irá completando en Fase 3, lote a lote — no es exhaustiva todavía.)
+
+---
+
+## Checkpoint — RESUELTO 2026-07-10
+
+1. ✅ Árbol y prioridades P1/P2 confirmados por Orel.
+2. ✅ "Sorting belt with batching" → **P1** (confirmado — además ya está parcialmente
+   modelada en `GraderPhysicalConfig.belts[main]` y `flipperPositions[]`, lo que refuerza la
+   decisión). "Acceleration belt 1/2" → **P2**.
+3. Ítems sin pantallazo explorado: quedan fuera de alcance por ahora (sin bloquear Fase 2/3).
+4. ✅ Arquitectura clon=documentación enlazada a `GraderPhysicalConfig` (ver sección arriba).
+
+**Sigue: Fase 2 (motor de navegación) y Fase 3 lote a lote**, en PR(s) de código separados de
+este (doc-only). Este archivo se actualiza a medida que Fase 3 avanza (diccionario bilingüe +
+cola de medición en terreno).
