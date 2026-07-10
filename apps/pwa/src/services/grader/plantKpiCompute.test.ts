@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO } from './plantKpiCompute'
+import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals } from './plantKpiCompute'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from './types'
 
@@ -55,7 +55,52 @@ describe('performanceISO', () => {
   })
 })
 
+describe('targetCpmFromIntervals', () => {
+  it('IGNORA el bucket parcial de arranque y toma el bucket completo', () => {
+    // Caso real yal 2026-07-09 Turno 3, Evisceradora 1: el primer bucket con
+    // expected>0 es parcial (37.95) → tomarlo daba 7.6 pz/min en vez de 16.0.
+    expect(targetCpmFromIntervals([
+      { expectedCycles: 37.9528 }, // arranque parcial
+      { expectedCycles: 0 },
+      { expectedCycles: 62.0992 }, // parcial
+      { expectedCycles: 80 },      // bucket completo → el target real
+      { expectedCycles: 80 },
+    ])).toBeCloseTo(16.0)
+  })
+  it('sin buckets con producción esperada → null', () => {
+    expect(targetCpmFromIntervals([{ expectedCycles: 0 }, { expectedCycles: 0 }])).toBeNull()
+  })
+  it('lista vacía → null', () => {
+    expect(targetCpmFromIntervals([])).toBeNull()
+  })
+})
+
 describe('plantKpiCompute', () => {
+  it('computeMachineKPI: target = bucket completo, no el primero', () => {
+    const k = computeMachineKPI(fakeMachine({
+      intervals: [
+        { cycles: 20, expectedCycles: 38 }, // arranque parcial
+        { cycles: 80, expectedCycles: 100 },
+      ],
+    } as unknown as Partial<UpstreamMachineShift>))
+    expect(k.shoplogixTargetCpm).toBeCloseTo(20.0) // 100/5, no 38/5 = 7.6
+  })
+
+  it('aggregateShifts: target toma el máximo entre TODOS los turnos del período', () => {
+    // El turno que va primero cronológicamente arrancó con bucket parcial.
+    const parcial = fakeMachine({ intervals: [{ cycles: 20, expectedCycles: 38 }] } as unknown as Partial<UpstreamMachineShift>)
+    const completo = fakeMachine({ intervals: [{ cycles: 80, expectedCycles: 100 }] } as unknown as Partial<UpstreamMachineShift>)
+    const agg = aggregateShifts(
+      [
+        { dateKey: '2026-02-27', shiftId: 'Turno noche', machines: [parcial] },
+        { dateKey: '2026-02-27', shiftId: 'Turno día', machines: [completo] },
+      ],
+      'día',
+      [],
+    )
+    expect(agg!.machines[0]!.shoplogixTargetCpm).toBeCloseTo(20.0)
+  })
+
   it('computeMachineKPI: A/P ISO + MTBF sin averías', () => {
     const k = computeMachineKPI(fakeMachine())
     expect(k.availability).toBeCloseTo(0.857, 3) // colación fuera

@@ -113,11 +113,28 @@ export function performanceISO(intervals: Pick<Interval, 'cycles' | 'expectedCyc
   return exp > 0 ? Math.min(1, cyc / exp) : 0
 }
 
+/**
+ * TARGET NOMINAL (pz/min) — velocidad de referencia configurada en Shoplogix.
+ * Se toma el MÁXIMO de `expectedCycles` entre los buckets, no el primero: los
+ * buckets de arranque/cierre de turno son PARCIALES (la máquina entra a mitad
+ * del bucket de 5 min) y Shoplogix escala `expectedCycles` a ese tiempo parcial.
+ * El bucket completo es el techo natural → el máximo es el target real.
+ *
+ * Observado 2026-07-09 (yal, Turno 3): 1er bucket con expected>0 valía 37.95
+ * ciclos en vez de 80 → el board mostraba 7.6 pz/min en vez de 16.0.
+ */
+export function targetCpmFromIntervals(intervals: Pick<Interval, 'expectedCycles'>[]): number | null {
+  let maxExpected = 0
+  for (const iv of intervals) {
+    if ((iv.expectedCycles || 0) > maxExpected) maxExpected = iv.expectedCycles
+  }
+  return maxExpected > 0 ? maxExpected / 5 : null
+}
+
 export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
   const uptimeSec = m.shiftRuntimeBreakdown.uptimeSec
   // Averías MACRO (sin micro ni paros operacionales) para MTTR/MTBF profesional.
   const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(m.states)
-  const firstInterval = m.intervals.find((iv) => iv.expectedCycles > 0)
   return {
     machineid: m.machineid,
     machineName: m.machineName,
@@ -128,7 +145,7 @@ export function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
     failureCount: macroCount,
     microCount,
     microMin: microSec / 60,
-    shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
+    shoplogixTargetCpm: targetCpmFromIntervals(m.intervals),
     totalCycles: m.totalCycles ?? 0,
   }
 }
@@ -188,7 +205,6 @@ export function aggregateShifts(
     const ms = entries.map(e => e.machine)
     const { macroSec, macroCount, microSec, microCount } = computeMaintenanceTotals(ms.flatMap(m => m.states))
     const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
-    const firstInterval = ms[0]?.intervals.find(iv => iv.expectedCycles > 0)
     // A/P ISO agregados: sumar segundos y ciclos de TODAS las instancias del
     // turno (no promediar ratios) → disponibilidad y rendimiento ponderados reales.
     const aggBreakdown = ms.reduce(
@@ -209,7 +225,7 @@ export function aggregateShifts(
       failureCount: macroCount,
       microCount,
       microMin: microSec / 60,
-      shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
+      shoplogixTargetCpm: targetCpmFromIntervals(ms.flatMap(m => m.intervals)),
       totalCycles: ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0),
     })
   }
