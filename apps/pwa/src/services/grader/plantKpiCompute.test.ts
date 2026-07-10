@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals } from './plantKpiCompute'
+import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals, computeLostPieces, cadenceCpm, lineCadenceCpm } from './plantKpiCompute'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from './types'
 
@@ -72,6 +72,75 @@ describe('targetCpmFromIntervals', () => {
   })
   it('lista vacía → null', () => {
     expect(targetCpmFromIntervals([])).toBeNull()
+  })
+})
+
+describe('cadenceCpm / lineCadenceCpm', () => {
+  it('cadencia = ciclos / minutos en marcha', () => {
+    expect(cadenceCpm(1600, 100 * 60)).toBeCloseTo(16)
+    expect(cadenceCpm(100, 0)).toBe(0) // sin uptime → 0, no Infinity
+  })
+  it('la cadencia de línea es la mediana de las máquinas activas', () => {
+    expect(lineCadenceCpm([15.4, 16.2, 15.4])).toBeCloseTo(15.4)
+    expect(lineCadenceCpm([16, 0, 14])).toBeCloseTo(15) // ignora las que no produjeron
+    expect(lineCadenceCpm([0, 0])).toBeNull()
+    expect(lineCadenceCpm([])).toBeNull()
+  })
+})
+
+describe('computeLostPieces', () => {
+  const H = 3600 // 1 hora en segundos
+
+  it('la máquina más lenta que la línea pierde por velocidad', () => {
+    // corre a 14 pz/min con la línea a 16 → 2 pz/min × 60 min = 120 piezas
+    const r = computeLostPieces(14 * 60, H, 0, 16)
+    expect(r.lostBySpeed).toBeCloseTo(120)
+    expect(r.lostByStops).toBe(0)
+  })
+
+  it('la máquina más RÁPIDA que la línea no pierde nada por velocidad', () => {
+    const r = computeLostPieces(18 * 60, H, 0, 16)
+    expect(r.lostBySpeed).toBe(0)
+  })
+
+  it('el downtime se valora a la cadencia de la línea', () => {
+    // 30 min parado × 16 pz/min = 480 piezas
+    expect(computeLostPieces(0, 0, 30 * 60, 16).lostByStops).toBeCloseTo(480)
+  })
+
+  it('sin línea de referencia usa su propia cadencia → no pierde por velocidad', () => {
+    const r = computeLostPieces(16 * 60, H, 30 * 60, null)
+    expect(r.lostBySpeed).toBe(0)
+    expect(r.lostByStops).toBeCloseTo(480) // su cadencia es 16
+  })
+
+  // EL CASO QUE MOTIVÓ EL CAMBIO. Contra el target propio, la Baader antigua
+  // (19 pz/min) "perdía" el doble que las nuevas pese a correr más rápido.
+  it('la Baader antigua corre más rápido que sus pares → 0 piezas perdidas por velocidad', () => {
+    const linea = lineCadenceCpm([15.4, 15.4, 16.2])! // mediana = 15.4
+
+    const antigua = computeLostPieces(16.2 * 60, H, 0, linea) // Ev3, target 19
+    const nueva   = computeLostPieces(15.4 * 60, H, 0, linea) // Ev1, target 16
+
+    expect(antigua.lostBySpeed).toBe(0)
+    expect(nueva.lostBySpeed).toBeCloseTo(0)
+    // Y la antigua entrega MÁS piezas que la nueva.
+    expect(16.2 * 60).toBeGreaterThan(15.4 * 60)
+  })
+
+  it('a igual cadencia, la que más para es la que más arrastra', () => {
+    const antigua = computeLostPieces(16 * 60, H, 60 * 60, 16) // 60 min parada
+    const nueva   = computeLostPieces(16 * 60, H, 30 * 60, 16) // 30 min parada
+    expect(antigua.lostByStops).toBeCloseTo(960)
+    expect(nueva.lostByStops).toBeCloseTo(480)
+    expect(antigua.lostByStops).toBeGreaterThan(nueva.lostByStops)
+  })
+
+  it('un paro largo domina sobre la pérdida de velocidad', () => {
+    const r = computeLostPieces(15 * 60, H, 20 * 60, 16)
+    expect(r.lostBySpeed).toBeCloseTo(60)   // 1 pz/min × 60 min
+    expect(r.lostByStops).toBeCloseTo(320)  // 20 min × 16
+    expect(r.lostByStops).toBeGreaterThan(r.lostBySpeed)
   })
 })
 
