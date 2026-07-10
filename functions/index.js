@@ -5927,12 +5927,15 @@ exports.shoplogixSyncHttp = onRequest(
     const { dateKey, plantSlug } = req.query || {}
     try {
       // Siempre syncDay (ventana 08:00→08:00, bounds reales desde intervals.shift).
+      // forceAll: este endpoint es el canal de backfill/corrección manual — si
+      // respetara el freeze, pedir un día viejo no reescribiría nada.
       const result = await shoplogixSyncMod.syncDay({
         db,
         accessToken: auth.accessToken,
         cookie:      auth.cookie,
         plantSlug:   plantSlug || 'chonchi',
         dateKey:     dateKey   || undefined,
+        forceAll:    true,
         logger,
       })
       res.json({ ...result, authMode: auth.mode })
@@ -6014,7 +6017,13 @@ exports.shoplogixSyncWakeup = onSchedule(
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
     let authExpired = false
-    const runDay = async (dateKey) => {
+    // `forceAll` reescribe también los turnos ya congelados. Los re-sync de días
+    // pasados existen precisamente para traer las correcciones retroactivas de
+    // etiquetado de Shoplogix, y ahí TODOS los turnos están cerrados: sin forzar,
+    // el freeze los saltearía a todos y la corrección nunca llegaría a la app.
+    // Para el día actual (dateKey undefined) va en false → los turnos que ya
+    // cerraron hoy no se reescriben cada 5 minutos.
+    const runDay = async (dateKey, forceAll = false) => {
       // dateKey undefined = día actual. Plantas en paralelo, días en secuencia.
       const settled = await Promise.allSettled(
         shoplogixSyncMod.ACTIVE_PLANTS.map((plantSlug) =>
@@ -6024,6 +6033,7 @@ exports.shoplogixSyncWakeup = onSchedule(
             cookie:      auth.cookie,
             plantSlug,
             dateKey,
+            forceAll,
             logger,
           })
         )
@@ -6045,7 +6055,7 @@ exports.shoplogixSyncWakeup = onSchedule(
     await runDay(undefined)
     for (const dk of extraDateKeys) {
       if (authExpired) break
-      await runDay(dk)
+      await runDay(dk, true)   // día pasado → forzar, es el canal de corrección retroactiva
     }
 
     if (authExpired) {
@@ -6198,6 +6208,9 @@ exports.shoplogixSyncNow = onCall(
         cookie:      auth.cookie,
         plantSlug:   plantSlug || 'chonchi',
         dateKey:     dateKey   || undefined,
+        // Sync manual desde el UI: el usuario lo pide explícitamente porque quiere
+        // datos frescos. Respetar el freeze aquí sería no hacer nada al apretar el botón.
+        forceAll:    true,
         logger,
       })
       return { ok: true, result }
@@ -6434,6 +6447,7 @@ exports.shoplogixBackfillRange = onRequest(
           cookie:      auth.cookie,
           plantSlug,
           dateKey,
+          forceAll:    true,   // backfill explícito de días pasados → ignorar freeze
           logger,
         })
         results.push({ dateKey, ok: true, shifts: result?.shiftsWritten ?? result?.shifts ?? null })

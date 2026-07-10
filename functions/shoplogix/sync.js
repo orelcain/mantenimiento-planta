@@ -29,6 +29,68 @@ const { canonicalShiftName } = require('./canonicalShift')
 /** Plantas activas — usada en wakeup scheduler. */
 const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
 
+/**
+ * Gracia tras el cierre de un turno antes de considerarlo "congelado".
+ * Shoplogix puede seguir ajustando states/intervals un rato después del cierre,
+ * así que exigimos al menos un sync POSTERIOR a `scheduledEnd + GRACE` antes de
+ * dejar de re-escribir el turno.
+ */
+const CLOSED_SHIFT_GRACE_MS = 2 * 60 * 60 * 1000  // 2h
+
+/**
+ * ¿Este turno ya quedó capturado en su forma final y no vale la pena reescribirlo?
+ *
+ * El wakeup corre cada 5 min y `syncDay` recorre TODOS los turnos del día — sin
+ * este chequeo se reescribían turnos cerrados hace horas con datos idénticos
+ * (~12k writes/día, casi todos redundantes).
+ *
+ * Devuelve true SOLO si:
+ *   1. el turno cerró hace más de la gracia,
+ *   2. existe doc padre con un `lastSyncAt` posterior a `scheduledEnd + gracia`
+ *      (⇒ los datos finales del turno ya se guardaron al menos una vez), y
+ *   3. el doc padre trae el enriquecimiento nuevo (`uptimeSec` por máquina).
+ *
+ * El punto 3 hace de marca de versión: los docs padre escritos por la versión
+ * anterior del sync se reescriben UNA vez (auto-backfill del enriquecimiento) y
+ * de ahí en adelante se saltean.
+ *
+ * Ante cualquier duda (doc ausente, sin lastSyncAt, error de lectura) devuelve
+ * false → se reescribe. Nunca deja de escribir un turno que no está confirmado.
+ *
+ * Costo: 1 read por turno cerrado, a cambio de evitar 7 writes.
+ */
+async function isShiftAlreadyFrozen({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, now, logger }) {
+  const closedForMs = now.getTime() - scheduledEnd.getTime()
+  if (closedForMs <= CLOSED_SHIFT_GRACE_MS) return false
+
+  try {
+    const snap = await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${shiftId}`).get()
+    if (!snap.exists) return false
+
+    const data = snap.data() || {}
+
+    // lastSyncAt llega como Timestamp (Admin SDK); tolerar Date/string por si acaso.
+    const raw = data.lastSyncAt
+    const lastSyncAt = raw && typeof raw.toDate === 'function' ? raw.toDate()
+      : raw instanceof Date ? raw
+      : typeof raw === 'string' ? new Date(raw)
+      : null
+    if (!lastSyncAt || Number.isNaN(lastSyncAt.getTime())) return false
+    if (lastSyncAt.getTime() < scheduledEnd.getTime() + CLOSED_SHIFT_GRACE_MS) return false
+
+    // Marca de versión: `.some` y no `.every` — una máquina que falló en el
+    // normalizer (status:'error', sin uptimeSec) no debe bloquear el freeze
+    // para siempre.
+    const machines = Array.isArray(data.machines) ? data.machines : []
+    if (!machines.some(m => typeof m?.uptimeSec === 'number')) return false
+
+    return true
+  } catch (err) {
+    logger.warn(`[syncDay][${plantSlug}] freeze-check err (${parentShiftDateKey} ${shiftId}): ${err.message}`)
+    return false
+  }
+}
+
 // ── Helpers de ventana temporal ───────────────────────────────────────────────
 
 /**
@@ -301,9 +363,14 @@ function currentShiftKey(now = new Date()) {
  * @param {string} [opts.cookie]      — Cookie legado
  * @param {string} [opts.plantSlug]   — 'chonchi' | 'yal'
  * @param {string} [opts.dateKey]     — "YYYY-MM-DD"; default: hoy en Chile
+ * @param {boolean} [opts.forceAll]   — reescribe también los turnos ya congelados.
+ *   Necesario en los re-sync de días pasados (auto-corrección de etiquetado
+ *   retroactivo de Shoplogix) y en backfills manuales: ahí TODOS los turnos están
+ *   cerrados, y sin este flag el freeze los saltearía a todos y la corrección
+ *   nunca llegaría a la app.
  * @param {function} [opts.logger]
  */
-async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey, logger = console }) {
+async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey, forceAll = false, logger = console }) {
   if (!accessToken && !cookie) throw new Error('[syncDay] se requiere accessToken (Bearer) o cookie (legacy)')
 
   const machines = PLANT_MACHINES[plantSlug]
@@ -379,9 +446,24 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   )
 
   const allShiftResults = []
+  const frozenSkipped = []
 
   // 3. Por cada turno: filtrar intervals + normalize + escribir
   for (const group of shiftGroups) {
+    // dateKey del doc = día calendario donde ARRANCA el turno (ver nota extensa
+    // más abajo, junto al armado del doc de máquina).
+    const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+
+    // Turno cerrado y ya capturado en su forma final → no reescribir.
+    if (!forceAll && await isShiftAlreadyFrozen({
+      db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
+      scheduledEnd: group.scheduledEnd, now: syncedAt, logger,
+    })) {
+      frozenSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
+      allShiftResults.push({ shiftId: group.shiftId, skipped: 'frozen' })
+      continue
+    }
+
     const shiftMachineResults = []
 
     for (let i = 0; i < machines.length; i++) {
@@ -458,7 +540,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         // → 08:00 (N), entonces el T3 0-7:45 del día N caía dentro.
         // El frontend al consultar "T3 del 13" no lo encontraba (estaba bajo
         // dateKey=12) y caía al fallback Unscheduled, mostrando data falsa.
-        const shiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+        const shiftDateKey = parentShiftDateKey
 
         const doc = normalizeShift({
           production:    filteredProd,
@@ -471,16 +553,18 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
           scheduleSource: 'intervals',
         })
 
-        const ref = db.doc(
-          `shoplogix/${plantSlug}/shifts/${shiftDateKey}_${group.shiftId}/machines/${machines[i].machineid}`,
-        )
-        await ref.set(doc, { merge: true })
-
         // ── Capa 1: validación de calidad post-sync (no bloquea) ──────────────
         // Detecta si algún interval quedó fuera de la ventana del turno — síntoma
-        // de filtrado incorrecto o timezone bug. Escribe dataQualityIssues al doc
-        // para que el cliente y los dashboards puedan mostrar una advertencia.
-        // Se ejecuta siempre: si no hay problema escribe [] para limpiar issues previos.
+        // de filtrado incorrecto o timezone bug. Se adjunta `dataQualityIssues` al
+        // doc para que el cliente y los dashboards puedan mostrar una advertencia.
+        // Se calcula siempre: si no hay problema queda [] y limpia issues previos.
+        //
+        // Va DENTRO del mismo `.set()` que el doc: antes era un segundo `.set()`
+        // sobre el mismo ref, lo que duplicaba los writes de todo el sync.
+        // `null` = el chequeo no pudo correr → se OMITE el campo del `.set({merge:true})`
+        // y el valor previo queda intacto. `[]` = corrió y no encontró problemas → limpia
+        // los issues anteriores. Pisar con `[]` en caso de error borraría un diagnóstico válido.
+        let dataQualityIssues = []
         try {
           const VAL_TOL_MS = 5 * 60_000
           const winLo = group.scheduledStart.getTime() - VAL_TOL_MS
@@ -499,21 +583,32 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
             const endTs   = s.endAt   instanceof Date ? s.endAt.getTime()   : new Date(s.endAt).getTime()
             return startTs < winLo || endTs > winHi
           })
-          const qualityIssues = []
           if (outOfWindow.length > 0) {
-            qualityIssues.push(`${outOfWindow.length}/${(doc.intervals || []).length} intervals fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
+            dataQualityIssues.push(`${outOfWindow.length}/${(doc.intervals || []).length} intervals fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
           }
           if (statesOutOfWindow.length > 0) {
-            qualityIssues.push(`${statesOutOfWindow.length}/${(doc.states || []).length} states fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
+            dataQualityIssues.push(`${statesOutOfWindow.length}/${(doc.states || []).length} states fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`)
           }
-          await ref.set({ dataQualityIssues: qualityIssues }, { merge: true })
-          if (qualityIssues.length > 0) {
-            logger.warn(`[syncDay][${plantSlug}] QUALITY ${machines[i].name}: ${qualityIssues.join(' · ')}`)
+          if (dataQualityIssues.length > 0) {
+            logger.warn(`[syncDay][${plantSlug}] QUALITY ${machines[i].name}: ${dataQualityIssues.join(' · ')}`)
           }
         } catch (qErr) {
           logger.warn(`[syncDay][${plantSlug}] quality-check err (${machines[i].name}): ${qErr.message}`)
+          dataQualityIssues = null   // no pisar los issues previos
         }
 
+        const ref = db.doc(
+          `shoplogix/${plantSlug}/shifts/${shiftDateKey}_${group.shiftId}/machines/${machines[i].machineid}`,
+        )
+        await ref.set(
+          dataQualityIssues === null ? doc : { ...doc, dataQualityIssues },
+          { merge: true },
+        )
+
+        // Agregados por máquina → doc padre. Permiten que la vista mensual
+        // resuelva uptime/OEE leyendo SOLO los docs padre (1 query de rango),
+        // sin bajar las subcolecciones `machines` de cada turno.
+        // `uptimeSec` es además la marca de versión que usa `isShiftAlreadyFrozen`.
         shiftMachineResults.push({
           machineid:   machines[i].machineid,
           name:        machines[i].name,
@@ -521,6 +616,11 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
           intervals:   doc.intervals.length,
           states:      doc.states.length,
           totalCycles: doc.totalCycles,
+          uptimeSec:           doc.shiftRuntimeBreakdown.uptimeSec,
+          shiftRuntime:        doc.shiftRuntime,
+          overallRatio:        doc.overallRatio,
+          expectedTotalCycles: doc.expectedTotalCycles,
+          breakdown:           doc.shiftRuntimeBreakdown,
         })
       } catch (err) {
         logger.warn(`[syncDay][${plantSlug}] ${machines[i].name} normalizer err: ${err.message}`)
@@ -528,8 +628,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       }
     }
 
-    // Metadata del doc padre del turno — dateKey derivado del scheduledStart real
-    const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+    // Metadata del doc padre del turno — `parentShiftDateKey` ya se calculó
+    // arriba (freeze check); reusarlo evita una segunda derivación divergente.
     const parentDoc = {
       dateKey:        parentShiftDateKey,
       shiftId:        group.shiftId,
@@ -563,7 +663,16 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${parentShiftDateKey} ${group.shiftId} OK (window dateKey=${dateKey})`, { machines: shiftMachineResults })
   }
 
-  return { plantSlug, dateKey, shiftGroups: shiftGroups.map(g => g.shiftId), results: allShiftResults }
+  if (frozenSkipped.length > 0) {
+    logger.info(`[shoplogix-syncDay][${plantSlug}] ${frozenSkipped.length} turno(s) congelados, sin reescribir: ${frozenSkipped.join(', ')}`)
+  }
+
+  return {
+    plantSlug, dateKey,
+    shiftGroups: shiftGroups.map(g => g.shiftId),
+    results: allShiftResults,
+    frozenSkipped: frozenSkipped.length,
+  }
 }
 
 // ── syncShift (legado) ────────────────────────────────────────────────────────
@@ -674,6 +783,7 @@ async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateK
 
 module.exports = {
   ACTIVE_PLANTS,
+  CLOSED_SHIFT_GRACE_MS,
   shiftWindow,
   fullDayWindow,
   deriveShiftGroups,
@@ -681,6 +791,7 @@ module.exports = {
   shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
+  isShiftAlreadyFrozen,
   syncDay,
   syncShift,
 }
