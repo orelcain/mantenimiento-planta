@@ -38,7 +38,12 @@ import {
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
-import { isMaintenanceState, computeMaintenanceTotals } from '@/services/grader/shoplogixMaintenance'
+import {
+  aggregatesFromStates,
+  maintenanceTotalsFromAggregates,
+  paretoFromAggregates,
+  type StateAggregate,
+} from '@/services/grader/shoplogixStateAggregates'
 import { BaaderTrendMultiChart } from '@/components/grader/UpstreamMachinesPanel'
 import {
   DEFAULT_SHIFT_SCHEDULE,
@@ -927,6 +932,16 @@ interface SlxShiftCache {
     /** Lista de states (uptime/break/downtime/setup) para esta máquina — usado
      *  para reconstruir el pareto filtrando por máquina. */
     states: UpstreamMachineState[]
+    /** Resumen de `states` agrupado por (type, name, reason).
+     *
+     *  Es lo ÚNICO que la vista MENSUAL necesita de los states: el pareto de
+     *  paros y los totales de avería macro/micro. Y a diferencia de `states`,
+     *  viaja dentro del doc PADRE del turno — así el mes no obliga a bajar la
+     *  subcolección `machines` de cada turno.
+     *
+     *  Derivarlo de `states` da exactamente los mismos números; verificado sobre
+     *  turnos reales en `shoplogixStateAggregates.test.ts`. */
+    stateAggregates: StateAggregate[]
   }>
   breakdown: {
     uptimeSec: number
@@ -1619,6 +1634,7 @@ export function GraderHistoricalCalendar({
             totalCycles:  m.totalCycles ?? 0,
             shiftRuntime: m.shiftRuntime ?? 0,
             states:       m.states ?? [],
+            stateAggregates: aggregatesFromStates(m.states),
           }))
           const cache: SlxShiftCache = {
             states,
@@ -1733,6 +1749,7 @@ export function GraderHistoricalCalendar({
         (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
       )
       const perMachine2 = mAll.map((m) => ({
+        stateAggregates: aggregatesFromStates(m.states),
         machineid:    m.machineid,
         name:         m.machineName,
         uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
@@ -1917,6 +1934,7 @@ export function GraderHistoricalCalendar({
           (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
         )
         const perMachine3 = mAll.map((m) => ({
+          stateAggregates: aggregatesFromStates(m.states),
           machineid:    m.machineid,
           name:         m.machineName,
           uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
@@ -2003,7 +2021,9 @@ export function GraderHistoricalCalendar({
       totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
       // Agregación por Baader individual del mes (uptime + MTTR macro/micro)
       for (const pm of cache.perMachine ?? []) {
-        const maint = computeMaintenanceTotals(pm.states)
+        // Desde los agregados, no desde `states`: mismos números (paridad
+        // verificada) y así el mes no depende de la subcolección `machines`.
+        const maint = maintenanceTotalsFromAggregates(pm.stateAggregates ?? [])
         const acc = perMachineAcc.get(pm.machineid)
         if (acc) {
           acc.uptimeSec       += pm.uptimeSec
@@ -2077,7 +2097,10 @@ export function GraderHistoricalCalendar({
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
-    const reasonMap = new Map<string, { durationSec: number; color: string; count: number; type: string }>()
+    // Agregados de todos los turnos del mes; el bucketing por razón lo hace
+    // `paretoFromAggregates` al final, igual que antes lo hacía este bucle sobre
+    // `states[]` (equivalencia verificada en shoplogixStateAggregates.test.ts).
+    const monthAggregates: StateAggregate[] = []
     // Filtro de ruido SLX vía helper centralizado: turnos con <SLX_NOISE_THRESHOLD
     // ciclos no aportan al pareto del mes (paros aislados, datos pre-startup).
     for (const [key, cache] of slxByShift) {
@@ -2094,47 +2117,29 @@ export function GraderHistoricalCalendar({
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
-      // Fuente de states según filtro:
-      //   - 'all' → suma states de las 3 Baaders (perMachine.flatMap). Antes
-      //     usaba `cache.states` que es SOLO M0 → "Todas" daba lo mismo que
-      //     "Ev 1" (M0). Bug detectado al hacer click en el filtro.
-      //   - machineid específico → states solo de esa Baader.
-      // Fallback al cache.states (M0) si perMachine está vacío (caches legacy).
-      let sourceStates: UpstreamMachineState[]
+      // Fuente de agregados según filtro:
+      //   - 'all' → suma las 3 Baaders (perMachine.flatMap). Antes usaba
+      //     `cache.states` que es SOLO M0 → "Todas" daba lo mismo que "Ev 1".
+      //     Bug detectado al hacer click en el filtro.
+      //   - machineid específico → solo esa Baader.
+      // Fallback a `cache.states` (M0) si perMachine está vacío (caches legacy).
       if (paretoMachineFilter === 'all') {
         const hasPerMachine = (cache.perMachine?.length ?? 0) > 0
-        sourceStates = hasPerMachine
-          ? cache.perMachine.flatMap((m) => m.states)
-          : cache.states
+        if (hasPerMachine) {
+          for (const m of cache.perMachine) monthAggregates.push(...(m.stateAggregates ?? []))
+        } else {
+          monthAggregates.push(...aggregatesFromStates(cache.states))
+        }
       } else {
         const pm = cache.perMachine?.find((m) => m.machineid === paretoMachineFilter)
-        sourceStates = pm?.states ?? []
-      }
-      for (const s of sourceStates) {
-        // Incluir TODAS las paradas (no solo downtime): break (colación, MMPP,
-        // paros programados según reason del supervisor), downtime (averías),
-        // setup (cambios). Excluir solo uptime (producción real).
-        if (s.type === 'uptime') continue
-        // Toggle "Solo mantención": dejar solo states clasificados como avería
-        // (type='downtime' menos reasons operacionales). Ver shoplogixMaintenance.ts.
-        if (paretoMaintOnly && !isMaintenanceState(s)) continue
-        // Clave del bucket: preferir `reason` específico (la causa que el
-        // supervisor o sistema agregó: COLACION, MMPP, REUNION INICIO TURNO,
-        // Paro Programado, etc.). Fallback a `name` (la categoría genérica
-        // tipo "Detencion" / "Micro Detencion"). Sin reason ni name → "Sin causa".
-        const reason = s.reason?.trim() || s.name?.trim() || 'Sin causa'
-        const entry  = reasonMap.get(reason)
-        if (entry) {
-          entry.durationSec += s.durationSec
-          entry.count       += 1
-        } else {
-          reasonMap.set(reason, { durationSec: s.durationSec, color: s.color, count: 1, type: s.type })
-        }
+        if (pm) monthAggregates.push(...(pm.stateAggregates ?? []))
       }
     }
-    return [...reasonMap.entries()]
-      .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.durationSec - a.durationSec)
+    // Incluye TODAS las paradas (break, downtime, setup) y excluye uptime.
+    // `paretoMaintOnly` deja solo las averías (type='downtime' menos los reasons
+    // operacionales). El bucket prefiere `reason` (la causa que registró el
+    // supervisor) sobre `name` (la categoría genérica de Shoplogix).
+    return paretoFromAggregates(monthAggregates, paretoMaintOnly)
   }, [slxByShift, currentMonth, paretoMachineFilter, paretoMaintOnly])
 
   // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
