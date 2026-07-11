@@ -1,7 +1,7 @@
 {
-  "version": "3.89.2",
+  "version": "3.90.0",
   "buildDate": "2026-07-10",
-  "buildTimestamp": 1783731315467,
+  "buildTimestamp": 1783732803200,
   "features": [
     "Visor de imágenes: ya se puede cerrar en móvil — al abrirlo desde el modal de Fotos quedaba sin recibir taps (pointer-events bloqueados por el modal); además la barra de cierre respeta el notch (safe-area)"
   ]

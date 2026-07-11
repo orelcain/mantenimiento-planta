@@ -1254,31 +1254,106 @@ function buildPocketZone(n, p) {
   };
 }
 
+/** Genera [prefix+i, value, ''] para i en [from,to] — evita repetir a mano
+    rangos uniformes reales del Z2 (ej. canIoType1-20, todos en 0). */
+function numberedFields(prefix, from, to, value) {
+  const out = [];
+  for (let i = from; i <= to; i++) out.push([`${prefix}${i}`, value, '']);
+  return out;
+}
+/** Igual, pero el VALOR también depende del índice (ej. driveName1="Drive 1"). */
+function numberedNamedFields(prefix, from, to, valuePrefix) {
+  const out = [];
+  for (let i = from; i <= to; i++) out.push([`${prefix}${i}`, `${valuePrefix} ${i}`, '']);
+  return out;
+}
+
 const PARAM_ZONES = [
   {
     id: 'zone-system', label: 'System settings (StaticGrader)', priority: 'P2',
-    note: 'Lista abreviada — el nodo real tiene ~70 parámetros (IO/CAN remoto completo, señales de torre, display/resolución). Ver docs/marelec-z2/parameters.md para el detalle íntegro.',
+    // Zona completa (docs/marelec-z2/parameters.md § System settings/Output
+    // signals/Display-resolución/CAN I/O mapping + lectura directa de
+    // p024.png para loadDefaultProgram) — ya no abreviada. Organizada por
+    // sub-tema (no es el orden exacto de scroll del Z2, que no aporta nada
+    // para un uso de referencia/entrenamiento).
     fields: [
       ['sernr', '3943', 'número de serie de la máquina'],
+      // Emergencia / seguridad / limpieza
       ['inpEmergency', '0', 'input of emergency stop circuit'],
+      ['inpInvEmergency', '0', 'input inverted emergency'],
       ['inpAirSupply', '0', 'input aire comprimido'],
-      ['driveName1', 'Drive 1', ''], ['driveName2', 'Drive 2', ''], ['driveName3', 'Drive 3', ''],
+      ['inpGenericWarning', '0', ''],
+      ['GenericWarningText', '', 'texto de warning genérico'],
+      ['genericWarningLength', '0', ''],
+      ['inpCleaningMode', '0', ''],
+      ['invertDriveErrors', '0', ''],
+      // Drives (motores) — 5 errores + 5 nombres
+      ...numberedFields('inpDriveError', 1, 5, '0'),
+      ...numberedNamedFields('driveName', 1, 5, 'Drive'),
+      // Entradas nombradas
+      ...numberedNamedFields('inpName', 1, 2, 'Input'),
+      // Comunicación / log
       ['comportLog', '1', ''],
+      ['colorScheme', '0', ''],
+      ['udpRemoteIOEnable', '0', ''],
+      ['udpRemoteIOPasskey', '0', ''],
+      ['syslogserver', '0', ''],
+      ['loglevel', '0', '0:Emergency, 1:Alert, 2:Critical, 3:Error, 4:Warning, 5:Notice...'],
+      // Buzzer / torre de señales
+      ['buzzDuration', '0', 'buzzer signal max duration en segundos, 0=continuo'],
+      ['outpSignalGreen', '0', ''], ['outpSignalOrange', '0', ''], ['outpSignalRed', '0', ''],
+      ['outpSignalWhite', '0', ''], ['outpSignalEmergency', '0', ''],
+      ['outpSignalBatchAboutToClose', '0', ''], ['outpSignalBuzzer', '0', ''],
+      // Compuertas globales
+      ['inpOpenCloseGates', '0', 'input for open/close all gates button'],
+      ['outpOpenCloseGates', '0', ''],
+      ['showCleaningScreen', '0', ''],
+      // Versión / protocolo
       ['pmsVersion', '2', ''],
       ['modbusId', '0', 'Modbus slave ID (0 = disabled, set to enable Modbus)'],
+      // Unidades
       ['unitProgram', 'g', 'unidad productos'],
+      ['factorProgram', '1', ''],
       ['unitBatch', 'kg', 'unidad lotes'],
       ['factorBatch', '0.001', ''],
+      // Pantalla táctil
+      ['resetOnBarcode', '0', ''],
+      ['touchScreen', '0', ''],
       ['keyboardLayout', '0', '0=ABC, 1=AZERTY, 2=QWERTY'],
+      ['outpTouchBeep', '0', ''],
+      ['selftestype', '0', ''],
+      // Atributos de pantalla principal
+      ['frontPageAttribute', '0', ''],
+      ['stationAttribute1', '0', ''], ['stationAttribute2', '0', ''], ['stationAttribute3', '0', ''],
+      // Arranque / mantención
+      ['outpStartup', '0', ''],
+      ['startupInStdby', '0', ''],
       ['beltOverviewInterval', '0', 'Only products put on the belt in this interval (0=disable, range 5-3600 s)'],
       ['maintenanceAlarm', '0', 'horas antes de alarma de mantención'],
       ['loadDefaultProgram', '0', '0: Load last active program at startup, 1: Load first program from programdefault.xml at startup, 2: same as 1 but load and display programs from regular program.xml afterwards'],
+      // Botones de programa (panel físico) — 16 de entrada, 9 de salida
+      ...numberedFields('inpProg', 1, 16, '0'),
+      ['inpProgShift', '0', 'input of program shift button'],
+      ['progShift16', '0', 'Program shift modus: 0=10 (default), 1=16'],
+      ...numberedFields('outpProg', 1, 9, '0'),
+      ['outpProgShift', '0', ''],
+      // Display / resolución de peso
+      ['forwardGrading', '0', ''],
+      ['reverseGrading', '0', ''],
+      ['dispRes', '10', 'display resolution (g)'],
+      ['e1', '20', ''], ['max1', '120000', '(= 120 kg)'],
+      ['e2', '10', ''], ['e3', '20', ''],
+      ['tSteady', '300', 'tiempo estabilización (ms)'],
+      ['trackZero', '1', ''],
+      ['minWeight', '300', 'peso mínimo aceptado (g)'],
+      ['minDeltaw', '0', ''],
+      ['unity', 'kg', ''],
+      ['factor', '0.001', ''],
+      // CAN I/O mapping
+      ...numberedFields('canIoType', 1, 20, '0'),
       ['canIdIo1', '51', 'can id for input/output 205-212'],
       ['canIdIo2', '52', ''], ['canIdIo3', '53', ''], ['canIdIo4', '54', ''], ['canIdIo5', '55', ''], ['canIdIo6', '56', ''], ['canIdIo7', '57', ''],
-      ['outpSignalGreen', '0', ''], ['outpSignalOrange', '0', ''], ['outpSignalRed', '0', ''], ['outpSignalWhite', '0', ''], ['outpSignalEmergency', '0', ''],
-      ['dispRes', '10', 'display resolution (g)'],
-      ['tSteady', '300', 'tiempo estabilización (ms)'],
-      ['minWeight', '300', 'peso mínimo aceptado (g)'],
+      ...numberedFields('canIdIo', 8, 14, '0'),
     ],
   },
   {
