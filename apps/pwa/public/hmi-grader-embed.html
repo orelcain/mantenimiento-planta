@@ -150,6 +150,20 @@ html.in-iframe, html.in-iframe body {
   flex: 1;
 }
 
+/* Fase 3 — separa el header (fecha/hora + indicadores) del resto del
+   contenido: en TODOS los pantallazos reales el header queda visible
+   incluso dentro de Menu/Velocidad cintas/etc — solo el tab+cuerpo+footer
+   cambian de pantalla. Los .panel (position:absolute;inset:0) ahora
+   cuelgan de #home-body (position:relative), no de #screen — así cubren
+   solo el área bajo el header, nunca lo tapan. */
+#home-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ══════════════════════════════════════
    HEADER: fecha/hora izquierda + UNDER derecha
 ══════════════════════════════════════ */
@@ -365,35 +379,139 @@ html.in-iframe, html.in-iframe body {
   z-index: 20;
 }
 .panel.active { display: flex; }
-.ph {
-  background: #0a1d45;
-  border-bottom: 1px solid #2980B9;
-  padding: 6px 10px;
-  font-size: 14px;
-  font-weight: bold;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
+/* Fase 3 — el breadcrumb reusa el MISMO tab que "StaticGrader" en el home
+   (fiel a los pantallazos reales: Menu/Velocidad cintas/Resultados
+   Clasificación abren con un tab idéntico, solo cambia el texto) —
+   .crumb es un modificador de .title-bar con fuente más chica para que
+   quepa "Home › Menu › Servicio" sin desbordar. */
+.title-bar.crumb {
+  font-size: 16px;
+  max-width: 700px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pb { flex: 1; display: flex; align-items: center; justify-content: center; color: #88bbee; font-size: 14px; }
-.pf { display: flex; gap: 0; padding: 2px 0 0; background: #1A5276; flex-shrink: 0; }
-.cx {
-  border: 1px solid rgba(255,255,255,0.3);
-  padding: 2px 8px;
-  font-size: 11px;
+
+/* Fase 3 — lista con scroll (Menu) */
+.menu-list { flex: 1; overflow-y: auto; background: var(--dark-zone); }
+.menu-row {
+  padding: 15px 16px;
+  font-size: 16px;
+  color: #9fb7d4;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   cursor: pointer;
-  color: #aaddff;
-  background: transparent;
-  outline: none;
+  font-family: Arial, sans-serif;
 }
-.cx:hover { background: rgba(255,255,255,0.1); }
+.menu-row:hover { background: rgba(255,255,255,0.06); }
+.menu-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
+
+/* Fase 3 — tabla clave/valor (Velocidad cintas, Resultados Clasificación) */
+.kv-table { flex: 1; padding: 18px 20px; overflow-y: auto; }
+.kv-head { display: flex; justify-content: flex-end; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+.kv-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 15px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.kv-row .k { cursor: help; border-bottom: 1px dotted rgba(255,255,255,0.35); }
+.kv-gap { height: 20px; }
+.kv-note { margin-top: 16px; font-size: 11px; color: #7fa8d0; font-style: italic; line-height: 1.5; }
+
+/* Fase 3 — footer compacto alineado a la derecha (Resultados Clasificación: 1 solo botón "OK", no full-width) */
+.btn-bar.right { justify-content: flex-end; padding-right: 12px; }
+.btn-bar.right .btn { flex: 0 0 140px; }
+
+/* Fase 3 Lote 2 — footer con 2 botones separados (Monitor CPU: "Habilitar
+   vistas" a la izquierda, "Salir" a la derecha, sin compartir borde) */
+.btn-bar.split { justify-content: space-between; padding: 0 12px; }
+.btn-bar.split .btn { flex: 0 0 180px; }
+.btn-bar.split .btn + .btn { border-left: none; }
+
+/* Fase 3 Lote 2 — grilla de checkboxes (Probar Entradas / Probar Salidas) */
+.checkbox-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-auto-rows: min-content;
+  gap: 8px 20px;
+  align-content: start;
+}
+.chk-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.chk-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #F1C40F; cursor: pointer; }
+
+/* Fase 3 Lote 2 — campo "Activ Sal." (Probar Salidas) */
+.activ-sal { display: flex; align-items: center; gap: 12px; padding: 6px 24px 0; font-size: 14px; color: #ffffff; font-family: Arial, sans-serif; }
+.activ-sal input[type="text"] { width: 120px; height: 26px; border: 1px solid #F1C40F; background: #ffffff; color: #000000; padding: 0 6px; font-family: 'Courier New', monospace; }
+
+/* Fase 3 Lote 2 — métricas Monitor CPU (2 columnas) + tabla de carga por proceso (oculta hasta "Habilitar vistas") */
+.cpu-metrics { flex: 1; padding: 18px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; overflow-y: auto; align-content: start; }
+.cpu-row { display: flex; justify-content: space-between; font-size: 14px; color: #e8f1fb; font-family: Arial, sans-serif; padding: 2px 0; }
+.cpu-gap { grid-column: 1 / -1; height: 12px; }
+.cpu-loads { grid-column: 1 / -1; display: none; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 10px; }
+.cpu-loads.show { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+
+/* Cambiar Parametros — login (clonado de p023): campo a la izquierda,
+   footer compacto de 1 botón (igual que Resultados Clasificación). */
+.login-body { flex: 1; display: flex; align-items: center; padding: 0 40px; gap: 20px; }
+.login-label { font-size: 15px; color: #ffffff; font-family: Arial, sans-serif; }
+.login-input { width: 220px; height: 30px; border: 1px solid #ffffff; background: #0a1d45; color: #ffffff; padding: 0 8px; font-family: 'Courier New', monospace; font-size: 14px; }
+
+/* Cambiar Parametros — editor árbol acordeón (clonado de p024/p133/p342).
+   UNA sola caja scrolleable: clickear un nodo (zona) despliega sus
+   parámetros INLINE justo debajo de ese nodo (indentado), no en un panel
+   aparte — feedback de Orel 2026-07-10 (dos rondas) tras ver el preview
+   real: primero pidió que el árbol se contraiga/expanda de verdad
+   (no chips), después que el contenido aparezca bajo el nodo clickeado
+   en vez de en una segunda caja separada arriba/abajo. Mantiene el árbol
+   real de la Z2 (Pocket 1-4 como hijos de Z-Belt). Varios nodos pueden
+   estar abiertos a la vez (acordeón múltiple, no selección única). */
+.param-editor { flex: 1; display: flex; overflow: hidden; }
+.param-list-col { flex: 1 1 56%; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.15); min-width: 0; }
+.param-tree { flex: 1; overflow-y: auto; background: #0a1d45; padding: 4px 0; }
+.tree-node { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; color: #aaddff; cursor: pointer; font-family: Arial, sans-serif; }
+.tree-node:hover { background: rgba(255,255,255,0.08); }
+.tree-node.sel { background: #143965; color: #ffffff; font-weight: 600; }
+.tree-node .caret { width: 11px; flex-shrink: 0; text-align: center; font-size: 9px; color: #7fa8d0; }
+.tree-node .tag { font-size: 8px; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 3px; margin-left: 4px; }
+/* .tree-content anida por DOM (cada nivel agrega su propio padding-left +
+   borde), así Pocket N queda indentado bajo Z-Belt sin clases por depth. */
+/* Árbol expandible fiel al Z2 (Orel 2026-07-11): al entrar SOLO System settings
+   está abierto → se ve StaticGrader (cerrado) + los campos de System settings, tal
+   cual p024; cada nodo se abre al tocarlo para profundizar (p133). Sin flechitas. */
+.tree-content { display: none; padding-left: 12px; }
+.tree-content.open { display: block; }
+.param-note { padding: 4px 10px 6px; font-size: 10px; color: #7fa8d0; font-style: italic; line-height: 1.4; }
+.param-row { display: flex; justify-content: space-between; padding: 3px 10px; font-size: 12px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.10); }
+.param-row:hover { background: rgba(255,255,255,0.05); }
+.param-row.sel { background: #143965; color: #ffffff; }
+.param-row .pv { color: #ffe8a3; }
+.param-help-col { flex: 1 1 44%; background: #ffffff; color: #13233c; padding: 14px; font-size: 13px; font-family: Arial, sans-serif; overflow-y: auto; line-height: 1.5; }
+.param-help-col .ph-key { font-weight: bold; font-family: 'Courier New', monospace; display: block; margin-bottom: 6px; color: #0a1d45; }
+.param-help-empty { color: #94a3b8; font-style: italic; }
+.param-help-col .ph-en { display: block; color: #13233c; }
+.param-help-col .ph-es { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dde3ea; color: #5a6b7f; }
+
+/* Explorador CAN — tabla de 5 columnas (clonado de p018/p020/p021) */
+.can-table { flex: 1; overflow-y: auto; }
+.can-row-head, .can-row {
+  display: grid;
+  grid-template-columns: 56px 64px 1fr 112px 92px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+}
+.can-row-head { color: #ffffff; font-weight: bold; background: #1F618D; position: sticky; top: 0; }
+.can-row { color: #9fb7d4; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.can-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
 
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
    Grid: rc + numpad derecha, fkeys abajo
 ══════════════════════════════════════ */
+/* Wrapper de ajuste responsive: NO dejar que el body (flex) lo comprima,
+   así fitShell() mide el ancho natural real del shell (1010px con teclados). */
+#shell-fit { flex-shrink: 0; }
 #marelec-shell {
+  transform-origin: top left;   /* fitShell() escala desde arriba-izquierda */
   display: grid;
   grid-template-columns: 760px 240px;
   grid-template-rows: 690px 110px;
@@ -568,6 +686,7 @@ html.in-iframe, html.in-iframe body {
 </head>
 <body>
 
+<div id="shell-fit">
 <div id="marelec-shell">
   <button id="toggle-keyboards" onclick="toggleKeyboards()">⌨ Ocultar teclados</button>
 
@@ -610,6 +729,11 @@ html.in-iframe, html.in-iframe body {
       </div>
     </div>
 
+    <!-- Fase 3: todo lo de abajo del header vive en #home-body — los .panel
+         cuelgan de ACÁ (position:relative), nunca tapan .hdr de arriba
+         (fiel a los pantallazos reales: el header queda visible siempre). -->
+    <div id="home-body">
+
     <!-- V4: TÍTULO TAB PARCIAL -->
     <div class="title-row">
       <div class="title-bar">StaticGrader</div>
@@ -634,29 +758,224 @@ html.in-iframe, html.in-iframe body {
 
     <!-- BOTONES -->
     <div class="btn-bar">
-      <button class="btn" onclick="sp('pp')">Cambiar programa</button>
-      <button class="btn" onclick="sp('pm')">Modo presentación</button>
+      <button class="btn" onclick="navigateTo('pp')">Cambiar programa</button>
+      <button class="btn" onclick="navigateTo('pm')">Modo presentación</button>
       <button class="btn" onclick="al('Centrando -> 0 <-')">-&gt; 0 &lt;-</button>
-      <button class="btn" onclick="sp('mn')">Menu</button>
+      <button class="btn" onclick="navigateTo('mn')">Menu</button>
     </div>
 
-    <!-- PANELES -->
-    <div class="panel" id="pp">
-      <div class="ph"><span>Cambiar programa</span><span class="cx" onclick="cp('pp')">✕ Volver</span></div>
+    <!-- PANELES — data-title = nombre real de la pantalla (breadcrumb + log).
+         Fase 2 (pp/pm, sin pantallazo fuente, quedan como placeholder) +
+         Fase 3 Lote 1 (mn/velocidad-cintas/resultados-clasificacion/estado,
+         clonadas contra p002-p006 reales, docs/hmi-grader/pantallas/). -->
+    <div class="panel" id="pp" data-title="Cambiar programa">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pp')">← Volver</button></div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
-    <div class="panel" id="pm">
-      <div class="ph"><span>Modo presentación</span><span class="cx" onclick="cp('pm')">✕ Volver</span></div>
+    <div class="panel" id="pm" data-title="Modo presentación">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pm')">← Volver</button></div>
-    </div>
-    <div class="panel" id="mn">
-      <div class="ph"><span>Menu</span><span class="cx" onclick="cp('mn')">✕ Volver</span></div>
-      <div class="pb">— Próxima iteración —</div>
-      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('mn')">← Volver</button></div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
+    <!-- Menu — clonado de p002-p004. Lista scrolleable de 15 ítems reales.
+         Solo 3 navegan de verdad en este lote (Velocidad cintas, Resultados
+         Clasificación, Estado) — el resto da feedback "no clonada todavía"
+         en el log en vez de un click muerto (honesto sobre el alcance). -->
+    <div class="panel" id="mn" data-title="Menu">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="menu-list" id="menu-list"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="scrollList('menu-list', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('menu-list', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Servicio — clonado de p007-p009. Lote 2: solo Probar Entradas/
+         Probar Salidas/Monitor CPU navegan de verdad; Cambiar Parametros
+         (editor gigante, lote aparte) y el resto quedan honestos como
+         "no clonada todavía". -->
+    <div class="panel" id="servicio" data-title="Servicio">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="menu-list" id="servicio-list"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="scrollList('servicio-list', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('servicio-list', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Probar Entradas — clonado de p010. Único rango (In1-In16, cabe en
+         una pantalla) — Anterior/Next existen en el chrome real pero no
+         hacen nada acá (no hay más páginas que mostrar). -->
+    <div class="panel" id="probar-entradas" data-title="Probar Entradas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="checkbox-grid" id="entradas-grid"></div>
+      <div class="btn-bar">
+        <button class="btn" onclick="al('Sin página anterior')">Anterior</button>
+        <button class="btn" onclick="al('Sin más páginas')">Next</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Probar Salidas — clonado de p011-p015 (wizard real de 5 páginas:
+         O1-24, O101-116, O117-132, O133-148, O149-164 — el Z2 real salta
+         de O24 a O101, sin O25-100 — no es un error de esta pantalla). -->
+    <div class="panel" id="probar-salidas" data-title="Probar Salidas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="checkbox-grid" id="salidas-grid"></div>
+      <div class="activ-sal">
+        <span>Activ Sal.</span>
+        <input type="text" id="activ-sal-input" placeholder="">
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="cambiarActivSal()">Cambiar</button>
+        <button class="btn" onclick="salidasPage(-1)">Anterior</button>
+        <button class="btn" onclick="salidasPage(1)">Next</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Monitor CPU — clonado de p016 (base) + p017 (tras "Habilitar
+         vistas": agrega la tabla de carga por proceso). -->
+    <div class="panel" id="monitor-cpu" data-title="Monitor CPU">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="cpu-metrics">
+        <div class="cpu-row"><span>Carga prcsador</span><span>14 %</span></div>
+        <div class="cpu-row"><span>Main board version:</span><span>V5</span></div>
+        <div class="cpu-row"><span>Tiempo entrada a salida:</span><span>56 us</span></div>
+        <div class="cpu-row"><span>Avail. Process Memory :</span><span>24896 kb</span></div>
+        <div class="cpu-row"><span>Entrada Jitter</span><span>12 us</span></div>
+        <div class="cpu-row"><span>Can frames rx / s</span><span>217</span></div>
+        <div class="cpu-row"><span>Salida jitter</span><span>45 us</span></div>
+        <div class="cpu-row"><span>Canframes tx/s [errors] :</span><span>28 [0]</span></div>
+        <div class="cpu-row"><span></span><span></span></div>
+        <div class="cpu-row"><span>CanIO output errors:</span><span>0</span></div>
+        <div class="cpu-gap"></div>
+        <div class="cpu-row"><span>Main/GUI</span><span>0.6%</span></div>
+        <div class="cpu-loads" id="cpu-loads">
+          <div class="cpu-row"><span>OpcServer</span><span>190</span></div>
+          <div class="cpu-row"><span>Pocket2</span><span>16</span></div>
+          <div class="cpu-row"><span>Sorting belt with batching</span><span>175</span></div>
+          <div class="cpu-row"><span>Pocket1</span><span>15</span></div>
+          <div class="cpu-row"><span>Z-Belt</span><span>90</span></div>
+          <div class="cpu-row"><span>*Pocket1</span><span>13</span></div>
+          <div class="cpu-row"><span>Acceleration belt 1</span><span>79</span></div>
+          <div class="cpu-row"><span>*Pocket4</span><span>13</span></div>
+          <div class="cpu-row"><span>Acceleration belt 2</span><span>74</span></div>
+          <div class="cpu-row"><span>*Pocket3</span><span>10</span></div>
+          <div class="cpu-row"><span>StaticGrader</span><span>26</span></div>
+          <div class="cpu-row"><span>*Pocket2</span><span>7</span></div>
+          <div class="cpu-row"><span>Pocket3</span><span>17</span></div>
+          <div class="cpu-row"><span>Pocket4</span><span>17</span></div>
+        </div>
+      </div>
+      <div class="btn-bar split">
+        <button class="btn" onclick="habilitarVistasCpu()">Habilitar vistas</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Cambiar Parametros — login, clonado de p023. Clave real = 8620
+         (docs/marelec-z2/parameters.md). Footer compacto 1-botón, igual
+         patrón que Resultados Clasificación. -->
+    <div class="panel" id="cambiar-parametros-login" data-title="Cambiar Parametros">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="login-body">
+        <span class="login-label">Introducir Clave</span>
+        <input type="password" class="login-input" id="clave-input" onkeydown="if(event.key==='Enter')intentarClave()">
+      </div>
+      <div class="btn-bar right"><button class="btn" onclick="goBack()">Salir</button></div>
+    </div>
+
+    <!-- Cambiar Parametros — editor árbol+lista+ayuda, clonado de p024
+         (StaticGrader raíz) / p133 (Z-Belt + Pocket 1-4 como hijos, confirmado
+         por breadcrumb real) / parameters.md (valores — ver nota de
+         integridad en el PR: p342 NO mostraba Pocket 1 al leerlo directo,
+         a pesar de que el manifiesto original lo marcaba así; se prefirió
+         la fuente ya curada y cruzada contra pantallazos propios). -->
+    <div class="panel" id="cambiar-parametros" data-title="Cambiar Parametros">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="param-editor">
+        <div class="param-list-col">
+          <div class="param-tree" id="param-tree"></div>
+        </div>
+        <div class="param-help-col" id="param-help"><span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span></div>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="goBack()">Cancelar</button>
+        <button class="btn" onclick="scrollList('param-tree', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('param-tree', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">OK</button>
+      </div>
+    </div>
+
+    <!-- Explorador CAN — clonado de p018/p020/p021. Tabla de dispositivos
+         CAN conectados + "Localizar ID's aleatorias" (resultado ESTÁTICO,
+         el mismo del pantallazo real — el Z2 real lo randomiza cada vez,
+         acá se replay del ejemplo capturado, no una simulación real). -->
+    <div class="panel" id="explorador-can" data-title="Explorador CAN">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="can-table" id="can-table">
+        <div class="can-row-head"><span>Id</span><span>Real Id</span><span>Label</span><span>Version</span><span>CRC</span></div>
+        <div id="can-rows"></div>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="localizarIdsAleatorias()">Localizar ID's aleatorias</button>
+        <button class="btn" onclick="scrollList('can-table', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('can-table', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Velocidad cintas — clonado de p005. Reporte en vivo (Reset Stats),
+         no config — los valores reales configurados viven en
+         GraderPhysicalConfig (ver nota + Pendientes de medición en terreno
+         en docs/marelec-z2/NAVEGACION.md). -->
+    <div class="panel" id="velocidad-cintas" data-title="Velocidad cintas">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="kv-table">
+        <div class="kv-head">Speed (min .. max (1s))(min .. max (100ms))</div>
+        <div class="kv-row"><span class="k" data-gloss="Z-Belt">Z-Belt</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Acceleration belt 1">Acceleration belt 1</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Acceleration belt 2">Acceleration belt 2</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <div class="kv-row"><span class="k" data-gloss="Sorting belt with batching">Sorting belt with batching</span><span>0 (0 .. 0)(0 .. 0)</span></div>
+        <p class="kv-note">◆ Configurado en la app: Análisis de Turno → Config Física → tab Cintas (<code>GraderPhysicalConfig.belts[]</code>). Esta pantalla del Z2 es un reporte en vivo (Reset Stats), no el punto de edición.</p>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="al('Reset Stats')">Reset Stats</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
+    <!-- Resultados Clasificación — clonado de p006. -->
+    <div class="panel" id="resultados-clasificacion" data-title="Resultados Clasificación">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="kv-table">
+        <div class="kv-row"><span>Fuera de límites</span><span>Static</span></div>
+        <div class="kv-row"><span>No leído por fotocélula</span><span>Static</span></div>
+        <div class="kv-row"><span>Too close or too long</span><span>Static</span></div>
+        <div class="kv-row"><span>Puerta no preparada</span><span>Static</span></div>
+        <div class="kv-gap"></div>
+        <div class="kv-row"><span>Peso total clasificado</span><span>0.00kg</span></div>
+        <div class="kv-row"><span>Cajas totales clasificadas</span><span>0</span></div>
+        <div class="kv-row"><span>Total unsorted pcs</span><span>0</span></div>
+      </div>
+      <div class="btn-bar right"><button class="btn" onclick="goBack()">OK</button></div>
+    </div>
+
+    <!-- Estado — SIN pantallazo fuente (ver Gaps en NAVEGACION.md): el PDF
+         nunca abrió esta pantalla. Placeholder honesto, no se inventa
+         contenido. -->
+    <div class="panel" id="estado" data-title="Estado">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="pb">— Sin pantallazo fuente: pendiente de documentar en terreno —</div>
+      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
+    </div>
+
+    </div><!-- #home-body -->
   </div><!-- #screen -->
 </div><!-- #rc-window -->
 
@@ -685,6 +1004,7 @@ html.in-iframe, html.in-iframe body {
   </div>
 
 </div><!-- #marelec-shell -->
+</div><!-- #shell-fit -->
 
 <script>
 /* ══════════════════════════════════════════════════
@@ -735,6 +1055,942 @@ function buildGates() {
 }
 buildGates();
 
+/* ══════════════════════════════════════════════════
+   LISTAS DE MENÚ — Fase 3 (Menu: Lote 1, Servicio: Lote 2)
+   `target` = id del panel al que navega; null = pantalla aún no clonada
+   (da feedback honesto en el log en vez de un click muerto o de inventar
+   contenido).
+══════════════════════════════════════════════════ */
+const MENU_ITEMS = [
+  { label: 'Printers', target: null },
+  { label: 'Mostrar gráfico pesaje', target: null },
+  { label: 'Servicio', target: 'servicio' },
+  { label: 'Cambiar Claves', target: null },
+  { label: 'Edit Species', target: null },
+  { label: 'Ajustar datos', target: null },
+  { label: 'Mostrar velocidad cintas', target: 'velocidad-cintas' },
+  { label: 'Enable/Disable Stations', target: null },
+  { label: 'Maintenance counters', target: null },
+  { label: 'Mostrar resultados clasificación', target: 'resultados-clasificacion' },
+  { label: 'Idioma', target: null },
+  { label: 'Ajustes Red', target: null },
+  { label: 'Mostrar eventos de sistema', target: null },
+  { label: 'Ajustar Fecha y hora', target: null },
+  { label: 'Estado', target: 'estado' },
+];
+
+/* 15 ítems reales de Servicio (p007-p009). Cambiar Parametros es el editor
+   gigante (~24 pantallazos únicos, lote propio más adelante); Version
+   Software/Explorar CAN bus/Activar Software/Estado Certificación son P2
+   (Lote 4 del spec). */
+const SERVICIO_ITEMS = [
+  { label: 'Optimizar filtro', target: null },
+  { label: 'Ajustar unidad de peso', target: null },
+  { label: 'Traceability Settings', target: null },
+  { label: 'Show EyeSync Differences', target: null },
+  { label: 'Show Statistics', target: null },
+  { label: 'autochange BLDC', target: null },
+  { label: 'Status memory', target: null },
+  { label: 'Probar Entradas', target: 'probar-entradas' },
+  { label: 'Probar Salidas', target: 'probar-salidas' },
+  { label: 'Cambiar Parametros', target: 'cambiar-parametros-login' },
+  { label: 'Monitor CPU', target: 'monitor-cpu' },
+  { label: 'Version Software', target: null },
+  { label: 'Explorar CAN bus', target: 'explorador-can' },
+  { label: 'Activar Software', target: null },
+  { label: 'Estado Certificación', target: null },
+];
+
+/** Construye una lista scrolleable genérica (Menu, Servicio, ...) dentro de `containerId`. */
+function buildScrollList(containerId, items) {
+  const list = document.getElementById(containerId);
+  items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'menu-row' + (i === 0 ? ' sel' : '');
+    row.textContent = item.label;
+    row.addEventListener('click', () => {
+      list.querySelectorAll('.menu-row.sel').forEach(r => r.classList.remove('sel'));
+      row.classList.add('sel');
+      if (item.target && document.getElementById(item.target)) {
+        navigateTo(item.target);
+      } else {
+        addLog(`${item.label} — pantalla aún no clonada`);
+      }
+    });
+    list.appendChild(row);
+  });
+}
+buildScrollList('menu-list', MENU_ITEMS);
+buildScrollList('servicio-list', SERVICIO_ITEMS);
+
+/** Abajo/Arriba de listas scrolleables (Menu, Servicio): una fila (~54px). */
+function scrollList(containerId, dir) {
+  document.getElementById(containerId).scrollBy({ top: dir * 54, behavior: 'smooth' });
+}
+
+/* ══════════════════════════════════════════════════
+   PROBAR ENTRADAS — Fase 3 Lote 2, clonado de p010.
+   In1-16, únicos pre-marcados en el pantallazo real: In1, In3, In5.
+══════════════════════════════════════════════════ */
+function buildEntradasGrid() {
+  const grid = document.getElementById('entradas-grid');
+  const CHECKED = new Set([1, 3, 5]);
+  for (let n = 1; n <= 16; n++) {
+    const row = document.createElement('label');
+    row.className = 'chk-row';
+    row.innerHTML = `<input type="checkbox" ${CHECKED.has(n) ? 'checked' : ''}><span>In ${n}</span>`;
+    grid.appendChild(row);
+  }
+}
+buildEntradasGrid();
+
+/* ══════════════════════════════════════════════════
+   PROBAR SALIDAS — Fase 3 Lote 2, wizard real de 5 páginas
+   (clonado de p011-p015). El Z2 real salta de O24 a O101 — no hay
+   O25-O100, no es un hueco de esta clonación.
+══════════════════════════════════════════════════ */
+const SALIDAS_PAGES = [
+  { from: 1,   to: 24 },
+  { from: 101, to: 116 },
+  { from: 117, to: 132 },
+  { from: 133, to: 148 },
+  { from: 149, to: 164 },
+];
+let salidasPageIdx = 0;
+
+function renderSalidasPage() {
+  const grid = document.getElementById('salidas-grid');
+  grid.innerHTML = '';
+  const { from, to } = SALIDAS_PAGES[salidasPageIdx];
+  for (let n = from; n <= to; n++) {
+    const row = document.createElement('label');
+    row.className = 'chk-row';
+    row.innerHTML = `<input type="checkbox" data-out="${n}"><span>O ${n}</span>`;
+    grid.appendChild(row);
+  }
+}
+renderSalidasPage();
+
+/** Next/Anterior del wizard Probar Salidas — con límites (5 páginas). */
+function salidasPage(dir) {
+  const next = salidasPageIdx + dir;
+  if (next < 0) { addLog('Sin página anterior'); return; }
+  if (next >= SALIDAS_PAGES.length) { addLog('Sin más páginas'); return; }
+  salidasPageIdx = next;
+  renderSalidasPage();
+}
+
+/** "Cambiar" de Probar Salidas: si el número tipeado está en la página
+    visible, togglea su checkbox (atajo real del Z2 para no scrollear). */
+function cambiarActivSal() {
+  const input = document.getElementById('activ-sal-input');
+  const n = parseInt(input.value, 10);
+  if (!Number.isFinite(n)) { addLog('Activ Sal.: número inválido'); return; }
+  const chk = document.querySelector(`#salidas-grid input[data-out="${n}"]`);
+  if (!chk) { addLog(`O ${n} no está en esta página`); return; }
+  chk.checked = !chk.checked;
+  addLog(`O ${n} ${chk.checked ? 'activada' : 'desactivada'}`);
+}
+
+/* ══════════════════════════════════════════════════
+   MONITOR CPU — Fase 3 Lote 2, clonado de p016 (base) + p017 (tras
+   "Habilitar vistas": agrega la tabla de carga por proceso).
+══════════════════════════════════════════════════ */
+function habilitarVistasCpu() {
+  document.getElementById('cpu-loads').classList.add('show');
+  addLog('Habilitar vistas');
+}
+
+/* ══════════════════════════════════════════════════
+   CAMBIAR PARAMETROS — Login + editor árbol+lista+ayuda.
+
+   Clave real = 8620 (docs/marelec-z2/parameters.md § Identificación del
+   equipo). Valores de cada zona: cruzados entre parameters.md (barrido
+   curado 2026-04-17) y pantallazos propios (p024 root, p133 Z-Belt+Pocket
+   1-4 como hijos confirmados por breadcrumb). Z-Belt y Pocket 1 tienen la
+   mayor confianza (coinciden ambas fuentes exactamente); Pocket 2-4 son
+   un calco estructural de Pocket 1 con los campos que SÍ varían por
+   pocket (confirmado por muestreo, no por lectura pantallazo-a-pantallazo
+   de cada uno); System settings es una lista ABREVIADA (el nodo real
+   tiene ~70 parámetros — ver parameters.md para el detalle íntegro).
+══════════════════════════════════════════════════ */
+function intentarClave() {
+  const val = document.getElementById('clave-input').value;
+  if (val === '8620') {
+    document.getElementById('clave-input').value = '';
+    // El login se REEMPLAZA por el editor (no se apila) — si no, Cancelar/OK
+    // del editor volvería a pedir la clave en vez de volver a Servicio.
+    document.getElementById('cambiar-parametros-login').classList.remove('active');
+    screenStack.pop();
+    navigateTo('cambiar-parametros');
+  } else {
+    addLog('Clave incorrecta');
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   ÁRBOL REAL DEL Z2 — corregido tras auditoría multi-agente (2026-07-10)
+   contra los 418 pantallazos: sangría medida en píxeles con script,
+   valores dudosos verificados con zoom. Jerarquía REAL de 4 niveles:
+
+     System settings                    ← raíz (emergencia, drives, CAN I/O, UDP/syslog)
+     └─ StaticGrader                    ← botones de programa, señales, unidades, touch, atributos
+        ├─ Z-Belt                       ← 29 campos propios
+        │   └─ Pocket 1..4              ← cada pocket es una báscula COMPLETA (~73 campos,
+        │                                 incl. su PROPIO bloque de display/peso con valores
+        │                                 por pocket: tSteady 500/400/300/500)
+        ├─ Acceleration belt 1 / 2
+        └─ Sorting belt with batching   ← ~200 campos (flippers, gates, eye sync 1-4, batching)
+
+   Evidencia clave: p343 (los 4 niveles visibles juntos), p024/p096 (sangría
+   raíz medida), p304 (fin de Sorting belt → cola StaticGrader un nivel menos),
+   p343-p418 (pockets fila a fila), p180-p340 (sorting completo).
+   Los campos del tramo p033-p089 (no fotografiado) se mantienen de
+   docs/marelec-z2/parameters.md, marcados "".
+══════════════════════════════════════════════════ */
+function numberedFields(prefix, from, to, value, help = '') {
+  const out = [];
+  for (let i = from; i <= to; i++) out.push([`${prefix}${i}`, value, help]);
+  return out;
+}
+
+/** Campos de un Pocket en el ORDEN real del Z2 (p343→p402, capturado fila a
+    fila). Cada pocket es una báscula completa: incluye su propio bloque de
+    display/peso (dispRes/tSteady/minWeight/unity/factor...) con valores POR
+    pocket — NO son parámetros globales del sistema. */
+function buildPocketZone(n, p) {
+  return {
+    id: `zone-pocket${n}`, label: `Pocket ${n}`, priority: 'P1', parent: 'zone-zbelt',
+    fields: [
+      ['outp', String(p.outp), 'Output to open pocket'],
+      ['pos', String(p.pos), 'mm, distance from eye to center of pocket'],
+      ['minOpen', String(p.minOpen), 'Minimum time to be open (ms)'],
+      ['delayClose', String(p.delayClose ?? 700), 'ms, delay to start weighing after closing pocket'],
+      ['defaultProduct', '0', ''],
+      ['inpMode', '0', 'input to switch mode of default product selection'],
+      ['outpMode', '0', ''],
+      ['inpButton1', String(p.btn), 'input of product selection button 1'],
+      ['inpButton2', String(p.btn + 1), ''],
+      ['inpButton3', String(p.btn + 2), ''],
+      ['inpButton4', String(p.btn + 3), ''],
+      ['inpButton5', '0', ''], ['inpButton6', '0', ''], ['inpButton7', '0', ''],
+      ['inpButton8', '0', 'input of product selection button 8'],
+      ['outpButton1', String(p.btn + 4), 'output of product selection button 1'],
+      ['outpButton2', String(p.btn + 5), ''],
+      ['outpButton3', String(p.btn + 6), ''],
+      ['outpButton4', String(p.btn + 7), 'output of product selection button 4'],
+      ['outpButton5', '0', ''], ['outpButton6', '0', ''], ['outpButton7', '0', ''],
+      ['outpButton8', '0', 'output of product selection button 8'],
+      ['tWeighing', String(p.tWeighing), 'Weighing time (ms)'],
+      ['delay', '0', 'ms, delay to transfer product to next component'],
+      ['inpTrigger', '0', ''],
+      ['forwardGrading', '0', 'Forward grading'],
+      ['reverseGrading', '0', ''],
+      ['dispRes', '10', 'display resolution (g)'],
+      ['e1', '20', ''], ['max1', '120000', '(= 120 kg)'],
+      ['e2', '10', ''], ['max2', '', ''],
+      ['e3', '20', ''], ['max3', '0', ''],
+      ['tSteady', String(p.tSteady), 'Stabilization time (ms)'],
+      ['d4CanId', '0', 'can id of D4 display'],
+      ['trackZero', '1', ''],
+      ['minWeight', '300', 'minimum weight (g)'],
+      ['minDeltaw', '', 'Minimum difference in weight to be detected as new weighing'],
+      ['unity', 'kg', 'unity symbol for user unit (ex kg)'],
+      ['factor', '0,001', ''],
+      ['altSteadyTolerance', '0', 'tolerance for alternative steady criterium. 0 = default = disabled'],
+      ['fsWc', String(p.fsWc), 'Full scale weight correction'],
+      ['fsRc', '0', 'full scale of the reference loadcell'],
+      ['mWc', '0', ''], ['mRc', '0', ''],
+      ['zpWc', String(p.zpWc), 'zero point WC'],
+      ['zpRc', '0', 'zero point of the reference loadcell'],
+      ['filter1', '60', 'FIR filter 1'], ['filter2', '70', 'setting of FIR filter 2'],
+      ['filter3', '0', ''], ['filter4', '0', 'setting of FIR filter 4'],
+      ['extraFilter', '1', ''],
+      ['fastStepFilter', '0', 'Enable faststep filter'],
+      ['motComp', '0', 'motion compensation'],
+      ['maxAcc', '0', 'x0.1G maximum acceleration (ex. 3 means 0.7 - 1.3G). 0 to disable'],
+      ['canId', String(p.canId), 'Id of the weighing module on the CAN bus'],
+      ['fsIncl1', '8388608', 'full scale of the inclinometer 1'],
+      ['fsIncl2', '8388608', ''],
+      ['zpIncl1', '0', 'zero point of the inclinometer 1'],
+      ['zpIncl2', '0', ''],
+      ['refTemp', '40', '/2 = reference temperature'],
+      ['tempCorFactor1', '10066', ''],
+      ['tempCorFactor2', '10066', 'temperature sensitivity of inclinometer 2'],
+      ['tempCorOffset1', '0', ''],
+      ['tempCorOffset2', '0', 'temperature sensitivity on the zero point of inclinometer 2'],
+      ['canIdIncl', '0', ''],
+      ['maxIncl', '15', 'Maximum inclination'],
+      ['warmUp', '0', 's, warm up time'],
+      ['dx', '0', 'distance between gravity point of main and reference loadcell'],
+      ['dy', '0', ''],
+      ['dh', '0', ''],
+    ],
+  };
+}
+
+const PARAM_ZONES = [
+  {
+    id: 'zone-system', label: 'System settings', priority: 'P2', parent: null,
+    note: 'Nodo RAÍZ del árbol real (p024/p343). Verificado por pantallazo salvo lo marcado "(del doc curado)" — el tramo p033-p089 del PDF no fotografió esta zona completa.',
+    fields: [
+      ['inpEmergency', '0', 'input of emergency stop circuit'],
+      ['inpInvEmergency', '0', 'input of emergency stop circuit (inverted function)'],
+      ['inpAirSupply', '0', "input for 'no air supply' detection"],
+      ['inpGenericWarning', '0', 'input for warning'],
+      ['GenericWarningText', '0', 'Text to show for the generic warning input'],
+      ['genericWarningLength', '0', 'Set the length of the generic warning bar, 0 for full screen length'],
+      ['inpCleaningMode', '0', "input for 'Cleaning mode' contact"],
+      ['invertDriveErrors', '0', 'invert the drive error signaling, 0 = error on high signal, 1 = error on low signal'],
+      ['inpDriveError1', '0', ''], ['driveName1', 'Drive 1', ''],
+      ['inpDriveError2', '0', ''], ['driveName2', 'Drive 2', ''],
+      ['inpDriveError3', '0', ''], ['driveName3', 'Drive 3', ''],
+      ['inpDriveError4', '0', ''], ['driveName4', 'Drive 4', 'name of drive 4'],
+      ['inpDriveError5', '0', ''],
+      ['driveName5', 'Drive 5', 'name of drive 5'],
+      ['invertInputErrors', '0', 'invert the input error signals'],
+      ['inpError1', '0', 'input for error 1'],
+      ['inpName1', 'Input 1', 'name of input 1'],
+      ['inpError2', '0', 'input for error 2'],
+      ['inpName2', 'Input 2', 'name of input 2'],
+      ['sernr', '3943', 'serial number of the system'],
+      ['comportLog', '1', ''],
+      ['colorScheme', '0', '0 = Z2, 1 = Z4'],
+      ['canOutputTransmitCount', '1', ''],
+      ...numberedFields('canIoType', 1, 20, '0', '0 = 8 output mode (output 101-108), 1 = 12 output mode (output 101-112)'),
+      ['canIdIo1', '51', "can id for input / output 101-108 (101-112 in 12 output mode)"],
+      ['canIdIo2', '52', "can id for input / output 109-116. This parameter is ignored when canIoType1 is set to 12 output mode"],
+      ['canIdIo3', '53', "can id for input / output 117-124 (117-128 in 12 output mode)"],
+      ['canIdIo4', '54', "can id for input / output 125-132. This parameter is ignored when canIoType3 is set to 12 output mode"],
+      ['canIdIo5', '55', "can id for input / output 133-140 (133-144 in 12 output mode)"],
+      ['canIdIo6', '56', "can id for input / output 141-148. This parameter is ignored when canIoType5 is set to 12 output mode"],
+      ['canIdIo7', '57', "can id for input / output 149-157 (149-160 in 12 output mode)"],
+      ['canIdIo8', '0', "can id for input / output 158-164. This parameter is ignored when canIoType7 is set to 12 output mode"],
+      ['canIdIo9', '0', "can id for input / output 165-172 (165-176 in 12 output mode)"],
+      ['canIdIo10', '0', "can id for input / output 173-180. This parameter is ignored when canIoType9 is set to 12 output mode"],
+      ['canIdIo11', '0', "can id for input / output 181-188 (181-192 in 12 output mode)"],
+      ['canIdIo12', '0', "can id for input / output 189-196. This parameter is ignored when canIoType11 is set to 12 output mode"],
+      ['canIdIo13', '0', "can id for input / output 197-204 (197-208 in 12 output mode)"],
+      ['canIdIo14', '0', "can id for input / output 205-212. This parameter is ignored when canIoType13 is set to 12 output mode"],
+      ['canIdIo15', '0', "can id for input / output 213-220 (213-224 in 12 output mode)"],
+      ['canIdIo16', '0', "can id for input / output 221-228. This parameter is ignored when canIoType15 is set to 12 output mode"],
+      ['canIdIo17', '0', "can id for input / output 229-236 (229-240 in 12 output mode)"],
+      ['canIdIo18', '0', "can id for input / output 237-244. This parameter is ignored when canIoType17 is set to 12 output mode"],
+      ['canIdIo19', '0', "can id for input / output 245-252 (244-256 in 12 output mode)"],
+      ['canIdIo20', '0', "can id for input / output 253-260. This parameter is ignored when canIoType19 is set to 12 output mode"],
+      ['udpRemoteIOEnable', '0', '0 = disable UDP remote IO (default), 1 = enabled UDP remote IO'],
+      ['udpRemoteIOPasskey', '0', ''],
+      ['syslogserver', '', 'IP address of syslog server'],
+      ['loglevel', '0', '0:Emergency, 1:Alert, 2:Critical, 3:Error, 4:Warning, 5:Notice...'],
+    ],
+  },
+  {
+    id: 'zone-staticgrader', label: 'StaticGrader', priority: 'P2', parent: 'zone-system',
+    note: 'Campos propios del nivel StaticGrader — en el Z2 real aparecen DESPUÉS de sus 4 nodos de cinta (p304-p340, sangría un nivel menor que los campos de Sorting belt).',
+    fields: [
+      ...numberedFields('inpProg', 1, 16, '0', 'input of program button'),
+      ['inpProgShift', '0', 'input of program shift button'],
+      ['progShift16', '0', 'Program shift modus: 0 = 10 (default), 1 = 16'],
+      ...numberedFields('outpProg', 1, 16, '0', 'output of light in program button'),
+      ['outpProgShift', '0', ''],
+      ['outpSignalGreen', '0', ''],
+      ['outpSignalOrange', '0', 'output for orange signal light - any batch closed'],
+      ['outpSignalRed', '0', ''],
+      ['outpSignalWhite', '0', ''],
+      ['outpSignalEmergency', '0', 'output for emergency signal light'],
+      ['outpSignalBatchAboutToClose', '0', ''],
+      ['outpSignalBuzzer', '0', ''],
+      ['buzzDuration', '0', 'buzzer signal max duration in seconds (0 = continuous)'],
+      ['inpOpenCloseGates', '0', 'input for open/close all gates button'],
+      ['outpOpenCloseGates', '0', ''],
+      ['showCleaningScreen', '0', '1 = show pop up cleaning screen'],
+      ['pmsVersion', '2', ''],
+      ['modbusId', '0', 'Modbus slave ID for the StaticGrader level (0 = disabled)'],
+      ['unitProgram', 'g', 'unity symbol for user unit (ex g) for use in program settings'],
+      ['factorProgram', '1', ''],
+      ['unitBatch', 'kg', ''],
+      ['factorBatch', '0.001', 'factor to convert internal units (usually g) to user units'],
+      ['resetOnBarcode', '0', ''],
+      ['touchScreen', '0', ''],
+      ['keyboardLayout', '0', '0 = ABC, 1 = AZERTY, 2 = QWERTY'],
+      ['outpTouchBeep', '0', ''],
+      ['selftesttype', '0', ''],
+      ['frontPageAttribute', '', 'name of attribute shown on the main screen'],
+      ['stationAttribute1', '', ''],
+      ['stationAttribute2', '', ''],
+      ['stationAttribute', '', 'Name of the attribute shown on the third line of the station, updated after each product is sorted'],
+      ['outpStartup', '0', ''],
+      ['startupInStdby', '0', ''],
+      ['beltOverviewInterval', '0', 'Only products put on the belt in this interval will be used in the belt overview (0s = disable, range: 5s - 3600s)'],
+      ['maintenanceAlarm', '0', 'Hours before the maintenance alarm'],
+      ['loadDefaultProgram', '0', '0: Load last active program at startup, 1: Load first program from programdefault.xml at startup, 2: same as 1 but load and display programs from regular program.xml afterwards'],
+    ],
+  },
+  {
+    id: 'zone-zbelt', label: 'Z-Belt', priority: 'P1', parent: 'zone-staticgrader',
+    fields: [
+      ['inpPulse', '4', 'Input of speed sensor'],
+      ['inpPulse2', '0', 'Second input of speed sensor / encoder'],
+      ['deltaI', '815', 'factor for the speed measurement'],
+      ['deltaIdiv', '1444', ''],
+      ['noEncoderMode', '0', ''],
+      ['simulSpeed', '0', ''],
+      ['length', '5800', 'Length of the belt (mm)'],
+      ['outpFlash', '0', 'output flash light when product arrives'],
+      ['finalBelt', '0', ''],
+      ['canId', '0', ''],
+      ['olg', '1500', ''],
+      ['pg', '0', 'Proportional gain of speed controller'],
+      ['ig', '1000', ''], ['dg', '0', ''],
+      ['mino', '100', ''], ['maxo', '700', ''],
+      ['inpStartStop', '0', 'Input of start / stop circuit'],
+      ['minSpeed', '100', 'mm/s'],
+      ['maxSpeed', '420', 'mm/s (= 0.42 m/s)'],
+      ['bdcMotor', '0', 'Motor type'],
+      ['daChannel', '1', 'Analog output channel'],
+      ['initialSpeed', '0', ''],
+      ['acceleration', '100', 'mm/s²'],
+      ['deceleration', '100', 'mm/s²'],
+      ['reverse', '0', '0=normal, 1=reverse (motor type 2 & 5)'],
+      ['inpEye', '1', 'input of the eye'],
+      ['dropPos', '0', 'mm to drop product behind flap'],
+      ['minCompartment', '0', 'mm, 0 to auto detect by using average size'],
+      ['skipCompartments', '0', 'number of compartments to skip after each drop'],
+    ],
+  },
+  buildPocketZone(1, { outp: 1, pos: 550,  minOpen: 600, tWeighing: 1000, tSteady: 500, canId: 11, fsWc: 273947, zpWc: 864997, btn: 101 }),
+  buildPocketZone(2, { outp: 2, pos: 970,  minOpen: 500, tWeighing: 1000, tSteady: 400, canId: 12, fsWc: 292162, zpWc: 781699, btn: 109 }),
+  buildPocketZone(3, { outp: 3, pos: 1390, minOpen: 470, tWeighing: 1000, tSteady: 300, canId: 13, fsWc: 286450, zpWc: 750139, btn: 117 }),
+  buildPocketZone(4, { outp: 4, pos: 1820, minOpen: 500, tWeighing: 900,  tSteady: 500, canId: 14, fsWc: 288832, zpWc: 761990, btn: 125 }),
+  {
+    id: 'zone-accel1', label: 'Acceleration belt 1', priority: 'P2', parent: 'zone-staticgrader',
+    fields: [
+      ['inpPulse', '5', 'input pulse encoder'],
+      ['inpPulse2', '0', 'Second input of speed sensor / encoder'],
+      ['deltaI', '52000', 'Encoder pulses per revolution'],
+      ['deltaIdiv', '39623', 'Delta divider'],
+      ['noEncoderMode', '0', ''],
+      ['simulSpeed', '0', ''],
+      ['length', '1000', 'Belt length (mm)'],
+      ['outpFlash', '0', 'Output to flash light that will flash when product comes on the belt'],
+      ['accelerationPoint', '0', '0-100%, Position of the product (in % of its length) when it will start moving at the speed of this belt'],
+      ['finalBelt', '0', 'Set to 1 if this is the last belt with products, even if there are more components defined in params.txt'],
+    ],
+  },
+  {
+    id: 'zone-accel2', label: 'Acceleration belt 2', priority: 'P2', parent: 'zone-staticgrader',
+    fields: [
+      ['inpPulse', '6', ''],
+      ['inpPulse2', '0', ''],
+      ['deltaI', '52000', ''],
+      ['deltaIdiv', '31219', ''],
+      ['noEncoderMode', '0', ''],
+      ['simulSpeed', '0', ''],
+      ['length', '3190', ''],
+      ['outpFlash', '16', ''],
+      ['accelerationPoint', '0', ''],
+      ['finalBelt', '0', ''],
+    ],
+  },
+  {
+    id: 'zone-sorting', label: 'Sorting belt with batching', priority: 'P1', parent: 'zone-staticgrader',
+    note: 'La "grading belt" con los 12 flippers/gates. Única cinta SIN campo length en el Z2 real. Orden y valores según pantallazos p175-p304.',
+    fields: [
+      ['inpPulse', '7', 'Input of speed sensor'],
+      ['inpPulse2', '0', 'Second input of speed sensor / encoder'],
+      ['deltaI', '5200', 'factor for the speed measurement'],
+      ['deltaIdiv', '1700', 'divider for the speed measurement'],
+      ['noEncoderMode', '0', ''],
+      ['simulSpeed', '0', ''],
+      ['outpFlash', '0', ''],
+      ['accelerationPoint', '0', ''],
+      ['finalBelt', '0', ''],
+      ['canId', '0', ''],
+      ['olg', '1500', ''],
+      ['pg', '0', ''], ['ig', '1000', ''], ['dg', '0', ''],
+      ['mino', '100', ''], ['maxo', '700', ''],
+      ['inpStartStop', '0', ''],
+      ['minSpeed', '50', 'mm/s, minimum speed'],
+      ['maxSpeed', '700', 'mm/s (= 0.70 m/s)'],
+      ['bdcMotor', '0', 'Motor type'],
+      ['daChannel', '1', 'Analog output channel'],
+      ['initialSpeed', '0', ''],
+      ['acceleration', '100', 'mm/s²'],
+      ['deceleration', '100', 'mm/s²'],
+      ['reverse', '0', '0=normal, 1=reverse (motor type 2 & 5)'],
+      ['nickname', '', 'short name'],
+      ['numGates', '12', 'Total number of gates'],
+      ['posGate1', '2', 'Position of gate 1'],
+      ['delayFlipperOpen', '150', 'ms delay to open flipper before product'],
+      ['delayFlipperClose', '150', 'ms delay to close flipper after product'],
+      ['minFlipperOpenTime', '350', 'ms, minimum open flipper time for product'],
+      ['fixedOpenFlipper', '0', 'Open with fixed time'],
+      ['triggerPointFlipper', '0', '0 = start, 50 = middle, 100 = end'],
+      ['inpEyeSync', '3', 'input sensor 1'],
+      ['disEyeSync', '425', 'mm — distance from beginning of belt to sync eye'],
+      ['eyeSyncMinLength', '10', 'Minimum detected length'],
+      ['eyeSyncMaxDender', '400', 'mm, max interruption in the detection of the product'],
+      ['maxDif', '1800', ''],
+      ['inpEyeSync2', '0', 'Sensor 2 (not used)'],
+      ['disEyeSync2', '0', ''],
+      ['eyeSyncMinLength2', '0', 'mm, minimum length of product (sync sensor 2)'],
+      ['eyeSyncMaxDender2', '0', ''],
+      ['maxDif2', '0', ''],
+      ['minimumGate2', '0', ''],
+      ['inpEyeSync3', '0', '3rd input of the eye for re-synchronisation, in the middle of the sorting belt (sync sensor 3)'],
+      ['disEyeSync3', '0', ''],
+      ['eyeSyncMinLength3', '0', ''],
+      ['eyeSyncMaxDender3', '0', ''],
+      ['maxDif3', '0', ''],
+      ['minimumGate3', '0', ''],
+      ['inpEyeSync4', '0', ''],
+      ['disEyeSync4', '0', ''],
+      ['eyeSyncMinLength4', '0', 'mm, minimum length of product (sync sensor 4)'],
+      ['eyeSyncMaxDender4', '0', ''],
+      ['maxDif4', '0', 'Maximum difference in expected position vs detected position (sync sensor 4)'],
+      ['minimumGate4', '0', 'First gate number considered by the sync sensor 4'],
+      ['outpRejectLight', '0', ''],
+      ['modbusId', '1', 'Modbus slave ID for the Sorting belt'],
+      ['gateVisualLayout', '0', '0=normal text, 1=minimal, 2=MID, 3=incl class, 4=auto open/no batch valve, 5=weight feedback'],
+      ['dynamicGateAssignment', '0', ''],
+      ['forceSpeciesAttributeName', '', ''],
+      ['sendPiece', '2', 'Send pieces to PMS. 0=no, 1=all sorted, 2=all'],
+      ['logStatsFTP', '0', ''],
+      ['resetGateOnChange', '0', ''],
+      ['statisticWindow', '0', 'Size of window used to detect changes in the weight distribution of the product'],
+      ['maxAvgDif', '0', ''],
+      ['maxStdevDif', '0', ''],
+      ['rejectNoSync', '1', 'Reject product that is not detected by the sync eye'],
+      ['rejectOnlyNonWeighed', '0', '1 = use reject gate only for products not weighed'],
+      ['defaultRejectGate', '0', 'Reject gate'],
+      ['minHeadTail', '0', 'mm, product that comes closer than this will be rejected'],
+      ['inpIncomingLotNr', '0', ''],
+      ['incomingLotNrDelay', '0', ''],
+      ['incomingLotNrAutoreset', '0', '0 = never reset counter, 1 = daily reset incoming lot nr'],
+      ['incomingLotNrResetValue', '0', ''],
+      ['outgoingLotNrAutoreset', '0', ''],
+      ['outgoingLotNrResetValue', '0', '0 = default (= 1), >= 1: resets outgoing lot nr to this value'],
+      ['sortAlgorithm', '0', ''],
+      ['fuzzySorting', '0', ''],
+      ['outpFlipper1', '133', 'Output to open flipper 1'],
+      ['outpFlipper2', '134', ''], ['outpFlipper3', '135', ''], ['outpFlipper4', '136', ''],
+      ['outpFlipper5', '141', ''], ['outpFlipper6', '142', ''], ['outpFlipper7', '143', ''], ['outpFlipper8', '144', ''],
+      ['outpFlipper9', '149', ''], ['outpFlipper10', '150', ''], ['outpFlipper11', '151', ''],
+      ['outpFlipper12', '152', 'Output to open flipper 12'],
+      ['dis1', '1250', 'mm, Distance to flipper 1'],
+      ['dis2', '2200', ''], ['dis3', '3800', ''], ['dis4', '5200', ''],
+      ['dis5', '6550', ''], ['dis6', '7850', ''], ['dis7', '9150', ''], ['dis8', '10400', ''],
+      ['dis9', '11700', ''], ['dis10', '13175', ''], ['dis11', '14800', ''],
+      ['dis12', '15850', 'mm, Distance to flipper 12'],
+      ...numberedFields('disableFlip', 1, 12, '0', 'Disable flipper'),
+      ['testMode', '0', ''],
+      ['flowRateInterval', '0', ''],
+      ['flowRateAlgorithm', '0', '0 = use time interval algorithm, 1 = use round robin algorithm'],
+      ['flipTimeWarning', '0', ''],
+      ['ftpLogServer', 'ftp.marelec.com', 'FTP server for logs'],
+      ['incomingLotNrTriggersGates', '0', '0 = No Action, 1 = Incoming Lot Nr Detect Triggers Gate flush'],
+      ['incomingLotNrTriggersDelay', '0', ''],
+      ['delayBeforeGateClose', '400', 'ms'],
+      ['delayGateClose', '500', 'time needed to close station (ms)'],
+      ['minGateOpen', '5000', 'ms'],
+      ['maxBinWeight', '25000', 'g (25 kg) — max weight inside the batch bin'],
+      ['idleWarning', '0', 's, warning when gate has not been used for x seconds'],
+      ['idleIndicator', '0', ''],
+      ['lightMode', '0', ''],
+      ['virtualBatchingWarning', '100', 'percentage (0-100) at which the batch light starts blinking; set lightMode = 4'],
+      ['indicateBatchWaiting', '0', ''],
+      ['spread', '1', ''],
+      ['autoOpen', '0', 'set to 1 to automatically open a closed gate'],
+      ['allowManualClose', '1', ''],
+      ['blockGUIClosing', '0', ''],
+      ['gateActionConfirmation', '0', 'show confirmation screen for gate actions in the GUI'],
+      ['sendBatch', '2', ''],
+      ['wFeedbackMode', '0', ''],
+      ['wFeedbackDelay', '0', 'delay before weighing station feedback, in ms'],
+      ['wFeedbackMaxStabilizationTime', '2000', '2 s'],
+      ['wFeedbackAfterZeroMargin', '0', ''],
+      ['wFeedbackSimulOffset', '0', 'Simulated station weight offset on average in g'],
+      ['wFeedbackSimulStdev', '10', ''],
+      ['wFeedbackSimulOffsetRate', '100', ''],
+      ['wFeedbackUnderLimit', '0', 'Relative lower limit for accepting weight correction (unit: -10th of percent)'],
+      ['wFeedbackUpperLimit', '0', 'Relative upper limit for accepting weight correction (10th of percent)'],
+      ['wFeedbackMaxRestart', '1', ''],
+      ['forceGates', '0', '0 = no action/resume normal operation, 1 = force all open, 2 = force all closed'],
+      ['orderProcessing', '0', ''],
+      ['lockGates', '0', ''],
+      ['safetyBatchValves', '0', '0 = automatically close batch valves, 1 = only close batch valves after operator presses gate button'],
+      ['outpGate1', '137', ''],
+      ['outpGate2', '138', ''], ['outpGate3', '139', ''], ['outpGate4', '140', ''],
+      ['outpGate5', '145', ''], ['outpGate6', '146', ''], ['outpGate7', '147', ''], ['outpGate8', '148', ''],
+      ['outpGate9', '153', ''], ['outpGate10', '154', ''], ['outpGate11', '155', ''], ['outpGate12', '156', ''],
+      ...numberedFields('outpLight', 1, 12, '0', 'Output for optional batch light'),
+      ['inp1', '133', 'Input for gate 1'],
+      ['inp2', '134', ''], ['inp3', '135', ''], ['inp4', '136', ''],
+      ['inp5', '141', ''], ['inp6', '142', ''], ['inp7', '143', ''], ['inp8', '144', ''],
+      ['inp9', '149', ''], ['inp10', '150', ''], ['inp11', '151', ''],
+      ['inp12', '152', 'Input for gate 12'],
+      ['noBatchValves', '0', ''],
+      ...numberedFields('noBatchValveGate', 1, 12, '0', 'Disable batch valve for gate'),
+    ],
+  },
+];
+
+/* Diccionario de traducción de las definiciones (inglés real del Z2 → español).
+   Traducido en bloque por Codex. El panel muestra inglés arriba + español abajo.
+   normHelp() tolera diferencias de caracteres (² / ^2, — / -, > / &gt;, & / and,
+   acentos) entre las claves y los helps reales del código, para que igual matcheen. */
+function normHelp(s){
+  return s.normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/²/g,'2').replace(/\^2/g,'2')
+    .replace(/&gt;/g,'>').replace(/&lt;/g,'<')
+    .replace(/\s*&\s*/g,' and ').replace(/[—–]/g,'-')
+    .replace(/\s+/g,' ').trim().toLowerCase();
+}
+const HELP_ES = {
+  '(= 120 kg)': '(= 120 kg)',
+  '/2 = reference temperature': '/2 = temperatura de referencia',
+  '0 = 8 output mode (output 101-108), 1 = 12 output mode (output 101-112)': '0 = modo de 8 salidas (salidas 101-108), 1 = modo de 12 salidas (salidas 101-112)',
+  '0 = ABC, 1 = AZERTY, 2 = QWERTY': '0 = ABC, 1 = AZERTY, 2 = QWERTY',
+  '0 = No Action, 1 = Incoming Lot Nr Detect Triggers Gate flush': '0 = sin acción, 1 = la detección de número de lote entrante activa el vaciado de gates',
+  '0 = Z2, 1 = Z4': '0 = Z2, 1 = Z4',
+  '0 = automatically close batch valves, 1 = only close batch valves after operator presses gate button': '0 = cerrar automáticamente las válvulas de batch, 1 = cerrarlas solo después de que el operador pulse el botón del gate',
+  '0 = default (= 1), >= 1: resets outgoing lot nr to this value': '0 = por defecto (= 1), >= 1: reinicia el número de lote saliente a este valor',
+  '0 = disable UDP remote IO (default), 1 = enabled UDP remote IO': '0 = deshabilitar E/S remota UDP (por defecto), 1 = habilitar E/S remota UDP',
+  '0 = never reset counter, 1 = daily reset incoming lot nr': '0 = nunca reiniciar el contador, 1 = reiniciar diariamente el número de lote entrante',
+  '0 = no action/resume normal operation, 1 = force all open, 2 = force all closed': '0 = sin acción/reanudar operación normal, 1 = forzar todos abiertos, 2 = forzar todos cerrados',
+  '0 = start, 50 = middle, 100 = end': '0 = inicio, 50 = centro, 100 = final',
+  '0 = use time interval algorithm, 1 = use round robin algorithm': '0 = usar algoritmo por intervalo de tiempo, 1 = usar algoritmo round robin',
+  '0-100%, Position of the product (in % of its length) when it will start moving at the speed of this belt': '0-100%, posición del producto (en % de su longitud) cuando empieza a moverse a la velocidad de esta cinta',
+  '0: Load last active program at startup, 1: Load first program from programdefault.xml at startup, 2: same as 1 but load and display programs from regular program.xml afterwards': '0: cargar el último programa activo al iniciar; 1: cargar el primer programa de programdefault.xml al iniciar; 2: igual que 1 pero luego carga y muestra los programas de program.xml normal',
+  '0:Emergency, 1:Alert, 2:Critical, 3:Error, 4:Warning, 5:Notice...': '0: Emergencia, 1: Alerta, 2: Crítico, 3: Error, 4: Advertencia, 5: Aviso...',
+  '0=normal text, 1=minimal, 2=MID, 3=incl class, 4=auto open/no batch valve, 5=weight feedback': '0=texto normal, 1=mínimo, 2=MID, 3=incluye clase, 4=apertura automática/sin válvula de batch, 5=retroalimentación de peso',
+  '0=normal, 1=reverse (motor type 2 & 5)': '0=normal, 1=inverso (motor tipo 2 y 5)',
+  '1 = show pop up cleaning screen': '1 = mostrar pantalla emergente de limpieza',
+  '1 = use reject gate only for products not weighed': '1 = usar el Reject gate solo para productos no pesados',
+  '2 s': '2 s',
+  '3rd input of the eye for re-synchronisation, in the middle of the sorting belt (sync sensor 3)': '3ª entrada del ojo para resincronización, en el centro de la cinta de clasificación (sensor de sincronismo 3)',
+  'Disable batch valve for gate': 'Deshabilitar válvula de batch para el gate',
+  'Disable flipper': 'Deshabilitar flipper',
+  'Enable faststep filter': 'Habilitar filtro faststep',
+  'FIR filter 1': 'Filtro FIR 1',
+  'First gate number considered by the sync sensor 4': 'Primer número de gate considerado por el sensor de sincronismo 4',
+  'Forward grading': 'Clasificación hacia adelante',
+  'IP address of syslog server': 'Dirección IP del servidor syslog',
+  'Id of the weighing module on the CAN bus': 'ID del módulo de pesaje en el bus CAN',
+  'Input for gate 1': 'Entrada para gate 1',
+  'Input for gate 12': 'Entrada para gate 12',
+  'Input of speed sensor': 'Entrada del sensor de velocidad',
+  'Input of start / stop circuit': 'Entrada del circuito de arranque / parada',
+  'Length of the belt (mm)': 'Longitud de la cinta (mm)',
+  'Maximum difference in expected position vs detected position (sync sensor 4)': 'Diferencia máxima entre la posición esperada y la detectada (sensor de sincronismo 4)',
+  'Maximum inclination': 'Inclinación máxima',
+  'Minimum time to be open (ms)': 'Tiempo mínimo de apertura (ms)',
+  'Only products put on the belt in this interval will be used in the belt overview (0s = disable, range: 5s - 3600s)': 'Solo los productos puestos en la cinta dentro de este intervalo se usan en la vista general de la cinta (0s = deshabilitado, rango: 5s - 3600s)',
+  'Output for optional batch light': 'Salida para luz opcional de batch',
+  'Output to flash light that will flash when product comes on the belt': 'Salida para luz intermitente que parpadea cuando el producto entra en la cinta',
+  'Output to open flipper 1': 'Salida para abrir flipper 1',
+  'Output to open flipper 12': 'Salida para abrir flipper 12',
+  'Output to open pocket': 'Salida para abrir el pocket',
+  'Program shift modus: 0 = 10 (default), 1 = 16': 'Modo de cambio de programa: 0 = 10 (por defecto), 1 = 16',
+  'Proportional gain of speed controller': 'Ganancia proporcional del controlador de velocidad',
+  'Reject product that is not detected by the sync eye': 'Rechazar el producto que no detecte el ojo de sincronismo',
+  'Relative lower limit for accepting weight correction (unit: -10th of percent)': 'Límite inferior relativo para aceptar corrección de peso (unidad: -décimas de porcentaje)',
+  'Relative upper limit for accepting weight correction (10th of percent)': 'Límite superior relativo para aceptar corrección de peso (décimas de porcentaje)',
+  'Second input of speed sensor / encoder': 'Segunda entrada del sensor de velocidad / encoder',
+  'Send pieces to PMS. 0=no, 1=all sorted, 2=all': 'Enviar piezas a PMS. 0=no, 1=todas las clasificadas, 2=todas',
+  'Set the length of the generic warning bar, 0 for full screen length': 'Fija el largo de la barra genérica de advertencia; 0 para el ancho completo de pantalla',
+  'Set to 1 if this is the last belt with products, even if there are more components defined in params.txt': 'Poner en 1 si esta es la última cinta con producto, aunque haya más componentes definidos en params.txt',
+  'Simulated station weight offset on average in g': 'Desfase promedio simulado del peso de la estación, en g',
+  'Size of window used to detect changes in the weight distribution of the product': 'Tamaño de la ventana usada para detectar cambios en la distribución de peso del producto',
+  'Text to show for the generic warning input': 'Texto a mostrar para la entrada genérica de advertencia',
+  'buzzer signal max duration in seconds (0 = continuous)': 'Duración máxima de la señal del buzzer en segundos (0 = continua)',
+  'can id for input / output 245-252 (244-256 in 12 output mode)': 'ID CAN para entrada/salida 245-252 (244-256 en modo de 12 salidas)',
+  "can id for input / output 101-108 (101-112 in 12 output mode)": "ID CAN para entrada/salida 101-108 (101-112 en modo de 12 salidas)",
+  "can id for input / output 109-116. This parameter is ignored when canIoType1 is set to 12 output mode": "ID CAN para entrada/salida 109-116. Este parámetro se ignora cuando canIoType1 está en modo de 12 salidas",
+  "can id for input / output 117-124 (117-128 in 12 output mode)": "ID CAN para entrada/salida 117-124 (117-128 en modo de 12 salidas)",
+  "can id for input / output 125-132. This parameter is ignored when canIoType3 is set to 12 output mode": "ID CAN para entrada/salida 125-132. Este parámetro se ignora cuando canIoType3 está en modo de 12 salidas",
+  "can id for input / output 133-140 (133-144 in 12 output mode)": "ID CAN para entrada/salida 133-140 (133-144 en modo de 12 salidas)",
+  "can id for input / output 141-148. This parameter is ignored when canIoType5 is set to 12 output mode": "ID CAN para entrada/salida 141-148. Este parámetro se ignora cuando canIoType5 está en modo de 12 salidas",
+  "can id for input / output 149-157 (149-160 in 12 output mode)": "ID CAN para entrada/salida 149-157 (149-160 en modo de 12 salidas)",
+  "can id for input / output 158-164. This parameter is ignored when canIoType7 is set to 12 output mode": "ID CAN para entrada/salida 158-164. Este parámetro se ignora cuando canIoType7 está en modo de 12 salidas",
+  "can id for input / output 165-172 (165-176 in 12 output mode)": "ID CAN para entrada/salida 165-172 (165-176 en modo de 12 salidas)",
+  "can id for input / output 173-180. This parameter is ignored when canIoType9 is set to 12 output mode": "ID CAN para entrada/salida 173-180. Este parámetro se ignora cuando canIoType9 está en modo de 12 salidas",
+  "can id for input / output 181-188 (181-192 in 12 output mode)": "ID CAN para entrada/salida 181-188 (181-192 en modo de 12 salidas)",
+  "can id for input / output 189-196. This parameter is ignored when canIoType11 is set to 12 output mode": "ID CAN para entrada/salida 189-196. Este parámetro se ignora cuando canIoType11 está en modo de 12 salidas",
+  "can id for input / output 197-204 (197-208 in 12 output mode)": "ID CAN para entrada/salida 197-204 (197-208 en modo de 12 salidas)",
+  "can id for input / output 205-212. This parameter is ignored when canIoType13 is set to 12 output mode": "ID CAN para entrada/salida 205-212. Este parámetro se ignora cuando canIoType13 está en modo de 12 salidas",
+  "can id for input / output 213-220 (213-224 in 12 output mode)": "ID CAN para entrada/salida 213-220 (213-224 en modo de 12 salidas)",
+  "can id for input / output 221-228. This parameter is ignored when canIoType15 is set to 12 output mode": "ID CAN para entrada/salida 221-228. Este parámetro se ignora cuando canIoType15 está en modo de 12 salidas",
+  "can id for input / output 229-236 (229-240 in 12 output mode)": "ID CAN para entrada/salida 229-236 (229-240 en modo de 12 salidas)",
+  "can id for input / output 237-244. This parameter is ignored when canIoType17 is set to 12 output mode": "ID CAN para entrada/salida 237-244. Este parámetro se ignora cuando canIoType17 está en modo de 12 salidas",
+  "can id for input / output 245-252 (244-256 in 12 output mode)": "ID CAN para entrada/salida 245-252 (244-256 en modo de 12 salidas)",
+  "can id for input / output 253-260. This parameter is ignored when canIoType19 is set to 12 output mode": "ID CAN para entrada/salida 253-260. Este parámetro se ignora cuando canIoType19 está en modo de 12 salidas",
+  'can id of D4 display': 'ID CAN del display D4',
+  'delay before weighing station feedback, in ms': 'Retardo antes de la respuesta de la estación de pesaje, en ms',
+  'display resolution (g)': 'Resolución del display (g)',
+  'distance between gravity point of main and reference loadcell': 'Distancia entre el centro de gravedad de la celda de carga principal y la de referencia',
+  'divider for the speed measurement': 'Divisor para la medición de velocidad',
+  'factor for the speed measurement': 'Factor para la medición de velocidad',
+  'factor to convert internal units (usually g) to user units': 'Factor para convertir unidades internas (normalmente g) a unidades de usuario',
+  'full scale of the inclinometer 1': 'Escala completa del inclinómetro 1',
+  'full scale of the reference loadcell': 'Escala completa de la celda de carga de referencia',
+  'g (25 kg) — max weight inside the batch bin': 'g (25 kg) — peso máximo dentro del bin de batch',
+  "input for 'Cleaning mode' contact": "Entrada para el contacto de 'modo limpieza'",
+  "input for 'no air supply' detection": "Entrada para detección de 'sin suministro de aire'",
+  'input for error 1': 'Entrada para error 1',
+  'input for error 2': 'Entrada para error 2',
+  'input for open/close all gates button': 'Entrada para el botón de abrir/cerrar todos los gates',
+  'input for warning': 'Entrada para advertencia',
+  'input of emergency stop circuit': 'Entrada del circuito de parada de emergencia',
+  'input of emergency stop circuit (inverted function)': 'Entrada del circuito de parada de emergencia (función invertida)',
+  'input of product selection button 1': 'Entrada del botón de selección de producto 1',
+  'input of product selection button 8': 'Entrada del botón de selección de producto 8',
+  'input of program button': 'Entrada del botón de programa',
+  'input of program shift button': 'Entrada del botón de cambio de programa',
+  'input of the eye': 'Entrada del ojo',
+  'input pulse encoder': 'Entrada de pulsos del encoder',
+  'input sensor 1': 'Entrada sensor 1',
+  'input to switch mode of default product selection': 'Entrada para cambiar el modo de selección de producto por defecto',
+  'invert the drive error signaling, 0 = error on high signal, 1 = error on low signal': 'Invertir la señalización de error del variador: 0 = error con señal alta, 1 = error con señal baja',
+  'invert the input error signals': 'Invertir las señales de entrada de error',
+  'minimum weight (g)': 'Peso mínimo (g)',
+  'mm to drop product behind flap': 'mm para dejar caer el producto detrás de la aleta',
+  'mm — distance from beginning of belt to sync eye': 'mm — distancia desde el inicio de la cinta hasta el ojo de sincronismo',
+  'mm, 0 to auto detect by using average size': 'mm; 0 para autodetectar usando el tamaño promedio',
+  'mm, distance from eye to center of pocket': 'mm, distancia del ojo al centro del pocket',
+  'mm, max interruption in the detection of the product': 'mm, interrupción máxima en la detección del producto',
+  'mm, minimum length of product (sync sensor 2)': 'mm, longitud mínima del producto (sensor de sincronismo 2)',
+  'mm, minimum length of product (sync sensor 4)': 'mm, longitud mínima del producto (sensor de sincronismo 4)',
+  'mm, product that comes closer than this will be rejected': 'mm; el producto que venga más cerca que esto será rechazado',
+  'mm/s': 'mm/s',
+  'mm/s²': 'mm/s²',
+  'motion compensation': 'Compensación de movimiento',
+  'ms': 'ms',
+  'ms delay to close flipper after product': 'ms de retardo para cerrar el flipper después del producto',
+  'ms delay to open flipper before product': 'ms de retardo para abrir el flipper antes del producto',
+  'ms, delay to transfer product to next component': 'ms, retardo para transferir el producto al siguiente componente',
+  'ms, minimum open flipper time for product': 'ms, tiempo mínimo de apertura del flipper para el producto',
+  'name of attribute shown on the main screen': 'Nombre del atributo mostrado en la pantalla principal',
+  'name of drive 4': 'Nombre del variador 4',
+  'name of drive 5': 'Nombre del variador 5',
+  'name of input 1': 'Nombre de la entrada 1',
+  'name of input 2': 'Nombre de la entrada 2',
+  'number of compartments to skip after each drop': 'Número de compartimentos a omitir después de cada descarga',
+  'output flash light when product arrives': 'Salida de luz intermitente cuando llega producto',
+  'output for emergency signal light': 'Salida para la luz de señal de emergencia',
+  'output for orange signal light - any batch closed': 'Salida para la luz de señal naranja — cualquier batch cerrado',
+  'output of light in program button': 'Salida de la luz en el botón de programa',
+  'output of product selection button 1': 'Salida del botón de selección de producto 1',
+  'output of product selection button 4': 'Salida del botón de selección de producto 4',
+  'output of product selection button 8': 'Salida del botón de selección de producto 8',
+  'percentage (0-100) at which the batch light starts blinking; set lightMode = 4': 'Porcentaje (0-100) en que la luz de batch empieza a parpadear; poner lightMode = 4',
+  's, warm up time': 's, tiempo de calentamiento',
+  's, warning when gate has not been used for x seconds': 's, advertencia cuando el gate no se usó durante x segundos',
+  'serial number of the system': 'Número de serie del sistema',
+  'set to 1 to automatically open a closed gate': 'Poner en 1 para abrir automáticamente un gate cerrado',
+  'setting of FIR filter 2': 'Ajuste del filtro FIR 2',
+  'setting of FIR filter 4': 'Ajuste del filtro FIR 4',
+  'short name': 'Nombre corto',
+  'show confirmation screen for gate actions in the GUI': 'Mostrar pantalla de confirmación para acciones de gate en la interfaz',
+  'temperature sensitivity of inclinometer 2': 'Sensibilidad a la temperatura del inclinómetro 2',
+  'temperature sensitivity on the zero point of inclinometer 2': 'Sensibilidad a la temperatura en el punto cero del inclinómetro 2',
+  'time needed to close station (ms)': 'Tiempo necesario para cerrar la estación (ms)',
+  'tolerance for alternative steady criterium. 0 = default = disabled': 'Tolerancia para el criterio alternativo de estabilidad. 0 = por defecto = deshabilitado',
+  'unity symbol for user unit (ex g) for use in program settings': 'Símbolo de unidad para la unidad de usuario (ej. g), usado en los ajustes de programa',
+  'unity symbol for user unit (ex kg)': 'Símbolo de unidad para la unidad de usuario (ej. kg)',
+  'x0.1G maximum acceleration (ex. 3 means 0.7 - 1.3G). 0 to disable': 'x0.1G aceleración máxima (ej. 3 = 0.7 - 1.3G). 0 para deshabilitar',
+  'zero point WC': 'Punto cero WC',
+  'zero point of the inclinometer 1': 'Punto cero del inclinómetro 1',
+  'zero point of the reference loadcell': 'Punto cero de la celda de carga de referencia',
+  'can id for input/output 205-212': 'ID CAN para entrada/salida 205-212',
+  "CAN ID for input/output 205-212": "ID CAN para entrada/salida 205-212",
+  "Modbus slave ID for the StaticGrader level (0 = disabled)": "ID Modbus esclavo para el nivel StaticGrader (0 = deshabilitado)",
+  "Name of the attribute shown on the third line of the station, updated after each product is sorted": "Nombre del atributo mostrado en la tercera línea de la estación, actualizado después de clasificar cada producto",
+  "Hours before the maintenance alarm": "Horas antes de la alarma de mantención",
+  "mm/s (= 0.42 m/s)": "mm/s (= 0,42 m/s)",
+  "Motor type": "Tipo de motor",
+  "Analog output channel": "Canal analógico de salida",
+  "mm/s²": "mm/s²",
+  "ms, delay to start weighing after closing pocket": "ms, retardo para iniciar el pesaje después de cerrar el pocket",
+  "Weighing time (ms)": "Tiempo de pesaje (ms)",
+  "Stabilization time (ms)": "Tiempo de estabilización (ms)",
+  "Minimum difference in weight to be detected as new weighing": "Diferencia mínima de peso para detectarlo como nuevo pesaje",
+  "Full scale weight correction": "Corrección de escala completa del peso",
+  "Second input of speed sensor / encoder": "Segunda entrada del sensor de velocidad / encoder",
+  "Encoder pulses per revolution": "Pulsos del encoder por revolución",
+  "Delta divider": "Divisor delta",
+  "Belt length (mm)": "Longitud de la cinta (mm)",
+  "mm/s, minimum speed": "mm/s, velocidad mínima",
+  "mm/s (= 0.70 m/s)": "mm/s (= 0,70 m/s)",
+  "Total number of gates": "Número total de gates",
+  "Position of gate 1": "Posición del gate 1",
+  "Open with fixed time": "Abrir con tiempo fijo",
+  "Minimum detected length": "Longitud mínima detectada",
+  "Sensor 2 (not used)": "Sensor 2 (no usado)",
+  "Modbus slave ID for the Sorting belt": "ID Modbus esclavo para la Sorting belt",
+  "Reject gate": "Gate de rechazo",
+  "Output to open flipper 1": "Salida para abrir flipper 1",
+  "mm, Distance to flipper 1": "mm, distancia hasta flipper 1",
+  "mm, Distance to flipper 12": "mm, distancia hasta flipper 12",
+  "FTP server for logs": "Servidor FTP para logs",
+  "ms": "ms",
+  "Input for gate 1": "Entrada para gate 1",
+};
+/* Índice normalizado: matchea aunque la clave difiera del help por caracteres especiales. */
+const HELP_ES_NORM = {};
+Object.keys(HELP_ES).forEach(k => { const n = normHelp(k); if(!(n in HELP_ES_NORM)) HELP_ES_NORM[n] = HELP_ES[k]; });
+
+function selectParamRow(row, key, value, help) {
+  document.querySelectorAll('#param-tree .sel').forEach(r => r.classList.remove('sel'));
+  row.classList.add('sel');
+  const panel = document.getElementById('param-help');
+  const es = help ? (HELP_ES[help] || HELP_ES_NORM[normHelp(help)] || '') : '';
+  panel.innerHTML = `<span class="ph-key">${key}</span>`
+    + (help ? `<span class="ph-en">${help}</span>` : `<span class="param-help-empty">Sin descripción documentada.</span>`)
+    + (es ? `<span class="ph-es">${es}</span>` : '');
+}
+
+/** Construye UN nodo del árbol acordeón: la fila del nodo + su contenido
+    (nota + campos propios + hijos anidados recursivos) en un solo
+    contenedor `.tree-content` que se abre/cierra con un click en la fila
+    — el contenido aparece DEBAJO del nodo clickeado, no en un panel
+    aparte (feedback de Orel 2026-07-10, segunda ronda). Como
+    `.tree-content` es un div normal anidado por DOM, cada nivel agrega
+    su propia indentación (CSS) sin necesitar clases por profundidad.
+    Varios nodos pueden estar abiertos a la vez — no hay selección única. */
+function renderZoneNode(zone) {
+  const children = PARAM_ZONES.filter(z => z.parent === zone.id);
+  const wrapper = document.createElement('div');
+
+  const node = document.createElement('div');
+  node.className = 'tree-node';
+  node.dataset.zoneId = zone.id;
+  node.innerHTML = `<span>${zone.label}</span>`;
+  wrapper.appendChild(node);
+
+  const content = document.createElement('div');
+  content.className = 'tree-content';
+
+  // Las notas de zona (zone.note) NO se renderizan — el Z2 real no muestra esos
+  // mensajes (Orel 2026-07-11). Se conservan en los datos como doc del código.
+
+  // ORDEN REAL DEL Z2 (auditoría 2026-07-10): los nodos HIJOS aparecen
+  // ANTES que los campos propios del padre — verificado en p024 (System
+  // settings: primero StaticGrader, después inpEmergency...), p096
+  // (StaticGrader: primero las 4 cintas, después inpProg1-16) y p133
+  // (Z-Belt: primero Pocket 1-4, después inpPulse...).
+  children.forEach(child => content.appendChild(renderZoneNode(child)));
+
+  zone.fields.forEach(([key, value, help]) => {
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    row.innerHTML = `<span>${key}</span><span class="pv">${value}</span>`;
+    row.addEventListener('click', (e) => {
+      e.stopPropagation(); // no togglear el nodo padre al clickear un campo
+      selectParamRow(row, key, value, help);
+    });
+    content.appendChild(row);
+  });
+
+  wrapper.appendChild(content);
+
+  // Árbol expandible: al tocar el nodo se selecciona (resalta) Y se abre/cierra
+  // su sección, como el drill-down del Z2 real (p024 → p133). Sin caret.
+  node.addEventListener('click', () => {
+    document.querySelectorAll('#param-tree .sel').forEach(el => el.classList.remove('sel'));
+    node.classList.add('sel');
+    content.classList.toggle('open');
+    const panel = document.getElementById('param-help');
+    panel.innerHTML = `<span class="ph-key">${zone.label}</span><span class="param-help-empty">Sección de parámetros.</span>`;
+  });
+
+  return wrapper;
+}
+
+/** Árbol acordeón real (no chips, no panel separado) — feedback de Orel
+    2026-07-10 en dos rondas: primero pidió expand/collapse de verdad
+    (Pocket 1-4 como hijos reales de Z-Belt), después que el contenido
+    aparezca inline bajo el nodo clickeado en vez de en una segunda caja. */
+function buildParamTree() {
+  const tree = document.getElementById('param-tree');
+  const topLevel = PARAM_ZONES.filter(z => !z.parent);
+  topLevel.forEach(zone => tree.appendChild(renderZoneNode(zone)));
+  // Abrir System settings por defecto: al entrar se ve System settings +
+  // StaticGrader (cerrado) + los campos de System settings, tal cual p024.
+  const first = tree.querySelector('.tree-content');
+  if (first) first.classList.add('open');
+}
+buildParamTree();
+
+/* ══════════════════════════════════════════════════
+   EXPLORADOR CAN — clonado de p018 (lista base) / p020 (continuación) /
+   p021 (resultado de "Localizar ID's aleatorias"). 11 dispositivos
+   confirmados en pantallazo: Pocket 1-4 (CANAD) + Idlo1-7 (CANIO). Idlo2
+   SÍ estaba en p019 — corregido 2026-07-11 (antes se creía omitido del PDF).
+══════════════════════════════════════════════════ */
+const CAN_DEVICES_BASE = [
+  { id: 11, real: 11, label: 'Pocket 1', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 12, real: 12, label: 'Pocket 2', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 13, real: 13, label: 'Pocket 3', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 14, real: 14, label: 'Pocket 4', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 51, real: 51, label: 'Idlo1', version: 'CANIO V1.04', crc: '' },
+  { id: 52, real: 52, label: 'Idlo2', version: 'CANIO V1.04', crc: '' },
+  { id: 53, real: 53, label: 'Idlo3', version: 'CANIO V1.04', crc: '' },
+  { id: 54, real: 54, label: 'Idlo4', version: 'CANIO V1.04', crc: '' },
+  { id: 55, real: 55, label: 'Idlo5', version: 'CANIO V1.04', crc: '' },
+  { id: 56, real: 56, label: 'Idlo6', version: 'CANIO V1.04', crc: '' },
+  { id: 57, real: 57, label: 'Idlo7', version: 'CANIO V1.04', crc: '' },
+];
+
+/* Resultado real capturado en p021 tras presionar el botón — el Z2 real
+   randomiza cada vez; acá se replay del ejemplo del pantallazo (estático,
+   no una simulación de aleatoriedad real). */
+const CAN_DEVICES_LOCALIZADOS = [
+  { id: 47,  real: 13, label: '', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 86,  real: 57, label: '', version: 'CANIO V1.04',  crc: '' },
+  { id: 93,  real: 12, label: '', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 99,  real: 55, label: '', version: 'CANIO V1.04',  crc: '' },
+  { id: 104, real: 56, label: '', version: 'CANIO V1.04',  crc: '' },
+];
+
+function renderCanDevices(devices) {
+  const rows = document.getElementById('can-rows');
+  rows.innerHTML = '';
+  devices.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'can-row' + (i === 0 ? ' sel' : '');
+    row.innerHTML = `<span>${d.id}</span><span>${d.real}</span><span>${d.label}</span><span>${d.version}</span><span>${d.crc}</span>`;
+    row.addEventListener('click', () => {
+      rows.querySelectorAll('.can-row.sel').forEach(r => r.classList.remove('sel'));
+      row.classList.add('sel');
+    });
+    rows.appendChild(row);
+  });
+}
+renderCanDevices(CAN_DEVICES_BASE);
+
+function localizarIdsAleatorias() {
+  renderCanDevices(CAN_DEVICES_LOCALIZADOS);
+  addLog("Localizar ID's aleatorias");
+}
+
+/* ══════════════════════════════════════════════════
+   DICCIONARIO BILINGÜE — Fase 3 (arranca acá, se centraliza más
+   adelante junto con labelForField()/graderGlossary.ts del lado React;
+   ver docs/marelec-z2/NAVEGACION.md § Decisión de arquitectura).
+   Tooltip nativo (title=) sobre los términos en inglés reales del Z2.
+══════════════════════════════════════════════════ */
+const GLOSSARY_EN_ES = {
+  'Z-Belt': 'Cinta elevadora entre el pocket (balanza) y las cintas de aceleración. 0.42 m/s real (ver GraderPhysicalConfig).',
+  'Acceleration belt 1': 'Primera cinta de aceleración — empareja la velocidad del pez antes de entrar a la cinta de clasificación.',
+  'Acceleration belt 2': 'Segunda cinta de aceleración.',
+  'Sorting belt with batching': 'Cinta de clasificación final con 12 flippers/gates. 0.70 m/s real — es la "grading belt" de GraderPhysicalConfig.',
+};
+document.querySelectorAll('[data-gloss]').forEach(el => {
+  const text = GLOSSARY_EN_ES[el.dataset.gloss];
+  if (text) el.title = text;
+});
+
 /* Reloj */
 function pad(n) { return String(n).padStart(2, '0'); }
 function tick() {
@@ -746,9 +2002,54 @@ function tick() {
 }
 tick(); setInterval(tick, 1000);
 
-/* Navegación */
-function sp(id) { document.getElementById(id).classList.add('active'); }
-function cp(id) { document.getElementById(id).classList.remove('active'); }
+/* ══════════════════════════════════════════════════
+   NAVEGACIÓN — Fase 2 (motor de pantallas)
+   Stack real (push/pop) en vez de show/hide plano: permite
+   anidar pantallas (Menu > Servicio > Probar Salidas > ...)
+   sin que cada nivel tenga que saber del anterior. Solo la
+   pantalla en el TOPE del stack está visible (position:absolute
+   inset:0 sobre #screen — como en la Z2 real, pantalla completa,
+   no ventanas superpuestas).
+══════════════════════════════════════════════════ */
+let screenStack = [];
+
+function screenTitle(id) {
+  const el = document.getElementById(id);
+  return el ? (el.dataset.title || id) : id;
+}
+
+/** Recalcula el breadcrumb "Home › Menu › Servicio › ..." de la pantalla en el tope. */
+function updateBreadcrumb() {
+  const topId = screenStack[screenStack.length - 1];
+  if (!topId) return; // volvimos a home, no hay panel visible que actualizar
+  const path = ['Home', ...screenStack.map(screenTitle)].join(' › ');
+  const crumbEl = document.getElementById(topId)?.querySelector('.crumb');
+  if (crumbEl) crumbEl.textContent = path;
+}
+
+/** Navega HACIA ADELANTE a la pantalla `id` (la apila sobre la actual). */
+function navigateTo(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  document.querySelectorAll('.panel.active').forEach(p => p.classList.remove('active'));
+  screenStack.push(id);
+  el.classList.add('active');
+  updateBreadcrumb();
+  logEventToParent('nav', screenTitle(id));
+}
+
+/** Vuelve un nivel (Salir/Cancelar en el footer). Vacía el stack → home. */
+function goBack() {
+  const closingId = screenStack.pop();
+  if (!closingId) return; // ya estábamos en home
+  document.getElementById(closingId)?.classList.remove('active');
+  const parentId = screenStack[screenStack.length - 1];
+  if (parentId) {
+    document.getElementById(parentId)?.classList.add('active');
+    updateBreadcrumb();
+  }
+  logEventToParent('nav', parentId ? screenTitle(parentId) : 'Home');
+}
 
 /* Log */
 function addLog(msg) {
@@ -777,6 +2078,7 @@ function toggleKeyboards() {
   btn.textContent = shell.classList.contains('keyboards-hidden')
     ? '⌨ Mostrar teclados'
     : '⌨ Ocultar teclados';
+  fitShell();   /* el ancho del shell cambió (con/sin teclados) → re-encajar */
 }
 
 /* Active indicator: click para seleccionar, numpad escribe ahí */
@@ -805,14 +2107,25 @@ function updateIndicatorValue(ind, valueStr) {
   ind.insertBefore(document.createTextNode(valueStr), unit);
 }
 
-/* F-keys → click en los botones del footer */
+/* F-keys → click CONTEXTUAL: dispara el botón i-ésimo del .btn-bar que esté
+   REALMENTE visible (el de home si no hay panel abierto, o el del panel en
+   el tope del stack) — igual que la Z2 real, donde F1-F4 significan algo
+   distinto en cada pantalla ("Cancelar/Abajo/Arriba/OK" en el editor de
+   parámetros, "Anterior/Next/Salir" en Probar Salidas, etc). */
+function currentBtnBar() {
+  const activePanel = document.querySelector('.panel.active');
+  return activePanel ? activePanel.querySelector('.btn-bar') : document.querySelector('#home-body > .btn-bar');
+}
+
 document.querySelectorAll('.fkey').forEach((fk, i) => {
   fk.addEventListener('click', () => {
-    const footerBtns = document.querySelectorAll('#rc-window .btn-bar .btn');
-    if (footerBtns[i]) {
-      footerBtns[i].click();
+    const bar = currentBtnBar();
+    const btns = bar ? bar.querySelectorAll('.btn') : [];
+    if (btns[i]) {
+      btns[i].click();
       addLog(`F${i + 1} pressed`);
     }
+    logEventToParent('fkey-press', 'F' + (i + 1));
   });
 });
 
@@ -862,6 +2175,14 @@ function numKey(label) {
 
 /* Atajos de teclado: F1-F4 + 0-9 + Enter + Esc/Backspace */
 document.addEventListener('keydown', (e) => {
+  /* Si el foco está en un <input>/<textarea> REAL (clave, Activ Sal.),
+     no interceptar — el usuario está escribiendo texto normal, no
+     "apretando" el numpad virtual. Sin este guard, tipear "8620" en el
+     campo de clave también escribía "8620" en el indicador de peso
+     activo (el mismo listener global capturaba las teclas 2 veces). */
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
   /* F1-F4 */
   const fMatch = e.key.match(/^F([1-4])$/);
   if (fMatch) {
@@ -1000,16 +2321,37 @@ document.querySelectorAll('.gate').forEach(g => {
     scheduleSave();
   });
 });
-document.querySelectorAll('.fkey').forEach((fk, i) => {
-  fk.addEventListener('click', () => {
-    logEventToParent('fkey-press', 'F' + (i + 1));
-  });
-});
+/* fkey-press ya se loguea en el handler contextual de F-keys (ver sección NAVEGACIÓN) */
 
 /* Detectar si estamos en iframe y aplicar clase para layout adaptado */
 if (window.parent !== window) {
   document.documentElement.classList.add('in-iframe');
 }
+
+/* ── Ajuste responsive: escala #marelec-shell para que la ventana COMPLETA
+   (pantalla + teclados) quepa sin recorte en cualquier contenedor. El shell
+   es un grid de ancho fijo (1010px con teclados); en un viewport/iframe más
+   angosto se salía y recortaba. Escalamos con transform para preservar
+   proporciones; el wrapper #shell-fit toma el tamaño escalado para que el
+   body lo centre sin scroll. Recalcula al redimensionar y en toggleKeyboards. */
+function fitShell() {
+  const shell = document.getElementById('marelec-shell');
+  const fit = document.getElementById('shell-fit');
+  if (!shell || !fit) return;
+  fit.style.width = 'auto';
+  fit.style.height = 'auto';
+  shell.style.transform = 'none';
+  const natW = shell.offsetWidth, natH = shell.offsetHeight;
+  const pad = 24;
+  const availW = document.documentElement.clientWidth - pad;
+  const availH = document.documentElement.clientHeight - pad;
+  const s = Math.min(1, availW / natW, availH / natH);
+  shell.style.transform = s < 1 ? 'scale(' + s + ')' : 'none';
+  fit.style.width = (natW * s) + 'px';
+  fit.style.height = (natH * s) + 'px';
+}
+window.addEventListener('resize', fitShell);
+fitShell();
 
 /* Notificar ready al wrapper */
 notifyReady();
