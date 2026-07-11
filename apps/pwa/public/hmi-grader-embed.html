@@ -502,7 +502,11 @@ html.in-iframe, html.in-iframe body {
    MARELEC SHELL — contiene rc-window + teclados
    Grid: rc + numpad derecha, fkeys abajo
 ══════════════════════════════════════ */
+/* Wrapper de ajuste responsive: NO dejar que el body (flex) lo comprima,
+   así fitShell() mide el ancho natural real del shell (1010px con teclados). */
+#shell-fit { flex-shrink: 0; }
 #marelec-shell {
+  transform-origin: top left;   /* fitShell() escala desde arriba-izquierda */
   display: grid;
   grid-template-columns: 760px 240px;
   grid-template-rows: 690px 110px;
@@ -677,6 +681,7 @@ html.in-iframe, html.in-iframe body {
 </head>
 <body>
 
+<div id="shell-fit">
 <div id="marelec-shell">
   <button id="toggle-keyboards" onclick="toggleKeyboards()">⌨ Ocultar teclados</button>
 
@@ -994,6 +999,7 @@ html.in-iframe, html.in-iframe body {
   </div>
 
 </div><!-- #marelec-shell -->
+</div><!-- #shell-fit -->
 
 <script>
 /* ══════════════════════════════════════════════════
@@ -1838,6 +1844,7 @@ function toggleKeyboards() {
   btn.textContent = shell.classList.contains('keyboards-hidden')
     ? '⌨ Mostrar teclados'
     : '⌨ Ocultar teclados';
+  fitShell();   /* el ancho del shell cambió (con/sin teclados) → re-encajar */
 }
 
 /* Active indicator: click para seleccionar, numpad escribe ahí */
@@ -2086,6 +2093,31 @@ document.querySelectorAll('.gate').forEach(g => {
 if (window.parent !== window) {
   document.documentElement.classList.add('in-iframe');
 }
+
+/* ── Ajuste responsive: escala #marelec-shell para que la ventana COMPLETA
+   (pantalla + teclados) quepa sin recorte en cualquier contenedor. El shell
+   es un grid de ancho fijo (1010px con teclados); en un viewport/iframe más
+   angosto se salía y recortaba. Escalamos con transform para preservar
+   proporciones; el wrapper #shell-fit toma el tamaño escalado para que el
+   body lo centre sin scroll. Recalcula al redimensionar y en toggleKeyboards. */
+function fitShell() {
+  const shell = document.getElementById('marelec-shell');
+  const fit = document.getElementById('shell-fit');
+  if (!shell || !fit) return;
+  fit.style.width = 'auto';
+  fit.style.height = 'auto';
+  shell.style.transform = 'none';
+  const natW = shell.offsetWidth, natH = shell.offsetHeight;
+  const pad = 24;
+  const availW = document.documentElement.clientWidth - pad;
+  const availH = document.documentElement.clientHeight - pad;
+  const s = Math.min(1, availW / natW, availH / natH);
+  shell.style.transform = s < 1 ? 'scale(' + s + ')' : 'none';
+  fit.style.width = (natW * s) + 'px';
+  fit.style.height = (natH * s) + 'px';
+}
+window.addEventListener('resize', fitShell);
+fitShell();
 
 /* Notificar ready al wrapper */
 notifyReady();
