@@ -449,6 +449,34 @@ html.in-iframe, html.in-iframe body {
 .cpu-loads { grid-column: 1 / -1; display: none; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 10px; }
 .cpu-loads.show { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
 
+/* Cambiar Parametros — login (clonado de p023): campo a la izquierda,
+   footer compacto de 1 botón (igual que Resultados Clasificación). */
+.login-body { flex: 1; display: flex; align-items: center; padding: 0 40px; gap: 20px; }
+.login-label { font-size: 15px; color: #ffffff; font-family: Arial, sans-serif; }
+.login-input { width: 220px; height: 30px; border: 1px solid #ffffff; background: #0a1d45; color: #ffffff; padding: 0 8px; font-family: 'Courier New', monospace; font-size: 14px; }
+
+/* Cambiar Parametros — editor árbol+lista+ayuda (clonado de p024/p133/p342).
+   Es UNA sola lista scrolleable con headers de zona intercalados (no 2
+   navegaciones separadas) — los chips "Ir a:" son un atajo agregado para
+   no scrollear ~150 filas a mano (el Z2 real no los tiene; documentado
+   como agregado deliberado en NAVEGACION.md/PR). */
+.param-editor { flex: 1; display: flex; overflow: hidden; }
+.param-list-col { flex: 1 1 56%; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.15); min-width: 0; }
+.param-jump { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; background: #0a1d45; border-bottom: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+.param-jump button { font-size: 10px; padding: 3px 7px; background: transparent; border: 1px solid rgba(255,255,255,0.35); color: #aaddff; cursor: pointer; border-radius: 2px; font-family: Arial, sans-serif; }
+.param-jump button:hover { background: rgba(255,255,255,0.12); }
+.param-list { flex: 1; overflow-y: auto; }
+.param-zone-header { padding: 9px 14px 5px; font-size: 13px; font-weight: bold; color: #ffffff; background: rgba(255,255,255,0.05); font-family: Arial, sans-serif; }
+.param-zone-header .tag { font-size: 9px; font-weight: normal; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 4px; margin-left: 6px; }
+.param-note { padding: 4px 14px 8px; font-size: 11px; color: #7fa8d0; font-style: italic; line-height: 1.5; }
+.param-row { display: flex; justify-content: space-between; padding: 4px 14px 4px 24px; font-size: 13px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.12); }
+.param-row:hover { background: rgba(255,255,255,0.05); }
+.param-row.sel { background: #143965; color: #ffffff; }
+.param-row .pv { color: #ffe8a3; }
+.param-help-col { flex: 1 1 44%; background: #ffffff; color: #13233c; padding: 14px; font-size: 13px; font-family: Arial, sans-serif; overflow-y: auto; line-height: 1.5; }
+.param-help-col .ph-key { font-weight: bold; font-family: 'Courier New', monospace; display: block; margin-bottom: 6px; color: #0a1d45; }
+.param-help-empty { color: #94a3b8; font-style: italic; }
+
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
    Grid: rc + numpad derecha, fkeys abajo
@@ -819,6 +847,41 @@ html.in-iframe, html.in-iframe body {
       </div>
     </div>
 
+    <!-- Cambiar Parametros — login, clonado de p023. Clave real = 8620
+         (docs/marelec-z2/parameters.md). Footer compacto 1-botón, igual
+         patrón que Resultados Clasificación. -->
+    <div class="panel" id="cambiar-parametros-login" data-title="Cambiar Parametros">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="login-body">
+        <span class="login-label">Introducir Clave</span>
+        <input type="password" class="login-input" id="clave-input" onkeydown="if(event.key==='Enter')intentarClave()">
+      </div>
+      <div class="btn-bar right"><button class="btn" onclick="goBack()">Salir</button></div>
+    </div>
+
+    <!-- Cambiar Parametros — editor árbol+lista+ayuda, clonado de p024
+         (StaticGrader raíz) / p133 (Z-Belt + Pocket 1-4 como hijos, confirmado
+         por breadcrumb real) / parameters.md (valores — ver nota de
+         integridad en el PR: p342 NO mostraba Pocket 1 al leerlo directo,
+         a pesar de que el manifiesto original lo marcaba así; se prefirió
+         la fuente ya curada y cruzada contra pantallazos propios). -->
+    <div class="panel" id="cambiar-parametros" data-title="Cambiar Parametros">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="param-editor">
+        <div class="param-list-col">
+          <div class="param-jump" id="param-jump"></div>
+          <div class="param-list" id="param-list"></div>
+        </div>
+        <div class="param-help-col" id="param-help"><span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span></div>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="goBack()">Cancelar</button>
+        <button class="btn" onclick="scrollList('param-list', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('param-list', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">OK</button>
+      </div>
+    </div>
+
     <!-- Velocidad cintas — clonado de p005. Reporte en vivo (Reset Stats),
          no config — los valores reales configurados viven en
          GraderPhysicalConfig (ver nota + Pendientes de medición en terreno
@@ -981,7 +1044,7 @@ const SERVICIO_ITEMS = [
   { label: 'Status memory', target: null },
   { label: 'Probar Entradas', target: 'probar-entradas' },
   { label: 'Probar Salidas', target: 'probar-salidas' },
-  { label: 'Cambiar Parametros', target: null },
+  { label: 'Cambiar Parametros', target: 'cambiar-parametros-login' },
   { label: 'Monitor CPU', target: 'monitor-cpu' },
   { label: 'Version Software', target: null },
   { label: 'Explorar CAN bus', target: null },
@@ -1088,6 +1151,237 @@ function habilitarVistasCpu() {
   document.getElementById('cpu-loads').classList.add('show');
   addLog('Habilitar vistas');
 }
+
+/* ══════════════════════════════════════════════════
+   CAMBIAR PARAMETROS — Login + editor árbol+lista+ayuda.
+
+   Clave real = 8620 (docs/marelec-z2/parameters.md § Identificación del
+   equipo). Valores de cada zona: cruzados entre parameters.md (barrido
+   curado 2026-04-17) y pantallazos propios (p024 root, p133 Z-Belt+Pocket
+   1-4 como hijos confirmados por breadcrumb). Z-Belt y Pocket 1 tienen la
+   mayor confianza (coinciden ambas fuentes exactamente); Pocket 2-4 son
+   un calco estructural de Pocket 1 con los campos que SÍ varían por
+   pocket (confirmado por muestreo, no por lectura pantallazo-a-pantallazo
+   de cada uno); System settings es una lista ABREVIADA (el nodo real
+   tiene ~70 parámetros — ver parameters.md para el detalle íntegro).
+══════════════════════════════════════════════════ */
+function intentarClave() {
+  const val = document.getElementById('clave-input').value;
+  if (val === '8620') {
+    document.getElementById('clave-input').value = '';
+    // El login se REEMPLAZA por el editor (no se apila) — si no, Cancelar/OK
+    // del editor volvería a pedir la clave en vez de volver a Servicio.
+    document.getElementById('cambiar-parametros-login').classList.remove('active');
+    screenStack.pop();
+    navigateTo('cambiar-parametros');
+  } else {
+    addLog('Clave incorrecta');
+  }
+}
+
+const POCKET_COMMON_FIELDS = [
+  ['defaultProduct', '0', ''], ['inpMode', '0', ''], ['outpMode', '0', ''],
+  ['inpButton5', '0', ''], ['inpButton6', '0', ''], ['inpButton7', '0', ''],
+  ['fsIncl1', '8388608', 'full scale inclinometer 1'], ['fsIncl2', '8388608', 'full scale inclinometer 2'],
+  ['zpIncl1', '0', 'zero point inclinometer 1'], ['zpIncl2', '0', 'zero point inclinometer 2'],
+  ['refTemp', '40', 'temperatura de referencia (°C)'],
+  ['tempCorFactor1', '10066', 'factor corrección temperatura 1'], ['tempCorFactor2', '10066', 'factor corrección temperatura 2'],
+  ['tempCorOffset1', '0', 'temperature sensitivity on the zero point of inclinometer 1'], ['tempCorOffset2', '0', ''],
+  ['canIdIncl', '0', ''], ['maxIncl', '15', 'inclinación máxima'], ['warmUp', '0', ''],
+  ['dx', '0', 'distance between gravity point of main and reference loadcell'], ['dy', '0', ''], ['dh', '0', ''],
+  ['fsRc', '0', ''], ['mWc', '0', ''], ['mRc', '0', ''], ['zpRc', '0', ''],
+  ['filter1', '60', 'FIR filter 1'], ['filter2', '70', 'setting of FIR filter 2'], ['filter3', '0', 'FIR filter 3'], ['filter4', '0', 'FIR filter 4'],
+  ['extraFilter', '1', ''], ['fastStepFilter', '0', ''], ['motComp', '0', 'motion compensation'], ['maxAcc', '0', ''],
+  ['altSteadyTolerance', '0', 'tolerance for alternative steady criterium. 0=default=disabled'],
+];
+
+function buildPocketZone(n, p) {
+  return {
+    id: `zone-pocket${n}`, label: `Pocket ${n}`, priority: 'P1', indent: true,
+    fields: [
+      ['outp', String(p.outp), 'output mapping'],
+      ['pos', String(p.pos), 'posición en la balanza (mm)'],
+      ['minOpen', String(p.minOpen), 'tiempo mínimo abierto (ms) — distinto de minFlipperOpenTime de la sorting belt'],
+      ['delayClose', String(p.delayClose), 'delay para cerrar (ms)'],
+      ['tWeighing', String(p.tWeighing), 'tiempo de pesaje (ms)'],
+      ['inpButton1', String(p.btn1), 'input of product selection button 1'],
+      ['inpButton2', String(p.btn2), ''],
+      ['inpButton3', String(p.btn3), ''],
+      ['inpButton4', String(p.btn4), ''],
+      ['canId', String(p.canId), 'CAN device ID del loadcell'],
+      ['fsWc', String(p.fsWc), 'fullscale weight correction (calibración con peso patrón)'],
+      ['zpWc', String(p.zpWc), 'zero point WC'],
+      ...POCKET_COMMON_FIELDS,
+    ],
+  };
+}
+
+const PARAM_ZONES = [
+  {
+    id: 'zone-system', label: 'System settings (StaticGrader)', priority: 'P2',
+    note: 'Lista abreviada — el nodo real tiene ~70 parámetros (IO/CAN remoto completo, señales de torre, display/resolución). Ver docs/marelec-z2/parameters.md para el detalle íntegro.',
+    fields: [
+      ['sernr', '3943', 'número de serie de la máquina'],
+      ['inpEmergency', '0', 'input of emergency stop circuit'],
+      ['inpAirSupply', '0', 'input aire comprimido'],
+      ['driveName1', 'Drive 1', ''], ['driveName2', 'Drive 2', ''], ['driveName3', 'Drive 3', ''],
+      ['comportLog', '1', ''],
+      ['pmsVersion', '2', ''],
+      ['modbusId', '0', 'Modbus slave ID (0 = disabled, set to enable Modbus)'],
+      ['unitProgram', 'g', 'unidad productos'],
+      ['unitBatch', 'kg', 'unidad lotes'],
+      ['factorBatch', '0.001', ''],
+      ['keyboardLayout', '0', '0=ABC, 1=AZERTY, 2=QWERTY'],
+      ['beltOverviewInterval', '0', 'Only products put on the belt in this interval (0=disable, range 5-3600 s)'],
+      ['maintenanceAlarm', '0', 'horas antes de alarma de mantención'],
+      ['loadDefaultProgram', '0', '0: Load last active program at startup, 1: Load first program from programdefault.xml at startup, 2: same as 1 but load and display programs from regular program.xml afterwards'],
+      ['canIdIo1', '51', 'can id for input/output 205-212'],
+      ['canIdIo2', '52', ''], ['canIdIo3', '53', ''], ['canIdIo4', '54', ''], ['canIdIo5', '55', ''], ['canIdIo6', '56', ''], ['canIdIo7', '57', ''],
+      ['outpSignalGreen', '0', ''], ['outpSignalOrange', '0', ''], ['outpSignalRed', '0', ''], ['outpSignalWhite', '0', ''], ['outpSignalEmergency', '0', ''],
+      ['dispRes', '10', 'display resolution (g)'],
+      ['tSteady', '300', 'tiempo estabilización (ms)'],
+      ['minWeight', '300', 'peso mínimo aceptado (g)'],
+    ],
+  },
+  {
+    id: 'zone-zbelt', label: 'Z-Belt', priority: 'P1',
+    fields: [
+      ['inpPulse', '4', 'input pulse encoder'],
+      ['inpPulse2', '0', ''],
+      ['deltaI', '815', ''],
+      ['deltaIdiv', '1444', ''],
+      ['noEncoderMode', '0', ''],
+      ['simulSpeed', '0', ''],
+      ['length', '5800', 'largo cinta (mm)'],
+      ['outpFlash', '0', 'output flash light when product arrives'],
+      ['finalBelt', '0', ''],
+      ['canId', '0', ''],
+      ['olg', '1500', ''],
+      ['pg', '0', ''], ['ig', '1000', ''], ['dg', '0', ''],
+      ['mino', '100', ''], ['maxo', '700', ''],
+      ['inpStartStop', '0', 'input start/stop circuit'],
+      ['minSpeed', '100', 'mm/s'],
+      ['maxSpeed', '420', 'mm/s (= 0.42 m/s) — cinta elevadora entre pocket y aceleradores. Ver GraderPhysicalConfig.belts[zeta].'],
+      ['bdcMotor', '0', 'tipo de motor'],
+      ['daChannel', '1', 'canal analógico salida'],
+      ['initialSpeed', '0', ''],
+      ['acceleration', '100', 'mm/s²'],
+      ['deceleration', '100', 'mm/s² — solo si bdcMotor=AMDC'],
+      ['reverse', '0', '0=normal, 1=reverse (motor type 2&5)'],
+      ['inpEye', '1', 'input de fotocelda'],
+      ['dropPos', '0', ''], ['minCompartment', '0', ''], ['skipCompartments', '0', ''],
+    ],
+  },
+  buildPocketZone(1, { outp: 1, pos: 550,  minOpen: 600, delayClose: 700, tWeighing: 1000, canId: 11, fsWc: 273947, zpWc: 864997, btn1: 101, btn2: 102, btn3: 103, btn4: 104 }),
+  buildPocketZone(2, { outp: 2, pos: 970,  minOpen: 500, delayClose: 700, tWeighing: 1000, canId: 12, fsWc: 292162, zpWc: 781699, btn1: 109, btn2: 110, btn3: 111, btn4: 112 }),
+  buildPocketZone(3, { outp: 3, pos: 1390, minOpen: 470, delayClose: 700, tWeighing: 1000, canId: 13, fsWc: 286450, zpWc: 750139, btn1: 117, btn2: 118, btn3: 119, btn4: 120 }),
+  buildPocketZone(4, { outp: 4, pos: 1820, minOpen: 500, delayClose: 700, tWeighing: 900,  canId: 14, fsWc: 288832, zpWc: 761990, btn1: 125, btn2: 126, btn3: 127, btn4: 128 }),
+  {
+    id: 'zone-accel1', label: 'Acceleration belt 1', priority: 'P2',
+    fields: [
+      ['inpPulse', '5', 'input pulse encoder'], ['inpPulse2', '5', ''],
+      ['deltaI', '52000', 'delta encoder por revolución'], ['deltaIdiv', '39623', 'divisor delta'],
+      ['noEncoderMode', '0', ''], ['simulSpeed', '0', ''],
+      ['length', '1000', 'largo cinta (mm)'], ['outpFlash', '0', 'output flash light when product arrives'],
+      ['accelerationPoint', '0', ''], ['finalBelt', '0', ''],
+    ],
+  },
+  {
+    id: 'zone-accel2', label: 'Acceleration belt 2', priority: 'P2',
+    fields: [
+      ['inpPulse', '6', ''], ['inpPulse2', '5', ''],
+      ['deltaI', '52000', ''], ['deltaIdiv', '31219', ''],
+      ['noEncoderMode', '0', ''], ['simulSpeed', '0', ''],
+      ['length', '3190', ''], ['outpFlash', '16', ''],
+      ['accelerationPoint', '0', ''], ['finalBelt', '0', ''],
+    ],
+  },
+  {
+    id: 'zone-sorting', label: 'Sorting belt with batching', priority: 'P1',
+    fields: [
+      ['minSpeed', '50', 'mm/s — velocidad mínima'],
+      ['maxSpeed', '700', 'mm/s (= 0.70 m/s) — la "grading belt". Ver GraderPhysicalConfig.belts[main].'],
+      ['initialSpeed', '0', ''],
+      ['acceleration', '100', 'mm/s²'], ['deceleration', '100', 'mm/s² — solo si bdcMotor=AMDC'],
+      ['bdcMotor', '0', 'tipo de motor'], ['daChannel', '1', 'canal analógico salida'],
+      ['reverse', '0', '0=normal, 1=reverse (motor type 2&5)'], ['inpStartStop', '0', 'input start/stop circuit'],
+      ['delayFlipperOpen', '150', 'ms delay to open flipper before product'],
+      ['delayFlipperClose', '150', 'ms delay to close flipper after product'],
+      ['minFlipperOpenTime', '350', 'ms, minimum open flipper time for product'],
+      ['fixedOpenFlipper', '0', 'abrir con tiempo fijo'], ['triggerPointFlipper', '0', ''],
+      ['numGates', '12', 'número total de gates'], ['posGate1', '2', 'posición gate 1'],
+      ['inp1', '133', 'input gate 1 (mapeo CAN)'], ['inp2', '134', ''], ['inp3', '135', ''], ['inp4', '136', ''],
+      ['inp5', '137', ''], ['inp6', '138', ''], ['inp7', '139', ''], ['inp8', '140', ''],
+      ['inp9', '141', ''], ['inp10', '142', ''], ['inp11', '143', ''], ['inp12', '152', ''],
+      ['inpEyeSync', '3', 'input sensor 1'],
+      ['disEyeSync', '425', 'mm — distance from beginning of belt to sync eye'],
+      ['eyeSyncMinLength', '10', 'largo mínimo detectado'], ['eyeSyncMaxDender', '400', ''], ['maxDif', '1800', ''],
+      ['inpEyeSync2', '0', 'sensor 2 (no usado)'],
+      ['inpEyeSync3', '0', '3rd input of the eye for re-synchronisation, in the middle of the sorting belt'],
+      ['minimumGate2', '0', ''],
+      ['rejectNoSync', '1', 'rechaza si no hay sync'],
+      ['rejectOnlyNonWeighed', '0', '1=use reject gate only for products not weighed'],
+      ['defaultRejectGate', '0', 'gate de rechazo'],
+      ['minHeadTail', '0', ''], ['inpIncomingLotNr', '0', ''], ['incomingLotNrDelay', '0', ''],
+      ['outgoingLotNrAutoreset', '0', ''], ['sortAlgorithm', '0', ''], ['fuzzySorting', '0', ''],
+      ['outpFlipper1', '133', 'output por flipper (coincide con inp1-12)'], ['outpFlipper12', '152', ''],
+      ['delayBeforeGateClose', '400', 'ms'], ['delayGateClose', '500', 'ms'], ['minGateOpen', '0', 'ms'],
+      ['maxBinWeight', '25000', 'g (25 kg) — max weight inside the batch bin'],
+      ['disableFlip12', '0', 'deshabilitar flipper 12'], ['testMode', '0', ''],
+      ['flowRateInterval', '0', ''], ['flowRateAlgorithm', '0', ''], ['flipTimeWarning', '0', ''],
+      ['ftpLogServer', 'ftp.marelec.com', 'servidor FTP para logs'],
+      ['spread', '1', ''], ['autoOpen', '0', ''], ['allowManualClose', '1', ''], ['blockGUIClosing', '0', ''],
+      ['sendBatch', '2', ''], ['idleWarning', '0', ''], ['virtualBatchingWarning', '100', ''], ['indicateBatchWaiting', '0', ''],
+      ['wFeedbackMode', '0', ''], ['wFeedbackDelay', '0', ''],
+      ['wFeedbackMaxStabilizationTime', '2000', '2 s'], ['wFeedbackAfterZeroMargin', '0', ''],
+      ['wFeedbackSimulOffset', '0', ''], ['wFeedbackSimulStdev', '10', ''], ['wFeedbackSimulOffsetRate', '100', ''],
+      ['wFeedbackUnderLimit', '0', ''],
+      ['wFeedbackUpperLimit', '0', 'Relative upper limit for accepting weight correction (10th of percent)'],
+    ],
+  },
+];
+
+function selectParamRow(row, key, value, help) {
+  document.querySelectorAll('#param-list .param-row.sel').forEach(r => r.classList.remove('sel'));
+  row.classList.add('sel');
+  const panel = document.getElementById('param-help');
+  panel.innerHTML = help
+    ? `<span class="ph-key">${key}</span>${help}`
+    : `<span class="ph-key">${key}</span><span class="param-help-empty">Sin descripción documentada.</span>`;
+}
+
+function buildParamEditor() {
+  const list = document.getElementById('param-list');
+  const jump = document.getElementById('param-jump');
+  PARAM_ZONES.forEach(zone => {
+    const jumpBtn = document.createElement('button');
+    jumpBtn.textContent = zone.label;
+    jumpBtn.onclick = () => document.getElementById(zone.id).scrollIntoView({ block: 'start', behavior: 'smooth' });
+    jump.appendChild(jumpBtn);
+
+    const header = document.createElement('div');
+    header.className = 'param-zone-header';
+    header.id = zone.id;
+    header.innerHTML = `${zone.label}<span class="tag">${zone.priority}</span>`;
+    list.appendChild(header);
+
+    if (zone.note) {
+      const note = document.createElement('div');
+      note.className = 'param-note';
+      note.textContent = zone.note;
+      list.appendChild(note);
+    }
+
+    zone.fields.forEach(([key, value, help]) => {
+      const row = document.createElement('div');
+      row.className = 'param-row';
+      row.innerHTML = `<span>${key}</span><span class="pv">${value}</span>`;
+      row.addEventListener('click', () => selectParamRow(row, key, value, help));
+      list.appendChild(row);
+    });
+  });
+}
+buildParamEditor();
 
 /* ══════════════════════════════════════════════════
    DICCIONARIO BILINGÜE — Fase 3 (arranca acá, se centraliza más
