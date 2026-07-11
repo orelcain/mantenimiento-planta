@@ -477,6 +477,19 @@ html.in-iframe, html.in-iframe body {
 .param-help-col .ph-key { font-weight: bold; font-family: 'Courier New', monospace; display: block; margin-bottom: 6px; color: #0a1d45; }
 .param-help-empty { color: #94a3b8; font-style: italic; }
 
+/* Explorador CAN — tabla de 5 columnas (clonado de p018/p020/p021) */
+.can-table { flex: 1; overflow-y: auto; }
+.can-row-head, .can-row {
+  display: grid;
+  grid-template-columns: 56px 64px 1fr 112px 92px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+}
+.can-row-head { color: #ffffff; font-weight: bold; background: #1F618D; position: sticky; top: 0; }
+.can-row { color: #9fb7d4; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.can-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
+
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
    Grid: rc + numpad derecha, fkeys abajo
@@ -882,6 +895,24 @@ html.in-iframe, html.in-iframe body {
       </div>
     </div>
 
+    <!-- Explorador CAN — clonado de p018/p020/p021. Tabla de dispositivos
+         CAN conectados + "Localizar ID's aleatorias" (resultado ESTÁTICO,
+         el mismo del pantallazo real — el Z2 real lo randomiza cada vez,
+         acá se replay del ejemplo capturado, no una simulación real). -->
+    <div class="panel" id="explorador-can" data-title="Explorador CAN">
+      <div class="title-row"><div class="title-bar crumb"></div></div>
+      <div class="can-table" id="can-table">
+        <div class="can-row-head"><span>Id</span><span>Real Id</span><span>Label</span><span>Version</span><span>CRC</span></div>
+        <div id="can-rows"></div>
+      </div>
+      <div class="btn-bar">
+        <button class="btn" onclick="localizarIdsAleatorias()">Localizar ID's aleatorias</button>
+        <button class="btn" onclick="scrollList('can-table', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('can-table', -1)">Arriba</button>
+        <button class="btn" onclick="goBack()">Salir</button>
+      </div>
+    </div>
+
     <!-- Velocidad cintas — clonado de p005. Reporte en vivo (Reset Stats),
          no config — los valores reales configurados viven en
          GraderPhysicalConfig (ver nota + Pendientes de medición en terreno
@@ -1047,7 +1078,7 @@ const SERVICIO_ITEMS = [
   { label: 'Cambiar Parametros', target: 'cambiar-parametros-login' },
   { label: 'Monitor CPU', target: 'monitor-cpu' },
   { label: 'Version Software', target: null },
-  { label: 'Explorar CAN bus', target: null },
+  { label: 'Explorar CAN bus', target: 'explorador-can' },
   { label: 'Activar Software', target: null },
   { label: 'Estado Certificación', target: null },
 ];
@@ -1382,6 +1413,57 @@ function buildParamEditor() {
   });
 }
 buildParamEditor();
+
+/* ══════════════════════════════════════════════════
+   EXPLORADOR CAN — clonado de p018 (lista base) / p020 (continuación) /
+   p021 (resultado de "Localizar ID's aleatorias"). 10 dispositivos
+   confirmados en pantallazo (Idlo2 NO capturado en el PDF entre Idlo1 e
+   Idlo3 — se omite en vez de inventarlo).
+══════════════════════════════════════════════════ */
+const CAN_DEVICES_BASE = [
+  { id: 11, real: 11, label: 'Pocket 1', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 12, real: 12, label: 'Pocket 2', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 13, real: 13, label: 'Pocket 3', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 14, real: 14, label: 'Pocket 4', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 51, real: 51, label: 'Idlo1', version: 'CANIO V1.04', crc: '' },
+  { id: 53, real: 53, label: 'Idlo3', version: 'CANIO V1.04', crc: '' },
+  { id: 54, real: 54, label: 'Idlo4', version: 'CANIO V1.04', crc: '' },
+  { id: 55, real: 55, label: 'Idlo5', version: 'CANIO V1.04', crc: '' },
+  { id: 56, real: 56, label: 'Idlo6', version: 'CANIO V1.04', crc: '' },
+  { id: 57, real: 57, label: 'Idlo7', version: 'CANIO V1.04', crc: '' },
+];
+
+/* Resultado real capturado en p021 tras presionar el botón — el Z2 real
+   randomiza cada vez; acá se replay del ejemplo del pantallazo (estático,
+   no una simulación de aleatoriedad real). */
+const CAN_DEVICES_LOCALIZADOS = [
+  { id: 47,  real: 13, label: '', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 86,  real: 57, label: '', version: 'CANIO V1.04',  crc: '' },
+  { id: 93,  real: 12, label: '', version: 'CANAD V2.0.2', crc: '39B69569' },
+  { id: 99,  real: 55, label: '', version: 'CANIO V1.04',  crc: '' },
+  { id: 104, real: 56, label: '', version: 'CANIO V1.04',  crc: '' },
+];
+
+function renderCanDevices(devices) {
+  const rows = document.getElementById('can-rows');
+  rows.innerHTML = '';
+  devices.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'can-row' + (i === 0 ? ' sel' : '');
+    row.innerHTML = `<span>${d.id}</span><span>${d.real}</span><span>${d.label}</span><span>${d.version}</span><span>${d.crc}</span>`;
+    row.addEventListener('click', () => {
+      rows.querySelectorAll('.can-row.sel').forEach(r => r.classList.remove('sel'));
+      row.classList.add('sel');
+    });
+    rows.appendChild(row);
+  });
+}
+renderCanDevices(CAN_DEVICES_BASE);
+
+function localizarIdsAleatorias() {
+  renderCanDevices(CAN_DEVICES_LOCALIZADOS);
+  addLog("Localizar ID's aleatorias");
+}
 
 /* ══════════════════════════════════════════════════
    DICCIONARIO BILINGÜE — Fase 3 (arranca acá, se centraliza más
