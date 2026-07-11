@@ -455,28 +455,29 @@ html.in-iframe, html.in-iframe body {
 .login-label { font-size: 15px; color: #ffffff; font-family: Arial, sans-serif; }
 .login-input { width: 220px; height: 30px; border: 1px solid #ffffff; background: #0a1d45; color: #ffffff; padding: 0 8px; font-family: 'Courier New', monospace; font-size: 14px; }
 
-/* Cambiar Parametros — editor árbol+lista+ayuda (clonado de p024/p133/p342).
-   Es UNA sola lista scrolleable con headers de zona intercalados (no 2
-   navegaciones separadas) — mantiene el árbol real de la Z2 (Pocket 1-4
-   como hijos de Z-Belt, Z-Belt/Accel1/Accel2/Sorting belt como hijos de
-   StaticGrader) con expand/collapse real, no una lista plana de 338
-   filas de una — feedback de Orel 2026-07-10 tras ver el preview. */
+/* Cambiar Parametros — editor árbol acordeón (clonado de p024/p133/p342).
+   UNA sola caja scrolleable: clickear un nodo (zona) despliega sus
+   parámetros INLINE justo debajo de ese nodo (indentado), no en un panel
+   aparte — feedback de Orel 2026-07-10 (dos rondas) tras ver el preview
+   real: primero pidió que el árbol se contraiga/expanda de verdad
+   (no chips), después que el contenido aparezca bajo el nodo clickeado
+   en vez de en una segunda caja separada arriba/abajo. Mantiene el árbol
+   real de la Z2 (Pocket 1-4 como hijos de Z-Belt). Varios nodos pueden
+   estar abiertos a la vez (acordeón múltiple, no selección única). */
 .param-editor { flex: 1; display: flex; overflow: hidden; }
 .param-list-col { flex: 1 1 56%; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.15); min-width: 0; }
-.param-tree { max-height: 42%; overflow-y: auto; background: #0a1d45; border-bottom: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; padding: 4px 0; }
-.tree-node { display: flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; color: #aaddff; cursor: pointer; font-family: Arial, sans-serif; white-space: nowrap; }
+.param-tree { flex: 1; overflow-y: auto; background: #0a1d45; padding: 4px 0; }
+.tree-node { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; color: #aaddff; cursor: pointer; font-family: Arial, sans-serif; }
 .tree-node:hover { background: rgba(255,255,255,0.08); }
 .tree-node.sel { background: #143965; color: #ffffff; font-weight: 600; }
 .tree-node .caret { width: 11px; flex-shrink: 0; text-align: center; font-size: 9px; color: #7fa8d0; }
 .tree-node .tag { font-size: 8px; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 3px; margin-left: 4px; }
-.tree-node.depth-1 { padding-left: 26px; }
-.tree-children { display: none; }
-.tree-children.open { display: block; }
-.param-list { flex: 1; overflow-y: auto; }
-.param-zone-header { padding: 9px 14px 5px; font-size: 13px; font-weight: bold; color: #ffffff; background: rgba(255,255,255,0.05); font-family: Arial, sans-serif; }
-.param-zone-header .tag { font-size: 9px; font-weight: normal; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 4px; margin-left: 6px; }
-.param-note { padding: 4px 14px 8px; font-size: 11px; color: #7fa8d0; font-style: italic; line-height: 1.5; }
-.param-row { display: flex; justify-content: space-between; padding: 4px 14px 4px 24px; font-size: 13px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.12); }
+/* .tree-content anida por DOM (cada nivel agrega su propio padding-left +
+   borde), así Pocket N queda indentado bajo Z-Belt sin clases por depth. */
+.tree-content { display: none; padding-left: 15px; margin-left: 14px; border-left: 1px solid rgba(255,255,255,0.10); }
+.tree-content.open { display: block; }
+.param-note { padding: 4px 10px 6px; font-size: 10px; color: #7fa8d0; font-style: italic; line-height: 1.4; }
+.param-row { display: flex; justify-content: space-between; padding: 3px 10px; font-size: 12px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.10); }
 .param-row:hover { background: rgba(255,255,255,0.05); }
 .param-row.sel { background: #143965; color: #ffffff; }
 .param-row .pv { color: #ffe8a3; }
@@ -890,14 +891,13 @@ html.in-iframe, html.in-iframe body {
       <div class="param-editor">
         <div class="param-list-col">
           <div class="param-tree" id="param-tree"></div>
-          <div class="param-list" id="param-list"></div>
         </div>
         <div class="param-help-col" id="param-help"><span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span></div>
       </div>
       <div class="btn-bar">
         <button class="btn" onclick="goBack()">Cancelar</button>
-        <button class="btn" onclick="scrollList('param-list', 1)">Abajo</button>
-        <button class="btn" onclick="scrollList('param-list', -1)">Arriba</button>
+        <button class="btn" onclick="scrollList('param-tree', 1)">Abajo</button>
+        <button class="btn" onclick="scrollList('param-tree', -1)">Arriba</button>
         <button class="btn" onclick="goBack()">OK</button>
       </div>
     </div>
@@ -1380,7 +1380,7 @@ const PARAM_ZONES = [
 ];
 
 function selectParamRow(row, key, value, help) {
-  document.querySelectorAll('#param-list .param-row.sel').forEach(r => r.classList.remove('sel'));
+  document.querySelectorAll('#param-tree .param-row.sel').forEach(r => r.classList.remove('sel'));
   row.classList.add('sel');
   const panel = document.getElementById('param-help');
   panel.innerHTML = help
@@ -1388,87 +1388,66 @@ function selectParamRow(row, key, value, help) {
     : `<span class="ph-key">${key}</span><span class="param-help-empty">Sin descripción documentada.</span>`;
 }
 
-/** Pinta SOLO los campos de la zona elegida en #param-list — no las 338
-    filas de todas las zonas juntas. Resetea el panel de ayuda (los
-    campos son de otra zona, la descripción anterior ya no aplica). */
-function selectZone(zoneId) {
-  document.querySelectorAll('#param-tree .tree-node.sel').forEach(n => n.classList.remove('sel'));
-  document.querySelector(`#param-tree .tree-node[data-zone-id="${zoneId}"]`)?.classList.add('sel');
+/** Construye UN nodo del árbol acordeón: la fila del nodo + su contenido
+    (nota + campos propios + hijos anidados recursivos) en un solo
+    contenedor `.tree-content` que se abre/cierra con un click en la fila
+    — el contenido aparece DEBAJO del nodo clickeado, no en un panel
+    aparte (feedback de Orel 2026-07-10, segunda ronda). Como
+    `.tree-content` es un div normal anidado por DOM, cada nivel agrega
+    su propia indentación (CSS) sin necesitar clases por profundidad.
+    Varios nodos pueden estar abiertos a la vez — no hay selección única. */
+function renderZoneNode(zone) {
+  const children = PARAM_ZONES.filter(z => z.parent === zone.id);
+  const wrapper = document.createElement('div');
 
-  const zone = PARAM_ZONES.find(z => z.id === zoneId);
-  const list = document.getElementById('param-list');
-  list.innerHTML = '';
+  const node = document.createElement('div');
+  node.className = 'tree-node';
+  node.dataset.zoneId = zone.id;
+  node.innerHTML = `<span class="caret">▸</span><span>${zone.label}</span><span class="tag">${zone.priority}</span>`;
+  wrapper.appendChild(node);
 
-  const header = document.createElement('div');
-  header.className = 'param-zone-header';
-  header.innerHTML = `${zone.label}<span class="tag">${zone.priority}</span>`;
-  list.appendChild(header);
+  const content = document.createElement('div');
+  content.className = 'tree-content';
 
   if (zone.note) {
     const note = document.createElement('div');
     note.className = 'param-note';
     note.textContent = zone.note;
-    list.appendChild(note);
+    content.appendChild(note);
   }
 
   zone.fields.forEach(([key, value, help]) => {
     const row = document.createElement('div');
     row.className = 'param-row';
     row.innerHTML = `<span>${key}</span><span class="pv">${value}</span>`;
-    row.addEventListener('click', () => selectParamRow(row, key, value, help));
-    list.appendChild(row);
+    row.addEventListener('click', (e) => {
+      e.stopPropagation(); // no togglear el nodo padre al clickear un campo
+      selectParamRow(row, key, value, help);
+    });
+    content.appendChild(row);
   });
 
-  document.getElementById('param-help').innerHTML = '<span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span>';
-}
+  children.forEach(child => content.appendChild(renderZoneNode(child)));
+  wrapper.appendChild(content);
 
-/** Construye UN nodo del árbol (con sus hijos anidados, recursivo — hoy
-    solo Z-Belt tiene hijos, Pocket 1-4, pero soporta más niveles). */
-function renderTreeNode(zone, depth) {
-  const children = PARAM_ZONES.filter(z => z.parent === zone.id);
-  const wrapper = document.createElement('div');
-
-  const node = document.createElement('div');
-  node.className = `tree-node depth-${depth}`;
-  node.dataset.zoneId = zone.id;
-  const caretChar = children.length ? '▾' : '';
-  node.innerHTML = `<span class="caret">${caretChar}</span><span>${zone.label}</span><span class="tag">${zone.priority}</span>`;
-  wrapper.appendChild(node);
-
-  let childrenEl = null;
-  if (children.length) {
-    childrenEl = document.createElement('div');
-    childrenEl.className = 'tree-children open';
-    children.forEach(c => childrenEl.appendChild(renderTreeNode(c, depth + 1)));
-    wrapper.appendChild(childrenEl);
-  }
-
-  // Click en la fila = seleccionar (no togglea). Click en el caret =
-  // SOLO abrir/cerrar (no cambia la selección) — dos acciones separadas,
-  // no un combo confuso donde ver los parámetros de Z-Belt a veces te
-  // abre o cierra Pocket 1-4 como efecto secundario.
-  node.addEventListener('click', () => selectZone(zone.id));
-  if (childrenEl) {
-    const caretEl = node.querySelector('.caret');
-    caretEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      childrenEl.classList.toggle('open');
-      caretEl.textContent = childrenEl.classList.contains('open') ? '▾' : '▸';
-    });
-  }
+  const caretEl = node.querySelector('.caret');
+  node.addEventListener('click', () => {
+    const isOpen = content.classList.toggle('open');
+    node.classList.toggle('sel', isOpen);
+    caretEl.textContent = isOpen ? '▾' : '▸';
+  });
 
   return wrapper;
 }
 
-/** Árbol real (expand/collapse), no chips horizontales — feedback de
-    Orel 2026-07-10 tras ver el preview: la Z2 real mantiene el orden
-    con un árbol que se contrae, no una cabecera plana con todas las
-    zonas listadas. Arranca con "System settings" seleccionado. */
+/** Árbol acordeón real (no chips, no panel separado) — feedback de Orel
+    2026-07-10 en dos rondas: primero pidió expand/collapse de verdad
+    (Pocket 1-4 como hijos reales de Z-Belt), después que el contenido
+    aparezca inline bajo el nodo clickeado en vez de en una segunda caja. */
 function buildParamTree() {
   const tree = document.getElementById('param-tree');
   const topLevel = PARAM_ZONES.filter(z => !z.parent);
-  topLevel.forEach(zone => tree.appendChild(renderTreeNode(zone, 0)));
-  selectZone('zone-system');
+  topLevel.forEach(zone => tree.appendChild(renderZoneNode(zone)));
 }
 buildParamTree();
 
