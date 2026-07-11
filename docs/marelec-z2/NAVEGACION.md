@@ -279,9 +279,17 @@ cola de medición en terreno).
   - Diccionario bilingüe sigue sin centralizar (deuda ya documentada arriba).
 - ✅ **Explorador CAN**: [PR #191](https://github.com/orelcain/mantenimiento-planta/pull/191) (`feat/hmi-grader-explorar-canbus`, apilado sobre #190). Tabla de 10 dispositivos CAN + "Localizar ID's aleatorias" (replay estático del resultado real de `p021.png`, no randomiza en vivo). **Última pantalla de Servicio con fuente visual real** — Idioma, Ajustes Red, Mostrar eventos de sistema y Ajustar Fecha y hora NO tienen pantallazo (el PDF nunca los abrió), quedan confirmados fuera de alcance.
 
-## Estado del clon: todo lo P1 + casi todo lo con fuente visual, cubierto
+## Iteración de UX en vivo sobre Cambiar Parametros — PR #192, #193, #194
 
-Con PR #191, el clon cubre: Home, Menu, Servicio, Velocidad cintas, Resultados Clasificación, Probar Entradas, Probar Salidas, Monitor CPU, Explorador CAN, y el editor completo de Cambiar Parametros (9 zonas). Lo único que falta tiene una razón concreta:
+Orel corrió el preview él mismo (algo que la herramienta de captura de la sesión no pudo hacer) y pidió 4 ajustes en cadena sobre la misma pantalla:
+1. **[PR #192]** el teclado global interceptaba lo tipeado en el campo de clave (escribía en el indicador de peso) → fix: ignorar el listener global cuando el foco está en un `<input>` real.
+2. **[PR #192]** el árbol no se contraía/expandía de verdad (chips horizontales) → rediseñado a árbol vertical con `parent` real (Pocket 1-4 como hijos de Z-Belt).
+3. **[PR #193]** el contenido de una zona aparecía en un panel separado, no debajo del nodo → rediseñado a acordeón de una sola caja (fusiona árbol+lista, contenido inline, varios nodos abiertos a la vez).
+4. **[PR #194]** el nodo "System settings" decía "lista abreviada" (P2) → completado de 28 a **133 parámetros reales** (todo lo que `parameters.md` documenta de esa zona: emergencia, drives, buzzer/torre de señales, botones de programa, display/resolución, CAN I/O mapping — cero valores inventados).
+
+## Estado del clon: TODO lo con fuente visual, cubierto e ÍNTEGRO (no abreviado)
+
+Con PR #194, el clon cubre: Home, Menu, Servicio, Velocidad cintas, Resultados Clasificación, Probar Entradas, Probar Salidas, Monitor CPU, Explorador CAN, y el editor completo de Cambiar Parametros (9 zonas, ~416 parámetros totales entre las 9 — ninguna zona queda abreviada). Lo único que falta tiene una razón concreta:
 - **Sin pantallazo fuente** (no clonable): Estado, Idioma, Ajustes Red, Mostrar eventos de sistema, Ajustar Fecha y hora, Optimizar filtro, Ajustar unidad de peso, Traceability Settings, Show EyeSync/Statistics, autochange BLDC, Status memory, Version Software, Activar Software, Estado Certificación, Printers, Cambiar Claves, Edit Species, Ajustar datos, Enable/Disable Stations, Maintenance counters.
 - **Deuda técnica, no pantalla nueva**: reconciliar `GLOSSARY_EN_ES` (inline en el HTML) con `labelForField()`/`graderGlossary.ts` (lado React) en un único diccionario.
 
