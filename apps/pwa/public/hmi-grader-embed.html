@@ -487,6 +487,8 @@ html.in-iframe, html.in-iframe body {
 .param-help-col { flex: 1 1 44%; background: #ffffff; color: #13233c; padding: 14px; font-size: 13px; font-family: Arial, sans-serif; overflow-y: auto; line-height: 1.5; }
 .param-help-col .ph-key { font-weight: bold; font-family: 'Courier New', monospace; display: block; margin-bottom: 6px; color: #0a1d45; }
 .param-help-empty { color: #94a3b8; font-style: italic; }
+.param-help-col .ph-en { display: block; color: #13233c; }
+.param-help-col .ph-es { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dde3ea; color: #5a6b7f; }
 
 /* Explorador CAN — tabla de 5 columnas (clonado de p018/p020/p021) */
 .can-table { flex: 1; overflow-y: auto; }
@@ -1618,13 +1620,33 @@ const PARAM_ZONES = [
   },
 ];
 
+/* Diccionario de traducción de las definiciones (inglés real del Z2 → español).
+   Se completa en bloque; el panel muestra inglés arriba + traducción abajo. */
+const HELP_ES = {
+  'Input of speed sensor': 'Entrada del sensor de velocidad',
+  'Second input of speed sensor / encoder': 'Segunda entrada del sensor de velocidad / encoder',
+  'factor for the speed measurement': 'Factor de la medición de velocidad',
+  'Length of the belt (mm)': 'Largo de la cinta (mm)',
+  'serial number of the system': 'Número de serie del sistema',
+  '0 = Z2, 1 = Z4': '0 = Z2, 1 = Z4',
+  'Output to open pocket': 'Salida para abrir el pocket',
+  'mm, distance from eye to center of pocket': 'mm, distancia del ojo al centro del pocket',
+  'Minimum time to be open (ms)': 'Tiempo mínimo abierto (ms)',
+  'Id of the weighing module on the CAN bus': 'ID del módulo de pesaje en el bus CAN',
+  'input of emergency stop circuit': 'Entrada del circuito de parada de emergencia',
+  'output for emergency signal light': 'Salida para la luz de señal de emergencia',
+  'Maximum inclination': 'Inclinación máxima',
+  '0 = 8 output mode (output 101-108), 1 = 12 output mode (output 101-112)': '0 = modo 8 salidas (101-108), 1 = modo 12 salidas (101-112)',
+};
+
 function selectParamRow(row, key, value, help) {
   document.querySelectorAll('#param-tree .sel').forEach(r => r.classList.remove('sel'));
   row.classList.add('sel');
   const panel = document.getElementById('param-help');
-  panel.innerHTML = help
-    ? `<span class="ph-key">${key}</span>${help}`
-    : `<span class="ph-key">${key}</span><span class="param-help-empty">Sin descripción documentada.</span>`;
+  const es = help ? (HELP_ES[help] || '') : '';
+  panel.innerHTML = `<span class="ph-key">${key}</span>`
+    + (help ? `<span class="ph-en">${help}</span>` : `<span class="param-help-empty">Sin descripción documentada.</span>`)
+    + (es ? `<span class="ph-es">${es}</span>` : '');
 }
 
 /** Construye UN nodo del árbol acordeón: la fila del nodo + su contenido
