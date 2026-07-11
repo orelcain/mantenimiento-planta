@@ -474,8 +474,9 @@ html.in-iframe, html.in-iframe body {
 .tree-node .tag { font-size: 8px; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 3px; margin-left: 4px; }
 /* .tree-content anida por DOM (cada nivel agrega su propio padding-left +
    borde), así Pocket N queda indentado bajo Z-Belt sin clases por depth. */
-.tree-content { display: none; padding-left: 15px; margin-left: 14px; border-left: 1px solid rgba(255,255,255,0.10); }
-.tree-content.open { display: block; }
+/* Lista lineal fiel al Z2 real (Orel 2026-07-11): todo el árbol visible SIEMPRE
+   (sin colapsar), indentación sutil por nivel, sin líneas de árbol — como p024/p133. */
+.tree-content { display: block; padding-left: 12px; }
 .param-note { padding: 4px 10px 6px; font-size: 10px; color: #7fa8d0; font-style: italic; line-height: 1.4; }
 .param-row { display: flex; justify-content: space-between; padding: 3px 10px; font-size: 12px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.10); }
 .param-row:hover { background: rgba(255,255,255,0.05); }
@@ -1260,7 +1261,7 @@ function buildPocketZone(n, p) {
       ['outp', String(p.outp), 'Output to open pocket'],
       ['pos', String(p.pos), 'mm, distance from eye to center of pocket'],
       ['minOpen', String(p.minOpen), 'Minimum time to be open (ms)'],
-      ['delayClose', String(p.delayClose), 'ms, delay to start weighing after closing pocket'],
+      ['delayClose', String(p.delayClose ?? 700), 'ms, delay to start weighing after closing pocket (parameters.md: 700)'],
       ['defaultProduct', '0', ''],
       ['inpMode', '0', 'input to switch mode of default product selection'],
       ['outpMode', '0', ''],
@@ -1612,7 +1613,7 @@ const PARAM_ZONES = [
 ];
 
 function selectParamRow(row, key, value, help) {
-  document.querySelectorAll('#param-tree .param-row.sel').forEach(r => r.classList.remove('sel'));
+  document.querySelectorAll('#param-tree .sel').forEach(r => r.classList.remove('sel'));
   row.classList.add('sel');
   const panel = document.getElementById('param-help');
   panel.innerHTML = help
@@ -1635,7 +1636,7 @@ function renderZoneNode(zone) {
   const node = document.createElement('div');
   node.className = 'tree-node';
   node.dataset.zoneId = zone.id;
-  node.innerHTML = `<span class="caret">▸</span><span>${zone.label}</span><span class="tag">${zone.priority}</span>`;
+  node.innerHTML = `<span>${zone.label}</span>`;
   wrapper.appendChild(node);
 
   const content = document.createElement('div');
@@ -1668,11 +1669,13 @@ function renderZoneNode(zone) {
 
   wrapper.appendChild(content);
 
-  const caretEl = node.querySelector('.caret');
+  // Lista lineal: el nodo NO colapsa; al clickearlo se selecciona (resalta)
+  // como una fila más, igual que en el Z2 real (p133: "Pocket 1" resaltado).
   node.addEventListener('click', () => {
-    const isOpen = content.classList.toggle('open');
-    node.classList.toggle('sel', isOpen);
-    caretEl.textContent = isOpen ? '▾' : '▸';
+    document.querySelectorAll('#param-tree .sel').forEach(el => el.classList.remove('sel'));
+    node.classList.add('sel');
+    const panel = document.getElementById('param-help');
+    panel.innerHTML = `<span class="ph-key">${zone.label}</span><span class="param-help-empty">Sección de parámetros.</span>`;
   });
 
   return wrapper;
