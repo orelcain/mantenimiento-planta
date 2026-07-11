@@ -287,6 +287,51 @@ Orel corrió el preview él mismo (algo que la herramienta de captura de la sesi
 3. **[PR #193]** el contenido de una zona aparecía en un panel separado, no debajo del nodo → rediseñado a acordeón de una sola caja (fusiona árbol+lista, contenido inline, varios nodos abiertos a la vez).
 4. **[PR #194]** el nodo "System settings" decía "lista abreviada" (P2) → completado de 28 a **133 parámetros reales** (todo lo que `parameters.md` documenta de esa zona: emergencia, drives, buzzer/torre de señales, botones de programa, display/resolución, CAN I/O mapping — cero valores inventados).
 
+## Auditoría del árbol de Cambiar Parametros (2026-07-10, PR #195)
+
+Orel detectó inconsistencias en el árbol → auditoría multi-agente contra los 418 pantallazos
+(4 lectores en paralelo midiendo la **indentación en píxeles** con script, valores dudosos
+verificados con zoom, cruce contra el modelo del clon extraído por eval del código real).
+**El árbol real del Z2 tiene 4 niveles**, no los 2 que tenía el clon:
+
+```
+System settings                          ← raíz: emergencia, drives, CAN I/O (canIdIo hasta 20), UDP/syslog
+└─ StaticGrader                          ← botones de programa (inpProg1-16, outpProg1-16), señales,
+   │                                       unidades, touchscreen, atributos, arranque, modbusId=0
+   ├─ Z-Belt (29 campos propios)
+   │   └─ Pocket 1..4                    ← cada pocket es una báscula COMPLETA: 73 campos c/u,
+   │                                       incl. SU PROPIO bloque display/peso con valores por
+   │                                       pocket (tSteady=500/400/300/500, tWeighing=1000/1000/1000/900)
+   │                                       + inpButton1-8 Y outpButton1-8 (101-108/109-116/117-124/125-132)
+   ├─ Acceleration belt 1 (10 campos, inpPulse2=0)
+   ├─ Acceleration belt 2 (10 campos, inpPulse2=0)
+   └─ Sorting belt with batching         ← 200 campos: única cinta SIN length; modbusId=1 PROPIO;
+                                           dis1-12 = 1250/2200/3800/5200/6550/7850/9150/10400/
+                                           11700/13175/14800/15850 mm (cf. GraderPhysicalConfig.
+                                           flipperPositions); inp/outpFlipper/outpGate con saltos
+                                           reales de módulos I/O de 8 canales
+```
+
+Además: en el Z2 real los **nodos hijos aparecen antes** que los campos propios del padre
+(p024/p096/p133), y max2/minDeltaw muestran columna de valor VACÍA (no 0).
+
+### ⚠️ Correcciones a `parameters.md` que destapó la auditoría (el pantallazo manda)
+
+| Parámetro | parameters.md decía | Real (verificado con zoom) |
+|---|---|---|
+| `minGateOpen` (Sorting) | 0 | **5000** |
+| `inpPulse2` (Accel 1 y 2) | 5 | **0** |
+| `inp1-12` (Sorting) | "133-152" ambiguo | **133,134,135,136,141,142,143,144,149,150,151,152** |
+| `outpProg` | 1-9 | **1-16** |
+| `tSteady` | 300 global | **por pocket: 500/400/300/500** (vive en cada Pocket, no global) |
+| `outpButton1-8` por pocket | no documentado | **existen** (105-108/113-116/121-124/129-132) |
+| jerarquía | Pockets/cintas ambiguo | **System settings > StaticGrader > Z-Belt > Pocket 1-4** |
+
+`parameters.md` NO se modifica (histórico); esta tabla es la fe de erratas. El tramo
+p033-p089 del PDF nunca fotografió esa parte de System settings — esos campos (sernr,
+canIoType, canIdIo1-2, comportLog, colorScheme, inpName1-2) se mantienen del doc curado
+con marca "(del doc curado — sin pantallazo)" en el clon.
+
 ## Estado del clon: TODO lo con fuente visual, cubierto e ÍNTEGRO (no abreviado)
 
 Con PR #194, el clon cubre: Home, Menu, Servicio, Velocidad cintas, Resultados Clasificación, Probar Entradas, Probar Salidas, Monitor CPU, Explorador CAN, y el editor completo de Cambiar Parametros (9 zonas, ~416 parámetros totales entre las 9 — ninguna zona queda abreviada). Lo único que falta tiene una razón concreta:
