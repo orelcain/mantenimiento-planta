@@ -474,9 +474,11 @@ html.in-iframe, html.in-iframe body {
 .tree-node .tag { font-size: 8px; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 3px; margin-left: 4px; }
 /* .tree-content anida por DOM (cada nivel agrega su propio padding-left +
    borde), así Pocket N queda indentado bajo Z-Belt sin clases por depth. */
-/* Lista lineal fiel al Z2 real (Orel 2026-07-11): todo el árbol visible SIEMPRE
-   (sin colapsar), indentación sutil por nivel, sin líneas de árbol — como p024/p133. */
-.tree-content { display: block; padding-left: 12px; }
+/* Árbol expandible fiel al Z2 (Orel 2026-07-11): al entrar SOLO System settings
+   está abierto → se ve StaticGrader (cerrado) + los campos de System settings, tal
+   cual p024; cada nodo se abre al tocarlo para profundizar (p133). Sin flechitas. */
+.tree-content { display: none; padding-left: 12px; }
+.tree-content.open { display: block; }
 .param-note { padding: 4px 10px 6px; font-size: 10px; color: #7fa8d0; font-style: italic; line-height: 1.4; }
 .param-row { display: flex; justify-content: space-between; padding: 3px 10px; font-size: 12px; color: #cddcee; font-family: 'Courier New', monospace; cursor: pointer; border-bottom: 1px solid rgba(241,196,15,0.10); }
 .param-row:hover { background: rgba(255,255,255,0.05); }
@@ -1669,11 +1671,12 @@ function renderZoneNode(zone) {
 
   wrapper.appendChild(content);
 
-  // Lista lineal: el nodo NO colapsa; al clickearlo se selecciona (resalta)
-  // como una fila más, igual que en el Z2 real (p133: "Pocket 1" resaltado).
+  // Árbol expandible: al tocar el nodo se selecciona (resalta) Y se abre/cierra
+  // su sección, como el drill-down del Z2 real (p024 → p133). Sin caret.
   node.addEventListener('click', () => {
     document.querySelectorAll('#param-tree .sel').forEach(el => el.classList.remove('sel'));
     node.classList.add('sel');
+    content.classList.toggle('open');
     const panel = document.getElementById('param-help');
     panel.innerHTML = `<span class="ph-key">${zone.label}</span><span class="param-help-empty">Sección de parámetros.</span>`;
   });
@@ -1689,6 +1692,10 @@ function buildParamTree() {
   const tree = document.getElementById('param-tree');
   const topLevel = PARAM_ZONES.filter(z => !z.parent);
   topLevel.forEach(zone => tree.appendChild(renderZoneNode(zone)));
+  // Abrir System settings por defecto: al entrar se ve System settings +
+  // StaticGrader (cerrado) + los campos de System settings, tal cual p024.
+  const first = tree.querySelector('.tree-content');
+  if (first) first.classList.add('open');
 }
 buildParamTree();
 
