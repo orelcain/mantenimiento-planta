@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.90.0' as const
+export const APP_VERSION = '3.91.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-07-10' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(hmi-grader): zona System settings completa (133 parámetros reales, ya no abreviada)' as const
+export const VERSION_NAME = 'feat(hmi-grader): árbol real del Z2 auditado contra pantallazos — 4 niveles, 674 parámetros, valores corregidos' as const
 
 /**
  * Nota:
