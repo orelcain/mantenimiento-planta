@@ -457,14 +457,21 @@ html.in-iframe, html.in-iframe body {
 
 /* Cambiar Parametros — editor árbol+lista+ayuda (clonado de p024/p133/p342).
    Es UNA sola lista scrolleable con headers de zona intercalados (no 2
-   navegaciones separadas) — los chips "Ir a:" son un atajo agregado para
-   no scrollear ~150 filas a mano (el Z2 real no los tiene; documentado
-   como agregado deliberado en NAVEGACION.md/PR). */
+   navegaciones separadas) — mantiene el árbol real de la Z2 (Pocket 1-4
+   como hijos de Z-Belt, Z-Belt/Accel1/Accel2/Sorting belt como hijos de
+   StaticGrader) con expand/collapse real, no una lista plana de 338
+   filas de una — feedback de Orel 2026-07-10 tras ver el preview. */
 .param-editor { flex: 1; display: flex; overflow: hidden; }
 .param-list-col { flex: 1 1 56%; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.15); min-width: 0; }
-.param-jump { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; background: #0a1d45; border-bottom: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
-.param-jump button { font-size: 10px; padding: 3px 7px; background: transparent; border: 1px solid rgba(255,255,255,0.35); color: #aaddff; cursor: pointer; border-radius: 2px; font-family: Arial, sans-serif; }
-.param-jump button:hover { background: rgba(255,255,255,0.12); }
+.param-tree { max-height: 42%; overflow-y: auto; background: #0a1d45; border-bottom: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; padding: 4px 0; }
+.tree-node { display: flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; color: #aaddff; cursor: pointer; font-family: Arial, sans-serif; white-space: nowrap; }
+.tree-node:hover { background: rgba(255,255,255,0.08); }
+.tree-node.sel { background: #143965; color: #ffffff; font-weight: 600; }
+.tree-node .caret { width: 11px; flex-shrink: 0; text-align: center; font-size: 9px; color: #7fa8d0; }
+.tree-node .tag { font-size: 8px; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 3px; margin-left: 4px; }
+.tree-node.depth-1 { padding-left: 26px; }
+.tree-children { display: none; }
+.tree-children.open { display: block; }
 .param-list { flex: 1; overflow-y: auto; }
 .param-zone-header { padding: 9px 14px 5px; font-size: 13px; font-weight: bold; color: #ffffff; background: rgba(255,255,255,0.05); font-family: Arial, sans-serif; }
 .param-zone-header .tag { font-size: 9px; font-weight: normal; color: #7fa8d0; border: 1px solid #7fa8d0; border-radius: 2px; padding: 0 4px; margin-left: 6px; }
@@ -882,7 +889,7 @@ html.in-iframe, html.in-iframe body {
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="param-editor">
         <div class="param-list-col">
-          <div class="param-jump" id="param-jump"></div>
+          <div class="param-tree" id="param-tree"></div>
           <div class="param-list" id="param-list"></div>
         </div>
         <div class="param-help-col" id="param-help"><span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span></div>
@@ -1228,7 +1235,7 @@ const POCKET_COMMON_FIELDS = [
 
 function buildPocketZone(n, p) {
   return {
-    id: `zone-pocket${n}`, label: `Pocket ${n}`, priority: 'P1', indent: true,
+    id: `zone-pocket${n}`, label: `Pocket ${n}`, priority: 'P1', parent: 'zone-zbelt',
     fields: [
       ['outp', String(p.outp), 'output mapping'],
       ['pos', String(p.pos), 'posición en la balanza (mm)'],
@@ -1381,38 +1388,89 @@ function selectParamRow(row, key, value, help) {
     : `<span class="ph-key">${key}</span><span class="param-help-empty">Sin descripción documentada.</span>`;
 }
 
-function buildParamEditor() {
+/** Pinta SOLO los campos de la zona elegida en #param-list — no las 338
+    filas de todas las zonas juntas. Resetea el panel de ayuda (los
+    campos son de otra zona, la descripción anterior ya no aplica). */
+function selectZone(zoneId) {
+  document.querySelectorAll('#param-tree .tree-node.sel').forEach(n => n.classList.remove('sel'));
+  document.querySelector(`#param-tree .tree-node[data-zone-id="${zoneId}"]`)?.classList.add('sel');
+
+  const zone = PARAM_ZONES.find(z => z.id === zoneId);
   const list = document.getElementById('param-list');
-  const jump = document.getElementById('param-jump');
-  PARAM_ZONES.forEach(zone => {
-    const jumpBtn = document.createElement('button');
-    jumpBtn.textContent = zone.label;
-    jumpBtn.onclick = () => document.getElementById(zone.id).scrollIntoView({ block: 'start', behavior: 'smooth' });
-    jump.appendChild(jumpBtn);
+  list.innerHTML = '';
 
-    const header = document.createElement('div');
-    header.className = 'param-zone-header';
-    header.id = zone.id;
-    header.innerHTML = `${zone.label}<span class="tag">${zone.priority}</span>`;
-    list.appendChild(header);
+  const header = document.createElement('div');
+  header.className = 'param-zone-header';
+  header.innerHTML = `${zone.label}<span class="tag">${zone.priority}</span>`;
+  list.appendChild(header);
 
-    if (zone.note) {
-      const note = document.createElement('div');
-      note.className = 'param-note';
-      note.textContent = zone.note;
-      list.appendChild(note);
-    }
+  if (zone.note) {
+    const note = document.createElement('div');
+    note.className = 'param-note';
+    note.textContent = zone.note;
+    list.appendChild(note);
+  }
 
-    zone.fields.forEach(([key, value, help]) => {
-      const row = document.createElement('div');
-      row.className = 'param-row';
-      row.innerHTML = `<span>${key}</span><span class="pv">${value}</span>`;
-      row.addEventListener('click', () => selectParamRow(row, key, value, help));
-      list.appendChild(row);
-    });
+  zone.fields.forEach(([key, value, help]) => {
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    row.innerHTML = `<span>${key}</span><span class="pv">${value}</span>`;
+    row.addEventListener('click', () => selectParamRow(row, key, value, help));
+    list.appendChild(row);
   });
+
+  document.getElementById('param-help').innerHTML = '<span class="param-help-empty">Seleccioná un parámetro para ver su descripción.</span>';
 }
-buildParamEditor();
+
+/** Construye UN nodo del árbol (con sus hijos anidados, recursivo — hoy
+    solo Z-Belt tiene hijos, Pocket 1-4, pero soporta más niveles). */
+function renderTreeNode(zone, depth) {
+  const children = PARAM_ZONES.filter(z => z.parent === zone.id);
+  const wrapper = document.createElement('div');
+
+  const node = document.createElement('div');
+  node.className = `tree-node depth-${depth}`;
+  node.dataset.zoneId = zone.id;
+  const caretChar = children.length ? '▾' : '';
+  node.innerHTML = `<span class="caret">${caretChar}</span><span>${zone.label}</span><span class="tag">${zone.priority}</span>`;
+  wrapper.appendChild(node);
+
+  let childrenEl = null;
+  if (children.length) {
+    childrenEl = document.createElement('div');
+    childrenEl.className = 'tree-children open';
+    children.forEach(c => childrenEl.appendChild(renderTreeNode(c, depth + 1)));
+    wrapper.appendChild(childrenEl);
+  }
+
+  // Click en la fila = seleccionar (no togglea). Click en el caret =
+  // SOLO abrir/cerrar (no cambia la selección) — dos acciones separadas,
+  // no un combo confuso donde ver los parámetros de Z-Belt a veces te
+  // abre o cierra Pocket 1-4 como efecto secundario.
+  node.addEventListener('click', () => selectZone(zone.id));
+  if (childrenEl) {
+    const caretEl = node.querySelector('.caret');
+    caretEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      childrenEl.classList.toggle('open');
+      caretEl.textContent = childrenEl.classList.contains('open') ? '▾' : '▸';
+    });
+  }
+
+  return wrapper;
+}
+
+/** Árbol real (expand/collapse), no chips horizontales — feedback de
+    Orel 2026-07-10 tras ver el preview: la Z2 real mantiene el orden
+    con un árbol que se contrae, no una cabecera plana con todas las
+    zonas listadas. Arranca con "System settings" seleccionado. */
+function buildParamTree() {
+  const tree = document.getElementById('param-tree');
+  const topLevel = PARAM_ZONES.filter(z => !z.parent);
+  topLevel.forEach(zone => tree.appendChild(renderTreeNode(zone, 0)));
+  selectZone('zone-system');
+}
+buildParamTree();
 
 /* ══════════════════════════════════════════════════
    EXPLORADOR CAN — clonado de p018 (lista base) / p020 (continuación) /
@@ -1665,6 +1723,14 @@ function numKey(label) {
 
 /* Atajos de teclado: F1-F4 + 0-9 + Enter + Esc/Backspace */
 document.addEventListener('keydown', (e) => {
+  /* Si el foco está en un <input>/<textarea> REAL (clave, Activ Sal.),
+     no interceptar — el usuario está escribiendo texto normal, no
+     "apretando" el numpad virtual. Sin este guard, tipear "8620" en el
+     campo de clave también escribía "8620" en el indicador de peso
+     activo (el mismo listener global capturaba las teclas 2 veces). */
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
   /* F1-F4 */
   const fMatch = e.key.match(/^F([1-4])$/);
   if (fMatch) {
