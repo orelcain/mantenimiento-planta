@@ -332,6 +332,36 @@ p033-p089 del PDF nunca fotografió esa parte de System settings — esos campos
 canIoType, canIdIo1-2, comportLog, colorScheme, inpName1-2) se mantienen del doc curado
 con marca "(del doc curado — sin pantallazo)" en el clon.
 
+## Segunda pasada de auditoría: ORDEN fila a fila verificado (2026-07-11)
+
+Orel pidió otra vuelta para comparar visualmente el orden de los parámetros. Cuatro
+transcriptores releyeron ~150 imágenes encadenando el orden por SOLAPAMIENTO entre capturas
+consecutivas (~17 filas visibles, avance de ~3-4 filas por captura; regla dura: nunca
+adivinar en un hueco, marcarlo como gap). El diff posicional (LCS) contra la secuencia
+renderizada del clon (extraída por eval del código real, incluyendo la regla nodos-antes-
+que-campos) dio **ORDEN IDÉNTICO en todas las zonas verificables**:
+
+| Zona | Posiciones comparadas | Resultado |
+|---|---|---|
+| System settings (inpEmergency→driveName4) | 16 | ✅ idéntico |
+| System settings (canIdIo2→loglevel) | 23 | ✅ idéntico |
+| Z-Belt (4 nodos Pocket + 29 campos) | 33 | ✅ idéntico |
+| Acceleration belt 1 / 2 | 10 + 10 | ✅ idéntico |
+| Sorting belt with batching | 200 | ✅ idéntico |
+| Cola StaticGrader (inpProg1→loadDefaultProgram) | 66 | ✅ idéntico |
+| Pocket 1-4 (vs transcripción fila a fila p343-p418) | 73 × 4 | ✅ idéntico |
+
+El empalme entre los dos transcriptores de Sorting se validó con 17 campos de solapamiento
+idénticos; el tramo completo de Sorting belt se encadenó SIN gaps. Confirmación extra: las
+series inpProg y outpProg llegan ambas a 16 (dos lectores independientes coinciden, p098 y
+p306-p310).
+
+Límites honestos que quedan (sin cambio posible sin nueva fuente visual):
+- El gap p033-p089 (entre driveName4 y canIdIo2 de System settings) sigue sin fotografiar —
+  el orden de los campos marcados "(del doc curado)" en ese tramo es el de parameters.md.
+- El borde loglevel→(fin de System settings) no se pudo encadenar por solapamiento (p095→
+  p096 salta al tope del árbol): si existe algo después de loglevel, no está capturado.
+
 ## Estado del clon: TODO lo con fuente visual, cubierto e ÍNTEGRO (no abreviado)
 
 Con PR #194, el clon cubre: Home, Menu, Servicio, Velocidad cintas, Resultados Clasificación, Probar Entradas, Probar Salidas, Monitor CPU, Explorador CAN, y el editor completo de Cambiar Parametros (9 zonas, ~416 parámetros totales entre las 9 — ninguna zona queda abreviada). Lo único que falta tiene una razón concreta:
