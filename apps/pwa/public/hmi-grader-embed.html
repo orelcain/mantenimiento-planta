@@ -1644,12 +1644,8 @@ function renderZoneNode(zone) {
   const content = document.createElement('div');
   content.className = 'tree-content';
 
-  if (zone.note) {
-    const note = document.createElement('div');
-    note.className = 'param-note';
-    note.textContent = zone.note;
-    content.appendChild(note);
-  }
+  // Las notas de zona (zone.note) NO se renderizan — el Z2 real no muestra esos
+  // mensajes (Orel 2026-07-11). Se conservan en los datos como doc del código.
 
   // ORDEN REAL DEL Z2 (auditoría 2026-07-10): los nodos HIJOS aparecen
   // ANTES que los campos propios del padre — verificado en p024 (System
