@@ -12,7 +12,9 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin, Boxes } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin, Boxes, Wrench } from 'lucide-react'
+import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
+import { findMachineBySlug } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -321,6 +323,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
   const [repFavOnly, setRepFavOnly] = useState(false)
+  // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine),
+  // la misma que se ve en la pestaña "Repuestos comunes" del Centro de Aprendizaje.
+  // Distinto de los favoritos (que son personales por usuario).
+  const [repComunOnly, setRepComunOnly] = useState(false)
   useEffect(() => {
     if (!user?.id) return
     getRepuestoFavs(user.id).then((arr) => setFavKeys(new Set(arr))).catch(() => {})
@@ -666,6 +672,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const filteredBase = useMemo(() => {
     let res = scopedRepuestos
     if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
+    if (repComunOnly) res = res.filter((r) => isCommonPartSap(r.codigoSAP))
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
       const ids = new Set(l?.repuestoIds ?? [])
@@ -697,7 +704,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       })
     }
     return res
-  }, [scopedRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
+  }, [scopedRepuestos, repFavOnly, repComunOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
+
+  // Cuántos comunes hay en el alcance actual (para el contador del chip).
+  const comunesEnScope = useMemo(
+    () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) ? 1 : 0), 0),
+    [scopedRepuestos],
+  )
 
   // Foco SAP: oculta el despiece sin código SAP (default). El conteo de lo oculto
   // alimenta el interruptor "ver despiece".
@@ -711,7 +724,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   )
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repComunOnly, listFilter, repPageSize])
 
   // Si la búsqueda/filtros dejan fuera al repuesto seleccionado, cerrar el panel
   // de detalle: evita que quede "pegado" mostrando un repuesto que ya no está
@@ -1656,6 +1669,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Favoritos
                 {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
               </Button>
+              {comunesEnScope > 0 && (
+                <Button
+                  variant={repComunOnly ? 'default' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setRepComunOnly((v) => !v)}
+                  title="Mostrar solo los repuestos comunes / más usados de la máquina (lista curada compartida, la misma del Centro de Aprendizaje)"
+                >
+                  <Wrench className="h-4 w-4" /> Comunes
+                  <span className="tabular-nums opacity-70">({comunesEnScope})</span>
+                </Button>
+              )}
               {favLists.length > 0 && (
                 <Select value={listFilter} onValueChange={setListFilter}>
                   <SelectTrigger className="w-[170px]"><SelectValue placeholder="Lista" /></SelectTrigger>
@@ -1778,6 +1803,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   </span>
                                 )}
                                 <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
+                                {isCommonPartSap(r.codigoSAP) && (
+                                  <span
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                    title={`Repuesto común / más usado de: ${machinesForCommonSap(r.codigoSAP).map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
+                                  >
+                                    <Wrench className="h-3 w-3" /> común
+                                  </span>
+                                )}
                                 {!r.codigoSAP && (
                                   <span className="shrink-0 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400" title="Pieza de despiece — sin código SAP">
                                     sin SAP
