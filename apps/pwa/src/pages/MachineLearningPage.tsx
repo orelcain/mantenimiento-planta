@@ -8,9 +8,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
-  ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ShieldCheck, Activity,
-  ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library, ExternalLink, Search,
+  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
+  ChevronLeft, ChevronRight, Image as ImageIcon,
+  ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
   MonitorPlay,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
@@ -21,7 +21,6 @@ import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { useMarkedCommonParts } from '@/hooks/repuestos/useMarkedCommonParts'
-import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
   listManualSections,
@@ -299,69 +298,53 @@ export function MachineLearningPage() {
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
         {loadingTab ? (
-          <div className="flex items-center justify-center py-12" style={{ color: LC.inkLo }}>
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Cargando...
-          </div>
+          <p className="dp-loading">Cargando…</p>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
-          <ProceduresList procedures={procedures} color={machine.color} machineSlug={machine.slug} />
+          <ProceduresList procedures={procedures} machineSlug={machine.slug} />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
+          <ManualList sections={manualSections} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
         ) : activeTab === 'flows' && flows.length > 0 ? (
-          <FlowDiagramViewer flows={flows} color={machine.color} />
+          <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
-          <DiagnosisList entries={diagnosis} color={machine.color} machineSlug={machine.slug} />
+          <DiagnosisList entries={diagnosis} machineSlug={machine.slug} />
         ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
-          <div className="space-y-8">
+          <div>
             {flows.length > 0 && (
-              <div className="space-y-3">
+              <div className="dp-casos">
                 <CasosSectionHeader
-                  icon={GitBranch}
-                  color={machine.color}
-                  badge="Señal → accion"
-                  title="¿Que hago cuando…?"
-                  subtitle="Flujo de reaccion paso a paso. Toca cada nodo para ver la instruccion completa."
+                  label="Señal → acción"
+                  title="¿Qué hago cuando…?"
+                  subtitle="Flujo de reacción paso a paso. Toca cada caso para desplegar la secuencia completa."
                 />
-                <FlowDiagramViewer flows={flows} color={machine.color} />
+                <FlowDiagramViewer flows={flows} />
               </div>
             )}
             {diagnosis.length > 0 && (
-              <div className="space-y-3">
+              <div className="dp-casos">
                 <CasosSectionHeader
-                  icon={Activity}
-                  color={machine.color}
-                  badge="Diagnostico"
+                  label="Diagnóstico"
                   title="Casos"
-                  subtitle="Sintoma → causa probable → solucion. Toca un caso para abrirlo."
+                  subtitle="Síntoma → causa probable → solución."
                 />
-                <DiagnosisList entries={diagnosis} color={machine.color} machineSlug={machine.slug} />
+                <DiagnosisList entries={diagnosis} machineSlug={machine.slug} />
               </div>
             )}
           </div>
         ) : activeTab === 'quiz' && quiz.length > 0 ? (
-          <QuizView questions={quiz} color={machine.color} />
+          <QuizView questions={quiz} />
         ) : activeTab === 'glossary' && glossary.length > 0 ? (
           <GlossaryView
             entries={glossary}
-            color={machine.color}
             onGoToLesson={order => { setPendingLessonOrder(order); setActiveTab('manual') }}
           />
         ) : activeTab === 'bibliografia' && bibliografia.length > 0 ? (
-          <BibliografiaView entries={bibliografia} color={machine.color} />
+          <BibliografiaView entries={bibliografia} />
         ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
-          <CommonPartsList parts={commonParts} color={machine.color} />
+          <CommonPartsList parts={commonParts} />
         ) : sectionEnabled ? (
-          <div
-            className="rounded-xl p-6"
-            style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-          >
-            <p className="text-sm" style={{ color: LC.inkMid }}>
-              Contenido disponible — proximamente cargado desde Firestore.
-            </p>
-          </div>
+          <p className="dp-empty">Contenido disponible — próximamente cargado desde Firestore.</p>
         ) : (
           <EmptySection
-            color={machine.color}
             tabLabel={activeTabData.label}
             machineName={machine.name}
           />
@@ -378,18 +361,15 @@ export function MachineLearningPage() {
  * runbook tiene ruta navegable en el clon HMI (ver graderHmiPractice.ts).
  * Abre el simulador ya encaminado a la pantalla del procedimiento.
  */
-function HmiPracticeButton({ contentId, machineSlug, color }: { contentId: string; machineSlug?: string; color: string }) {
+function HmiPracticeButton({ contentId, machineSlug }: { contentId: string; machineSlug?: string }) {
   const navigate = useNavigate()
   if (machineSlug !== 'grader') return null
   const url = hmiPracticeUrl(contentId)
   if (!url) return null
   return (
     <button
+      className="dp-practice"
       onClick={() => navigate(url)}
-      className="mb-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
-      style={{ color, background: `${color}12`, border: `1px dashed ${color}55` }}
-      onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
-      onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
       title="Abre el simulador HMI Grader navegado a la pantalla de este procedimiento"
     >
       <MonitorPlay className="h-3.5 w-3.5" />
@@ -399,62 +379,36 @@ function HmiPracticeButton({ contentId, machineSlug, color }: { contentId: strin
 }
 
 /**
- * ProceduresList — acordeón de procedimientos (una fila abierta a la vez,
- * primera abierta), consistente con DiagnosisList. La cabecera siempre visible
- * resume el procedimiento (nº de paso + título + chips de qué trae: pasos,
- * ruta de menú, fórmula) para escanear el listado sin desplegar todo; el
- * detalle completo (descripción, ruta, práctica, fórmula, pasos, criterios)
- * vive en el cuerpo colapsable.
+ * ProceduresList — índice de procedimientos en formato dossier: filas hairline
+ * (una abierta a la vez, la primera). La cabecera resume el procedimiento
+ * (nº + título + línea mono de qué trae: pasos, ruta, fórmula, práctica); el
+ * cuerpo despliega descripción, ruta de menú, fórmula, los pasos numerados y
+ * los criterios de éxito.
  */
-function ProceduresList({ procedures, color, machineSlug }: { procedures: Procedure[]; color: string; machineSlug?: string }) {
+function ProceduresList({ procedures, machineSlug }: { procedures: Procedure[]; machineSlug?: string }) {
   const [openId, setOpenId] = useState<string | null>(procedures[0]?.id ?? null)
 
   return (
-    <div className="space-y-2.5">
+    <div className="dp-acc">
       {procedures.map((proc, idx) => {
         const open = openId === proc.id
+        const tags = [
+          `${proc.steps.length} pasos`,
+          proc.menuPath && proc.menuPath.length > 0 ? 'ruta de menú' : null,
+          proc.formula ? 'fórmula' : null,
+          machineSlug === 'grader' && hmiPracticeUrl(proc.id) ? 'práctica' : null,
+        ].filter(Boolean) as string[]
         return (
-          <article
-            key={proc.id}
-            className="overflow-hidden rounded-lg transition-colors"
-            style={{
-              background: LC.surface,
-              border: `1px solid ${open ? LC.borderHi : LC.border}`,
-              boxShadow: open ? '0 4px 14px rgba(0,0,0,0.28)' : '0 1px 2px rgba(0,0,0,0.3)',
-            }}
-          >
-            {/* Cabecera clickeable */}
-            <button
-              type="button"
-              onClick={() => setOpenId(open ? null : proc.id)}
-              aria-expanded={open}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
-              style={{ background: open ? LC.surfaceHi : 'transparent' }}
-            >
-              <span
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
-                style={{ background: `${color}18`, color, border: `1px solid ${color}45` }}
-              >
-                {String(idx + 1).padStart(2, '0')}
+          <div key={proc.id} className="dp-acc-item" data-open={open}>
+            <button type="button" className="dp-acc-head" aria-expanded={open} onClick={() => setOpenId(open ? null : proc.id)}>
+              <span className="dp-acc-no">{String(idx + 1).padStart(2, '0')}</span>
+              <span>
+                <span className="dp-acc-title">{proc.title}</span>
+                <span className="dp-acc-sub">{tags.join(' · ')}</span>
               </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-bold leading-snug" style={{ color: LC.ink }}>
-                  {proc.title}
-                </span>
-                <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <ProcedureChip color={color}>{proc.steps.length} pasos</ProcedureChip>
-                  {proc.menuPath && proc.menuPath.length > 0 && <ProcedureChip color={color}>ruta de menú</ProcedureChip>}
-                  {proc.formula && <ProcedureChip color={color}>fórmula</ProcedureChip>}
-                  {machineSlug === 'grader' && hmiPracticeUrl(proc.id) && <ProcedureChip color={color}>práctica</ProcedureChip>}
-                </span>
-              </span>
-              <ChevronDown
-                className="h-4 w-4 flex-shrink-0 transition-transform duration-200"
-                style={{ color: open ? color : LC.inkLo, transform: open ? 'rotate(180deg)' : 'none' }}
-              />
+              <ChevronDown className="dp-acc-chev h-4 w-4" />
             </button>
 
-            {/* Cuerpo con animación de altura (grid 0fr→1fr) */}
             <div
               style={{
                 display: 'grid',
@@ -463,78 +417,47 @@ function ProceduresList({ procedures, color, machineSlug }: { procedures: Proced
               }}
             >
               <div style={{ overflow: 'hidden', minHeight: 0 }}>
-                <div className="px-4 pb-4 pt-4" style={{ borderTop: `1px solid ${LC.border}` }}>
+                <div className="dp-acc-body-inner">
                   {proc.description && (
-                    <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: LC.inkMid }}>
-                      {proc.description}
-                    </p>
+                    <div className="dp-body"><p style={{ whiteSpace: 'pre-wrap' }}>{proc.description}</p></div>
                   )}
 
                   {proc.menuPath && proc.menuPath.length > 0 && (
-                    <div className="mb-3 rounded-md px-3 py-2" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
-                      <p className="text-[10px] uppercase tracking-[0.14em] font-bold mb-1.5" style={{ color: LC.inkLo }}>
-                        Ruta de menu
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1 text-xs font-mono" style={{ color: LC.ink }}>
-                        {proc.menuPath.map((segment, index) => (
-                          <span key={`${segment}-${index}`} className="flex items-center gap-1">
-                            {index > 0 && <ChevronRight className="h-3 w-3" style={{ color: LC.inkLo }} />}
-                            <span className="rounded px-1.5 py-0.5" style={{ background: `${color}14`, border: `1px solid ${color}28` }}>
-                              {segment}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
+                    <div className="dp-path">
+                      <span className="dp-lbl">Ruta</span>
+                      {proc.menuPath.map((segment, index) => (
+                        <span key={`${segment}-${index}`} className="inline-flex items-center gap-2">
+                          {index > 0 && <span className="dp-caret">›</span>}
+                          <span className="dp-seg">{segment}</span>
+                        </span>
+                      ))}
                     </div>
                   )}
 
-                  <HmiPracticeButton contentId={proc.id} machineSlug={machineSlug} color={color} />
+                  <HmiPracticeButton contentId={proc.id} machineSlug={machineSlug} />
 
                   {proc.formula && (
-                    <div className="mb-3 rounded-md p-3" style={{ background: `${color}0d`, border: `1px solid ${color}33` }}>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Gauge className="h-3.5 w-3.5" style={{ color }} />
-                        <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color }}>
-                          Formula
-                        </p>
-                      </div>
-                      <p className="text-sm font-mono mb-2 break-all" style={{ color: LC.ink }}>{proc.formula.expression}</p>
-                      <dl className="space-y-1">
+                    <div className="dp-formula">
+                      <span className="dp-lbl">Fórmula</span>
+                      <p className="dp-expr">{proc.formula.expression}</p>
+                      <dl>
                         {Object.entries(proc.formula.variables).map(([name, meaning]) => (
-                          <div key={name} className="flex gap-2 text-xs">
-                            <dt className="font-mono font-semibold flex-shrink-0" style={{ color }}>{name}</dt>
-                            <dd className="min-w-0 flex-1" style={{ color: LC.inkMid }}>{meaning}</dd>
-                          </div>
+                          <div key={name} className="dp-var"><dt>{name}</dt><dd>{meaning}</dd></div>
                         ))}
                       </dl>
                     </div>
                   )}
 
-                  <ol className="space-y-0 mt-4 border-l" style={{ borderColor: `${color}35` }}>
+                  <ol className="dp-proc-ol">
                     {proc.steps.map(step => (
-                      <li key={step.order} className="relative flex gap-3 pb-4 pl-4 last:pb-0">
-                        <span
-                          className="absolute -left-[14px] flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
-                          style={{ background: LC.bg, color, border: `1px solid ${color}55` }}
-                        >
-                          {step.order}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#e9eef3]">{step.title}</p>
-                          {step.description && (
-                            <p className="text-xs mt-1 leading-relaxed whitespace-pre-wrap" style={{ color: LC.inkMid }}>
-                              {step.description}
-                            </p>
-                          )}
+                      <li key={step.order}>
+                        <span className="dp-n" />
+                        <div className="dp-c">
+                          <b>{step.title}</b>
+                          {step.description && <span style={{ whiteSpace: 'pre-wrap' }}>{step.description}</span>}
                           {step.imageUrl && (
-                            <a href={step.imageUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
-                              <img
-                                src={step.imageUrl}
-                                alt={step.title}
-                                loading="lazy"
-                                className="max-h-60 rounded-lg border"
-                                style={{ borderColor: `${color}40` }}
-                              />
+                            <a href={step.imageUrl} target="_blank" rel="noopener noreferrer">
+                              <img src={step.imageUrl} alt={step.title} loading="lazy" />
                             </a>
                           )}
                         </div>
@@ -543,19 +466,11 @@ function ProceduresList({ procedures, color, machineSlug }: { procedures: Proced
                   </ol>
 
                   {proc.successCriteria && proc.successCriteria.length > 0 && (
-                    <div className="mt-4 rounded-md p-3" style={{ background: LC.okSoft, border: `1px solid ${LC.ok}33` }}>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <ShieldCheck className="h-3.5 w-3.5" style={{ color: LC.ok }} />
-                        <p className="text-[13px] font-semibold" style={{ color: LC.ok }}>
-                          Criterios de éxito
-                        </p>
-                      </div>
-                      <ul className="space-y-1.5">
+                    <div className="dp-crit">
+                      <span className="dp-lbl">Criterios de éxito</span>
+                      <ul>
                         {proc.successCriteria.map((criterion, index) => (
-                          <li key={index} className="flex gap-2 text-xs leading-relaxed" style={{ color: LC.inkMid }}>
-                            <span className="mt-[6px] h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: LC.ok }} />
-                            <span className="flex-1">{criterion}</span>
-                          </li>
+                          <li key={index}>{criterion}</li>
                         ))}
                       </ul>
                     </div>
@@ -563,28 +478,15 @@ function ProceduresList({ procedures, color, machineSlug }: { procedures: Proced
                 </div>
               </div>
             </div>
-          </article>
+          </div>
         )
       })}
     </div>
   )
 }
 
-/** Chip compacto para la cabecera colapsada de un procedimiento. */
-function ProcedureChip({ children, color }: { children: React.ReactNode; color: string }) {
-  return (
-    <span
-      className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-      style={{ background: `${color}14`, color, border: `1px solid ${color}30` }}
-    >
-      {children}
-    </span>
-  )
-}
-
 function ManualList({
   sections,
-  color,
   machineSlug,
   canEdit,
   isCourse = false,
@@ -592,7 +494,6 @@ function ManualList({
   onJumpConsumed,
 }: {
   sections: ManualSection[]
-  color: string
   machineSlug: string
   canEdit: boolean
   isCourse?: boolean
@@ -601,13 +502,8 @@ function ManualList({
   onJumpConsumed?: () => void
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
-  const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const activeSection = sections.find(section => section.id === activeId) ?? sections[0]
   const activeIndex = Math.max(0, sections.findIndex(section => section.id === activeSection?.id))
-  // En cursos forzamos lista plana (las lecciones no agrupan por familia de maquina).
-  const compactNavigator = sections.length > 6 && !isCourse
-  const sectionGroups = compactNavigator ? groupManualSections(sections) : []
-  const activeGroup = sectionGroups.find(group => group.sections.some(section => section.id === activeSection?.id)) ?? sectionGroups[0]
 
   useEffect(() => {
     if (!sections.some(section => section.id === activeId)) {
@@ -619,346 +515,89 @@ function ManualList({
   useEffect(() => {
     if (jumpToOrder == null) return
     const target = sections.find(section => section.order === jumpToOrder)
-    if (target) {
-      setActiveId(target.id)
-      setOpenGroupId(null)
-    }
+    if (target) setActiveId(target.id)
     onJumpConsumed?.()
   }, [jumpToOrder, sections, onJumpConsumed])
 
   if (!activeSection) return null
 
   const blocks = parseManualContent(activeSection.content)
-  const canGoPrevious = activeIndex > 0
-  const canGoNext = activeIndex < sections.length - 1
+  const isGraderGlossary = machineSlug === 'grader' && activeSection.id === 'grader-manual-glosario'
+  const noun = isCourse ? 'Lección' : 'Sección'
   const goToIndex = (index: number) => {
     const nextSection = sections[index]
-    if (nextSection) {
-      setActiveId(nextSection.id)
-      setOpenGroupId(null)
-    }
+    if (nextSection) setActiveId(nextSection.id)
   }
 
   return (
-    <div className="space-y-4">
-      <div
-        className="rounded-lg p-2.5"
-        style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-      >
-        <div className="flex items-center gap-2 px-1 pb-2">
-          <BookOpen className="h-4 w-4" style={{ color: LC.inkMid }} />
-          <h3 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
-            {isCourse ? 'Lecciones del curso' : 'Secciones del manual'}
-          </h3>
-        </div>
-        {compactNavigator ? (
-          <div className="space-y-3">
-            <div>
-              <p className="mb-2 text-xs" style={{ color: LC.inkLo }}>
-                Familia técnica
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-              {sectionGroups.map(group => {
-                const selected = group.id === activeGroup?.id
-                return (
-                  <button
-                    key={group.id}
-                    type="button"
-                    onClick={() => {
-                      setOpenGroupId(current => current === group.id ? null : group.id)
-                      setActiveId(group.sections[0]?.id ?? activeSection.id)
-                    }}
-                    className="flex min-w-max items-center gap-2 rounded-md px-3 py-2 text-left transition"
-                    style={{
-                      background: selected ? `${color}18` : LC.surfaceHi,
-                      border: `1px solid ${selected ? color + '55' : LC.border}`,
-                      color: selected ? LC.ink : LC.inkMid,
-                    }}
-                    aria-expanded={openGroupId === group.id}
-                  >
-                    <span className="text-xs font-bold">{group.label}</span>
-                    <span
-                      className="rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums"
-                      style={{ background: selected ? color : `${color}16`, color: selected ? LC.bg : color }}
-                    >
-                      {group.sections.length}
-                    </span>
-                    <ChevronDown
-                      className="h-3.5 w-3.5 transition-transform"
-                      style={{ color: LC.inkLo, transform: openGroupId === group.id ? 'rotate(180deg)' : 'none' }}
-                    />
-                  </button>
-                )
-              })}
-              </div>
-            </div>
+    <div>
+      {/* Índice de secciones / lecciones */}
+      <nav className="dp-index" aria-label={isCourse ? 'Lecciones del curso' : 'Secciones del manual'}>
+        {sections.map(sec => (
+          <button
+            key={sec.id}
+            type="button"
+            onClick={() => setActiveId(sec.id)}
+            aria-current={sec.id === activeSection.id ? 'true' : undefined}
+          >
+            <b>{String(sec.order).padStart(2, '0')}</b>{sec.title}
+          </button>
+        ))}
+      </nav>
 
-            {openGroupId && (
-              <div
-                className="rounded-md p-2"
-                style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}
-              >
-                <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: LC.inkLo }}>
-                  Ajustes de {sectionGroups.find(group => group.id === openGroupId)?.label ?? 'manual'}
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {(sectionGroups.find(group => group.id === openGroupId)?.sections ?? []).map(sec => {
-                    const selected = sec.id === activeSection.id
-                    return (
-                      <button
-                        key={sec.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveId(sec.id)
-                          setOpenGroupId(null)
-                        }}
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold transition"
-                        style={{
-                          background: selected ? `${color}18` : LC.surface,
-                          border: `1px solid ${selected ? color + '55' : LC.border}`,
-                          color: selected ? LC.ink : LC.inkMid,
-                        }}
-                      >
-                        <span
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[10px] font-bold tabular-nums"
-                          style={{ background: selected ? color : `${color}16`, color: selected ? LC.bg : color }}
-                        >
-                          {sec.order}
-                        </span>
-                        <span className="min-w-0 flex-1 leading-snug">{sec.title}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 rounded-md p-2 sm:flex-row sm:items-center sm:justify-between" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
-              <p className="px-1 text-xs font-semibold tabular-nums" style={{ color: LC.inkMid }}>
-                Ajuste {activeIndex + 1} de {sections.length}
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:w-auto sm:grid-cols-[112px_112px]">
-              <button
-                type="button"
-                onClick={() => goToIndex(activeIndex - 1)}
-                disabled={!canGoPrevious}
-                className="flex h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
-                style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}`, color: LC.ink }}
-                aria-label="Seccion anterior"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Anterior</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => goToIndex(activeIndex + 1)}
-                disabled={!canGoNext}
-                className="flex h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
-                style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}`, color: LC.ink }}
-                aria-label="Seccion siguiente"
-              >
-                <span className="hidden sm:inline">Siguiente</span>
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {sections.map(sec => {
-              const selected = sec.id === activeSection.id
-              return (
-                <button
-                  key={sec.id}
-                  type="button"
-                  onClick={() => setActiveId(sec.id)}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left transition-colors sm:w-auto sm:max-w-[260px]"
-                  style={{
-                    background: selected ? `${color}18` : LC.surfaceHi,
-                    border: `1px solid ${selected ? color + '55' : LC.border}`,
-                  }}
-                >
-                  <span
-                    className="flex h-6 w-6 items-center justify-center rounded text-[10px] font-bold tabular-nums"
-                    style={{
-                      background: selected ? color : `${color}16`,
-                      color: selected ? LC.bg : color,
-                    }}
-                  >
-                    {sec.order}
-                  </span>
-                  <span className="min-w-0 flex-1 text-xs font-semibold leading-snug sm:flex-none" style={{ color: selected ? LC.ink : LC.inkMid }}>
-                    {sec.title}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
+      {/* Sub-cabecera de la sección activa */}
+      <div className="dp-subhead">
+        <span className="dp-subno">{String(activeSection.order).padStart(2, '0')}</span>
+        <h3>{activeSection.title}</h3>
       </div>
+      <div className="dp-sec-code">{isCourse ? 'Lección del curso' : 'Manual técnico'}</div>
 
-      <article
-        className="overflow-hidden rounded-lg"
-        style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-      >
-        <div className="p-5">
-          <div className="mb-5 flex items-start gap-3">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold tabular-nums"
-              style={{ background: `${color}18`, color, border: `1px solid ${color}38` }}
-            >
-              {String(activeSection.order).padStart(2, '0')}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs" style={{ color: LC.inkLo }}>
-                {isCourse ? 'Lección' : 'Manual técnico'}
-              </p>
-              <h3 className="mt-1 text-lg font-semibold leading-tight text-[#e9eef3]">{activeSection.title}</h3>
-              {blocks.description && (
-                <p className="text-sm leading-relaxed mt-2 whitespace-pre-wrap" style={{ color: LC.inkMid }}>
-                  {blocks.description}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {machineSlug === 'grader' && activeSection.id === 'grader-manual-glosario' ? (
-            <GraderGlossaryView color={color} />
-          ) : (
-          <div className="grid gap-6">
-            {blocks.documents.length > 0 && (
-              <ManualDocuments documents={blocks.documents} color={color} />
-            )}
-            {blocks.measurements.length > 0 && (
-              <ManualBlock
-                icon={Ruler}
-                title="Medidas / tolerancias"
-                color={color}
-                items={blocks.measurements}
-                variant="measure"
-              />
-            )}
-            {blocks.keyPoints.length > 0 && (
-              <ManualBlock
-                icon={FileText}
-                title="Puntos clave"
-                color={color}
-                items={blocks.keyPoints}
-              />
-            )}
-            {blocks.notes.length > 0 && (
-              <ManualBlock
-                icon={AlertTriangle}
-                title="Notas operativas"
-                color={color}
-                items={blocks.notes}
-                variant="note"
-              />
-            )}
-            {blocks.images.length > 0 && (
-              <ManualImages
-                images={blocks.images}
-                color={color}
-                sectionTitle={activeSection.title}
-                machineSlug={machineSlug}
-                canEdit={canEdit}
-              />
-            )}
-          </div>
-          )}
-        </div>
-      </article>
-
-      {compactNavigator && sections.length > 1 && (
-        <div
-          className="flex flex-col gap-2 rounded-lg p-2 sm:flex-row sm:items-center sm:justify-between"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-        >
-          <button
-            type="button"
-            onClick={() => goToIndex(activeIndex - 1)}
-            disabled={!canGoPrevious}
-            className="flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
-            style={{ background: LC.surfaceHi, color: LC.ink, border: `1px solid ${LC.border}` }}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Anterior
-          </button>
-          <span className="text-center text-xs font-semibold tabular-nums" style={{ color: LC.inkMid }}>
-            {activeIndex + 1} / {sections.length}
-          </span>
-          <button
-            type="button"
-            onClick={() => goToIndex(activeIndex + 1)}
-            disabled={!canGoNext}
-            className="flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
-            style={{ background: LC.surfaceHi, color: LC.ink, border: `1px solid ${LC.border}` }}
-          >
-            Siguiente
-            <ChevronRight className="h-4 w-4" />
-          </button>
+      {!isGraderGlossary && blocks.description && (
+        <div className="dp-body" style={{ marginTop: 24 }}>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{blocks.description}</p>
         </div>
       )}
 
-      {!compactNavigator && sections.length > 1 && (
-        <div className="flex justify-between gap-2">
-          {sections.map(sec =>
-            sec.id === activeSection.id ? (
-              <span key={sec.id} className="h-1.5 flex-1 rounded-full" style={{ background: color }} />
-            ) : (
-              <button
-                key={sec.id}
-                type="button"
-                aria-label={`Abrir ${sec.title}`}
-                onClick={() => setActiveId(sec.id)}
-                className="h-1.5 flex-1 rounded-full"
-                style={{ background: LC.border }}
-              />
-            )
+      {isGraderGlossary ? (
+        <div style={{ marginTop: 24 }}><GraderGlossaryView /></div>
+      ) : (
+        <>
+          {blocks.documents.length > 0 && <ManualDocuments documents={blocks.documents} />}
+          {blocks.measurements.length > 0 && (
+            <ManualBlock title="Medidas / tolerancias" items={blocks.measurements} variant="measure" />
           )}
+          {blocks.keyPoints.length > 0 && (
+            <ManualBlock title="Puntos clave" items={blocks.keyPoints} />
+          )}
+          {blocks.notes.length > 0 && (
+            <ManualBlock title="Notas operativas" items={blocks.notes} variant="note" />
+          )}
+          {blocks.images.length > 0 && (
+            <ManualImages
+              images={blocks.images}
+              sectionTitle={activeSection.title}
+              machineSlug={machineSlug}
+              canEdit={canEdit}
+            />
+          )}
+        </>
+      )}
+
+      {sections.length > 1 && (
+        <div className="dp-nav">
+          <button type="button" onClick={() => goToIndex(activeIndex - 1)} disabled={activeIndex <= 0}>
+            ← {noun} anterior
+          </button>
+          <span className="dp-nav-count">
+            {String(activeIndex + 1).padStart(2, '0')} / {String(sections.length).padStart(2, '0')}
+          </span>
+          <button type="button" onClick={() => goToIndex(activeIndex + 1)} disabled={activeIndex >= sections.length - 1}>
+            {noun} siguiente →
+          </button>
         </div>
       )}
     </div>
   )
-}
-
-interface ManualSectionGroup {
-  id: string
-  label: string
-  sections: ManualSection[]
-}
-
-function groupManualSections(sections: ManualSection[]): ManualSectionGroup[] {
-  const groups: ManualSectionGroup[] = []
-
-  sections.forEach(section => {
-    const title = section.title.toLowerCase()
-    let id = 'general'
-    let label = 'General'
-
-    if (title.includes('aliment')) {
-      id = 'alimentacion'
-      label = 'Alimentacion'
-    } else if (title.includes('aleta') || title.includes('guía') || title.includes('guia') || title.includes('espina')) {
-      id = 'guiado'
-      label = 'Guiado'
-    } else if (title.includes('cuchillo')) {
-      id = 'cuchillos'
-      label = 'Cuchillos'
-    } else if (title.includes('embrague') || title.includes('mando')) {
-      id = 'transmision'
-      label = 'Transmision'
-    }
-
-    let group = groups.find(item => item.id === id)
-    if (!group) {
-      group = { id, label, sections: [] }
-      groups.push(group)
-    }
-    group.sections.push(section)
-  })
-
-  return groups
 }
 
 interface ManualContentBlocks {
@@ -1016,80 +655,63 @@ function parseManualContent(content: string): ManualContentBlocks {
 }
 
 function ManualBlock({
-  icon: Icon,
   title,
-  color,
   items,
   variant = 'default',
 }: {
-  icon: React.ElementType
   title: string
-  color: string
   items: string[]
   variant?: 'default' | 'measure' | 'note'
 }) {
-  return (
-    <section>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-3.5 w-3.5" style={{ color }} />
-        <h4 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
-          {title}
-        </h4>
-      </div>
-      <ul className={variant === 'measure' ? 'grid gap-x-6 gap-y-1.5 sm:grid-cols-2' : 'space-y-1.5'}>
+  // Notas operativas → aviso (barra óxido, como el mockup)
+  if (variant === 'note') {
+    return (
+      <div className="dp-aviso">
+        <span className="dp-lbl">{title}</span>
         {items.map((item, index) => (
-          <li
-            key={`${item}-${index}`}
-            className="flex gap-2.5 text-sm leading-relaxed"
-            style={{ color: LC.inkMid }}
-          >
-            <span className="mt-[8px] w-1 h-1 rounded-full flex-shrink-0" style={{ background: LC.inkLo }} />
-            <span className="flex-1 whitespace-pre-wrap">{item}</span>
-          </li>
+          <p key={`${item}-${index}`} style={{ whiteSpace: 'pre-wrap' }}>{item}</p>
+        ))}
+      </div>
+    )
+  }
+  // Medidas → lista mono con hairlines; puntos clave → lista con guiones
+  return (
+    <div className="dp-block">
+      <div className="dp-block-head"><span className="dp-lbl">{title}</span></div>
+      <ul className={variant === 'measure' ? 'dp-list dp-specs' : 'dp-list'}>
+        {items.map((item, index) => (
+          <li key={`${item}-${index}`}><span style={{ whiteSpace: 'pre-wrap' }}>{item}</span></li>
         ))}
       </ul>
-    </section>
+    </div>
   )
 }
 
 /** Documentos oficiales descargables (PDF, planos) de una seccion de manual. */
-function ManualDocuments({ documents, color }: { documents: { label: string; url: string }[]; color: string }) {
+function ManualDocuments({ documents }: { documents: { label: string; url: string }[] }) {
   return (
-    <section>
-      <div className="flex items-center gap-2 mb-2">
-        <FileText className="h-3.5 w-3.5" style={{ color }} />
-        <h4 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
-          Documentos
-        </h4>
+    <>
+      <div className="dp-block-head" style={{ marginTop: 26, marginBottom: 0 }}>
+        <span className="dp-lbl">Documentos</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="dp-docs">
         {documents.map((doc, index) => (
-          <a
-            key={`${doc.label}-${index}`}
-            href={doc.url || undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm transition hover:-translate-y-0.5"
-            style={{ background: LC.surface, border: `1px solid ${color}30`, color: LC.ink }}
-          >
-            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" style={{ color }} />
-            <span className="min-w-0 flex-1 leading-snug">{doc.label}</span>
+          <a key={`${doc.label}-${index}`} href={doc.url || undefined} target="_blank" rel="noopener noreferrer">
+            {doc.label}
           </a>
         ))}
       </div>
-    </section>
+    </>
   )
 }
 
 function ManualImages({
   images,
-  color,
   sectionTitle,
   machineSlug,
   canEdit,
 }: {
   images: { label: string; url: string }[]
-  color: string
   sectionTitle?: string
   machineSlug: string
   canEdit: boolean
@@ -1112,55 +734,43 @@ function ManualImages({
 
   return (
     <>
-      <section className="rounded-md p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <ImageIcon className="h-4 w-4" style={{ color }} />
-            <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
-              Referencias visuales
-            </h4>
-          </div>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => window.open(`/mantenimiento-planta/aprendizaje/admin/${machineSlug}?tab=manual`, '_blank', 'noopener,noreferrer')}
-              className="rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90"
-              style={{ background: `${color}18`, border: `1px solid ${color}45`, color }}
-            >
-              Agregar / editar referencias
-            </button>
-          )}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {images.map((image, index) => (
-            <button
-              key={`${image.label}-${index}`}
-              type="button"
-              onClick={() => image.url && setActiveIndex(index)}
-              className="group overflow-hidden rounded-md text-left transition hover:-translate-y-0.5"
-              style={{ background: LC.surface, border: `1px solid ${color}30` }}
-            >
-              {image.url ? (
-                <img src={image.url} alt={image.label} loading="lazy" className="h-56 w-full bg-white object-contain p-2 grayscale-[10%] transition group-hover:grayscale-0" />
-              ) : (
-                <div className="h-24 flex items-center justify-center" style={{ color: LC.inkGhost }}>
-                  <ImageIcon className="h-6 w-6" />
-                </div>
-              )}
-              <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs leading-snug" style={{ color: LC.inkMid }}>
-                <span>{readableLabel(image.label)}</span>
-                {image.url && <span className="font-semibold" style={{ color }}>Ver grande</span>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="dp-fig-head">
+        <span className="dp-lbl">Referencias visuales</span>
+        {canEdit && (
+          <button
+            type="button"
+            className="dp-edit"
+            onClick={() => window.open(`/mantenimiento-planta/aprendizaje/admin/${machineSlug}?tab=manual`, '_blank', 'noopener,noreferrer')}
+          >
+            Editar referencias
+          </button>
+        )}
+      </div>
+      <div className="dp-figs">
+        {images.map((image, index) => (
+          <button
+            key={`${image.label}-${index}`}
+            type="button"
+            className="dp-fig"
+            onClick={() => image.url && setActiveIndex(index)}
+          >
+            {image.url ? (
+              <img src={image.url} alt={image.label} loading="lazy" />
+            ) : (
+              <div className="dp-fig-empty"><ImageIcon className="h-6 w-6" /></div>
+            )}
+            <figcaption>
+              <span>{readableLabel(image.label)}</span>
+              {image.url && <span className="dp-fig-zoom">Ampliar</span>}
+            </figcaption>
+          </button>
+        ))}
+      </div>
 
       {activeImage && (
         <ImageLightbox
           image={activeImage}
           label={readableLabel(activeImage.label)}
-          color={color}
           onClose={() => setActiveIndex(null)}
           onPrevious={images.length > 1 ? () => setActiveIndex(index => index == null ? 0 : (index + images.length - 1) % images.length) : undefined}
           onNext={images.length > 1 ? () => setActiveIndex(index => index == null ? 0 : (index + 1) % images.length) : undefined}
@@ -1173,14 +783,12 @@ function ManualImages({
 function ImageLightbox({
   image,
   label,
-  color,
   onClose,
   onPrevious,
   onNext,
 }: {
   image: { label: string; url: string }
   label: string
-  color: string
   onClose: () => void
   onPrevious?: () => void
   onNext?: () => void
@@ -1221,24 +829,22 @@ function ImageLightbox({
       aria-modal="true"
       aria-label={label}
     >
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: LC.border, background: LC.surface }}>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--dp-rule)', background: 'var(--dp-paper)' }}>
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color }}>
-            Referencia visual
-          </p>
-          <h3 className="truncate text-sm font-semibold" style={{ color: LC.ink }}>{label}</h3>
+          <p className="dp-lbl">Referencia visual</p>
+          <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--dp-ink)' }}>{label}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => zoom(-0.25)} className="rounded-md p-2" style={{ background: LC.surfaceHi, color: LC.ink }} aria-label="Alejar">
+          <button type="button" onClick={() => zoom(-0.25)} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Alejar">
             <ZoomOut className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => zoom(0.25)} className="rounded-md p-2" style={{ background: LC.surfaceHi, color: LC.ink }} aria-label="Acercar">
+          <button type="button" onClick={() => zoom(0.25)} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Acercar">
             <ZoomIn className="h-4 w-4" />
           </button>
-          <button type="button" onClick={reset} className="rounded-md p-2" style={{ background: LC.surfaceHi, color: LC.ink }} aria-label="Restablecer zoom">
+          <button type="button" onClick={reset} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Restablecer zoom">
             <RotateCcw className="h-4 w-4" />
           </button>
-          <button type="button" onClick={onClose} className="rounded-md p-2" style={{ background: `${color}1f`, color }} aria-label="Cerrar visor">
+          <button type="button" onClick={onClose} className="rounded-md p-2" style={{ color: 'var(--dp-accent)' }} aria-label="Cerrar visor">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1274,7 +880,7 @@ function ImageLightbox({
         }}
       >
         {onPrevious && (
-          <button type="button" onClick={onPrevious} className="absolute left-3 top-1/2 z-10 rounded-full p-3" style={{ background: LC.surface, color: LC.ink }} aria-label="Imagen anterior">
+          <button type="button" onClick={onPrevious} className="absolute left-3 top-1/2 z-10 rounded-full p-3" style={{ background: 'var(--dp-paper)', color: 'var(--dp-ink)' }} aria-label="Imagen anterior">
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
@@ -1291,7 +897,7 @@ function ImageLightbox({
           onDoubleClick={() => zoom(scale > 1 ? -0.5 : 0.75)}
         />
         {onNext && (
-          <button type="button" onClick={onNext} className="absolute right-3 top-1/2 z-10 rounded-full p-3" style={{ background: LC.surface, color: LC.ink }} aria-label="Imagen siguiente">
+          <button type="button" onClick={onNext} className="absolute right-3 top-1/2 z-10 rounded-full p-3" style={{ background: 'var(--dp-paper)', color: 'var(--dp-ink)' }} aria-label="Imagen siguiente">
             <ChevronRight className="h-5 w-5" />
           </button>
         )}
@@ -1301,156 +907,50 @@ function ImageLightbox({
 }
 
 
-/** Cabecera de sub-seccion dentro de la pestana "Casos" (distingue flujos de diagnostico). */
-function CasosSectionHeader({
-  icon: Icon,
-  color,
-  badge,
-  title,
-  subtitle,
-}: {
-  icon: React.ElementType
-  color: string
-  badge: string
-  title: string
-  subtitle: string
-}) {
+/** Cabecera de sub-sección dentro de la pestaña "Casos" (distingue flujos de diagnóstico). */
+function CasosSectionHeader({ label, title, subtitle }: { label: string; title: string; subtitle: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-        style={{ background: `${color}16`, border: `1px solid ${color}33` }}
-      >
-        <Icon className="h-4 w-4" style={{ color }} />
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold text-[#e9eef3]">{title}</h3>
-          <span
-            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
-            style={{ background: `${color}16`, color, border: `1px solid ${color}30` }}
-          >
-            {badge}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs leading-relaxed" style={{ color: LC.inkLo }}>
-          {subtitle}
-        </p>
-      </div>
+    <div style={{ marginBottom: 24 }}>
+      <span className="dp-lbl" style={{ display: 'block', marginBottom: 10 }}>{label}</span>
+      <div className="dp-subhead"><h3>{title}</h3></div>
+      <div className="dp-sec-code">{subtitle}</div>
     </div>
   )
 }
 
-function DiagnosisList({ entries, color, machineSlug }: { entries: DiagnosisEntry[]; color: string; machineSlug?: string }) {
-  // Acordeón: una fila abierta a la vez. Arranca con la primera abierta.
-  const [openId, setOpenId] = useState<string | null>(entries[0]?.id ?? null)
-
+/**
+ * DiagnosisList — tabla de diagnóstico en formato dossier (flat, como el §06 del
+ * mockup): columna de caso (óxido) + síntoma, causas con guiones y solución con
+ * etiqueta verde. Sin acordeón: todo a la vista, se lee como una tabla de fallas.
+ */
+function DiagnosisList({ entries, machineSlug }: { entries: DiagnosisEntry[]; machineSlug?: string }) {
   return (
-    <div className="space-y-2.5">
+    <div className="dp-diag">
       {entries.map((entry, idx) => {
-        const open = openId === entry.id
+        const heading = entry.title || entry.symptom
+        const showSymptom = !!entry.title && !!entry.symptom && entry.title !== entry.symptom
         return (
-          <article
-            key={entry.id}
-            className="overflow-hidden rounded-lg transition-colors"
-            style={{
-              background: LC.surface,
-              border: `1px solid ${open ? LC.borderHi : LC.border}`,
-              boxShadow: open ? '0 4px 14px rgba(0,0,0,0.28)' : '0 1px 2px rgba(0,0,0,0.3)',
-            }}
-          >
-            {/* Fila clickeable: índice + título + preview del síntoma */}
-            <button
-              type="button"
-              onClick={() => setOpenId(open ? null : entry.id)}
-              aria-expanded={open}
-              className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
-              style={{ background: open ? LC.surfaceHi : 'transparent' }}
-            >
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-bold leading-snug" style={{ color: LC.ink }}>
-                  {entry.title || entry.symptom}
-                </span>
-                {!open && entry.symptom && (
-                  <span className="block text-xs mt-0.5 truncate" style={{ color: LC.inkLo }}>
-                    {entry.symptom}
-                  </span>
-                )}
-              </span>
-              <ChevronDown
-                className="h-4 w-4 flex-shrink-0 transition-transform duration-200"
-                style={{ color: open ? color : LC.inkLo, transform: open ? 'rotate(180deg)' : 'none' }}
-              />
-            </button>
-
-            {/* Cuerpo con animación de altura (grid 0fr→1fr, sin saltos) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateRows: open ? '1fr' : '0fr',
-                transition: 'grid-template-rows 260ms cubic-bezier(0.22,1,0.36,1)',
-              }}
-            >
-              <div style={{ overflow: 'hidden', minHeight: 0 }}>
-                <div
-                  className="px-4 pb-4 pt-4 space-y-5"
-                  style={{ borderTop: `1px solid ${LC.border}` }}
-                >
-                  <div>
-                    <span
-                      className="rounded px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]"
-                      style={{ background: `${color}18`, color, border: `1px solid ${color}35` }}
-                    >
-                      Caso {String(idx + 1).padStart(2, '0')}
-                    </span>
-                  </div>
-
-                  <HmiPracticeButton contentId={entry.id} machineSlug={machineSlug} color={color} />
-
-                  {/* Síntoma */}
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-1.5" style={{ color: LC.inkLo }}>
-                      Síntoma
-                    </p>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: LC.ink }}>
-                      {entry.symptom}
-                    </p>
-                  </div>
-
-                  {/* Causas */}
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-2" style={{ color: LC.inkLo }}>
-                      Causas posibles
-                    </p>
-                    <ul className="space-y-2">
-                      {entry.possibleCauses.map((cause, i) => (
-                        <li key={i} className="flex gap-2.5 text-sm leading-relaxed" style={{ color: LC.inkMid }}>
-                          <span
-                            className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ background: color }}
-                          />
-                          <span className="flex-1 whitespace-pre-wrap">{cause}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Solución — payoff destacado */}
-                  <div className="rounded-md p-4" style={{ background: `${color}0e`, border: `1px solid ${color}33` }}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Wrench className="h-3.5 w-3.5" style={{ color }} />
-                      <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color }}>
-                        Solución
-                      </p>
-                    </div>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: LC.ink }}>
-                      {entry.solution}
-                    </p>
-                  </div>
-                </div>
+          <div className="dp-row" key={entry.id}>
+            <div className="dp-code">CASO {String(idx + 1).padStart(2, '0')}</div>
+            <div>
+              <div className="dp-sy">{heading}</div>
+              {showSymptom && (
+                <div className="dp-cause" style={{ whiteSpace: 'pre-wrap' }}>{entry.symptom}</div>
+              )}
+              {entry.possibleCauses.length > 0 && (
+                <ul className="dp-causes">
+                  {entry.possibleCauses.map((cause, i) => (
+                    <li key={i}><span style={{ whiteSpace: 'pre-wrap' }}>{cause}</span></li>
+                  ))}
+                </ul>
+              )}
+              <div className="dp-sol">
+                <span className="dp-lbl">Solución</span>
+                <span style={{ whiteSpace: 'pre-wrap' }}>{entry.solution}</span>
               </div>
+              <HmiPracticeButton contentId={entry.id} machineSlug={machineSlug} />
             </div>
-          </article>
+          </div>
         )
       })}
     </div>
@@ -1459,11 +959,9 @@ function DiagnosisList({ entries, color, machineSlug }: { entries: DiagnosisEntr
 
 function GlossaryView({
   entries,
-  color,
   onGoToLesson,
 }: {
   entries: GlossaryEntry[]
-  color: string
   onGoToLesson: (order: number) => void
 }) {
   const [queryText, setQueryText] = useState('')
@@ -1473,48 +971,28 @@ function GlossaryView({
     : entries
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LC.inkLo }} />
-        <input
-          type="text"
-          value={queryText}
-          onChange={e => setQueryText(e.target.value)}
-          placeholder="Buscar sigla o termino…"
-          className="w-full rounded-lg py-2.5 pl-9 pr-3 text-sm outline-none"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}`, color: LC.ink }}
-        />
-      </div>
+    <div>
+      <input
+        type="text"
+        className="dp-search"
+        value={queryText}
+        onChange={e => setQueryText(e.target.value)}
+        placeholder="Buscar sigla o término…"
+      />
 
       {filtered.length === 0 ? (
-        <p className="px-1 py-6 text-center text-sm" style={{ color: LC.inkLo }}>
-          Sin resultados para “{queryText}”.
-        </p>
+        <p className="dp-noresult">Sin resultados para «{queryText}».</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="dp-gloss">
           {filtered.map(entry => (
-            <li
-              key={entry.id}
-              className="rounded-lg p-4"
-              style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-bold" style={{ color }}>{entry.term}</h3>
-                {entry.lesson != null && (
-                  <button
-                    type="button"
-                    onClick={() => onGoToLesson(entry.lesson!)}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition hover:brightness-110"
-                    style={{ background: `${color}16`, color, border: `1px solid ${color}33` }}
-                  >
-                    <BookOpen className="h-3 w-3" />
-                    Leccion {entry.lesson}
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-sm leading-relaxed" style={{ color: LC.inkMid }}>
-                {entry.definition}
-              </p>
+            <li key={entry.id}>
+              <span className="dp-term">{entry.term}</span>
+              <p className="dp-def">{entry.definition}</p>
+              {entry.lesson != null && (
+                <button type="button" className="dp-lesson" onClick={() => onGoToLesson(entry.lesson!)}>
+                  → Lección {entry.lesson}
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -1531,7 +1009,7 @@ function GlossaryView({
  * una pantalla real del clon, botón "Ver en el simulador" (mismo deep-link
  * que los procedimientos).
  */
-function GraderGlossaryView({ color }: { color: string }) {
+function GraderGlossaryView() {
   const navigate = useNavigate()
   const [queryText, setQueryText] = useState('')
   const entries = Object.entries(GRADER_GLOSSARY)
@@ -1544,55 +1022,31 @@ function GraderGlossaryView({ color }: { color: string }) {
     : entries
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LC.inkLo }} />
-        <input
-          type="text"
-          value={queryText}
-          onChange={e => setQueryText(e.target.value)}
-          placeholder="Buscar término, alias o definición…"
-          className="w-full rounded-lg py-2.5 pl-9 pr-3 text-sm outline-none"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}`, color: LC.ink }}
-        />
-      </div>
+    <div>
+      <input
+        type="text"
+        className="dp-search"
+        value={queryText}
+        onChange={e => setQueryText(e.target.value)}
+        placeholder="Buscar término, alias o definición…"
+      />
 
       {filtered.length === 0 ? (
-        <p className="px-1 py-6 text-center text-sm" style={{ color: LC.inkLo }}>
-          Sin resultados para “{queryText}”.
-        </p>
+        <p className="dp-noresult">Sin resultados para «{queryText}».</p>
       ) : (
-        <ul className="grid gap-2.5 sm:grid-cols-2">
+        <ul className="dp-gloss">
           {filtered.map(([key, entry]) => {
             const practiceUrl = glossaryPracticeUrl(key)
             return (
-              <li
-                key={key}
-                className="flex flex-col rounded-lg p-4"
-                style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-              >
-                <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <h3 className="text-sm font-bold" style={{ color }}>{entry.label}</h3>
-                  {(entry.alts ?? []).map(alt => (
-                    <span
-                      key={alt}
-                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                      style={{ background: LC.surfaceHi, color: LC.inkLo, border: `1px solid ${LC.border}` }}
-                    >
-                      {alt}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed" style={{ color: LC.inkMid }}>
-                  {entry.description}
-                </p>
+              <li key={key}>
+                <span className="dp-term">{entry.label}</span>
+                {(entry.alts ?? []).map(alt => <span key={alt} className="dp-alt">{alt}</span>)}
+                <p className="dp-def">{entry.description}</p>
                 {practiceUrl && (
                   <button
+                    type="button"
+                    className="dp-practice"
                     onClick={() => navigate(practiceUrl)}
-                    className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors"
-                    style={{ color, background: `${color}12`, border: `1px dashed ${color}55` }}
-                    onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
-                    onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
                     title="Abre el simulador HMI Grader en la pantalla donde vive este parámetro"
                   >
                     <MonitorPlay className="h-3.5 w-3.5" />
@@ -1614,7 +1068,7 @@ function GraderGlossaryView({ color }: { color: string }) {
  * traer foto, stock y ubicación reales. Agrupa por tipo; cada ítem enlaza al
  * módulo Repuestos (flujo diario). Fuente única compartida entre ambos lados.
  */
-function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string }) {
+function CommonPartsList({ parts }: { parts: CommonPart[] }) {
   const navigate = useNavigate()
   const allParts = parts
   const saps = allParts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
@@ -1634,117 +1088,69 @@ function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string 
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: LC.inkLo }}>
-        <span>{allParts.length} repuestos comunes · stock en vivo y foto (cuando está cargada) desde el módulo Repuestos</span>
-        {loading && <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> cargando datos…</span>}
-      </div>
+    <div className="dp-parts">
+      <p className="dp-parts-meta">
+        {allParts.length} repuestos comunes · stock en vivo y foto desde el módulo Repuestos{loading ? ' · cargando datos…' : ''}
+      </p>
 
       {grupos.map(grupo => (
-        <div key={grupo.tipo}>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-            <h3 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>{grupo.tipo}</h3>
-            <span className="text-[11px]" style={{ color: LC.inkLo }}>({grupo.items.length})</span>
-          </div>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {grupo.items.map((p, i) => (
-              <CommonPartCard
-                key={`${p.sap}-${i}`}
-                part={p}
-                resolved={bySap.get(p.sap) ?? (p.sapAlt ? bySap.get(p.sapAlt) : undefined)}
-                color={color}
-                onOpen={() => navigate(`/repuestos?q=${encodeURIComponent(p.sap)}`)}
-              />
-            ))}
-          </div>
+        <div className="dp-part-group" key={grupo.key}>
+          <span className="dp-lbl">{grupo.tipo} · {grupo.items.length}</span>
+          {grupo.items.map((p, i) => (
+            <CommonPartRow
+              key={`${p.sap}-${i}`}
+              part={p}
+              resolved={bySap.get(p.sap) ?? (p.sapAlt ? bySap.get(p.sapAlt) : undefined)}
+              onOpen={() => navigate(`/repuestos?q=${encodeURIComponent(p.sap)}`)}
+            />
+          ))}
         </div>
       ))}
     </div>
   )
 }
 
-function CommonPartCard({
-  part, resolved, color, onOpen,
-}: { part: CommonPart; resolved?: RepuestoResuelto; color: string; onOpen: () => void }) {
+function CommonPartRow({
+  part, resolved, onOpen,
+}: { part: CommonPart; resolved?: RepuestoResuelto; onOpen: () => void }) {
   return (
-    <div className="flex gap-3 rounded-lg p-3" style={{ background: LC.surface, border: `1px solid ${LC.border}` }}>
-      {/* Miniatura: foto real del repuesto o placeholder */}
-      <div
-        className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-md"
-        style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}
-      >
-        {resolved?.fotoUrl ? (
-          <img src={resolved.fotoUrl} alt={part.nombre} loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <Wrench className="h-5 w-5" style={{ color: LC.inkLo }} />
-        )}
-      </div>
+    <div className="dp-part">
+      {resolved?.fotoUrl ? (
+        <img className="dp-part-thumb" src={resolved.fotoUrl} alt={part.nombre} loading="lazy" />
+      ) : (
+        <div className="dp-part-thumb-empty"><Wrench className="h-5 w-5" /></div>
+      )}
 
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold leading-snug text-[#e9eef3]">{part.nombre}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: LC.inkMid }}>
-          <span className="font-mono">SAP {part.sap}{part.sapAlt ? ` / ${part.sapAlt}` : ''}</span>
-          {part.codigoManual && <span className="font-mono" style={{ color: LC.inkLo }}>Manual {part.codigoManual}</span>}
+      <div className="min-w-0">
+        <div className="dp-part-name">{part.nombre}</div>
+        <div className="dp-part-codes">
+          <span>SAP {part.sap}{part.sapAlt ? ` / ${part.sapAlt}` : ''}</span>
+          {part.codigoManual && <span className="dp-alt">Manual {part.codigoManual}</span>}
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <div className="dp-part-foot">
           {resolved?.stockFisico != null && (
-            <span
-              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-              style={{
-                background: resolved.stockFisico > 0 ? LC.okSoft : 'rgba(239,68,68,0.14)',
-                color: resolved.stockFisico > 0 ? LC.ok : LC.crit,
-                border: `1px solid ${resolved.stockFisico > 0 ? LC.ok + '4d' : LC.crit + '4d'}`,
-              }}
-            >
+            <span className={`dp-stock ${resolved.stockFisico > 0 ? 'dp-stock-ok' : 'dp-stock-no'}`}>
               Stock {resolved.stockFisico}
             </span>
           )}
-          {resolved?.ubicacion && (
-            <span className="text-[10px]" style={{ color: LC.inkLo }}>{resolved.ubicacion}</span>
-          )}
-          <button
-            onClick={onOpen}
-            className="ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors"
-            style={{ color, background: `${color}12`, border: `1px solid ${color}33` }}
-            onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
-            onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
-          >
-            <ExternalLink className="h-3 w-3" />
-            Ver en Repuestos
-          </button>
+          {resolved?.ubicacion && <span className="dp-part-loc">{resolved.ubicacion}</span>}
+          <button type="button" className="dp-part-link" onClick={onOpen}>Ver en Repuestos →</button>
         </div>
       </div>
     </div>
   )
 }
 
-function BibliografiaView({ entries, color }: { entries: BibliographyEntry[]; color: string }) {
+function BibliografiaView({ entries }: { entries: BibliographyEntry[] }) {
   return (
-    <ol className="space-y-2.5">
-      {entries.map((entry, idx) => (
-        <li
-          key={entry.id}
-          className="flex gap-3 rounded-lg p-4"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-        >
-          <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
-            style={{ background: `${color}16`, color, border: `1px solid ${color}40` }}
-          >
-            {idx + 1}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm leading-relaxed" style={{ color: LC.ink }}>{entry.label}</p>
+    <ol className="dp-biblio">
+      {entries.map(entry => (
+        <li key={entry.id}>
+          <span className="dp-bibno" />
+          <div>
+            <div className="dp-bibtext">{entry.label}</div>
             {entry.url && (
-              <a
-                href={entry.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold break-all transition hover:underline"
-                style={{ color }}
-              >
-                <ExternalLink className="h-3 w-3 shrink-0" />
+              <a href={entry.url} target="_blank" rel="noopener noreferrer">
                 {entry.url.replace(/^https?:\/\//, '')}
               </a>
             )}
@@ -1756,33 +1162,16 @@ function BibliografiaView({ entries, color }: { entries: BibliographyEntry[]; co
 }
 
 function EmptySection({
-  color,
   tabLabel,
   machineName,
 }: {
-  color: string
   tabLabel: string
   machineName: string
 }) {
   return (
-    <div
-      className="rounded-xl p-8 text-center"
-      style={{ background: LC.surface, border: `1px dashed ${LC.borderHi}` }}
-    >
-      <div
-        className="flex items-center justify-center w-14 h-14 rounded-full mx-auto mb-4"
-        style={{ background: `${color}12`, border: `1px solid ${color}30` }}
-      >
-        <Clock className="h-7 w-7" style={{ color, opacity: 0.7 }} />
-      </div>
-      <h3 className="text-base font-semibold text-[#e9eef3] mb-2">Sección en preparación</h3>
-      <p className="text-sm mb-1" style={{ color: LC.inkMid }}>
-        La sección <strong style={{ color: LC.ink }}>{tabLabel}</strong> de{' '}
-        <strong style={{ color: LC.ink }}>{machineName}</strong> aún no tiene contenido publicado.
-      </p>
-      <p className="text-xs mt-4" style={{ color: LC.inkLo }}>
-        El administrador puede agregar contenido desde el panel de administración.
-      </p>
-    </div>
+    <p className="dp-empty">
+      La sección <b>{tabLabel}</b> de <b>{machineName}</b> aún no tiene contenido publicado.
+      El administrador puede agregarlo desde el panel de administración.
+    </p>
   )
 }
