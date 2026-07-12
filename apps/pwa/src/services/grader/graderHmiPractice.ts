@@ -76,3 +76,22 @@ export function hmiPracticeUrl(contentOrRunbookId: string): string | null {
   if (!GRADER_HMI_TARGETS[runbookId]) return null
   return `/aprendizaje/hmi-grader?practica=${runbookId}`
 }
+
+/**
+ * Término del glosario (`GRADER_GLOSSARY`) → runbook cuyo target del simulador
+ * ejemplifica ese concepto. Deja "ver en el simulador" en los términos que
+ * apuntan a una pantalla real del clon; el resto queda como lectura.
+ */
+export const GLOSSARY_TERM_TO_RUNBOOK: Record<string, string> = {
+  fsWc: 'contrastacion-pocket',
+  eyeSync: 'ajuste-eye-sync',
+  tachometro: 'tachometro-cinta',
+  fotocelula: 'limpieza-fotocelula',
+  flipper: 'slow-mo-flipper',
+}
+
+/** URL de práctica para un término del glosario; null si el término no la tiene. */
+export function glossaryPracticeUrl(termKey: string): string | null {
+  const runbookId = GLOSSARY_TERM_TO_RUNBOOK[termKey]
+  return runbookId ? hmiPracticeUrl(runbookId) : null
+}

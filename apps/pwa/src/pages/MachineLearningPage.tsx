@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
-import { hmiPracticeUrl } from '@/services/grader/graderHmiPractice'
+import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmiPractice'
+import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
@@ -942,6 +943,9 @@ function ManualList({
             </div>
           </div>
 
+          {machineSlug === 'grader' && activeSection.id === 'grader-manual-glosario' ? (
+            <GraderGlossaryView color={color} />
+          ) : (
           <div className="grid gap-3">
             {blocks.documents.length > 0 && (
               <ManualDocuments documents={blocks.documents} color={color} />
@@ -982,6 +986,7 @@ function ManualList({
               />
             )}
           </div>
+          )}
         </div>
       </article>
 
@@ -1642,6 +1647,91 @@ function GlossaryView({
               </p>
             </li>
           ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * GraderGlossaryView — glosario rico del Grader (reemplaza el muro de viñetas
+ * que salía al meter GRADER_GLOSSARY como texto de un ManualSection).
+ * Lee la data estructurada directo: término destacado, alias como chips,
+ * buscador (término + alias + definición) y, para los términos que apuntan a
+ * una pantalla real del clon, botón "Ver en el simulador" (mismo deep-link
+ * que los procedimientos).
+ */
+function GraderGlossaryView({ color }: { color: string }) {
+  const navigate = useNavigate()
+  const [queryText, setQueryText] = useState('')
+  const entries = Object.entries(GRADER_GLOSSARY)
+  const q = queryText.trim().toLowerCase()
+  const filtered = q
+    ? entries.filter(([, e]) =>
+        e.label.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q) ||
+        (e.alts ?? []).some(a => a.toLowerCase().includes(q)))
+    : entries
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LC.inkLo }} />
+        <input
+          type="text"
+          value={queryText}
+          onChange={e => setQueryText(e.target.value)}
+          placeholder="Buscar término, alias o definición…"
+          className="w-full rounded-lg py-2.5 pl-9 pr-3 text-sm outline-none"
+          style={{ background: LC.surface, border: `1px solid ${LC.border}`, color: LC.ink }}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="px-1 py-6 text-center text-sm" style={{ color: LC.inkLo }}>
+          Sin resultados para “{queryText}”.
+        </p>
+      ) : (
+        <ul className="grid gap-2.5 sm:grid-cols-2">
+          {filtered.map(([key, entry]) => {
+            const practiceUrl = glossaryPracticeUrl(key)
+            return (
+              <li
+                key={key}
+                className="flex flex-col rounded-lg p-4"
+                style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+              >
+                <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <h3 className="text-sm font-bold" style={{ color }}>{entry.label}</h3>
+                  {(entry.alts ?? []).map(alt => (
+                    <span
+                      key={alt}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={{ background: LC.surfaceHi, color: LC.inkLo, border: `1px solid ${LC.border}` }}
+                    >
+                      {alt}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm leading-relaxed" style={{ color: LC.inkMid }}>
+                  {entry.description}
+                </p>
+                {practiceUrl && (
+                  <button
+                    onClick={() => navigate(practiceUrl)}
+                    className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                    style={{ color, background: `${color}12`, border: `1px dashed ${color}55` }}
+                    onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
+                    onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
+                    title="Abre el simulador HMI Grader en la pantalla donde vive este parámetro"
+                  >
+                    <MonitorPlay className="h-3.5 w-3.5" />
+                    Ver en el simulador
+                  </button>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
