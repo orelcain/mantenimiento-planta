@@ -337,15 +337,20 @@ html.in-iframe, html.in-iframe body {
    BOTONES FOOTER — 60px, #2E86C1
 ══════════════════════════════════════ */
 .btn-bar {
-  display: flex;
-  gap: 0;
+  /* Grilla FIJA de 4 slots = posiciones físicas F1-F4 del Z2 real (p002-p023):
+     cada pantalla puebla solo algunos slots y los vacíos quedan oscuros
+     (Menu usa 2-3-4, Velocidad usa 2 y 4, Monitor CPU usa 1 y 4...). */
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 2px;
   flex-shrink: 0;
   background: #1A5276;
-  padding: 4px 0 0;
+  padding: 4px 2px 2px;
   border-top: 1px solid #154360;
 }
+.btn-spacer { /* slot F-key sin botón en esta pantalla */ }
 .btn {
-  flex: 1;
+  width: 100%;
   height: 78px;
   background: #1F618D;
   border: 1px solid #2874A6;
@@ -396,8 +401,9 @@ html.in-iframe, html.in-iframe body {
 /* Fase 3 — lista con scroll (Menu) */
 .menu-list { flex: 1; overflow-y: auto; background: var(--dark-zone); }
 .menu-row {
-  padding: 15px 16px;
-  font-size: 16px;
+  padding: 14px 16px;
+  font-size: 18px;
+  font-weight: bold;
   color: #9fb7d4;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   cursor: pointer;
@@ -408,31 +414,25 @@ html.in-iframe, html.in-iframe body {
 
 /* Fase 3 — tabla clave/valor (Velocidad cintas, Resultados Clasificación) */
 .kv-table { flex: 1; padding: 18px 20px; overflow-y: auto; }
-.kv-head { display: flex; justify-content: flex-end; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
-.kv-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 15px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.kv-head { padding-left: 48%; color: #ffffff; font-size: 13px; font-weight: bold; margin-bottom: 10px; font-family: Arial, sans-serif; }
+.kv-row { display: grid; grid-template-columns: 48% 1fr; padding: 7px 0 7px 26px; font-size: 15px; color: #e8f1fb; font-family: Arial, sans-serif; }
+.kv-row > span:first-child { padding-right: 8px; }
 .kv-row .k { cursor: help; border-bottom: 1px dotted rgba(255,255,255,0.35); }
 .kv-gap { height: 20px; }
 .kv-note { margin-top: 16px; font-size: 11px; color: #7fa8d0; font-style: italic; line-height: 1.5; }
 
-/* Fase 3 — footer compacto alineado a la derecha (Resultados Clasificación: 1 solo botón "OK", no full-width) */
-.btn-bar.right { justify-content: flex-end; padding-right: 12px; }
-.btn-bar.right .btn { flex: 0 0 140px; }
-
-/* Fase 3 Lote 2 — footer con 2 botones separados (Monitor CPU: "Habilitar
-   vistas" a la izquierda, "Salir" a la derecha, sin compartir borde) */
-.btn-bar.split { justify-content: space-between; padding: 0 12px; }
-.btn-bar.split .btn { flex: 0 0 180px; }
-.btn-bar.split .btn + .btn { border-left: none; }
-
 /* Fase 3 Lote 2 — grilla de checkboxes (Probar Entradas / Probar Salidas) */
 .checkbox-grid {
+  /* El Z2 real llena columnas VERTICALES de a 8 (p010: In1-8 | In9-16;
+     p011: O1-8 | O9-16 | O17-24; p012+: 2 columnas). */
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 26px 44px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  grid-auto-rows: min-content;
-  gap: 8px 20px;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(8, min-content);
+  justify-content: flex-start;
+  gap: 10px 130px;
   align-content: start;
 }
 .chk-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #e8f1fb; font-family: Arial, sans-serif; }
@@ -493,15 +493,28 @@ html.in-iframe, html.in-iframe body {
 /* Explorador CAN — tabla de 5 columnas (clonado de p018/p020/p021) */
 .can-table { flex: 1; overflow-y: auto; }
 .can-row-head, .can-row {
+  /* p018: tabla con BORDES de celda visibles, texto azul brillante bold en
+     todas las filas (el real no atenúa las no seleccionadas), filas altas. */
   display: grid;
-  grid-template-columns: 56px 64px 1fr 112px 92px;
-  padding: 9px 12px;
-  font-size: 13px;
+  grid-template-columns: 56px 72px 1fr 128px 100px;
+  font-size: 15px;
+  font-weight: bold;
   font-family: Arial, sans-serif;
 }
-.can-row-head { color: #ffffff; font-weight: bold; background: #1F618D; position: sticky; top: 0; }
-.can-row { color: #9fb7d4; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.can-row.sel { background: #c7cbcf; color: #13233c; font-weight: 600; }
+.can-row-head span, .can-row span {
+  padding: 13px 10px;
+  border-right: 1px solid #2E86C1;
+  border-bottom: 1px solid #2E86C1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.can-row-head span:first-child, .can-row span:first-child { border-left: 1px solid #2E86C1; }
+.can-row-head { color: #F1C40F; position: sticky; top: 0; background: #1A5276; }
+.can-row-head span { border-top: 1px solid #2E86C1; }
+.can-row { color: #5B9BD5; }
+.can-row.sel { background: #c7cbcf; }
+.can-row.sel span { color: #5b7fa6; }
 
 /* ══════════════════════════════════════
    MARELEC SHELL — contiene rc-window + teclados
@@ -771,12 +784,12 @@ html.in-iframe, html.in-iframe body {
     <div class="panel" id="pp" data-title="Cambiar programa">
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
+      <div class="btn-bar"><div class="btn-spacer"></div><div class="btn-spacer"></div><div class="btn-spacer"></div><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
     <div class="panel" id="pm" data-title="Modo presentación">
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Próxima iteración —</div>
-      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
+      <div class="btn-bar"><div class="btn-spacer"></div><div class="btn-spacer"></div><div class="btn-spacer"></div><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
     <!-- Menu — clonado de p002-p004. Lista scrolleable de 15 ítems reales.
@@ -787,6 +800,7 @@ html.in-iframe, html.in-iframe body {
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="menu-list" id="menu-list"></div>
       <div class="btn-bar">
+        <div class="btn-spacer"></div>
         <button class="btn" onclick="scrollList('menu-list', 1)">Abajo</button>
         <button class="btn" onclick="scrollList('menu-list', -1)">Arriba</button>
         <button class="btn" onclick="goBack()">Salir</button>
@@ -801,6 +815,7 @@ html.in-iframe, html.in-iframe body {
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="menu-list" id="servicio-list"></div>
       <div class="btn-bar">
+        <div class="btn-spacer"></div>
         <button class="btn" onclick="scrollList('servicio-list', 1)">Abajo</button>
         <button class="btn" onclick="scrollList('servicio-list', -1)">Arriba</button>
         <button class="btn" onclick="goBack()">Salir</button>
@@ -814,6 +829,7 @@ html.in-iframe, html.in-iframe body {
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="checkbox-grid" id="entradas-grid"></div>
       <div class="btn-bar">
+        <div class="btn-spacer"></div>
         <button class="btn" onclick="al('Sin página anterior')">Anterior</button>
         <button class="btn" onclick="al('Sin más páginas')">Next</button>
         <button class="btn" onclick="goBack()">Salir</button>
@@ -872,8 +888,9 @@ html.in-iframe, html.in-iframe body {
           <div class="cpu-row"><span>Pocket4</span><span>17</span></div>
         </div>
       </div>
-      <div class="btn-bar split">
+      <div class="btn-bar">
         <button class="btn" onclick="habilitarVistasCpu()">Habilitar vistas</button>
+        <div class="btn-spacer"></div><div class="btn-spacer"></div>
         <button class="btn" onclick="goBack()">Salir</button>
       </div>
     </div>
@@ -887,7 +904,7 @@ html.in-iframe, html.in-iframe body {
         <span class="login-label">Introducir Clave</span>
         <input type="password" class="login-input" id="clave-input" onkeydown="if(event.key==='Enter')intentarClave()">
       </div>
-      <div class="btn-bar right"><button class="btn" onclick="goBack()">Salir</button></div>
+      <div class="btn-bar"><div class="btn-spacer"></div><div class="btn-spacer"></div><div class="btn-spacer"></div><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
     <!-- Cambiar Parametros — editor árbol+lista+ayuda, clonado de p024
@@ -945,7 +962,9 @@ html.in-iframe, html.in-iframe body {
         <p class="kv-note">◆ Configurado en la app: Análisis de Turno → Config Física → tab Cintas (<code>GraderPhysicalConfig.belts[]</code>). Esta pantalla del Z2 es un reporte en vivo (Reset Stats), no el punto de edición.</p>
       </div>
       <div class="btn-bar">
+        <div class="btn-spacer"></div>
         <button class="btn" onclick="al('Reset Stats')">Reset Stats</button>
+        <div class="btn-spacer"></div>
         <button class="btn" onclick="goBack()">Salir</button>
       </div>
     </div>
@@ -963,7 +982,7 @@ html.in-iframe, html.in-iframe body {
         <div class="kv-row"><span>Cajas totales clasificadas</span><span>0</span></div>
         <div class="kv-row"><span>Total unsorted pcs</span><span>0</span></div>
       </div>
-      <div class="btn-bar right"><button class="btn" onclick="goBack()">OK</button></div>
+      <div class="btn-bar"><div class="btn-spacer"></div><div class="btn-spacer"></div><div class="btn-spacer"></div><button class="btn" onclick="goBack()">OK</button></div>
     </div>
 
     <!-- Estado — SIN pantallazo fuente (ver Gaps en NAVEGACION.md): el PDF
@@ -972,7 +991,7 @@ html.in-iframe, html.in-iframe body {
     <div class="panel" id="estado" data-title="Estado">
       <div class="title-row"><div class="title-bar crumb"></div></div>
       <div class="pb">— Sin pantallazo fuente: pendiente de documentar en terreno —</div>
-      <div class="btn-bar"><button class="btn" onclick="goBack()">Salir</button></div>
+      <div class="btn-bar"><div class="btn-spacer"></div><div class="btn-spacer"></div><div class="btn-spacer"></div><button class="btn" onclick="goBack()">Salir</button></div>
     </div>
 
     </div><!-- #home-body -->
@@ -2237,10 +2256,12 @@ function currentBtnBar() {
 
 document.querySelectorAll('.fkey').forEach((fk, i) => {
   fk.addEventListener('click', () => {
+    /* El slot i-ésimo del footer ES la posición F(i+1) del panel físico —
+       si el slot está vacío (spacer), la F-key no hace nada (fiel al Z2). */
     const bar = currentBtnBar();
-    const btns = bar ? bar.querySelectorAll('.btn') : [];
-    if (btns[i]) {
-      btns[i].click();
+    const slot = bar ? bar.children[i] : null;
+    if (slot && slot.classList.contains('btn')) {
+      slot.click();
       addLog(`F${i + 1} pressed`);
     }
     logEventToParent('fkey-press', 'F' + (i + 1));
