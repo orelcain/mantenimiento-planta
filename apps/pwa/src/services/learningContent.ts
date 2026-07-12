@@ -21,6 +21,14 @@ import {
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from './firebase'
 import { getB200Sections, ALL_DEFAULT_SECTIONS, type B200Section } from './baader200Learning'
+import {
+  GRADER_CONTENT_UPDATED_AT,
+  GRADER_LEARNING_SLUG,
+  listGraderDiagnosis as graderDiagnosisSeed,
+  listGraderFlows as graderFlowsSeed,
+  listGraderManualSections as graderManualSeed,
+  listGraderProcedures as graderProceduresSeed,
+} from './graderLearning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -43,6 +51,12 @@ export interface Procedure {
   createdAt: number
   updatedAt: number
   createdBy?: string
+  /** Ruta de menu del controlador, ej. MENU → Servicio → Cambiar parametros. */
+  menuPath?: string[]
+  /** Formula de calculo asociada, con el significado de cada variable. */
+  formula?: { expression: string; variables: Record<string, string> }
+  /** Condiciones verificables que definen que el procedimiento salio bien. */
+  successCriteria?: string[]
 }
 
 export interface ManualSection {
@@ -164,7 +178,7 @@ async function listStoredDiagnosis(machineSlug: string): Promise<StoredOverride<
   return snap.docs.map(d => ({ ...(d.data() as StoredOverride<DiagnosisEntry>), id: d.id }))
 }
 
-function mergeB200Overrides<T extends { id: string; updatedAt: number }>(
+function mergeSeedOverrides<T extends { id: string; updatedAt: number }>(
   base: T[],
   stored: StoredOverride<T>[],
 ): T[] {
@@ -261,12 +275,12 @@ async function listB200ManualSections(): Promise<ManualSection[]> {
       updatedAt: section.updatedAt.getTime(),
     }))
   const stored = await listStoredManualSections(B200_LEARNING_SLUG)
-  return mergeB200Overrides(base, stored).sort((a, b) => a.order - b.order)
+  return mergeSeedOverrides(base, stored).sort((a, b) => a.order - b.order)
 }
 
 async function listB200Procedures(): Promise<Procedure[]> {
   const sections = await getBaader200SourceSections()
-  const base = sections
+  const base: Procedure[] = sections
     .filter(section => section.type === 'seguridad' || section.type === 'precaucion')
     .map(section => ({
       id: `b200-procedure-${section.id}`,
@@ -287,7 +301,7 @@ async function listB200Procedures(): Promise<Procedure[]> {
       createdBy: 'baader200-adapter',
     }))
   const stored = await listStoredProcedures(B200_LEARNING_SLUG)
-  return mergeB200Overrides(base, stored)
+  return mergeSeedOverrides(base, stored)
 }
 
 async function listB200Flows(): Promise<Flow[]> {
@@ -306,7 +320,7 @@ async function listB200Flows(): Promise<Flow[]> {
       updatedAt: section.updatedAt.getTime(),
     }))
   const stored = await listStoredFlows(B200_LEARNING_SLUG)
-  return mergeB200Overrides(base, stored)
+  return mergeSeedOverrides(base, stored)
 }
 
 async function listB200Diagnosis(): Promise<DiagnosisEntry[]> {
@@ -323,7 +337,7 @@ async function listB200Diagnosis(): Promise<DiagnosisEntry[]> {
       updatedAt: section.updatedAt.getTime(),
     }))
   const stored = await listStoredDiagnosis(B200_LEARNING_SLUG)
-  return mergeB200Overrides(base, stored)
+  return mergeSeedOverrides(base, stored)
 }
 
 async function getB200ContentCounts(): Promise<MachineContentCounts> {
@@ -403,11 +417,54 @@ function getB142ContentCounts(): MachineContentCounts {
 }
 
 // ─────────────────────────────────────────────────────────────
+// GRADER — el catalogo de runbooks Z2 traducido al formato del expediente.
+// La fuente vive en services/grader/graderRunbooks.ts (sus `triggers` alimentan
+// el plan de accion del Analisis de Turno); aqui solo se adapta y se le aplican
+// los overrides que un admin haya guardado en Firestore.
+// ─────────────────────────────────────────────────────────────
+
+async function listGraderManualSections(): Promise<ManualSection[]> {
+  const stored = await listStoredManualSections(GRADER_LEARNING_SLUG)
+  return mergeSeedOverrides(graderManualSeed(), stored).sort((a, b) => a.order - b.order)
+}
+
+async function listGraderProcedures(): Promise<Procedure[]> {
+  const stored = await listStoredProcedures(GRADER_LEARNING_SLUG)
+  return mergeSeedOverrides(graderProceduresSeed(), stored)
+}
+
+async function listGraderFlows(): Promise<Flow[]> {
+  const stored = await listStoredFlows(GRADER_LEARNING_SLUG)
+  return mergeSeedOverrides(graderFlowsSeed(), stored)
+}
+
+async function listGraderDiagnosis(): Promise<DiagnosisEntry[]> {
+  const stored = await listStoredDiagnosis(GRADER_LEARNING_SLUG)
+  return mergeSeedOverrides(graderDiagnosisSeed(), stored)
+}
+
+async function getGraderContentCounts(): Promise<MachineContentCounts> {
+  const [manual, procedures, flows, diagnosis] = await Promise.all([
+    listGraderManualSections(),
+    listGraderProcedures(),
+    listGraderFlows(),
+    listGraderDiagnosis(),
+  ])
+  return {
+    manual: manual.length,
+    procedures: procedures.length,
+    flows: flows.length,
+    diagnosis: diagnosis.length,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // PROCEDURES
 // ─────────────────────────────────────────────────────────────
 
 export async function listProcedures(machineSlug: string): Promise<Procedure[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Procedures()
+  if (machineSlug === GRADER_LEARNING_SLUG) return listGraderProcedures()
 
   return listStoredProcedures(machineSlug)
     .then(list => list.filter(item => !item._deleted).map(stripDeleted))
@@ -438,6 +495,10 @@ export async function saveProcedure(
 }
 
 export async function deleteProcedure(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-procedure-')) {
+    await setDoc(sectionDoc(machineSlug, 'procedures', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-procedure-')) {
     await setDoc(sectionDoc(machineSlug, 'procedures', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
@@ -452,6 +513,7 @@ export async function deleteProcedure(machineSlug: string, id: string): Promise<
 export async function listManualSections(machineSlug: string): Promise<ManualSection[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200ManualSections()
   if (machineSlug === B142_LEARNING_SLUG) return listB142ManualSections()
+  if (machineSlug === GRADER_LEARNING_SLUG) return listGraderManualSections()
 
   return listStoredManualSections(machineSlug)
     .then(list => list.filter(item => !item._deleted).map(stripDeleted))
@@ -470,6 +532,10 @@ export async function saveManualSection(
 }
 
 export async function deleteManualSection(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-manual-')) {
+    await setDoc(sectionDoc(machineSlug, 'manual', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-manual-')) {
     await setDoc(sectionDoc(machineSlug, 'manual', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
@@ -483,6 +549,7 @@ export async function deleteManualSection(machineSlug: string, id: string): Prom
 
 export async function listFlows(machineSlug: string): Promise<Flow[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Flows()
+  if (machineSlug === GRADER_LEARNING_SLUG) return listGraderFlows()
 
   return listStoredFlows(machineSlug)
     .then(list => list.filter(item => !item._deleted).map(stripDeleted))
@@ -501,6 +568,10 @@ export async function saveFlow(
 }
 
 export async function deleteFlow(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-flow-')) {
+    await setDoc(sectionDoc(machineSlug, 'flows', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-flow-')) {
     await setDoc(sectionDoc(machineSlug, 'flows', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
@@ -514,6 +585,7 @@ export async function deleteFlow(machineSlug: string, id: string): Promise<void>
 
 export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Diagnosis()
+  if (machineSlug === GRADER_LEARNING_SLUG) return listGraderDiagnosis()
 
   return listStoredDiagnosis(machineSlug)
     .then(list => list.filter(item => !item._deleted).map(stripDeleted))
@@ -532,6 +604,10 @@ export async function saveDiagnosis(
 }
 
 export async function deleteDiagnosis(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-diagnosis-')) {
+    await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-diagnosis-')) {
     await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
@@ -604,6 +680,7 @@ export async function getMachineContentCounts(
 ): Promise<MachineContentCounts> {
   if (machineSlug === B200_LEARNING_SLUG) return getB200ContentCounts()
   if (machineSlug === B142_LEARNING_SLUG) return getB142ContentCounts()
+  if (machineSlug === GRADER_LEARNING_SLUG) return getGraderContentCounts()
 
   const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
     getDocs(sectionCollection(machineSlug, 'manual')),
@@ -637,6 +714,10 @@ export async function getMachineContentMeta(
   }
   if (machineSlug === B142_LEARNING_SLUG) {
     return { ...getB142ContentCounts(), lastUpdatedAt: B142_CONTENT_UPDATED_AT }
+  }
+  if (machineSlug === GRADER_LEARNING_SLUG) {
+    const counts = await getGraderContentCounts()
+    return { ...counts, lastUpdatedAt: GRADER_CONTENT_UPDATED_AT }
   }
 
   const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
@@ -676,8 +757,10 @@ export async function getSymptomsForMachines(machineSlugs: string[]): Promise<Sy
   const results = await Promise.all(
     machineSlugs.map(async slug => {
       try {
-        if (slug === B200_LEARNING_SLUG) {
-          const diagnosis = await listB200Diagnosis()
+        if (slug === B200_LEARNING_SLUG || slug === GRADER_LEARNING_SLUG) {
+          const diagnosis = slug === B200_LEARNING_SLUG
+            ? await listB200Diagnosis()
+            : await listGraderDiagnosis()
           return diagnosis.map(entry => ({
             machineSlug: slug,
             diagnosisId: entry.id,

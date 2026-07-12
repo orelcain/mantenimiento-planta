@@ -79,8 +79,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Clasificador automatico por peso y tamaño. Manual Marelec MS4/12, SOPs y runbooks Z2 (contrastacion, calibracion, mantencion, limpieza, troubleshooting).',
     icon: Scale,
     color: '#44dd88',
-    customRoute: '/aprendizaje/grader-manual',
-    sections: { manual: true, procedures: true, flows: false, diagnosis: true },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'baader-200',

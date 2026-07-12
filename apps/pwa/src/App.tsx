@@ -91,7 +91,6 @@ const Visor3DInteractivePlataformaPontonPage = lazyWithReload(() => import('@/pa
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
 const GraderQuickChangePage = lazyWithReload(() => import('@/pages/AnalisisGrader/GraderQuickChangePage').then((mod) => ({ default: mod.GraderQuickChangePage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
-const AnalisisGraderAyudaPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderAyudaPage').then((mod) => ({ default: mod.AnalisisGraderAyudaPage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
 
 // Redirect legacy `/analisis-grader/detalle?date=X&shift=Y` → `/analisis-grader/turno/:id`
@@ -368,17 +367,14 @@ export function App() {
                 </Suspense>
               }
             />
-            <Route
-              path="/aprendizaje/grader-manual"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <AnalisisGraderAyudaPage />
-                </Suspense>
-              }
-            />
           </Route>
 
           {/* Legacy redirects — keep old URLs working */}
+          {/* El Grader paso a usar el expediente generico de maquina. Ambos redirects
+              viven fuera del bloque protegido: el destino es publico, igual que el
+              resto del Centro de Aprendizaje. */}
+          <Route path="/aprendizaje/grader-manual" element={<Navigate to="/aprendizaje/maquina/grader" replace />} />
+          <Route path="/analisis-grader/ayuda" element={<Navigate to="/aprendizaje/maquina/grader" replace />} />
           <Route path="/baader-200/learn/:sectionId" element={
             <Suspense fallback={<LoadingScreen />}><Baader200LearningPublicPage /></Suspense>
           } />
@@ -654,8 +650,6 @@ export function App() {
                 <AnalisisGraderPeriodoPage />
               </Suspense>
             } />
-            {/* Movido al Centro de Aprendizaje — se deja redirect por links/bookmarks viejos */}
-            <Route path="analisis-grader/ayuda" element={<Navigate to="/aprendizaje/grader-manual" replace />} />
             <Route path="gantt" element={
               <Suspense fallback={<LoadingScreen />}>
                 <GanttModulePage />
