@@ -7,8 +7,9 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
+import { findMachineBySlug } from '@/data/learningMachines'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
@@ -56,6 +57,13 @@ interface RepuestoDetailPanelProps {
    * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
    */
   onSaveApodos?: (apodos: string[]) => Promise<void>
+  // ── Repuesto común / más usado de una máquina (lista compartida de planta) ──
+  /** Slugs de máquina para las que este repuesto está marcado como común. */
+  comunEn?: string[]
+  /** Abrir el selector de máquina para marcarlo como común. Solo admin. */
+  onMarkComun?: () => void
+  /** Quitar la marca "común" de una máquina. Solo admin. */
+  onRemoveComun?: (slug: string) => void
 }
 
 /** Botón de acción compacto del panel (icono + etiqueta). */
@@ -105,7 +113,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -364,6 +372,48 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             </div>
           )}
         </div>
+
+        {/* Repuesto común / más usado — lista COMPARTIDA de planta (marca del admin).
+            Se refleja en la pestaña "Repuestos comunes" del Centro de Aprendizaje. */}
+        {(( comunEn && comunEn.length > 0) || onMarkComun) && (
+          <div className="border-b border-border/60 py-2">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <Wrench className="h-3.5 w-3.5 text-emerald-500" />
+              Repuesto común de
+            </div>
+            {comunEn && comunEn.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {comunEn.map((slug) => (
+                  <span
+                    key={slug}
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-[12px] font-medium text-emerald-600 dark:text-emerald-400"
+                  >
+                    {findMachineBySlug(slug)?.name ?? slug}
+                    {onRemoveComun && (
+                      <button onClick={() => onRemoveComun(slug)} className="ml-0.5 opacity-60 hover:opacity-100" aria-label="Quitar">
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                ))}
+                {onMarkComun && (
+                  <button onClick={onMarkComun} className="inline-flex items-center gap-1 px-1 text-[11px] text-primary hover:underline">
+                    <Plus className="h-3 w-3" /> Otra máquina
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-[12.5px] text-muted-foreground">Marcalo como repuesto común de una máquina para que aparezca en su lista de aprendizaje.</p>
+                {onMarkComun && (
+                  <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onMarkComun}>
+                    <Wrench className="h-4 w-4" /> Marcar como común
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Manuales del equipo (heredados de los equipos donde se usa) */}
         {(manualesHeredados.length > 0 || manualesLoading) && (

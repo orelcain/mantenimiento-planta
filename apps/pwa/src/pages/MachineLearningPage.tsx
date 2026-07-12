@@ -5,7 +5,7 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
@@ -19,6 +19,7 @@ import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmi
 import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
+import { useMarkedCommonParts } from '@/hooks/repuestos/useMarkedCommonParts'
 import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
@@ -490,7 +491,7 @@ export function MachineLearningPage() {
         ) : activeTab === 'bibliografia' && bibliografia.length > 0 ? (
           <BibliografiaView entries={bibliografia} color={machine.color} />
         ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
-          <CommonPartsList parts={commonParts} color={machine.color} />
+          <CommonPartsList parts={commonParts} slug={machine.slug} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -1819,14 +1820,20 @@ function GraderGlossaryView({ color }: { color: string }) {
  * traer foto, stock y ubicación reales. Agrupa por tipo; cada ítem enlaza al
  * módulo Repuestos (flujo diario). Fuente única compartida entre ambos lados.
  */
-function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string }) {
+function CommonPartsList({ parts, slug, color }: { parts: CommonPart[]; slug: string; color: string }) {
   const navigate = useNavigate()
-  const saps = parts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
+  // Config estática + los marcados desde el módulo Repuestos (comunEn), dedup por SAP.
+  const { parts: marked } = useMarkedCommonParts(slug)
+  const allParts = useMemo(() => {
+    const seen = new Set(parts.map(p => p.sap))
+    return [...parts, ...marked.filter(m => !seen.has(m.sap))]
+  }, [parts, marked])
+  const saps = allParts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
   const { bySap, loading } = useRepuestosByCodigos(saps)
 
   // agrupar preservando el orden de aparición de los tipos
   const grupos: { tipo: string; items: CommonPart[] }[] = []
-  for (const p of parts) {
+  for (const p of allParts) {
     let g = grupos.find(x => x.tipo === p.tipo)
     if (!g) { g = { tipo: p.tipo, items: [] }; grupos.push(g) }
     g.items.push(p)
@@ -1835,7 +1842,7 @@ function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: LC.inkLo }}>
-        <span>{parts.length} repuestos comunes · stock en vivo y foto (cuando está cargada) desde el módulo Repuestos</span>
+        <span>{allParts.length} repuestos comunes · stock en vivo y foto (cuando está cargada) desde el módulo Repuestos</span>
         {loading && <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> cargando datos…</span>}
       </div>
 

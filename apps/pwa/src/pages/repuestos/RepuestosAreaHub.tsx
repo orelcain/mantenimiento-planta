@@ -14,7 +14,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin, Boxes, Wrench } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
-import { findMachineBySlug } from '@/data/learningMachines'
+import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -323,10 +323,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
   const [repFavOnly, setRepFavOnly] = useState(false)
-  // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine),
-  // la misma que se ve en la pestaña "Repuestos comunes" del Centro de Aprendizaje.
-  // Distinto de los favoritos (que son personales por usuario).
+  // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine
+  // estática + marca `comunEn` del doc), la misma que se ve en la pestaña "Repuestos
+  // comunes" del Aprendizaje. Distinto de los favoritos (personales por usuario).
   const [repComunOnly, setRepComunOnly] = useState(false)
+  // Picker "marcar como común de [máquina]" (abierto desde el panel de detalle).
+  const [comunPickerOpen, setComunPickerOpen] = useState(false)
+  const [comunQuery, setComunQuery] = useState('')
   useEffect(() => {
     if (!user?.id) return
     getRepuestoFavs(user.id).then((arr) => setFavKeys(new Set(arr))).catch(() => {})
@@ -672,7 +675,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const filteredBase = useMemo(() => {
     let res = scopedRepuestos
     if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
-    if (repComunOnly) res = res.filter((r) => isCommonPartSap(r.codigoSAP))
+    if (repComunOnly) res = res.filter((r) => isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0)
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
       const ids = new Set(l?.repuestoIds ?? [])
@@ -706,9 +709,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     return res
   }, [scopedRepuestos, repFavOnly, repComunOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
-  // Cuántos comunes hay en el alcance actual (para el contador del chip).
+  // Cuántos comunes hay en el alcance actual (lista estática por SAP + marca comunEn).
   const comunesEnScope = useMemo(
-    () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) ? 1 : 0), 0),
+    () => scopedRepuestos.reduce((n, r) => n + (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0 ? 1 : 0), 0),
     [scopedRepuestos],
   )
 
@@ -1041,6 +1044,34 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         toast({ variant: 'destructive', title: 'No se pudo asignar el equipo', description: e instanceof Error ? e.message : '' })
       } finally {
         setAsignarEquipoSaving(false)
+      }
+    },
+    [selectedRep, resolveSources, crudUpdate, refreshCatalog, toast],
+  )
+
+  // Marcar / desmarcar el repuesto como "común" de una máquina (lista compartida).
+  // Escribe `comunEn` en el/los doc(s) del SAP (con auditoría vía crudUpdate).
+  const handleToggleComun = useCallback(
+    async (slug: string) => {
+      if (!selectedRep) return
+      const sources = resolveSources(selectedRep)
+      if (!sources.length) { toast({ variant: 'destructive', title: 'No se encontró la pieza base' }); return }
+      const machineName = findMachineBySlug(slug)?.name ?? slug
+      const wasComun = sources.some((s) => (s.repuesto.comunEn || []).includes(slug))
+      try {
+        for (const s of sources) {
+          const cur = s.repuesto.comunEn || []
+          const next = cur.includes(slug) ? cur.filter((x) => x !== slug) : [...cur, slug]
+          await crudUpdate('repuestos', s.repuesto.id, { comunEn: next }, s.repuesto)
+        }
+        toast({
+          title: wasComun ? 'Quitado de comunes' : 'Marcado como común',
+          description: machineName,
+          variant: 'success',
+        })
+        await refreshCatalog()
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'No se pudo actualizar', description: e instanceof Error ? e.message : '' })
       }
     },
     [selectedRep, resolveSources, crudUpdate, refreshCatalog, toast],
@@ -1664,9 +1695,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 size="sm"
                 className="gap-1.5"
                 onClick={() => setRepFavOnly((v) => !v)}
-                title="Mostrar solo repuestos favoritos"
+                title="Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina."
               >
-                <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Favoritos
+                <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Mis favoritos
                 {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
               </Button>
               {comunesEnScope > 0 && (
@@ -1803,10 +1834,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   </span>
                                 )}
                                 <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
-                                {isCommonPartSap(r.codigoSAP) && (
+                                {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
                                     className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
-                                    title={`Repuesto común / más usado de: ${machinesForCommonSap(r.codigoSAP).map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
+                                    title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
                                   </span>
@@ -1964,6 +1995,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
           onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
+          comunEn={selectedRep.comunEn}
+          onMarkComun={isAdmin ? () => { setComunQuery(''); setComunPickerOpen(true) } : undefined}
+          onRemoveComun={isAdmin ? (slug) => handleToggleComun(slug) : undefined}
         />
       )}
 
@@ -2161,6 +2195,37 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
                   <span className="min-w-0 flex-1 truncate">{e.alias || e.nombre}</span>
                   {e.codigo && <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{e.codigo}</span>}
+                </button>
+              ))
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Marcar como común de [máquina] — lista compartida (badge en tabla + pestaña de Aprendizaje) */}
+      <Dialog open={comunPickerOpen} onOpenChange={(o) => !o && setComunPickerOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Marcar como común de…</DialogTitle>
+            <DialogDescription>Elegí la máquina para la que este repuesto es común / más usado. Aparecerá en su lista del Centro de Aprendizaje y con el badge «común» acá.</DialogDescription>
+          </DialogHeader>
+          <Input value={comunQuery} onChange={(e) => setComunQuery(e.target.value)} placeholder="Buscar máquina…" autoFocus />
+          <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">
+            {(() => {
+              const already = new Set(selectedRep?.comunEn || [])
+              const q = normalizeForSearch(comunQuery)
+              const cands = LEARNING_MACHINES
+                .filter((m) => !isCourseMachine(m))
+                .filter((m) => !already.has(m.slug) && (!q || normalizeForSearch(m.name).includes(q)))
+              if (!cands.length) return <p className="px-1 py-2 text-xs text-muted-foreground">Sin máquinas que coincidan.</p>
+              return cands.map((m) => (
+                <button
+                  key={m.slug}
+                  onClick={() => { handleToggleComun(m.slug); setComunPickerOpen(false) }}
+                  className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted/40 hover:border-primary/40"
+                >
+                  <Wrench className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <span className="min-w-0 flex-1 truncate">{m.name}</span>
                 </button>
               ))
             })()}

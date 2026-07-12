@@ -113,6 +113,10 @@ export interface Repuesto {
   equipos?: string[];
   /** Códigos SAP de esos nodos (denormalizado, para búsqueda/legibilidad) */
   equiposCodigos?: string[];
+  /** Slugs de LEARNING_MACHINES para las que este repuesto es "común / más usado"
+   *  (marca manual del técnico/admin; complementa la lista estática commonPartsByMachine).
+   *  Se ve en la pestaña "Repuestos comunes" de Aprendizaje y con el badge "común" acá. */
+  comunEn?: string[];
   /** Sub-repuestos: docId del repuesto padre en la colección plana */
   parentRepuestoId?: string | null;
   /** Marca física (repuestos migrados desde plantAssets: motores/bombas) */

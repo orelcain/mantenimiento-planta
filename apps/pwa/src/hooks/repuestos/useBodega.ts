@@ -68,6 +68,8 @@ export interface BodegaMergedItem {
   textoBreve: string
   alias?: string
   nombresComunes?: string[]
+  /** Slugs de máquina para las que este repuesto es "común" (marca compartida). */
+  comunEn?: string[]
   tipo?: string
   /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
   clase?: MaterialClase
@@ -339,6 +341,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         textoBreve: rep.textoBreve || rep.descripcion || '',
         alias: rep.alias,
         nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
+        comunEn: Array.isArray(rep.comunEn) ? rep.comunEn : undefined,
         tipo: rep.tipo,
         clase: rep.clase,
         tieneSap: rep.tieneSap ?? !!sap,
