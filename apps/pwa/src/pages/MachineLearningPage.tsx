@@ -303,21 +303,41 @@ export function MachineLearningPage() {
                 )}
               </div>
 
-              {!isCourse && machine.hmiRoute && (
-                <button
-                  onClick={() => navigate(machine.hmiRoute!)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
-                  style={{
-                    color: machine.color,
-                    background: `${machine.color}14`,
-                    border: `1px solid ${machine.color}40`,
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = `${machine.color}26`)}
-                  onMouseLeave={e => (e.currentTarget.style.background = `${machine.color}14`)}
-                >
-                  <MonitorPlay className="h-4 w-4" />
-                  Practicar en el simulador — {machine.hmiLabel}
-                </button>
+              {!isCourse && (machine.hmiRoute || machine.immersiveRoute) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {machine.immersiveRoute && (
+                    <button
+                      onClick={() => navigate(machine.immersiveRoute!)}
+                      className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+                      style={{
+                        color: machine.color,
+                        background: `${machine.color}14`,
+                        border: `1px solid ${machine.color}40`,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = `${machine.color}26`)}
+                      onMouseLeave={e => (e.currentTarget.style.background = `${machine.color}14`)}
+                    >
+                      <BookMarked className="h-4 w-4" />
+                      {machine.immersiveLabel ?? 'Manual completo'}
+                    </button>
+                  )}
+                  {machine.hmiRoute && (
+                    <button
+                      onClick={() => navigate(machine.hmiRoute!)}
+                      className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+                      style={{
+                        color: machine.color,
+                        background: `${machine.color}14`,
+                        border: `1px solid ${machine.color}40`,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = `${machine.color}26`)}
+                      onMouseLeave={e => (e.currentTarget.style.background = `${machine.color}14`)}
+                    >
+                      <MonitorPlay className="h-4 w-4" />
+                      Practicar en el simulador — {machine.hmiLabel}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
