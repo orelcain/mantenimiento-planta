@@ -2212,7 +2212,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           <Input value={comunQuery} onChange={(e) => setComunQuery(e.target.value)} placeholder="Buscar máquina…" autoFocus />
           <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">
             {(() => {
-              const already = new Set(selectedRep?.comunEn || [])
+              // Excluir las máquinas que YA tiene: marcadas a mano (comunEn) + sembradas
+              // en la lista base (machinesForCommonSap por SAP). Así no re-ofrece marcar
+              // algo que ya es común de esa máquina.
+              const already = new Set([
+                ...(selectedRep?.comunEn || []),
+                ...machinesForCommonSap(selectedRep?.codigoSAP || ''),
+              ])
               const q = normalizeForSearch(comunQuery)
               const cands = LEARNING_MACHINES
                 .filter((m) => !isCourseMachine(m))
