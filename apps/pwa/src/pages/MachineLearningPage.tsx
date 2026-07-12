@@ -160,6 +160,17 @@ export function MachineLearningPage() {
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
 
+  // Repuestos comunes: config (fallback, hoy vacía) + los marcados en Firestore
+  // (comunEn). Se resuelve acá (antes de los early returns) para decidir si mostrar
+  // la 5ª pestaña. Dedup por SAP.
+  const { parts: markedCommonParts } = useMarkedCommonParts(machine && !isCourse ? machine.slug : undefined)
+  const commonParts = useMemo<CommonPart[]>(() => {
+    if (!machine || isCourse) return []
+    const cfg = getCommonParts(machine.slug)
+    const seen = new Set(cfg.map(p => p.sap))
+    return [...cfg, ...markedCommonParts.filter(m => !seen.has(m.sap))]
+  }, [machine, isCourse, markedCommonParts])
+
   // Cargar contenido de Firestore segun tab activo
   useEffect(() => {
     if (!machine || machine.customRoute) return
@@ -210,7 +221,6 @@ export function MachineLearningPage() {
   }
 
   const Icon = machine.icon
-  const commonParts = isCourse ? [] : getCommonParts(machine.slug)
   const tabs = isCourse
     ? COURSE_TABS
     : (commonParts.length > 0 ? [...TABS, REPUESTOS_TAB] : TABS)
@@ -491,7 +501,7 @@ export function MachineLearningPage() {
         ) : activeTab === 'bibliografia' && bibliografia.length > 0 ? (
           <BibliografiaView entries={bibliografia} color={machine.color} />
         ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
-          <CommonPartsList parts={commonParts} slug={machine.slug} color={machine.color} />
+          <CommonPartsList parts={commonParts} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -1820,14 +1830,9 @@ function GraderGlossaryView({ color }: { color: string }) {
  * traer foto, stock y ubicación reales. Agrupa por tipo; cada ítem enlaza al
  * módulo Repuestos (flujo diario). Fuente única compartida entre ambos lados.
  */
-function CommonPartsList({ parts, slug, color }: { parts: CommonPart[]; slug: string; color: string }) {
+function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string }) {
   const navigate = useNavigate()
-  // Config estática + los marcados desde el módulo Repuestos (comunEn), dedup por SAP.
-  const { parts: marked } = useMarkedCommonParts(slug)
-  const allParts = useMemo(() => {
-    const seen = new Set(parts.map(p => p.sap))
-    return [...parts, ...marked.filter(m => !seen.has(m.sap))]
-  }, [parts, marked])
+  const allParts = parts
   const saps = allParts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
   const { bySap, loading } = useRepuestosByCodigos(saps)
 

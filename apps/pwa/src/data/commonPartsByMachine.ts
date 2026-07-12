@@ -33,14 +33,11 @@ export interface CommonPart {
 }
 
 export const COMMON_PARTS_BY_MACHINE: Record<string, CommonPart[]> = {
-  // Solo las 2 piezas de la planilla que NO existen en el maestro `repuestos` (no
-  // se pueden marcar por UI). Las otras 25 se migraron a `comunEn` en Firestore y
-  // se editan desde el módulo Repuestos. `tipo` en el mismo estilo del maestro
-  // (singular) para agrupar junto a las marcadas.
-  'baader-142': [
-    { tipo: 'CORREA', nombre: 'Correa 835 5M', sap: '3300035260' },
-    { tipo: 'REPUESTO', nombre: 'Punto de engrase (ancho)', sap: '3300027307', codigoManual: '1424101003' },
-  ],
+  // VACÍO a propósito: la lista de repuestos comunes ahora vive 100% en Firestore
+  // (campo `comunEn` del doc `repuestos`, editable desde el módulo Repuestos). Los
+  // 27 del Baader 142 se migraron ahí (script seed-comun-baader142.js) y los 2 que
+  // faltaban se crearon en el maestro (crear-2-comunes-baader142.js). Esta config
+  // queda solo como fallback si alguna vez hay que sembrar una pieza sin doc.
 }
 
 /** Lista curada de repuestos comunes de una máquina (vacía si no hay). */

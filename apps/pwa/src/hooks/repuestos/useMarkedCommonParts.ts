@@ -27,9 +27,13 @@ export function useMarkedCommonParts(slug: string | undefined): { parts: CommonP
         const out: CommonPart[] = snap.docs.map(d => {
           const r = d.data() as Record<string, unknown>
           const sap = String(r.codigoSAP ?? d.id).trim()
+          // Nombre común (el que usan los técnicos, `nombresComunes`) primero; si no
+          // hay, cae al nombre oficial de bodega (textoBreve).
+          const comun = Array.isArray(r.nombresComunes) && r.nombresComunes.length
+            ? String(r.nombresComunes[0]) : ''
           return {
             tipo: (typeof r.tipo === 'string' && r.tipo.trim()) ? r.tipo.trim() : TIPO_FALLBACK,
-            nombre: String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
+            nombre: comun || String(r.textoBreve || r.descripcion || r.alias || r.nombreManual || 'Repuesto'),
             sap,
             codigoManual: typeof r.codigoFabricante === 'string' ? r.codigoFabricante : undefined,
           }
