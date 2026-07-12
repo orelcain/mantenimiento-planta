@@ -1,0 +1,431 @@
+{
+  "manual": [
+    {
+      "id": "det-manual-familia-vistus",
+      "title": "Qué es el detector y familia Vistus",
+      "order": 1,
+      "content": "El Vistus es un detector de metales en línea que inspecciona el producto en el flujo de empaque y separa del caudal aquellas piezas contaminadas con metal. Genera un campo electromagnético alterno en la abertura; una partícula metálica que lo atraviesa altera el campo y dispara un mensaje de detección que actúa sobre el separador de rechazo.\n\nPuntos clave:\n\n- La familia Vistus tiene varias configuraciones: Vistus-C (Compact, abertura rectangular con electrónica y terminal integrados), Vistus-H (Head, detector con electrónica, requiere terminal Vistus-T), Vistus-T (Terminal de manejo independiente), Vistus-E (Electronic, terminal con electrónica de evaluación), Vistus-S (Small, abertura rectangular pequeña), Vistus-R (Round, abertura redonda) y Vistus-EI (Electronic Interface, electrónica independiente).\n- Todos los detectores están disponibles en distintos tamaños de abertura.\n- Detecta metales ferrosos (Fe), no ferrosos (aluminio, latón, bronce) y aceros inoxidables (magnéticos como AISI 420 y no magnéticos como AISI 304).\n\nNotas operativas:\n\n- Estas instrucciones no reemplazan la documentación técnica de los sensores, actuadores y módulos suministrados con el equipo.\n- Fuente: manual Vistus, pág 6, 8, 25."
+    },
+    {
+      "id": "det-manual-seguridad",
+      "title": "Seguridad",
+      "order": 2,
+      "content": "El detector de metales solo debe manejarse conociendo los peligros típicos y respetando los dispositivos de seguridad instalados de fábrica.\n\nPuntos clave:\n\n- Existen peligros típicos por partes en movimiento del sistema de transporte y del separador, y por energía eléctrica.\n- Los rótulos de seguridad del equipo deben mantenerse legibles.\n- Solo personal cualificado y autorizado debe configurar, operar y mantener el detector.\n\nNotas operativas:\n\n- No repare ni modifique usted mismo el detector de metales; ante una avería no descrita, contacte al servicio técnico de Sartorius Mechatronics.\n- No eluda, cambie ni retire los dispositivos de seguridad montados por el fabricante.\n- Desconecte la tensión antes de intervenir en el terminal o en el interior del equipo.\n- Fuente: manual Vistus, pág 9-15, 174."
+    },
+    {
+      "id": "det-manual-componentes",
+      "title": "Componentes y accesorios",
+      "order": 3,
+      "content": "El sistema se compone del detector (bobina y abertura), el terminal de manejo con pantalla táctil, el separador de rechazo y los accesorios de sincronización y supervisión que aseguran que el rechazo actúe sobre la pieza correcta.\n\nPuntos clave:\n\n- Sensor para la sincronización de productos: informa la posición del producto para temporizar el rechazo.\n- Separador: desvía del caudal la pieza detectada hacia el recipiente colector.\n- Transmisor de impulsos (encoder de recorrido): entrega la velocidad/avance de la cinta para calcular tiempos.\n- Supervisión del movimiento de la cinta y supervisión de la separación: verifican que la cinta y el separador funcionen.\n- Recipiente colector y sensor de nivel de llenado: reciben las piezas rechazadas.\n- Teclas de confirmación externas: permiten confirmar mensajes desde el equipo.\n\nNotas operativas:\n\n- Monte las cubiertas apropiadas antes de operar.\n- Fuente: manual Vistus, pág 39-44."
+    },
+    {
+      "id": "det-manual-efecto-producto",
+      "title": "Principio de funcionamiento y efecto de producto",
+      "order": 4,
+      "content": "Muchos productos (húmedos, salados, con alto contenido de sal minerales o empaquetados en film metálico o con tintas conductoras) generan por sí mismos una señal en el detector: es el llamado efecto de producto, que puede ser mucho más intenso que la señal de una contaminación metálica.\n\nPuntos clave:\n\n- El detector debe APRENDER primero el efecto de producto para poder distinguir el metal del propio producto.\n- Por eso cada tipo de producto necesita su propio perfil de datos de producto con la frecuencia, fase y umbral de sensibilidad ajustados.\n- Si el efecto de producto no se aprende bien, el equipo rechaza producto sano (falsos rechazos) o pierde sensibilidad.\n\nNotas operativas:\n\n- Los productos con envoltorio conductor (film metálico) o con impresión de pintura conductora acentúan el efecto de producto.\n- Fuente: manual Vistus, pág 27-29."
+    },
+    {
+      "id": "det-manual-sensibilidad-zona-libre",
+      "title": "Sensibilidad, zona libre de metales y límites de detección",
+      "order": 5,
+      "content": "La sensibilidad alcanzable depende del entorno del detector y de la naturaleza del producto. Distinguir tres niveles ayuda a fijar expectativas realistas.\n\nPuntos clave:\n\n- Sensibilidad básica: la máxima del equipo en condiciones ideales.\n- Sensibilidad de funcionamiento: la real considerando interferencias (cinta sucia, piezas metálicas o espirales de cortocircuito cercanas, cargas estáticas, campos de variadores). Es inferior a la básica.\n- Sensibilidad al producto: la máxima para una contaminación en cualquier punto del producto; depende del efecto de producto, la cantidad y consistencia del producto y el tipo de transporte.\n\nMedidas / tolerancias:\n\n- Zona libre de metales aguas arriba y abajo: 3 veces la altura de la abertura si el transporte es de acero inoxidable; 4 veces si es de acero.\n- A izquierda, derecha, arriba y abajo: al menos el equivalente a la altura de la abertura.\n- Detección de alambres: la orientación importa; el hierro se detecta mejor en unas orientaciones y el acero inoxidable no magnético (AISI 304 / V2A) es el más difícil de detectar.\n\nNotas operativas:\n\n- Si no se puede mantener la zona libre de metales, la sensibilidad se reduce.\n- Evite espirales de cortocircuito cerca de la abertura.\n- Fuente: manual Vistus, pág 27-29."
+    },
+    {
+      "id": "det-manual-datos-producto",
+      "title": "Perfiles de datos de producto",
+      "order": 6,
+      "content": "Antes de inspeccionar un tipo de producto nuevo hay que crear su perfil de datos de producto. En él se guarda toda la información que el equipo necesita para inspeccionar ese producto.\n\nPuntos clave:\n\n- Cada perfil guarda: datos característicos (nombre y número de artículo), características físicas (humedad, viscosidad, temperatura), ajustes del detector para ocultar el efecto de producto (frecuencia, fase, umbral de sensibilidad) y, opcionalmente, las comprobaciones de funcionamiento programadas.\n- Cada perfil se identifica de forma inequívoca por número de posición, nombre de producto y número de artículo.\n- Los operadores solo pueden seleccionar el producto e iniciar la inspección; no editan los ajustes de detección.\n\nMedidas / tolerancias:\n\n- El nombre de producto y el número de artículo no deben superar 15 caracteres para verse en el área línea/producto.\n\nNotas operativas:\n\n- Modificar mal los datos de producto puede hacer que falle la detección o que se rechace producto sano; solo personal formado debe editarlos.\n- Fuente: manual Vistus, pág 120-123."
+    },
+    {
+      "id": "det-manual-usuarios-mensajes",
+      "title": "Grupos de usuarios y tipos de mensaje",
+      "order": 7,
+      "content": "El acceso al terminal está organizado por grupos de usuarios con distintos privilegios, y el equipo comunica su estado mediante cuatro tipos de mensaje con código de color en el semáforo.\n\nPuntos clave:\n\n- Grupos de usuarios: operador, ingeniero, jefe de calidad, responsable de mantenimiento y administrador; cada uno accede a un menú principal distinto.\n- El aprendizaje automático de un producto requiere privilegios de ingeniero o responsable de mantenimiento.\n- Confirmar un mensaje de error requiere ingeniero; confirmar advertencia o detección requiere operador o ingeniero.\n\nMedidas / tolerancias:\n\n- Mensaje de error (E): semáforo rojo, la detección se detiene, se dispara el relé Error.\n- Mensaje de advertencia (W): semáforo amarillo, la detección sigue funcionando.\n- Mensaje de evento (M): informativo, la detección funciona (p. ej. se conectó un USB).\n- Mensaje de detección (X): se disparó la detección de metal.\n\nNotas operativas:\n\n- Todos los mensajes se protocolizan automáticamente y quedan en informes y listas.\n- Fuente: manual Vistus, pág 148-150, 175-176."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "det-proc-crear-datos-producto",
+      "title": "Crear un nuevo perfil de datos de producto",
+      "description": "Alta de un producto nuevo antes de poder inspeccionarlo. Requiere privilegios de ingeniero. Fuente: manual Vistus, pág 121.",
+      "steps": [
+        { "order": 1, "title": "Abrir Definir producto", "description": "En la lista de productos, tocar sobre << Definir producto >>. Aparece el menú Definir producto." },
+        { "order": 2, "title": "Confirmar el número de posición", "description": "En el campo Posición aparece automáticamente el número libre más bajo. Se puede cambiar tocándolo; los números ya ocupados no se reutilizan." },
+        { "order": 3, "title": "Nombre y número de artículo", "description": "Introducir el nombre del producto y el número de artículo. Máximo 15 caracteres cada uno para que se vean en el área línea/producto." },
+        { "order": 4, "title": "Completar la descripción", "description": "Tocar Siguiente y completar la descripción del producto (humedad, viscosidad, temperatura)." },
+        { "order": 5, "title": "Completar los datos de detección", "description": "Completar los datos para la detección de metal por aprendizaje automático (recomendado) o introducción manual (requiere curso de formación de Sartorius)." },
+        { "order": 6, "title": "Opcional: comprobaciones de funcionamiento", "description": "Configurar las comprobaciones de funcionamiento periódicas para este producto si corresponde." }
+      ]
+    },
+    {
+      "id": "det-proc-aprender-producto",
+      "title": "Aprender automáticamente un producto",
+      "description": "El procedimiento central: el detector mide el efecto del transporte y del producto para poder distinguir el metal. Requiere privilegios de ingeniero o responsable de mantenimiento. Fuente: manual Vistus, pág 122-125.",
+      "steps": [
+        { "order": 1, "title": "Preparar producto sin metal", "description": "Tener a mano suficientes productos libres de metal (mínimo 3) del tipo a aprender." },
+        { "order": 2, "title": "Cargar el perfil", "description": "En la lista de productos, tocar el perfil a aprender. Si el nombre no aparece en el área línea/producto, tocar Cargar." },
+        { "order": 3, "title": "Iniciar el ajuste automático", "description": "Tocar Ajuste automático de producto y seguir las indicaciones de la pantalla táctil." },
+        { "order": 4, "title": "Medir el efecto del transporte", "description": "Tras confirmar la solicitud, hacer funcionar el sistema de transporte SIN productos hasta la siguiente solicitud. El detector mide el efecto del sistema de transporte en la primera frecuencia." },
+        { "order": 5, "title": "Medir el efecto de producto", "description": "Tras confirmar, dejar pasar un mínimo de 3 productos libres de metal por la abertura. El detector mide el efecto de producto y determina umbrales apropiados por frecuencia." },
+        { "order": 6, "title": "Optimizar si hace falta", "description": "Seguir las solicitudes hasta terminar. El resultado puede optimizarse después si la detección no es suficiente." }
+      ]
+    },
+    {
+      "id": "det-proc-seleccionar-producto",
+      "title": "Seleccionar el producto para producción",
+      "description": "El operador elige qué perfil se usa para inspeccionar el flujo actual. Fuente: manual Vistus, pág 150-152.",
+      "steps": [
+        { "order": 1, "title": "Abrir la lista de productos", "description": "Desde el menú principal de operador, abrir la lista de productos. Se puede ordenar por Posición, Producto o N.º art." },
+        { "order": 2, "title": "Tocar el perfil deseado", "description": "Tocar el perfil de datos de producto a utilizar. Su nombre y número de artículo aparecen en el área línea/producto." },
+        { "order": 3, "title": "Asignar lote si corresponde", "description": "Si aparece la página de nombre/número de lote, introducir esos datos (ver el procedimiento de iniciar/parar lote)." },
+        { "order": 4, "title": "Comenzar a transportar", "description": "Con el producto seleccionado, transportar ese tipo de producto por el detector." }
+      ]
+    },
+    {
+      "id": "det-proc-iniciar-parar-lote",
+      "title": "Iniciar o parar un lote",
+      "description": "Agrupa los mensajes bajo un lote para poder filtrar informes por él. Fuente: manual Vistus, pág 150-153.",
+      "steps": [
+        { "order": 1, "title": "Elegir el perfil", "description": "En la lista de productos, tocar el perfil cuyo modo lote se desea iniciar. Aparece la página para asignar nombres/números de lote." },
+        { "order": 2, "title": "Nombrar el lote", "description": "Introducir en el campo Lote el nombre o número Lot que identifica el lote; bajo ese nombre se encontrarán luego todos sus mensajes en los informes." },
+        { "order": 3, "title": "Iniciar el lote", "description": "Confirmar para iniciar el lote. La inspección queda asociada a ese lote." },
+        { "order": 4, "title": "Parar el lote", "description": "Al terminar la producción, parar el lote desde la misma página para cerrar el registro." }
+      ]
+    },
+    {
+      "id": "det-proc-configurar-prueba-funcionamiento",
+      "title": "Configurar las comprobaciones de funcionamiento",
+      "description": "Programa las pruebas periódicas con bolas de test para verificar la sensibilidad. Requiere haber activado 'Comprobar con piezas de prueba' en Ajustes del detector. Fuente: manual Vistus, pág 130-134.",
+      "steps": [
+        { "order": 1, "title": "Elegir el tipo de prueba", "description": "Definir el tipo: prueba única (1 pieza), prueba estándar (3 piezas) o ampliada, según el nivel de control deseado." },
+        { "order": 2, "title": "Elegir las bolas de test", "description": "Usar bolas de test de los metales más frecuentes en la producción y del tamaño acorde a la sensibilidad de control deseada. Recordar que el acero inoxidable no magnetizable (AISI 304 / V2A) es más difícil de detectar que el magnetizable (AISI 420)." },
+        { "order": 3, "title": "Fijar tolerancias", "description": "Introducir la Tolerancia de amplitud y la Tolerancia de fase en porcentaje. Si en la prueba la amplitud o la fase quedan fuera, esa parte se considera no superada." },
+        { "order": 4, "title": "Definir y aprender la pieza de prueba", "description": "Dar a la bola de test un nombre representativo que los operadores reconozcan, tocar Aprender y seguir las instrucciones. Si el producto tiene efecto de producto, colocar la bola en la zona de señal de metal más débil." }
+      ]
+    },
+    {
+      "id": "det-proc-ejecutar-prueba-funcionamiento",
+      "title": "Ejecutar la prueba de funcionamiento",
+      "description": "Verificación periódica que ejecuta el jefe de calidad cuando el equipo la solicita. Los resultados se protocolizan. Fuente: manual Vistus, pág 133, 161-163.",
+      "steps": [
+        { "order": 1, "title": "Atender la solicitud", "description": "El equipo instala al jefe de calidad a ejecutar la prueba a los intervalos configurados; abrir la prueba solicitada." },
+        { "order": 2, "title": "Pasar la bola de test", "description": "Pasar por la abertura la bola de test indicada. Si hay efecto de producto, colocarla junto al producto en la zona de señal más débil." },
+        { "order": 3, "title": "Verificar la detección y el rechazo", "description": "Comprobar que el equipo detecta la pieza y que el separador la rechaza dentro de las tolerancias de amplitud y fase." },
+        { "order": 4, "title": "Registrar el resultado", "description": "Confirmar el resultado; queda protocolizado automáticamente en los informes para trazabilidad." }
+      ]
+    },
+    {
+      "id": "det-proc-confirmar-mensajes",
+      "title": "Confirmar mensajes de error o advertencia",
+      "description": "Tras solventar la causa hay que confirmar el mensaje para reanudar. Fuente: manual Vistus, pág 153, 176.",
+      "steps": [
+        { "order": 1, "title": "Solventar la causa", "description": "Corregir la causa del mensaje antes de confirmarlo (un error confirmado sin resolver reaparece)." },
+        { "order": 2, "title": "Tocar Confirmar", "description": "Tocar Confirmar en el mensaje activo, o pulsar la tecla externa de confirmación si está conectada." },
+        { "order": 3, "title": "Confirmación múltiple", "description": "La tecla externa confirma de una sola vez todos los mensajes de error y advertencia ya solventados." },
+        { "order": 4, "title": "Respetar privilegios", "description": "Confirmar un error requiere privilegio de ingeniero; confirmar advertencia o detección, operador o ingeniero." }
+      ]
+    },
+    {
+      "id": "det-proc-copia-seguridad",
+      "title": "Crear una copia de seguridad en USB",
+      "description": "Respalda perfiles de producto, usuarios, ajustes, informes y registros en un soporte externo. Fuente: manual Vistus, pág 156-158.",
+      "steps": [
+        { "order": 1, "title": "Conectar el USB", "description": "Conectar un lápiz de memoria USB; el detector debe contar con la interfaz correspondiente." },
+        { "order": 2, "title": "Abrir Copia de seguridad", "description": "En el menú principal de operador, tocar el botón '...' y luego 'Copia seg.'. Aparece el menú Copia seg. sistema." },
+        { "order": 3, "title": "Elegir el destino", "description": "Tocar Medio de destino y seleccionar el soporte externo para la copia." },
+        { "order": 4, "title": "Ejecutar la copia", "description": "Confirmar para guardar los datos. Conviene respaldar periódicamente porque la memoria del detector es limitada y sobrescribe los datos antiguos." }
+      ]
+    },
+    {
+      "id": "det-proc-sustituir-bateria",
+      "title": "Sustituir la batería del terminal",
+      "description": "La batería alimenta el reloj interno; dura unos 3 años y al agotarse se pierden fecha y hora. Fuente: manual Vistus, pág 176-177.",
+      "steps": [
+        { "order": 1, "title": "Abrir la tapa del terminal", "description": "Soltar los 4 tornillos de sujeción de la tapa del terminal, evitando que caigan al flujo de productos, y abrir la tapa." },
+        { "order": 2, "title": "Localizar la batería", "description": "La batería está en el módulo HMI, en la parte trasera de la tapa del terminal. Extraerla de su soporte." },
+        { "order": 3, "title": "Colocar la batería nueva", "description": "Colocar una batería de litio de 3 V tipo CR 2032 respetando la polaridad." },
+        { "order": 4, "title": "Cerrar y reajustar la hora", "description": "Cerrar la tapa, apretar a mano los 4 tornillos y volver a ajustar la fecha y hora del detector." }
+      ]
+    },
+    {
+      "id": "det-proc-ajustar-fecha-hora",
+      "title": "Ajustar la fecha y la hora",
+      "description": "Necesario tras cambiar la batería o al perder la hora. Fuente: manual Vistus, pág 78-79.",
+      "steps": [
+        { "order": 1, "title": "Abrir Ajustes del sistema", "description": "Entrar al menú de características de la pantalla táctil / fecha y hora dentro de Ajustes del sistema." },
+        { "order": 2, "title": "Introducir fecha y hora", "description": "Introducir la fecha y la hora actuales." },
+        { "order": 3, "title": "Guardar", "description": "Guardar las introducciones en el menú Ajustes del sistema para que queden aplicadas." }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "det-flow-mensaje-error",
+      "title": "¿Qué hago cuando aparece un mensaje de error (E)?",
+      "trigger": "El semáforo cambia a rojo, aparece un texto de error y se dispara el relé Error; la detección de metal se detiene.",
+      "actions": [
+        "Tocar el texto del error en la pantalla para investigar su origen.",
+        "Consultar el código E en la lista de mensajes de error del manual para conocer su significado.",
+        "Solventar la causa (revisar transmisor, separador, cableado o configuración según el código).",
+        "Confirmar el mensaje con privilegio de ingeniero una vez resuelto.",
+        "Si el error indica un fallo de hardware o de software, notificar al servicio técnico de Sartorius Mechatronics.",
+        "Fuente: manual Vistus, pág 175-176."
+      ]
+    },
+    {
+      "id": "det-flow-mensaje-advertencia",
+      "title": "¿Qué hago cuando aparece una advertencia (W)?",
+      "trigger": "El semáforo cambia a amarillo y aparece un texto de advertencia; la detección de metal sigue funcionando pero hay un problema.",
+      "actions": [
+        "Tocar el texto de la advertencia para ver su origen.",
+        "Identificar el código W (p. ej. separador fuera de posición, cinta detenida, recipiente lleno, transporte sucio).",
+        "Corregir la causa física indicada por el código.",
+        "Confirmar el mensaje (operador o ingeniero) una vez corregido.",
+        "Fuente: manual Vistus, pág 176."
+      ]
+    },
+    {
+      "id": "det-flow-deteccion-metal",
+      "title": "¿Qué hago cuando se detecta metal (X) y actúa el separador?",
+      "trigger": "Se dispara un mensaje de detección (X) y el separador rechaza la pieza al recipiente colector.",
+      "actions": [
+        "Retirar del recipiente colector la pieza rechazada.",
+        "Verificar si realmente contiene metal o si es un falso rechazo por efecto de producto.",
+        "Si hay muchos rechazos seguidos, revisar el perfil de producto seleccionado y su aprendizaje.",
+        "Vaciar el recipiente colector para evitar la advertencia por exceso de piezas.",
+        "Fuente: manual Vistus, pág 176."
+      ]
+    },
+    {
+      "id": "det-flow-cambio-producto",
+      "title": "¿Qué hago cuando cambio de producto?",
+      "trigger": "Empieza a producirse un tipo de producto distinto al que estaba seleccionado.",
+      "actions": [
+        "Abrir la lista de productos en el menú de operador.",
+        "Seleccionar el perfil de datos de producto correcto para el nuevo producto.",
+        "Verificar que el nombre y número de artículo correctos aparezcan en el área línea/producto.",
+        "Si el producto es nuevo y no tiene perfil, crearlo y aprenderlo antes de inspeccionar.",
+        "Fuente: manual Vistus, pág 150."
+      ]
+    },
+    {
+      "id": "det-flow-prueba-periodica",
+      "title": "¿Qué hago para la prueba de funcionamiento periódica?",
+      "trigger": "El equipo solicita al jefe de calidad ejecutar una comprobación de funcionamiento al cumplirse el intervalo configurado.",
+      "actions": [
+        "Tomar la bola de test indicada para el producto en curso.",
+        "Pasarla por la abertura; si hay efecto de producto, colocarla junto al producto en la zona de señal más débil.",
+        "Comprobar que el equipo la detecta y la rechaza dentro de las tolerancias de amplitud y fase.",
+        "Confirmar el resultado; queda protocolizado automáticamente.",
+        "Fuente: manual Vistus, pág 133, 161."
+      ]
+    },
+    {
+      "id": "det-flow-falsos-rechazos",
+      "title": "¿Qué hago cuando el detector rechaza producto sano?",
+      "trigger": "El equipo separa productos que no contienen metal (falsos rechazos).",
+      "actions": [
+        "Confirmar que está seleccionado el perfil de producto correcto.",
+        "Revisar el aprendizaje del efecto de producto; reaprender el producto si cambió su humedad, sal o temperatura.",
+        "Verificar la zona libre de metales y que no haya piezas metálicas o cinta sucia cerca de la abertura.",
+        "Si persiste, revisar con personal formado los ajustes de frecuencia, fase y umbral del perfil.",
+        "Fuente: manual Vistus, pág 27-29, 122, 130."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "det-diag-tipos-mensaje",
+      "title": "Entender los tipos de mensaje (E, W, M, X)",
+      "symptom": "Aparece un mensaje o cambia el color del semáforo y no sé qué significa.",
+      "possibleCauses": [
+        "Mensaje de error (E): semáforo rojo, la detección se detiene, se dispara el relé Error.",
+        "Mensaje de advertencia (W): semáforo amarillo, la detección sigue pero hay un problema.",
+        "Mensaje de evento (M): informativo, la detección funciona (p. ej. se conectó un USB).",
+        "Mensaje de detección (X): se disparó la detección de metal."
+      ],
+      "solution": "Tocar el texto del mensaje para ver su origen y buscar el código en la lista de mensajes del manual. Los E y W requieren confirmarse tras solventar la causa (E: ingeniero; W y X: operador o ingeniero). Fuente: manual Vistus, pág 175-176."
+    },
+    {
+      "id": "det-diag-separador-no-reposo",
+      "title": "W0004 – El separador no está en posición de reposo",
+      "symptom": "Advertencia W0004 'Separator zero position': el separador no se encuentra en posición de reposo.",
+      "possibleCauses": [
+        "Separador trabado o desajustado.",
+        "Supervisión de la separación mal ajustada o con sensor defectuoso."
+      ],
+      "solution": "Comprobar el separador y la supervisión de la separación. Si no se resuelve, notificar al servicio técnico de Sartorius Mechatronics. Fuente: manual Vistus, pág 181."
+    },
+    {
+      "id": "det-diag-separador-en-reposo",
+      "title": "W0005 – El separador está en reposo cuando debería actuar",
+      "symptom": "Advertencia W0005 'Separator active position': el separador se encuentra en posición de reposo.",
+      "possibleCauses": [
+        "Separador que no alcanza la posición activa.",
+        "Supervisión de la separación mal ajustada o sensor defectuoso."
+      ],
+      "solution": "Comprobar el separador y la supervisión de la separación. Si no se resuelve, notificar al servicio técnico de Sartorius Mechatronics. Fuente: manual Vistus, pág 181."
+    },
+    {
+      "id": "det-diag-producto-no-reconocido",
+      "title": "W0006 / W0007 – Producto no reconocido en el caudal",
+      "symptom": "Advertencia W0006/W0007: el producto no fue reconocido en el caudal de rechazo (W0006) o en el caudal aceptable (W0007).",
+      "possibleCauses": [
+        "Separador que no desvía correctamente la pieza.",
+        "Supervisión de la separación desajustada."
+      ],
+      "solution": "Comprobar el separador y la supervisión de la separación. Si el problema persiste, notificar al servicio técnico de Sartorius Mechatronics. Fuente: manual Vistus, pág 181."
+    },
+    {
+      "id": "det-diag-recipiente-lleno",
+      "title": "W0008 – Demasiados productos en el recipiente colector",
+      "symptom": "Advertencia W0008 'Quantity separated product': hay demasiados productos en el recipiente colector.",
+      "possibleCauses": [
+        "Recipiente colector lleno sin vaciar.",
+        "Exceso de rechazos (posible falso rechazo por efecto de producto)."
+      ],
+      "solution": "Vaciar el recipiente colector. Si el número de rechazos es anormalmente alto, revisar el perfil y el aprendizaje del producto. Fuente: manual Vistus, pág 181."
+    },
+    {
+      "id": "det-diag-product-trigger",
+      "title": "W0001 – Señal de sincronización más larga que el producto",
+      "symptom": "Advertencia W0001 'Product Trigger': la señal del sensor de sincronización es más larga que la longitud de producto indicada.",
+      "possibleCauses": [
+        "Velocidad de producto mal indicada en los datos de producto.",
+        "Impulsos proporcionales al recorrido (transmisor de impulsos) mal ajustados.",
+        "Longitud de producto mal configurada."
+      ],
+      "solution": "Revisar la velocidad de producto, el ajuste del transmisor de impulsos y la longitud de producto en el perfil. La advertencia no ocurre si se desactiva la supervisión de longitud de producto. Fuente: manual Vistus, pág 180-181."
+    },
+    {
+      "id": "det-diag-cinta-marcha-sin-impulsos",
+      "title": "W0017 – La cinta está en marcha pero no hay impulsos",
+      "symptom": "Advertencia W0017 'Conveyor belt start': el sensor indica que el transporte está en marcha pero no se registran señales del transmisor de impulsos.",
+      "possibleCauses": [
+        "Transmisor de impulsos desconectado o defectuoso.",
+        "Mala configuración de las opciones 'Sensor inicio/parada cinta' y 'Transmisor de impulsos'.",
+        "Accionamiento del sistema de transporte detenido."
+      ],
+      "solution": "Comprobar la configuración de esas dos opciones y el accionamiento del sistema de transporte, y verificar el transmisor de impulsos. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-cinta-parada-con-impulsos",
+      "title": "W0018 – La cinta figura detenida pero llegan impulsos",
+      "symptom": "Advertencia W0018 'Conveyor belt stop': el sensor indica que el transporte no está en marcha pero sí se registran señales del transmisor de impulsos.",
+      "possibleCauses": [
+        "Sensor de inicio/parada de cinta mal configurado o defectuoso.",
+        "Transmisor de impulsos entregando señal con la cinta detenida."
+      ],
+      "solution": "Comprobar la configuración de las opciones 'Sensor inicio/parada cinta' y 'Transmisor de impulsos' y el accionamiento del transporte. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-cinta-sucia",
+      "title": "W0019 – Sistema de transporte sucio",
+      "symptom": "Advertencia W0019 'Conveyor belt quality': el sistema de transporte está sucio, con riesgo de falsas activaciones y pérdida de sensibilidad.",
+      "possibleCauses": [
+        "Cinta o cadena de transporte sucia.",
+        "Cinta o cadena desgastada."
+      ],
+      "solution": "Limpiar el sistema de transporte; si es necesario, sustituir la cinta o la cadena. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-falta-impulso-avance",
+      "title": "W001E – Falta la señal del transmisor de impulsos",
+      "symptom": "Advertencia W001E 'Way pulse missing': el sensor indica transporte en marcha pero falta la señal de avance del transmisor de impulsos.",
+      "possibleCauses": [
+        "Transmisor de impulsos (encoder de recorrido) desconectado, sucio o defectuoso.",
+        "Cableado del transmisor interrumpido."
+      ],
+      "solution": "Verificar el transmisor de impulsos y su cableado, y la configuración del sensor de inicio/parada de cinta. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-acumulacion-metal",
+      "title": "W0020 – Acumulación de metal (demasiadas detecciones)",
+      "symptom": "Advertencia W0020 'Metal amassment': las detecciones superan el máximo configurado por intervalo de tiempo, piezas o distancia.",
+      "possibleCauses": [
+        "Contaminación real recurrente en el flujo de producto.",
+        "Umbral de acumulación configurado muy bajo para el proceso.",
+        "Falsos rechazos por efecto de producto mal aprendido."
+      ],
+      "solution": "Revisar el origen de las detecciones en el flujo; ajustar 'Cantidad máx. detecciones metal' y el intervalo/piezas/distancia de acumulación si el proceso lo justifica; verificar el aprendizaje del producto. Fuente: manual Vistus, pág 183-184."
+    },
+    {
+      "id": "det-diag-mantenimiento-requerido",
+      "title": "W007F – Mantenimiento del detector requerido",
+      "symptom": "Advertencia W007F 'Detector maintenance required': se alcanzó el intervalo o el momento de mantenimiento programado.",
+      "possibleCauses": [
+        "Se cumplió el intervalo de mantenimiento preventivo configurado."
+      ],
+      "solution": "Ejecutar el mantenimiento preventivo del detector y reiniciar el contador/intervalo de mantenimiento. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-transmisor-riesgo-fallo",
+      "title": "W0016 – Aviso general del transmisor",
+      "symptom": "Advertencia W0016 'Transmitter generic warning': aviso general, existe riesgo de fallo en el transmisor.",
+      "possibleCauses": [
+        "Módulo transmisor con parámetros al límite o degradado."
+      ],
+      "solution": "Notificar al servicio técnico de Sartorius Mechatronics para revisar el módulo transmisor. Fuente: manual Vistus, pág 183."
+    },
+    {
+      "id": "det-diag-separacion-distancia-corta",
+      "title": "EFF07 – Distancia de separación demasiado corta",
+      "symptom": "Error EFF07 'group delay error': la distancia (tiempo) de desplazamiento para separar el producto es demasiado reducida.",
+      "possibleCauses": [
+        "El separador está demasiado cerca del detector para el tiempo de rechazo requerido."
+      ],
+      "solution": "Aumentar la distancia entre el separador y el detector de metales para dar tiempo a la separación. Fuente: manual Vistus, pág 180."
+    },
+    {
+      "id": "det-diag-campo-transmisor-bajo",
+      "title": "EFF08 – Intensidad de campo del transmisor demasiado baja",
+      "symptom": "Error EFF08 'Receiver Tx magnitude error': la intensidad de campo generada por el módulo transmisor es demasiado baja.",
+      "possibleCauses": [
+        "Tensión del transmisor insuficiente.",
+        "Posible error de hardware."
+      ],
+      "solution": "Aumentar la tensión del transmisor en 'Cambiar datos producto'. Si persiste, puede ser un error de hardware: notificar a Sartorius Mechatronics. Fuente: manual Vistus, pág 180."
+    },
+    {
+      "id": "det-diag-profibus",
+      "title": "EFF48 / W0080 – Comunicación Profibus",
+      "symptom": "Error EFF48 'IO Profibus error' o advertencia W0080: fallo de comunicación Profibus o opción Profibus activada sin estar instalada.",
+      "possibleCauses": [
+        "Cableado del bus Profibus defectuoso.",
+        "Configuración de Profibus incorrecta.",
+        "Opción Profibus activada en la configuración sin el módulo instalado."
+      ],
+      "solution": "Comprobar el cableado del bus y la configuración de Profibus; si el módulo no está instalado, desactivar la opción o instalar el hardware. Fuente: manual Vistus, pág 180."
+    },
+    {
+      "id": "det-diag-bateria-agotada",
+      "title": "Batería agotada – se pierden fecha y hora",
+      "symptom": "Al reconectar la tensión el detector muestra fecha y hora incorrectas.",
+      "possibleCauses": [
+        "Batería de litio del reloj interno agotada (dura unos 3 años)."
+      ],
+      "solution": "Sustituir la batería por una de litio 3 V tipo CR 2032 (respetando la polaridad) y volver a ajustar la fecha y hora. Fuente: manual Vistus, pág 176-177."
+    },
+    {
+      "id": "det-diag-interferencias-em",
+      "title": "Interferencias electromagnéticas",
+      "symptom": "Falsas activaciones, ruido o pérdida de sensibilidad sin causa aparente en el producto.",
+      "possibleCauses": [
+        "Conductores de señal sin apantallar.",
+        "Pasos de cable no metálicos en la carcasa del terminal.",
+        "Variadores mal conectados u otros detectores con la misma frecuencia cerca."
+      ],
+      "solution": "Usar conductores de señal apantallados y sustituir los pasos de cable por racores metálicos CEM. Mantener la zona libre de metales y alejar fuentes de campo. Fuente: manual Vistus, pág 174."
+    },
+    {
+      "id": "det-diag-errores-software",
+      "title": "Errores de software / hardware internos (contactar a Sartorius)",
+      "symptom": "Códigos como E0100-E01xx (puntero/archivo/XML no válido), FFFF 'Unknown message', o W000C/W000D/W000E/W001A de comunicación interna.",
+      "possibleCauses": [
+        "Errores internos de software del detector.",
+        "Fallos de hardware de módulos internos."
+      ],
+      "solution": "No son accionables en planta: anotar el código y las circunstancias y notificar al servicio de asistencia técnica de Sartorius Mechatronics C&D GmbH & Co. KG. Fuente: manual Vistus, pág 176-182."
+    }
+  ]
+}

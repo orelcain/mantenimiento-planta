@@ -134,7 +134,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Detector de metales en linea de empaque.',
     icon: Zap,
     color: '#ff4444',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'enzunchadora-n2',
