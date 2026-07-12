@@ -62,10 +62,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'marel-hg',
     name: 'Marel HG',
     area: 'Planta Principal',
-    description: 'Maquina descabezadora / desvisceradora de procesamiento primario.',
+    description: 'Linea de procesamiento primario Marel; operacion y control desde el software del Clasificador A600 (controlador M3210): pantallas, programas, productos, lotes, informes y alarmas.',
     icon: Fish,
     color: '#5a7d9e',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'baader-142',

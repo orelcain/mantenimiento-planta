@@ -1,0 +1,313 @@
+{
+  "manual": [
+    {
+      "id": "mhg-manual-que-es",
+      "title": "Qué es el A600 y el controlador M3210",
+      "order": 1,
+      "content": "La línea Marel HG (eviscerado / procesamiento primario) se opera desde el software del Clasificador A600, una aplicación que corre sobre el controlador M3210. La pantalla Main (Principal) y las demás pantallas concentran el manejo de la producción, la clasificación por peso y los informes.\n\nPuntos clave:\n\n- El A600 clasifica y crea lotes por peso a partir de las piezas que pasan por la balanza (Weigher).\n- El manual de software se divide en cinco capítulos: Introducción, Pantalla principal, Pantallas del A600, Cómo (configuración paso a paso) y Uso (tareas básicas).\n- La aplicación se ejecuta en el controlador M3210; su etiqueta de estado debe estar en RUNNING durante la producción.\n\nNotas operativas:\n\n- Este es el manual del software/operación; para repuestos mecánicos ver el catálogo de piezas de la máquina.\n- Fuente: manual A600 (Marel), pág 7, 11."
+    },
+    {
+      "id": "mhg-manual-arranque-seguridad",
+      "title": "Preparación y arranque de producción",
+      "order": 2,
+      "content": "Antes de iniciar la producción en el A600 conviene una verificación breve para evitar alarmas y paros.\n\nPuntos clave:\n\n- La etiqueta de estado del menú de encabezado del controlador M3210 debe estar en RUNNING durante la producción.\n- Las vías que reciben el producto deben estar despejadas (sin herramientas ni objetos).\n- La balanza (Weigher) debe estar inicializada y lista antes de producir.\n\nNotas operativas:\n\n- Si la balanza no está lista, detener toda la producción hasta que se inicialice.\n- Fuente: manual A600 (Marel), pág 8, 13-14."
+    },
+    {
+      "id": "mhg-manual-pantallas",
+      "title": "Las pantallas del A600",
+      "order": 3,
+      "content": "El A600 organiza la operación en pantallas accesibles desde el menú principal.\n\nPuntos clave:\n\n- Production (Producción): estado de la producción en curso.\n- Buffer Overview: información general de los buffers.\n- Reports (Informes): informes de producción.\n- Last Pieces / Last Batches (Últimas piezas / Últimos lotes): trazabilidad reciente.\n- Programs (Programas) y Products (Productos): configuración de la clasificación.\n- Cleaner (Limpieza), Advanced (Avanzado) y Service (Servicio): mantenimiento y ajustes.\n\nNotas operativas:\n\n- El botón Alarm (Alarma) del encabezado indica el estado; el botón On/Off arranca/detiene.\n- Fuente: manual A600 (Marel), pág 3, 12-25."
+    },
+    {
+      "id": "mhg-manual-metodos-clasificacion",
+      "title": "Métodos de clasificación",
+      "order": 4,
+      "content": "El A600 admite distintos métodos para agrupar las piezas en lotes por peso.\n\nPuntos clave:\n\n- Creación de lotes óptima (Optimal batching): arma los lotes de la forma más eficiente según el objetivo.\n- Tasa: clasificación por tasa/ritmo.\n- Simple Batching (Creación de lotes simple): agrupación directa.\n- Clasificación simple: reparte por rango de peso sin optimización.\n\nNotas operativas:\n\n- El método se elige en la configuración del programa según el objetivo de producción.\n- Fuente: manual A600 (Marel), pág 25-31."
+    },
+    {
+      "id": "mhg-manual-programas",
+      "title": "Programas",
+      "order": 5,
+      "content": "Un programa define cómo clasifica el A600 (método, rangos, destinos). Se gestionan desde la pantalla Programs.\n\nPuntos clave:\n\n- Se pueden agregar, copiar, editar, eliminar y activar programas.\n- Solo el programa activo controla la clasificación en curso.\n- La configuración del programa incluye el método de clasificación y sus parámetros.\n\nNotas operativas:\n\n- Copiar un programa existente y editarlo es más rápido que crear uno desde cero.\n- Fuente: manual A600 (Marel), pág 19, 33-39."
+    },
+    {
+      "id": "mhg-manual-productos",
+      "title": "Productos y ubicaciones",
+      "order": 6,
+      "content": "Los productos describen los artículos a clasificar y se asignan a las ubicaciones (vías/salidas) del clasificador. Se gestionan desde la pantalla Products.\n\nPuntos clave:\n\n- Se pueden agregar, copiar, editar y eliminar productos.\n- Los productos se asignan a ubicaciones para dirigir cada rango a su salida.\n\nNotas operativas:\n\n- Revisar la asignación de productos a ubicaciones al cambiar de programa.\n- Fuente: manual A600 (Marel), pág 21, 40-45."
+    },
+    {
+      "id": "mhg-manual-alarmas-informes",
+      "title": "Alarmas e informes",
+      "order": 7,
+      "content": "El A600 comunica su estado por el botón Alarm y registra la producción en informes.\n\nMedidas / tolerancias:\n\n- Alarma en ROJO: error grave, requiere atención inmediata.\n- Alarma en NARANJA / AMARILLO: advertencia de menor gravedad.\n\nPuntos clave:\n\n- Al tocar Alarm Log (Registro de alarmas) se muestra el tipo de error con su descripción, prioridad y solución.\n- Los informes de producción se presentan y se eliminan desde la pantalla Reports.\n\nNotas operativas:\n\n- Ante una alarma, leer siempre el Registro de alarmas antes de actuar.\n- Fuente: manual A600 (Marel), pág 5, 46."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "mhg-proc-preparar-produccion",
+      "title": "Preparar antes de iniciar producción",
+      "description": "Verificación breve para evitar alarmas al arrancar. Fuente: manual A600 (Marel), pág 8.",
+      "steps": [
+        { "order": 1, "title": "Estado del M3210", "description": "Verificar que la etiqueta de estado del menú de encabezado del controlador M3210 esté en RUNNING." },
+        { "order": 2, "title": "Despejar las vías", "description": "Comprobar que no haya herramientas ni objetos en las vías que reciben el producto." },
+        { "order": 3, "title": "Balanza lista", "description": "Confirmar que la balanza (Weigher) esté inicializada y lista antes de producir." }
+      ]
+    },
+    {
+      "id": "mhg-proc-agregar-programa",
+      "title": "Agregar un nuevo programa",
+      "description": "Crear un programa de clasificación desde la pantalla Programs. Fuente: manual A600 (Marel), pág 33.",
+      "steps": [
+        { "order": 1, "title": "Abrir Programs", "description": "Ir a la pantalla Programs (Programas)." },
+        { "order": 2, "title": "Agregar", "description": "Elegir agregar un nuevo programa." },
+        { "order": 3, "title": "Método y parámetros", "description": "Configurar el método de clasificación (lotes óptimos, tasa, simple) y sus parámetros." },
+        { "order": 4, "title": "Guardar y activar", "description": "Guardar el programa y activarlo cuando corresponda para que controle la clasificación." }
+      ]
+    },
+    {
+      "id": "mhg-proc-copiar-programa",
+      "title": "Copiar y editar un programa",
+      "description": "Reutilizar un programa existente como base. Fuente: manual A600 (Marel), pág 35-39.",
+      "steps": [
+        { "order": 1, "title": "Seleccionar el programa", "description": "En la pantalla Programs, elegir el programa a copiar." },
+        { "order": 2, "title": "Copiar", "description": "Crear una copia del programa." },
+        { "order": 3, "title": "Editar la configuración", "description": "Ajustar el método, rangos y destinos en la configuración del programa copiado." },
+        { "order": 4, "title": "Activar", "description": "Activar el programa editado para usarlo en producción." }
+      ]
+    },
+    {
+      "id": "mhg-proc-activar-programa",
+      "title": "Activar un programa",
+      "description": "Solo el programa activo controla la clasificación. Fuente: manual A600 (Marel), pág 37.",
+      "steps": [
+        { "order": 1, "title": "Abrir Programs", "description": "Ir a la pantalla Programs (Programas)." },
+        { "order": 2, "title": "Elegir el programa", "description": "Seleccionar el programa que se quiere poner en producción." },
+        { "order": 3, "title": "Activar", "description": "Activarlo; el A600 pasa a clasificar según ese programa." }
+      ]
+    },
+    {
+      "id": "mhg-proc-agregar-producto",
+      "title": "Agregar y asignar un producto",
+      "description": "Definir un producto y dirigirlo a su salida. Fuente: manual A600 (Marel), pág 40-45.",
+      "steps": [
+        { "order": 1, "title": "Abrir Products", "description": "Ir a la pantalla Products (Productos)." },
+        { "order": 2, "title": "Agregar producto", "description": "Agregar un nuevo producto (o copiar uno existente y editarlo)." },
+        { "order": 3, "title": "Asignar a ubicación", "description": "Asignar el producto a la ubicación (vía/salida) que le corresponde." }
+      ]
+    },
+    {
+      "id": "mhg-proc-terminar-lotes",
+      "title": "Terminar lotes",
+      "description": "Cerrar los lotes en curso. Fuente: manual A600 (Marel), pág 18.",
+      "steps": [
+        { "order": 1, "title": "Abrir Last Batches", "description": "Ir a la pantalla Last Batches (Últimos lotes)." },
+        { "order": 2, "title": "Terminar", "description": "Terminar el/los lote(s) según el flujo de la pantalla." },
+        { "order": 3, "title": "Verificar informe", "description": "Comprobar que el lote quedó registrado en los informes." }
+      ]
+    },
+    {
+      "id": "mhg-proc-presentar-informe",
+      "title": "Presentar un informe",
+      "description": "Consultar la producción registrada. Fuente: manual A600 (Marel), pág 46.",
+      "steps": [
+        { "order": 1, "title": "Abrir Reports", "description": "Ir a la pantalla Reports (Informes)." },
+        { "order": 2, "title": "Presentar", "description": "Presentar el informe deseado." },
+        { "order": 3, "title": "Eliminar si corresponde", "description": "Eliminar informes que ya no se necesiten desde la misma pantalla." }
+      ]
+    },
+    {
+      "id": "mhg-proc-registro-alarmas",
+      "title": "Consultar el registro de alarmas",
+      "description": "Investigar el origen de una alarma. Fuente: manual A600 (Marel), pág 7.",
+      "steps": [
+        { "order": 1, "title": "Tocar Alarm Log", "description": "Cuando el botón Alarm parpadea, tocar Alarm Log (Registro de alarmas)." },
+        { "order": 2, "title": "Leer el error", "description": "Ver el tipo de error con su descripción, prioridad (color) y solución sugerida." },
+        { "order": 3, "title": "Aplicar la solución", "description": "Ejecutar la solución indicada; si dice contactar servicio, anotar el error y avisar a Marel." }
+      ]
+    },
+    {
+      "id": "mhg-proc-limpieza",
+      "title": "Limpieza de la cinta de la balanza",
+      "description": "Mantener limpia la cinta transportadora de la balanza para pesajes estables. Fuente: manual A600 (Marel), pág 14, 23.",
+      "steps": [
+        { "order": 1, "title": "Detener producción", "description": "Detener la producción y asegurar la máquina antes de limpiar." },
+        { "order": 2, "title": "Limpiar la cinta", "description": "Limpiar la cinta transportadora de la balanza (Weigher), donde la suciedad desestabiliza el peso." },
+        { "order": 3, "title": "Verificar estabilidad", "description": "Reiniciar y comprobar que el peso de la cinta ya no marque inestable." }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "mhg-flow-alarma",
+      "title": "¿Qué hago cuando parpadea la alarma?",
+      "trigger": "El botón Alarm parpadea en rojo, naranja o amarillo indicando un problema y su gravedad.",
+      "actions": [
+        "Tocar Alarm Log (Registro de alarmas) para ver el tipo de error y su descripción.",
+        "Leer la prioridad (rojo = grave) y la solución sugerida.",
+        "Aplicar la solución accionable (parada de emergencia, sensor sucio, cinta de la balanza, balanza no lista).",
+        "Si la solución indica contactar servicio técnico, anotar el error y avisar a Marel.",
+        "Fuente: manual A600 (Marel), pág 7."
+      ]
+    },
+    {
+      "id": "mhg-flow-antes-produccion",
+      "title": "¿Qué hago antes de iniciar la producción?",
+      "trigger": "Se va a arrancar la producción en el A600.",
+      "actions": [
+        "Verificar que el controlador M3210 esté en estado RUNNING.",
+        "Despejar las vías de recepción (sin herramientas ni objetos).",
+        "Confirmar que la balanza esté inicializada y lista.",
+        "Seleccionar/activar el programa correcto para el producto a correr.",
+        "Fuente: manual A600 (Marel), pág 8."
+      ]
+    },
+    {
+      "id": "mhg-flow-cambio-programa",
+      "title": "¿Qué hago cuando cambio de producto o programa?",
+      "trigger": "Se va a correr un producto distinto o cambiar el criterio de clasificación.",
+      "actions": [
+        "Abrir la pantalla Programs y activar el programa correspondiente.",
+        "Revisar en Products que los productos estén asignados a las ubicaciones correctas.",
+        "Confirmar que el programa activo sea el deseado antes de reanudar.",
+        "Fuente: manual A600 (Marel), pág 37, 45."
+      ]
+    },
+    {
+      "id": "mhg-flow-terminar-lote",
+      "title": "¿Qué hago para terminar un lote?",
+      "trigger": "Se completó un lote y hay que cerrarlo.",
+      "actions": [
+        "Ir a Last Batches (Últimos lotes) y terminar el lote.",
+        "Verificar que quede registrado en Reports (Informes).",
+        "Fuente: manual A600 (Marel), pág 18, 46."
+      ]
+    },
+    {
+      "id": "mhg-flow-balanza-no-lista",
+      "title": "¿Qué hago cuando la balanza no está lista?",
+      "trigger": "El A600 avisa que la balanza no está inicializada / no está lista.",
+      "actions": [
+        "Detener toda la producción hasta que la balanza esté lista.",
+        "Esperar a que termine la inicialización del Weigher.",
+        "Si no se inicializa, revisar el registro de alarmas y contactar servicio si persiste.",
+        "Fuente: manual A600 (Marel), pág 14."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "mhg-diag-colores-alarma",
+      "title": "Entender el color de la alarma (rojo / naranja / amarillo)",
+      "symptom": "El botón Alarm parpadea y no sé qué gravedad tiene.",
+      "possibleCauses": [
+        "Rojo: error grave que requiere atención inmediata.",
+        "Naranja o amarillo: advertencia de menor gravedad."
+      ],
+      "solution": "Tocar Alarm Log para ver el error, su prioridad y la solución. Priorizar los rojos. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-emergencia",
+      "title": "Paradas de emergencia activadas (Runner)",
+      "symptom": "Alarma Runner 'Paradas de emergencia': la parada de emergencia está activada.",
+      "possibleCauses": [
+        "Un pulsador de emergencia quedó accionado."
+      ],
+      "solution": "Comprobar todos los botones de emergencia y liberar el que esté accionado. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-sensor-productos",
+      "title": "Sensor de productos bloqueado (Weigher 2)",
+      "symptom": "Alarma Weigher 'Sensor de productos': el sensor de productos podría estar bloqueado.",
+      "possibleCauses": [
+        "Suciedad o residuo sobre el sensor de productos de la balanza."
+      ],
+      "solution": "Comprobar si hay suciedad en el sensor de productos de la balanza y limpiarlo. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-peso-inestable",
+      "title": "Peso de la cinta inestable (Weigher 8)",
+      "symptom": "Alarma Weigher 'Estabilidad del peso de la cinta': el peso de la cinta es inestable.",
+      "possibleCauses": [
+        "Cinta transportadora de la balanza sucia.",
+        "Residuos que alteran la lectura de peso."
+      ],
+      "solution": "Limpiar la cinta transportadora de la balanza. Fuente: manual A600 (Marel), pág 14."
+    },
+    {
+      "id": "mhg-diag-balanza-no-lista",
+      "title": "Balanza no lista / inicialización (Weigher 14)",
+      "symptom": "Alarma Weigher 'Inicialización': la balanza no está lista.",
+      "possibleCauses": [
+        "La balanza aún se está inicializando o no completó su arranque."
+      ],
+      "solution": "Detener toda la producción hasta que la balanza esté lista. Si no se inicializa, revisar el registro y contactar servicio. Fuente: manual A600 (Marel), pág 14."
+    },
+    {
+      "id": "mhg-diag-velocidad-cinta",
+      "title": "Velocidad de la cinta anómala (Weigher 3/4)",
+      "symptom": "Alarma Weigher 'Velocidad de la cinta': la cinta va demasiado despacio (3) o demasiado rápido (4).",
+      "possibleCauses": [
+        "Desajuste del accionamiento de la cinta de la balanza.",
+        "Fallo en el control de velocidad."
+      ],
+      "solution": "No es ajuste de operador: anotar el código y contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 13."
+    },
+    {
+      "id": "mhg-diag-longitud-cinta",
+      "title": "Longitud de la cinta inestable/incorrecta (Weigher 5/6/7)",
+      "symptom": "Alarma Weigher 'Longitud de la cinta': la longitud es inestable (5), demasiado corta (6) o demasiado larga (7).",
+      "possibleCauses": [
+        "Problema en la medición de la longitud de la cinta de pesaje."
+      ],
+      "solution": "Contactar al servicio técnico de Marel (no es corregible desde la operación). Fuente: manual A600 (Marel), pág 13-14."
+    },
+    {
+      "id": "mhg-diag-indice-cinta",
+      "title": "Falta el enlace al índice de cinta (Weigher 13)",
+      "symptom": "Alarma Weigher 'Índice de cinta': falta el enlace al índice de cinta.",
+      "possibleCauses": [
+        "Pérdida de la referencia/índice de la cinta de pesaje."
+      ],
+      "solution": "Contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 14."
+    },
+    {
+      "id": "mhg-diag-itemtracker",
+      "title": "ItemTracker inestable / no disponible (1/2)",
+      "symptom": "Alarma ItemTracker: el indicador es inestable (1) o dejó de estar disponible (2).",
+      "possibleCauses": [
+        "Problema en el seguimiento de piezas (ItemTracker)."
+      ],
+      "solution": "Contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-takeaway",
+      "title": "Error de TakeAway",
+      "symptom": "Alarma TakeAway: se detectó un fallo en TakeAway.",
+      "possibleCauses": [
+        "Fallo en el sistema de retiro/evacuación (TakeAway)."
+      ],
+      "solution": "Consultar el Registro de alarmas para el detalle y contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-weigher-sin-identificar",
+      "title": "Error sin identificar del Weigher (motor MWS2)",
+      "symptom": "Alarma Weigher 'Error sin identificar': mensaje de error sin identificar del motor MWS2.",
+      "possibleCauses": [
+        "Fallo no clasificado del motor/servo MWS2 de la balanza."
+      ],
+      "solution": "Anotar las circunstancias y contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 7."
+    },
+    {
+      "id": "mhg-diag-prevencion",
+      "title": "Prevención: evitar problemas antes de producir",
+      "symptom": "Quiero reducir alarmas y paros al arrancar.",
+      "possibleCauses": [
+        "Controlador M3210 no está en RUNNING.",
+        "Objetos o herramientas olvidados en las vías de recepción.",
+        "Balanza sin inicializar."
+      ],
+      "solution": "Antes de iniciar: M3210 en RUNNING, vías despejadas y balanza lista. Fuente: manual A600 (Marel), pág 8."
+    }
+  ]
+}
