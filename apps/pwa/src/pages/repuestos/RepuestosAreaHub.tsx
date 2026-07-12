@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, MapPin, Boxes, Wrench } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
@@ -1611,31 +1611,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             </div>
           )}
 
-          {/* Composición por clase (clic = filtra por esa clase) */}
-          {!repuestosBusy && catalogStats.clases.length > 1 && (
-            <div className="mb-6 -mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">Composición:</span>
-              {catalogStats.clases.map(({ clase, count }) => {
-                const active = repClaseFilter === clase
-                return (
-                  <button
-                    key={clase}
-                    onClick={() => setRepClaseFilter(active ? 'all' : clase)}
-                    className={[
-                      'rounded-full px-2 py-0.5 text-[11px] font-medium transition',
-                      active
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                    ].join(' ')}
-                    title={`Filtrar por ${CLASE_LABEL[clase]}`}
-                  >
-                    {CLASE_LABEL[clase]} <span className="tabular-nums opacity-70">{count}</span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
           {/* (Fase 4 normalización) La sección "Motores y bombas del área" se eliminó:
               los motores/bombas físicos ahora son repuestos de la colección plana y
               aparecen en la tabla de abajo con su marca/modelo/foto. */}
@@ -1842,11 +1817,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                     <Wrench className="h-3 w-3" /> común
                                   </span>
                                 )}
-                                {!r.codigoSAP && (
-                                  <span className="shrink-0 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400" title="Pieza de despiece — sin código SAP">
-                                    sin SAP
-                                  </span>
-                                )}
                               </div>
                               {/* En móvil, SAP + equipo + tipo van como subtítulo (columnas ocultas) */}
                               <div className="mt-0.5 text-[10px] text-muted-foreground md:hidden">
@@ -1905,28 +1875,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                 <span className="tabular-nums font-medium">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
                                 <span className={['text-[10px]', meta.text].join(' ')}>{meta.label}</span>
                               </div>
-                              {r.ubicacionBodega && (
-                                <div className="mt-0.5 flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Ubicación en bodega">
-                                  <MapPin className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="font-mono">{r.ubicacionBodega}</span>
-                                </div>
-                              )}
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
                             <td className="px-3 py-2">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
-                                  className={['rounded p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
-                                  title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                                  aria-label="Favorito"
-                                >
-                                  <Star className={['h-4 w-4', favKeys.has(r.rowKey) ? 'fill-current' : ''].join(' ')} />
-                                </button>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
-                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
+                                className={['rounded p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                aria-label="Favorito"
+                              >
+                                <Star className={['h-4 w-4', favKeys.has(r.rowKey) ? 'fill-current' : ''].join(' ')} />
+                              </button>
                             </td>
                           </tr>
                           </Fragment>

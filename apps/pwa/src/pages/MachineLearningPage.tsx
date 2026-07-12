@@ -678,17 +678,17 @@ function ProceduresList({ procedures, color, machineSlug }: { procedures: Proced
                   </ol>
 
                   {proc.successCriteria && proc.successCriteria.length > 0 && (
-                    <div className="mt-4 rounded-md p-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.28)' }}>
+                    <div className="mt-4 rounded-md p-3" style={{ background: LC.okSoft, border: `1px solid ${LC.ok}33` }}>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <ShieldCheck className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />
-                        <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color: '#22c55e' }}>
-                          Criterios de exito
+                        <ShieldCheck className="h-3.5 w-3.5" style={{ color: LC.ok }} />
+                        <p className="text-[13px] font-semibold" style={{ color: LC.ok }}>
+                          Criterios de éxito
                         </p>
                       </div>
                       <ul className="space-y-1.5">
                         {proc.successCriteria.map((criterion, index) => (
                           <li key={index} className="flex gap-2 text-xs leading-relaxed" style={{ color: LC.inkMid }}>
-                            <span className="mt-[6px] h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: '#22c55e' }} />
+                            <span className="mt-[6px] h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: LC.ok }} />
                             <span className="flex-1">{criterion}</span>
                           </li>
                         ))}
@@ -1779,7 +1779,7 @@ function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string 
         <div key={grupo.tipo}>
           <div className="mb-2 flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-            <h3 className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color }}>{grupo.tipo}</h3>
+            <h3 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>{grupo.tipo}</h3>
             <span className="text-[11px]" style={{ color: LC.inkLo }}>({grupo.items.length})</span>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2">
@@ -1827,9 +1827,9 @@ function CommonPartCard({
             <span
               className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
               style={{
-                background: resolved.stockFisico > 0 ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)',
-                color: resolved.stockFisico > 0 ? '#22c55e' : '#ef4444',
-                border: `1px solid ${resolved.stockFisico > 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                background: resolved.stockFisico > 0 ? LC.okSoft : 'rgba(239,68,68,0.14)',
+                color: resolved.stockFisico > 0 ? LC.ok : LC.crit,
+                border: `1px solid ${resolved.stockFisico > 0 ? LC.ok + '4d' : LC.crit + '4d'}`,
               }}
             >
               Stock {resolved.stockFisico}
