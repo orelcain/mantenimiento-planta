@@ -1,0 +1,194 @@
+{
+  "manual": [
+    {
+      "id": "mf-manual-que-es",
+      "title": "Qué es la línea SmartLine",
+      "order": 1,
+      "content": "La Marel Filete usa una línea SmartLine: un sistema dinámico de pesaje y clasificación que recibe el producto, lo pesa pieza a pieza y lo distribuye en lotes por peso o cantidad. Está disponible en tres modelos, con vía individual o doble y distintas anchuras/longitudes de cinta.\n\nPuntos clave:\n\n- Consta de tres módulos principales: alimentación, unidad de báscula MW (pesaje dinámico) y unidad de descarga.\n- El software A600 calcula cuándo un lote alcanza su objetivo de peso o de número de piezas y ordena la descarga.\n- El rendimiento máximo depende de un flujo de producto uniforme e individualizado en la alimentación.\n\nNotas operativas:\n\n- Es equipo Marel de clasificación/pesaje de la línea de fileteado; el control es el mismo software A600 de la familia.\n- Fuente: manual SmartLine (Marel), pág 3, 6, 9-12."
+    },
+    {
+      "id": "mf-manual-seguridad",
+      "title": "Seguridad",
+      "order": 2,
+      "content": "Toda persona que use, instale o limpie la SmartLine debe conocer las instrucciones de seguridad; su incumplimiento anula la garantía y puede causar daños o lesiones graves.\n\nPuntos clave:\n\n- Desconectar la alimentación eléctrica para trabajar en el equipo: interruptor de red del armario eléctrico en OFF y bloquearlo con candado (LOTO).\n- Toda instalación/reparación eléctrica la realiza un electricista autorizado según normativa.\n\nNotas operativas:\n\n- Nunca trabajar en piezas móviles de la máquina.\n- Operar sin las protecciones/tapas suministradas es mal uso y riesgo para las personas.\n- Fuente: manual SmartLine (Marel), pág 4."
+    },
+    {
+      "id": "mf-manual-alimentacion",
+      "title": "Módulo de alimentación",
+      "order": 3,
+      "content": "La alimentación es una cartera de cintas transportadoras en línea recta (vía individual o doble) que entrega un flujo continuo de producto separado de manera uniforme e individualizado a la báscula dinámica.\n\nPuntos clave:\n\n- El proceso de separación se completa en dos o tres pasos.\n- El rendimiento máximo del sistema solo se logra con un flujo de producto óptimo (separado y parejo).\n\nNotas operativas:\n\n- Un flujo mal separado o con piezas pegadas baja el rendimiento y ensucia el pesaje.\n- Fuente: manual SmartLine (Marel), pág 10."
+    },
+    {
+      "id": "mf-manual-bascula-mw",
+      "title": "Unidad de báscula MW (pesaje dinámico)",
+      "order": 4,
+      "content": "La unidad de báscula MW pesa cada pieza en movimiento con sensores de celda de carga sobre varias plataformas y transfiere el peso a la HMI de la unidad de descarga.\n\nMedidas / tolerancias:\n\n- MW1000: aplicaciones de alta velocidad y espacio reducido; la alimentación es crítica por ser corta.\n- MW1450: modelo predeterminado.\n- MW1900: para artículos de longitud superior a 700 mm.\n\nPuntos clave:\n\n- El pesaje es dinámico (pieza en movimiento), por eso la limpieza y el flujo parejo importan tanto.\n\nNotas operativas:\n\n- Suciedad sobre las plataformas de pesaje o celdas desestabiliza la lectura.\n- Fuente: manual SmartLine (Marel), pág 11."
+    },
+    {
+      "id": "mf-manual-descarga",
+      "title": "Unidad de descarga y creación de lotes",
+      "order": 5,
+      "content": "En la descarga, brazos de puerta neumáticos dirigen el flujo hacia las canaletas y bandejas, donde el material se recoge en lotes de un peso o tamaño determinado.\n\nPuntos clave:\n\n- El software A600 decide cuándo un lote alcanzó su objetivo (peso o número de piezas) y da la instrucción de descarga.\n- La descarga puede alimentar una cinta de cajas opcional.\n\nNotas operativas:\n\n- Un brazo neumático lento o desajustado desvía piezas al destino equivocado.\n- Fuente: manual SmartLine (Marel), pág 12."
+    },
+    {
+      "id": "mf-manual-limpieza-mantenimiento",
+      "title": "Limpieza y mantenimiento",
+      "order": 6,
+      "content": "La limpieza es central en la SmartLine: al ser pesaje dinámico, la suciedad afecta directamente la exactitud y el rendimiento.\n\nPuntos clave:\n\n- Limpiar las cintas y las plataformas de pesaje según el plan, con la máquina asegurada.\n- El mantenimiento cubre cintas, brazos neumáticos de descarga y sensores.\n\nNotas operativas:\n\n- Antes de limpiar o intervenir: cortar energía y bloquear con candado (LOTO); no usar la máquina sin protecciones.\n- Fuente: manual SmartLine (Marel), pág 4, y capítulos de limpieza/mantenimiento."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "mf-proc-arranque",
+      "title": "Arranque de la línea",
+      "description": "Poner en marcha la SmartLine para producción. Fuente: manual SmartLine (Marel).",
+      "steps": [
+        { "order": 1, "title": "Verificar seguridad", "description": "Confirmar que las protecciones/tapas estén puestas y que nadie trabaje en piezas móviles." },
+        { "order": 2, "title": "Energizar", "description": "Poner el interruptor de red del armario en ON (quitar el candado de bloqueo)." },
+        { "order": 3, "title": "Seleccionar producto", "description": "Cargar el producto/programa correcto en la HMI (A600)." },
+        { "order": 4, "title": "Verificar flujo", "description": "Arrancar la alimentación y comprobar que el producto llegue separado y parejo a la báscula." }
+      ]
+    },
+    {
+      "id": "mf-proc-limpieza",
+      "title": "Limpieza de cintas y plataformas de pesaje",
+      "description": "Mantener la exactitud del pesaje dinámico. Fuente: manual SmartLine (Marel), pág 4.",
+      "steps": [
+        { "order": 1, "title": "Asegurar la máquina", "description": "Cortar la alimentación eléctrica (interruptor de red en OFF) y bloquear con candado (LOTO)." },
+        { "order": 2, "title": "Limpiar cintas", "description": "Limpiar las cintas de alimentación y descarga según el plan de limpieza." },
+        { "order": 3, "title": "Limpiar plataformas de pesaje", "description": "Limpiar las plataformas de la báscula MW, evitando dejar residuos que desestabilicen la lectura." },
+        { "order": 4, "title": "Reponer protecciones", "description": "Volver a colocar todas las protecciones/tapas antes de reenergizar." }
+      ]
+    },
+    {
+      "id": "mf-proc-seleccionar-producto",
+      "title": "Seleccionar / cambiar producto",
+      "description": "Configurar la línea para otra especie/calibre. Fuente: manual SmartLine (Marel).",
+      "steps": [
+        { "order": 1, "title": "Abrir la HMI", "description": "En la HMI (software A600) abrir la selección de producto/programa." },
+        { "order": 2, "title": "Elegir el producto", "description": "Seleccionar el producto con su objetivo de lote (peso o número de piezas)." },
+        { "order": 3, "title": "Verificar la descarga", "description": "Confirmar que las canaletas/bandejas de destino correspondan al nuevo producto." }
+      ]
+    },
+    {
+      "id": "mf-proc-ajustar-alimentacion",
+      "title": "Ajustar el flujo de alimentación",
+      "description": "Lograr un flujo separado y parejo para el máximo rendimiento. Fuente: manual SmartLine (Marel), pág 10.",
+      "steps": [
+        { "order": 1, "title": "Observar la entrada", "description": "Ver cómo llega el producto a la báscula: debe estar separado e individualizado." },
+        { "order": 2, "title": "Corregir la carga aguas arriba", "description": "Ajustar la alimentación para que no lleguen piezas pegadas ni en bloque." },
+        { "order": 3, "title": "Verificar rendimiento", "description": "Comprobar que suba el rendimiento y baje el rechazo con el flujo parejo." }
+      ]
+    },
+    {
+      "id": "mf-proc-mantenimiento",
+      "title": "Mantenimiento de cintas y descarga",
+      "description": "Conservar cintas, brazos neumáticos y sensores. Fuente: manual SmartLine (Marel).",
+      "steps": [
+        { "order": 1, "title": "Asegurar (LOTO)", "description": "Cortar energía y bloquear con candado antes de intervenir." },
+        { "order": 2, "title": "Revisar cintas", "description": "Inspeccionar tensión, desgaste y limpieza de las cintas." },
+        { "order": 3, "title": "Revisar brazos neumáticos", "description": "Comprobar el accionamiento de los brazos de puerta de la descarga." },
+        { "order": 4, "title": "Revisar sensores", "description": "Verificar sensores de celda de carga y su limpieza." }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "mf-flow-arrancar",
+      "title": "¿Qué hago para arrancar la línea?",
+      "trigger": "Se va a iniciar la producción en la SmartLine.",
+      "actions": [
+        "Verificar protecciones puestas y personal fuera de piezas móviles.",
+        "Energizar (interruptor de red en ON, sin candado).",
+        "Seleccionar el producto/programa en la HMI (A600).",
+        "Arrancar la alimentación y comprobar flujo separado y parejo.",
+        "Fuente: manual SmartLine (Marel)."
+      ]
+    },
+    {
+      "id": "mf-flow-cambio-producto",
+      "title": "¿Qué hago cuando cambio de producto?",
+      "trigger": "Se corre otra especie/calibre o cambia el objetivo de lote.",
+      "actions": [
+        "Seleccionar el nuevo producto/programa en la HMI.",
+        "Confirmar el objetivo de lote (peso o número de piezas).",
+        "Verificar que las canaletas/bandejas de destino sean las correctas.",
+        "Fuente: manual SmartLine (Marel)."
+      ]
+    },
+    {
+      "id": "mf-flow-limpiar",
+      "title": "¿Qué hago para limpiar con seguridad?",
+      "trigger": "Toca limpieza de fin de turno o entre productos.",
+      "actions": [
+        "Poner el interruptor de red del armario en OFF y bloquear con candado (LOTO).",
+        "Limpiar cintas y plataformas de pesaje sin dejar residuos.",
+        "Reponer todas las protecciones antes de reenergizar.",
+        "Fuente: manual SmartLine (Marel), pág 4."
+      ]
+    },
+    {
+      "id": "mf-flow-rendimiento-bajo",
+      "title": "¿Qué hago cuando baja el rendimiento?",
+      "trigger": "La línea produce menos de lo esperado o rechaza mucho.",
+      "actions": [
+        "Revisar el flujo de alimentación: el producto debe llegar separado e individualizado.",
+        "Verificar la limpieza de las plataformas de pesaje (suciedad = pesaje inestable).",
+        "Comprobar que los brazos de descarga dirijan al destino correcto.",
+        "Fuente: manual SmartLine (Marel), pág 10-12."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "mf-diag-flujo-deficiente",
+      "title": "Rendimiento bajo por flujo de alimentación deficiente",
+      "symptom": "La línea rinde menos de lo esperado o el pesaje es errático.",
+      "possibleCauses": [
+        "Producto que llega pegado o en bloque, no individualizado.",
+        "Alimentación mal ajustada aguas arriba."
+      ],
+      "solution": "Ajustar la alimentación para lograr un flujo separado y parejo hacia la báscula. El rendimiento máximo solo se logra con flujo óptimo. Fuente: manual SmartLine (Marel), pág 10."
+    },
+    {
+      "id": "mf-diag-pesaje-inestable",
+      "title": "Pesaje inestable en la báscula MW",
+      "symptom": "Los pesos saltan o hay muchos rechazos por peso fuera de rango.",
+      "possibleCauses": [
+        "Suciedad sobre las plataformas de pesaje o celdas de carga.",
+        "Flujo de producto no individualizado (dos piezas en una plataforma)."
+      ],
+      "solution": "Limpiar las plataformas de pesaje (con LOTO) y asegurar que el producto llegue separado. Fuente: manual SmartLine (Marel), pág 11."
+    },
+    {
+      "id": "mf-diag-descarga-destino",
+      "title": "El producto se descarga al destino equivocado",
+      "symptom": "Piezas que caen en la canaleta/bandeja que no corresponde.",
+      "possibleCauses": [
+        "Brazo de puerta neumático lento, desajustado o sin presión.",
+        "Objetivo de lote o asignación de destino mal configurado."
+      ],
+      "solution": "Revisar el accionamiento de los brazos neumáticos de descarga y la configuración de destinos en la HMI (A600). Fuente: manual SmartLine (Marel), pág 12."
+    },
+    {
+      "id": "mf-diag-lote-no-cierra",
+      "title": "El lote no alcanza el objetivo",
+      "symptom": "Los lotes no cierran o quedan fuera del peso/cantidad objetivo.",
+      "possibleCauses": [
+        "Objetivo de lote mal configurado para el producto.",
+        "Rechazo alto que impide completar el lote.",
+        "Pesaje impreciso que descarta piezas válidas."
+      ],
+      "solution": "Verificar el objetivo de lote del producto y resolver primero el pesaje/flujo. Fuente: manual SmartLine (Marel), pág 12."
+    },
+    {
+      "id": "mf-diag-seguridad",
+      "title": "Antes de intervenir: bloqueo de energía (LOTO)",
+      "symptom": "Hay que abrir tapas, limpiar o tocar piezas de la línea.",
+      "possibleCauses": [
+        "Intervención con la máquina energizada = riesgo grave."
+      ],
+      "solution": "Poner el interruptor de red del armario en OFF, bloquear con candado y no trabajar en piezas móviles ni sin protecciones. Reparaciones eléctricas solo por electricista autorizado. Fuente: manual SmartLine (Marel), pág 4."
+    }
+  ]
+}

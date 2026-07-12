@@ -104,10 +104,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'marel-filete',
     name: 'Marel Filete',
     area: 'Planta Principal',
-    description: 'Maquina fileteadora Marel.',
+    description: 'Linea de fileteado/porcionado Marel con SmartLine: alimentacion, bascula dinamica MW (celdas de carga) y descarga por brazos neumaticos en lotes; control por software A600. Seguridad, limpieza y mantenimiento.',
     icon: Fish,
     color: '#86769c',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'termoformadora-gea',
