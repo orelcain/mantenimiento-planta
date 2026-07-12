@@ -492,6 +492,26 @@ html.in-iframe, html.in-iframe body {
 
 /* Explorador CAN — tabla de 5 columnas (clonado de p018/p020/p021) */
 .can-table { flex: 1; overflow-y: auto; }
+/* Botón AYUDA DEL CLON (no existe en el Z2 real): tras "Localizar ID's
+   aleatorias" el Z2 deja la vista localizada y no ofrece vuelta atrás en
+   pantalla; este botón punteado (estilo nota didáctica, distinto de los
+   botones reales) restaura la lista completa — pedido de Orel 2026-07-11. */
+.clon-aid-btn {
+  display: none;
+  flex-shrink: 0;
+  margin: 6px 12px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed #7fa8d0;
+  border-radius: 3px;
+  color: #7fa8d0;
+  font-size: 12px;
+  font-style: italic;
+  font-family: Arial, sans-serif;
+  cursor: pointer;
+}
+.clon-aid-btn.show { display: block; }
+.clon-aid-btn:hover { background: rgba(127,168,208,0.12); color: #aaccee; }
 .can-row-head, .can-row {
   /* p018: tabla con BORDES de celda visibles, texto azul brillante bold en
      todas las filas (el real no atenúa las no seleccionadas), filas altas. */
@@ -939,6 +959,7 @@ html.in-iframe, html.in-iframe body {
         <div class="can-row-head"><span>Id</span><span>Real Id</span><span>Label</span><span>Version</span><span>CRC</span></div>
         <div id="can-rows"></div>
       </div>
+      <button class="clon-aid-btn" id="can-volver" onclick="volverListaCan()">◆ Volver a todas las IDs — botón del clon (ayuda de entrenamiento), no existe en el Z2 real</button>
       <div class="btn-bar">
         <button class="btn" onclick="localizarIdsAleatorias()">Localizar ID's aleatorias</button>
         <button class="btn" onclick="scrollList('can-table', 1)">Abajo</button>
@@ -2108,7 +2129,16 @@ renderCanDevices(CAN_DEVICES_BASE);
 
 function localizarIdsAleatorias() {
   renderCanDevices(CAN_DEVICES_LOCALIZADOS);
+  document.getElementById('can-volver').classList.add('show');
   addLog("Localizar ID's aleatorias");
+}
+
+/* Ayuda del clon (no-Z2): restaura la lista completa tras el replay de
+   "Localizar ID's aleatorias". En el Z2 real hay que salir y volver a entrar. */
+function volverListaCan() {
+  renderCanDevices(CAN_DEVICES_BASE);
+  document.getElementById('can-volver').classList.remove('show');
+  addLog('Volver a todas las IDs (ayuda del clon)');
 }
 
 /* ══════════════════════════════════════════════════
