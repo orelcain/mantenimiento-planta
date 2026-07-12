@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
 import {
@@ -23,9 +24,17 @@ import { Button } from '@/components/ui'
  * Patrón idéntico a HmiKnuroPage pero sin presets (el Grader no los usa).
  */
 export function HmiGraderPage() {
+  const navigate = useNavigate()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
+
+  // Volver: go-back real si hay historial de navegación in-app; si se entró
+  // por link directo (sin historial), cae al Centro de Aprendizaje.
+  const handleBack = useCallback(() => {
+    if (window.history.length > 1) navigate(-1)
+    else navigate('/aprendizaje')
+  }, [navigate])
 
   const [graderState, setGraderState] = useState<GraderState | null>(null)
   const [savingState, setSavingState] = useState(false)
@@ -142,6 +151,16 @@ export function HmiGraderPage() {
       {/* ── Toolbar ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
         <div className="flex items-center gap-2 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="h-7 gap-1 text-xs flex-shrink-0"
+            title="Volver al Centro de Aprendizaje"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Volver</span>
+          </Button>
           <Scale className="h-4 w-4 text-primary flex-shrink-0" />
           <span className="text-sm font-semibold truncate">HMI Grader</span>
           <span className="text-xs text-muted-foreground hidden md:inline">
