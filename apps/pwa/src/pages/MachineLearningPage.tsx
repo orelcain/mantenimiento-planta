@@ -31,6 +31,7 @@ import {
   listBibliografia,
   type Procedure,
   type ManualSection,
+  type SectionQuizItem,
   type Flow,
   type DiagnosisEntry,
   type QuizQuestion,
@@ -552,10 +553,21 @@ function ManualList({
       </div>
       <div className="dp-sec-code">{isCourse ? 'Lección del curso' : 'Manual técnico'}</div>
 
+      {!isGraderGlossary && activeSection.objetivo && (
+        <div className="dp-objetivo">
+          <span className="dp-lbl">Objetivo</span>
+          <p>{activeSection.objetivo}</p>
+        </div>
+      )}
+
       {!isGraderGlossary && blocks.description && (
         <div className="dp-body" style={{ marginTop: 24 }}>
           <p style={{ whiteSpace: 'pre-wrap' }}>{blocks.description}</p>
         </div>
+      )}
+
+      {!isGraderGlossary && activeSection.porque && (
+        <p className="dp-porque"><span className="dp-lbl">Por qué importa — </span>{activeSection.porque}</p>
       )}
 
       {isGraderGlossary ? (
@@ -580,6 +592,9 @@ function ManualList({
               canEdit={canEdit}
             />
           )}
+          {activeSection.quiz && activeSection.quiz.length > 0 && (
+            <SectionQuizView items={activeSection.quiz} />
+          )}
         </>
       )}
 
@@ -596,6 +611,58 @@ function ManualList({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * SectionQuizView — autoevaluación al pie de una sección de manual. Cada pregunta
+ * revela ✓/✕ + explicación al elegir una opción (sin flujo tipo examen del curso).
+ * Estado local por pregunta, no persiste.
+ */
+function SectionQuizView({ items }: { items: SectionQuizItem[] }) {
+  const [answers, setAnswers] = useState<Record<number, number>>({})
+  return (
+    <div className="dp-selfquiz">
+      <span className="dp-lbl">Autoevaluación · {items.length} {items.length === 1 ? 'pregunta' : 'preguntas'}</span>
+      {items.map((item, qi) => {
+        const chosen = answers[qi]
+        const answered = chosen !== undefined
+        const correct = chosen === item.correctIndex
+        return (
+          <div className="dp-sq-item" key={qi}>
+            <p className="dp-q">{item.question}</p>
+            <div className="dp-quiz-opts">
+              {item.options.map((opt, oi) => {
+                const isCorrect = oi === item.correctIndex
+                const isChosen = chosen === oi
+                const state = answered ? (isCorrect ? 'correct' : isChosen ? 'wrong' : undefined) : undefined
+                return (
+                  <button
+                    key={oi}
+                    type="button"
+                    className="dp-quiz-opt"
+                    data-state={state}
+                    disabled={answered}
+                    onClick={() => setAnswers(a => ({ ...a, [qi]: oi }))}
+                  >
+                    <span className="dp-k">
+                      {answered && isCorrect ? '✓' : answered && isChosen ? '✕' : String.fromCharCode(65 + oi)}
+                    </span>
+                    <span className="dp-otext">{opt}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {answered && (
+              <div className={`dp-quiz-fb ${correct ? '' : 'is-wrong'}`}>
+                <span className="dp-lbl">{correct ? 'Correcto' : 'Explicación'}</span>
+                {item.explanation}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -83,6 +83,16 @@
 .dossier .dp-objetivo .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 6px; }
 .dossier .dp-objetivo p { margin: 0; font-size: 15px; }
 
+/* "El porqué" — por qué importa la sección */
+.dossier .dp-porque { max-width: 60ch; font-size: 14px; color: var(--dp-ink-soft); margin: 20px 0; }
+.dossier .dp-porque .dp-lbl { color: var(--dp-ink-soft); }
+
+/* Autoevaluación al pie de una sección de manual (reusa dp-quiz-opt/fb) */
+.dossier .dp-selfquiz { max-width: 60ch; margin: 44px 0 0; padding-top: 26px; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-selfquiz > .dp-lbl { color: var(--dp-ink-faint); display: block; margin-bottom: 18px; }
+.dossier .dp-selfquiz .dp-sq-item + .dp-sq-item { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-selfquiz .dp-q { font-size: 15px; font-weight: 600; color: var(--dp-ink); margin: 0 0 14px; line-height: 1.4; }
+
 .dossier .dp-body { max-width: 60ch; }
 .dossier .dp-body p { margin: 0 0 15px; }
 

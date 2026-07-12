@@ -99,6 +99,15 @@ export interface Procedure {
   successCriteria?: string[]
 }
 
+/** Pregunta de autoevaluación al pie de una sección de manual (didáctica). */
+export interface SectionQuizItem {
+  question: string
+  options: string[]
+  /** Índice (0-based) de la opción correcta. */
+  correctIndex: number
+  explanation: string
+}
+
 export interface ManualSection {
   id: string
   title: string
@@ -106,6 +115,12 @@ export interface ManualSection {
   order: number
   createdAt: number
   updatedAt: number
+  /** Objetivo de aprendizaje: qué sabrá hacer el lector al terminar la sección. */
+  objetivo?: string
+  /** "El porqué": por qué importa la sección, no solo el qué. */
+  porque?: string
+  /** Autoevaluación corta (1-3 preguntas) al pie de la sección. */
+  quiz?: SectionQuizItem[]
 }
 
 export interface Flow {
