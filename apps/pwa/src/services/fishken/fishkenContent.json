@@ -1,0 +1,225 @@
+{
+  "manual": [
+    {
+      "id": "fk-manual-que-es",
+      "title": "Qué es la Fishken E-Pack S28",
+      "order": 1,
+      "content": "La Fishken E-Pack S28 es una envasadora/pesadora combinatoria: un conjunto de compuertas que operan con distintos productos para generar cajas con un peso restringido. Los productos se agregan en cada compuerta, se validan según el rango de pesaje de cada pieza y se combinan para armar la caja objetivo.\n\nPuntos clave:\n\n- Tiene 28 compuertas; cada una recibe piezas que se pesan en celdas de carga.\n- El software E-Pack toma los datos de las tarjetas de pesaje, hace la combinatoria de pesos y acciona las tarjetas de relé (NUMATO) para abrir/cerrar compuertas.\n- El objetivo es armar cajas dentro del peso restringido minimizando el sobrepeso.\n\nNotas operativas:\n\n- El manejo se hace desde el software E-Pack S28 y desde FishKen Web (reportes).\n- Fuente: manual Fishken E-Pack S28, pág 4-5."
+    },
+    {
+      "id": "fk-manual-software-epack",
+      "title": "El software E-Pack S28",
+      "order": 2,
+      "content": "El software E-Pack es el encargado de operar la máquina. Presenta un menú principal con dos opciones: Iniciar Proceso y Servicio FishKen.\n\nPuntos clave:\n\n- Iniciar Proceso: controla el proceso productivo y muestra los datos en vivo.\n- Servicio FishKen: calibración, ajuste de puertas y pruebas de conexión.\n\nNotas operativas:\n\n- El software lee las tarjetas de pesaje y comanda las tarjetas de relé según la combinatoria.\n- Fuente: manual Fishken E-Pack S28, pág 5, 19."
+    },
+    {
+      "id": "fk-manual-iniciar-proceso",
+      "title": "Pantalla Iniciar Proceso: datos y estadísticas",
+      "order": 3,
+      "content": "La pantalla Iniciar Proceso concentra el estado del proceso en curso.\n\nPuntos clave:\n\n- Nombre del equipo y algoritmo en uso (p. ej. Algoritmo Estándar).\n- Datos del producto configurado: nombre, especie, orden de trabajo, calibre, caja master.\n- Estadísticas del proceso: cajas producidas y rechazadas, peso de cajas producidas/rechazadas, sobrepeso y % de sobrepeso, productividad (kg/h) y cajas/h.\n- Datos fijos: rango de peso por celda de carga, margen de error de la máquina, versión del software.\n\nMedidas / tolerancias:\n\n- Estado de compuertas: las habilitadas se ven con transparencia; las deshabilitadas, en color ROJO.\n\nNotas operativas:\n\n- Las estadísticas se cuentan desde el último reinicio o carga de configuración.\n- Fuente: manual Fishken E-Pack S28, pág 6-9."
+    },
+    {
+      "id": "fk-manual-servicio",
+      "title": "Servicio FishKen: calibración, puertas y conexiones",
+      "order": 4,
+      "content": "La sección Servicio FishKen agrupa las tareas de mantenimiento del software.\n\nPuntos clave:\n\n- Calibración: calibración del sistema de pesaje.\n- Ajuste de puertas: habilitar/deshabilitar cada compuerta (casilla Activo + Guardar Cambios).\n- Pruebas de conexión: verifican que la E-Pack esté operativa en 3 grupos — Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.\n\nNotas operativas:\n\n- Deshabilitar una compuerta si presenta problemas de pesaje, hasta resolverla.\n- Fuente: manual Fishken E-Pack S28, pág 19, 25, 27-28."
+    },
+    {
+      "id": "fk-manual-web-reportes",
+      "title": "FishKen Web: reportes",
+      "order": 5,
+      "content": "FishKen Web es la aplicación web que entrega los reportes de producción de la E-Pack S28.\n\nPuntos clave:\n\n- Reportes por Especie (General y Detallado).\n- Reportes por Calidad (General y Detallado).\n- Reportes por Calibre (General y Detallado).\n\nNotas operativas:\n\n- Los reportes se usan para trazabilidad y control de producción por turno/orden.\n- Fuente: manual FishKen Web, pág 6, 19-21."
+    },
+    {
+      "id": "fk-manual-compuertas-celdas",
+      "title": "Compuertas, celdas de carga y sobrepeso",
+      "order": 6,
+      "content": "El corazón de la máquina es la combinatoria de pesos entre compuertas para armar la caja con el menor sobrepeso posible.\n\nPuntos clave:\n\n- Cada compuerta pesa sus piezas en una celda de carga con un rango de peso definido.\n- El algoritmo combina las compuertas cuya suma cae dentro del peso objetivo de la caja.\n- El sobrepeso (y su %) mide cuánto se pasa la caja del peso objetivo: cuanto menor, mejor rendimiento.\n\nNotas operativas:\n\n- Una compuerta con celda fuera de rango o sucia degrada la combinatoria y sube el sobrepeso/rechazo.\n- Fuente: manual Fishken E-Pack S28, pág 6-8."
+    }
+  ],
+  "procedures": [
+    {
+      "id": "fk-proc-iniciar-proceso",
+      "title": "Iniciar el proceso",
+      "description": "Arrancar la producción desde el software E-Pack. Fuente: manual Fishken E-Pack S28, pág 9.",
+      "steps": [
+        { "order": 1, "title": "Abrir Iniciar Proceso", "description": "En el menú principal del E-Pack, entrar a Iniciar Proceso." },
+        { "order": 2, "title": "Verificar producto y compuertas", "description": "Confirmar el producto configurado y que las compuertas necesarias estén habilitadas (no en rojo)." },
+        { "order": 3, "title": "Iniciar", "description": "Presionar Iniciar Proceso: todas las compuertas se levantan por un tiempo configurable y luego vuelven a su estado original." },
+        { "order": 4, "title": "Vigilar estadísticas", "description": "Seguir cajas producidas/rechazadas, sobrepeso % y productividad en la pantalla." }
+      ]
+    },
+    {
+      "id": "fk-proc-calibrar",
+      "title": "Calibrar el sistema de pesaje",
+      "description": "Mantener el pesaje exacto. Fuente: manual Fishken E-Pack S28, pág 19.",
+      "steps": [
+        { "order": 1, "title": "Abrir Servicio FishKen", "description": "Desde el menú principal, entrar a Servicio FishKen." },
+        { "order": 2, "title": "Calibración", "description": "Ir a la sección Calibración y seguir el procedimiento del sistema de pesaje." },
+        { "order": 3, "title": "Verificar", "description": "Comprobar que las lecturas de las celdas queden dentro del rango esperado." }
+      ]
+    },
+    {
+      "id": "fk-proc-ajustar-compuerta",
+      "title": "Habilitar o deshabilitar una compuerta",
+      "description": "Sacar de servicio una compuerta con problemas sin parar la máquina. Fuente: manual Fishken E-Pack S28, pág 25.",
+      "steps": [
+        { "order": 1, "title": "Abrir Ajuste de puertas", "description": "En Servicio FishKen, ir a Ajuste de puertas." },
+        { "order": 2, "title": "Marcar/desmarcar Activo", "description": "Para deshabilitar una compuerta con problemas de pesaje, desmarcar la casilla Activo (para habilitarla, marcarla)." },
+        { "order": 3, "title": "Guardar Cambios", "description": "Dar clic en Guardar Cambios; la compuerta deshabilitada se muestra en rojo." }
+      ]
+    },
+    {
+      "id": "fk-proc-pruebas-conexion",
+      "title": "Pruebas de conexión",
+      "description": "Verificar que la E-Pack esté operativa. Fuente: manual Fishken E-Pack S28, pág 27-28.",
+      "steps": [
+        { "order": 1, "title": "Abrir Pruebas de conexión", "description": "En Servicio FishKen, ir a Pruebas de conexión." },
+        { "order": 2, "title": "Base de Datos", "description": "Ejecutar la prueba de Base de Datos para corroborar la conexión." },
+        { "order": 3, "title": "Tarjetas de Relé", "description": "Probar las Tarjetas de Relé (NUMATO) que accionan las compuertas." },
+        { "order": 4, "title": "Tarjetas de Pesaje", "description": "Probar las Tarjetas de Pesaje que leen las celdas de carga." }
+      ]
+    },
+    {
+      "id": "fk-proc-generar-reporte",
+      "title": "Generar un reporte en FishKen Web",
+      "description": "Obtener reportes de producción por especie/calidad/calibre. Fuente: manual FishKen Web, pág 19-21.",
+      "steps": [
+        { "order": 1, "title": "Abrir FishKen Web", "description": "Entrar a la aplicación FishKen Web." },
+        { "order": 2, "title": "Elegir el tipo de reporte", "description": "Seleccionar por Especie, Calidad o Calibre, en versión General o Detallado." },
+        { "order": 3, "title": "Filtrar y generar", "description": "Aplicar el rango/orden deseado y generar el reporte." }
+      ]
+    },
+    {
+      "id": "fk-proc-revisar-rechazo",
+      "title": "Revisar rechazo y sobrepeso",
+      "description": "Controlar el rendimiento del proceso. Fuente: manual Fishken E-Pack S28, pág 7.",
+      "steps": [
+        { "order": 1, "title": "Ver estadísticas", "description": "En Iniciar Proceso, mirar cajas rechazadas, sobrepeso y % de sobrepeso." },
+        { "order": 2, "title": "Identificar la causa", "description": "Sobrepeso o rechazo alto suele venir de compuertas con pesaje malo o rango de celda incorrecto." },
+        { "order": 3, "title": "Actuar", "description": "Deshabilitar la compuerta problemática o recalibrar; verificar la mejora en las estadísticas." }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "fk-flow-arrancar",
+      "title": "¿Qué hago para arrancar la producción?",
+      "trigger": "Se va a iniciar un turno/orden de producción en la E-Pack S28.",
+      "actions": [
+        "Confirmar el producto configurado (especie, calibre, orden, caja master).",
+        "Verificar que las compuertas necesarias estén habilitadas (sin rojo).",
+        "Entrar a Iniciar Proceso y presionar Iniciar.",
+        "Seguir el sobrepeso % y el rechazo en las estadísticas.",
+        "Fuente: manual Fishken E-Pack S28, pág 9."
+      ]
+    },
+    {
+      "id": "fk-flow-cambio-producto",
+      "title": "¿Qué hago cuando cambio de producto?",
+      "trigger": "Se va a correr otra especie/calibre o una nueva orden de trabajo.",
+      "actions": [
+        "Cargar la configuración del nuevo producto (nombre, especie, calibre, caja master).",
+        "Revisar el rango de peso por celda y que las compuertas correctas queden habilitadas.",
+        "Reiniciar las estadísticas y arrancar el proceso.",
+        "Fuente: manual Fishken E-Pack S28, pág 7."
+      ]
+    },
+    {
+      "id": "fk-flow-compuerta-problema",
+      "title": "¿Qué hago cuando una compuerta pesa mal?",
+      "trigger": "Una compuerta entrega pesajes erráticos o sube el rechazo/sobrepeso.",
+      "actions": [
+        "Ir a Servicio FishKen › Ajuste de puertas.",
+        "Desmarcar Activo en la compuerta problemática y Guardar Cambios (queda en rojo).",
+        "Seguir produciendo con el resto mientras se revisa la celda/mecánica de esa compuerta.",
+        "Recalibrar o reparar antes de volver a habilitarla.",
+        "Fuente: manual Fishken E-Pack S28, pág 25."
+      ]
+    },
+    {
+      "id": "fk-flow-generar-reporte",
+      "title": "¿Qué hago para sacar un reporte de producción?",
+      "trigger": "Se necesita el resultado del turno/orden por especie, calidad o calibre.",
+      "actions": [
+        "Abrir FishKen Web.",
+        "Elegir el reporte (Especie / Calidad / Calibre, General o Detallado).",
+        "Filtrar por el rango u orden y generarlo.",
+        "Fuente: manual FishKen Web, pág 19-21."
+      ]
+    },
+    {
+      "id": "fk-flow-falla-conexion",
+      "title": "¿Qué hago cuando la máquina no responde bien?",
+      "trigger": "La E-Pack no acciona compuertas, no pesa o el software no reacciona como debería.",
+      "actions": [
+        "Ir a Servicio FishKen › Pruebas de conexión.",
+        "Verificar los 3 grupos: Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.",
+        "Reparar la conexión del grupo que falle antes de reanudar.",
+        "Fuente: manual Fishken E-Pack S28, pág 27-28."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "fk-diag-compuerta-roja",
+      "title": "Una compuerta aparece en rojo (deshabilitada)",
+      "symptom": "En la pantalla, una o varias compuertas se ven en color rojo.",
+      "possibleCauses": [
+        "La compuerta fue deshabilitada a propósito (casilla Activo desmarcada).",
+        "Se deshabilitó por problemas de pesaje."
+      ],
+      "solution": "Es el estado 'deshabilitada'. Para volver a usarla: Servicio FishKen › Ajuste de puertas, marcar Activo y Guardar Cambios (tras resolver el problema de pesaje). Fuente: manual Fishken E-Pack S28, pág 8, 25."
+    },
+    {
+      "id": "fk-diag-sobrepeso-rechazo",
+      "title": "Sobrepeso alto o muchas cajas rechazadas",
+      "symptom": "El % de sobrepeso o la cantidad de cajas rechazadas sube por encima de lo normal.",
+      "possibleCauses": [
+        "Una o más compuertas con pesaje impreciso.",
+        "Rango de peso por celda mal configurado para el producto.",
+        "Celda de carga sucia o descalibrada."
+      ],
+      "solution": "Identificar la compuerta problemática, deshabilitarla o recalibrar, y verificar el rango de peso del producto. Fuente: manual Fishken E-Pack S28, pág 7-8."
+    },
+    {
+      "id": "fk-diag-falla-base-datos",
+      "title": "Falla de conexión con la Base de Datos",
+      "symptom": "El software no guarda/lee datos o los reportes no aparecen.",
+      "possibleCauses": [
+        "Conexión a la Base de Datos caída."
+      ],
+      "solution": "Servicio FishKen › Pruebas de conexión › Base de Datos para corroborar la conexión; restablecerla antes de seguir. Fuente: manual Fishken E-Pack S28, pág 27-28."
+    },
+    {
+      "id": "fk-diag-falla-rele",
+      "title": "Las compuertas no accionan (Tarjetas de Relé)",
+      "symptom": "Las compuertas no se abren/cierran aunque el software lo ordene.",
+      "possibleCauses": [
+        "Falla en las Tarjetas de Relé (NUMATO) que accionan las compuertas.",
+        "Conexión de la tarjeta de relé interrumpida."
+      ],
+      "solution": "Servicio FishKen › Pruebas de conexión › Tarjetas de Relé; revisar cableado/tarjeta NUMATO. Fuente: manual Fishken E-Pack S28, pág 27-28."
+    },
+    {
+      "id": "fk-diag-falla-pesaje",
+      "title": "Pesajes ausentes o erráticos (Tarjetas de Pesaje)",
+      "symptom": "Una compuerta no entrega peso o el peso salta sin sentido.",
+      "possibleCauses": [
+        "Falla en la Tarjeta de Pesaje que lee las celdas de carga.",
+        "Celda de carga desconectada o dañada."
+      ],
+      "solution": "Servicio FishKen › Pruebas de conexión › Tarjetas de Pesaje; revisar la celda de carga de esa compuerta. Mientras tanto, deshabilitar la compuerta. Fuente: manual Fishken E-Pack S28, pág 27-28."
+    },
+    {
+      "id": "fk-diag-celda-rango",
+      "title": "Celda de carga fuera de rango",
+      "symptom": "Una compuerta descarta piezas que deberían servir, o acepta fuera de rango.",
+      "possibleCauses": [
+        "Rango de peso de la celda mal ajustado para el producto.",
+        "Celda descalibrada."
+      ],
+      "solution": "Revisar el rango de peso por celda en los datos fijos y recalibrar desde Servicio FishKen › Calibración. Fuente: manual Fishken E-Pack S28, pág 8, 19."
+    }
+  ]
+}

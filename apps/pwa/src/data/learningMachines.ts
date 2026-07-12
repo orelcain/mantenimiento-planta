@@ -122,10 +122,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'fishken',
     name: 'Fishken',
     area: 'Planta Principal',
-    description: 'Equipo de procesamiento Fishken.',
+    description: 'Envasadora / pesadora combinatoria Fishken E-Pack S28: 28 compuertas, celdas de carga y software E-Pack (proceso, servicio, calibracion) + FishKen Web (reportes).',
     icon: Fish,
     color: '#ab8f5e',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'detector-metales',

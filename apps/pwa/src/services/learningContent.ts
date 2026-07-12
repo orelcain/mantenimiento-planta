@@ -53,6 +53,14 @@ import {
   listMarelHgFlows,
   listMarelHgDiagnosis,
 } from './marelHgLearning'
+import {
+  FISHKEN_CONTENT_UPDATED_AT,
+  getFishkenContentCounts,
+  listFishkenManualSections,
+  listFishkenProcedures,
+  listFishkenFlows,
+  listFishkenDiagnosis,
+} from './fishkenLearning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -174,6 +182,7 @@ const B200_CONTENT_UPDATED_AT = new Date('2026-05-27T00:00:00-04:00').getTime()
 const B142_LEARNING_SLUG = 'baader-142'
 const DETECTOR_LEARNING_SLUG = 'detector-metales'
 const MAREL_HG_LEARNING_SLUG = 'marel-hg'
+const FISHKEN_LEARNING_SLUG = 'fishken'
 type StoredOverride<T> = T & { _deleted?: boolean }
 
 async function listStoredProcedures(machineSlug: string): Promise<StoredOverride<Procedure>[]> {
@@ -431,6 +440,7 @@ export async function listProcedures(machineSlug: string): Promise<Procedure[]> 
   if (machineSlug === B142_LEARNING_SLUG) return listB142Procedures()
   if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorProcedures()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgProcedures()
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenProcedures()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderProcedures()
 
   return listStoredProcedures(machineSlug)
@@ -482,6 +492,7 @@ export async function listManualSections(machineSlug: string): Promise<ManualSec
   if (machineSlug === B142_LEARNING_SLUG) return listB142ManualSections()
   if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorManualSections()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgManualSections()
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenManualSections()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderManualSections()
 
   return listStoredManualSections(machineSlug)
@@ -521,6 +532,7 @@ export async function listFlows(machineSlug: string): Promise<Flow[]> {
   if (machineSlug === B142_LEARNING_SLUG) return listB142Flows()
   if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorFlows()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgFlows()
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenFlows()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderFlows()
 
   return listStoredFlows(machineSlug)
@@ -560,6 +572,7 @@ export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry
   if (machineSlug === B142_LEARNING_SLUG) return listB142Diagnosis()
   if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorDiagnosis()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgDiagnosis()
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenDiagnosis()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderDiagnosis()
 
   return listStoredDiagnosis(machineSlug)
@@ -657,6 +670,7 @@ export async function getMachineContentCounts(
   if (machineSlug === B142_LEARNING_SLUG) return getB142ContentCounts()
   if (machineSlug === DETECTOR_LEARNING_SLUG) return getDetectorContentCounts()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return getMarelHgContentCounts()
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return getFishkenContentCounts()
   if (machineSlug === GRADER_LEARNING_SLUG) return getGraderContentCounts()
 
   const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
@@ -697,6 +711,9 @@ export async function getMachineContentMeta(
   }
   if (machineSlug === MAREL_HG_LEARNING_SLUG) {
     return { ...getMarelHgContentCounts(), lastUpdatedAt: MAREL_HG_CONTENT_UPDATED_AT }
+  }
+  if (machineSlug === FISHKEN_LEARNING_SLUG) {
+    return { ...getFishkenContentCounts(), lastUpdatedAt: FISHKEN_CONTENT_UPDATED_AT }
   }
   if (machineSlug === GRADER_LEARNING_SLUG) {
     const counts = await getGraderContentCounts()
