@@ -1831,11 +1831,16 @@ function CommonPartsList({ parts, slug, color }: { parts: CommonPart[]; slug: st
   const saps = allParts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
   const { bySap, loading } = useRepuestosByCodigos(saps)
 
-  // agrupar preservando el orden de aparición de los tipos
-  const grupos: { tipo: string; items: CommonPart[] }[] = []
+  // agrupar por tipo (normalizado: el maestro usa MAYÚSCULAS singular — RESORTE,
+  // CORREA...; se muestra en Title Case y se agrupa case-insensitive para unir
+  // config + marcados sin duplicar grupos por diferencias de mayúsculas).
+  const grpKey = (t: string) => t.trim().toUpperCase()
+  const grpDisplay = (t: string) => { const s = t.trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : 'Sin clasificar' }
+  const grupos: { key: string; tipo: string; items: CommonPart[] }[] = []
   for (const p of allParts) {
-    let g = grupos.find(x => x.tipo === p.tipo)
-    if (!g) { g = { tipo: p.tipo, items: [] }; grupos.push(g) }
+    const key = grpKey(p.tipo)
+    let g = grupos.find(x => x.key === key)
+    if (!g) { g = { key, tipo: grpDisplay(p.tipo), items: [] }; grupos.push(g) }
     g.items.push(p)
   }
 

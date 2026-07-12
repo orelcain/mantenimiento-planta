@@ -11,7 +11,7 @@ import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
 import type { CommonPart } from '@/data/commonPartsByMachine'
 
-const TIPO_FALLBACK = 'Marcados en Repuestos'
+const TIPO_FALLBACK = 'Sin clasificar'
 
 export function useMarkedCommonParts(slug: string | undefined): { parts: CommonPart[]; loading: boolean } {
   const [parts, setParts] = useState<CommonPart[]>([])
