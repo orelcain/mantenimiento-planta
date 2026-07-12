@@ -17,6 +17,8 @@ import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
 import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmiPractice'
 import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
+import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
+import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
@@ -42,7 +44,7 @@ import { QuizView } from '@/components/learning/QuizView'
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'casos' | 'quiz' | 'glossary' | 'bibliografia'
+type TabId = LearningSection | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos'
 
 interface TabDef {
   id: TabId
@@ -82,6 +84,15 @@ const TABS: TabDef[] = [
     description: 'Sintoma → Causa probable → Solucion.',
   },
 ]
+
+/** Pestaña extra "Repuestos comunes" — solo se muestra si la máquina tiene lista curada. */
+const REPUESTOS_TAB: TabDef = {
+  id: 'repuestos',
+  label: 'Repuestos comunes',
+  shortLabel: 'Repuestos',
+  icon: Wrench,
+  description: 'Los repuestos más usados de la máquina, con foto y stock en vivo.',
+}
 
 /** Set de pestanas para temas de curso (area "Capacitacion / Normativa"). */
 const COURSE_TABS: TabDef[] = [
@@ -198,7 +209,10 @@ export function MachineLearningPage() {
   }
 
   const Icon = machine.icon
-  const tabs = isCourse ? COURSE_TABS : TABS
+  const commonParts = isCourse ? [] : getCommonParts(machine.slug)
+  const tabs = isCourse
+    ? COURSE_TABS
+    : (commonParts.length > 0 ? [...TABS, REPUESTOS_TAB] : TABS)
   const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
   const ActiveIcon = activeTabData.icon
   // Conteo de items reales por pestana (casos = flujos + diagnostico)
@@ -211,6 +225,7 @@ export function MachineLearningPage() {
     : id === 'quiz' ? quiz.length
     : id === 'glossary' ? glossary.length
     : id === 'bibliografia' ? bibliografia.length
+    : id === 'repuestos' ? commonParts.length
     : 0
   const activeCount = countFor(activeTab)
   const sectionEnabled = activeCount > 0 || (!isCourse && machine.sections[activeTab as LearningSection])
@@ -474,6 +489,8 @@ export function MachineLearningPage() {
           />
         ) : activeTab === 'bibliografia' && bibliografia.length > 0 ? (
           <BibliografiaView entries={bibliografia} color={machine.color} />
+        ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
+          <CommonPartsList parts={commonParts} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -1792,6 +1809,111 @@ function GraderGlossaryView({ color }: { color: string }) {
           })}
         </ul>
       )}
+    </div>
+  )
+}
+
+/**
+ * CommonPartsList — pestaña "Repuestos comunes": la lista curada de la máquina
+ * (commonPartsByMachine) resuelta contra el maestro `repuestos` en vivo para
+ * traer foto, stock y ubicación reales. Agrupa por tipo; cada ítem enlaza al
+ * módulo Repuestos (flujo diario). Fuente única compartida entre ambos lados.
+ */
+function CommonPartsList({ parts, color }: { parts: CommonPart[]; color: string }) {
+  const navigate = useNavigate()
+  const saps = parts.flatMap(p => [p.sap, p.sapAlt]).filter((s): s is string => !!s)
+  const { bySap, loading } = useRepuestosByCodigos(saps)
+
+  // agrupar preservando el orden de aparición de los tipos
+  const grupos: { tipo: string; items: CommonPart[] }[] = []
+  for (const p of parts) {
+    let g = grupos.find(x => x.tipo === p.tipo)
+    if (!g) { g = { tipo: p.tipo, items: [] }; grupos.push(g) }
+    g.items.push(p)
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: LC.inkLo }}>
+        <span>{parts.length} repuestos comunes · stock en vivo y foto (cuando está cargada) desde el módulo Repuestos</span>
+        {loading && <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> cargando datos…</span>}
+      </div>
+
+      {grupos.map(grupo => (
+        <div key={grupo.tipo}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+            <h3 className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color }}>{grupo.tipo}</h3>
+            <span className="text-[11px]" style={{ color: LC.inkLo }}>({grupo.items.length})</span>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {grupo.items.map((p, i) => (
+              <CommonPartCard
+                key={`${p.sap}-${i}`}
+                part={p}
+                resolved={bySap.get(p.sap) ?? (p.sapAlt ? bySap.get(p.sapAlt) : undefined)}
+                color={color}
+                onOpen={() => navigate(`/repuestos?q=${encodeURIComponent(p.sap)}`)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CommonPartCard({
+  part, resolved, color, onOpen,
+}: { part: CommonPart; resolved?: RepuestoResuelto; color: string; onOpen: () => void }) {
+  return (
+    <div className="flex gap-3 rounded-lg p-3" style={{ background: LC.surface, border: `1px solid ${LC.border}` }}>
+      {/* Miniatura: foto real del repuesto o placeholder */}
+      <div
+        className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-md"
+        style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}
+      >
+        {resolved?.fotoUrl ? (
+          <img src={resolved.fotoUrl} alt={part.nombre} loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <Wrench className="h-5 w-5" style={{ color: LC.inkLo }} />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold leading-snug text-[#e9eef3]">{part.nombre}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: LC.inkMid }}>
+          <span className="font-mono">SAP {part.sap}{part.sapAlt ? ` / ${part.sapAlt}` : ''}</span>
+          {part.codigoManual && <span className="font-mono" style={{ color: LC.inkLo }}>Manual {part.codigoManual}</span>}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {resolved?.stockFisico != null && (
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                background: resolved.stockFisico > 0 ? 'rgba(34,197,94,0.14)' : 'rgba(239,68,68,0.14)',
+                color: resolved.stockFisico > 0 ? '#22c55e' : '#ef4444',
+                border: `1px solid ${resolved.stockFisico > 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}
+            >
+              Stock {resolved.stockFisico}
+            </span>
+          )}
+          {resolved?.ubicacion && (
+            <span className="text-[10px]" style={{ color: LC.inkLo }}>{resolved.ubicacion}</span>
+          )}
+          <button
+            onClick={onOpen}
+            className="ml-auto inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors"
+            style={{ color, background: `${color}12`, border: `1px solid ${color}33` }}
+            onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
+            onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
+          >
+            <ExternalLink className="h-3 w-3" />
+            Ver en Repuestos
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -35,12 +35,6 @@
       "title": "Esquema de programas",
       "order": 6,
       "content": "El selector 5 concentra limpieza, pruebas, servicio de motores, parada para ajuste, selección de tamaño/corte y reseteo.\n\nPuntos clave:\n\n- Cleaning Position: grifos esféricos para tubos de aspiración abiertos.\n- Test 12: marcha de prueba de máquina completa.\n- Test 13: marcha de prueba solo herramientas.\n- Height [mm]: valor actual de altura del palpador.\n- Service for Stepmotors: ajuste de motores paso a paso.\n- Stop for justage 1 F/min: parada en posición cero de abrazadera de colas.\n- Reset Fishcounter: contador de pescados vuelve a cero.\n\nNotas operativas:\n\n- ¡Esta función ha de utilizarse para todos los ajustes básicos de las herramientas!\n- ¡Después de seleccionarse el tamaño de pescado y la clase de corte, el selector 5 tiene que volverse a la posición de clase de pescado!\n- Fuente: manual 142, pág 44-49."
-    },
-    {
-      "id": "b142-manual-repuestos-comunes",
-      "title": "Repuestos comunes",
-      "order": 7,
-      "content": "Tabla local de repuestos frecuentes usada como apoyo para identificar consumibles y componentes recurrentes de Baader 142. No sale del manual: es levantamiento propio de planta.\n\nPuntos clave:\n\n- Incluye resortes, correas, cuchillos, repuestos mecanicos, sensores y bomba sopladora.\n\n- Relaciona nombre de componente con codigo SAP y, cuando aplica, codigo de manual.\n\n- Sirve como punto de partida para levantar repuestos criticos y crear procedimientos de cambio.\n\nNotas operativas:\n\n- Confirmar codigo final contra bodega, catalogo de repuestos vigente y configuracion exacta del equipo.\n\nReferencias visuales:\n\n- Repuestos Baader 142 mas comunes: /mantenimiento-planta/learning-assets/baader-142/b142-repuestos-comunes.jpg"
     }
   ],
   "procedures": [

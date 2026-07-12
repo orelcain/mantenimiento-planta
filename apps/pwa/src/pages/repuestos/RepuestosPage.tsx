@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Package, LayoutGrid } from 'lucide-react'
 import { BodegaView } from './BodegaView'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
@@ -48,6 +49,21 @@ export function RepuestosPage() {
 
   // jumpQuery: saltar a Áreas con query pre-cargada (desde Bodega "Ver en Áreas" o "Buscar similar")
   const [jumpQuery, setJumpQuery] = useState<string>('')
+
+  // Deep-link ?q=<SAP> (ej. desde "Ver en Repuestos" de la pestaña Repuestos comunes
+  // del Centro de Aprendizaje): abre Áreas con ese código pre-buscado.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q && q.trim()) {
+      setJumpQuery(q.trim())
+      setActiveTab('areas')
+      searchParams.delete('q')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // solo al montar / cambiar el param
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Persiste tab activo + lazy mount
   useEffect(() => {
