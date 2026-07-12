@@ -29,6 +29,14 @@ import {
   listGraderManualSections as graderManualSeed,
   listGraderProcedures as graderProceduresSeed,
 } from './graderLearning'
+import {
+  B142_CONTENT_UPDATED_AT,
+  getB142ContentCounts,
+  listB142ManualSections,
+  listB142Procedures,
+  listB142Flows,
+  listB142Diagnosis,
+} from './baader142Learning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -148,7 +156,6 @@ function sectionDoc(machineSlug: string, section: LearningSectionKey, id: string
 const B200_LEARNING_SLUG = 'baader-200'
 const B200_CONTENT_UPDATED_AT = new Date('2026-05-27T00:00:00-04:00').getTime()
 const B142_LEARNING_SLUG = 'baader-142'
-const B142_CONTENT_UPDATED_AT = new Date('2026-05-28T00:00:00-04:00').getTime()
 type StoredOverride<T> = T & { _deleted?: boolean }
 
 async function listStoredProcedures(machineSlug: string): Promise<StoredOverride<Procedure>[]> {
@@ -355,67 +362,6 @@ async function getB200ContentCounts(): Promise<MachineContentCounts> {
   }
 }
 
-function listB142ManualSections(): ManualSection[] {
-  return [
-    {
-      id: 'b142-manual-generalidades-datos-tecnicos',
-      title: 'Generalidades y datos tecnicos',
-      order: 1,
-      createdAt: B142_CONTENT_UPDATED_AT,
-      updatedAt: B142_CONTENT_UPDATED_AT,
-      content: [
-        'La BAADER 142 esta concebida para eviscerar salmones y truchas marinas frescos y enteros, con cabeza, antes de rigidez cadaverica. El manual indica corte princesa y extraccion de visceras mediante instalacion de vacio.',
-        'Medidas / tolerancias:',
-        '- Rango de pescado: 2 - 7 kg, no eviscerado, con cabeza',
-        '- Rendimiento de referencia: 1 - 16 pescados/min',
-        '- Consumo de energia: 4 kW',
-        '- Agua: 10 litros/min, presion minima 2 bar, toma 3/4 pulg',
-        '- Aire comprimido: 125 litros/min, presion minima 6 bar, presion de servicio 4 bar, toma 3/8 pulg',
-        '- Vacio: 15 m3/min, presion negativa minima 0,4 bar, toma DN 80/DN 100',
-        '- Dimensiones con caja de almacenamiento y cinta posterior: 7420 x 1932 x 2365 mm',
-        '- Peso BAADER 142: 1700 kg; cinta de limpieza posterior: 270 kg',
-        '- Nivel de ruido en puesto de trabajo: 80 dB(A), usar proteccion auditiva',
-        'Puntos clave:',
-        '- No procesar peces en rigor mortis ni congelados.',
-        '- Debe existir aleta anal para el proceso indicado por el manual.',
-        '- El equipo usa control compacto A3C para movimientos de herramientas con motores paso a paso.',
-        '- Los valores de rendimiento pueden variar por proporcion, calidad, temporada, caladero y frescura del pescado.',
-        'Notas operativas:',
-        '- Fuente base: Manual de instrucciones BAADER 142, archivo local 142-Manual de Instrucciones-2005-12-E (1).pdf.',
-        '- Validar cualquier ajuste contra manual oficial, supervisor o experiencia documentada de planta antes de intervenir.',
-      ].join('\n\n'),
-    },
-    {
-      id: 'b142-manual-repuestos-comunes',
-      title: 'Repuestos comunes',
-      order: 2,
-      createdAt: B142_CONTENT_UPDATED_AT,
-      updatedAt: B142_CONTENT_UPDATED_AT,
-      content: [
-        'Tabla local de repuestos frecuentes usada como apoyo para identificar consumibles y componentes recurrentes de Baader 142.',
-        'Puntos clave:',
-        '- Incluye resortes, correas, cuchillos, repuestos mecanicos, sensores y bomba sopladora.',
-        '- Relaciona nombre de componente con codigo SAP y, cuando aplica, codigo de manual.',
-        '- Sirve como punto de partida para levantar repuestos criticos y crear procedimientos de cambio.',
-        'Notas operativas:',
-        '- Confirmar codigo final contra bodega, catalogo de repuestos vigente y configuracion exacta del equipo.',
-        '- Separar posteriormente por familias: resortes, correas, cuchillos, sensores, vacio/sopladora y mecanica general.',
-        'Referencias visuales:',
-        '- Repuestos Baader 142 mas comunes: /mantenimiento-planta/learning-assets/baader-142/b142-repuestos-comunes.jpg',
-      ].join('\n\n'),
-    },
-  ]
-}
-
-function getB142ContentCounts(): MachineContentCounts {
-  return {
-    manual: listB142ManualSections().length,
-    procedures: 0,
-    flows: 0,
-    diagnosis: 0,
-  }
-}
-
 // ─────────────────────────────────────────────────────────────
 // GRADER — el catalogo de runbooks Z2 traducido al formato del expediente.
 // La fuente vive en services/grader/graderRunbooks.ts (sus `triggers` alimentan
@@ -464,6 +410,7 @@ async function getGraderContentCounts(): Promise<MachineContentCounts> {
 
 export async function listProcedures(machineSlug: string): Promise<Procedure[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Procedures()
+  if (machineSlug === B142_LEARNING_SLUG) return listB142Procedures()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderProcedures()
 
   return listStoredProcedures(machineSlug)
@@ -549,6 +496,7 @@ export async function deleteManualSection(machineSlug: string, id: string): Prom
 
 export async function listFlows(machineSlug: string): Promise<Flow[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Flows()
+  if (machineSlug === B142_LEARNING_SLUG) return listB142Flows()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderFlows()
 
   return listStoredFlows(machineSlug)
@@ -585,6 +533,7 @@ export async function deleteFlow(machineSlug: string, id: string): Promise<void>
 
 export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Diagnosis()
+  if (machineSlug === B142_LEARNING_SLUG) return listB142Diagnosis()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderDiagnosis()
 
   return listStoredDiagnosis(machineSlug)

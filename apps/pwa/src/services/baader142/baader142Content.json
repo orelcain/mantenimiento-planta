@@ -1,0 +1,807 @@
+{
+  "manual": [
+    {
+      "id": "b142-manual-seguridad",
+      "title": "Indicaciones de seguridad",
+      "order": 1,
+      "content": "Referencia de seguridad para servicio, limpieza, mantenimiento y operación.\n\nPuntos clave:\n\n- Leer el manual de instrucciones antes de poner la máquina en marcha.\n- Personal no calificado y no autorizado no debe poner la máquina en marcha ni trabajar con ella.\n- No deben ponerse las manos en la máquina en marcha.\n- La máquina no debe correr sin vigilancia.\n- Desconectar la máquina, poner el interruptor principal en posición 0 y asegurarlo al producirse fallos, antes de la limpieza, antes de trabajos de mantenimiento y antes de la lubricación.\n\nNotas operativas:\n\n- Antes de poner la máquina en marcha, han de montarse todas las cubiertas y placas protectoras.\n- ¡Inspeccionar todos los dispositivos de seguridad por su funcionamiento correcto!\n- ¡Peligro de lesiones en la zona de cuchillas!\n- ¡Llevar guantes protectores!\n- ¡Se prohíbe rociar con spray de cualquier clase las cajas de distribución o los aparatos eléctricos; existe peligro de explosión!\n- Fuente: manual 142, pág 5-6."
+    },
+    {
+      "id": "b142-manual-generalidades-datos-tecnicos",
+      "title": "Generalidades y datos técnicos",
+      "order": 2,
+      "content": "La BAADER 142 está conceptuada para eviscerar salmones y truchas marinas frescos y enteros con cabeza; el corte eviscerador se realiza por el corte princesa y las vísceras se quitan mediante instalación de vacío.\n\nMedidas / tolerancias:\n\n- Pescado: salmón y trucha marina; fresco, no en estado de rigidez cadavérica; tiene que haber aleta anal.\n- Tamaño: 2 - 7 kgs, no eviscerado, con cabeza.\n- Rendimiento: 1-16 pescados/min.\n- Energía: 4 kW. Agua: 10 litros/min, 2 bar mínimo, toma 3/4 pulg.\n- Aire: 125 litros/min, 6 bar mínimo, 4 bar servicio, toma 3/8 pulg., DIN ISO 8573-1 clase 7.4.3.\n- Vacío: 15 m3/min, 0,4 bar presión negativa, DN 80/DN 100.\n- Dimensiones: 7420 mm largo, 1932 mm ancho, 2365 mm alto. Peso: 1700 kg; cinta posterior 270 kg.\n- Ruido: 80 dB(A).\n\nNotas operativas:\n\n- ¡No pueden elaborarse peces ni pescados de rigidez cadavérica (rigor mortis) y congelados!\n- ¡Hay que llevar cascos de protección auditiva!\n- Fuente: manual 142, pág 7-8."
+    },
+    {
+      "id": "b142-manual-instalacion-servicios",
+      "title": "Instalación y servicios",
+      "order": 3,
+      "content": "La máquina colocada tiene que tener fácil acceso desde todos los lados para servicio y mantenimiento, apoyada en placas base y ajustada horizontalmente con husillos de ajuste.\n\nMedidas / tolerancias:\n\n- Agua: manguera 3/4 pulg., diámetro interior 19 mm.\n- Aire comprimido: manguera 3/8 pulg., diámetro interior 10 mm.\n- Caída de presión a menos de 2 bar: la unidad es parada por interruptor automático por caída de presión.\n\nNotas operativas:\n\n- ¡No deben instalarse grifos de cierre delante de la máquina! ¡No debe interrumpirse el circuito de refrigeración para la caja del controlador de pescado!\n- ¡Al calentarse el controlador de pescado sobrepasando los 50°C, la máquina se desconecta, y las herramientas se caen incontroladamente abajo!\n- ¡Solo deberá aplicarse aire comprimido de la especificación según ISO 8573-1, clase 7.4.3!\n- Fuente: manual 142, pág 11, 14-15."
+    },
+    {
+      "id": "b142-manual-dispositivos-seguridad",
+      "title": "Dispositivos de seguridad",
+      "order": 4,
+      "content": "Los dispositivos de seguridad detienen la máquina ante aperturas de cubiertas, puertas protectoras o accionamiento de paradas de emergencia.\n\nPuntos clave:\n\n- La máquina ha de pararse al levantarse las cubiertas.\n- La máquina ha de pararse al girarse las puertas protectoras hacia arriba.\n- La máquina ha de pararse al accionarse el pulsador de EMERGENCIA en la BAADER 142.\n- La máquina ha de pararse al accionarse el pulsador de EMERGENCIA en el ciclón.\n\nNotas operativas:\n\n- ¡Los dispositivos de seguridad montados por el fabricante no deben eludirse, cambiarse o quitarse!\n- Fuente: manual 142, pág 16."
+    },
+    {
+      "id": "b142-manual-funcionamiento",
+      "title": "Funcionamiento",
+      "order": 5,
+      "content": "El pescado se introduce con el dorso contra la chapaleta de ciclo; la abrazadera de cola lo arrastra en posición dorsal sobre prismas. El A3C calcula recorridos a partir del largo, contorno y posición del ano.\n\nPuntos clave:\n\n- Las vísceras se sacan por aspiración a presión negativa mediante grupo de vacío.\n- La posición cero de herramientas es la más alta para que pescados no medidos correctamente pasen sin dañarse.\n- El puntero introduce su punta en el ano; el aspirador quita vísceras y corta el esófago con guillotina.\n- El excavador A separa el recto; el excavador B suelta sangre del riñón y saca el corazón.\n\nNotas operativas:\n\n- Para operar la máquina hace falta instalar un grupo de vacío.\n- Fuente: manual 142, pág 17-19."
+    },
+    {
+      "id": "b142-manual-programas",
+      "title": "Esquema de programas",
+      "order": 6,
+      "content": "El selector 5 concentra limpieza, pruebas, servicio de motores, parada para ajuste, selección de tamaño/corte y reseteo.\n\nPuntos clave:\n\n- Cleaning Position: grifos esféricos para tubos de aspiración abiertos.\n- Test 12: marcha de prueba de máquina completa.\n- Test 13: marcha de prueba solo herramientas.\n- Height [mm]: valor actual de altura del palpador.\n- Service for Stepmotors: ajuste de motores paso a paso.\n- Stop for justage 1 F/min: parada en posición cero de abrazadera de colas.\n- Reset Fishcounter: contador de pescados vuelve a cero.\n\nNotas operativas:\n\n- ¡Esta función ha de utilizarse para todos los ajustes básicos de las herramientas!\n- ¡Después de seleccionarse el tamaño de pescado y la clase de corte, el selector 5 tiene que volverse a la posición de clase de pescado!\n- Fuente: manual 142, pág 44-49."
+    },
+    {
+      "id": "b142-manual-repuestos-comunes",
+      "title": "Repuestos comunes",
+      "order": 7,
+      "content": "Tabla local de repuestos frecuentes usada como apoyo para identificar consumibles y componentes recurrentes de Baader 142. No sale del manual: es levantamiento propio de planta.\n\nPuntos clave:\n\n- Incluye resortes, correas, cuchillos, repuestos mecanicos, sensores y bomba sopladora.\n\n- Relaciona nombre de componente con codigo SAP y, cuando aplica, codigo de manual.\n\n- Sirve como punto de partida para levantar repuestos criticos y crear procedimientos de cambio.\n\nNotas operativas:\n\n- Confirmar codigo final contra bodega, catalogo de repuestos vigente y configuracion exacta del equipo.\n\nReferencias visuales:\n\n- Repuestos Baader 142 mas comunes: /mantenimiento-planta/learning-assets/baader-142/b142-repuestos-comunes.jpg"
+    }
+  ],
+  "procedures": [
+    {
+      "id": "b142-proc-arrancar-maquina",
+      "title": "Arrancar la máquina",
+      "description": "Secuencia de arranque para producción.\n\nFuente: manual 142, pág 20",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Cerrar todas las cubiertas y puertas."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Poner interruptor 5 en posición de limpieza."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Arrancar la bomba de vacío."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Poner interruptor 5 en la posición para la clase de pescado."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Poner interruptor 4 en la velocidad deseada."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Apretar pulsador I."
+        },
+        {
+          "order": 7,
+          "title": "Paso 7",
+          "description": "Hacer pasar 2-3 pescados y corregir con interruptores 1-3 si es necesario."
+        },
+        {
+          "order": 8,
+          "title": "Paso 8",
+          "description": "¡Controlar el funcionamiento de todos los dispositivos de seguridad!"
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-parada",
+      "title": "Parada",
+      "description": "Parada temporal durante producción.\n\nFuente: manual 142, pág 20",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Hacer marchar la máquina hasta que quede vacía."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Parar presionando pulsador 0, sin desconectar la bomba de vacío BNM (BUSCH)."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Abrir cubiertas y puertas protectoras y rociar con agua potable superficialmente."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Sacar pescados caídos a la cubeta colectora, en caso dado."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Cerrar cubiertas y puertas protectoras y arrancar la máquina."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-fin-produccion",
+      "title": "Fin de producción",
+      "description": "Término de producción previo a limpieza.\n\nFuente: manual 142, pág 21",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Hacer marchar la máquina hasta que quede vacía."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Parar presionando pulsador 0."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Poner interruptor 5 en posición de limpieza."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Desconectar la bomba de vacío presionando pulsador 0."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Abrir cubiertas y puertas protectoras."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Limpiar la máquina según párrafo 15."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-ajustar-chapaleta-largos",
+      "title": "Ajustar entrada y chapaleta medidora de largos",
+      "description": "Ajuste básico de medición de largos.\n\nFuente: manual 142, pág 26",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Desplazar abrazadera de colas a posición cero con interruptor 5, posición 6."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Ajustar 400 mm entre chapaleta medidora de largos y canto delantero del carro."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Ajustar muelle de tracción a 80 mm entre ojales."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Ajustar 250 mm entre posición superior de la chapaleta y soporte."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Alinear horizontalmente el interruptor de aproximación."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Ajustar pieza angular a 0,5 - 1 mm del interruptor."
+        },
+        {
+          "order": 7,
+          "title": "Paso 7",
+          "description": "Verificar que al bajar la chapaleta 5 mm empieza a reaccionar el interruptor."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-ajustar-palpador-medicion",
+      "title": "Ajustar palpador de medición",
+      "description": "Ajuste del palpador y su interruptor de aproximación.\n\nFuente: manual 142, pág 28-29",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Controlar marcha suave; la aleta de conexión no debe engancharse."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Ajustar muelles de tracción a 65 mm y 100 mm, y muelles de compresión a 25 mm."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Ajustar tornillo de tope para que las puntas se toquen ligeramente."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Con ambas puntas tocándose se enciende el diodo; con regleta de 1 mm se apaga."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Centrar el punto medio de las puntas respecto a la cadena de transporte."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Ajustar 51 mm entre puntas y canto superior del carro."
+        },
+        {
+          "order": 7,
+          "title": "Paso 7",
+          "description": "En posición 4 verificar que valor y medido y visualizado sean idénticos."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-ajustar-centraje",
+      "title": "Ajustar centraje",
+      "description": "Ajuste básico de barras de centraje.\n\nFuente: manual 142, pág 29",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Alinear barras de centraje a igual largo y alto."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Ajustar distancia entre barras a 6 mm."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Ajustar muelle de tracción a 65 mm entre ojales."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Desplazar buje fijador para que el punto central entre barras quede céntrico a la cadena."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-ajustar-topes-motores",
+      "title": "Ajustar topes de motores paso a paso",
+      "description": "Ajuste de posiciones CERO, MAX y MIN.\n\nFuente: manual 142, pág 32",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Ajustar 0,8 mm entre interruptor de aproximación y polea de correa dentada."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Ajustar 2 mm entre tornillo de tope y tuerca hexagonal; unos 17 mm entre palanca y tornillo."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Con interruptor principal en I y selector 5 en posición 5, pulsar I para CERO y otra vez para MAX."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Apretar tornillo de tope contra el tope y fijar polea."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Pulsar I para MIN y ajustar 0,5 - 1 mm entre tornillo de tope opuesto y tope."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Repetir en orden SM3, SM2, SM1, SM4, SM5; atornillar contratuercas."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-limpieza-diaria",
+      "title": "Limpieza diaria",
+      "description": "Limpieza diaria BAADER 142.\n\nFuente: manual 142, pág 52",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Girar interruptor 5 a posición de limpieza; todas las válvulas de cierre quedan abiertas."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Arrancar bomba de vacío."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Abrir cubiertas y puertas protectoras."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Rociar máquina; introducir bastante agua en aberturas de aspiración para limpiar válvulas y tubería."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Limpiar cinta de control con máquina en marcha."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Para cadena: cerrar protecciones, verificar que no haya lámpara roja, pulsar I, levantar cubiertas y limpiar."
+        },
+        {
+          "order": 7,
+          "title": "Paso 7",
+          "description": "Bajar cubiertas, pulsar I para avanzar un carro y repetir cuatro veces."
+        },
+        {
+          "order": 8,
+          "title": "Paso 8",
+          "description": "¡No debe desconectarse el interruptor principal!"
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-limpieza-principal",
+      "title": "Limpieza principal y desinfección",
+      "description": "Esquema químico de limpieza.\n\nFuente: manual 142, pág 50-51",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Poner interruptor principal en posición 0 y asegurarlo."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Espumar 2 - 5% P3-topax 17 desde abajo hacia arriba; tiempo de acción 15 minutos."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Para capas de cal, 1 vez por semana usar 2 - 5% P3-topax 56 en lugar de P3-topax 17."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Enjuagar con agua potable 60°C máximo, baja presión 30 bar máximo, desde arriba hacia abajo."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Desinfectar con 1% P3-topax 91 a 30 bar máximo; tiempo de acción unos 10-15 minutos."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Aclarar con agua potable, 20°C aprox., baja presión 30 bar máximo."
+        }
+      ]
+    },
+    {
+      "id": "b142-proc-mantenimiento-lubrificacion",
+      "title": "Mantenimiento y lubrificación",
+      "description": "Operaciones periódicas indicadas.\n\nFuente: manual 142, pág 57-59",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Paso 1",
+          "description": "Diario: verificar palpador por marcha suave; cambiar hoja de membrana; verificar cuchillas y hojas."
+        },
+        {
+          "order": 2,
+          "title": "Paso 2",
+          "description": "Diario: rociar bomba BNM (BUSCH) con 10 l de agua; girar interruptores 360°; resetear contador."
+        },
+        {
+          "order": 3,
+          "title": "Paso 3",
+          "description": "Semanal: lubrificar máquina, palpador y bielas; desmontar cuchilla hendedora y reafilarla o sustituirla."
+        },
+        {
+          "order": 4,
+          "title": "Paso 4",
+          "description": "Semanal: controlar hermeticidad de mangueras, tensión de correas dentadas y sujeciones."
+        },
+        {
+          "order": 5,
+          "title": "Paso 5",
+          "description": "Semanal: controlar presión de aire 4 bar, presión de agua 2 bar y vacío -0,4 bar."
+        },
+        {
+          "order": 6,
+          "title": "Paso 6",
+          "description": "Lubrificar con GLS 380/N3; presión máxima en boquilla de pistola no deberáa sobrepasar 190 bar."
+        },
+        {
+          "order": 7,
+          "title": "Paso 7",
+          "description": "Palpador, cabezas articuladas y cadena: intervalo 40 horas, Spray especial FLC 65."
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "b142-flow-limpiar-maquina",
+      "title": "¿Qué hago cuando debo limpiar la máquina?",
+      "trigger": "Fin de producción o necesidad de abrir válvulas de aspiración.",
+      "actions": [
+        "Girar selector 5 a posición de limpieza.",
+        "Arrancar bomba de vacío y abrir cubiertas/puertas.",
+        "Rociar máquina e introducir bastante agua en aberturas de aspiración.",
+        "Limpiar cadena avanzando un carro por vez y repetir cuatro veces.",
+        "Fuente: manual 142, pág 50-52."
+      ]
+    },
+    {
+      "id": "b142-flow-probar-maquina-completa",
+      "title": "¿Qué hago para probar la máquina completa?",
+      "trigger": "Selector 5 en Test 12.",
+      "actions": [
+        "Pulsar I; la máquina arranca y la cadena marcha.",
+        "Tras dos ciclos de vacío, herramientas se mueven con pescado de muestra programado.",
+        "Terminar con pulsador 0 o girando selector 5.",
+        "Si una herramienta funciona mal, la máquina realiza marcha de referencia.",
+        "Fuente: manual 142, pág 46."
+      ]
+    },
+    {
+      "id": "b142-flow-probar-solo-herramientas",
+      "title": "¿Qué hago para probar solo herramientas?",
+      "trigger": "Selector 5 en Test 13.",
+      "actions": [
+        "Pulsar I para avanzar la cadena a posición de descanso programada.",
+        "Pulsar I nuevamente para iniciar movimiento de herramientas después de dos ciclos de vacío.",
+        "¡Desconectar siempre el interruptor principal después de la marcha de prueba 13!",
+        "Fuente: manual 142, pág 47."
+      ]
+    },
+    {
+      "id": "b142-flow-ajustar-motores-paso",
+      "title": "¿Qué hago para ajustar motores paso a paso?",
+      "trigger": "Selector 5 en Service for Stepmotors.",
+      "actions": [
+        "Pulsar I para posición cero.",
+        "Pulsar I para posición máxima.",
+        "Pulsar I para posición mínima.",
+        "Pulsar I para posición cero.",
+        "Pulsar I para pasar al siguiente motor paso a paso.",
+        "Fuente: manual 142, pág 47."
+      ]
+    },
+    {
+      "id": "b142-flow-seleccionar-tamano-corte",
+      "title": "¿Qué hago cuando cambio tamaño o corte?",
+      "trigger": "Selector 5 en posición 7.",
+      "actions": [
+        "Seleccionar con selector 4 tamaño de pescado y clase de corte.",
+        "Usar opciones estándar o de equipo especial según corresponda.",
+        "Después de seleccionar, volver selector 5 a clase de pescado: salmón o trucha asalmonada.",
+        "Fuente: manual 142, pág 48-49."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "b142-diag-herramientas-no-se-bajan",
+      "title": "Las herramientas no se bajan",
+      "symptom": "Las herramientas no se bajan",
+      "possibleCauses": [
+        "Interruptor 1 en posición 8; aleta anal no introducida, no hay aleta anal o es demasiado fina; palpador de medición no opera correctamente; medición de largos incorrecta; tamaño fuera de lo admitido; codificador de ángulos defectuoso."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 37."
+    },
+    {
+      "id": "b142-diag-puntero-entra-con-anterioridad",
+      "title": "El puntero entra en acción con anterioridad",
+      "symptom": "El puntero entra en acción con anterioridad",
+      "possibleCauses": [
+        "Posición del interruptor 2 incorrecta; posición del puntero incorrecta; puntero no gira o marcha dura; mangueras de aire comprimido defectuosas; suministro de aire incorrecto; tensiones de muelle incorrectas; pescado malplazado o no agarrado por abrazadera."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 37."
+    },
+    {
+      "id": "b142-diag-puntero-entra-con-retraso",
+      "title": "El puntero entra en acción con retraso",
+      "symptom": "El puntero entra en acción con retraso",
+      "possibleCauses": [
+        "Posición del interruptor 2 incorrecta; posición del puntero incorrecta; puntero no vuelve a posición inicial; mangueras o suministro de aire defectuosos; palpador de medición duro; tensiones de muelle incorrectas; aleta anal mucho más alta que el ano; falta amortiguador o está defectuoso."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 38."
+    },
+    {
+      "id": "b142-diag-puntero-se-asienta-con-irregularidad",
+      "title": "El puntero se asienta con irregularidad",
+      "symptom": "El puntero se asienta con irregularidad",
+      "possibleCauses": [
+        "Ano unilateral o deformado; distancia irregular entre aleta anal y ano; aleta anal mucho más alta que el ano; falta amortiguador o está defectuoso; bujes de sujeción sueltos con juego entre muelle de ajuste y ranura."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 38."
+    },
+    {
+      "id": "b142-diag-puntero-se-asienta-lateralmente",
+      "title": "El puntero se asienta lateralmente",
+      "symptom": "El puntero se asienta lateralmente",
+      "possibleCauses": [
+        "Puntero entra antes y se asienta sobre la aleta anal; interruptor 2 incorrecto; centraje incorrecto; barras demasiado separadas; altura del puntero incorrecta; bujes sueltos; ano no céntrico."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 38."
+    },
+    {
+      "id": "b142-diag-corte-princesa-largo-corto",
+      "title": "El corte princesa resulta demasiado largo o corto",
+      "symptom": "El corte princesa resulta demasiado largo o corto",
+      "possibleCauses": [
+        "La posición del interruptor 3 está incorrecta."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 39."
+    },
+    {
+      "id": "b142-diag-corte-princesa-partido",
+      "title": "El corte princesa queda partido",
+      "symptom": "El corte princesa queda partido",
+      "possibleCauses": [
+        "No funciona medición de largos; ajuste básico incorrecto; muelle demasiado flojo; interruptor de aproximación defectuoso; fallan motores paso a paso; disposición incorrecta de prismas."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 39."
+    },
+    {
+      "id": "b142-diag-corte-princesa-irregular",
+      "title": "El corte princesa resulta irregular",
+      "symptom": "El corte princesa resulta irregular",
+      "possibleCauses": [
+        "Muelle demasiado flojo en medición de largos; chapaleta medidora dura; disposición incorrecta de prismas; pescados deformados; ajuste básico de cuchilla hendedora; bujes sueltos."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 39."
+    },
+    {
+      "id": "b142-diag-corte-princesa-desgarrado",
+      "title": "El corte princesa queda desgarrado",
+      "symptom": "El corte princesa queda desgarrado",
+      "possibleCauses": [
+        "Pescado demasiado blando; corte princesa ajustado extremamente corto; ajuste básico del aspirador incorrecto; ajuste básico del excavador B incorrecto; trayectos de giro de aspirador y excavador B demasiado pequeños; cilindros duros o estrangulados."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 39."
+    },
+    {
+      "id": "b142-diag-recto-queda-en-pescado",
+      "title": "El recto se queda en el pescado, la cavidad abdominal no queda limpia",
+      "symptom": "El recto se queda en el pescado, la cavidad abdominal no queda limpia",
+      "possibleCauses": [
+        "Excavador A se baja con anterioridad y se asienta sobre el pescado; hoja del excavador embotada, incorrectamente afilada o no sobresale suficientemente."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 40."
+    },
+    {
+      "id": "b142-diag-piel-desgarrada-ano-aleta",
+      "title": "La piel de la cavidad abdominal resulta desgarrada entre el ano y la aleta ventral",
+      "symptom": "La piel de la cavidad abdominal resulta desgarrada entre el ano y la aleta ventral",
+      "possibleCauses": [
+        "Disposición incorrecta de prismas; pescado demasiado bajo; hoja del excavador no abre riñón sanguíneo; ajuste básico del excavador A incorrecto; amortiguador con tensión baja, distancia mal ajustada o interruptor defectuoso; excavador A elevado por aspirador."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 40."
+    },
+    {
+      "id": "b142-diag-piel-desgarrada-aleta-cabeza",
+      "title": "La piel de la cavidad abdominal resulta desgarrada entre la aleta ventral y la cabeza",
+      "symptom": "La piel de la cavidad abdominal resulta desgarrada entre la aleta ventral y la cabeza",
+      "possibleCauses": [
+        "Hoja de membrana embotada, incorrectamente afilada o montada hoja de truchas con bisel; prismas incorrectos y pescado demasiado bajo; ajuste básico del aspirador incorrecto; amortiguador del aspirador con tensión baja, distancia mal ajustada o interruptor defectuoso."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 40."
+    },
+    {
+      "id": "b142-diag-cavidad-danada-ano-aleta",
+      "title": "La cavidad abdominal en la zona del ano hasta la aleta ventral resulta dañada en el interior con incisiones",
+      "symptom": "La cavidad abdominal en la zona del ano hasta la aleta ventral resulta dañada en el interior con incisiones",
+      "possibleCauses": [
+        "Hoja del excavador sobresale demasiado o está incorrectamente afilada; excavador no céntrico; tensión del muelle del amortiguador del excavador A demasiado alta; prismas incorrectos y pescado demasiado alto; ajuste básico del excavador A incorrecto."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 40."
+    },
+    {
+      "id": "b142-diag-cavidad-danada-aleta-cabeza",
+      "title": "La cavidad abdominal en la zona de la aleta ventral hasta la cabeza resulta dañada en el interior con incisiones",
+      "symptom": "La cavidad abdominal en la zona de la aleta ventral hasta la cabeza resulta dañada en el interior con incisiones",
+      "possibleCauses": [
+        "Hoja de membrana incorrectamente afilada o montada; aspirador no céntrico; prismas incorrectos y pescado demasiado alto; pescado deformado con cavidad abdominal que asciende en zona de aleta ventral."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 40."
+    },
+    {
+      "id": "b142-diag-esofago-demasiado-largo",
+      "title": "El esófago queda demasiado largo",
+      "symptom": "El esófago queda demasiado largo",
+      "possibleCauses": [
+        "Hoja de membrana embotada o incorrectamente afilada; guillotina dura, embotada, dañada o guía desgastada; aire comprimido interrumpido; pérdidas de presión; manguera defectuosa o apretada; grifo cerrado; vacío insuficiente o tubería obstruida; grifo esférico duro o defectuoso; deformaciones."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-no-water-cooling-for-computer",
+      "title": "no water-cooling for computer - parpadea indicación A3C",
+      "symptom": "no water-cooling for computer - parpadea indicación A3C",
+      "possibleCauses": [
+        "Control de pescado desconectó unidades de potencia; se interrumpió entrada de agua; válvula magnética en circuito de refrigeración defectuosa."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e770",
+      "title": "E 770",
+      "symptom": "E 770",
+      "possibleCauses": [
+        "La tarjeta del contador de valor de rotación está defectuosa."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e771",
+      "title": "E 771",
+      "symptom": "E 771",
+      "possibleCauses": [
+        "Transmisor de valor de rotación B21 para SM1 defectuoso (centraje)."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e772",
+      "title": "E 772",
+      "symptom": "E 772",
+      "possibleCauses": [
+        "Transmisor de valor de rotación B22 para SM2 defectuoso (cuchilla abridora)."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e773",
+      "title": "E 773",
+      "symptom": "E 773",
+      "possibleCauses": [
+        "Transmisor de valor de rotación B23 para SM3 defectuoso (aspirador)."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e774",
+      "title": "E 774",
+      "symptom": "E 774",
+      "possibleCauses": [
+        "Transmisor de valor de rotación B24 para SM4 defectuoso (excavador A)."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e775",
+      "title": "E 775",
+      "symptom": "E 775",
+      "possibleCauses": [
+        "Transmisor de valor de rotación B25 para SM5 defectuoso (excavador B)."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e777",
+      "title": "E 777",
+      "symptom": "E 777",
+      "possibleCauses": [
+        "Pescado en la entrada: fallo de introducción por operador, fallo de abrazadera; si se produce regularmente, muelle de tracción roto en el carro."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e8nx",
+      "title": "E 8 N X",
+      "symptom": "E 8 N X",
+      "possibleCauses": [
+        "N = función del motor paso a paso de 0 a 6; X = 1 Cuchilla abridora, 2 Centraje, 3 Aspirador, 4 Excavador A, 5 Excavador B."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+    },
+    {
+      "id": "b142-diag-e801-e805",
+      "title": "E 801 - E 805",
+      "symptom": "E 801 - E 805",
+      "possibleCauses": [
+        "Motor paso a paso no encuentra posición cero; interruptor de aproximación en accionamiento defectuoso; distancia entre interruptores de aproximación demasiado grande."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e811-e815",
+      "title": "E 811 - E 815",
+      "symptom": "E 811 - E 815",
+      "possibleCauses": [
+        "Marcha de prueba de motores paso a paso defectuosa."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e821-e825",
+      "title": "E 821 - E 825",
+      "symptom": "E 821 - E 825",
+      "possibleCauses": [
+        "Motor paso a paso no ha alcanzado posición cero después de la última marcha durante producción."
+      ],
+      "solution": "Pulsar el pulsador I: la máquina hace marcha de referencia. Pulsar el pulsador I otra vez: la máquina arranca. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e826",
+      "title": "E 826",
+      "symptom": "E 826",
+      "possibleCauses": [
+        "Accionamiento bloquea durante la producción."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e827",
+      "title": "E 827",
+      "symptom": "E 827",
+      "possibleCauses": [
+        "Extractor de pescados no se encuentra en posición básica o interruptor de aproximación defectuoso."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e831-e835",
+      "title": "E 831 - E 835",
+      "symptom": "E 831 - E 835",
+      "possibleCauses": [
+        "Iniciador de ranura (interruptor de aproximación) en motor paso a paso defectuoso."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e841-e845",
+      "title": "E 841 - E 845",
+      "symptom": "E 841 - E 845",
+      "possibleCauses": [
+        "Motor paso a paso no alcanza posición tope mínima prevista."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e851-e855",
+      "title": "E 851 - E 855",
+      "symptom": "E 851 - E 855",
+      "possibleCauses": [
+        "Motor paso a paso no alcanza posición tope máxima prevista."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e861-e865",
+      "title": "E 861 - E 865",
+      "symptom": "E 861 - E 865",
+      "possibleCauses": [
+        "Marcha desde posición tope mínima hasta posición cero incorrecta."
+      ],
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 42."
+    },
+    {
+      "id": "b142-diag-e900-e999",
+      "title": "E 900 - E 999",
+      "symptom": "E 900 - E 999",
+      "possibleCauses": [
+        "Se ve solamente en indicación de unidad de control; fallo en placa de unidad de control; unidad de control colgada; fenómenos inexplicables como movimiento incontrolado, pescado al canalón sin elaborar, excavador en abrazadera, display no reacciona."
+      ],
+      "solution": "Desconectar el interruptor principal por 5 segundos, por lo menos. Fuente: manual 142, pág 42."
+    }
+  ]
+}
