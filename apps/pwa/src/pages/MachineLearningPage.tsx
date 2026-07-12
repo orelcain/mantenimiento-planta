@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
-  ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ClipboardCheck, ShieldCheck, Activity,
+  ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ShieldCheck, Activity,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library, ExternalLink, Search,
   MonitorPlay,
 } from 'lucide-react'
@@ -248,11 +248,7 @@ export function MachineLearningPage() {
   return (
     <div
       className={`${heightClass} w-full`}
-      style={{
-        background:
-          `radial-gradient(circle at 18% 0%, ${machine.color}14 0, transparent 32%), ` +
-          `linear-gradient(180deg, ${LC.bgPanel} 0%, ${LC.bg} 38%, ${LC.bg} 100%)`,
-      }}
+      style={{ background: LC.bg }}
     >
       {/* Header */}
       <div className="max-w-6xl mx-auto px-4 pt-4 pb-3 sm:px-6 sm:pt-10 sm:pb-4">
@@ -282,51 +278,25 @@ export function MachineLearningPage() {
               <div className="flex items-start gap-3 sm:gap-4">
                 <div
                   className="flex items-center justify-center w-12 h-12 rounded-lg flex-shrink-0 sm:h-16 sm:w-16"
-                  style={{
-                    background: `linear-gradient(145deg, ${machine.color}24, #151a20)`,
-                    border: `1px solid ${machine.color}45`,
-                    boxShadow: `inset 0 0 0 1px ${machine.color}12`,
-                  }}
+                  style={{ background: `${machine.color}1a`, border: `1px solid ${machine.color}33` }}
                 >
                   <Icon className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: machine.color }} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className="rounded px-2 py-1 text-[10px] font-bold uppercase"
-                      style={{ color: machine.color, background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
-                    >
+                  <div className="flex flex-wrap items-center gap-2 mb-2 text-xs" style={{ color: LC.inkLo }}>
+                    <span style={{ color: machine.color }}>
                       {isCourse
-                        ? `Modulo ${machine.modulo ?? '—'}${machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}`
-                        : 'Dossier tecnico'}
+                        ? `Módulo ${machine.modulo ?? '—'}${machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}`
+                        : 'Dossier técnico'}
                     </span>
-                    <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
-                      {isCourse ? (machine.programa ?? machine.area) : machine.area}
-                    </span>
+                    <span>·</span>
+                    <span>{isCourse ? (machine.programa ?? machine.area) : machine.area}</span>
                   </div>
                   <h1 className="text-[1.7rem] sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>
                   <p className="text-sm leading-relaxed mt-3 max-w-2xl" style={{ color: LC.inkMid }}>
                     {machine.description}
                   </p>
                 </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2 sm:mt-6">
-                {isCourse ? (
-                  <>
-                    <MachineMetric icon={BookOpen} label="Lecciones" enabled color={machine.color} tone="blue" />
-                    <MachineMetric icon={ClipboardCheck} label="Practica" enabled color="#22c55e" tone="green" />
-                    <MachineMetric icon={GitBranch} label="Casos" enabled color="#eab308" tone="amber" />
-                    <MachineMetric icon={GraduationCap} label="Examen" enabled color="#f97316" tone="orange" />
-                  </>
-                ) : (
-                  <>
-                    <MachineMetric icon={BookOpen} label="Manual" enabled={machine.sections.manual} color={machine.color} tone="blue" />
-                    <MachineMetric icon={ClipboardCheck} label="Proced." enabled={machine.sections.procedures} color="#22c55e" tone="green" />
-                    <MachineMetric icon={GitBranch} label="Flujos" enabled={machine.sections.flows} color="#eab308" tone="amber" />
-                    <MachineMetric icon={Activity} label="Diagnostico" enabled={machine.sections.diagnosis} color="#f97316" tone="orange" />
-                  </>
-                )}
               </div>
 
               {!isCourse && machine.hmiRoute && (
@@ -349,12 +319,12 @@ export function MachineLearningPage() {
 
             <aside
               className="hidden p-5 sm:block sm:p-6 lg:border-l"
-              style={{ background: '#151a20', borderColor: LC.border }}
+              style={{ background: LC.bgPanel, borderColor: LC.border }}
             >
               <div className="flex items-center gap-2 mb-4">
-                <Gauge className="h-4 w-4" style={{ color: machine.color }} />
-                <h2 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
-                  {isCourse ? 'Sobre el curso' : 'Lectura rapida'}
+                <Gauge className="h-4 w-4" style={{ color: LC.inkMid }} />
+                <h2 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
+                  {isCourse ? 'Sobre el curso' : 'Lectura rápida'}
                 </h2>
               </div>
               <div className="space-y-3">
@@ -372,9 +342,9 @@ export function MachineLearningPage() {
                   </>
                 )}
               </div>
-              <div className="mt-5 rounded-md p-3" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.28)' }}>
+              <div className="mt-5 rounded-md p-3" style={{ background: LC.surface, border: `1px solid ${LC.border}` }}>
                 <div className="flex gap-2">
-                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#eab308' }} />
+                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: LC.inkMid }} />
                   <p className="text-xs leading-relaxed" style={{ color: LC.inkMid }}>
                     {isCourse
                       ? 'Material de estudio destilado de la clase. Para la prueba, repasa la pestana Examen.'
@@ -525,52 +495,10 @@ export function MachineLearningPage() {
   )
 }
 
-function MachineMetric({
-  icon: Icon,
-  label,
-  enabled,
-  color,
-  tone,
-}: {
-  icon: React.ElementType
-  label: string
-  enabled: boolean
-  color: string
-  tone: 'blue' | 'green' | 'amber' | 'orange'
-}) {
-  const toneBg = {
-    blue: `${color}12`,
-    green: 'rgba(34,197,94,0.10)',
-    amber: 'rgba(234,179,8,0.10)',
-    orange: 'rgba(249,115,22,0.10)',
-  }[tone]
-  const toneBorder = {
-    blue: `${color}24`,
-    green: 'rgba(34,197,94,0.24)',
-    amber: 'rgba(234,179,8,0.24)',
-    orange: 'rgba(249,115,22,0.24)',
-  }[tone]
-  return (
-    <div
-      className="flex items-center gap-2 rounded-full px-3 py-2"
-      style={{
-        background: enabled ? toneBg : LC.surfaceHi,
-        border: `1px solid ${enabled ? toneBorder : LC.border}`,
-        opacity: enabled ? 1 : 0.55,
-      }}
-    >
-      <Icon className="h-3.5 w-3.5" style={{ color: enabled ? color : LC.inkGhost }} />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: enabled ? LC.inkMid : LC.inkLo }}>
-        {label}
-      </span>
-    </div>
-  )
-}
-
 function DossierRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b pb-2 last:border-b-0 last:pb-0" style={{ borderColor: LC.border }}>
-      <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: LC.inkLo }}>
+      <span className="text-xs" style={{ color: LC.inkLo }}>
         {label}
       </span>
       <span className="text-xs font-medium text-right" style={{ color: LC.ink }}>
@@ -853,16 +781,16 @@ function ManualList({
         style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
       >
         <div className="flex items-center gap-2 px-1 pb-2">
-          <BookOpen className="h-4 w-4" style={{ color }} />
-          <h3 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
+          <BookOpen className="h-4 w-4" style={{ color: LC.inkMid }} />
+          <h3 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
             {isCourse ? 'Lecciones del curso' : 'Secciones del manual'}
           </h3>
         </div>
         {compactNavigator ? (
           <div className="space-y-3">
             <div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: LC.inkLo }}>
-                Familia tecnica
+              <p className="mb-2 text-xs" style={{ color: LC.inkLo }}>
+                Familia técnica
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
               {sectionGroups.map(group => {
@@ -1017,8 +945,8 @@ function ManualList({
               {String(activeSection.order).padStart(2, '0')}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
-                {isCourse ? 'Leccion' : 'Manual tecnico'}
+              <p className="text-xs" style={{ color: LC.inkLo }}>
+                {isCourse ? 'Lección' : 'Manual técnico'}
               </p>
               <h3 className="mt-1 text-lg font-semibold leading-tight text-[#e9eef3]">{activeSection.title}</h3>
               {blocks.description && (
@@ -1032,7 +960,7 @@ function ManualList({
           {machineSlug === 'grader' && activeSection.id === 'grader-manual-glosario' ? (
             <GraderGlossaryView color={color} />
           ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-6">
             {blocks.documents.length > 0 && (
               <ManualDocuments documents={blocks.documents} color={color} />
             )}
@@ -1235,32 +1163,23 @@ function ManualBlock({
   items: string[]
   variant?: 'default' | 'measure' | 'note'
 }) {
-  const background = variant === 'note' ? `${color}0d` : LC.surfaceHi
   return (
-    <section className="rounded-md p-4" style={{ background, border: `1px solid ${variant === 'note' ? color + '33' : LC.border}` }}>
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className="h-4 w-4" style={{ color }} />
-        <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
+    <section>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="h-3.5 w-3.5" style={{ color }} />
+        <h4 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
           {title}
         </h4>
       </div>
-      <ul className={variant === 'measure' ? 'grid gap-2 sm:grid-cols-2' : 'space-y-2'}>
+      <ul className={variant === 'measure' ? 'grid gap-x-6 gap-y-1.5 sm:grid-cols-2' : 'space-y-1.5'}>
         {items.map((item, index) => (
           <li
             key={`${item}-${index}`}
-            className={variant === 'measure' ? 'rounded-md px-3 py-2 text-sm' : 'flex gap-2.5 text-sm leading-relaxed'}
-            style={variant === 'measure'
-              ? { background: `${color}10`, border: `1px solid ${color}22`, color: LC.ink }
-              : { color: LC.inkMid }}
+            className="flex gap-2.5 text-sm leading-relaxed"
+            style={{ color: LC.inkMid }}
           >
-            {variant === 'measure' ? (
-              <span className="whitespace-pre-wrap">{item}</span>
-            ) : (
-              <>
-                <span className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                <span className="flex-1 whitespace-pre-wrap">{item}</span>
-              </>
-            )}
+            <span className="mt-[8px] w-1 h-1 rounded-full flex-shrink-0" style={{ background: LC.inkLo }} />
+            <span className="flex-1 whitespace-pre-wrap">{item}</span>
           </li>
         ))}
       </ul>
@@ -1271,10 +1190,10 @@ function ManualBlock({
 /** Documentos oficiales descargables (PDF, planos) de una seccion de manual. */
 function ManualDocuments({ documents, color }: { documents: { label: string; url: string }[]; color: string }) {
   return (
-    <section className="rounded-md p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="h-4 w-4" style={{ color }} />
-        <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
+    <section>
+      <div className="flex items-center gap-2 mb-2">
+        <FileText className="h-3.5 w-3.5" style={{ color }} />
+        <h4 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
           Documentos
         </h4>
       </div>

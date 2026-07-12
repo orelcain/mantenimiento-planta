@@ -24,7 +24,6 @@ import { animate, stagger } from 'animejs'
 import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
-import { InfoTooltip } from '@/components/ui'
 import {
   groupMachinesByArea,
   isCourseMachine,
@@ -38,6 +37,7 @@ import {
 } from '@/services/learningContent'
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
 import { LC as C } from '@/data/learningTheme'
+import { MetaText, StatusTag } from '@/components/learning/primitives'
 
 // ── Paleta DARK + AquaChile: ver import { LC as C } arriba (compartida con admin) ──
 
@@ -59,17 +59,17 @@ const SPECIAL_MODULES: SpecialModule[] = [
   {
     id: 'hmi-knuro', title: 'HMI Knuro B2', subtitle: 'Simulador de parámetros',
     description: 'Panel HMI Knuro para máquinas Baader. Presets de planta y modo de práctica.',
-    icon: Cpu, href: '/aprendizaje/hmi-knuro', tint: '#3fb98f', stats: '6 presets · práctica',
+    icon: Cpu, href: '/aprendizaje/hmi-knuro', tint: '#6b8299', stats: '6 presets · práctica',
   },
   {
     id: 'hmi-grader', title: 'HMI Grader', subtitle: 'StaticGrader Marelec Z2',
     description: 'Clasificador automático por peso. Teclado F1-F4 y numpad con funcionalidad real.',
-    icon: Scale, href: '/aprendizaje/hmi-grader', tint: '#46c46f', stats: '12 pockets · práctica',
+    icon: Scale, href: '/aprendizaje/hmi-grader', tint: '#6e9080', stats: '12 pockets · práctica',
   },
   {
     id: 'hmi-bombeo-s2', title: 'HMI Bombeo Acopio S2', subtitle: 'Ciclo PLC · planta Yal',
     description: 'Bombeo Sistema 2. Motor de ciclo Fase A ↔ Fase B con eventos PLC reales y sidebar interactivo.',
-    icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5aa6e8', stats: 'ciclo 90 s · 10 válvulas',
+    icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5a7d9e', stats: 'ciclo 90 s · 10 válvulas',
   },
 ]
 
@@ -123,9 +123,7 @@ export function LearningHubPage() {
   const [recents] = useState<string[]>(() => getRecents())
   const [query, setQuery] = useState('')
 
-  const counterRef = useRef<HTMLSpanElement>(null)
   const mainRef = useRef<HTMLElement>(null)
-  const [barFill, setBarFill] = useState(0)
 
   // ── Carga de meta (counts + lastUpdatedAt) por máquina ──
   useEffect(() => {
@@ -161,7 +159,6 @@ export function LearningHubPage() {
   const documentedMachines = allMachines.filter(m => hasAnyContent(m, metaMap[m.slug])).length
   const totalCatalog = allMachines.length + SPECIAL_MODULES.length
   const itemsWithContent = documentedMachines + SPECIAL_MODULES.length
-  const coverageRatio = totalCatalog > 0 ? itemsWithContent / totalCatalog : 0
 
   // ── Búsqueda ──
   const q = norm(query.trim())
@@ -191,31 +188,6 @@ export function LearningHubPage() {
     animate(cards, { opacity: [0, 1], translateY: [14, 0], duration: 480, delay: stagger(45), ease: 'outExpo' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // ── Roll-up del contador (rAF puro, robusto) ──
-  useEffect(() => {
-    const node = counterRef.current
-    if (!node || totalCatalog <= 0) return
-    if (prefersReduced()) { node.textContent = String(totalCatalog); return }
-    let raf = 0
-    const start = performance.now()
-    const dur = 1100
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / dur)
-      const eased = 1 - Math.pow(1 - t, 3)
-      node.textContent = String(Math.round(eased * totalCatalog))
-      if (t < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [totalCatalog])
-
-  // ── Llenado de la barra de cobertura (CSS transition vía estado) ──
-  useEffect(() => {
-    if (prefersReduced()) { setBarFill(coverageRatio); return }
-    const id = requestAnimationFrame(() => setBarFill(coverageRatio))
-    return () => cancelAnimationFrame(id)
-  }, [coverageRatio])
 
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
 
@@ -247,13 +219,7 @@ export function LearningHubPage() {
           >
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="rounded px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em]"
-                  style={{ color: C.aquaBright, background: C.aquaSoft, border: `1px solid ${C.borderHi}` }}
-                >
-                  Centro de Aprendizaje
-                </span>
-                <span className="hidden text-[10px] uppercase tracking-[0.18em] sm:inline" style={{ color: C.inkLo }}>
+                <span className="text-xs font-medium" style={{ color: C.aquaBright }}>
                   Centro de Aprendizaje · AquaChile
                 </span>
               </div>
@@ -264,42 +230,9 @@ export function LearningHubPage() {
                 Manuales, procedimientos, flujos y diagnóstico, cuando algo no anda y hay que resolverlo rápido.
               </p>
               <div className="grid gap-2 sm:grid-cols-3 mt-6">
-                <HubMetric icon={Activity} label="Catalogo" value={`${totalCatalog}`} detail="equipos y simuladores" color={C.aquaBright} />
-                <HubMetric icon={FileText} label="Contenido" value={`${itemsWithContent}/${totalCatalog}`} detail="con material publicado" color="#22c55e" />
-                <HubMetric icon={Stethoscope} label="Busqueda" value="Sintomas" detail="diagnostico integrado" color="#eab308" />
-              </div>
-            </div>
-
-            <div
-              className="hidden items-center gap-5 shrink-0 rounded-md p-4 md:flex"
-              style={{ background: '#151a20', border: `1px solid ${C.border}` }}
-            >
-              <div className="flex items-baseline gap-1.5">
-                <span ref={counterRef} className="font-extrabold tabular-nums leading-none" style={{ color: C.ink, fontSize: '1.9rem' }}>
-                  {totalCatalog}
-                </span>
-                <span className="text-[11px] leading-tight" style={{ color: C.inkLo }}>equipos y<br />simuladores</span>
-              </div>
-              <div className="w-px h-9" style={{ background: C.border }} />
-              <div className="min-w-[140px]">
-                <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: C.inkLo }}>
-                    Con contenido
-                  </span>
-                  <span className="text-[11px] font-bold tabular-nums" style={{ color: C.aquaLight }}>
-                    {itemsWithContent}/{totalCatalog}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: C.border }}>
-                  <div
-                    className="h-full rounded-full origin-left"
-                    style={{
-                      background: `linear-gradient(90deg, ${C.aqua}, ${C.aquaBright})`,
-                      transform: `scaleX(${barFill})`,
-                      transition: 'transform 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
-                    }}
-                  />
-                </div>
+                <HubMetric icon={Activity} label="Catálogo" value={`${totalCatalog}`} detail="equipos y simuladores" color={C.aquaBright} />
+                <HubMetric icon={FileText} label="Contenido" value={`${itemsWithContent}/${totalCatalog}`} detail="con material publicado" color={C.aquaBright} />
+                <HubMetric icon={Stethoscope} label="Búsqueda" value="Síntomas" detail="diagnóstico integrado" color={C.aquaBright} />
               </div>
             </div>
           </div>
@@ -334,7 +267,7 @@ export function LearningHubPage() {
         {searching ? (
           // ── Resultados de búsqueda ──
           <section>
-            <SectionLabel n="⌕">Resultados para "{query.trim()}"</SectionLabel>
+            <SectionLabel n="">Resultados para "{query.trim()}"</SectionLabel>
             {noResults ? (
               <div className="mt-5 rounded-lg p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <p className="text-sm" style={{ color: C.inkMid }}>Sin resultados para "{query.trim()}".</p>
@@ -481,10 +414,9 @@ export function LearningHubPage() {
 // ── Section label editorial ────────────────────────────────────────────────────
 function SectionLabel({ n, children }: { n: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs font-bold tabular-nums" style={{ color: C.aquaBright }}>{n}</span>
-      <span className="h-px flex-shrink-0 w-6" style={{ background: C.borderHi }} />
-      <h2 className="text-sm uppercase tracking-widest font-bold" style={{ color: C.ink }}>{children}</h2>
+    <div className="flex items-center gap-2.5">
+      {n && <span className="text-xs font-semibold tabular-nums" style={{ color: C.inkLo }}>{n}</span>}
+      <h2 className="text-[13px] font-semibold" style={{ color: C.inkMid }}>{children}</h2>
     </div>
   )
 }
@@ -507,7 +439,7 @@ function HubMetric({
     <div className="rounded-md px-3 py-2" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5" style={{ color }} />
-        <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: C.inkLo }}>
+        <span className="text-xs" style={{ color: C.inkLo }}>
           {label}
         </span>
       </div>
@@ -597,76 +529,58 @@ function MachineCard({
   const enabledCount = badges.filter(b => b.enabled).length
   const isNew = ready && meta?.lastUpdatedAt != null && (Date.now() - meta.lastUpdatedAt) < NEW_WINDOW_MS
 
-  // Color de identidad de la máquina (atenuado si está en preparación)
+  // Color de identidad de la máquina (vive en el strip + icono, no tiñe la card)
   const accent = machine.color
+  // Una sola línea de contenido en vez de 4 badges: "6 manual · 9 proced. · 5 flujos · 9 diagnós."
+  const countLine = badges
+    .filter(b => b.enabled)
+    .map(b => {
+      const c = b.count > 0 ? (b.count > 9 ? '9+' : String(b.count)) : ''
+      return `${c ? c + ' ' : ''}${b.short.toLowerCase()}`
+    })
+    .join(' · ')
 
   return (
     <div data-card className="relative">
       <button
         onClick={onClick}
-        className="group w-full text-left rounded-lg overflow-hidden flex flex-col transition-[transform,box-shadow,border-color] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-1 hover:shadow-[0_14px_36px_-12px_rgba(46,117,182,0.45)] active:translate-y-0 active:scale-[0.98]"
-        style={{ background: C.surface, border: `1px solid ${accent}33`, opacity: ready ? 1 : 0.78 }}
+        className="group w-full text-left rounded-lg overflow-hidden flex flex-col transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
+        style={{ background: C.surface, border: `1px solid ${C.border}`, opacity: ready ? 1 : 0.72 }}
       >
-        {/* Strip superior — color de identidad (siempre visible) + fill = progreso de secciones */}
-        <div className="h-1 w-full" style={{ background: `${accent}2e` }}>
+        {/* Strip superior — identidad de la máquina + fill = progreso de secciones */}
+        <div className="h-1 w-full" style={{ background: `${accent}26` }}>
           <div className="h-full transition-[width] duration-500 ease-out"
             style={{ width: `${(enabledCount / 4) * 100}%`, background: accent }} />
         </div>
 
         <div className="p-4 flex flex-col flex-1">
-          {/* Fila de estado (deja espacio a la derecha para la estrella) */}
-          <div className="flex items-center gap-2 mb-3 pr-8 min-h-[20px]">
-            {ready ? (
-              course ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide font-bold" style={{ color: accent }}>
-                  <span className="rounded px-1.5 py-0.5" style={{ background: `${accent}1f`, border: `1px solid ${accent}45` }}>
-                    Modulo {machine.modulo ?? '—'}
-                  </span>
-                  {machine.nivel != null && <span style={{ color: C.inkLo }}>Nivel {machine.nivel}</span>}
-                </span>
-              ) : (
-                <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: accent }}>
-                  {enabledCount}/4 secciones
-                </span>
-              )
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                style={{ background: C.prepSoft, color: C.prep, border: `1px solid ${C.prep}40` }}>
-                <Clock className="h-2.5 w-2.5" /> En preparación
-              </span>
-            )}
-            {isNew && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                style={{ background: C.nuevoSoft, color: C.nuevo, border: `1px solid ${C.nuevo}40` }}>
-                <Sparkles className="h-2.5 w-2.5" /> Nuevo
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-start gap-3 mb-3">
-            <div className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0 transition-transform duration-200 ease-out group-hover:scale-105"
-              style={{ background: `${accent}1f`, border: `1px solid ${accent}40` }}>
+          <div className="flex items-start gap-3 pr-8">
+            <div className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0"
+              style={{ background: `${accent}1a`, border: `1px solid ${accent}33` }}>
               <Icon style={{ color: accent, width: 22, height: 22 }} />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-bold leading-tight" style={{ color: C.ink }}>{machine.name}</h3>
+              <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{machine.name}</h3>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                {ready ? (
+                  course ? (
+                    <MetaText>Módulo {machine.modulo ?? '—'}{machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}</MetaText>
+                  ) : (
+                    <MetaText>{enabledCount}/4 secciones</MetaText>
+                  )
+                ) : (
+                  <StatusTag tone={C.prep} subtle icon={<Clock className="h-3 w-3" />}>En preparación</StatusTag>
+                )}
+                {isNew && <StatusTag tone={C.nuevo} subtle icon={<Sparkles className="h-3 w-3" />}>Nuevo</StatusTag>}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
-            {badges.map((b, i) => {
-              const SIcon = b.icon
-              return (
-                <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold"
-                  style={{ background: b.enabled ? C.aquaSoft : 'transparent', color: b.enabled ? C.aquaLight : C.inkGhost, border: `1px solid ${b.enabled ? C.borderHi : C.border}`, opacity: b.enabled ? 1 : 0.7 }}>
-                  <SIcon className="h-3 w-3" />
-                  {b.short}
-                  {b.count > 0 && <span className="tabular-nums">· {b.count > 9 ? '9+' : b.count}</span>}
-                  <InfoTooltip text={b.tooltip} iconSize={9} position="top" />
-                </span>
-              )
-            })}
-          </div>
+          {ready && countLine && (
+            <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
+              <MetaText>{countLine}</MetaText>
+            </div>
+          )}
         </div>
       </button>
 
@@ -690,18 +604,18 @@ function SimulatorCard({ mod, onClick }: { mod: SpecialModule; onClick: () => vo
     <button
       data-card
       onClick={onClick}
-      className="group text-left rounded-lg p-5 flex flex-col h-full transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-1 hover:shadow-[0_16px_40px_-14px_rgba(46,117,182,0.5)] active:translate-y-0 active:scale-[0.98]"
+      className="group text-left rounded-lg p-5 flex flex-col h-full transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
       style={{ background: C.surface, border: `1px solid ${C.border}` }}
     >
-      <div className="flex items-center justify-center w-12 h-12 rounded-lg mb-4 transition-transform duration-200 ease-out group-hover:scale-105"
-        style={{ background: mod.tint, boxShadow: `0 6px 18px ${mod.tint}40` }}>
-        <Icon className="h-6 w-6" style={{ color: C.bg }} />
+      <div className="flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+        style={{ background: `${mod.tint}1a`, border: `1px solid ${mod.tint}33` }}>
+        <Icon className="h-5 w-5" style={{ color: mod.tint }} />
       </div>
-      <h3 className="text-base font-bold leading-tight" style={{ color: C.ink }}>{mod.title}</h3>
-      <p className="text-xs font-semibold mt-0.5" style={{ color: mod.tint }}>{mod.subtitle}</p>
+      <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{mod.title}</h3>
+      <p className="text-xs mt-0.5" style={{ color: C.inkMid }}>{mod.subtitle}</p>
       <p className="text-sm leading-relaxed mt-2 flex-1" style={{ color: C.inkMid }}>{mod.description}</p>
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-        <span className="text-[11px] uppercase tracking-wide" style={{ color: C.inkLo }}>{mod.stats}</span>
+        <span className="text-[11px]" style={{ color: C.inkLo }}>{mod.stats}</span>
         <span className="inline-flex items-center gap-1 text-sm font-bold" style={{ color: mod.tint }}>
           Abrir <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </span>
