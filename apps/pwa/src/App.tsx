@@ -319,22 +319,11 @@ export function App() {
                 </Suspense>
               }
             />
-            <Route
-              path="/aprendizaje/baader-200/:sectionId"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader200LearningPublicPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/baader-200"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader200LearningPublicPage />
-                </Suspense>
-              }
-            />
+            {/* La vista inmersiva del Baader 200 (iframe con tema propio) se unificó
+                en la ficha estándar para no tener 2 formatos distintos en el Centro.
+                El share standalone por QR (/baader-200/learn) se conserva aparte. */}
+            <Route path="/aprendizaje/baader-200/:sectionId" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
+            <Route path="/aprendizaje/baader-200" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
             <Route
               path="/aprendizaje/hmi-knuro/:presetId"
               element={

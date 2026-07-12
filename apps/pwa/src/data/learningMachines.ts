@@ -32,10 +32,6 @@ export interface LearningMachine {
   hmiRoute?: string
   /** Nombre del simulador asociado (para el label del boton). */
   hmiLabel?: string
-  /** Vista inmersiva/manual completo dedicado (ej: Baader 200 manual de ajustes). */
-  immersiveRoute?: string
-  /** Label del boton de la vista inmersiva. */
-  immersiveLabel?: string
   sections: LearningMachineSections
   // ── Solo para temas de curso (area CAPACITACION_AREA) ──
   /** Programa/serie al que pertenece el curso (ej: "Programa Electricidad - Mantenimiento Industrial"). */
@@ -102,8 +98,6 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     color: '#4499ff',
     hmiRoute: '/aprendizaje/hmi-knuro',
     hmiLabel: 'HMI Knuro B2',
-    immersiveRoute: '/aprendizaje/baader-200',
-    immersiveLabel: 'Manual de ajustes completo',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
