@@ -1,0 +1,131 @@
+/*
+ * learningDossier — identidad visual "Dossier de campo" para las fichas de máquina
+ * del Centro de Aprendizaje. Se lee como un manual técnico de servicio, no como
+ * una app: portada con código de doc, secciones §, monoespaciada para todo dato,
+ * hairlines en vez de cajas, un solo acento (petróleo) + óxido para avisos.
+ *
+ * Theme-aware: papel claro por defecto, "workshop" oscuro bajo `.dark` (la app usa
+ * darkMode:'class'). Todo scopeado bajo `.dossier` para no filtrar al resto.
+ */
+.dossier {
+  --dp-paper:     #f3f4f2;
+  --dp-ink:       #16191c;
+  --dp-ink-soft:  #565d62;
+  --dp-ink-faint: #979d9a;
+  --dp-rule:      #e0e2df;
+  --dp-rule-hard: #c4c8c3;
+  --dp-accent:    #275874;
+  --dp-warn:      #9c4a22;
+  --dp-ok:        #38614c;
+  --dp-cond: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --dp-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  --dp-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+
+  background: var(--dp-paper);
+  color: var(--dp-ink);
+  font-family: var(--dp-body);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.dark .dossier {
+  --dp-paper:     #14181b;
+  --dp-ink:       #dde2e5;
+  --dp-ink-soft:  #98a2a9;
+  --dp-ink-faint: #626c72;
+  --dp-rule:      #232a2f;
+  --dp-rule-hard: #363f45;
+  --dp-accent:    #7aacc7;
+  --dp-warn:      #d5885a;
+  --dp-ok:        #63b58e;
+}
+
+/* Utilidades */
+.dossier .dp-lbl { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-mono { font-family: var(--dp-mono); }
+.dossier .dp-num { font-variant-numeric: tabular-nums; }
+.dossier .dp-wrap { max-width: 760px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 40px); }
+
+/* Volver */
+.dossier .dp-back { display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12px; letter-spacing: .04em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 8px 0; }
+.dossier .dp-back:hover { color: var(--dp-accent); }
+
+/* Portada */
+.dossier .dp-eyebrow { font-family: var(--dp-mono); font-size: 11px; letter-spacing: .14em; color: var(--dp-ink-soft); }
+.dossier .dp-eyebrow b { color: var(--dp-accent); font-weight: 600; }
+.dossier .dp-eyebrow .sep { color: var(--dp-ink-faint); margin: 0 8px; }
+.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; text-transform: uppercase; font-size: clamp(31px, 6vw, 54px); line-height: 1.0; letter-spacing: .005em; margin: 18px 0 14px; text-wrap: balance; color: var(--dp-ink); }
+.dossier .dp-sub { font-size: 15px; color: var(--dp-ink-soft); max-width: 56ch; margin: 0; }
+
+.dossier .dp-meta { display: flex; flex-wrap: wrap; gap: 20px 44px; padding: 18px 0; margin-top: 26px; border-top: 1px solid var(--dp-rule); border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-meta .dp-lbl { display: block; margin-bottom: 5px; }
+.dossier .dp-meta .dp-val { font-family: var(--dp-mono); font-size: 14px; color: var(--dp-ink); }
+
+.dossier .dp-hmi { margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; }
+.dossier .dp-hmi:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
+
+/* Tabs / índice */
+.dossier .dp-toc { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-toc button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .02em; color: var(--dp-ink-soft); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 7px; }
+.dossier .dp-toc button b { color: var(--dp-ink-faint); }
+.dossier .dp-toc button:hover { color: var(--dp-ink); }
+.dossier .dp-toc button[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); }
+.dossier .dp-toc button[aria-current="true"] b { color: var(--dp-accent); }
+
+/* Cabecera de sección de contenido */
+.dossier .dp-sec-head { display: flex; align-items: baseline; gap: 14px; }
+.dossier .dp-sec-no { font-family: var(--dp-mono); font-size: 13px; font-weight: 600; color: var(--dp-accent); letter-spacing: .05em; }
+.dossier .dp-sec-no::before { content: "§ "; color: var(--dp-ink-faint); }
+.dossier .dp-sec-title { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(20px, 4vw, 27px); letter-spacing: .01em; margin: 0; line-height: 1.05; color: var(--dp-ink); }
+.dossier .dp-sec-code { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .1em; color: var(--dp-ink-faint); text-transform: uppercase; margin-top: 12px; }
+
+/* Bloques de manual: objetivo, cuerpo, porqué, aviso, medidas, notas */
+.dossier .dp-objetivo { max-width: 62ch; margin: 22px 0; padding-left: 18px; border-left: 2px solid var(--dp-accent); }
+.dossier .dp-objetivo .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 6px; }
+.dossier .dp-objetivo p { margin: 0; font-size: 15px; }
+
+.dossier .dp-body { max-width: 62ch; }
+.dossier .dp-body p { margin: 0 0 15px; }
+
+.dossier .dp-block { max-width: 62ch; margin: 26px 0; }
+.dossier .dp-block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.dossier .dp-block-head .dp-lbl { color: var(--dp-ink-soft); }
+.dossier .dp-list { list-style: none; margin: 0; padding: 0; }
+.dossier .dp-list li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; font-size: 14px; color: var(--dp-ink-soft); padding: 4px 0; }
+.dossier .dp-list li::before { content: "—"; color: var(--dp-ink-faint); }
+.dossier .dp-list li > span { color: var(--dp-ink-soft); }
+.dossier .dp-block b { color: var(--dp-ink); font-weight: 600; }
+
+/* Aviso / nota operativa */
+.dossier .dp-aviso { max-width: 62ch; margin: 24px 0; padding-left: 18px; border-left: 2px solid var(--dp-warn); }
+.dossier .dp-aviso .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 6px; }
+.dossier .dp-aviso p, .dossier .dp-aviso li { font-size: 14px; color: var(--dp-ink-soft); }
+
+/* Medidas / especificaciones — tabla o lista mono */
+.dossier .dp-specs li { grid-template-columns: 1fr; }
+.dossier .dp-specs li::before { content: ""; }
+.dossier .dp-specs li { border-bottom: 1px solid var(--dp-rule); padding: 9px 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); }
+
+/* Procedimientos — pasos con hairline, mono */
+.dossier .dp-proc { max-width: 62ch; margin: 6px 0 30px; }
+.dossier .dp-proc-ol { list-style: none; counter-reset: st; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-proc-ol li { counter-increment: st; display: grid; grid-template-columns: 38px 1fr; padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-proc-ol li .dp-n { font-family: var(--dp-mono); font-weight: 600; color: var(--dp-ink-faint); font-size: 13px; }
+.dossier .dp-proc-ol li .dp-n::before { content: counter(st, decimal-leading-zero); }
+.dossier .dp-proc-ol li .dp-c b { display: block; font-size: 14px; font-weight: 600; color: var(--dp-ink); margin-bottom: 3px; }
+.dossier .dp-proc-ol li .dp-c span { font-size: 13.5px; color: var(--dp-ink-soft); }
+
+/* Diagnóstico */
+.dossier .dp-diag { max-width: 62ch; border-top: 1px solid var(--dp-rule-hard); margin: 12px 0 0; }
+.dossier .dp-diag .dp-row { display: grid; grid-template-columns: 88px 1fr; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-diag .dp-code { font-family: var(--dp-mono); font-weight: 600; color: var(--dp-warn); font-size: 12.5px; }
+.dossier .dp-diag .dp-sy { font-weight: 600; font-size: 14px; color: var(--dp-ink); }
+.dossier .dp-diag .dp-cause { font-size: 13.5px; color: var(--dp-ink-soft); margin-top: 5px; }
+.dossier .dp-diag .dp-sol { font-size: 13.5px; color: var(--dp-ink-soft); margin-top: 5px; }
+.dossier .dp-diag .dp-sol .dp-lbl { color: var(--dp-ok); margin-right: 7px; }
+
+.dossier .dp-marg { max-width: 62ch; padding-left: 16px; border-left: 2px solid var(--dp-rule-hard); margin: 22px 0; font-size: 13px; color: var(--dp-ink-soft); }
+.dossier .dp-marg .dp-lbl { display: block; margin-bottom: 4px; }
+
+.dossier .dp-empty { max-width: 62ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 24px 0; }
+
+.dossier a:focus-visible, .dossier button:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 3px; }

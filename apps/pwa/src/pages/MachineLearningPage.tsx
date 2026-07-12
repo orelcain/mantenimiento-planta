@@ -13,6 +13,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library, ExternalLink, Search,
   MonitorPlay,
 } from 'lucide-react'
+import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
 import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmiPractice'
@@ -220,12 +221,10 @@ export function MachineLearningPage() {
     return <Navigate to={machine.customRoute} replace />
   }
 
-  const Icon = machine.icon
   const tabs = isCourse
     ? COURSE_TABS
     : (commonParts.length > 0 ? [...TABS, REPUESTOS_TAB] : TABS)
   const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
-  const ActiveIcon = activeTabData.icon
   // Conteo de items reales por pestana (casos = flujos + diagnostico)
   const countFor = (id: TabId): number =>
     id === 'procedures' ? procedures.length
@@ -244,181 +243,60 @@ export function MachineLearningPage() {
 
   // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
+  const docCode = machine.slug.toUpperCase()
+  const activeIndex = tabs.findIndex(t => t.id === activeTab)
+  const contenido = isCourse
+    ? 'Curso / Normativa'
+    : `${Object.values(machine.sections).filter(Boolean).length} secciones`
 
   return (
-    <div
-      className={`${heightClass} w-full`}
-      style={{ background: LC.bg }}
-    >
-      {/* Header */}
-      <div className="max-w-6xl mx-auto px-4 pt-4 pb-3 sm:px-6 sm:pt-10 sm:pb-4">
-        <button
-          onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-2 rounded-lg transition-colors sm:mb-5 sm:py-3"
-          style={{ color: LC.inkLo, minHeight: '44px' }}
-          onMouseEnter={e => (e.currentTarget.style.color = LC.aquaBright)}
-          onMouseLeave={e => (e.currentTarget.style.color = LC.inkLo)}
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Centro de Aprendizaje
+    <div className={`dossier ${heightClass} w-full`}>
+      <div className="dp-wrap" style={{ paddingBottom: '7rem' }}>
+        <button className="dp-back" onClick={() => navigate('/aprendizaje')}>
+          <ArrowLeft className="h-4 w-4" /> Centro de Aprendizaje
         </button>
 
-        <section
-          className="overflow-hidden rounded-lg"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-        >
-          <div className="grid lg:grid-cols-[1fr_340px]">
-            <div className="p-5 sm:p-6 lg:p-7">
-              <div className="flex items-center gap-1.5 text-xs mb-5" style={{ color: LC.inkLo }}>
-                <span>Aprendizaje</span>
-                <span>/</span>
-                <span style={{ color: machine.color }}>{machine.name}</span>
-              </div>
+        {/* Portada del documento */}
+        <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
+          <div className="dp-eyebrow">
+            {isCourse ? 'MÓDULO' : 'FICHA TÉCNICA'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area).toUpperCase() : 'REV 2026-07'}
+          </div>
+          <h1 className="dp-title">{machine.name}</h1>
+          <p className="dp-sub">{machine.description}</p>
 
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div
-                  className="flex items-center justify-center w-12 h-12 rounded-lg flex-shrink-0 sm:h-16 sm:w-16"
-                  style={{ background: `${machine.color}1a`, border: `1px solid ${machine.color}33` }}
-                >
-                  <Icon className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: machine.color }} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2 text-xs" style={{ color: LC.inkLo }}>
-                    <span style={{ color: machine.color }}>
-                      {isCourse
-                        ? `Módulo ${machine.modulo ?? '—'}${machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}`
-                        : 'Dossier técnico'}
-                    </span>
-                    <span>·</span>
-                    <span>{isCourse ? (machine.programa ?? machine.area) : machine.area}</span>
-                  </div>
-                  <h1 className="text-[1.7rem] sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>
-                  <p className="text-sm leading-relaxed mt-3 max-w-2xl" style={{ color: LC.inkMid }}>
-                    {machine.description}
-                  </p>
-                </div>
-              </div>
+          <div className="dp-meta">
+            <div><span className="dp-lbl">Área</span><span className="dp-val">{isCourse ? (machine.programa ?? machine.area) : machine.area}</span></div>
+            <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
+            <div><span className="dp-lbl">Uso</span><span className="dp-val">{isCourse ? 'Estudio' : 'Consulta en terreno'}</span></div>
+            <div><span className="dp-lbl">Nivel</span><span className="dp-val">{isCourse ? `M${machine.modulo ?? '—'}` : 'Operador → Mant.'}</span></div>
+          </div>
 
-              {!isCourse && machine.hmiRoute && (
-                <button
-                  onClick={() => navigate(machine.hmiRoute!)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
-                  style={{
-                    color: machine.color,
-                    background: `${machine.color}14`,
-                    border: `1px solid ${machine.color}40`,
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = `${machine.color}26`)}
-                  onMouseLeave={e => (e.currentTarget.style.background = `${machine.color}14`)}
-                >
-                  <MonitorPlay className="h-4 w-4" />
-                  Practicar en el simulador — {machine.hmiLabel}
-                </button>
-              )}
-            </div>
+          {!isCourse && machine.hmiRoute && (
+            <button className="dp-hmi" onClick={() => navigate(machine.hmiRoute!)}>
+              <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
+            </button>
+          )}
+        </header>
 
-            <aside
-              className="hidden p-5 sm:block sm:p-6 lg:border-l"
-              style={{ background: LC.bgPanel, borderColor: LC.border }}
+        {/* Índice / pestañas */}
+        <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
+          {tabs.map((tab, i) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              aria-current={activeTab === tab.id ? 'true' : undefined}
             >
-              <div className="flex items-center gap-2 mb-4">
-                <Gauge className="h-4 w-4" style={{ color: LC.inkMid }} />
-                <h2 className="text-[13px] font-semibold" style={{ color: LC.inkMid }}>
-                  {isCourse ? 'Sobre el curso' : 'Lectura rápida'}
-                </h2>
-              </div>
-              <div className="space-y-3">
-                {isCourse ? (
-                  <>
-                    <DossierRow label="Tipo" value="Curso / Normativa" />
-                    <DossierRow label="Contenido" value="Lecciones, practica, casos y examen" />
-                    <DossierRow label="Acceso" value="Libre, sin login" />
-                  </>
-                ) : (
-                  <>
-                    <DossierRow label="Uso" value="Consulta en terreno" />
-                    <DossierRow label="Contenido" value="Ajustes, fallas y referencias" />
-                    <DossierRow label="Formato" value="Editable desde admin" />
-                  </>
-                )}
-              </div>
-              <div className="mt-5 rounded-md p-3" style={{ background: LC.surface, border: `1px solid ${LC.border}` }}>
-                <div className="flex gap-2">
-                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: LC.inkMid }} />
-                  <p className="text-xs leading-relaxed" style={{ color: LC.inkMid }}>
-                    {isCourse
-                      ? 'Material de estudio destilado de la clase. Para la prueba, repasa la pestana Examen.'
-                      : 'Prioriza medidas, tolerancias y acciones verificables antes de intervenir el equipo.'}
-                  </p>
-                </div>
-              </div>
-            </aside>
-          </div>
-        </section>
-      </div>
+              <b>{String(i + 1).padStart(2, '0')}</b>{tab.label}
+            </button>
+          ))}
+        </nav>
 
-      {/* Tabs */}
-      <div className="sticky top-0 z-20 max-w-6xl mx-auto px-4 sm:static sm:px-6 mt-3">
-        <div
-          className={`grid grid-cols-2 ${isCourse ? 'sm:grid-cols-6' : 'sm:grid-cols-4'} gap-px overflow-hidden rounded-lg backdrop-blur`}
-          style={{ background: LC.border, border: `1px solid ${LC.border}` }}
-        >
-          {tabs.map(tab => {
-            const TabIcon = tab.icon
-            const isActive = activeTab === tab.id
-            const tabCount = countFor(tab.id)
-            const hasContent = tabCount > 0 || (!isCourse && machine.sections[tab.id as LearningSection])
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="flex items-center justify-center sm:justify-start gap-2 px-3 py-3 transition-all relative"
-                style={{
-                  background: isActive ? `${machine.color}18` : LC.surface,
-                  minHeight: '58px',
-                }}
-              >
-                <TabIcon
-                  className="h-4 w-4 flex-shrink-0"
-                  style={{
-                    color: isActive ? machine.color : hasContent ? LC.inkMid : LC.inkGhost,
-                  }}
-                />
-                <span
-                  className="text-xs font-semibold leading-tight"
-                  style={{ color: isActive ? machine.color : LC.inkMid }}
-                >
-                  <span className="sm:hidden">{tab.shortLabel}</span>
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </span>
-                {hasContent && !isActive && (
-                  <span
-                    className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full"
-                    style={{ background: machine.color }}
-                  />
-                )}
-              </button>
-            )
-          })}
+        {/* Cabecera de sección activa */}
+        <div className="dp-sec-head" style={{ marginTop: 46 }}>
+          <span className="dp-sec-no">{String(activeIndex + 1).padStart(2, '0')}</span>
+          <h2 className="dp-sec-title">{activeTabData.label}</h2>
         </div>
-      </div>
-
-      {/* Content area */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-28 sm:pb-12">
-        <div className="mb-5 flex items-start gap-3">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-lg"
-            style={{ background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
-          >
-            <ActiveIcon className="h-5 w-5" style={{ color: machine.color }} />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-[#e9eef3]">{activeTabData.label}</h2>
-            <p className="text-xs mt-0.5" style={{ color: LC.inkLo }}>
-              {activeTabData.description}
-            </p>
-          </div>
-        </div>
+        <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
         {loadingTab ? (
           <div className="flex items-center justify-center py-12" style={{ color: LC.inkLo }}>
@@ -491,19 +369,6 @@ export function MachineLearningPage() {
 
         <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
       </div>
-    </div>
-  )
-}
-
-function DossierRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b pb-2 last:border-b-0 last:pb-0" style={{ borderColor: LC.border }}>
-      <span className="text-xs" style={{ color: LC.inkLo }}>
-        {label}
-      </span>
-      <span className="text-xs font-medium text-right" style={{ color: LC.ink }}>
-        {value}
-      </span>
     </div>
   )
 }
