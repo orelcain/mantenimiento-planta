@@ -28,6 +28,10 @@ export interface LearningMachine {
   color: string
   /** Ruta custom si la maquina tiene su propia pagina (ej: Baader 200) */
   customRoute?: string
+  /** Simulador HMI asociado (cross-link "Practicar en el simulador"). */
+  hmiRoute?: string
+  /** Nombre del simulador asociado (para el label del boton). */
+  hmiLabel?: string
   sections: LearningMachineSections
   // ── Solo para temas de curso (area CAPACITACION_AREA) ──
   /** Programa/serie al que pertenece el curso (ej: "Programa Electricidad - Mantenimiento Industrial"). */
@@ -70,6 +74,8 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Maquina evisceradora para procesamiento primario de pescado. Contenido base trazado al manual BAADER 142 y referencias locales verificadas.',
     icon: Scissors,
     color: '#ff8844',
+    hmiRoute: '/aprendizaje/hmi-knuro',
+    hmiLabel: 'HMI Knuro B2',
     sections: { manual: true, procedures: false, flows: false, diagnosis: false },
   },
   {
@@ -79,6 +85,8 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Clasificador automatico por peso y tamaño. Manual Marelec MS4/12, SOPs y runbooks Z2 (contrastacion, calibracion, mantencion, limpieza, troubleshooting).',
     icon: Scale,
     color: '#44dd88',
+    hmiRoute: '/aprendizaje/hmi-grader',
+    hmiLabel: 'HMI Grader (Z2)',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
@@ -88,6 +96,8 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Fileteadora Baader 200 — manual tecnico completo con ajustes, medidas y calibracion.',
     icon: BookOpen,
     color: '#4499ff',
+    hmiRoute: '/aprendizaje/hmi-knuro',
+    hmiLabel: 'HMI Knuro B2',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {

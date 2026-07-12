@@ -1,7 +1,8 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, BookOpen, Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useAuthStore } from '@/store'
+import { GRADER_HMI_TARGETS } from '@/services/grader/graderHmiPractice'
 import { logger } from '@/lib/logger'
 import {
   getGraderState,
@@ -25,9 +26,17 @@ import { Button } from '@/components/ui'
  */
 export function HmiGraderPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
+
+  // Modo práctica: ?practica=<runbookId> → al cargar, el simulador navega solo
+  // hasta la pantalla del procedimiento (ver graderHmiPractice.ts).
+  const practiceTarget = useMemo(() => {
+    const id = searchParams.get('practica')
+    return id ? GRADER_HMI_TARGETS[id] ?? null : null
+  }, [searchParams])
 
   // Volver: go-back real si hay historial de navegación in-app; si se entró
   // por link directo (sin historial), cae al Centro de Aprendizaje.
@@ -75,7 +84,15 @@ export function HmiGraderPage() {
 
       if (type === 'hmi:ready') {
         iframeReadyRef.current = true
-        if (iframeRef.current) await sendInitData(iframeRef.current)
+        if (iframeRef.current) {
+          await sendInitData(iframeRef.current)
+          if (practiceTarget) {
+            iframeRef.current.contentWindow?.postMessage(
+              { type: 'hmi:goto', target: practiceTarget },
+              '*',
+            )
+          }
+        }
         return
       }
 
@@ -107,7 +124,7 @@ export function HmiGraderPage() {
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [user, sendInitData])
+  }, [user, sendInitData, practiceTarget])
 
   const refreshIframe = useCallback(() => {
     if (!iframeRef.current) return
@@ -169,6 +186,17 @@ export function HmiGraderPage() {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/aprendizaje/maquina/grader')}
+            className="h-7 gap-1 text-xs"
+            title="Ver el expediente del Grader (manual, procedimientos, diagnóstico)"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Expediente</span>
+          </Button>
+
           <Button
             variant="ghost"
             size="sm"

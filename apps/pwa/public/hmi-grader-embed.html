@@ -1263,6 +1263,7 @@ function intentarClave() {
     document.getElementById('cambiar-parametros-login').classList.remove('active');
     screenStack.pop();
     navigateTo('cambiar-parametros');
+    applyParamGoto(); // modo práctica: posicionarse en la zona/parámetro del runbook
   } else {
     addLog('Clave incorrecta');
   }
@@ -2468,7 +2469,55 @@ window.addEventListener('message', (event) => {
   if (event.data.type === 'hmi:init') {
     applyState(event.data.state);
   }
+  if (event.data.type === 'hmi:goto') {
+    hmiGoto(event.data.target);
+  }
 });
+
+/* ── Modo práctica (deep-link desde el expediente del Grader) ──────────────
+   El wrapper React manda { type:'hmi:goto', target } con la secuencia de
+   pantallas del runbook. Si la ruta entra al editor de parámetros, se detiene
+   en el LOGIN (la clave de servicio es parte de lo que el procedimiento
+   enseña — igual que la máquina real); al ingresar la clave, el editor se
+   abre ya posicionado en la zona + parámetro del runbook. */
+let pendingParamGoto = null;
+
+function hmiGoto(target) {
+  if (!target || !Array.isArray(target.screens)) return;
+  while (screenStack.length > 0) goBack();
+  target.screens.forEach(id => navigateTo(id));
+  if (target.zone && target.param) {
+    pendingParamGoto = { zone: target.zone, param: target.param };
+    addLog('Práctica: ingresá la clave de servicio del procedimiento');
+  }
+  addLog('Modo práctica: ' + (target.label || 'ruta del procedimiento'));
+  logEventToParent('practice-goto', target.label || target.screens.join('>'));
+}
+
+/* Abre la cadena de ancestros de la zona pedida, selecciona el parámetro y
+   lo trae a la vista. Se dispara tras el login correcto del editor. */
+function applyParamGoto() {
+  if (!pendingParamGoto) return;
+  const { zone, param } = pendingParamGoto;
+  pendingParamGoto = null;
+  const chain = [];
+  let z = PARAM_ZONES.find(x => x.id === zone);
+  while (z) { chain.unshift(z.id); z = PARAM_ZONES.find(x => x.id === z.parent); }
+  chain.forEach(id => {
+    const node = document.querySelector(`#param-tree .tree-node[data-zone-id="${id}"]`);
+    node?.parentElement?.querySelector(':scope > .tree-content')?.classList.add('open');
+  });
+  const zoneNode = document.querySelector(`#param-tree .tree-node[data-zone-id="${zone}"]`);
+  const content = zoneNode?.parentElement?.querySelector(':scope > .tree-content');
+  if (!content) return;
+  const row = [...content.querySelectorAll(':scope > .param-row')]
+    .find(r => r.firstElementChild?.textContent === param);
+  if (row) {
+    row.click();
+    row.scrollIntoView({ block: 'center' });
+    addLog(`Práctica: parámetro ${param} seleccionado`);
+  }
+}
 
 /* Debounce: escribir a Firestore tras 800ms de inactividad */
 let saveStateTimer = null;

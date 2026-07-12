@@ -11,9 +11,11 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Ruler, Image as ImageIcon, FileText, Gauge, ClipboardCheck, ShieldCheck, Activity,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library, ExternalLink, Search,
+  MonitorPlay,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
+import { hmiPracticeUrl } from '@/services/grader/graderHmiPractice'
 import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
@@ -299,6 +301,23 @@ export function MachineLearningPage() {
                   </>
                 )}
               </div>
+
+              {!isCourse && machine.hmiRoute && (
+                <button
+                  onClick={() => navigate(machine.hmiRoute!)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+                  style={{
+                    color: machine.color,
+                    background: `${machine.color}14`,
+                    border: `1px solid ${machine.color}40`,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = `${machine.color}26`)}
+                  onMouseLeave={e => (e.currentTarget.style.background = `${machine.color}14`)}
+                >
+                  <MonitorPlay className="h-4 w-4" />
+                  Practicar en el simulador — {machine.hmiLabel}
+                </button>
+              )}
             </div>
 
             <aside
@@ -410,13 +429,13 @@ export function MachineLearningPage() {
             Cargando...
           </div>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
-          <ProceduresList procedures={procedures} color={machine.color} />
+          <ProceduresList procedures={procedures} color={machine.color} machineSlug={machine.slug} />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
           <ManualList sections={manualSections} color={machine.color} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} color={machine.color} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
-          <DiagnosisList entries={diagnosis} color={machine.color} />
+          <DiagnosisList entries={diagnosis} color={machine.color} machineSlug={machine.slug} />
         ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
           <div className="space-y-8">
             {flows.length > 0 && (
@@ -440,7 +459,7 @@ export function MachineLearningPage() {
                   title="Casos"
                   subtitle="Sintoma → causa probable → solucion. Toca un caso para abrirlo."
                 />
-                <DiagnosisList entries={diagnosis} color={machine.color} />
+                <DiagnosisList entries={diagnosis} color={machine.color} machineSlug={machine.slug} />
               </div>
             )}
           </div>
@@ -532,7 +551,32 @@ function DossierRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ProceduresList({ procedures, color }: { procedures: Procedure[]; color: string }) {
+/**
+ * Botón "Practicar en el simulador" — solo para contenido del Grader cuyo
+ * runbook tiene ruta navegable en el clon HMI (ver graderHmiPractice.ts).
+ * Abre el simulador ya encaminado a la pantalla del procedimiento.
+ */
+function HmiPracticeButton({ contentId, machineSlug, color }: { contentId: string; machineSlug?: string; color: string }) {
+  const navigate = useNavigate()
+  if (machineSlug !== 'grader') return null
+  const url = hmiPracticeUrl(contentId)
+  if (!url) return null
+  return (
+    <button
+      onClick={() => navigate(url)}
+      className="mb-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
+      style={{ color, background: `${color}12`, border: `1px dashed ${color}55` }}
+      onMouseEnter={e => (e.currentTarget.style.background = `${color}24`)}
+      onMouseLeave={e => (e.currentTarget.style.background = `${color}12`)}
+      title="Abre el simulador HMI Grader navegado a la pantalla de este procedimiento"
+    >
+      <MonitorPlay className="h-3.5 w-3.5" />
+      Practicar en el simulador
+    </button>
+  )
+}
+
+function ProceduresList({ procedures, color, machineSlug }: { procedures: Procedure[]; color: string; machineSlug?: string }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {procedures.map(proc => (
@@ -573,6 +617,8 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                 </div>
               </div>
             )}
+
+            <HmiPracticeButton contentId={proc.id} machineSlug={machineSlug} color={color} />
 
             {proc.formula && (
               <div className="mb-3 rounded-md p-3" style={{ background: `${color}0d`, border: `1px solid ${color}33` }}>
@@ -1420,7 +1466,7 @@ function CasosSectionHeader({
   )
 }
 
-function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: string }) {
+function DiagnosisList({ entries, color, machineSlug }: { entries: DiagnosisEntry[]; color: string; machineSlug?: string }) {
   // Acordeón: una fila abierta a la vez. Arranca con la primera abierta.
   const [openId, setOpenId] = useState<string | null>(entries[0]?.id ?? null)
 
@@ -1483,6 +1529,8 @@ function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: s
                       Caso {String(idx + 1).padStart(2, '0')}
                     </span>
                   </div>
+
+                  <HmiPracticeButton contentId={entry.id} machineSlug={machineSlug} color={color} />
 
                   {/* Síntoma */}
                   <div>
