@@ -320,18 +320,136 @@ function b200DiagnosisSolution(section: B200Section): string {
   ].filter(Boolean).join('\n\n')
 }
 
+/**
+ * Capa didáctica (objetivo · el porqué · autoevaluación) de las 14 secciones de
+ * ajuste de la Baader 200, keyed por section.id. Grounded en las medidas, pasos y
+ * notas de cada B200Section (baader200Learning.ts) — sin inventar tolerancias.
+ */
+const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz?: SectionQuizItem[] }> = {
+  'primera-alimentacion': {
+    objetivo: 'Ajustar la 1ra alimentación (chapaletas, silleta y resortes) sin roces y con la presión de resorte acorde a la temperatura de la materia prima.',
+    porque: 'no ajustar a ciegas la medida del catálogo (32-28 mm): en la práctica suele ser menos, y con materia prima bajo 0 °C hace falta más presión de resorte o el pescado no avanza parejo.',
+    quiz: [
+      { question: 'La materia prima entra a menos de 0 °C. ¿Qué se ajusta?', options: ['Menos presión al resorte', 'Más presión al resorte', 'Nada', 'Se sube la velocidad'], correctIndex: 1, explanation: 'Con materia prima bajo 0 °C se da más presión al resorte (tuerca Fig 6) para que avance parejo.' },
+      { question: '¿La distancia de chapaletas es siempre 32-28 mm como el catálogo?', options: ['Sí, siempre', 'No: en la práctica generalmente es menos', 'Siempre más', 'No importa'], correctIndex: 1, explanation: 'El catálogo indica 32-28 mm, pero en la práctica generalmente es menos; se usa la medida que corresponde a las condiciones reales.' },
+    ],
+  },
+  'segunda-alimentacion': {
+    objetivo: 'Ajustar la 2da alimentación (leva, chapaletas, topes) dejando las chapaletas por dentro del filo de los cuchillos dorsales ±0.5 mm, y reajustarlas al montar cuchillos nuevos.',
+    porque: 'si no reajustás las chapaletas al cambiar cuchillos, al bajar el mando dorsal los cuchillos rozan con ellas y se dañan; el ±0.5 mm es la diferencia entre corte limpio y rotura.',
+    quiz: [
+      { question: '¿A qué tolerancia deben quedar las chapaletas respecto del filo de los cuchillos dorsales?', options: ['±5 mm', '±0.5 mm (casi chocando)', '10 mm', 'No importa'], correctIndex: 1, explanation: 'Las chapaletas quedan por dentro del filo de los dorsales a ±0.5 mm; los topes de seguridad, a 0.5 mm de los amortiguadores.' },
+      { question: 'Al montar cuchillos nuevos, ¿qué hay que reajustar en la 2da alimentación?', options: ['Nada', 'Las chapaletas (con pernos M10)', 'La leva', 'Solo los resortes'], correctIndex: 1, explanation: 'Con cuchillos nuevos hay que reajustar las chapaletas de la 2da alimentación con pernos M10, o al bajar el mando dorsal rozarían.' },
+    ],
+  },
+  'levantadores-aletas': {
+    objetivo: 'Ajustar el 1er (tope 30 mm) y 2do (tope 50 mm) levantador de aletas, dejando la parte inferior delantera del 2do a 5 mm del contradiente.',
+    porque: 'el 2do levantador no tiene chapas guías de aleta, por eso baja más; si la distancia al contradiente no es 5 mm, la aleta no pasa bien y arruina el filete.',
+    quiz: [
+      { question: '¿A qué distancia del contradiente debe quedar la parte inferior delantera del 2do levantador?', options: ['30 mm', '5 mm', '50 mm', '2 mm'], correctIndex: 1, explanation: 'A 5 mm del contradiente al paso de las aletas; si no, se regula con la biela de mando Fig 6.' },
+    ],
+  },
+  'cuchillos-ventrales': {
+    objetivo: 'Calibrar los cuchillos ventrales con la cruz patrón: avance «a» de 5 mm y referencia de 177.5 mm a la cara interna del cuchillo izquierdo.',
+    porque: 'los pernos de fijación pos 1-2 (alineamiento entre cuchillos) SOLO se tocan en la mantención anual; moverlos en un ajuste de turno descalibra el alineamiento fino.',
+    quiz: [
+      { question: '¿Cuándo se mueven los pernos de fijación pos 1-2 de los cuchillos ventrales?', options: ['Cada turno', 'Solo en la mantención anual', 'Al cambiar de especie', 'Nunca'], correctIndex: 1, explanation: 'Los pernos de fijación pos 1-2 solo se mueven en la mantención anual, para el alineamiento de los cuchillos entre sí.' },
+      { question: '¿Cuál es el avance «a» de los cuchillos ventrales?', options: ['5 mm', '12 mm', '177.5 mm', '20 mm'], correctIndex: 0, explanation: 'El avance «a» es 5 mm; la referencia a la cara interna del cuchillo izquierdo es 177.5 mm.' },
+    ],
+  },
+  'guias-flotantes': {
+    objetivo: 'Ajustar las guías flotantes (abertura máx. 4.8 mm, 5 mm por debajo de las guías de la 2da alimentación) SIEMPRE después de los cuchillos ventrales y con la silleta en reposo.',
+    porque: 'el orden importa: si ajustás las guías flotantes antes que los ventrales quedan descalibradas; y con la silleta fuera de reposo la medida sale falsa.',
+    quiz: [
+      { question: '¿Cuándo se ajustan las guías flotantes?', options: ['Antes de los cuchillos ventrales', 'Siempre después de los cuchillos ventrales', 'En cualquier orden', 'Solo en mantención anual'], correctIndex: 1, explanation: 'Las guías flotantes se ajustan SIEMPRE después de los cuchillos ventrales, con la silleta en posición de reposo.' },
+      { question: '¿Cuál es la abertura máxima de las guías flotantes?', options: ['4.8 mm', '12 mm', '17-18 mm', '5 mm'], correctIndex: 0, explanation: 'La abertura no debe ser más de 4.8 mm; la altura, 5 mm por debajo de las guías de la 2da alimentación.' },
+    ],
+  },
+  'cuchillos-dorsales': {
+    objetivo: 'Ajustar la abertura «b» de los cuchillos dorsales con la máquina en reposo, usando la cruz patrón para alinearlos con los ventrales.',
+    porque: 'la cruz patrón es lo que garantiza que ventrales y dorsales queden exactamente alineados; sin ella, el corte queda desfasado.',
+    quiz: [
+      { question: '¿Para qué se coloca la cruz patrón entre los cuchillos?', options: ['Para medir el pescado', 'Para alinear exactamente ventrales y dorsales', 'Para limpiar', 'Para afilar'], correctIndex: 1, explanation: 'La cruz patrón asegura que los cuchillos ventrales y dorsales queden exactamente alineados entre sí.' },
+    ],
+  },
+  'medidas-cuchillos': {
+    objetivo: 'Verificar y mantener los 12 mm entre cuchillos ventrales y dorsales, especialmente al cambiar cuchillos nuevos.',
+    porque: 'si la distancia no es 12 mm, los cuchillos rozan con las chapaletas de la 2da alimentación; verificarlo al cambiar cuchillos evita romperlos en el arranque.',
+    quiz: [
+      { question: '¿Cuál es la distancia correcta entre cuchillos ventrales y dorsales?', options: ['5 mm', '12 mm', '20 mm', '0.5 mm'], correctIndex: 1, explanation: '12 mm. Si no es correcta, los cuchillos rozarían con las chapaletas de la 2da alimentación; verificar siempre al cambiar cuchillos.' },
+    ],
+  },
+  'mando-cuchillos-dorsales': {
+    objetivo: 'Ajustar el levante de 20 mm de los cuchillos dorsales al paso de la silleta y seguir la secuencia de diagnóstico si no levantan.',
+    porque: 'si no levantan, el orden de revisión es primero el trinquete y después el bulón con gollete; saltarse el orden hace perder tiempo.',
+    quiz: [
+      { question: 'Los cuchillos dorsales no levantan al paso de la silleta. ¿Qué se revisa PRIMERO?', options: ['El bulón con gollete', 'La posición del trinquete', 'Los resortes', 'La leva'], correctIndex: 1, explanation: 'Primero se verifica la posición del trinquete; después, el bulón con gollete del mando dorsales en el carter de las levas. El levante debe ser 20 mm.' },
+    ],
+  },
+  'guias-espinas-superiores': {
+    objetivo: 'Ajustar las guías de espinas superiores (2 mm al contradiente, filo escondido 1 mm, 3 mm sobre los dorsales en reposo) con el perno separador suelto durante la regulación.',
+    porque: 'si el perno separador no está suelto durante el ajuste, interfiere y la guía queda mal; recién al final se reaprieta a 0.5 mm.',
+    quiz: [
+      { question: 'Durante la regulación de las guías de espinas superiores, ¿cómo debe estar el perno separador?', options: ['Apretado', 'Suelto (para no interferir)', 'Retirado por completo', 'Da igual'], correctIndex: 1, explanation: 'El perno separador debe estar suelto durante la regulación para no interferir; al final se reaprieta a 0.5 mm de la guía superior.' },
+    ],
+  },
+  'cuchillos-punzones': {
+    objetivo: 'Ajustar caída (7 mm antes del fin B), altura mínima (1 mm) y altura de trabajo (punta-cuchilla 3-4 mm, separación 8 mm) de los punzones, entendiendo qué pasa si quedan altos o bajos.',
+    porque: 'punzones muy altos hacen «gay ping» en el filete a lo largo del espinazo; muy bajos cortan la espina del flanco y dejan sin función a los rascadores. La altura decide la calidad del filete.',
+    quiz: [
+      { question: 'Los cuchillos punzones quedaron más bajos de lo normal. ¿Qué pasa?', options: ['Nada', 'Cortan la espina del flanco y los rascadores no cumplen función', 'Mejora el filete', 'Se traba la silleta'], correctIndex: 1, explanation: 'Punzones muy bajos cortan la espina del flanco y dejan sin función a los cuchillos rascadores; muy altos hacen «gay ping» a lo largo del espinazo.' },
+      { question: '¿Cuál es la distancia de altura de trabajo entre la punta del diente y la cuchilla?', options: ['1 mm', '3-4 mm', '8 mm', '7 mm'], correctIndex: 1, explanation: 'Al pasar la silleta, la distancia punta del diente–cuchilla debe ser 3-4 mm; la separación entre cuchillos, 8 mm.' },
+    ],
+  },
+  'cuchillos-rascadores-ajuste': {
+    objetivo: 'Ajustar los cuchillos rascadores únicamente con la silleta en la posición 1350 mm, donde quedan bajo la guía inferior de espinas.',
+    porque: 'el ajuste SOLO se puede hacer en 1350 mm; intentarlo en otra posición no llega a los topes de los rodillos y el ajuste sale mal.',
+    quiz: [
+      { question: '¿En qué posición de silleta se ajustan los cuchillos rascadores?', options: ['En reposo', 'En 1350 mm aprox.', 'En 177.5 mm', 'En cualquiera'], correctIndex: 1, explanation: 'El ajuste de los rascadores SOLO se puede realizar con la silleta en 1350 mm aprox., donde quedan bajo la guía inferior de espinas.' },
+    ],
+  },
+  'cuchillos-rascadores-altura': {
+    objetivo: 'Ajustar la altura de trabajo (3 mm sobre la base del diente) y la abertura (17-18 mm) de los cuchillos rascadores en posición de trabajo.',
+    porque: 'la abertura de 17-18 mm se toma como referencia de las guías superiores de espinas; fuera de ese rango, el rascador no limpia bien la espina.',
+    quiz: [
+      { question: '¿Cuál es la abertura correcta de los cuchillos rascadores?', options: ['4.8 mm', '8 mm', '17-18 mm', '3 mm'], correctIndex: 2, explanation: 'La abertura debe ser 17-18 mm, ajustada en posición de trabajo; la altura de trabajo, 3 mm sobre la base del diente.' },
+    ],
+  },
+  'cuchillos-cola-contrabancadas': {
+    objetivo: 'Ajustar los cuchillos circulares de corte de cola para que entren en el hueco de la contrabancada (0.5 mm a los soportes) sin rozar la guía de espinas inferiores.',
+    porque: 'si el rodillo de la biela pos 11 toca el tope de seguridad pos 12, hay que regular primero con la biela pos 5 y no forzar el perno tope; el orden evita romper el mecanismo.',
+    quiz: [
+      { question: 'El rodillo de la biela pos 11 toca el tope de seguridad pos 12. ¿Qué se regula primero?', options: ['El perno tope pos 1', 'La biela pos 5', 'Nada', 'La contrabancada'], correctIndex: 1, explanation: 'Si el rodillo pos 11 toca el tope pos 12, se regula con la biela pos 5. Los cuchillos deben quedar a 0.5 mm de los soportes pos 3.' },
+    ],
+  },
+  'embrague': {
+    objetivo: 'Reajustar el embrague girando el eje 180° para pasar al otro canal chavetero, solo cuando NO hay causal justificada de bloqueo.',
+    porque: 'antes de reajustar hay que descartar un objeto interpuesto (pescado); reajustar con un bloqueo real por objeto oculta el problema y puede dañar la máquina.',
+    quiz: [
+      { question: 'Antes de reajustar el embrague, ¿qué hay que verificar?', options: ['La presión de aire', 'Que no haya un objeto (pescado) interpuesto al accionamiento', 'El nivel de aceite', 'La velocidad'], correctIndex: 1, explanation: 'El reajuste se hace solo cuando no hay causal justificada de bloqueo; primero se verifica que no haya un objeto interpuesto.' },
+      { question: '¿Cuánto se gira el eje para que aparezca el otro canal chavetero?', options: ['90°', '180° (media vuelta)', '360°', '45°'], correctIndex: 1, explanation: 'Se gira el volante en sentido horario y el eje 180° (media vuelta) para que aparezca el otro canal chavetero; luego se recoloca el prisionero.' },
+    ],
+  },
+}
+
 async function listB200ManualSections(): Promise<ManualSection[]> {
   const sections = await getBaader200SourceSections()
   const base = sections
     .filter(section => section.type === 'ajuste')
-    .map(section => ({
-      id: `b200-manual-${section.id}`,
-      title: section.title,
-      content: b200ManualContent(section),
-      order: section.order,
-      createdAt: B200_CONTENT_UPDATED_AT,
-      updatedAt: section.updatedAt.getTime(),
-    }))
+    .map(section => {
+      const d = B200_MANUAL_DIDACTIC[section.id]
+      return {
+        id: `b200-manual-${section.id}`,
+        title: section.title,
+        content: b200ManualContent(section),
+        order: section.order,
+        createdAt: B200_CONTENT_UPDATED_AT,
+        updatedAt: section.updatedAt.getTime(),
+        objetivo: d?.objetivo,
+        porque: d?.porque,
+        quiz: d?.quiz,
+      }
+    })
   const stored = await listStoredManualSections(B200_LEARNING_SLUG)
   return mergeSeedOverrides(base, stored).sort((a, b) => a.order - b.order)
 }
