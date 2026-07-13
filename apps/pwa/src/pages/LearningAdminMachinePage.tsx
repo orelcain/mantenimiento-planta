@@ -35,6 +35,7 @@ import {
   type Procedure,
   type ProcedureStep,
   type ManualSection,
+  type SectionQuizItem,
   type Flow,
   type DiagnosisEntry,
 } from '@/services/learningContent'
@@ -698,7 +699,165 @@ function ManualSectionForm({
         onRemove={index => setManualFields(fields => ({ ...fields, images: fields.images.filter((_, i) => i !== index) }))}
       />
 
+      {/* ─ Bloque didáctico (Dossier de campo): Objetivo · Por qué importa · Autoevaluación ─ */}
+      <div className="pt-3 mt-1 border-t border-dashed border-[#22384a] space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6d8298]">
+          Didáctico · se muestra como Objetivo (arriba), Por qué importa y Autoevaluación al pie
+        </p>
+
+        <FormField label="Objetivo de aprendizaje">
+          <textarea
+            value={section.objetivo ?? ''}
+            onChange={e => setSection({ ...section, objetivo: e.target.value })}
+            placeholder="Qué sabrá hacer quien lea la sección. Ej: Al terminar vas a poder calibrar un pocket con la fórmula fsWc."
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+          />
+        </FormField>
+
+        <FormField label="El porqué (por qué importa, no solo el qué)">
+          <textarea
+            value={section.porque ?? ''}
+            onChange={e => setSection({ ...section, porque: e.target.value })}
+            placeholder="Ej: un pocket descalibrado manda pescado al calibre equivocado todo el turno y arruina la contrastación."
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+          />
+        </FormField>
+
+        <SectionQuizEditor quiz={section.quiz ?? []} onChange={quiz => setSection({ ...section, quiz })} />
+      </div>
+
       <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+/**
+ * SectionQuizEditor — edita la autoevaluación de una sección de manual: lista de
+ * preguntas, cada una con su texto, opciones (2+), la marca de opción correcta y
+ * la explicación. Se guarda como `section.quiz` (SectionQuizItem[]).
+ */
+function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChange: (quiz: SectionQuizItem[]) => void }) {
+  const items = quiz
+
+  function updateItem(i: number, patch: Partial<SectionQuizItem>) {
+    onChange(items.map((q, idx) => (idx === i ? { ...q, ...patch } : q)))
+  }
+  function addQuestion() {
+    onChange([...items, { question: '', options: ['', ''], correctIndex: 0, explanation: '' }])
+  }
+  function removeQuestion(i: number) {
+    onChange(items.filter((_, idx) => idx !== i))
+  }
+  function updateOption(qi: number, oi: number, value: string) {
+    const q = items[qi]
+    if (!q) return
+    updateItem(qi, { options: q.options.map((o, idx) => (idx === oi ? value : o)) })
+  }
+  function addOption(qi: number) {
+    const q = items[qi]
+    if (!q) return
+    updateItem(qi, { options: [...q.options, ''] })
+  }
+  function removeOption(qi: number, oi: number) {
+    const q = items[qi]
+    if (!q) return
+    const options = q.options.filter((_, idx) => idx !== oi)
+    const safe = options.length > 0 ? options : ['']
+    const correctIndex = oi < q.correctIndex ? q.correctIndex - 1 : Math.min(q.correctIndex, safe.length - 1)
+    updateItem(qi, { options: safe, correctIndex: Math.max(0, correctIndex) })
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">Autoevaluación</label>
+        <button
+          onClick={addQuestion}
+          className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Añadir pregunta
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="px-1 py-2 text-[11px] text-[#6d8298]">Sin preguntas. La sección no mostrará autoevaluación.</p>
+      ) : (
+        <div className="space-y-4">
+          {items.map((q, qi) => (
+            <div key={qi} className="space-y-2.5 rounded-lg border border-[#22384a] bg-[#111c26] p-3">
+              <div className="flex items-start gap-2">
+                <span className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#5aa6e8]/15 text-[11px] font-bold text-[#5aa6e8]">
+                  {qi + 1}
+                </span>
+                <textarea
+                  value={q.question}
+                  onChange={e => updateItem(qi, { question: e.target.value })}
+                  placeholder="Pregunta"
+                  rows={2}
+                  className="flex-1 resize-y rounded-lg border border-[#22384a] bg-[#16242f] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+                />
+                <button
+                  onClick={() => removeQuestion(qi)}
+                  className="mt-0.5 flex-shrink-0 rounded p-1.5 text-[#e0697d] hover:bg-[#e0697d]/15"
+                  title="Eliminar pregunta"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5 pl-8">
+                <p className="text-[10px] uppercase tracking-wider text-[#6d8298]">Opciones · marcá la correcta</p>
+                {q.options.map((opt, oi) => (
+                  <div key={oi} className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateItem(qi, { correctIndex: oi })}
+                      title={oi === q.correctIndex ? 'Opción correcta' : 'Marcar como correcta'}
+                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
+                      style={oi === q.correctIndex
+                        ? { background: LC.nuevo, borderColor: LC.nuevo, color: '#0d1722' }
+                        : { borderColor: '#22384a', color: '#6d8298' }}
+                    >
+                      {oi === q.correctIndex ? '✓' : String.fromCharCode(65 + oi)}
+                    </button>
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={e => updateOption(qi, oi, e.target.value)}
+                      placeholder={`Opción ${String.fromCharCode(65 + oi)}`}
+                      className="flex-1 rounded-md border border-[#22384a] bg-[#16242f] px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+                    />
+                    <button
+                      onClick={() => removeOption(qi, oi)}
+                      disabled={q.options.length <= 2}
+                      className="flex-shrink-0 rounded p-1 text-[#e0697d] hover:bg-[#e0697d]/15 disabled:opacity-30"
+                      title="Eliminar opción"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => addOption(qi)}
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10"
+                >
+                  <Plus className="h-3 w-3" /> Añadir opción
+                </button>
+
+                <textarea
+                  value={q.explanation}
+                  onChange={e => updateItem(qi, { explanation: e.target.value })}
+                  placeholder="Explicación (se muestra al responder)"
+                  rows={2}
+                  className="mt-1 w-full resize-y rounded-lg border border-[#22384a] bg-[#16242f] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

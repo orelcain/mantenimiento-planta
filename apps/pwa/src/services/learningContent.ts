@@ -630,13 +630,24 @@ export async function deleteProcedure(machineSlug: string, id: string): Promise<
 // MANUAL SECTIONS
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Aplica los overrides de Firestore sobre un seed sincrónico de secciones de
+ * manual. Necesario para que las máquinas que leen su seed de un JSON (Detector,
+ * Baader 142, Marel HG/Filete, Fishken) sean editables desde el admin: sin esto,
+ * el admin guardaría en Firestore pero el seed nunca leería ese override.
+ */
+async function withManualOverrides(slug: string, base: ManualSection[]): Promise<ManualSection[]> {
+  const stored = await listStoredManualSections(slug)
+  return mergeSeedOverrides(base, stored).sort((a, b) => a.order - b.order)
+}
+
 export async function listManualSections(machineSlug: string): Promise<ManualSection[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200ManualSections()
-  if (machineSlug === B142_LEARNING_SLUG) return listB142ManualSections()
-  if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorManualSections()
-  if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgManualSections()
-  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenManualSections()
-  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteManualSections()
+  if (machineSlug === B142_LEARNING_SLUG) return withManualOverrides(B142_LEARNING_SLUG, listB142ManualSections())
+  if (machineSlug === DETECTOR_LEARNING_SLUG) return withManualOverrides(DETECTOR_LEARNING_SLUG, listDetectorManualSections())
+  if (machineSlug === MAREL_HG_LEARNING_SLUG) return withManualOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgManualSections())
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return withManualOverrides(FISHKEN_LEARNING_SLUG, listFishkenManualSections())
+  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withManualOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteManualSections())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderManualSections()
 
   return listStoredManualSections(machineSlug)
@@ -655,12 +666,22 @@ export async function saveManualSection(
   })
 }
 
+/** Prefijo del id de las secciones de manual que vienen de un seed (no de Firestore).
+ *  Borrar una de estas = soft-delete (marca `_deleted`), para que el seed no la
+ *  reponga; las secciones creadas desde admin (`sec_*`) se borran de verdad. */
+const SEED_MANUAL_PREFIX: Record<string, string> = {
+  [GRADER_LEARNING_SLUG]: 'grader-manual-',
+  [B200_LEARNING_SLUG]: 'b200-manual-',
+  [DETECTOR_LEARNING_SLUG]: 'det-manual-',
+  [B142_LEARNING_SLUG]: 'b142-manual-',
+  [MAREL_HG_LEARNING_SLUG]: 'mhg-manual-',
+  [MAREL_FILETE_LEARNING_SLUG]: 'mf-manual-',
+  [FISHKEN_LEARNING_SLUG]: 'fk-manual-',
+}
+
 export async function deleteManualSection(machineSlug: string, id: string): Promise<void> {
-  if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-manual-')) {
-    await setDoc(sectionDoc(machineSlug, 'manual', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
-    return
-  }
-  if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-manual-')) {
+  const seedPrefix = SEED_MANUAL_PREFIX[machineSlug]
+  if (seedPrefix && id.startsWith(seedPrefix)) {
     await setDoc(sectionDoc(machineSlug, 'manual', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
   }
