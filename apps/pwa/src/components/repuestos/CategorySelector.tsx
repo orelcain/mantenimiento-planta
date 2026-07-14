@@ -80,7 +80,7 @@ function SortableTab({
     <div ref={setNodeRef} style={style} className="flex items-center">
       {isAdmin && (
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mr-1">
-          <GripVertical className="h-4 w-4 text-gray-400" />
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
       <button
@@ -91,8 +91,8 @@ function SortableTab({
           border-b-3 border-transparent
           ${
             isActive
-              ? 'text-slate-200 border-b-slate-400 bg-slate-700/50 hover:bg-slate-700/60'
-              : 'text-gray-400 hover:text-gray-300 hover:border-b-gray-500 hover:bg-slate-800/30'
+              ? 'text-foreground border-b-primary bg-muted hover:bg-muted'
+              : 'text-muted-foreground hover:text-foreground hover:border-b-border hover:bg-muted/50'
           }
         `}
       >
@@ -101,7 +101,7 @@ function SortableTab({
           <span
             className={`
               inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
-              ${isActive ? 'bg-slate-600 text-white' : 'bg-slate-700 text-gray-300'}
+              ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
             `}
           >
             {count}
@@ -202,12 +202,12 @@ export function CategorySelector({
   };
 
   if (loading) {
-    return <div className="py-4 text-center text-sm text-gray-500">Cargando categorías...</div>;
+    return <div className="py-4 text-center text-sm text-muted-foreground">Cargando categorías...</div>;
   }
 
   return (
     <>
-      <div className={`border-b border-slate-700 bg-slate-900 ${className}`}>
+      <div className={`border-b border-border bg-card ${className}`}>
         <div className="flex items-center justify-between px-4 py-2">
           <nav className="flex space-x-2 overflow-x-auto pb-px flex-1" aria-label="Categorías">
             {/* Tabs de categorías con drag & drop */}
@@ -224,8 +224,8 @@ export function CategorySelector({
                         border-b-3 border-transparent
                         ${
                           selectedCategoryId === 'maquinas-principales'
-                            ? 'text-slate-200 border-b-slate-400 bg-slate-700/50 hover:bg-slate-700/60'
-                            : 'text-gray-400 hover:text-gray-300 hover:border-b-gray-500 hover:bg-slate-800/30'
+                            ? 'text-foreground border-b-primary bg-muted hover:bg-muted'
+                            : 'text-muted-foreground hover:text-foreground hover:border-b-border hover:bg-muted/50'
                         }
                       `}
                     >
@@ -234,7 +234,7 @@ export function CategorySelector({
                         <span
                           className={`
                             inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
-                            ${selectedCategoryId === 'maquinas-principales' ? 'bg-slate-600 text-white' : 'bg-slate-700 text-gray-300'}
+                            ${selectedCategoryId === 'maquinas-principales' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
                           `}
                         >
                           {machineCountsByCategory['maquinas-principales']}
@@ -301,7 +301,7 @@ export function CategorySelector({
                 onChange={(e) => setFormData({ ...formData, icono: e.target.value })}
                 placeholder="Ej: Factory, Zap, Link"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Ver iconos en{' '}
                 <a
                   href="https://lucide.dev/icons"
