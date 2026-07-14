@@ -675,13 +675,22 @@ export function MainLayout() {
                   </div>
                   <span className="font-semibold">Mantenimiento</span>
                 </div>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-1 hover:bg-muted rounded"
-                  aria-label="Cerrar menú"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={toggleTheme}
+                    title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                  >
+                    {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  </button>
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-1 hover:bg-muted rounded"
+                    aria-label="Cerrar menú"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Navigation — grouped (mobile) */}
@@ -720,18 +729,11 @@ export function MainLayout() {
                 })}
               </nav>
 
-              {/* Version label + alto contraste (mobile) */}
+              {/* Version label (mobile) — el toggle de tema vive en la cabecera del drawer */}
               <div className="px-4 pb-2 flex items-center gap-2">
                 <div className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
                   <span>v{APP_VERSION}</span>
                 </div>
-                <button
-                  onClick={toggleTheme}
-                  title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-                  className="p-1.5 rounded-lg transition-colors shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
               </div>
 
               {/* User section */}
