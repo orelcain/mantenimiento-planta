@@ -531,8 +531,8 @@ function ManualList({
   }
 
   return (
-    <div>
-      {/* Índice de secciones / lecciones */}
+    <div className="dp-doc">
+      {/* Índice de secciones / lecciones (riel lateral en desktop) */}
       <nav className="dp-index" aria-label={isCourse ? 'Lecciones del curso' : 'Secciones del manual'}>
         {sections.map(sec => (
           <button
@@ -546,6 +546,7 @@ function ManualList({
         ))}
       </nav>
 
+      <div className="dp-doc-body">
       {/* Sub-cabecera de la sección activa */}
       <div className="dp-subhead">
         <span className="dp-subno">{String(activeSection.order).padStart(2, '0')}</span>
@@ -611,6 +612,7 @@ function ManualList({
           </button>
         </div>
       )}
+      </div>
     </div>
   )
 }
