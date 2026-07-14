@@ -8,18 +8,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Tema oscuro AquaChile (neutros tintados al azul de marca).
-        // Fuente de verdad de la paleta del módulo: src/data/learningTheme.ts (LC).
-        // Status (destructive/success/warning) se mantienen vivos para que resalten.
-        background: '#0d1722',
-        foreground: '#e9eef3',
+        // Neutros por VARIABLE CSS (canales RGB en index.css): tema oscuro AquaChile
+        // (el de siempre, default) bajo `.dark`, y tema claro bajo `:root`.
+        // Toggle en el header (useTheme, clase `dark` en <html>, anti-flash en index.html).
+        // Marca (primary) y status (destructive/success/warning) NO varían por tema.
+        background: 'rgb(var(--background) / <alpha-value>)',
+        foreground: 'rgb(var(--foreground) / <alpha-value>)',
         card: {
-          DEFAULT: '#16242f',
-          foreground: '#e9eef3',
+          DEFAULT: 'rgb(var(--card) / <alpha-value>)',
+          foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         popover: {
-          DEFAULT: '#16242f',
-          foreground: '#e9eef3',
+          DEFAULT: 'rgb(var(--card) / <alpha-value>)',
+          foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         primary: {
           DEFAULT: '#2E75B6',
@@ -36,16 +37,16 @@ export default {
           900: '#173a5a',
         },
         secondary: {
-          DEFAULT: '#2b3d4c',
-          foreground: '#e9eef3',
+          DEFAULT: 'rgb(var(--secondary) / <alpha-value>)',
+          foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         muted: {
-          DEFAULT: '#15212c',
-          foreground: '#9db0c2',
+          DEFAULT: 'rgb(var(--muted) / <alpha-value>)',
+          foreground: 'rgb(var(--muted-foreground) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#1f3445',
-          foreground: '#e9eef3',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         destructive: {
           DEFAULT: '#f44336',
@@ -59,8 +60,8 @@ export default {
           DEFAULT: '#ff9800',
           foreground: '#000000',
         },
-        border: '#22384a',
-        input: '#22384a',
+        border: 'rgb(var(--border) / <alpha-value>)',
+        input: 'rgb(var(--border) / <alpha-value>)',
         ring: '#5aa6e8',
       },
       borderRadius: {

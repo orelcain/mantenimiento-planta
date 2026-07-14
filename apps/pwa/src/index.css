@@ -16,6 +16,34 @@
   .landscape-mobile-hidden { display: none !important; }
 }
 
+/* ── Tokens de tema (canales RGB → tailwind.config.js) ──────────────────────
+   `.dark` = el tema oscuro AquaChile de siempre (default: el script anti-flash
+   de index.html pone la clase antes de que cargue React).
+   `:root` sin `.dark` = tema claro (papel tintado al azul de marca), para
+   quienes prefieren fondo blanco. Toggle: useTheme (header + Ajustes). */
+:root {
+  color-scheme: light;
+  --background: 242 245 247;        /* #f2f5f7 papel azulado */
+  --foreground: 22 36 47;           /* #16242f tinta */
+  --card: 255 255 255;              /* #ffffff */
+  --secondary: 221 229 235;         /* #dde5eb */
+  --muted: 231 237 241;             /* #e7edf1 */
+  --muted-foreground: 90 108 125;   /* #5a6c7d */
+  --accent: 219 231 240;            /* #dbe7f0 */
+  --border: 204 215 223;            /* #ccd7df */
+}
+.dark {
+  color-scheme: dark;
+  --background: 13 23 34;           /* #0d1722 */
+  --foreground: 233 238 243;        /* #e9eef3 */
+  --card: 22 36 47;                 /* #16242f */
+  --secondary: 43 61 76;            /* #2b3d4c */
+  --muted: 21 33 44;                /* #15212c */
+  --muted-foreground: 157 176 194;  /* #9db0c2 */
+  --accent: 31 52 69;               /* #1f3445 */
+  --border: 34 56 74;               /* #22384a */
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -34,14 +62,14 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
-    color-scheme: dark;
+    /* color-scheme lo fija el tema (:root / .dark) */
   }
 
-  /* Form controls nativos (select, input) respetan dark mode */
+  /* Form controls nativos (select, input) siguen el tema activo */
   select,
   option {
-    color-scheme: dark;
-    background-color: var(--tw-bg-opacity, #1e1e1e);
+    background-color: rgb(var(--card));
+    color: rgb(var(--foreground));
   }
 
   /* Evitar problemas de passive event listener en contenedores de zoom/pan */

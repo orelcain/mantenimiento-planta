@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Camera,
   Sun,
+  Moon,
   Activity,
   Cpu,
   Mail,
@@ -48,7 +49,7 @@ import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 import { loadSidebarConfig } from '@/services/sidebarConfig'
-import { useHighContrast } from '@/hooks/useHighContrast'
+import { useTheme } from '@/hooks/useTheme'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 
 import type { AppModule } from '@/types/permissions'
@@ -346,7 +347,7 @@ export function MainLayout() {
     }
   }
 
-  const { enabled: highContrast, toggle: toggleHighContrast } = useHighContrast()
+  const { isDark, toggleTheme } = useTheme()
 
   // Orden dinámico del sidebar (cargado desde Firestore una vez)
   const [sidebarOrder, setSidebarOrder] = useState<{ groupOrder: string[]; itemOrders: Record<string, string[]> } | null>(null)
@@ -725,11 +726,11 @@ export function MainLayout() {
                   <span>v{APP_VERSION}</span>
                 </div>
                 <button
-                  onClick={toggleHighContrast}
-                  title={highContrast ? 'Desactivar alto contraste' : 'Alto contraste'}
-                  className={`p-1.5 rounded-lg transition-colors shrink-0 ${highContrast ? 'bg-yellow-500/20 text-yellow-400' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                  onClick={toggleTheme}
+                  title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+                  className="p-1.5 rounded-lg transition-colors shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
                 >
-                  <Sun className="h-4 w-4" />
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
               </div>
 
@@ -866,11 +867,11 @@ export function MainLayout() {
               )}
             </div>
             <button
-              onClick={toggleHighContrast}
-              title={highContrast ? 'Desactivar alto contraste' : 'Activar alto contraste (luz intensa)'}
-              className={`p-1.5 rounded-lg transition-colors ${highContrast ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              onClick={toggleTheme}
+              title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+              className="p-1.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
             >
-              <Sun className="h-4 w-4" />
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <HelpButton />
             <span className="text-sm text-muted-foreground">
