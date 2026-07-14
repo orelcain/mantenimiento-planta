@@ -31,6 +31,33 @@
   --muted-foreground: 90 108 125;   /* #5a6c7d */
   --accent: 219 231 240;            /* #dbe7f0 */
   --border: 204 215 223;            /* #ccd7df */
+
+  /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara */
+  --lc-bg: #f2f5f7;
+  --lc-bg-panel: #e9eef2;
+  --lc-surface: #ffffff;
+  --lc-surface-hi: #edf1f4;
+  --lc-ink: #16242f;
+  --lc-ink-mid: #45596c;
+  --lc-ink-lo: #6b7f92;
+  --lc-ink-ghost: #94a5b5;
+  --lc-aqua: #2E75B6;
+  --lc-aqua-bright: #245a8c;
+  --lc-aqua-light: #2a6aa6;
+  --lc-aqua-soft: rgba(46, 117, 182, 0.10);
+  --lc-border: #d5dee5;
+  --lc-border-hi: #bccbd6;
+  --lc-danger: #b8394f;
+  --lc-danger-soft: rgba(184, 57, 79, 0.10);
+  --lc-prep: #8a6a2f;
+  --lc-prep-soft: rgba(138, 106, 47, 0.10);
+  --lc-nuevo: #177a5b;
+  --lc-nuevo-soft: rgba(23, 122, 91, 0.10);
+  --lc-ok: #0e8060;
+  --lc-ok-soft: rgba(14, 128, 96, 0.10);
+  --lc-warn: #a16207;
+  --lc-crit: #dc2626;
+  --lc-star: #b7791f;
 }
 .dark {
   color-scheme: dark;
@@ -42,6 +69,33 @@
   --muted-foreground: 157 176 194;  /* #9db0c2 */
   --accent: 31 52 69;               /* #1f3445 */
   --border: 34 56 74;               /* #22384a */
+
+  /* Paleta LC — los valores oscuros de siempre (learningTheme.ts pre-tema) */
+  --lc-bg: #0d1722;
+  --lc-bg-panel: #0f1d2b;
+  --lc-surface: #16242f;
+  --lc-surface-hi: #1b2f3f;
+  --lc-ink: #e9eef3;
+  --lc-ink-mid: #9db0c2;
+  --lc-ink-lo: #6d8298;
+  --lc-ink-ghost: #51677b;
+  --lc-aqua: #2E75B6;
+  --lc-aqua-bright: #5aa6e8;
+  --lc-aqua-light: #9DC3E6;
+  --lc-aqua-soft: rgba(46, 117, 182, 0.16);
+  --lc-border: #22384a;
+  --lc-border-hi: #2f4d65;
+  --lc-danger: #e0697d;
+  --lc-danger-soft: rgba(224, 105, 125, 0.14);
+  --lc-prep: #cf9f54;
+  --lc-prep-soft: rgba(207, 159, 84, 0.13);
+  --lc-nuevo: #3fb98f;
+  --lc-nuevo-soft: rgba(63, 185, 143, 0.14);
+  --lc-ok: #10b981;
+  --lc-ok-soft: rgba(16, 185, 129, 0.14);
+  --lc-warn: #f59e0b;
+  --lc-crit: #ef4444;
+  --lc-star: #fbbf24;
 }
 
 @layer base {

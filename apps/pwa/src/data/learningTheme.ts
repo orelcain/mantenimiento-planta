@@ -9,41 +9,45 @@
  * Colores corporativos AquaChile (azulMedio #2E75B6, azulClaro #9DC3E6 —
  * fuente: utils/exportETTWord.ts). Neutros tintados hacia el azul de marca.
  */
+// Desde el tema claro/oscuro global (2026-07): cada color es una VARIABLE CSS
+// definida en index.css (`--lc-*`, con valores para `:root` claro y `.dark`).
+// Así el hub, el admin y los primitives cambian de tema sin tocar sus 60+
+// estilos inline. ⚠ Por eso un valor LC ya NO es un hex parseable: no usarlo
+// con `tint()` ni concatenarle alfa (`${LC.x}18`); para canvas/echarts usar
+// colores resueltos, no LC.
 export const LC = {
   // Fondos (de más oscuro a más claro)
-  bg:        '#0d1722',
-  bgPanel:   '#0f1d2b',
-  surface:   '#16242f',
-  surfaceHi: '#1b2f3f',
+  bg:        'var(--lc-bg)',
+  bgPanel:   'var(--lc-bg-panel)',
+  surface:   'var(--lc-surface)',
+  surfaceHi: 'var(--lc-surface-hi)',
   // Tinta / texto
-  ink:       '#e9eef3',
-  inkMid:    '#9db0c2',
-  inkLo:     '#6d8298',
-  inkGhost:  '#51677b',
+  ink:       'var(--lc-ink)',
+  inkMid:    'var(--lc-ink-mid)',
+  inkLo:     'var(--lc-ink-lo)',
+  inkGhost:  'var(--lc-ink-ghost)',
   // Acento AquaChile
-  aqua:      '#2E75B6',
-  aquaBright:'#5aa6e8',
-  aquaLight: '#9DC3E6',
-  aquaSoft:  'rgba(46,117,182,0.16)',
+  aqua:      'var(--lc-aqua)',
+  aquaBright:'var(--lc-aqua-bright)',
+  aquaLight: 'var(--lc-aqua-light)',
+  aquaSoft:  'var(--lc-aqua-soft)',
   // Bordes
-  border:    '#22384a',
-  borderHi:  '#2f4d65',
+  border:    'var(--lc-border)',
+  borderHi:  'var(--lc-border-hi)',
   // Estados semánticos del MÓDULO (contenido/UI)
-  danger:    '#e0697d',
-  dangerSoft:'rgba(224,105,125,0.14)',
-  prep:      '#cf9f54',
-  prepSoft:  'rgba(207,159,84,0.13)',
-  nuevo:     '#3fb98f',
-  nuevoSoft: 'rgba(63,185,143,0.14)',
-  // Estado de STOCK — mismos valores que usa Repuestos (Tailwind emerald/amber/red
-  // 500) para que "común/stock" se lea idéntico en ambos módulos. Antes CommonPartCard
-  // usaba #22c55e (green-500, más brillante) → doble verde.
-  ok:        '#10b981',
-  okSoft:    'rgba(16,185,129,0.14)',
-  warn:      '#f59e0b',
-  crit:      '#ef4444',
-  // Favorito — amber-400, igual que Repuestos (antes #f0c14b, otro amarillo).
-  star:      '#fbbf24',
+  danger:    'var(--lc-danger)',
+  dangerSoft:'var(--lc-danger-soft)',
+  prep:      'var(--lc-prep)',
+  prepSoft:  'var(--lc-prep-soft)',
+  nuevo:     'var(--lc-nuevo)',
+  nuevoSoft: 'var(--lc-nuevo-soft)',
+  // Estado de STOCK — en oscuro, mismos valores que Repuestos (emerald/amber/red 500).
+  ok:        'var(--lc-ok)',
+  okSoft:    'var(--lc-ok-soft)',
+  warn:      'var(--lc-warn)',
+  crit:      'var(--lc-crit)',
+  // Favorito
+  star:      'var(--lc-star)',
 } as const
 
 export type LearningColorKey = keyof typeof LC
