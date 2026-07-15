@@ -506,3 +506,10 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Verificación: `tsc --noEmit` + `eslint` limpios en cada incremento; verificado en preview (búsqueda, ficha, manuales heredados, asignar-equipo, Bodega).
 - Estado: datos HECHO; UI HECHO (incrementos 1–7). Trabajo directo en working tree (aún sin ramas/PR; los scripts de migración ya se aplicaron a Firestore).
 - Sigue: ver `TASKS.md` (solicitar-a-bodega, chatbot al maestro, Mapas, Fase 5 limpieza). De aquí en adelante, todo por rama + PR (flujo estricto).
+
+## 2026-07-14 · claude · Sync Telegram controlado desde el panel admin (PWA↔agente PC)
+
+- Hecho: card "Sincronización Telegram" en el hub admin (`/admin/sync-telegram`): botón "Sincronizar ahora", periodicidad (manual/diaria HH:MM/cada 4h) y estado en vivo (onSnapshot) del agente del PC (heartbeat, última corrida, ítems nuevos, errores). Doc de control `telegramSync/chonchi` (multi-planta ready). El ejecutor es `_SYNC_TELEGRAM/agente_sync.py` en el PC de Orel (Task Scheduler c/15 min): Telethon incremental por topic → organiza a carpetas de equipo (OneDrive) → cura pistas → `_novedades.json`.
+- Archivos: `apps/pwa/src/pages/admin/TelegramSyncPage.tsx` (nuevo), `apps/pwa/src/services/telegramSyncConfig.service.ts` (nuevo), `App.tsx` (ruta), `AdminPanelPage.tsx` (card), `firestore.rules` (regla `telegramSync/{plantId}`: solo admin; campos de estado solo Admin SDK).
+- Verificación: tsc+eslint 0; agente probado end-to-end real (orden simulada → pipeline → estado ok en Firestore); PWA bota en preview worktree (5199) hasta login. Falta: click-through de Orel logueado + **deploy manual de rules** tras merge (deploy.yml NO las incluye).
+- Estado: EN REVISIÓN (PR).

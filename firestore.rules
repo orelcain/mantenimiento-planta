@@ -1521,6 +1521,28 @@ service cloud.firestore {
       allow read:  if isAuthenticated();
       allow write: if isAdmin();
     }
+    // ── Sync Telegram → OneDrive (doc de control por planta) ────────────────
+    // La PWA (solo admin) escribe la intención: modo/horaDiaria y la orden
+    // "sincronizar ahora". El agente del PC reporta estado vía Admin SDK
+    // (bypass de rules). Validamos que el cliente no toque los campos de
+    // estado que reporta el agente.
+    match /telegramSync/{plantId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin()
+        && request.resource.data.modo in ['manual', 'diaria', 'cada4h']
+        && request.resource.data.horaDiaria is string
+        && request.resource.data.ordenPendiente is bool
+        // los campos de estado los reporta SOLO el agente (Admin SDK):
+        // en creación deben venir en null/idle; en update no pueden cambiar.
+        && (resource == null
+              ? (request.resource.data.estado == 'idle'
+                 && request.resource.data.ultimaCorridaAt == null
+                 && request.resource.data.itemsNuevos == null)
+              : (request.resource.data.estado == resource.data.estado
+                 && request.resource.data.ultimaCorridaAt == resource.data.ultimaCorridaAt
+                 && request.resource.data.itemsNuevos == resource.data.itemsNuevos
+                 && request.resource.data.agenteVistoAt == resource.data.agenteVistoAt));
+    }
     // Estado interno de notificaciones por máquina/turno — solo Admin SDK
     match /shoplogixNotifState/{docId} {
       allow read, write: if false;
