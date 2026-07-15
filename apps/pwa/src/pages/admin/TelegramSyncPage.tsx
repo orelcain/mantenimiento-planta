@@ -17,17 +17,19 @@ import {
   Input,
   Label,
 } from '@/components/ui'
-import { Send, Loader2, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Laptop } from 'lucide-react'
+import { Send, Loader2, RefreshCw, CircleCheck, CircleAlert, CircleDashed, Laptop, History, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 import {
   subscribeTelegramSyncConfig,
+  subscribeTelegramSyncCorridas,
   saveTelegramSyncModo,
   requestTelegramSyncNow,
   TELEGRAM_SYNC_DEFAULTS,
   type TelegramSyncConfig,
   type TelegramSyncModo,
+  type TelegramSyncCorrida,
 } from '@/services/telegramSyncConfig.service'
 import type { Timestamp } from 'firebase/firestore'
 
@@ -48,6 +50,52 @@ function agenteEnLinea(ts: Timestamp | null): boolean {
   return Date.now() - ts.toDate().getTime() < 25 * 60 * 1000
 }
 
+/** Fila del historial, expandible al detalle por grupo/tema. */
+function CorridaRow({ corrida }: { corrida: TelegramSyncCorrida }) {
+  const [abierta, setAbierta] = useState(false)
+  const expandible = corrida.porTema.length > 0
+  return (
+    <div className="border-b border-border/60 last:border-0">
+      <button
+        onClick={() => expandible && setAbierta((v) => !v)}
+        className={['w-full flex items-center gap-2 py-2 text-left text-sm',
+          expandible ? 'cursor-pointer hover:bg-muted/40' : 'cursor-default'].join(' ')}
+      >
+        {corrida.ok
+          ? <CircleCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          : <CircleAlert className="w-4 h-4 text-red-400 shrink-0" />}
+        <span className="text-xs text-muted-foreground w-32 shrink-0">{fmt(corrida.at)}</span>
+        <span className="flex-1 truncate">
+          {corrida.itemsNuevos > 0
+            ? `${corrida.itemsNuevos} ítems nuevos`
+            : (corrida.ok ? 'Sin novedades' : (corrida.error ?? 'Error'))}
+          {corrida.motivo && <span className="text-muted-foreground"> · {corrida.motivo}</span>}
+        </span>
+        {corrida.solicitadaPor && (
+          <span className="text-[11px] text-muted-foreground hidden sm:inline truncate max-w-[10rem]">
+            {corrida.solicitadaPor}
+          </span>
+        )}
+        {expandible && (abierta
+          ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />)}
+      </button>
+      {abierta && (
+        <div className="pb-2 pl-6 space-y-0.5">
+          {corrida.porTema.map((t, i) => (
+            <div key={i} className="text-xs text-muted-foreground flex gap-2">
+              <span className="text-sky-400/80">{t.grupo}</span>
+              <span>·</span>
+              <span className="text-foreground">{t.tema}</span>
+              <span className="ml-auto tabular-nums">{t.nuevos}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TelegramSyncPage() {
   const { toast } = useToast()
   const user = useAuthStore((s) => s.user)
@@ -59,9 +107,12 @@ export function TelegramSyncPage() {
   const [modoDraft, setModoDraft] = useState<TelegramSyncModo | null>(null)
   const [horaDraft, setHoraDraft] = useState<string | null>(null)
 
+  const [corridas, setCorridas] = useState<TelegramSyncCorrida[]>([])
+
   useEffect(() => {
     const unsub = subscribeTelegramSyncConfig((c) => { setConfig(c); setLoading(false) })
-    return unsub
+    const unsubCorridas = subscribeTelegramSyncCorridas(10, setCorridas)
+    return () => { unsub(); unsubCorridas() }
   }, [])
 
   const modo = modoDraft ?? config.modo
@@ -214,6 +265,27 @@ export function TelegramSyncPage() {
             {guardando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Guardar periodicidad
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Historial de corridas */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <History className="w-4 h-4" />
+            Historial de sincronizaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {corridas.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Aún no hay corridas registradas — aparecerán aquí desde la próxima sincronización.
+            </p>
+          ) : (
+            <div>
+              {corridas.map((c) => <CorridaRow key={c.id} corrida={c} />)}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

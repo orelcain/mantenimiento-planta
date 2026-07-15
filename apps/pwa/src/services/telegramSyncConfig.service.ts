@@ -6,7 +6,10 @@
  * Task Scheduler cada 15 min), que reporta de vuelta estado/última corrida/ítems.
  * Doc: telegramSync/{plantId} (multi-planta ready, hoy 'chonchi').
  */
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore'
+import {
+  doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, Timestamp,
+  collection, query, orderBy, limit,
+} from 'firebase/firestore'
 import { db } from '@/services/firebase'
 
 export type TelegramSyncModo = 'manual' | 'diaria' | 'cada4h'
@@ -73,6 +76,52 @@ export async function saveTelegramSyncModo(modo: TelegramSyncModo, horaDiaria: s
 }
 
 /** Botón "Sincronizar ahora": deja la orden; el agente la toma en ≤15 min. */
+// ── Historial de corridas (subcolección `corridas`; la escribe SOLO el agente) ──
+
+export interface TelegramSyncCorridaTema {
+  grupo: string
+  tema: string
+  nuevos: number
+}
+
+export interface TelegramSyncCorrida {
+  id: string
+  at: Timestamp | null
+  ok: boolean
+  itemsNuevos: number
+  motivo: string | null
+  solicitadaPor: string | null
+  porTema: TelegramSyncCorridaTema[]
+  error: string | null
+}
+
+/** Últimas corridas del agente, en vivo (más reciente primero). */
+export function subscribeTelegramSyncCorridas(
+  max: number,
+  cb: (corridas: TelegramSyncCorrida[]) => void,
+): () => void {
+  const q = query(
+    collection(db, 'telegramSync', PLANT_ID, 'corridas'),
+    orderBy('at', 'desc'),
+    limit(max),
+  )
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => {
+      const x = d.data()
+      return {
+        id: d.id,
+        at: (x.at as Timestamp | undefined) ?? null,
+        ok: Boolean(x.ok),
+        itemsNuevos: typeof x.itemsNuevos === 'number' ? x.itemsNuevos : 0,
+        motivo: (x.motivo as string | undefined) ?? null,
+        solicitadaPor: (x.solicitadaPor as string | undefined) ?? null,
+        porTema: Array.isArray(x.porTema) ? (x.porTema as TelegramSyncCorridaTema[]) : [],
+        error: (x.error as string | undefined) ?? null,
+      }
+    }))
+  })
+}
+
 export async function requestTelegramSyncNow(solicitadoPor: string | null): Promise<void> {
   const snap = await getDoc(REF())
   const orden = {

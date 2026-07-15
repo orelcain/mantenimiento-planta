@@ -513,3 +513,10 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Archivos: `apps/pwa/src/pages/admin/TelegramSyncPage.tsx` (nuevo), `apps/pwa/src/services/telegramSyncConfig.service.ts` (nuevo), `App.tsx` (ruta), `AdminPanelPage.tsx` (card), `firestore.rules` (regla `telegramSync/{plantId}`: solo admin; campos de estado solo Admin SDK).
 - Verificación: tsc+eslint 0; agente probado end-to-end real (orden simulada → pipeline → estado ok en Firestore); PWA bota en preview worktree (5199) hasta login. Falta: click-through de Orel logueado + **deploy manual de rules** tras merge (deploy.yml NO las incluye).
 - Estado: EN REVISIÓN (PR).
+
+## 2026-07-15 · claude · Historial de corridas Sync Telegram + multi-grupo (agente PC)
+
+- Hecho: (PWA) card "Historial de sincronizaciones" en `/admin/sync-telegram`: últimas 10 corridas en vivo (ok/error, ítems, motivo, quién la pidió) con detalle expandible por grupo/tema (subcolección `telegramSync/chonchi/corridas`, regla read admin / write false — solo Admin SDK). (PC, fuera del repo) descargador reescrito MULTI-GRUPO (4 grupos nuevos aprobados por Orel: Manuales e info mantencion, Levantamiento equipos planta, Registros temperaturas, Registros consumos), fix de fresh-ingest del organizador (ruteo tema→equipo con creación de carpetas nuevas) y agente que sube el historial.
+- Archivos: `TelegramSyncPage.tsx`, `telegramSyncConfig.service.ts`, `firestore.rules`.
+- Verificación: tsc+eslint 0; preview worktree bota a login sin errores de consola. Post-merge: deploy manual de rules.
+- Estado: EN REVISIÓN (PR).
