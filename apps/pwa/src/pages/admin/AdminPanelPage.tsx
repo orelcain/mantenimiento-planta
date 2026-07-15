@@ -32,6 +32,7 @@ import {
   Bell,
   Wrench,
   LayoutDashboard,
+  Send,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -114,6 +115,14 @@ const ADMIN_ITEMS: AdminItem[] = [
   },
 
   // ── Configuración general (no requieren re-auth, son admin pero menos sensibles) ─
+  {
+    to: '/admin/sync-telegram',
+    title: 'Sincronización Telegram',
+    description: 'Baja lo nuevo del grupo de mantención a las carpetas de equipo y alimenta la bandeja de novedades. Orden inmediata o periodicidad automática.',
+    icon: <Send className="w-5 h-5" />,
+    iconColor: 'text-sky-400',
+    section: 'config',
+  },
   {
     to: '/admin/dev-modules',
     title: 'Módulos en desarrollo',
