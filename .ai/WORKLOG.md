@@ -520,3 +520,9 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Archivos: `TelegramSyncPage.tsx`, `telegramSyncConfig.service.ts`, `firestore.rules`.
 - Verificación: tsc+eslint 0; preview worktree bota a login sin errores de consola. Post-merge: deploy manual de rules.
 - Estado: EN REVISIÓN (PR).
+
+## 2026-07-15 · claude · Sync Telegram: layout responsive en desktop
+
+- Hecho: `/admin/sync-telegram` pasa de columna angosta (max-w-2xl) a `max-w-6xl` con grid 2 columnas en lg+ (controles izquierda, historial derecha); móvil intacto (1 columna).
+- Archivos: `TelegramSyncPage.tsx` (solo layout).
+- Verificación: tsc+eslint 0; preview worktree bota sin errores de consola.

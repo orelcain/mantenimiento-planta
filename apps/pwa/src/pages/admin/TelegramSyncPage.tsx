@@ -167,7 +167,7 @@ export function TelegramSyncPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 max-w-2xl space-y-4">
+    <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Send className="w-6 h-6 text-sky-400" />
@@ -179,6 +179,9 @@ export function TelegramSyncPage() {
         </p>
       </div>
 
+      {/* Desktop: controles a la izquierda, historial a la derecha. Móvil: una columna. */}
+      <div className="grid gap-4 items-start lg:grid-cols-2">
+      <div className="space-y-4">
       {/* Estado del agente */}
       <Card>
         <CardHeader className="pb-3">
@@ -267,6 +270,7 @@ export function TelegramSyncPage() {
           </Button>
         </CardContent>
       </Card>
+      </div>{/* fin columna controles */}
 
       {/* Historial de corridas */}
       <Card>
@@ -288,6 +292,7 @@ export function TelegramSyncPage() {
           )}
         </CardContent>
       </Card>
+      </div>{/* fin grid */}
     </div>
   )
 }
