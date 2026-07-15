@@ -1542,6 +1542,11 @@ service cloud.firestore {
                  && request.resource.data.ultimaCorridaAt == resource.data.ultimaCorridaAt
                  && request.resource.data.itemsNuevos == resource.data.itemsNuevos
                  && request.resource.data.agenteVistoAt == resource.data.agenteVistoAt));
+      // Historial de corridas: lo escribe SOLO el agente (Admin SDK)
+      match /corridas/{corridaId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
     }
     // Estado interno de notificaciones por máquina/turno — solo Admin SDK
     match /shoplogixNotifState/{docId} {
