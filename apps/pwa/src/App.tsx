@@ -10,41 +10,24 @@ import { HelpProvider } from '@/components/help'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { isChunkLoadError, recoverFromChunkError } from '@/utils/chunkRecovery'
 
-// Todas las páginas con lazy loading para reducir bundle inicial
-const LoginPage = lazy(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
-
-// Helper para recargar chunks automáticamente en caso de error de versión (deploy nuevo)
+// Helper para recargar chunks automáticamente en caso de error de versión (deploy nuevo).
+// La estrategia escalonada (reload → limpiar caches + cache-buster) y el contador
+// anti-bucle viven en @/utils/chunkRecovery, compartidos con el ErrorBoundary.
 const lazyWithReload = (fn: () => Promise<any>) =>
   lazy(() =>
     fn().catch((error) => {
-      // Verificar errores comunes de carga de módulos/chunks
-      const isChunkLoadError = 
-        error.name === 'TypeError' && 
-        (error.message?.includes('Failed to fetch dynamically imported module') ||
-         error.message?.includes('Importing a module script failed') ||
-         error.message?.includes('check the network connection'))
-
-      if (isChunkLoadError) {
-        // Guardar flag para evitar bucles infinitos de recarga
-        const storageKey = 'chunk_load_error_reload'
-        const reloaded = sessionStorage.getItem(storageKey)
-        
-        if (!reloaded) {
-          logger.info('Recargando página por actualización de versión (Chunk Load Error)')
-          sessionStorage.setItem(storageKey, 'true')
-          window.location.reload()
-          return new Promise(() => {}) // Promesa perpetua mientras recarga
-        } else {
-          // Si ya recargamos y sigue fallando, limpiar flag y dejar que explote (o mostrar error)
-          sessionStorage.removeItem(storageKey)
-        }
+      if (isChunkLoadError(error) && recoverFromChunkError()) {
+        return new Promise(() => {}) // Promesa perpetua mientras recarga
       }
       throw error
     })
   )
 
-// Code Splitting con autorecarga
+// Code Splitting con autorecarga (todas las páginas, incluida Login: es la
+// primera que pide un usuario deslogueado justo después de un deploy)
+const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
 const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
 import { HomeRedirect } from '@/components/HomeRedirect'
 const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
