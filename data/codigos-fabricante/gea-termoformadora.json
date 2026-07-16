@@ -37,6 +37,14 @@
  ],
  "totalFilas": 7160,
  "codigosUnicos": 2914,
+ "equipoNodeIds": [
+  "p2mD30ZOeYafoXdMk2Vw"
+ ],
+ "equipoCodigos": [
+  "720012997"
+ ],
+ "equipoNombre": "TERMOFORMADORA GEA",
+ "manualPorFuente": {},
  "piezas": [
   {
    "codigo": "3000543796",

@@ -16,6 +16,10 @@
  "extraidoEl": "2026-07-16",
  "totalFilas": 336,
  "codigosUnicos": 259,
+ "equipoNodeIds": [],
+ "equipoCodigos": [],
+ "equipoNombre": "",
+ "manualPorFuente": {},
  "piezas": [
   {
    "codigo": "6130175",

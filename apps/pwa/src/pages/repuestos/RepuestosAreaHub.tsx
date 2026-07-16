@@ -43,7 +43,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
-import { CLASE_LABEL, type MaterialClase, type Machine, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
+import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -97,13 +97,26 @@ function KpiCard({ value, label, hint, icon: Icon, tone }: {
   )
 }
 
+/** Prellenado de creación al llegar desde la pestaña Códigos fabricante. */
+export interface PendingCreateRepuesto {
+  codigoFabricante: string
+  textoBreve: string
+  descripcion: string
+  equipoNodeIds: string[]
+  equipoCodigos: string[]
+  equipoNombre: string
+}
+
 interface RepuestosAreaHubProps {
   /** Query inicial (al saltar desde "Buscar similar" de otras vistas). */
   initialQuery?: string
   onQueryConsumed?: () => void
+  /** Abrir el form de crear repuesto prellenado (desde Códigos fabricante). */
+  pendingCreate?: PendingCreateRepuesto | null
+  onPendingCreateConsumed?: () => void
 }
 
-export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAreaHubProps = {}) {
+export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate, onPendingCreateConsumed }: RepuestosAreaHubProps = {}) {
   const { areaTree, findNode, getNodePath, expandNode } = useHierarchyAreaTree()
 
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
@@ -308,6 +321,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [createEquipoQuery, setCreateEquipoQuery] = useState('')
   /** Modelos de equipo seleccionados en el picker (claves de equipoModelGroups) — multi N:M. */
   const [createEquipoSel, setCreateEquipoSel] = useState<Set<string>>(new Set())
+  /** Datos prellenados del form de crear (al venir desde Códigos fabricante). */
+  const [createInitial, setCreateInitial] = useState<Repuesto | null>(null)
   const [savingRep, setSavingRep] = useState(false)
   // Asignar SAP a una pieza de despiece (sin SAP → ordenable). Fase 6.
   const [asignarSapOpen, setAsignarSapOpen] = useState(false)
@@ -574,6 +589,35 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       onQueryConsumed?.()
     }
   }, [initialQuery, onQueryConsumed])
+
+  // "Agregar a repuestos" desde Códigos fabricante → abrir el form de crear prellenado.
+  // Con equipo conocido (GEA/Baader) va directo al form; sin equipo (Marel) pasa
+  // primero por el picker para que el usuario confirme el equipo.
+  useEffect(() => {
+    if (!pendingCreate) return
+    setCreateInitial({
+      codigoFabricante: pendingCreate.codigoFabricante,
+      textoBreve: pendingCreate.textoBreve,
+      descripcion: pendingCreate.descripcion,
+      clase: 'repuesto',
+    } as Repuesto)
+    setCreateTransversal(false)
+    if (pendingCreate.equipoNodeIds.length > 0) {
+      setCreateTargetEquipos({
+        nodeIds: pendingCreate.equipoNodeIds,
+        codigos: pendingCreate.equipoCodigos,
+        label: pendingCreate.equipoNombre || 'Equipo',
+      })
+      setCreateOpen(true)
+    } else {
+      // Marel: sin mapeo fijo → el usuario elige el equipo en el picker.
+      setCreateTargetEquipos(null)
+      setCreateEquipoSel(new Set())
+      setCreateEquipoQuery('')
+      setCreatePicker(true)
+    }
+    onPendingCreateConsumed?.()
+  }, [pendingCreate, onPendingCreateConsumed])
 
   // Repuestos del área (catálogo + bodega) y KPIs de stock derivados
   const areaRepuestos = useAreaRepuestos(bodegaItems, { showingAll, selectedAreaId, machineInArea })
@@ -1163,6 +1207,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // repuesto automáticamente a ese modelo y salta el picker. Si no, abre el picker
   // (material transversal o buscar el equipo destino en toda la planta).
   const startCreate = useCallback(() => {
+    setCreateInitial(null)  // "+ Repuesto" normal: nunca hereda el prellenado del catálogo
     if (selectedEquipMachineId) {
       const group = equipoModelGroups.find((g) => g.nodeIds.includes(selectedEquipMachineId))
       if (group) {
@@ -2270,8 +2315,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       {/* Crear repuesto / material transversal */}
       <RepuestoFormModal
         open={createOpen}
-        onClose={() => { setCreateOpen(false); setCreateTransversal(false) }}
+        onClose={() => { setCreateOpen(false); setCreateTransversal(false); setCreateInitial(null) }}
         mode="create"
+        initialData={createInitial}
         machineName={createTransversal || !createTargetEquipos ? '' : `${createTargetEquipos.label}${createTargetEquipos.nodeIds.length > 1 ? ` · ${createTargetEquipos.nodeIds.length} equipos` : ''}`}
         transversal={createTransversal}
         defaultClase={createTransversal ? 'insumo' : 'repuesto'}
