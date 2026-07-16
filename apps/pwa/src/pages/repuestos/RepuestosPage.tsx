@@ -13,18 +13,19 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Package, LayoutGrid } from 'lucide-react'
+import { Package, LayoutGrid, ScanSearch } from 'lucide-react'
 import { BodegaView } from './BodegaView'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
+import { CodigosFabricanteView } from './CodigosFabricanteView'
 
-type Tab = 'areas' | 'bodega'
+type Tab = 'areas' | 'bodega' | 'codigos'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    if (saved === 'areas' || saved === 'bodega') return saved
+    if (saved === 'areas' || saved === 'bodega' || saved === 'codigos') return saved
   } catch { /* noop */ }
   return 'areas'
 }
@@ -38,8 +39,9 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'areas',  label: 'Áreas',  mobileLabel: 'Áreas',  icon: LayoutGrid },
-  { id: 'bodega', label: 'Bodega', mobileLabel: 'Bodega', icon: Package    },
+  { id: 'areas',   label: 'Áreas',   mobileLabel: 'Áreas',   icon: LayoutGrid },
+  { id: 'bodega',  label: 'Bodega',  mobileLabel: 'Bodega',  icon: Package    },
+  { id: 'codigos', label: 'Códigos fabricante', mobileLabel: 'Códigos', icon: ScanSearch },
 ]
 
 export function RepuestosPage() {
@@ -136,6 +138,12 @@ export function RepuestosPage() {
               onViewInEquipo={handleViewInAreas}
               onSearchSimilar={handleSearchSimilar}
             />
+          )}
+        </div>
+
+        <div className={activeTab === 'codigos' ? '' : 'hidden'}>
+          {mountedTabs.has('codigos') && (
+            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} />
           )}
         </div>
 
