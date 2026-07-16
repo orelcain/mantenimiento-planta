@@ -13,11 +13,12 @@
  * con el mismo esquema y agregarlo a CATALOGOS.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { BookMarked, BookOpen, Check, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
+import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { APP_VERSION } from '@/constants'
+import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
 
 /** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
@@ -166,6 +167,9 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
     return scored.slice(0, 100).map((s) => s.p)
   }, [piezas, query])
 
+  // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
+  const { existentes } = useRepuestosExistentes(resultados.map((p) => p.codigo))
+
   const copiar = (codigo: string) => {
     navigator.clipboard?.writeText(codigo).then(() => {
       setCopiado(codigo)
@@ -210,7 +214,10 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
       )}
 
       <div className="space-y-2">
-        {resultados.map((p, i) => (
+        {resultados.map((p, i) => {
+          // undefined = aún no verificado · null = no existe · objeto = ya creado
+          const existe = existentes.get(normCodigo(p.codigo))
+          return (
           <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-lg border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
@@ -219,14 +226,19 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
                 {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               {p.cantidad && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">×{p.cantidad} en el conjunto</span>}
-              {onBuscarEnRepuestos && (
-                <button
-                  onClick={() => onBuscarEnRepuestos(p.codigo)}
-                  className="ml-auto text-[11px] text-primary hover:underline"
-                  title="Ver si ya existe como repuesto en el maestro"
+              {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
+              {existe === undefined ? null : existe ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                  title={existe.textoBreve || 'Ya está en el maestro'}
                 >
-                  ¿Existe en repuestos?
-                </button>
+                  <CircleCheck className="h-3 w-3" />
+                  {existe.codigoSAP ? `En repuestos · SAP ${existe.codigoSAP}` : 'En repuestos · sin SAP'}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                  <CirclePlus className="h-3 w-3" /> No está en repuestos
+                </span>
               )}
             </div>
             <div className="mt-1 text-[13px] font-medium text-foreground">
@@ -252,7 +264,16 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
                   <BookOpen className="h-3.5 w-3.5" /> Ver manual · pág. {p.pagina}
                 </a>
               )}
-              {onCrearRepuesto && (
+              {/* Ya creado → ir a verlo. No creado → sembrarlo prellenado. */}
+              {existe && onBuscarEnRepuestos ? (
+                <button
+                  onClick={() => onBuscarEnRepuestos(existe.codigoSAP || p.codigo)}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted hover:text-primary"
+                  title={existe.textoBreve || 'Abrir en Áreas'}
+                >
+                  <PackagePlus className="h-3.5 w-3.5" /> Ver repuesto
+                </button>
+              ) : !existe && onCrearRepuesto ? (
                 <button
                   onClick={() => onCrearRepuesto({
                     codigoFabricante: p.codigo,
@@ -267,10 +288,11 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
                 >
                   <PackagePlus className="h-3.5 w-3.5" /> Agregar a repuestos
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
