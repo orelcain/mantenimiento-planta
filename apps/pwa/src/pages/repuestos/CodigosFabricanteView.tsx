@@ -8,9 +8,9 @@
  * pertenece y en qué página de qué manual está — aunque nadie la haya creado
  * aún como repuesto en el maestro.
  *
- * Catálogos disponibles: GEA termoformadora (PowerPak 50520184/50540108 +
- * TraversingUnit). Para sumar otra máquina: generar su JSON con el mismo
- * esquema y agregarlo a CATALOGOS.
+ * Catálogos disponibles: GEA termoformadora, Baader 142 (EK 2014), Baader 200,
+ * Marel Eviscerado y Marel Filete. Para sumar otra máquina: generar su JSON
+ * con el mismo esquema y agregarlo a CATALOGOS.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { BookMarked, Check, Copy, Loader2, ScanSearch, Search } from 'lucide-react'
@@ -27,6 +27,8 @@ interface PiezaCatalogo {
   conjunto: string
   pagina: number
   fuente: string
+  /** Máquina dueña del catálogo (se estampa al cargar, del header del JSON). */
+  maquina?: string
 }
 
 interface CatalogoFabricante {
@@ -38,6 +40,10 @@ interface CatalogoFabricante {
 /** Catálogos publicados (public/data/codigos-fabricante/). */
 const CATALOGOS = [
   { id: 'gea', url: '/data/codigos-fabricante/gea-termoformadora.json', maquina: 'TERMOFORMADORA GEA' },
+  { id: 'baader-142', url: '/data/codigos-fabricante/baader-142.json', maquina: 'BAADER 142' },
+  { id: 'baader-200', url: '/data/codigos-fabricante/baader-200.json', maquina: 'BAADER 200' },
+  { id: 'marel-eviscerado', url: '/data/codigos-fabricante/marel-eviscerado.json', maquina: 'MAREL EVISCERADO' },
+  { id: 'marel-filete', url: '/data/codigos-fabricante/marel-filete.json', maquina: 'MAREL FILETE' },
 ]
 
 // Cache de módulo: el JSON (~2 MB) se baja una sola vez por sesión.
@@ -157,6 +163,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos }: { onBuscarEnRepue
           <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-lg border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
+              {p.maquina && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{p.maquina}</span>}
               <button onClick={() => copiar(p.codigo)} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Copiar código">
                 {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
