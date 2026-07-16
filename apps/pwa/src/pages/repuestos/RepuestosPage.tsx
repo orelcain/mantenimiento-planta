@@ -1,32 +1,32 @@
 /**
  * RepuestosPage — Contenedor principal del módulo de repuestos
  *
- * 2 vistas:
+ * 3 vistas:
  *  - Áreas             → hub área-first (default); reemplaza "Por equipo" retirado en v3.75.0
+ *  - Bodega            → stock real, movimientos, inventario y estadísticas
  *  - Códigos fabricante → buscador de los despieces oficiales de los manuales
  *
- * La pestaña "Bodega" se retiró en v3.91.0: cargaba todo el inventario (lento)
- * y nunca se usó — 0 movimientos y 0 solicitudes en 2.177 ítems, con el stock
- * congelado en la importación inicial. El inventario ahora se lleva contando
- * desde la ficha del repuesto (botón "Contar" del panel de detalle), y se filtra
- * con el selector de stock de Áreas. `BodegaView.tsx` queda sin uso.
+ * Bodega se retiró en v3.91.0 por costo/desuso y volvió en v3.93.0 abaratada:
+ * los "últimos movimientos" salen de UNA query collection-group (antes ~2.200
+ * queries por pestaña) y las escrituras parchean el estado local en vez de
+ * releer los ~2.200 docs. Ver `useBodega`.
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Package, LayoutGrid, ScanSearch } from 'lucide-react'
+import { BodegaView } from './BodegaView'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 import { CodigosFabricanteView, type CrearDesdeCatalogo } from './CodigosFabricanteView'
 
-type Tab = 'areas' | 'codigos'
+type Tab = 'areas' | 'bodega' | 'codigos'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    // 'bodega' quedó guardado en localStorage de quienes usaban la pestaña retirada.
-    if (saved === 'areas' || saved === 'codigos') return saved
+    if (saved === 'areas' || saved === 'bodega' || saved === 'codigos') return saved
   } catch { /* noop */ }
   return 'areas'
 }
@@ -41,6 +41,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'areas',   label: 'Áreas',   mobileLabel: 'Áreas',   icon: LayoutGrid },
+  { id: 'bodega',  label: 'Bodega',  mobileLabel: 'Bodega',  icon: Package    },
   { id: 'codigos', label: 'Códigos fabricante', mobileLabel: 'Códigos', icon: ScanSearch },
 ]
 
@@ -74,6 +75,12 @@ export function RepuestosPage() {
     try { localStorage.setItem(STORAGE_KEY, activeTab) } catch { /* noop */ }
     setMountedTabs(prev => prev.has(activeTab) ? prev : new Set([...prev, activeTab]))
   }, [activeTab])
+
+  // ── "Ver en Áreas" desde Bodega → salta al hub con el machineId como query ──
+  const handleViewInAreas = useCallback((machineId: string) => {
+    setJumpQuery(machineId)
+    setActiveTab('areas')
+  }, [])
 
   // ── "Buscar similar" / "Ver repuesto" → hub con query ──
   const handleSearchSimilar = useCallback((query: string) => {
@@ -139,6 +146,15 @@ export function RepuestosPage() {
               onQueryConsumed={handleQueryConsumed}
               pendingCreate={pendingCreate}
               onPendingCreateConsumed={handlePendingCreateConsumed}
+            />
+          )}
+        </div>
+
+        <div className={activeTab === 'bodega' ? '' : 'hidden'}>
+          {mountedTabs.has('bodega') && (
+            <BodegaView
+              onViewInEquipo={handleViewInAreas}
+              onSearchSimilar={handleSearchSimilar}
             />
           )}
         </div>

@@ -702,14 +702,14 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
   const [filtroTipo, setFiltroTipo] = useState<MovFilter>('todos')
   const [searchMov, setSearchMov] = useState('')
 
-  const { loadAllMovimientos } = bodega
+  const { loadMovimientosRecientes } = bodega
   useEffect(() => {
     setLoading(true)
-    loadAllMovimientos(50).then(data => {
+    loadMovimientosRecientes(50).then(data => {
       setMovimientos(data)
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [loadAllMovimientos])
+  }, [loadMovimientosRecientes])
 
   const filtered = useMemo(() => {
     let result = movimientos
@@ -814,17 +814,17 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 // ══════════════════════════════════════════════
 
 function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
-  const { items, stats, loadAllMovimientos } = bodega
+  const { items, stats, loadMovimientosRecientes } = bodega
   const [movimientos, setMovimientos] = useState<MovimientoBodega[]>([])
   const [movLoading, setMovLoading] = useState(true)
 
   useEffect(() => {
     setMovLoading(true)
-    loadAllMovimientos(30).then(data => {
+    loadMovimientosRecientes(200).then(data => {
       setMovimientos(data)
       setMovLoading(false)
     }).catch(() => setMovLoading(false))
-  }, [loadAllMovimientos])
+  }, [loadMovimientosRecientes])
 
   // Rotación por ítem (salidas / stock promedio)
   const rotacionData = useMemo(() => {
