@@ -84,6 +84,7 @@ const TelegramSyncPage = lazyWithReload(() => import('@/pages/admin/TelegramSync
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
+const CatalogoPublicPage = lazyWithReload(() => import('@/pages/CatalogoPublicPage').then((mod) => ({ default: mod.CatalogoPublicPage })))
 const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPage').then((mod) => ({ default: mod.HmiKnuroPublicPage })))
 const HmiBombeoS2PublicPage = lazyWithReload(() => import('@/pages/HmiBombeoS2PublicPage').then((mod) => ({ default: mod.HmiBombeoS2PublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
@@ -280,6 +281,16 @@ export function App() {
             element={
               <Suspense fallback={<LoadingScreen />}>
                 <Visor3DPublicPage />
+              </Suspense>
+            }
+          />
+
+          {/* Buscador público de códigos de fabricante (link/QR para bodega) */}
+          <Route
+            path="/catalogo"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CatalogoPublicPage />
               </Suspense>
             }
           />
