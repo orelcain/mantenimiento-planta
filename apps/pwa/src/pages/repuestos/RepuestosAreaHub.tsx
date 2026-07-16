@@ -184,7 +184,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
-  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento } = useBodega(allRepuestos)
+  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento, registrarConteoRapido } = useBodega(allRepuestos)
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -926,6 +926,31 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       await saveStock(sap, payload as unknown as Parameters<typeof saveStock>[1])
     },
     [bodegaItems, saveStock],
+  )
+
+  /**
+   * Conteo físico desde la ficha del repuesto (reemplaza a la pestaña Bodega).
+   * Fija el stock a lo contado (0 = "no había") y lo deja trazado; con eso el
+   * filtro "Sin stock" / "Bajo" de esta misma pestaña pasa a ser confiable.
+   */
+  const handleContar = useCallback(
+    async (contado: number) => {
+      if (!selectedRep) return
+      const sap = selectedRep.codigoSAP?.trim()
+      if (!sap) {
+        toast({ variant: 'destructive', title: 'Sin código SAP', description: 'El stock se guarda por SAP: asígnale uno antes de contarlo.' })
+        return
+      }
+      const base = bodegaItems.find((b) => b.codigoSAP === sap) ?? selectedRep
+      const nombre = [user?.nombre, user?.apellido].filter(Boolean).join(' ') || user?.email || 'Sin nombre'
+      try {
+        await registrarConteoRapido(base, contado, user?.id ?? '', nombre)
+        toast({ title: contado === 0 ? 'Conteo guardado: no había stock' : `Conteo guardado: ${contado}`, variant: 'success' })
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'No se pudo guardar el conteo', description: err instanceof Error ? err.message : '' })
+      }
+    },
+    [selectedRep, bodegaItems, registrarConteoRapido, user, toast],
   )
 
   // ══════════════════════════════════════════════════════════════════
@@ -2006,6 +2031,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
           onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
+          onContar={handleContar}
           comunEn={selectedRep.comunEn}
           onMarkComun={isAdmin ? () => { setComunQuery(''); setComunPickerOpen(true) } : undefined}
           onRemoveComun={isAdmin ? (slug) => handleToggleComun(slug) : undefined}

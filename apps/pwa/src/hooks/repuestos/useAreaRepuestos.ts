@@ -20,7 +20,10 @@ export interface AreaRepuestoRow extends BodegaMergedItem {
 
 export function stockStatusOf(item: BodegaMergedItem): StockStatus {
   if (!item.bodegaId) return 'unset' // sin configuración de bodega
-  if (item.stockActual === 0 && item.stockMinimo > 0) return 'out'
+  // Cero es "sin stock" SIEMPRE, tenga o no mínimo definido: antes exigir
+  // stockMinimo > 0 hacía que ~1.768 ítems con 0 unidades se mostraran como
+  // "Disponible" (solo 19 de 2.177 tienen mínimo) y el filtro no servía.
+  if (item.stockActual === 0) return 'out'
   if (item.stockMinimo > 0 && item.stockActual <= item.stockMinimo) return 'low'
   return 'ok'
 }

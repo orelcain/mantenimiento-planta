@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
+import { X, Copy, Check, ClipboardCheck, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { machinesForCommonSap } from '@/data/commonPartsByMachine'
@@ -58,6 +58,8 @@ interface RepuestoDetailPanelProps {
    * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
    */
   onSaveApodos?: (apodos: string[]) => Promise<void>
+  /** Registrar un conteo físico (fija el stock a lo contado; 0 = "no había"). */
+  onContar?: (contado: number) => Promise<void>
   // ── Repuesto común / más usado de una máquina (lista compartida de planta) ──
   /** Slugs de máquina para las que este repuesto está marcado como común. */
   comunEn?: string[]
@@ -139,7 +141,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -148,6 +150,10 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const [editLoc, setEditLoc] = useState(false)
   const [locForm, setLocForm] = useState<UbicacionEstructurada>({})
   const [savingLoc, setSavingLoc] = useState(false)
+  // ── Conteo físico ──
+  const [contando, setContando] = useState(false)
+  const [conteoVal, setConteoVal] = useState('')
+  const [savingConteo, setSavingConteo] = useState(false)
 
   // ── Ancho redimensionable del panel (desktop) ──
   const [width, setWidth] = useState<number>(() => {
@@ -206,6 +212,15 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
     finally { setSavingLoc(false) }
   }, [item, locForm, onSaveLocation])
 
+  const saveConteo = useCallback(async () => {
+    if (!onContar) return
+    const n = Number.parseInt(conteoVal, 10)
+    if (!Number.isFinite(n) || n < 0) return
+    setSavingConteo(true)
+    try { await onContar(n); setContando(false); setConteoVal('') }
+    finally { setSavingConteo(false) }
+  }, [onContar, conteoVal])
+
   const bodegaDocId = item?.bodegaId
   const sap = item?.codigoSAP ?? ''
 
@@ -217,7 +232,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
-  useEffect(() => { setEditLoc(false); setEditApodos(false) }, [sap])
+  useEffect(() => { setEditLoc(false); setEditApodos(false); setContando(false); setConteoVal('') }, [sap])
 
   useEffect(() => {
     setMovs(null); setShowMovs(false)
@@ -578,6 +593,53 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             <div className="text-2xl font-bold tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
           </div>
         </div>
+
+        {/* Conteo físico — reemplaza a la pestaña Bodega: se cuenta desde acá,
+            en la ficha del repuesto, y el resultado alimenta el filtro de stock. */}
+        {onContar && sap && (
+          <div className="mt-2">
+            {!contando ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 text-[11px] text-muted-foreground">
+                  {item.ultimoConteoAt ? (
+                    <>Contado el {fmtDate(item.ultimoConteoAt)}{item.ultimoConteoPor ? ` · por ${item.ultimoConteoPor}` : ''}</>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">Nunca contado — el stock viene de la importación</span>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1.5" onClick={() => { setConteoVal(String(item.stockActual ?? 0)); setContando(true) }}>
+                  <ClipboardCheck className="h-3.5 w-3.5" /> Contar
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-2">
+                <div className="mb-1.5 text-[11px] text-muted-foreground">
+                  Antes había <span className="font-bold text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    autoFocus
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={conteoVal}
+                    onChange={(e) => setConteoVal(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveConteo()
+                      else if (e.key === 'Escape') setContando(false)
+                    }}
+                    className="h-8 w-24 text-sm"
+                    disabled={savingConteo}
+                  />
+                  <Button size="sm" className="h-8 flex-1" onClick={saveConteo} disabled={savingConteo || conteoVal.trim() === ''}>
+                    {savingConteo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Guardar conteo'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => setContando(false)} disabled={savingConteo}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bodega / Ubicación */}
         <div className="mt-3 divide-y divide-border/60 border-y border-border/60">
