@@ -146,6 +146,13 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
   const [showMovs, setShowMovs] = useState(false)
+  /**
+   * Fuerza recargar los movimientos tras escribir desde este panel. El efecto
+   * de abajo solo depende de `bodegaDocId`, que NO cambia al contar (es el mismo
+   * doc) → sin esto, el conteo se guardaba bien pero "Última actualización"
+   * seguía diciendo "Sin movimientos registrados" hasta reabrir el panel.
+   */
+  const [movsRefresh, setMovsRefresh] = useState(0)
   const [lightbox, setLightbox] = useState<string[] | null>(null)
   const [editLoc, setEditLoc] = useState(false)
   const [locForm, setLocForm] = useState<UbicacionEstructurada>({})
@@ -217,7 +224,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
     const n = Number.parseInt(conteoVal, 10)
     if (!Number.isFinite(n) || n < 0) return
     setSavingConteo(true)
-    try { await onContar(n); setContando(false); setConteoVal('') }
+    try { await onContar(n); setContando(false); setConteoVal(''); setMovsRefresh((v) => v + 1) }
     finally { setSavingConteo(false) }
   }, [onContar, conteoVal])
 
@@ -232,10 +239,10 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
-  useEffect(() => { setEditLoc(false); setEditApodos(false); setContando(false); setConteoVal('') }, [sap])
+  useEffect(() => { setEditLoc(false); setEditApodos(false); setContando(false); setConteoVal(''); setShowMovs(false) }, [sap])
 
   useEffect(() => {
-    setMovs(null); setShowMovs(false)
+    setMovs(null)
     if (!bodegaDocId) return
     let alive = true
     setMovsLoading(true)
@@ -244,7 +251,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
       .catch(() => { if (alive) setMovs([]) })
       .finally(() => { if (alive) setMovsLoading(false) })
     return () => { alive = false }
-  }, [bodegaDocId, loadMovimientos])
+  }, [bodegaDocId, loadMovimientos, movsRefresh])
 
   const copySap = useCallback(() => {
     if (!sap) return
