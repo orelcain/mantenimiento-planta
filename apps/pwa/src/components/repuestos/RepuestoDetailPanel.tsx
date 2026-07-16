@@ -93,6 +93,31 @@ function formatUbicacion(item: AreaRepuestoRow): string {
   return item.ubicacionBodega || '—'
 }
 
+/**
+ * Agrupa los equipos donde se usa el material por familia de máquina:
+ * "KNURO N1/N2/N3" → una fila "KNURO · N1 N2 N3". La jerarquía puede traer
+ * nodos duplicados con el mismo nombre visible → se deduplica por nombre.
+ */
+function agruparEquiposPorFamilia(equipos: { machineId: string; machineName: string }[]): { familia: string; unidades: string[] }[] {
+  const vistos = new Set<string>()
+  const familias = new Map<string, { familia: string; unidades: string[] }>()
+  for (const e of equipos) {
+    const nombre = (e.machineName || '').trim()
+    const clave = nombre.toUpperCase()
+    if (!nombre || vistos.has(clave)) continue
+    vistos.add(clave)
+    const m = nombre.match(/^(.*\S)\s+(N[°º]?\s?\d+)$/i)
+    const familia = m?.[1] ?? nombre
+    const unidad = m?.[2]?.toUpperCase().replace(/\s+/g, '') ?? ''
+    const famKey = familia.toUpperCase()
+    const g: { familia: string; unidades: string[] } = familias.get(famKey) ?? { familia, unidades: [] }
+    if (unidad) g.unidades.push(unidad)
+    familias.set(famKey, g)
+  }
+  for (const g of familias.values()) g.unidades.sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
+  return [...familias.values()]
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
@@ -186,6 +211,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
 
   // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
   const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
+  // Vista agrupada por familia (KNURO N1/N2/N3 → "KNURO · N1 N2 N3") — deduplicada.
+  const familiasEquipos = agruparEquiposPorFamilia(equiposReales)
+  const totalEquiposUnicos = familiasEquipos.reduce((n, f) => n + Math.max(1, f.unidades.length), 0)
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
@@ -344,17 +372,22 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         <div className="border-y border-border/60 py-2">
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" />
-            {equiposReales.length > 0 ? `Dónde se usa · ${equiposReales.length} ${equiposReales.length === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
+            {equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
           </div>
           {equiposReales.length > 0 ? (
             <div className="space-y-1">
-              {equiposReales.slice(0, 6).map((e) => (
-                <div key={e.machineId} className="truncate rounded-md bg-muted/40 px-2 py-1 text-[12.5px] text-foreground" title={e.machineName}>
-                  {e.machineName}
+              {familiasEquipos.slice(0, 6).map((f) => (
+                <div key={f.familia} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-[12.5px] text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
+                  <span className="min-w-0 truncate">{f.familia}</span>
+                  {f.unidades.length > 0 && (
+                    <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {f.unidades.join(' · ')}
+                    </span>
+                  )}
                 </div>
               ))}
-              {equiposReales.length > 6 && (
-                <div className="px-2 text-[11px] text-muted-foreground">y {equiposReales.length - 6} más…</div>
+              {familiasEquipos.length > 6 && (
+                <div className="px-2 text-[11px] text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
               )}
               {onAssignEquipo && (
                 <button onClick={onAssignEquipo} className="mt-0.5 inline-flex items-center gap-1 px-1 text-[11px] text-primary hover:underline">
@@ -457,6 +490,24 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                   </a>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Descripción y observaciones del catálogo (antes solo visibles en Editar) */}
+        {(item.descripcion || item.observacionesRepuesto) && (
+          <div className="border-b border-border/60 py-2">
+            {item.descripcion && (
+              <div className="mb-1.5">
+                <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">Descripción</div>
+                <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-foreground">{item.descripcion}</p>
+              </div>
+            )}
+            {item.observacionesRepuesto && (
+              <div>
+                <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">Observaciones</div>
+                <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-muted-foreground">{item.observacionesRepuesto}</p>
               </div>
             )}
           </div>
