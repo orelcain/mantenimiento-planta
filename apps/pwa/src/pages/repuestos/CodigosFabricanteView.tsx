@@ -17,6 +17,7 @@ import { BookMarked, BookOpen, Check, Copy, Loader2, PackagePlus, ScanSearch, Se
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
+import { APP_VERSION } from '@/constants'
 import { logger } from '@/lib/logger'
 
 /** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
@@ -77,7 +78,10 @@ async function cargarCatalogos(): Promise<PiezaCatalogo[]> {
     _cachePromise = Promise.all(
       CATALOGOS.map(async (c) => {
         const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-        const res = await fetch(`${base}${c.url}`)
+        // ?v=<versión> evita que el navegador sirva un JSON viejo cacheado
+        // (GitHub Pages manda Cache-Control max-age=600): al subir la versión,
+        // la URL cambia y se baja el catálogo fresco tras cada deploy.
+        const res = await fetch(`${base}${c.url}?v=${APP_VERSION}`)
         if (!res.ok) throw new Error(`catálogo ${c.id}: HTTP ${res.status}`)
         const data = (await res.json()) as CatalogoFabricante
         const manualPorFuente = data.manualPorFuente || {}
