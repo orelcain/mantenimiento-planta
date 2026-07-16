@@ -32,6 +32,7 @@ import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGl
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
+import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, saveFavoriteLists, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
 import { useToast } from '@/hooks/useToast'
@@ -1235,6 +1236,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
   // Datos del repuesto/equipo objetivo de la acción en curso.
   const actionRep = actionTarget?.source.repuesto ?? null
+  // Manuales heredados de los equipos del repuesto — fallback del modal "Manual".
+  const { manuales: manualesHeredadosModal } = useManualesDeEquipos(
+    actionTarget?.kind === 'manual' ? actionRep?.equipos ?? [] : [],
+  )
   const actionMachineId = actionTarget?.source.machineId
   const actionMachine = useMemo(
     () => (actionMachineId ? machines.find((m) => m.id === actionMachineId) ?? null : null),
@@ -2325,6 +2330,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           open
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
+          manualesHeredados={manualesHeredadosModal}
         />
       )}
 

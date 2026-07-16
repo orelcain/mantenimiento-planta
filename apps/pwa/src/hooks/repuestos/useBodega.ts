@@ -82,6 +82,8 @@ export interface BodegaMergedItem {
   /** Modelo/tipo físico (ej. RNYM08-1320B-30) — buscable */
   modeloTipo?: string
   descripcion?: string
+  /** Observaciones del doc de catálogo (`repuestos`), distintas de las de bodega. */
+  observacionesRepuesto?: string
   valorUnitario: number
   equipos: { machineId: string; machineName: string }[]
   bodegaId?: string
@@ -349,6 +351,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         marca: rep.marca,
         modeloTipo: rep.modeloTipo,
         descripcion: rep.descripcion,
+        observacionesRepuesto: rep.observaciones,
         valorUnitario: rep.valorUnitario || 0,
         equipos: [{ machineId: r.machineId, machineName: r.machineName }],
         bodegaId: overlay?.id,
