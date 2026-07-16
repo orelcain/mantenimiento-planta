@@ -3899,18 +3899,21 @@ async function ariaGetRepuestos() {
     return _ariaRepuestosCache.items
   }
   const snap = await db.collection('repuestos')
-    .select('textoBreve', 'descripcion', 'codigoSAP', 'clase', 'equiposCodigos', 'valorUnitario', 'tieneSap', 'cantidadPorMaquina', 'ubicacionEnPlanta')
+    .select('textoBreve', 'descripcion', 'codigoSAP', 'codigoFabricante', 'clase', 'equiposCodigos', 'valorUnitario', 'tieneSap', 'cantidadPorMaquina', 'ubicacionEnPlanta')
     .get()
   const items = snap.docs.map((d) => {
     const x = d.data()
     return {
       textoBreve: x.textoBreve || '', descripcion: x.descripcion || '',
       codigoSAP: x.codigoSAP || '', clase: x.clase || '',
+      codigoFabricante: x.codigoFabricante || '',
       equiposCodigos: Array.isArray(x.equiposCodigos) ? x.equiposCodigos : [],
       valorUnitario: x.valorUnitario,
       cantidadPorMaquina: x.cantidadPorMaquina,
       ubicacionEnPlanta: x.ubicacionEnPlanta || '',
-      _blob: `${x.textoBreve || ''} ${x.descripcion || ''} ${x.codigoSAP || ''} ${(x.equiposCodigos || []).join(' ')}`.toUpperCase(),
+      // codigoFabricante en el blob: permite hallar el repuesto por part number
+      // (los números puros NUNCA buscan por texto — ver ariaBuscarCodigoEnMaestro)
+      _blob: `${x.textoBreve || ''} ${x.descripcion || ''} ${x.codigoSAP || ''} ${x.codigoFabricante || ''} ${(x.equiposCodigos || []).join(' ')}`.toUpperCase(),
     }
   })
   _ariaRepuestosCache = { at: Date.now(), items }
@@ -4346,7 +4349,8 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
   const pendingHint = pending
     ? `\n\nESTADO ACTUAL: hay una acción PENDIENTE de confirmación: ${pendingDesc}. ` +
       'Si el usuario asiente o acepta → accion "confirmar". Si rechaza, duda o cambia de tema → "cancelar". ' +
-      'EXCEPCIÓN: si en vez de confirmar pide agregar el material como repuesto / vincularlo a un equipo → accion "repuesto_agregar".'
+      'EXCEPCIÓN: si en vez de confirmar pide agregar el material como repuesto / vincularlo a un equipo → accion "repuesto_agregar". ' +
+      'Si la pendiente es CREAR un material y el usuario responde con el nombre de un equipo (ej. "de la Knuro N1", "es del compresor GA90") → accion "repuesto_agregar" con equipo=<ese texto>.'
     : '\n\nESTADO ACTUAL: no hay ninguna acción pendiente de confirmación — NO uses "confirmar" ni "cancelar"; ' +
       'un "sí/dale" suelto sin reporte nuevo es "charla".'
   const notasHint = notas.length
@@ -4375,7 +4379,14 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
     // del GA90") NO es un sí/no al borrador: que lo resuelva el router. Un "sí,
     // agrégala" a secas sigue siendo confirmación determinista.
     const pideOtraCosa = /como (repuesto|material|insumo)|al maestro|vincul/i.test(userText)
-    if (userText.trim().length <= 40 && !pideOtraCosa) {
+    // "sin equipo": respuesta explícita al guard de equipo del material nuevo —
+    // permite crear un repuesto transversal a propósito (nunca por descuido).
+    // Va ANTES que negación/afirmación: "ninguno" o "no tiene equipo" son
+    // respuestas a la pregunta del equipo, no una cancelación del borrador.
+    const esSinEquipo = /sin equipo|ningun[oa]|no (va|tiene) (a )?(un )?equipo|transversal/.test(t)
+    if (pending.kind === 'repuesto_nuevo' && !pending.equipoNodeId && esSinEquipo && userText.trim().length <= 40) {
+      accionDirecta = 'confirmar_sin_equipo'
+    } else if (userText.trim().length <= 40 && !pideOtraCosa) {
       if (esNegacion) accionDirecta = 'cancelar'
       else if (esAfirmacion) accionDirecta = 'confirmar'
     }
@@ -4437,7 +4448,7 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       await ariaSetPending(chatId, { kind: 'cerrar', incidentId: hits[0].id, titulo: hits[0].titulo || 'Sin título', at: Date.now() })
       reply = `**Voy a marcar como RESUELTA esta incidencia:**\n\n📋 ${hits[0].titulo || 'Sin título'} [${hits[0].prioridad}]\n\n¿Confirmás? (sí / no)`
     }
-  } else if (route.accion === 'confirmar') {
+  } else if (route.accion === 'confirmar' || route.accion === 'confirmar_sin_equipo') {
     if (!pending) {
       reply = 'No tengo ninguna acción pendiente de confirmar. Si querés reportar algo, contame qué pasó.'
     } else if (pending.kind === 'cerrar') {
@@ -4469,6 +4480,12 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
       const fail = resultados.length - ok
       await ariaSetPending(chatId, null)
       reply = `✅ Agregadas ${ok} foto${ok === 1 ? '' : 's'} a sus repuestos.` + (fail ? ` ⚠️ ${fail} fallaron — probá esas de nuevo.` : '')
+    } else if (pending.kind === 'repuesto_nuevo' && !pending.equipoNodeId && pending.clase === 'repuesto' && route.accion !== 'confirmar_sin_equipo') {
+      // Guard: un REPUESTO no se crea huérfano por descuido (quedaba en "Sin
+      // equipo" y nadie lo volvía a vincular). Insumos/herramientas/etc. sí
+      // pueden ser transversales sin preguntar.
+      reply = `🔧 Antes de crear **${pending.nombre}**: ¿de qué equipo es? Decímelo (ej. "de la KNURO N1") y lo dejo vinculado. ` +
+        'Si de verdad no va atado a un equipo, respondé **"sin equipo"** y lo creo transversal.'
     } else if (pending.kind === 'repuesto_nuevo') {
       try {
         await ariaCrearRepuestoNuevo(pending, fromName, telegramUserId)
@@ -4627,7 +4644,9 @@ async function tgHandleAriaChat(chatId, userText, fromName, telegramUserId, topi
         const lineaEquipo = equipo.mejor
           ? `🔧 Equipo: **${equipo.mejor.alias || equipo.mejor.nombre}**${equipo.mejor.codigo ? ` (${equipo.mejor.codigo})` : ''}` +
             (equipo.candidatos.length > 1 && !equipo.exacto ? ' *(si no es ese, decime "no" y dame el nombre exacto)*' : '')
-          : '🔧 Sin equipo vinculado (lo podés vincular después en la app)'
+          : clase === 'repuesto'
+            ? '🔧 ¿De qué equipo es? Decímelo (ej. "de la KNURO N1") y lo dejo vinculado; si es transversal respondé "sin equipo"'
+            : '🔧 Sin equipo vinculado (lo podés vincular después en la app)'
         reply = '**Voy a crear este material en el maestro:**\n\n' +
           `📦 ${nombre}\n` +
           `🏷️ Clase: **${clase}** · ${codigoNuevo ? `SAP \`${codigoNuevo}\`` : 'sin código SAP'}\n` +
