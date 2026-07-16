@@ -17,6 +17,7 @@ import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, Pa
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
+import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { APP_VERSION } from '@/constants'
 import { useRepuestosExistentes, normCodigo } from '@/hooks/repuestos/useRepuestosExistentes'
 import { logger } from '@/lib/logger'
@@ -110,9 +111,18 @@ interface CodigosFabricanteViewProps {
   onBuscarEnRepuestos?: (codigo: string) => void
   /** Salta a Áreas y abre el form de crear repuesto prellenado desde el catálogo. */
   onCrearRepuesto?: (data: CrearDesdeCatalogo) => void
+  /**
+   * Modo invitado (ruta pública /catalogo, sin sesión): solo buscar códigos.
+   * Los catálogos son archivos estáticos ya públicos, así que no hace falta
+   * Firestore — y se OMITE a propósito todo lo que sí lo necesita: el enlace al
+   * PDF del manual (documento del fabricante, solo para gente logueada) y el
+   * cruce contra el maestro. Sin esto, un invitado dispararía lecturas que las
+   * reglas rechazan.
+   */
+  publico?: boolean
 }
 
-export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: CodigosFabricanteViewProps) {
+export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, publico = false }: CodigosFabricanteViewProps) {
   const [piezas, setPiezas] = useState<PiezaCatalogo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -128,17 +138,21 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
         if (alive) setError('No se pudo cargar el catálogo de códigos.')
         logger.error('Error cargando catálogos de fabricante', e instanceof Error ? e : new Error(String(e)))
       })
-    // Una sola lectura de `manuales` (colección chica) para resolver los PDF subidos.
-    getDocs(collection(db, 'manuales'))
-      .then((snap) => {
-        if (!alive) return
-        const m: Record<string, string> = {}
-        snap.forEach((d) => { const u = d.data().url; if (u) m[d.id] = u })
-        setManualUrls(m)
-      })
-      .catch((e) => logger.warn('No se pudieron cargar URLs de manuales', { error: e instanceof Error ? e.message : String(e) }))
+    // Una sola lectura de `manuales` (colección chica) para resolver los PDF
+    // subidos. En modo invitado se omite: las reglas la rechazan y los manuales
+    // del fabricante no se publican.
+    if (!publico) {
+      getDocs(collection(db, 'manuales'))
+        .then((snap) => {
+          if (!alive) return
+          const m: Record<string, string> = {}
+          snap.forEach((d) => { const u = d.data().url; if (u) m[d.id] = u })
+          setManualUrls(m)
+        })
+        .catch((e) => logger.warn('No se pudieron cargar URLs de manuales', { error: e instanceof Error ? e.message : String(e) }))
+    }
     return () => { alive = false }
-  }, [])
+  }, [publico])
 
   const resultados = useMemo(() => {
     if (!piezas) return []
@@ -168,7 +182,8 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
   }, [piezas, query])
 
   // ¿cuáles de los códigos en pantalla ya existen como repuesto en el maestro?
-  const { existentes } = useRepuestosExistentes(resultados.map((p) => p.codigo))
+  // (requiere sesión: en modo invitado no se consulta)
+  const { existentes } = useRepuestosExistentes(publico ? [] : resultados.map((p) => p.codigo))
 
   const copiar = (codigo: string) => {
     navigator.clipboard?.writeText(codigo).then(() => {
@@ -180,8 +195,17 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: 
   return (
     <div className="mx-auto max-w-3xl p-3 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
-        <ScanSearch className="h-5 w-5 text-primary" />
-        <h1 className="text-lg font-bold text-foreground">Códigos de fabricante</h1>
+        {!publico && <ScanSearch className="h-5 w-5 shrink-0 text-primary" />}
+        {!publico && <h1 className="text-lg font-bold text-foreground">Códigos de fabricante</h1>}
+        {/* Compartir con bodega: link fijo + QR a la vista pública de solo lectura */}
+        {!publico && (
+          <ShareInteractiveButton
+            className="ml-auto"
+            url={`${window.location.origin}${import.meta.env.BASE_URL}catalogo`}
+            title="Códigos de fabricante"
+            description="Buscador de los despieces oficiales de las máquinas de planta (solo lectura)."
+          />
+        )}
       </div>
       <p className="mb-4 text-[12.5px] text-muted-foreground">
         Despieces oficiales extraídos de los manuales. Escribe el código grabado en la pieza
