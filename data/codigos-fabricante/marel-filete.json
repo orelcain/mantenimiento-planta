@@ -19,7 +19,10 @@
  "equipoNodeIds": [],
  "equipoCodigos": [],
  "equipoNombre": "",
- "manualPorFuente": {},
+ "manualPorFuente": {
+  "Sparepart-book 8009081 SPA_10579193.pdf": "marel-filete__8009081",
+  "Sparepart-book 8009254 SPA_10579194.pdf": "marel-filete__8009254"
+ },
  "piezas": [
   {
    "codigo": "6130175",

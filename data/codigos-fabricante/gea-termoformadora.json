@@ -44,7 +44,12 @@
   "720012997"
  ],
  "equipoNombre": "TERMOFORMADORA GEA",
- "manualPorFuente": {},
+ "manualPorFuente": {
+  "50520184_GEA PowerPak_50520_Mechanical spare part catalogue_es.pdf": "gea__mech-50520",
+  "50520184_GEA PowerPak_50520_Tooling spare part catalogue_es.pdf": "gea__tooling-50520",
+  "50540108_GEA_PowerPak_5550_Mechanical_spare_part_catalogue_ES.pdf": "gea__mech-5550",
+  "96350121_GEA_TraversingUnit_Mechanical_spare_part_ctalogue_es.pdf": "gea__traversing-96350121"
+ },
  "piezas": [
   {
    "codigo": "3000543796",
