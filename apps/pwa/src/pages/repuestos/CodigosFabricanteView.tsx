@@ -9,8 +9,14 @@
  * aún como repuesto en el maestro.
  *
  * Catálogos disponibles: GEA termoformadora, Baader 142 (EK 2014), Baader 200,
- * Marel Eviscerado y Marel Filete. Para sumar otra máquina: generar su JSON
- * con el mismo esquema y agregarlo a CATALOGOS.
+ * Marel Eviscerado, Marel Filete y Enzunchadora TP-6000. Para sumar otra máquina:
+ * generar su JSON con el mismo esquema y agregarlo a CATALOGOS.
+ *
+ * Códigos de distribuidor: las empresas que revenden equipos (ej. GARIBALDI para
+ * las enzunchadoras TRANSPAK) usan códigos propios que ENVUELVEN el código del
+ * fabricante (29123 + T612025022 = prefijo + "T6-1-20250" sin guiones + sufijo).
+ * Por eso el buscador también matchea por contención alfanumérica y expone
+ * codigoProveedor / codigoSap cuando el catálogo los trae.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { BookMarked, BookOpen, Check, CircleCheck, CirclePlus, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
@@ -49,6 +55,11 @@ interface PiezaCatalogo {
   equipoNombre?: string
   /** Id del manual en la colección `manuales` (si el PDF está subido a la app). */
   manualId?: string
+  /** Código del distribuidor local (envuelve al código de fabricante) y su empresa. */
+  codigoProveedor?: string
+  proveedor?: string
+  /** Código SAP ya creado para esta pieza (cruzado desde el maestro del proveedor). */
+  codigoSap?: string
 }
 
 interface CatalogoFabricante {
@@ -68,6 +79,7 @@ const CATALOGOS = [
   { id: 'baader-200', url: '/data/codigos-fabricante/baader-200.json', maquina: 'BAADER 200' },
   { id: 'marel-eviscerado', url: '/data/codigos-fabricante/marel-eviscerado.json', maquina: 'MAREL EVISCERADO' },
   { id: 'marel-filete', url: '/data/codigos-fabricante/marel-filete.json', maquina: 'MAREL FILETE' },
+  { id: 'enzunchadora-tp6000', url: '/data/codigos-fabricante/enzunchadora-tp6000.json', maquina: 'ENZUNCHADORA TP-6000' },
 ]
 
 // Cache de módulo: el JSON (~2 MB) se baja una sola vez por sesión.
@@ -160,16 +172,24 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
     if (q.length < 3) return []
     // Si la consulta trae una secuencia numérica larga se busca como código,
     // tolerando prefijos ("GEA 3000544810" viene grabado así en la pieza).
+    // También se compara sin separadores ("T6-1-20250" ↔ "T6120250") para que
+    // el código del distribuidor (29123T612025022, que envuelve al del
+    // fabricante) y el código con/sin guiones encuentren la misma pieza.
     const soloDigitos = q.replace(/[^0-9]/g, '')
+    const alnumQ = q.replace(/[^A-Z0-9]/g, '')
     const esNumerico = soloDigitos.length >= 4
     const terms = q.split(/\s+/).filter((t) => t.length >= 2)
     const scored: { p: PiezaCatalogo; score: number }[] = []
     for (const p of piezas) {
       let score = 0
       if (esNumerico) {
-        if (p.codigo === soloDigitos) score = 100
-        else if (p.codigo.startsWith(soloDigitos)) score = 60
-        else if (p.codigo.includes(soloDigitos)) score = 30
+        const alnumCod = norm(p.codigo).replace(/[^A-Z0-9]/g, '')
+        const alnumProv = p.codigoProveedor ? norm(p.codigoProveedor).replace(/[^A-Z0-9]/g, '') : ''
+        if (p.codigo === soloDigitos || alnumCod === alnumQ) score = 100
+        else if (alnumProv === alnumQ || p.codigoSap === soloDigitos) score = 90
+        else if (p.codigo.startsWith(soloDigitos) || alnumCod.startsWith(alnumQ)) score = 60
+        else if (alnumCod.length >= 5 && alnumQ.includes(alnumCod)) score = 40
+        else if (p.codigo.includes(soloDigitos) || (alnumProv && alnumProv.includes(alnumQ))) score = 30
       } else if (terms.length) {
         const blob = norm(`${p.descripcion} ${p.descripcionEn} ${p.conjunto} ${p.especificacion}`)
         const hits = terms.filter((t) => blob.includes(t)).length
@@ -270,6 +290,31 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               {p.descripcionEn && <span className="ml-1.5 text-[11.5px] font-normal text-muted-foreground">({p.descripcionEn})</span>}
             </div>
             {p.especificacion && <div className="font-mono text-[11.5px] text-muted-foreground">{p.especificacion}</div>}
+            {/* Códigos equivalentes: distribuidor local (envuelve al de fabricante) y SAP */}
+            {(p.codigoProveedor || p.codigoSap) && (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {p.codigoProveedor && (
+                  <button
+                    onClick={() => copiar(p.codigoProveedor!)}
+                    className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-sky-600 hover:bg-sky-500/20 dark:text-sky-400"
+                    title={`Código ${p.proveedor || 'del distribuidor'} — clic para copiar`}
+                  >
+                    {p.proveedor || 'Distribuidor'}: {p.codigoProveedor}
+                    {copiado === p.codigoProveedor ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                )}
+                {p.codigoSap && (
+                  <button
+                    onClick={() => copiar(p.codigoSap!)}
+                    className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-violet-600 hover:bg-violet-500/20 dark:text-violet-400"
+                    title="Código SAP ya creado para esta pieza — clic para copiar"
+                  >
+                    SAP: {p.codigoSap}
+                    {copiado === p.codigoSap ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
               <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
