@@ -765,6 +765,15 @@ service cloud.firestore {
       }
     }
 
+    // Movimientos por COLLECTION GROUP: las pestañas Movimientos/Estadísticas
+    // piden "los últimos N movimientos de toda la bodega" en UNA query. Sin este
+    // match la query se rechaza (el match anidado de arriba solo autoriza leer
+    // dentro de un ítem concreto), y había que iterar los ~2.200 ítems uno a uno.
+    // `movimientos` solo existe bajo /bodega, así que el alcance es el mismo.
+    match /{path=**}/movimientos/{movId} {
+      allow read: if isNotAnonymous();
+    }
+
     // Inventarios periódicos de bodega
     match /bodega_inventarios/{inventarioId} {
       allow read: if isNotAnonymous();

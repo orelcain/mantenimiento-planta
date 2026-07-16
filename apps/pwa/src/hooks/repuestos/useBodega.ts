@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   collection,
+  collectionGroup,
   doc,
   getDocs,
   setDoc,
@@ -195,13 +196,46 @@ function tsToDate(ts: Timestamp | Date | undefined | null): Date {
 }
 
 // ══════════════════════════════════════════════
+//  Caché de módulo de los overlays de bodega
+// ══════════════════════════════════════════════
+// La colección son ~2.200 docs y `useBodega` se monta en Áreas y en Bodega a la
+// vez: sin caché, cada montaje volvía a leerla entera. Mismo patrón/TTL que
+// `useGlobalSearch`.
+let cachedOverlays: Map<string, BodegaOverlay> | null = null
+let overlaysCachedAt = 0
+const OVERLAYS_TTL = 5 * 60 * 1000
+
+export function invalidateBodegaCache() {
+  cachedOverlays = null
+  overlaysCachedAt = 0
+}
+
+// ══════════════════════════════════════════════
 //  HOOK PRINCIPAL
 // ══════════════════════════════════════════════
 
 export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
-  const [bodegaOverlays, setBodegaOverlays] = useState<Map<string, BodegaOverlay>>(new Map())
+  const [bodegaOverlays, setBodegaOverlays] = useState<Map<string, BodegaOverlay>>(
+    () => (cachedOverlays && Date.now() - overlaysCachedAt < OVERLAYS_TTL ? cachedOverlays : new Map()),
+  )
   const [bodegaLoading, setBodegaLoading] = useState(true)
   const bodegaLoadedRef = useRef(false)
+
+  /**
+   * Aplica el resultado de una escritura al overlay EN MEMORIA (y a la caché)
+   * en vez de releer los ~2.200 docs. Antes cada movimiento/conteo/edición de
+   * stock disparaba un `reloadBodega()` completo.
+   */
+  const patchOverlay = useCallback((sap: string, cambios: Partial<BodegaOverlay> & { id: string }) => {
+    setBodegaOverlays((prev) => {
+      const next = new Map(prev)
+      const actual = next.get(sap)
+      next.set(sap, { ...(actual ?? ({ codigoSAP: sap, stockActual: 0, stockMinimo: 0, ubicacionBodega: '', unidad: 'pzas', createdAt: new Date(), updatedAt: new Date() } as BodegaOverlay)), ...cambios })
+      cachedOverlays = next
+      overlaysCachedAt = Date.now()
+      return next
+    })
+  }, [])
 
   // ── Watch list (Firestore + localStorage fallback) ──
   const [watchlist, setWatchlist] = useState<Set<string>>(() => {
@@ -264,7 +298,13 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   }, [])
 
   // ── Cargar datos de bodega ──
-  const reloadBodega = useCallback(async () => {
+  // `force` salta la caché (tras una escritura que no se pueda parchear local).
+  const reloadBodega = useCallback(async (force = false) => {
+    if (!force && cachedOverlays && Date.now() - overlaysCachedAt < OVERLAYS_TTL) {
+      setBodegaOverlays(cachedOverlays)
+      setBodegaLoading(false)
+      return
+    }
     try {
       const snap = await getDocs(collection(db, BODEGA_COL))
       const map = new Map<string, BodegaOverlay>()
@@ -295,6 +335,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
           updatedAt: tsToDate(data.updatedAt),
         })
       })
+      cachedOverlays = map
+      overlaysCachedAt = Date.now()
       setBodegaOverlays(map)
     } catch (err: any) {
       if (err?.code !== 'permission-denied') {
@@ -410,8 +452,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     } else {
       await setDoc(doc(db, BODEGA_COL, key), { codigoSAP: key, ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
     }
-    await reloadBodega()
-  }, [bodegaOverlays, reloadBodega])
+    // Parche local en vez de releer los ~2.200 docs de la colección.
+    patchOverlay(key, { ...data, id: existing?.id ?? key, codigoSAP: key, updatedAt: new Date() })
+  }, [bodegaOverlays, patchOverlay])
 
   // ── Registrar movimiento ──
   const registrarMovimiento = useCallback(async (
@@ -445,8 +488,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       stockResultante: nuevoStock, motivo: mov.motivo,
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
-    await reloadBodega()
-  }, [reloadBodega])
+    patchOverlay(key, { id: bodegaDocId, codigoSAP: key, stockActual: nuevoStock, updatedAt: new Date() })
+  }, [patchOverlay])
 
   /**
    * Conteo físico RÁPIDO de un repuesto, desde su ficha (v3.91.0). Fija el stock
@@ -495,8 +538,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       motivo: `Conteo físico (antes: ${anterior})`,
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
-    await reloadBodega()
-  }, [reloadBodega])
+    patchOverlay(key, {
+      id: bodegaDocId, codigoSAP: key, stockActual: contado,
+      ultimoConteoAt: new Date(), ultimoConteoPor: userName, updatedAt: new Date(),
+    })
+  }, [patchOverlay])
 
   // ── Cargar movimientos ──
   const loadMovimientos = useCallback(async (bodegaDocId: string, max = 30): Promise<MovimientoBodega[]> => {
@@ -515,16 +561,38 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   }, [])
 
   // ── Cargar TODOS los movimientos recientes (para estadísticas) ──
-  const loadAllMovimientos = useCallback(async (maxPerItem = 10): Promise<MovimientoBodega[]> => {
-    const all: MovimientoBodega[] = []
-    for (const [, overlay] of bodegaOverlays) {
-      try {
-        const movs = await loadMovimientos(overlay.id, maxPerItem)
-        all.push(...movs)
-      } catch { /* skip */ }
+  /**
+   * Últimos `max` movimientos de TODA la bodega, en UNA query (collection group).
+   *
+   * Reemplaza al antiguo `loadAllMovimientos`, que iteraba los ~2.200 ítems
+   * haciendo una query por cada uno: abrir "Movimientos" costaba ~2.200 queries
+   * (hasta ~108.000 lecturas) y "Estadísticas" otro tanto. Ahora son `max`
+   * lecturas (50 → 50). Requiere el índice COLLECTION_GROUP de
+   * `movimientos.createdAt` y el match `/{path=**}/movimientos/` en las reglas.
+   */
+  const loadMovimientosRecientes = useCallback(async (max = 50): Promise<MovimientoBodega[]> => {
+    try {
+      const q = query(collectionGroup(db, 'movimientos'), orderBy('createdAt', 'desc'), limit(max))
+      const snap = await getDocs(q)
+      return snap.docs.map((d) => {
+        const data = d.data()
+        return {
+          id: d.id,
+          bodegaItemId: data.bodegaItemId || d.ref.parent.parent?.id || '',
+          tipo: data.tipo,
+          cantidad: data.cantidad,
+          stockResultante: data.stockResultante ?? 0,
+          motivo: data.motivo || '',
+          realizadoPor: data.realizadoPor || '',
+          realizadoPorNombre: data.realizadoPorNombre || '',
+          createdAt: tsToDate(data.createdAt),
+        } as MovimientoBodega
+      })
+    } catch (err) {
+      logger.error('Error cargando movimientos recientes', err instanceof Error ? err : new Error(String(err)))
+      return []
     }
-    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-  }, [bodegaOverlays, loadMovimientos])
+  }, [])
 
   // ══════════════════════════════════════════
   //  INVENTARIO PERIÓDICO
@@ -673,7 +741,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       closedAt: serverTimestamp(),
     })
 
-    await reloadBodega()
+    // Finalizar ajusta el stock de MUCHOS ítems a la vez: acá sí conviene releer
+    // la colección (forzando, para saltar la caché) en vez de parchear uno a uno.
+    await reloadBodega(true)
   }, [bodegaOverlays, loadConteos, reloadBodega])
 
   // ── Movimiento en lote ──
@@ -739,13 +809,14 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     } else {
       await setDoc(doc(db, BODEGA_COL, key), {
         codigoSAP: key, stockActual: 0, stockMinimo: 0,
-        ubicacionBodega: '', unidad: 'pzas', fotos: newFotos,
+        // `isValidBodega()` de las reglas exige ubicacionBodega no vacío al crear.
+        ubicacionBodega: 'Sin ubicación', unidad: 'pzas', fotos: newFotos,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
     }
-    await reloadBodega()
+    patchOverlay(key, { id: existing?.id ?? key, codigoSAP: key, fotos: newFotos, updatedAt: new Date() })
     return url
-  }, [bodegaOverlays, reloadBodega])
+  }, [bodegaOverlays, patchOverlay])
 
   const removePhoto = useCallback(async (codigoSAP: string, url: string) => {
     await deleteBodegaPhoto(url)
@@ -754,9 +825,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     if (existing) {
       const newFotos = (existing.fotos || []).filter(f => f !== url)
       await updateDoc(doc(db, BODEGA_COL, existing.id), { fotos: newFotos, updatedAt: serverTimestamp() })
+      patchOverlay(key, { id: existing.id, fotos: newFotos, updatedAt: new Date() })
     }
-    await reloadBodega()
-  }, [bodegaOverlays, reloadBodega])
+  }, [bodegaOverlays, patchOverlay])
 
   // ── Cálculo de punto de reorden ──
   const calcReorderData = useCallback((item: BodegaMergedItem, movimientos: MovimientoBodega[]) => {
@@ -781,7 +852,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     registrarConteoRapido,
     registrarMovimientoBatch,
     loadMovimientos,
-    loadAllMovimientos,
+    loadMovimientosRecientes,
     reloadBodega,
     // Watch list
     watchlist,
