@@ -16,7 +16,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Package, LayoutGrid, ScanSearch } from 'lucide-react'
 import { BodegaView } from './BodegaView'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
-import { CodigosFabricanteView } from './CodigosFabricanteView'
+import { CodigosFabricanteView, type CrearDesdeCatalogo } from './CodigosFabricanteView'
 
 type Tab = 'areas' | 'bodega' | 'codigos'
 
@@ -51,6 +51,8 @@ export function RepuestosPage() {
 
   // jumpQuery: saltar a Áreas con query pre-cargada (desde Bodega "Ver en Áreas" o "Buscar similar")
   const [jumpQuery, setJumpQuery] = useState<string>('')
+  // pendingCreate: saltar a Áreas y abrir el form de crear prellenado (desde Códigos fabricante)
+  const [pendingCreate, setPendingCreate] = useState<CrearDesdeCatalogo | null>(null)
 
   // Deep-link ?q=<SAP> (ej. desde "Ver en Repuestos" de la pestaña Repuestos comunes
   // del Centro de Aprendizaje): abre Áreas con ese código pre-buscado.
@@ -88,6 +90,16 @@ export function RepuestosPage() {
   // Limpiar jumpQuery una vez consumido
   const handleQueryConsumed = useCallback(() => {
     setJumpQuery('')
+  }, [])
+
+  // ── "Agregar a repuestos" desde Códigos fabricante → salta a Áreas con el form prellenado ──
+  const handleCrearDesdeCatalogo = useCallback((data: CrearDesdeCatalogo) => {
+    setPendingCreate(data)
+    setActiveTab('areas')
+  }, [])
+
+  const handlePendingCreateConsumed = useCallback(() => {
+    setPendingCreate(null)
   }, [])
 
   return (
@@ -128,7 +140,12 @@ export function RepuestosPage() {
 
         <div className={activeTab === 'areas' ? 'h-full' : 'hidden'}>
           {mountedTabs.has('areas') && (
-            <RepuestosAreaHub initialQuery={jumpQuery} onQueryConsumed={handleQueryConsumed} />
+            <RepuestosAreaHub
+              initialQuery={jumpQuery}
+              onQueryConsumed={handleQueryConsumed}
+              pendingCreate={pendingCreate}
+              onPendingCreateConsumed={handlePendingCreateConsumed}
+            />
           )}
         </div>
 
@@ -143,7 +160,7 @@ export function RepuestosPage() {
 
         <div className={activeTab === 'codigos' ? '' : 'hidden'}>
           {mountedTabs.has('codigos') && (
-            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} />
+            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} onCrearRepuesto={handleCrearDesdeCatalogo} />
           )}
         </div>
 

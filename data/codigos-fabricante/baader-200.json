@@ -13,6 +13,16 @@
  "extraidoEl": "2026-07-16",
  "totalFilas": 3755,
  "codigosUnicos": 1489,
+ "equipoNodeIds": [
+  "EOfHKwSGwFQthQW1AX34"
+ ],
+ "equipoCodigos": [
+  "720004417"
+ ],
+ "equipoNombre": "BAADER 200",
+ "manualPorFuente": {
+  "549_BAADER 200 n°parte y materiales.pdf": "baader-200__0"
+ },
  "piezas": [
   {
    "codigo": "2001101002",

@@ -13,6 +13,12 @@
  "extraidoEl": "2026-07-16",
  "totalFilas": 152,
  "codigosUnicos": 113,
+ "equipoNodeIds": [],
+ "equipoCodigos": [],
+ "equipoNombre": "",
+ "manualPorFuente": {
+  "SPAREPART-BOOK 7022730 ENG.pdf": "marel-eviscerado__2"
+ },
  "piezas": [
   {
    "codigo": "3519288",

@@ -13,6 +13,20 @@
  "extraidoEl": "2026-07-16",
  "totalFilas": 3658,
  "codigosUnicos": 1697,
+ "equipoNodeIds": [
+  "nIjUKAay3odasttyZ0yj",
+  "kRbjM6jI0bD60l5ABNPD",
+  "FeeOSDfn2uV0BvOTLekP"
+ ],
+ "equipoCodigos": [
+  "720004441",
+  "720004447",
+  "720004453"
+ ],
+ "equipoNombre": "EVISCERADORA BAADER 142 (N1/N2/N3)",
+ "manualPorFuente": {
+  "499_EK-Lachsschlachtmaschine_1420000821_10.12.2014.pdf": "baader-142__0"
+ },
  "piezas": [
   {
    "codigo": "1420100000",

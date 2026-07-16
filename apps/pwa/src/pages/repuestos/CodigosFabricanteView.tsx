@@ -13,9 +13,21 @@
  * con el mismo esquema y agregarlo a CATALOGOS.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { BookMarked, Check, Copy, Loader2, ScanSearch, Search } from 'lucide-react'
+import { BookMarked, BookOpen, Check, Copy, Loader2, PackagePlus, ScanSearch, Search } from 'lucide-react'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
 import { logger } from '@/lib/logger'
+
+/** Datos para prellenar la creación de un repuesto desde una pieza de catálogo. */
+export interface CrearDesdeCatalogo {
+  codigoFabricante: string
+  textoBreve: string
+  descripcion: string
+  equipoNodeIds: string[]
+  equipoCodigos: string[]
+  equipoNombre: string
+}
 
 interface PiezaCatalogo {
   codigo: string
@@ -27,13 +39,22 @@ interface PiezaCatalogo {
   conjunto: string
   pagina: number
   fuente: string
-  /** Máquina dueña del catálogo (se estampa al cargar, del header del JSON). */
+  /** Campos estampados al cargar desde el header del catálogo: */
   maquina?: string
+  equipoNodeIds?: string[]
+  equipoCodigos?: string[]
+  equipoNombre?: string
+  /** Id del manual en la colección `manuales` (si el PDF está subido a la app). */
+  manualId?: string
 }
 
 interface CatalogoFabricante {
   maquina: string
   sap?: string
+  equipoNodeIds?: string[]
+  equipoCodigos?: string[]
+  equipoNombre?: string
+  manualPorFuente?: Record<string, string>
   piezas: PiezaCatalogo[]
 }
 
@@ -59,7 +80,15 @@ async function cargarCatalogos(): Promise<PiezaCatalogo[]> {
         const res = await fetch(`${base}${c.url}`)
         if (!res.ok) throw new Error(`catálogo ${c.id}: HTTP ${res.status}`)
         const data = (await res.json()) as CatalogoFabricante
-        return (data.piezas || []).map((p) => ({ ...p, maquina: data.maquina }))
+        const manualPorFuente = data.manualPorFuente || {}
+        return (data.piezas || []).map((p) => ({
+          ...p,
+          maquina: data.maquina,
+          equipoNodeIds: data.equipoNodeIds || [],
+          equipoCodigos: data.equipoCodigos || [],
+          equipoNombre: data.equipoNombre || '',
+          manualId: manualPorFuente[p.fuente],
+        }))
       }),
     ).then((listas) => {
       _cache = listas.flat()
@@ -71,11 +100,20 @@ async function cargarCatalogos(): Promise<PiezaCatalogo[]> {
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
 
-export function CodigosFabricanteView({ onBuscarEnRepuestos }: { onBuscarEnRepuestos?: (codigo: string) => void }) {
+interface CodigosFabricanteViewProps {
+  /** Salta a la pestaña Áreas con este código pre-buscado ("¿Existe en repuestos?"). */
+  onBuscarEnRepuestos?: (codigo: string) => void
+  /** Salta a Áreas y abre el form de crear repuesto prellenado desde el catálogo. */
+  onCrearRepuesto?: (data: CrearDesdeCatalogo) => void
+}
+
+export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto }: CodigosFabricanteViewProps) {
   const [piezas, setPiezas] = useState<PiezaCatalogo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [copiado, setCopiado] = useState<string | null>(null)
+  // Mapa manualId → URL del PDF (colección `manuales`), para el enlace "Ver manual".
+  const [manualUrls, setManualUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let alive = true
@@ -85,6 +123,15 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos }: { onBuscarEnRepue
         if (alive) setError('No se pudo cargar el catálogo de códigos.')
         logger.error('Error cargando catálogos de fabricante', e instanceof Error ? e : new Error(String(e)))
       })
+    // Una sola lectura de `manuales` (colección chica) para resolver los PDF subidos.
+    getDocs(collection(db, 'manuales'))
+      .then((snap) => {
+        if (!alive) return
+        const m: Record<string, string> = {}
+        snap.forEach((d) => { const u = d.data().url; if (u) m[d.id] = u })
+        setManualUrls(m)
+      })
+      .catch((e) => logger.warn('No se pudieron cargar URLs de manuales', { error: e instanceof Error ? e.message : String(e) }))
     return () => { alive = false }
   }, [])
 
@@ -187,6 +234,36 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos }: { onBuscarEnRepue
               <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
               <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
               <span className="min-w-0 truncate" title={p.fuente}>{p.fuente}</span>
+            </div>
+            {/* Acciones: abrir el PDF del manual en la página exacta + sembrar el maestro */}
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+              {p.manualId && manualUrls[p.manualId] && (
+                <a
+                  href={`${manualUrls[p.manualId]}#page=${p.pagina}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted hover:text-primary"
+                  title={`Abrir ${p.fuente} en la página ${p.pagina}`}
+                >
+                  <BookOpen className="h-3.5 w-3.5" /> Ver manual · pág. {p.pagina}
+                </a>
+              )}
+              {onCrearRepuesto && (
+                <button
+                  onClick={() => onCrearRepuesto({
+                    codigoFabricante: p.codigo,
+                    textoBreve: p.descripcion || p.descripcionEn || p.codigo,
+                    descripcion: [p.descripcionEn, p.especificacion, p.conjunto ? `Conjunto: ${p.conjunto}` : '', `Manual: ${p.fuente} pág. ${p.pagina}`].filter(Boolean).join(' · '),
+                    equipoNodeIds: p.equipoNodeIds || [],
+                    equipoCodigos: p.equipoCodigos || [],
+                    equipoNombre: p.equipoNombre || '',
+                  })}
+                  className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary/10"
+                  title="Crear este repuesto en el maestro, prellenado"
+                >
+                  <PackagePlus className="h-3.5 w-3.5" /> Agregar a repuestos
+                </button>
+              )}
             </div>
           </div>
         ))}
