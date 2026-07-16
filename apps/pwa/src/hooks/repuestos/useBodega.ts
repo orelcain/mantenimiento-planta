@@ -54,6 +54,9 @@ export interface BodegaOverlay {
   ultimaCompra?: Date
   categoria?: 'A' | 'B' | 'C' // clasificación ABC
   observaciones?: string
+  /** Sello del último conteo físico (ver `registrarConteo`). */
+  ultimoConteoAt?: Date
+  ultimoConteoPor?: string
   fotos?: string[]
   createdAt: Date
   updatedAt: Date
@@ -102,6 +105,10 @@ export interface BodegaMergedItem {
   ultimaCompra?: Date
   categoria?: 'A' | 'B' | 'C'
   observaciones?: string
+  /** Último conteo físico (sello de `registrarConteo`): distingue "contado y da
+   *  0" de "nunca contado" — el stock importado no tiene ningún movimiento. */
+  ultimoConteoAt?: Date
+  ultimoConteoPor?: string
   fotos?: string[]
   /** Fotos del catálogo (fotosReales > imagenesManual > gallery del doc Repuesto).
    *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
@@ -281,6 +288,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
           ultimaCompra: data.ultimaCompra ? tsToDate(data.ultimaCompra) : undefined,
           categoria: data.categoria || undefined,
           observaciones: data.observaciones || undefined,
+          ultimoConteoAt: data.ultimoConteoAt ? tsToDate(data.ultimoConteoAt) : undefined,
+          ultimoConteoPor: data.ultimoConteoPor || undefined,
           fotos: Array.isArray(data.fotos) ? data.fotos : undefined,
           createdAt: tsToDate(data.createdAt),
           updatedAt: tsToDate(data.updatedAt),
@@ -369,6 +378,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimaCompra: overlay?.ultimaCompra,
         categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
+        ultimoConteoAt: overlay?.ultimoConteoAt,
+        ultimoConteoPor: overlay?.ultimoConteoPor,
         fotos: overlay?.fotos,
         fotosCatalogo: (() => { const p = catalogPhotosOf(rep); return p.length ? p : undefined })(),
         isWatched: sap ? watchlist.has(sap) : false,
@@ -432,6 +443,56 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     await addDoc(collection(db, BODEGA_COL, bodegaDocId, 'movimientos'), {
       bodegaItemId: bodegaDocId, tipo: mov.tipo, cantidad: mov.cantidad,
       stockResultante: nuevoStock, motivo: mov.motivo,
+      realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
+    })
+    await reloadBodega()
+  }, [reloadBodega])
+
+  /**
+   * Conteo físico RÁPIDO de un repuesto, desde su ficha (v3.91.0). Fija el stock
+   * al valor contado (0 = "no había") y lo deja trazado como movimiento de
+   * ajuste + `ultimoConteoAt`. Ese sello distingue "contado y da 0" de "nunca se
+   * contó" — clave porque el stock actual viene de una importación sin un solo
+   * movimiento registrado.
+   *
+   * Distinto de `registrarConteo`, que pertenece al flujo de SESIONES de
+   * inventario (crearInventario → contar → finalizarInventario) de la retirada
+   * pestaña Bodega: ese exige abrir una sesión y nunca se usó.
+   */
+  const registrarConteoRapido = useCallback(async (
+    item: BodegaMergedItem,
+    contado: number,
+    userId: string,
+    userName: string,
+  ) => {
+    const key = item.codigoSAP.trim()
+    if (!key) throw new Error('Sin código SAP')
+    const anterior = item.stockActual
+    const bodegaDocId = item.bodegaId || key
+    const sello = {
+      stockActual: contado,
+      ultimoConteoAt: serverTimestamp(),
+      ultimoConteoPor: userName,
+      updatedAt: serverTimestamp(),
+    }
+    if (item.bodegaId) {
+      await updateDoc(doc(db, BODEGA_COL, bodegaDocId), sello)
+    } else {
+      // Primer conteo de un repuesto sin doc de bodega: `isValidBodega()` de las
+      // reglas exige ubicacionBodega NO vacío, así que se siembra "Sin ubicación"
+      // (editable luego desde el propio panel) en vez de '' → si no, Firestore
+      // rechaza la creación.
+      await setDoc(doc(db, BODEGA_COL, key), {
+        codigoSAP: key, stockMinimo: item.stockMinimo || 0,
+        ubicacionBodega: item.ubicacionBodega?.trim() || 'Sin ubicación',
+        unidad: item.unidad || 'pzas',
+        createdAt: serverTimestamp(), ...sello,
+      })
+    }
+    await addDoc(collection(db, BODEGA_COL, bodegaDocId, 'movimientos'), {
+      bodegaItemId: bodegaDocId, tipo: 'ajuste', cantidad: contado,
+      stockResultante: contado,
+      motivo: `Conteo físico (antes: ${anterior})`,
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
     await reloadBodega()
@@ -717,6 +778,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     stats,
     saveStock,
     registrarMovimiento,
+    registrarConteoRapido,
     registrarMovimientoBatch,
     loadMovimientos,
     loadAllMovimientos,
