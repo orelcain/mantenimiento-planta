@@ -147,6 +147,43 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
         </CardContent>
       </Card>
 
+      {/* Fin de turno */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Fin de turno</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Brief de cierre</Label>
+              <p className="text-xs text-muted-foreground">
+                Resumen al terminar cada turno: piezas por Baader, total vs target, uptime, paros y calidad Grader (si hay Excel)
+              </p>
+            </div>
+            <Switch
+              checked={config.shiftEnd.enabled}
+              onCheckedChange={(v) => patch('shiftEnd', { enabled: v })}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor={`enddelay-${plantSlug}`} className="text-sm whitespace-nowrap">
+              Enviar
+            </Label>
+            <Input
+              id={`enddelay-${plantSlug}`}
+              type="number"
+              min={5}
+              max={60}
+              className="w-24 h-8 text-sm"
+              value={config.shiftEnd.delayMinutes}
+              onChange={(e) => patch('shiftEnd', { delayMinutes: Math.max(5, parseInt(e.target.value) || 10) })}
+              disabled={!config.shiftEnd.enabled}
+            />
+            <span className="text-sm text-muted-foreground">minutos después del fin (deja aterrizar el último sync)</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Primera pieza */}
       <Card>
         <CardHeader className="pb-3">
@@ -211,12 +248,28 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Detenciones</Label>
-              <p className="text-xs text-muted-foreground">Avisa cuando Shoplogix registra una detención en cualquier Baader</p>
+              <p className="text-xs text-muted-foreground">Avisa cuando una detención supera el umbral de minutos (bajo eso es ruido operacional)</p>
             </div>
             <Switch
               checked={config.events.stoppage}
               onCheckedChange={(v) => patch('events', { stoppage: v })}
             />
+          </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor={`stopmin-${plantSlug}`} className="text-sm whitespace-nowrap">
+              Solo si dura
+            </Label>
+            <Input
+              id={`stopmin-${plantSlug}`}
+              type="number"
+              min={0}
+              max={60}
+              className="w-24 h-8 text-sm"
+              value={config.events.stoppageMinMinutes}
+              onChange={(e) => patch('events', { stoppageMinMinutes: Math.max(0, parseInt(e.target.value) || 0) })}
+              disabled={!config.events.stoppage}
+            />
+            <span className="text-sm text-muted-foreground">minutos o más (0 = todas)</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
