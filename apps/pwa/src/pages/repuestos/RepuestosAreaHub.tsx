@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2 } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
@@ -230,7 +230,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Filtros + paginación de la tabla de repuestos
   const [repQuery, setRepQuery] = useState('')
+  // Al empezar a buscar, llevar la lista a la vista: el aterrizaje del área
+  // deja al usuario scrolleado en el dashboard y los resultados aparecían
+  // "abajo", fuera de pantalla (se notaba sobre todo en móvil).
+  const listSectionRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!repQuery.trim()) return
+    listSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [repQuery])
   const [repEquipoFilter, setRepEquipoFilter] = useState<string>('all')
+  // Móvil: KPIs y filtros arrancan colapsados — entre el usuario y la primera
+  // fila de repuestos había ~2 pantallas de dashboard. En desktop no aplica.
+  const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false)
   const [repStockFilter, setRepStockFilter] = useState<StockFilter>('all')
   const [repTipoFilter, setRepTipoFilter] = useState<string>('all')
   const [repClaseFilter, setRepClaseFilter] = useState<string>('all')
@@ -783,6 +794,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     () => (repSoloSap ? filteredBase.reduce((n, r) => n + (r.codigoSAP ? 0 : 1), 0) : 0),
     [filteredBase, repSoloSap],
   )
+
+  // Filtros NO-default activos — badge del botón "Filtros" en móvil (los
+  // filtros arrancan colapsados; sin el conteo, un filtro activo escondido
+  // haría "desaparecer" repuestos sin explicación). `repSoloSap` no cuenta:
+  // true ES el default.
+  const filtrosActivos =
+    (repEquipoFilter !== 'all' ? 1 : 0) +
+    (repClaseFilter !== 'all' ? 1 : 0) +
+    (repTipoFilter !== 'all' ? 1 : 0) +
+    (repStockFilter !== 'all' ? 1 : 0) +
+    (!repSoloSap ? 1 : 0) +
+    (repFavOnly ? 1 : 0) +
+    (repComunOnly ? 1 : 0) +
+    (listFilter !== 'all' ? 1 : 0)
 
   // Reset de página al cambiar área/filtros
   useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repComunOnly, listFilter, repPageSize])
@@ -1674,8 +1699,29 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             </div>
           </div>
 
-          {/* KPIs */}
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* KPIs — en móvil el grid de 4 cards + stats empujaba la lista ~2
+              pantallas abajo: se reemplaza por un strip de una línea (mismos
+              datos, chequeables de un vistazo) y las cards quedan tras el
+              toggle "KPIs y filtros". Desktop: sin cambios. */}
+          <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /><b>{repuestosBusy ? '…' : stockKpis.ok}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /><b>{repuestosBusy ? '…' : stockKpis.low}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /><b>{repuestosBusy ? '…' : stockKpis.out}</b></span>
+              <span className="text-muted-foreground"><b className="text-foreground">{repuestosBusy ? '…' : catalogStats.conSAP}</b> con SAP</span>
+            </div>
+            <Button
+              variant={mobileExtrasOpen ? 'default' : 'outline'}
+              size="sm"
+              className="shrink-0 gap-1.5"
+              onClick={() => setMobileExtrasOpen((v) => !v)}
+            >
+              <Settings2 className="h-4 w-4" /> Filtros
+              {filtrosActivos > 0 && <span className="tabular-nums opacity-80">({filtrosActivos})</span>}
+            </Button>
+          </div>
+
+          <div className={[mobileExtrasOpen ? 'grid' : 'hidden', 'mb-6 grid-cols-2 gap-3 sm:grid sm:grid-cols-4'].join(' ')}>
             <KpiCard value={repuestosBusy ? '…' : catalogStats.conSAP} label="Repuestos con SAP" icon={Package} tone="primary" hint={repuestosBusy ? undefined : `+${catalogStats.sinSAP} despiece sin SAP`} />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" icon={PackageCheck} tone="emerald" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}% del stock`} />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" icon={PackageMinus} tone="amber" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}% del stock`} />
@@ -1684,7 +1730,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
           {/* KPIs de catálogo (cobertura) */}
           {!repuestosBusy && stockKpis.total > 0 && (
-            <div className="mb-6 -mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-6 -mt-2 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground sm:flex'].join(' ')}>
               <span><b className="text-foreground tabular-nums">{catalogStats.conSAP}</b> con SAP <span className="opacity-60">({catalogStats.pctSAP}%)</span></span>
               <span className="opacity-40">·</span>
               <span><b className="text-foreground tabular-nums">{catalogStats.sinSAP}</b> sin SAP</span>
@@ -1703,10 +1749,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               los motores/bombas físicos ahora son repuestos de la colección plana y
               aparecen en la tabla de abajo con su marca/modelo/foto. */}
 
-          {/* Tabla de repuestos del área (catálogo + bodega) */}
-          <section>
-            {/* Filtros (la búsqueda vive en la barra superior — global, sticky) */}
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+          {/* Tabla de repuestos del área (catálogo + bodega).
+              scroll-mt compensa la barra sticky al hacer scrollIntoView. */}
+          <section ref={listSectionRef} className="scroll-mt-44 sm:scroll-mt-28">
+            {/* Filtros (la búsqueda vive en la barra superior — global, sticky).
+                En móvil colapsados tras el botón "Filtros" del strip de KPIs. */}
+            <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-3 flex-wrap items-center gap-2 sm:flex'].join(' ')}>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
               <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}>
@@ -1810,14 +1858,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="border-b border-border bg-muted/40 text-left">
+                      {/* En móvil solo Repuesto + favorito: la foto (96% sin foto)
+                          y la columna Stock desbordaban el ancho — el stock va
+                          como chip bajo el título (ver celda Repuesto). */}
                       <tr>
-                        <th className="w-12 px-2 py-2" aria-label="Foto" />
+                        <th className="hidden w-12 px-2 py-2 md:table-cell" aria-label="Foto" />
                         {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
                         {renderSortTh('codigoFabricante', 'Cód. Fabricante', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
                         <th className="hidden px-3 py-2 font-semibold lg:table-cell">Nombre común</th>
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
-                        {renderSortTh('stock', 'Stock')}
+                        {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
                         <th className="w-8 px-3 py-2" />
                       </tr>
@@ -1850,7 +1901,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               isSel ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
                             ].join(' ')}
                           >
-                            <td className="px-2 py-1.5">
+                            <td className="hidden px-2 py-1.5 md:table-cell">
                               {fotos.length > 0 && fotos[0] ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRowLightbox(fotos) }}
@@ -1892,7 +1943,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
                                 {r.clase && (
-                                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground" title="Clase de material">
+                                  <span
+                                    className={[
+                                      'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground',
+                                      // "Repuesto" es la clase del ~75% de las filas: en
+                                      // móvil es ruido puro — solo se muestran las
+                                      // distintas (insumo/herramienta/químico…).
+                                      r.clase === 'repuesto' ? 'hidden md:inline-block' : '',
+                                    ].join(' ')}
+                                    title="Clase de material"
+                                  >
                                     {CLASE_LABEL[r.clase]}
                                   </span>
                                 )}
@@ -1906,7 +1966,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </span>
                                 )}
                               </div>
-                              {/* En móvil, SAP + equipo + tipo van como subtítulo (columnas ocultas) */}
+                              {/* En móvil, stock + ubicación como chip propio (la columna
+                                  Stock está oculta: desbordaba el ancho y quedaba cortada) */}
+                              <div className="mt-1 flex items-center gap-1.5 text-[11px] md:hidden">
+                                <span className={['h-2 w-2 shrink-0 rounded-full', meta.dot].join(' ')} />
+                                <span className="tabular-nums font-semibold">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
+                                <span className={meta.text}>{meta.label}</span>
+                                {r.ubicacionBodega && (
+                                  <span className="text-muted-foreground">· 📍 {r.ubicacionBodega}</span>
+                                )}
+                              </div>
+                              {/* SAP + equipo + tipo como subtítulo (columnas ocultas) */}
                               <div className="mt-0.5 text-[10px] text-muted-foreground md:hidden">
                                 {r.codigoSAP && (
                                   <button
@@ -1921,7 +1991,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
                                 {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground/80">Fab {r.codigoFabricante}</span></span>}
-                                {r.ubicacionBodega && <span> · 📍 {r.ubicacionBodega}</span>}
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
@@ -1957,7 +2026,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               )}
                             </td>
                             <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
-                            <td className="px-3 py-2">
+                            <td className="hidden px-3 py-2 md:table-cell">
                               <div className="flex items-center gap-1.5">
                                 <span className={['h-2 w-2 rounded-full', meta.dot].join(' ')} />
                                 <span className="tabular-nums font-medium">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
