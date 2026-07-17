@@ -5,7 +5,7 @@
  */
 const { test } = require('node:test')
 const assert = require('node:assert')
-const { componerBriefInicioTurno, componerBriefFinTurno, resumenParos, evaluarDelayCheck } = require('../turnoBrief')
+const { componerBriefInicioTurno, componerBriefFinTurno, resumenParos, evaluarDelayCheck, componerMensajeRecuperacion } = require('../turnoBrief')
 
 // wall-clock-as-UTC (convención del proyecto)
 const wall = (h, m = 0) => new Date(Date.UTC(2026, 6, 16, h, m))
@@ -155,4 +155,39 @@ test('delayCheck: sin docs de máquinas todavía → wait (no alertar en vacío)
     checkAt: wall(9, 5), now: wall(10, 0),
   })
   assert.strictEqual(r, 'wait')
+})
+
+// ── F3: ciclo de recuperación (alerted:true) ───────────────────────────────────
+
+test('delayCheck: ya alertó y llegan piezas → recovered (no "ok")', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 10, machines: idleDay,
+    checkAt: wall(9, 5), now: wall(10, 30),
+    alerted: true,
+  })
+  assert.strictEqual(r, 'recovered')
+})
+
+test('delayCheck: ya alertó y SIGUE sin piezas → wait, no re-alerta aunque la actividad bajara', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0, machines: idleDay, // sin actividad real, ni importa: ya alertó
+    checkAt: wall(9, 5), now: wall(10, 30),
+    alerted: true,
+  })
+  assert.strictEqual(r, 'wait')
+})
+
+test('delayCheck: ya alertó y sigue sin piezas pasadas 12h → expire igual (no queda esperando eternamente)', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0, machines: idleDay,
+    checkAt: wall(9, 5), now: new Date(wall(9, 5).getTime() + 13 * 3600 * 1000),
+    alerted: true,
+  })
+  assert.strictEqual(r, 'expire')
+})
+
+test('componerMensajeRecuperacion: formato con minutos de demora', () => {
+  const msg = componerMensajeRecuperacion({ plantLabel: 'Yal', shiftId: 'Turno 2', delayMinutes: 47 })
+  assert.match(msg, /✅ <b>Arrancó<\/b> — Yal/)
+  assert.match(msg, /Turno 2 · demoró <b>47 min<\/b>/)
 })

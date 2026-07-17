@@ -6634,8 +6634,10 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
       const checkAt        = new Date(scheduledStart.getTime() + gracePeriodMs)
       await db.collection('shoplogixShiftDelayChecks').doc(`${plant}_${shiftDoc}`).set({
         plant, shiftDoc, shiftId, plantLabel,
+        scheduledStart, // F3: base para "demoró N min" del mensaje de recuperación
         checkAt,
         done: false,
+        alerted: false,
         createdAt: new Date(),
       })
       logger.info(`[onShoplogixShiftStarted] Delay check creado para ${checkAt.toISOString()}`)
@@ -6924,8 +6926,14 @@ exports.checkShiftStartDelays = onSchedule(
     if (pending.empty) return
 
     for (const doc of pending.docs) {
-      const { plant, shiftDoc, shiftId, plantLabel } = doc.data()
-      const checkAt = doc.data().checkAt?.toDate?.() || now
+      const data = doc.data()
+      const { plant, shiftDoc, shiftId, plantLabel, alerted } = data
+      const checkAt = data.checkAt?.toDate?.() || now
+      // Docs creados antes de F3 no tienen scheduledStart guardado — se puede
+      // recalcular restando el margen de gracia, pero si tampoco hay config
+      // disponible el fallback es checkAt (subestima el delay, nunca lo inventa
+      // de más). Nunca bloquea el flujo: es solo el número que se muestra.
+      const scheduledStart = data.scheduledStart?.toDate?.() || checkAt
       try {
         const config = await getShoplogixNotifConfig(plant)
         if (!config.shiftStart.enabled) {
@@ -6947,12 +6955,14 @@ exports.checkShiftStartDelays = onSchedule(
           machines: machinesSnap.docs.map((m) => ({ states: m.data().states || [] })),
           checkAt,
           now,
+          alerted: Boolean(alerted),
         })
 
         if (veredicto === 'wait') {
           // Sin actividad todavía (día sin proceso, o Shoplogix aún no registra
-          // nada): dejar el check pendiente — la próxima corrida re-evalúa.
-          logger.info('[checkShiftStartDelays] sin actividad — esperando cambio', { plant, shiftDoc })
+          // nada) o ya alertó y sigue esperando piezas: dejar el check
+          // pendiente — la próxima corrida re-evalúa.
+          logger.info('[checkShiftStartDelays] esperando cambio', { plant, shiftDoc, alerted: Boolean(alerted) })
           continue
         }
 
@@ -6969,7 +6979,32 @@ exports.checkShiftStartDelays = onSchedule(
             `⚠️ <b>Sin piezas registradas</b> — ${label}\n${shiftId} arrancó hace ${graceMins} min · Shoplogix registra actividad pero ninguna pieza`,
           )
           logger.warn('[checkShiftStartDelays] alerta emitida', { plant, shiftDoc, totalCycles })
-        } else if (veredicto === 'expire') {
+          // NO se marca done: el check sigue vivo esperando la recuperación
+          // (primera pieza) para cerrar el ciclo con el mensaje de F3.
+          await doc.ref.update({ alerted: true, alertedAt: now })
+          continue
+        }
+
+        if (veredicto === 'recovered') {
+          const label = plantLabel || SHOPLOGIX_PLANT_LABEL[plant] || plant
+          const delayMinutes = Math.max(0, Math.round((now.getTime() - scheduledStart.getTime()) / 60000))
+          const eligibleIds = await getShoplogixEligibleUsers(plant)
+          await dispatchShoplogixNotif(
+            config,
+            eligibleIds,
+            `✅ Arrancó · ${label}`,
+            `${shiftId} · demoró ${delayMinutes} min`,
+            { plant, shiftDoc },
+            turnoBriefMod.componerMensajeRecuperacion({ plantLabel: label, shiftId, delayMinutes }),
+          )
+          // delayMinutes queda persistido: dato crudo para reportar "retraso de
+          // arranque por turno" más adelante (no se construye el reporte acá).
+          await doc.ref.update({ done: true, recoveredAt: now, delayMinutes })
+          logger.warn('[checkShiftStartDelays] recuperación emitida', { plant, shiftDoc, delayMinutes })
+          continue
+        }
+
+        if (veredicto === 'expire') {
           logger.info('[checkShiftStartDelays] expirado sin proceso (día sin producción)', { plant, shiftDoc })
         } else {
           logger.info('[checkShiftStartDelays] turno con piezas OK', { plant, shiftDoc, totalCycles })
