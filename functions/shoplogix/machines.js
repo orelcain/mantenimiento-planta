@@ -24,4 +24,14 @@ const PLANT_MACHINES = Object.freeze({
   yal:     YAL_EVISCERADORAS,
 })
 
-module.exports = { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, PLANT_MACHINES }
+/**
+ * areaId de Shoplogix para el rollup oficial (`type=whiteboard&rollup=1&areas=X`).
+ * Jerarquía real (docs/SHOPLOGIX_API.md): Planta Chonchi (3640) → Eviscerados (3650),
+ * Eviscerados YAL (3651). Cada área agrega las 3 evisceradoras de esa planta.
+ */
+const PLANT_AREA_ID = Object.freeze({
+  chonchi: 3650,
+  yal:     3651,
+})
+
+module.exports = { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, PLANT_MACHINES, PLANT_AREA_ID }

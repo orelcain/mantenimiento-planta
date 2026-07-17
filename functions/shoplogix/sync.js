@@ -19,7 +19,7 @@
  *   - Network → skip esa máquina y continuar
  */
 
-const { PLANT_MACHINES } = require('./machines')
+const { PLANT_MACHINES, PLANT_AREA_ID } = require('./machines')
 const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
@@ -130,6 +130,68 @@ function shiftDateKeyFromStart(scheduledStart) {
  * @param {string} [plantSlug] — planta, para aplicar las reglas canónicas.
  * @returns {Array<{shiftId, rawShiftId, scheduledStart, scheduledEnd}>}
  */
+
+/**
+ * Enriquecimiento OPCIONAL con el rollup oficial de Shoplogix
+ * (`type=whiteboard&rollup=1&areas=<area>&start=<instante>`), que es el mismo
+ * endpoint que alimenta el whiteboard en vivo (confirmado inspeccionando el
+ * tráfico real del navegador, 2026-07-16).
+ *
+ * Dos capas de horario que NO siempre coinciden y no hay que confundir:
+ *   - `deriveShiftGroups` (arriba): ventana REAL derivada de los intervals
+ *     de producción — cuándo la gente efectivamente trabajó. Es la fuente de
+ *     verdad que ya usa toda la app para mostrar turnos históricos.
+ *   - Este rollup: el CALENDARIO OFICIAL de Shoplogix (una plantilla fija de
+ *     horarios de turno) + el target/expectedCycles oficial por máquina +
+ *     el trabajo/especie en curso. Verificado que para fechas pasadas este
+ *     endpoint puede devolver una ventana que NO es la que realmente se
+ *     trabajó ese día (ej. dice "Turno 3 00:00→07:45" en un tramo que en los
+ *     datos reales aparece como "Unscheduled" porque nadie producía), y para
+ *     fechas lejanas puede traer targets en 0. Por eso NUNCA se usa para
+ *     reconstruir turnos históricos ni se reintenta con backfill: se consulta
+ *     una sola vez, "ahora" (`syncedAt`), únicamente cuando `syncDay` está
+ *     sincronizando el día de HOY — momento en que este dato sí es fiable,
+ *     porque describe el turno vigente en tiempo real.
+ *
+ * Falla en silencio (devuelve null): es un adorno informativo, nunca debe
+ * tumbar el sync de producción real.
+ *
+ * @returns {Promise<{shiftLabel: string, targetsByMachineId: Map<string, number>,
+ *   officialStart: Date, officialEnd: Date, currentJob: object|null} | null>}
+ */
+async function fetchOfficialRollup({ query, plantSlug, at, logger = console }) {
+  const areaId = PLANT_AREA_ID[plantSlug]
+  if (!areaId) return null
+  try {
+    const data = await query({
+      type: 'whiteboard',
+      params: { rollup: 1, areas: areaId, start: toShoplogixTime(at) },
+    })
+    const machineRows = (data?.machines || []).filter(m => m.machineid && m.machineid !== 'Total')
+    if (!machineRows.length) return null
+
+    const shiftLabel = machineRows[0].shift
+    const targetsByMachineId = new Map(machineRows.map(m => [m.machineid, m.target]))
+    const currentJobRaw = (data?.jobs || []).find(j => j.currentJob) || (data?.jobs || [])[0] || null
+
+    return {
+      shiftLabel,
+      targetsByMachineId,
+      officialStart: parseShoplogixTime(machineRows[0].start),
+      officialEnd:   parseShoplogixTime(machineRows[0].end),
+      currentJob: currentJobRaw ? {
+        name: currentJobRaw.name ?? null,
+        jobMaxRunRate: currentJobRaw.jobMaxRunRate ?? null,
+        productionQuantityExpected: currentJobRaw.productionQuantityExpected ?? null,
+      } : null,
+    }
+  } catch (err) {
+    if (err.code === 'AUTH_EXPIRED') throw err
+    logger.warn(`[syncDay][${plantSlug}] rollup oficial no disponible (no bloquea): ${err.message}`)
+    return null
+  }
+}
+
 function deriveShiftGroups(machineProductionResponses, plantSlug) {
   // Usar la primera máquina que tenga intervalos (todas deberían tener los mismos shifts)
   const firstWithIntervals = machineProductionResponses.find(r => r?.machineProduction?.length > 0)
@@ -297,6 +359,15 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   // 2. Derivar grupos de turno reales
   const shiftGroups = deriveShiftGroups(productionResponses, plantSlug)
 
+  // 2.1 Rollup oficial de Shoplogix — SOLO cuando se sincroniza el día de HOY
+  // (nunca en backfill/re-sync de días pasados: ver comentario en
+  // fetchOfficialRollup sobre por qué no es fiable para reconstruir historia).
+  // Al ser "ahora", describe el turno vigente — se adjunta al grupo cuyo
+  // shiftId coincide con la etiqueta que reporta el rollup.
+  const officialRollup = (dateKey === currentDateKey())
+    ? await fetchOfficialRollup({ query, plantSlug, at: syncedAt, logger })
+    : null
+
   if (shiftGroups.length === 0) {
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${dateKey}: sin turnos detectados (sin datos aún)`)
     return { plantSlug, dateKey, shiftGroups: [] }
@@ -459,7 +530,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
     // Metadata del doc padre del turno — dateKey derivado del scheduledStart real
     const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
-    await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set({
+    const parentDoc = {
       dateKey:        parentShiftDateKey,
       shiftId:        group.shiftId,
       // Nombre crudo de Shoplogix (para trazabilidad); != shiftId solo cuando se
@@ -470,7 +541,23 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       scheduleSource: 'intervals',
       lastSyncAt:     syncedAt,
       machines:       shiftMachineResults,
-    }, { merge: true })
+    }
+
+    // Enriquecimiento con el rollup oficial: solo si su etiqueta de turno
+    // coincide con ESTE grupo (el rollup describe un único turno vigente por
+    // consulta; ver fetchOfficialRollup). additivo — nunca reemplaza
+    // scheduledStart/End derivados de intervals reales.
+    if (officialRollup && officialRollup.shiftLabel === group.shiftId) {
+      parentDoc.officialSchedule = {
+        start: officialRollup.officialStart,
+        end:   officialRollup.officialEnd,
+      }
+      parentDoc.officialTargetsByMachineId = Object.fromEntries(officialRollup.targetsByMachineId)
+      parentDoc.currentJob = officialRollup.currentJob
+      parentDoc.officialSyncedAt = syncedAt
+    }
+
+    await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set(parentDoc, { merge: true })
 
     allShiftResults.push({ shiftId: group.shiftId, machines: shiftMachineResults })
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${parentShiftDateKey} ${group.shiftId} OK (window dateKey=${dateKey})`, { machines: shiftMachineResults })
@@ -590,6 +677,7 @@ module.exports = {
   shiftWindow,
   fullDayWindow,
   deriveShiftGroups,
+  fetchOfficialRollup,
   shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
