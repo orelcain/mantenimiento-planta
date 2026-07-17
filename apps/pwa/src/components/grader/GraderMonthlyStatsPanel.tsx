@@ -5,14 +5,14 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, Sunrise } from 'lucide-react'
+import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
-import type { SlxMonthlyStats } from './GraderHistoricalCalendar'
+import { fmtSecPanoramic, type SlxMonthlyStats } from './GraderHistoricalCalendar'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -282,6 +282,53 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           )}
         </CardContent>
       </Card>
+
+      {/* ── Fila 3.5: Producción fuera de turno configurado ──
+          Visibilidad de horas extra productivas: la planta a veces entra
+          antes del horario oficial (decisión operacional del día) y esa
+          producción se registra en Shoplogix igual, solo sin turno asignado
+          ("Unscheduled"). No es un turno (no compite en Mejor/Peor/promedio,
+          ver slxMonthlyStats), pero tampoco se esconde — y es la munición
+          concreta para pedirle a planta que configure ese turno si el bloque
+          se repite seguido. Se oculta si el mes no tuvo nada fuera de turno. */}
+      {slxStats && slxStats.unscheduled.cycles > 0 && (
+        <Card className="border-slate-500/25 bg-slate-500/5">
+          <CardContent className="py-1.5 px-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                Fuera de turno configurado
+              </p>
+            </div>
+            <div className="flex justify-around text-center">
+              <div>
+                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                  {slxStats.unscheduled.cycles >= 1000
+                    ? `${(slxStats.unscheduled.cycles / 1000).toFixed(1)}k`
+                    : slxStats.unscheduled.cycles.toLocaleString('es-CL')}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">ciclos</p>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                  {fmtSecPanoramic(slxStats.unscheduled.uptimeSec)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">horas-máquina</p>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                  {slxStats.unscheduled.daysWithData}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  día{slxStats.unscheduled.daysWithData === 1 ? '' : 's'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ── */}
       {stats && stats.causas.length > 0 && (
