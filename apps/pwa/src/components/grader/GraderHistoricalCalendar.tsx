@@ -428,8 +428,9 @@ function normalizeUploads(
   return Array.from(map.values())
 }
 
-/** Formatea segundos en forma compacta. Usado en el panel panorámico mensual. */
-function fmtSecPanoramic(sec: number): string {
+/** Formatea segundos en forma compacta. Usado en el panel panorámico mensual
+ *  y en GraderMonthlyStatsPanel (contador de horas fuera de turno). */
+export function fmtSecPanoramic(sec: number): string {
   if (sec <= 0) return '0s'
   if (sec < 60) return `${Math.round(sec)}s`
   const m = Math.floor(sec / 60)
@@ -1000,6 +1001,21 @@ export interface SlxMonthlyStats {
   daysWithData: number
   bestShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
   worstShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
+  /**
+   * Producción registrada FUERA de cualquier turno configurado en Shoplogix
+   * ("Unscheduled") — visibilidad de horas extra productivas: la planta a
+   * veces entra antes del horario oficial (decisión operacional del día, no
+   * un turno faltante) y esa producción se registra igual, solo sin
+   * etiqueta de turno. Se cuenta aparte de bestShift/worstShift/avgUptimePct
+   * (que la excluyen, ver PR paquete Unscheduled) — no compite como turno,
+   * pero tampoco se esconde.
+   */
+  unscheduled: {
+    cycles: number
+    uptimeSec: number
+    /** Días del mes con producción SIGNIFICATIVA (≥ SLX_NOISE_THRESHOLD) fuera de turno. */
+    daysWithData: number
+  }
 }
 
 export function GraderHistoricalCalendar({
@@ -1989,6 +2005,11 @@ export function GraderHistoricalCalendar({
     let totalCycles = 0
     let sumUptime = 0
     let totalUptimeSec = 0
+    // Contador "fuera de turno" (ver SlxMonthlyStats.unscheduled) — visibilidad
+    // de horas extra productivas, no ranking.
+    let unscheduledCycles = 0
+    let unscheduledUptimeSec = 0
+    const unscheduledDaySet = new Set<string>()
     // Acumulador por Baader: machineid → uptime + ciclos + counts MTTR macro/micro
     const perMachineAcc = new Map<string, {
       name: string
@@ -2034,6 +2055,10 @@ export function GraderHistoricalCalendar({
         // — debe excluir Unscheduled en el MISMO if, si no el promedio queda mal
         // (numerador con más turnos que el denominador).
         sumUptime += uptimePct
+      } else {
+        unscheduledCycles    += cache.totalCycles
+        unscheduledUptimeSec += cache.totalUptimeSecAllMachines ?? 0
+        unscheduledDaySet.add(dk)
       }
       totalCycles    += cache.totalCycles
       // Suma de las 3 Baaders (no solo M0), coherente con totalCycles que también
@@ -2104,6 +2129,11 @@ export function GraderHistoricalCalendar({
       daysWithData: daySet.size,
       bestShift:  sorted[0] ?? null,
       worstShift: sorted[sorted.length - 1] ?? null,
+      unscheduled: {
+        cycles: unscheduledCycles,
+        uptimeSec: unscheduledUptimeSec,
+        daysWithData: unscheduledDaySet.size,
+      },
     }
   }, [currentMonth, slxByShift])
 
