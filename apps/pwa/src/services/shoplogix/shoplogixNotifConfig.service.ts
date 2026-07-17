@@ -2,10 +2,15 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 
+/** Destino de los mensajes Telegram: DM del admin con el bot, grupo (topic
+ *  General), o ambos. 'bot' es el default mientras los briefs están en rodaje. */
+export type TelegramDest = 'bot' | 'grupo' | 'ambos'
+
 export interface ShoplogixNotifConfig {
   channels: {
     push: boolean
     telegram: boolean
+    telegramDest: TelegramDest
   }
   shiftStart: {
     enabled: boolean
@@ -36,7 +41,7 @@ export interface ShoplogixNotifConfig {
 
 // Mantener alineado con SHOPLOGIX_NOTIF_DEFAULTS en functions/index.js.
 export const SHOPLOGIX_NOTIF_CONFIG_DEFAULTS: ShoplogixNotifConfig = {
-  channels:      { push: true, telegram: false },
+  channels:      { push: true, telegram: false, telegramDest: 'bot' },
   shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
   shiftEnd:      { enabled: true, delayMinutes: 10 },
   firstPiece:    { enabled: true },

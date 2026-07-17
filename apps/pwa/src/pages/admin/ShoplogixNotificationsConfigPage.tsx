@@ -7,6 +7,11 @@ import {
   Button,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Switch,
 } from '@/components/ui'
 import { Bell, Save, Loader2, RotateCcw } from 'lucide-react'
@@ -17,6 +22,7 @@ import {
   saveShoplogixNotifConfig,
   SHOPLOGIX_NOTIF_CONFIG_DEFAULTS,
   type ShoplogixNotifConfig,
+  type TelegramDest,
 } from '@/services/shoplogix/shoplogixNotifConfig.service'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
@@ -102,13 +108,31 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Telegram</Label>
-              <p className="text-xs text-muted-foreground">Mensaje al grupo Telegram (topic General)</p>
+              <p className="text-xs text-muted-foreground">Mensaje por Telegram (destino configurable abajo)</p>
             </div>
             <Switch
               checked={config.channels.telegram}
               onCheckedChange={(v) => patch('channels', { telegram: v })}
             />
           </div>
+          {config.channels.telegram && (
+            <div className="flex items-center gap-3 pl-4">
+              <Label className="text-sm whitespace-nowrap text-muted-foreground">Destino</Label>
+              <Select
+                value={config.channels.telegramDest}
+                onValueChange={(v) => patch('channels', { telegramDest: v as TelegramDest })}
+              >
+                <SelectTrigger className="h-8 text-sm w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bot">Solo al bot (chat privado)</SelectItem>
+                  <SelectItem value="grupo">Grupo Telegram (topic General)</SelectItem>
+                  <SelectItem value="ambos">Bot + grupo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 

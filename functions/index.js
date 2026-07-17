@@ -6615,6 +6615,7 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
             }
           : null
         await sendShoplogixTelegram(
+          config,
           turnoBriefMod.componerBriefInicioTurno({
             plantLabel,
             shiftId,
@@ -6654,7 +6655,9 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
 const SHOPLOGIX_PLANT_LABEL = { chonchi: 'Chonchi', yal: 'Yal', filete: 'Filete' }
 
 const SHOPLOGIX_NOTIF_DEFAULTS = {
-  channels:      { push: true, telegram: false },
+  // telegramDest: 'bot' = solo DM del admin con @antarfood_mant_bot (rodaje),
+  // 'grupo' = grupo Telegram (topic General), 'ambos' = los dos.
+  channels:      { push: true, telegram: false, telegramDest: 'bot' },
   shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
   // Brief de FIN de turno (piezas por Baader, total vs target, uptime, paros,
   // calidad Grader). delayMinutes = margen tras el fin para que el último sync
@@ -6696,15 +6699,21 @@ async function getShoplogixEligibleUsers(plant) {
   return ids
 }
 
-// Mientras los briefs Shoplogix están en rodaje, Telegram va SOLO al chat
-// privado del admin (DM con @antarfood_mant_bot), no al grupo. Cuando el
-// formato esté validado, poner en true para volver al grupo (topic General).
-const SHOPLOGIX_TELEGRAM_TO_GROUP = false
-
-function sendShoplogixTelegram(msg) {
-  if (!SHOPLOGIX_TELEGRAM_TO_GROUP) return sendTelegramMessage(msg, ARIA_ADMIN_CHAT_ID)
-  const topicId = getTopicId('general')
-  return sendTelegramMessage(msg, null, topicId ? { topicId } : {})
+// Destino Telegram de las notifs Shoplogix, configurable por planta desde
+// Panel Admin (channels.telegramDest): 'bot' = DM del admin con
+// @antarfood_mant_bot (default, para rodaje sin ensuciar el grupo),
+// 'grupo' = grupo Telegram (topic General), 'ambos' = los dos.
+function sendShoplogixTelegram(config, msg) {
+  const dest = config?.channels?.telegramDest || 'bot'
+  const sends = []
+  if (dest === 'bot' || dest === 'ambos') {
+    sends.push(sendTelegramMessage(msg, ARIA_ADMIN_CHAT_ID))
+  }
+  if (dest === 'grupo' || dest === 'ambos') {
+    const topicId = getTopicId('general')
+    sends.push(sendTelegramMessage(msg, null, topicId ? { topicId } : {}))
+  }
+  return Promise.all(sends)
 }
 
 async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data = {}, telegramMsg = null) {
@@ -6730,7 +6739,7 @@ async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data
     }
   }
   if (config.channels.telegram && telegramMsg) {
-    promises.push(sendShoplogixTelegram(telegramMsg))
+    promises.push(sendShoplogixTelegram(config, telegramMsg))
   }
   if (promises.length > 0) await Promise.all(promises)
 }
