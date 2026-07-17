@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, ClipboardCheck, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
+import { X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { machinesForCommonSap } from '@/data/commonPartsByMachine'
@@ -302,21 +302,19 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {/* Foto */}
-        <div className="mb-3 flex justify-center">
-          {photo ? (
+        {/* Foto — solo cuando HAY foto. El placeholder gastaba media pantalla
+            de móvil en un ícono (solo ~64 de 7.700 repuestos tienen foto) y
+            empujaba stock/ubicación fuera de la vista. */}
+        {photo && (
+          <div className="mb-3 flex justify-center">
             <button
               onClick={() => setLightbox(allPhotos.length ? allPhotos : null)}
               className="overflow-hidden rounded-lg border border-border transition hover:ring-2 hover:ring-primary"
             >
               <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
             </button>
-          ) : (
-            <div className="flex h-28 w-full max-w-[280px] items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground/50">
-              <ImageOff className="h-7 w-7" />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Nombre + SAP */}
         {isAdmin && onRename ? (
@@ -347,6 +345,27 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">sin SAP · pieza de despiece</span>
           )}
         </div>
+
+        {/* Stock + ubicación PRIMERO — es lo que el técnico vino a buscar.
+            Antes vivían 2 scrolls abajo (tarjeta de stock + fila BODEGA),
+            detrás de secciones administrativas. La tarjeta detallada
+            (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
+        {item.bodegaId && (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+              <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
+              <span className={item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'}>
+                {item.stockActual} {item.unidad || 'pzas'}
+              </span>
+              {item.stockStatus === 'out' && <span className="text-[11px] font-normal text-muted-foreground">sin stock</span>}
+              {item.stockStatus === 'low' && <span className="text-[11px] font-normal text-muted-foreground">bajo mínimo</span>}
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1 text-sm text-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate font-medium">{bodega}</span>
+            </span>
+          </div>
+        )}
 
         {/* Acción: solicitar repuesto — solo con SAP (lo ordenable). Sin SAP no se puede pedir. */}
         {sap ? (
