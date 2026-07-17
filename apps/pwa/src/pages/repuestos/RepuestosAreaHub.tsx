@@ -181,8 +181,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqLoading])
 
-  const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
-  useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
+  const { allRepuestos, loadAll, loadArea, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
   const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarMovimiento, registrarConteoRapido } = useBodega(allRepuestos)
 
@@ -196,6 +195,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
   })
   const [showingAll, setShowingAll] = useState(false)
+
+  // Carga de datos: si el usuario mira un área puntual, traer SOLO esa área
+  // (query por `areaIds`) en vez del maestro completo (~7.700 docs) — el
+  // aterrizaje típico del módulo. "Todas las áreas" o sin área elegida aún
+  // (primera visita, sin preferencia guardada) siguen usando el catálogo
+  // completo, que además deja tibio el caché para cualquier área futura.
+  useEffect(() => {
+    if (!machines.length) return
+    if (showingAll || !selectedAreaId) {
+      loadAll()
+    } else {
+      loadArea(selectedAreaId)
+    }
+  }, [machines, showingAll, selectedAreaId, loadAll, loadArea])
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>(() => {
     try { const s = localStorage.getItem('repuestos-open-nodes'); return s ? (JSON.parse(s) as Record<string, boolean>) : {} } catch { return {} }
   })
