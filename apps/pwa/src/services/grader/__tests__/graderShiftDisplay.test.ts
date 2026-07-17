@@ -5,6 +5,7 @@ import {
   getCfDateKeyForDisplayDay,
   slxKeyForVisualShift,
   getShiftMeta,
+  isUnscheduledShift,
 } from '../graderShiftDisplay'
 
 describe('isMidnightShift — dateKey del CF = día calendario (verificado vs prod)', () => {
@@ -98,5 +99,30 @@ describe('getShiftMeta — período derivado del HORARIO real (no del nombre)', 
   it('acepta Date además de string ISO', () => {
     const meta = getShiftMeta('Turno 1', new Date('2026-07-08T00:00:00.000Z'))
     expect(meta.period).toBe('noche')
+  })
+})
+
+describe('isUnscheduledShift — centraliza el literal "Unscheduled" (antes repetido en ~7 puntos)', () => {
+  it('true solo para el string exacto "Unscheduled"', () => {
+    expect(isUnscheduledShift('Unscheduled')).toBe(true)
+  })
+
+  it('false para turnos reales, incluidos los que contienen la palabra como substring', () => {
+    expect(isUnscheduledShift('Turno 1')).toBe(false)
+    expect(isUnscheduledShift('Turno 2')).toBe(false)
+    expect(isUnscheduledShift('Turno día')).toBe(false)
+    expect(isUnscheduledShift('UnscheduledX')).toBe(false)
+  })
+
+  it('false/sin lanzar para null, undefined y string vacío', () => {
+    expect(isUnscheduledShift(null)).toBe(false)
+    expect(isUnscheduledShift(undefined)).toBe(false)
+    expect(isUnscheduledShift('')).toBe(false)
+  })
+
+  it('la traducción amigable de Unscheduled sigue siendo "Sin turno asignado" (contrato usado en varias UIs)', () => {
+    const meta = getShiftMeta('Unscheduled')
+    expect(meta.label).toBe('Sin turno asignado')
+    expect(meta.shortLabel).toBe('S/T')
   })
 })

@@ -402,3 +402,14 @@ export function isSignificantSlxShift(
 ): boolean {
   return isSignificantCycleCount(cache?.totalCycles)
 }
+
+/**
+ * `true` si el shiftId representa el bloque "sin turno configurado" de
+ * Shoplogix (no es un turno real: no tiene horario que la planta haya
+ * declarado, así que nunca debe competir en rankings/promedios de turno ni
+ * contarse como turno de día o de noche). Centraliza el string literal
+ * 'Unscheduled', repetido antes en ~7 puntos de la UI sin un solo helper.
+ */
+export function isUnscheduledShift(shiftId: string | null | undefined): boolean {
+  return shiftId === 'Unscheduled'
+}

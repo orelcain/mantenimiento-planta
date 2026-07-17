@@ -14,6 +14,7 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from './types'
 import { aggregateShifts, type PlantKPIs } from './plantKpiCompute'
+import { isUnscheduledShift } from './graderShiftDisplay'
 
 function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
@@ -40,6 +41,11 @@ async function loadShiftForDates(
   for (const dk of dateKeys) {
     const ids = await listShoplogixShiftIdsForDay(dk, plantSlug).catch(() => [] as string[])
     for (const sid of [...ids].reverse()) {
+      // "Unscheduled" no es un turno — ARIA nunca debe reportar sus KPIs como
+      // "el turno actual" (mismo fix aplicado en usePlantKPIs.ts). Puede
+      // aparecer primero en este reverse() por tener el scheduledStart más
+      // tardío del día (arranca justo tras el turno nocturno).
+      if (isUnscheduledShift(sid)) continue
       const res = await loadShoplogixShift(dk, sid, plantSlug).catch(() => null)
       if (!res?.snapshot || res.snapshot.machines.length === 0) continue
       if (res.snapshot.machines.some((m) => m.shiftRuntime > 0)) {

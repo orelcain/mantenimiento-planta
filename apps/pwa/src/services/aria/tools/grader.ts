@@ -1022,7 +1022,10 @@ registerTool({
     }
     const s = live.snapshot
     const freshMin = live.syncedAt ? Math.max(0, Math.round((Date.now() - live.syncedAt.getTime()) / 60000)) : null
-    const tag = wantsPast ? `${s.shiftId} del ${s.dateKey}` : `EN CURSO ${s.shiftId}`
+    // shiftLabel() traduce 'Unscheduled' → 'Sin turno asignado': sin esto, si
+    // el bucket con más ciclos del día pasado resultaba ser Unscheduled, ARIA
+    // respondía literalmente "turno Unscheduled del 2026-07-05" al usuario.
+    const tag = wantsPast ? `${shiftLabel(s.shiftId)} del ${s.dateKey}` : `EN CURSO ${shiftLabel(s.shiftId)}`
 
     // Estado ACTUAL por máquina (último state = el vigente) — solo tiene
     // sentido para el turno en vivo; en un turno pasado el "último state" es
