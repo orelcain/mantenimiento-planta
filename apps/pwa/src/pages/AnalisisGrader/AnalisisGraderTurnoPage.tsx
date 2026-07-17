@@ -26,6 +26,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
+import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -1356,6 +1357,19 @@ export function AnalisisGraderTurnoPage() {
             )}
           </span>
         </div>
+      )}
+
+      {/* Chip rollup oficial de Shoplogix (horario/especie/% target) — solo
+          existe para el turno VIGENTE, degrada a nada en históricos. */}
+      {upstreamLine.officialRollup && (
+        <TurnoOficialChip
+          rollup={upstreamLine.officialRollup}
+          machines={upstreamLine.snapshot?.machines.map(m => ({
+            machineid: m.machineid,
+            totalCycles: m.totalCycles ?? 0,
+          })) ?? []}
+          className="mx-1"
+        />
       )}
 
       {/* Tiempos del DÍA completo (todos los turnos) — se muestra una sola vez,

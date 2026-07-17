@@ -186,6 +186,40 @@ export function computeLostPieces(
   }
 }
 
+export interface OfficialCompliance {
+  /** Suma de piezas producidas (todas las máquinas con target oficial). */
+  totalCycles: number
+  /** Suma de `officialTargetsByMachineId` — piezas esperadas del turno. */
+  targetTotal: number
+  /** `totalCycles / targetTotal`, 0..1+ (sin techo — un turno puede superar el target). */
+  pct: number
+  /** Mismos umbrales que `componerBriefFinTurno` (functions/shoplogix/turnoBrief.js):
+   *  ≥95% ok · ≥75% warn · resto critical. Mantener alineados — es el mismo
+   *  número que ve el operador en el brief de Telegram del mismo turno. */
+  level: 'ok' | 'warn' | 'critical'
+}
+
+/**
+ * Cumplimiento vs TARGET OFICIAL del turno (rollup de Shoplogix), no contra
+ * el target nominal/nameplate. Solo tiene sentido para el turno VIGENTE — el
+ * rollup nunca se captura en backfill (ver `fetchOfficialRollup` en
+ * `functions/shoplogix/sync.js`), así que para turnos históricos
+ * `officialTargetsByMachineId` es `null` y esta función devuelve `null`
+ * (degrada limpio: no inventar un target donde no lo hay).
+ */
+export function computeOfficialCompliance(
+  machines: Pick<MachineKPI, 'machineid' | 'totalCycles'>[],
+  officialTargetsByMachineId: Record<string, number> | null | undefined,
+): OfficialCompliance | null {
+  if (!officialTargetsByMachineId) return null
+  const targetTotal = Object.values(officialTargetsByMachineId).reduce((a, b) => a + (b || 0), 0)
+  if (targetTotal <= 0) return null
+  const totalCycles = machines.reduce((a, m) => a + (m.totalCycles || 0), 0)
+  const pct = totalCycles / targetTotal
+  const level: OfficialCompliance['level'] = pct >= 0.95 ? 'ok' : pct >= 0.75 ? 'warn' : 'critical'
+  return { totalCycles, targetTotal, pct, level }
+}
+
 export function computeMachineKPI(m: UpstreamMachineShift, lineCpm: number | null = null): MachineKPI {
   const uptimeSec = m.shiftRuntimeBreakdown.uptimeSec
   // Averías MACRO (sin micro ni paros operacionales) para MTTR/MTBF profesional.

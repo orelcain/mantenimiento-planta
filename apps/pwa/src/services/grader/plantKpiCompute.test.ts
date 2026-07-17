@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals, computeLostPieces, cadenceCpm, lineCadenceCpm } from './plantKpiCompute'
+import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals, computeLostPieces, cadenceCpm, lineCadenceCpm, computeOfficialCompliance } from './plantKpiCompute'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from './types'
 
@@ -208,5 +208,49 @@ describe('plantKpiCompute', () => {
     const kpis = aggregateShifts([shift], 'test', [])
     expect(kpis!.quality).toBeNull()
     expect(kpis!.oee).toBeNull()
+  })
+})
+
+describe('computeOfficialCompliance', () => {
+  const machines = [
+    { machineid: 'a', totalCycles: 1109 },
+    { machineid: 'b', totalCycles: 900 },
+    { machineid: 'c', totalCycles: 934 },
+  ]
+  const targets = { a: 1109.4195, b: 934.248, c: 934.248 } // caso real chonchi Turno 1 COHO
+
+  it('sin rollup (turno histórico) → null, no inventa target', () => {
+    expect(computeOfficialCompliance(machines, null)).toBeNull()
+    expect(computeOfficialCompliance(machines, undefined)).toBeNull()
+  })
+
+  it('targetTotal 0 → null (no dividir por cero)', () => {
+    expect(computeOfficialCompliance(machines, { a: 0, b: 0 })).toBeNull()
+  })
+
+  it('calcula % y nivel igual que componerBriefFinTurno (umbrales 95/75)', () => {
+    const r = computeOfficialCompliance(machines, targets)
+    expect(r).not.toBeNull()
+    expect(r!.totalCycles).toBe(2943)
+    expect(r!.targetTotal).toBeCloseTo(2977.9155, 2)
+    expect(r!.pct).toBeCloseTo(0.9883, 3) // ~99% → ok
+    expect(r!.level).toBe('ok')
+  })
+
+  it('nivel warn entre 75% y 95%', () => {
+    const r = computeOfficialCompliance([{ machineid: 'a', totalCycles: 800 }], { a: 1000 })
+    expect(r!.level).toBe('warn')
+  })
+
+  it('nivel critical bajo 75% (caso brief: 20% del target → rojo)', () => {
+    const r = computeOfficialCompliance([{ machineid: 'a', totalCycles: 1000 }], { a: 5000 })
+    expect(r!.pct).toBeCloseTo(0.2, 3)
+    expect(r!.level).toBe('critical')
+  })
+
+  it('puede superar 100% (sin techo)', () => {
+    const r = computeOfficialCompliance([{ machineid: 'a', totalCycles: 1200 }], { a: 1000 })
+    expect(r!.pct).toBeCloseTo(1.2, 3)
+    expect(r!.level).toBe('ok')
   })
 })

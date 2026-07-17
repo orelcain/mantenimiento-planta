@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
-import { subscribeShoplogixShiftAuto } from '@/services/shoplogix/shoplogixShift.service'
+import { subscribeShoplogixShiftAuto, type ShoplogixOfficialRollup } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { logger } from '@/lib/logger'
 
@@ -25,6 +25,9 @@ export interface UseUpstreamLineSnapshotResult {
   syncedAt: Date | null
   /** Identifica la fuente de datos para debug. */
   source: 'firestore' | 'demo' | 'none'
+  /** Rollup oficial (horario/especie/targets) del turno vigente. `null` cuando
+   *  no aplica (turno histórico, o aún sin sincronizar). */
+  officialRollup: ShoplogixOfficialRollup | null
 }
 
 /**
@@ -60,12 +63,14 @@ export function useUpstreamLineSnapshot(
   const [error, setError] = useState<string | null>(null)
   const [syncedAt, setSyncedAt] = useState<Date | null>(null)
   const [source, setSource] = useState<'firestore' | 'demo' | 'none'>('none')
+  const [officialRollup, setOfficialRollup] = useState<ShoplogixOfficialRollup | null>(null)
 
   useEffect(() => {
     if (!dateKey || !shiftId) {
       setSnapshot(null)
       setSource('none')
       setLoading(false)
+      setOfficialRollup(null)
       return
     }
 
@@ -77,6 +82,7 @@ export function useUpstreamLineSnapshot(
     setSnapshot(null)
     setSource('none')
     setSyncedAt(null)
+    setOfficialRollup(null)
 
     // Suscripción en tiempo real: el hook se actualiza automáticamente cada
     // vez que el Cloud Function escribe a Firestore (cada ~5 min en turno activo).
@@ -85,7 +91,8 @@ export function useUpstreamLineSnapshot(
       dateKey,
       shiftId,
       plantSlug,
-      ({ snapshot: fsSnap, syncedAt: fsSynced }) => {
+      ({ snapshot: fsSnap, syncedAt: fsSynced, officialRollup: fsRollup }) => {
+        setOfficialRollup(fsRollup ?? null)
         if (fsSnap) {
           setSnapshot(fsSnap)
           setSource('firestore')
@@ -112,5 +119,5 @@ export function useUpstreamLineSnapshot(
     return unsubscribe
   }, [dateKey, shiftId, plantSlug])
 
-  return { snapshot, loading, error, syncedAt, source }
+  return { snapshot, loading, error, syncedAt, source, officialRollup }
 }
