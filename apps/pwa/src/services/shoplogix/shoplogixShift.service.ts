@@ -82,6 +82,53 @@ function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
   }
 }
 
+/**
+ * Rollup oficial de Shoplogix (horario real del turno, especie en curso,
+ * target de piezas por máquina), capturado por `fetchOfficialRollup` en
+ * `functions/shoplogix/sync.js` — SOLO existe para el turno VIGENTE (nunca en
+ * backfill/históricos: no es fiable para reconstrucción, ver comentario en el
+ * sync). Mismos campos que consume `turnoBrief.js` para los briefs de Telegram
+ * — mantener el cálculo de cumplimiento alineado con `componerBriefFinTurno`
+ * (total/targetTotal, umbrales 95/75) para que el número de la UI y el del
+ * brief sean siempre el mismo.
+ */
+export interface ShoplogixOfficialRollup {
+  officialSchedule: { start: Date; end: Date } | null
+  currentJob: {
+    name: string | null
+    jobMaxRunRate: number | null
+    productionQuantityExpected: number | null
+  } | null
+  officialTargetsByMachineId: Record<string, number> | null
+}
+
+function parseOfficialRollup(data: FirestoreData | null | undefined): ShoplogixOfficialRollup | null {
+  if (!data) return null
+  const sched = data.officialSchedule as FirestoreData | undefined
+  const officialSchedule = sched?.start != null && sched?.end != null
+    ? { start: toDateSafe(sched.start), end: toDateSafe(sched.end) }
+    : null
+
+  const job = data.currentJob as FirestoreData | undefined
+  const currentJob = job
+    ? {
+        name: typeof job.name === 'string' ? job.name : null,
+        jobMaxRunRate: typeof job.jobMaxRunRate === 'number' ? job.jobMaxRunRate : null,
+        productionQuantityExpected: typeof job.productionQuantityExpected === 'number' ? job.productionQuantityExpected : null,
+      }
+    : null
+
+  const targetsRaw = data.officialTargetsByMachineId as FirestoreData | undefined
+  const officialTargetsByMachineId = targetsRaw && typeof targetsRaw === 'object'
+    ? Object.fromEntries(
+        Object.entries(targetsRaw).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+      )
+    : null
+
+  if (!officialSchedule && !currentJob && !officialTargetsByMachineId) return null
+  return { officialSchedule, currentJob, officialTargetsByMachineId }
+}
+
 function deserializeState(raw: FirestoreData): UpstreamMachineState {
   return {
     startAt:     toDateSafe(raw.startAt),
@@ -282,6 +329,11 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
 export interface LoadShoplogixShiftResult {
   snapshot: UpstreamLineSnapshot | null
   syncedAt: Date | null
+  /** Rollup oficial del turno vigente (horario/especie/targets). `undefined` en
+   *  `loadShoplogixShift` (carga histórica, nunca lo trae) — solo poblado por
+   *  `subscribeShoplogixShift`/`subscribeShoplogixShiftAuto`. `null` = turno sin
+   *  rollup disponible (histórico, o aún no sincronizado). */
+  officialRollup?: ShoplogixOfficialRollup | null
 }
 
 /**
@@ -361,12 +413,29 @@ export function subscribeShoplogixShift(
 ): () => void {
   const shiftDocId = `${dateKey}_${shiftId}`
   const machinesRef = collection(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`)
+  const parentRef = doc(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}`)
 
-  return onSnapshot(
+  // Dos listeners combinados: la subcolección `machines` (data pesada, ya
+  // existía) y el doc padre (liviano, 1 doc — trae officialSchedule/currentJob/
+  // officialTargetsByMachineId cuando este es el turno vigente). Se emite un
+  // único LoadShoplogixShiftResult cada vez que CUALQUIERA de los dos cambia,
+  // una vez que ambos emitieron al menos una vez (evita un primer emit con
+  // rollup a medias).
+  let machinesResult: { snapshot: UpstreamLineSnapshot | null; syncedAt: Date | null } | null = null
+  let officialRollup: ShoplogixOfficialRollup | null = null
+  let parentHeard = false
+
+  const emit = () => {
+    if (!machinesResult || !parentHeard) return
+    onUpdate({ ...machinesResult, officialRollup })
+  }
+
+  const unsubMachines = onSnapshot(
     machinesRef,
     (snap) => {
       if (snap.empty) {
-        onUpdate({ snapshot: null, syncedAt: null })
+        machinesResult = { snapshot: null, syncedAt: null }
+        emit()
         return
       }
       const machines: ReturnType<typeof deserializeShift>[] = snap.docs.map(
@@ -376,13 +445,31 @@ export function subscribeShoplogixShift(
       const lineSnapshot = buildLineSnapshot({ dateKey, shiftId, machines })
       // syncedAt desde el primer doc (todas las máquinas se sincronizan juntas)
       const syncedAt = machines[0]?.syncedAt ?? null
-      onUpdate({ snapshot: lineSnapshot, syncedAt })
+      machinesResult = { snapshot: lineSnapshot, syncedAt }
+      emit()
     },
     (_error) => {
       // Error de red o permisos → informar pero no romper la UI
-      onUpdate({ snapshot: null, syncedAt: null })
+      machinesResult = { snapshot: null, syncedAt: null }
+      emit()
     },
   )
+
+  const unsubParent = onSnapshot(
+    parentRef,
+    (snap) => {
+      officialRollup = parseOfficialRollup(snap.exists() ? (snap.data() as FirestoreData) : null)
+      parentHeard = true
+      emit()
+    },
+    (_error) => {
+      officialRollup = null
+      parentHeard = true
+      emit()
+    },
+  )
+
+  return () => { unsubMachines(); unsubParent() }
 }
 
 /**
