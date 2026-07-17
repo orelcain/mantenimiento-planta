@@ -16,6 +16,7 @@ import {
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
 import { avg, computeMachineKPI, aggregateShifts } from '@/services/grader/plantKpiCompute'
+import { isUnscheduledShift } from '@/services/grader/graderShiftDisplay'
 import type { MachineKPI, PlantKPIs } from '@/services/grader/plantKpiCompute'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
@@ -83,7 +84,12 @@ async function loadShiftsForDates(
 ): Promise<{ dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[]> {
   const perDay = await Promise.all(
     dateKeys.map(async (dk) => {
-      const ids = await listShoplogixShiftIdsForDay(dk, plantSlug).catch(() => [] as string[])
+      const allIds = await listShoplogixShiftIdsForDay(dk, plantSlug).catch(() => [] as string[])
+      // "Unscheduled" no es un turno (no tiene ventana programada) — no debe
+      // entrar a la agregación de KPIs de Día/Semana/Mes: infla shiftsCount y
+      // diluye disponibilidad/rendimiento con un bucket que no es comparable
+      // (misma razón que en slxMonthlyStats del calendario histórico).
+      const ids = allIds.filter((sid) => !isUnscheduledShift(sid))
       const loaded = await Promise.all(
         ids.map(async (sid) => {
           const res = await loadShoplogixShift(dk, sid, plantSlug).catch(() => null)
@@ -123,6 +129,11 @@ export function usePlantKPIs(
           const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
           if (cancelled) return
           for (const sid of [...ids].reverse()) {
+            // "Unscheduled" nunca debe quedar como "el turno" que representa
+            // el board — puede tener el scheduledStart más TARDÍO del día
+            // (arranca justo tras el turno nocturno) y ganarle a un turno
+            // real que aún no comenzó, apareciendo primero en este reverse().
+            if (isUnscheduledShift(sid)) continue
             const res = await loadShoplogixShift(dk, sid, plantSlug)
             if (cancelled) return
             if (!res.snapshot || res.snapshot.machines.length === 0) continue
@@ -227,6 +238,9 @@ export function usePlantKPIsForPeriod(
             const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
             if (cancelled) return
             for (const sid of [...ids].reverse()) {
+              // Ver comentario equivalente en usePlantKPIs (arriba): Unscheduled
+              // nunca debe representar "el turno" del board.
+              if (isUnscheduledShift(sid)) continue
               const res = await loadShoplogixShift(dk, sid, plantSlug)
               if (cancelled) return
               if (!res.snapshot || res.snapshot.machines.length === 0) continue

@@ -66,6 +66,7 @@ import {
   getShiftMeta,
   isSignificantCycleCount,
   isLowActivityCycleCount,
+  isUnscheduledShift,
   SLX_LOW_ACTIVITY_THRESHOLD,
 } from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
@@ -520,7 +521,16 @@ function buildDayTimelineBlocks(
     // Refinar posición con Shoplogix efectivo (cuando disponible).
     // Esto muestra gaps reales: ej. si Shoplogix dice activo 09:00–17:27
     // pero hist.startAt = 07:00, el bloque D arranca en 09:00 (gap visible).
-    const slxCacheForBlock = slxData?.get(hist.id)
+    //
+    // Para cards virtuales (buildSlxVirtualSummaries), `hist.id` viene con el
+    // prefijo `slx-virtual:` pero `slxData` (= slxByShift) se llavea por el
+    // mapKey `${dateKey}__${shiftId}` SIN ese prefijo — el lookup fallaba
+    // siempre para virtuales y el recorte a ventana efectiva nunca corría
+    // (bug real: el bloque "Unscheduled" pintaba 04:00→04:00, 24h enteras,
+    // en vez de recortarse a su actividad real).
+    const SLX_VIRTUAL_PREFIX = 'slx-virtual:'
+    const slxLookupKey = hist.id.startsWith(SLX_VIRTUAL_PREFIX) ? hist.id.slice(SLX_VIRTUAL_PREFIX.length) : hist.id
+    const slxCacheForBlock = slxData?.get(slxLookupKey)
     if (slxCacheForBlock?.shiftStart && slxCacheForBlock?.shiftEnd && slxCacheForBlock.states.length > 0) {
       const gS = hist.startAt ? new Date(hist.startAt).getTime() : null
       const gE = hist.endAt   ? new Date(hist.endAt).getTime()   : null
@@ -549,21 +559,29 @@ function buildDayTimelineBlocks(
       }
     }
 
-    const status = p0StatusFromPct(hist.pointZeroPct)
-    const bgClass =
-      status === 'ok'    ? 'bg-emerald-500/65' :
-      status === 'alert' ? 'bg-amber-500/65'   :
-                           'bg-rose-500/65'
+    // "Unscheduled" no es un turno real (no tiene P0% ni Excel asociado): el
+    // status P0 siempre daba 'ok' (pointZeroPct=0 por defecto) y pintaba el
+    // bloque VERDE como si fuera un turno saludable. Se pinta neutro (slate,
+    // igual paleta que su SHIFT_META_TABLE) y nunca se calcula P0 sobre él.
+    const isUnscheduledBlock = isUnscheduledShift(hist.shiftId)
+    const status = isUnscheduledBlock ? null : p0StatusFromPct(hist.pointZeroPct)
+    const bgClass = isUnscheduledBlock
+      ? 'bg-slate-500/45'
+      : status === 'ok'    ? 'bg-emerald-500/65' :
+        status === 'alert' ? 'bg-amber-500/65'   :
+                             'bg-rose-500/65'
 
     // Etiqueta del bloque = shiftId real de Shoplogix, no convención
     // inventada (D/N). Para Turno día/noche dejamos D/N por compat con
-    // Chonchi; para T1/T2/T3 mostramos el número tal cual.
+    // Chonchi; para T1/T2/T3 mostramos el número tal cual. "Unscheduled" usa
+    // su shortLabel amigable ("S/T") en vez del string crudo de Shoplogix.
     const base =
       hist.shiftId === 'Turno día'   ? 'D'  :
       hist.shiftId === 'Turno noche' ? 'N'  :
       hist.shiftId === 'Turno 1'     ? 'T1' :
       hist.shiftId === 'Turno 2'     ? 'T2' :
       hist.shiftId === 'Turno 3'     ? 'T3' :
+      isUnscheduledBlock             ? getShiftMeta(hist.shiftId).shortLabel :
       hist.shiftId
     const label =
       direction === 'enters' ? `→${base}` :
@@ -592,7 +610,9 @@ function buildDayTimelineBlocks(
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
       bgClass, label,
-      title: `${hist.shiftId} · P0 ${hist.pointZeroPct.toFixed(2)}% · ${ts}${pct}`,
+      title: isUnscheduledBlock
+        ? `${getShiftMeta(hist.shiftId).label} · ${hist.totalPieces.toLocaleString('es-CL')} ciclos · ${ts}${pct}`
+        : `${hist.shiftId} · P0 ${hist.pointZeroPct.toFixed(2)}% · ${ts}${pct}`,
       nightSide: direction === 'enters' ? 'start' : direction === 'exits' ? 'end' : null,
       summaryId: hist.id,
       dateKey: hist.dateKey,
@@ -633,7 +653,12 @@ function buildDayTimelineBlocks(
     interface VisualShiftRef { shiftId: string; cfDateKey: string; mapKey: string }
     const visualShifts: VisualShiftRef[] = []
     for (const [mapKey, slx] of slxData.entries()) {
-      if ((slx.totalCycles ?? 0) === 0) continue
+      // Antes filtraba con `=== 0` (cualquier ciclo >0 pasaba): un turno con
+      // 1-49 ciclos (ruido — ver SLX_NOISE_THRESHOLD) pintaba igual un bloque
+      // de día completo y clicable, mismo problema que en el resto del módulo
+      // (Unscheduled con pocos ciclos era el caso más visible, pero el filtro
+      // débil aplicaba a cualquier shiftId).
+      if (!isSignificantCycleCount(slx.totalCycles)) continue
       const sepIdx = mapKey.indexOf('__')
       if (sepIdx < 0) continue
       const cfDateKey = mapKey.slice(0, sepIdx)
@@ -1995,9 +2020,22 @@ export function GraderHistoricalCalendar({
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       const uptimePct = cache.avgShiftRuntime * 100
-      withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
+      // "Unscheduled" no es un turno (no tiene ventana programada — igual que
+      // Shoplogix trata el tiempo sin turno como "Capacidad no definida",
+      // EXCLUIDA antes del cálculo de OEE, confirmado inspeccionando su propia
+      // cascada OEE). No entra a `withData` → nunca gana/pierde el ranking de
+      // Mejor/Peor turno, ni infla el promedio de uptime, ni cuenta como turno
+      // (ni de día ni de noche). Su producción SÍ sigue contando en
+      // totalCycles/totalUptimeSec/perMachineMonth de abajo — los ciclos
+      // procesados son reales y no se ocultan, solo no compiten como "turno".
+      if (!isUnscheduledShift(shiftId)) {
+        withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
+        // sumUptime es el numerador de avgUptimePct (denominador: withData.length)
+        // — debe excluir Unscheduled en el MISMO if, si no el promedio queda mal
+        // (numerador con más turnos que el denominador).
+        sumUptime += uptimePct
+      }
       totalCycles    += cache.totalCycles
-      sumUptime      += uptimePct
       // Suma de las 3 Baaders (no solo M0), coherente con totalCycles que también
       // suma las 3. Representa horas-máquina totales procesando del mes.
       totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
@@ -2600,8 +2638,13 @@ export function GraderHistoricalCalendar({
                 : `${visibleIdx}/${visibleCount}`
             const meta = KIND_META[kind]
             const isVirtual = hist.isSlxVirtual === true
-            // Virtuals SLX: no hay P0% real → usar 'ok' (color emerald) por defecto
-            // y mostrar uptime% en su lugar del P0%.
+            // "Unscheduled" no es un turno real (nunca tiene Excel/P0%): se
+            // distingue de los demás virtuales SLX (turnos nombrados sin Excel,
+            // que sí muestran 'ok'/verde por defecto porque no se conoce ningún
+            // problema) — Unscheduled directamente no es evaluable como turno.
+            const isUnscheduledCard = isVirtual && isUnscheduledShift(hist.shiftId)
+            // Virtuals SLX (turnos nombrados): no hay P0% real → 'ok' (emerald)
+            // por defecto y se muestra uptime% en su lugar del P0%.
             const status = isVirtual ? 'ok' : p0StatusFromPct(hist.pointZeroPct)
             const fragPieces = chip?.pieces ?? hist.totalPieces
             const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
@@ -2724,9 +2767,11 @@ export function GraderHistoricalCalendar({
                 onMouseLeave={() => setHoveredFragId(null)}
                 className={cn(
                   'rounded-lg border-2 border-l-4 px-3 py-2.5 space-y-2 cursor-pointer transition-all',
-                  isLowActivity
-                    ? 'border-dashed border-amber-500/40 bg-amber-500/5'
-                    : P0_CARD_CLASS[status],
+                  isUnscheduledCard
+                    ? 'border-slate-500/25 bg-slate-500/5 hover:border-slate-500/40'
+                    : isLowActivity
+                      ? 'border-dashed border-amber-500/40 bg-amber-500/5'
+                      : P0_CARD_CLASS[status],
                   isActiveForConfig &&
                     'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
                   isHovered && !isActiveForConfig &&
@@ -2740,8 +2785,12 @@ export function GraderHistoricalCalendar({
                       {/* Yal: usar el shiftId real de Shoplogix (Turno 1/2/3) en
                           lugar de la convención inventada "Día/Noche". Chonchi:
                           KIND_META.title sigue siendo Día/Noche/Madrugada como
-                          se ha mostrado siempre. */}
-                      {plantLine.isClassificationPlant === false ? hist.shiftId : meta.title}
+                          se ha mostrado siempre. "Unscheduled" es la única
+                          excepción: se traduce siempre a su label amigable —
+                          antes salía crudo ("Unscheduled") incluso en Yal. */}
+                      {isUnscheduledCard
+                        ? getShiftMeta(hist.shiftId).label
+                        : plantLine.isClassificationPlant === false ? hist.shiftId : meta.title}
                     </p>
                     {orderText && (
                       <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground">
@@ -2784,7 +2833,20 @@ export function GraderHistoricalCalendar({
                       </span>
                     )}
                   </div>
-                  {isVirtual ? (
+                  {isUnscheduledCard ? (
+                    // Sin turno no hay "uptime del turno" que mostrar (no hay
+                    // ventana programada contra la cual medirlo) — mostrar el
+                    // % de uptime acá era el mismo error que "P0 0.00%" del
+                    // tooltip del timeline: un número que parece evaluar algo
+                    // que en realidad no es evaluable. Se muestran los ciclos
+                    // reales (el dato honesto: esa producción SÍ se registró).
+                    <span
+                      className="text-xl font-bold tabular-nums text-slate-400"
+                      title="Sin turno configurado en Shoplogix para esta ventana — no se calcula uptime de turno."
+                    >
+                      {hist.totalPieces.toLocaleString('es-CL')}
+                    </span>
+                  ) : isVirtual ? (
                     <span
                       className="text-xl font-bold tabular-nums text-sky-500"
                       title={`Uptime promedio Baader (${((hist.slxUptimeFraction ?? 0) * 100).toFixed(0)}% del turno).`}
