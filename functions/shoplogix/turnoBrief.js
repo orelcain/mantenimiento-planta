@@ -162,22 +162,38 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
  * algún estado uptime, o los estados empiezan a cambiar (más de un estado por
  * máquina: la línea está intentando algo).
  *
+ * Ciclo de vida completo del check (F3, mensaje de recuperación):
+ *   pending → wait → alert (mensaje "Sin piezas", el check NO se cierra) →
+ *   wait (post-alerta, sin re-alertar) → recovered (mensaje "✅ arrancó") → cierra
+ *   El único estado que re-evalúa actividad (uptime/estados cambiando) es el
+ *   PRIMER paso a 'alert'; una vez alertado, `alerted:true` hace que 'wait'
+ *   ignore la actividad y solo mire `totalCycles` — no tiene sentido "des-alertar"
+ *   por perder actividad después de ya haber avisado.
+ *
  * @param {Object} p
  * @param {number} p.totalCycles   suma de ciclos de todas las máquinas
  * @param {Array<{states: Array}>} p.machines  máquinas del turno (states normalizados)
  * @param {Date}   p.checkAt       cuándo venció el check
  * @param {Date}   p.now
+ * @param {boolean} [p.alerted]    true si este check YA emitió la alerta "Sin piezas"
+ *   en una corrida anterior (sigue pendiente esperando la recuperación, no cerrado)
  * @param {number} [p.expireHours] horas tras checkAt para dar el turno por perdido
- * @returns {'ok'|'alert'|'wait'|'expire'}
- *   ok     — hay piezas: cerrar sin alertar
- *   expire — sin piezas y el turno quedó atrás: cerrar en silencio (día sin proceso)
- *   alert  — hay actividad en Shoplogix pero 0 piezas: alertar UNA vez y cerrar
- *   wait   — sin actividad todavía: dejar el check pendiente hasta que Shoplogix
- *            registre un cambio (piezas o estado nuevo fuera del idle de fondo)
+ * @returns {'ok'|'alert'|'wait'|'expire'|'recovered'}
+ *   ok        — nunca alertó y ya hay piezas (arrancó dentro del margen): cerrar sin mensaje
+ *   expire    — sin piezas y el check lleva demasiado tiempo abierto (>expireHours desde
+ *               checkAt): cerrar en silencio. Aplica ASÍ HAYA ALERTADO — sin este tope el
+ *               ciclo de recuperación quedaría esperando piezas para siempre en un turno
+ *               que se perdió del todo, recreando el backlog eterno que motivó F3
+ *               (ver incidente 2026-07-17, PR #221).
+ *   alert     — primera vez con actividad pero 0 piezas: alertar y SEGUIR pendiente
+ *               (para poder emitir la recuperación cuando arranque)
+ *   wait      — sin novedad: dejar el check pendiente
+ *   recovered — ya había alertado y ahora hay piezas: mensaje de recuperación y cerrar
  */
-function evaluarDelayCheck({ totalCycles, machines, checkAt, now, expireHours = 12 }) {
-  if (totalCycles > 0) return 'ok'
+function evaluarDelayCheck({ totalCycles, machines, checkAt, now, alerted = false, expireHours = 12 }) {
+  if (totalCycles > 0) return alerted ? 'recovered' : 'ok'
   if (now.getTime() - checkAt.getTime() >= expireHours * 3600 * 1000) return 'expire'
+  if (alerted) return 'wait' // ya avisó una vez; solo esperar piezas, no re-evaluar actividad
   const hayActividad = (machines || []).some((m) => {
     const states = m.states || []
     return states.some((s) => s?.type === 'uptime') || states.length > 1
@@ -185,4 +201,20 @@ function evaluarDelayCheck({ totalCycles, machines, checkAt, now, expireHours = 
   return hayActividad ? 'alert' : 'wait'
 }
 
-module.exports = { componerBriefInicioTurno, componerBriefFinTurno, resumenParos, evaluarDelayCheck }
+/**
+ * Mensaje de recuperación tras una alerta "Sin piezas" — cierra el ciclo: el
+ * turno arrancó tarde pero arrancó. `delayMinutes` queda persistido en el
+ * check (ver checkShiftStartDelays) como dato crudo para poder reportar
+ * "retraso de arranque por turno" más adelante.
+ */
+function componerMensajeRecuperacion({ plantLabel, shiftId, delayMinutes }) {
+  return `✅ <b>Arrancó</b> — ${plantLabel}\n${shiftId} · demoró <b>${delayMinutes} min</b> desde el horario programado`
+}
+
+module.exports = {
+  componerBriefInicioTurno,
+  componerBriefFinTurno,
+  resumenParos,
+  evaluarDelayCheck,
+  componerMensajeRecuperacion,
+}
