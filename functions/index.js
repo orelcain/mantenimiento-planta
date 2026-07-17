@@ -4,7 +4,7 @@ const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
-const { getFirestore, FieldValue } = require('firebase-admin/firestore')
+const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore')
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
@@ -5851,6 +5851,7 @@ exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const shoplogixSyncMod  = require('./shoplogix/sync')
+const turnoBriefMod     = require('./shoplogix/turnoBrief')
 const shoplogixPolling  = require('./shoplogix/polling')
 const shoplogixTokenStore = require('./shoplogix/tokenStore')
 const shoplogixClient   = require('./shoplogix/client')
@@ -6567,6 +6568,15 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
     const shiftId    = data.shiftId || shiftDoc.split('_').slice(1).join('_')
     const plantLabel = SHOPLOGIX_PLANT_LABEL[plant] || plant
 
+    // "Unscheduled" no es un turno: su doc se crea en el primer sync del día
+    // (bucket residual de Shoplogix) y disparaba "Proceso iniciado ·
+    // Unscheduled" + un delay-check espurio. Mismo criterio que la PWA
+    // (isUnscheduledShift) y que checkShiftEndBriefs.
+    if (shiftId === 'Unscheduled') {
+      logger.info(`[onShoplogixShiftStarted] ${plant} Unscheduled — skip (no es un turno)`)
+      return
+    }
+
     logger.info(`[onShoplogixShiftStarted] ${plant} ${shiftId}`)
 
     const [config, usersSnap] = await Promise.all([
@@ -6594,11 +6604,25 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
           logger.info(`[onShoplogixShiftStarted] FCM enviado`, { eligible: eligibleIds.length, tokens: tokens.length })
         }
       }
-      // Telegram (canal opcional)
+      // Telegram (canal opcional) — brief enriquecido con el rollup oficial
+      // (horario/especie/target quedan en el doc padre desde el sync que crea
+      // el turno vigente; si faltan, el composer degrada a las 2 líneas de antes)
       if (config.channels.telegram) {
         const topicId = getTopicId('general')
+        const officialSchedule = data.officialSchedule?.start && data.officialSchedule?.end
+          ? {
+              start: data.officialSchedule.start.toDate?.() ?? data.officialSchedule.start,
+              end:   data.officialSchedule.end.toDate?.()   ?? data.officialSchedule.end,
+            }
+          : null
         await sendTelegramMessage(
-          `🟢 <b>Proceso iniciado · ${plantLabel}</b>\n${shiftId} ha arrancado`,
+          turnoBriefMod.componerBriefInicioTurno({
+            plantLabel,
+            shiftId,
+            officialSchedule,
+            currentJob: data.currentJob ?? null,
+            officialTargets: data.officialTargetsByMachineId ?? null,
+          }),
           null,
           topicId ? { topicId } : {},
         )
@@ -6635,9 +6659,15 @@ const SHOPLOGIX_PLANT_LABEL = { chonchi: 'Chonchi', yal: 'Yal', filete: 'Filete'
 const SHOPLOGIX_NOTIF_DEFAULTS = {
   channels:      { push: true, telegram: false },
   shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
+  // Brief de FIN de turno (piezas por Baader, total vs target, uptime, paros,
+  // calidad Grader). delayMinutes = margen tras el fin para que el último sync
+  // (cada 5 min) alcance a dejar la data completa antes de redactar.
+  shiftEnd:      { enabled: true, delayMinutes: 10 },
   firstPiece:    { enabled: true },
   pieceInterval: { enabled: false, every: 1000 },
-  events:        { stoppage: true, microStoppage: false },
+  // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es
+  // ruido operacional (y las "Micro Detencion" tienen su propio toggle aparte).
+  events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false },
 }
 
 async function getShoplogixNotifConfig(plantSlug) {
@@ -6648,6 +6678,7 @@ async function getShoplogixNotifConfig(plantSlug) {
     return {
       channels:      { ...SHOPLOGIX_NOTIF_DEFAULTS.channels,      ...(d.channels      || {}) },
       shiftStart:    { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftStart,    ...(d.shiftStart    || {}) },
+      shiftEnd:      { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftEnd,      ...(d.shiftEnd      || {}) },
       firstPiece:    { ...SHOPLOGIX_NOTIF_DEFAULTS.firstPiece,    ...(d.firstPiece    || {}) },
       pieceInterval: { ...SHOPLOGIX_NOTIF_DEFAULTS.pieceInterval, ...(d.pieceInterval || {}) },
       events:        { ...SHOPLOGIX_NOTIF_DEFAULTS.events,        ...(d.events        || {}) },
@@ -6742,13 +6773,28 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     const notifications = await db.runTransaction(async (tx) => {
       const snap = await tx.get(stateRef)
 
+      // Clave estable por evento de detención: startAt (Timestamp) si existe;
+      // fallback a nombre+posición. Permite deduplicar por EVENTO en vez de por
+      // conteo — necesario con el umbral de minutos: una detención "en curso"
+      // (durationSec creciendo) que cruza el umbral en un sync posterior debe
+      // alertar UNA vez, cosa que el conteo posicional no podía expresar.
+      const stopKeyOf = (stop, idx) => {
+        const ts = stop.startAt?.toMillis?.() ?? (stop.startAt instanceof Date ? stop.startAt.getTime() : null)
+        return ts != null ? `t${ts}` : `${stop.name || 's'}|${stop.reason || ''}|${idx}`
+      }
+      const minSec = Math.max(0, (config.events.stoppageMinMinutes ?? 3)) * 60
+      const relevantes = downtimes
+        .map((stop, idx) => ({ stop, key: stopKeyOf(stop, idx) }))
+        .filter(({ stop }) => (stop.durationSec || 0) >= minSec)
+
       // Primera vez que vemos esta máquina/turno: inicializar baseline sin notificar.
       // Evita "catch-up" de historial al hacer un deploy mid-shift.
       if (!snap.exists) {
         tx.set(stateRef, {
           firstPieceSent:     cyclesAfter > 0,   // si ya tiene ciclos, no notificar
           lastNotifiedCycles: 0,
-          downtimeCount:      downtimes.length,   // baseline — no notificar histórico
+          downtimeCount:      downtimes.length,   // legado (ya no gobierna macro)
+          notifiedStopKeys:   relevantes.map(r => r.key), // baseline — no notificar histórico
           microStopCount:     microStops.length,
           updatedAt:          new Date(),
         })
@@ -6785,18 +6831,28 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
         }
       }
 
-      // ── Detenciones ──────────────────────────────────────────────────────────
-      if (config.events.stoppage && downtimes.length > (st.downtimeCount || 0)) {
-        const newOnes = downtimes.slice(st.downtimeCount || 0)
-        for (const stop of newOnes) {
+      // ── Detenciones (≥ umbral de minutos, dedupe por evento) ─────────────────
+      // Solo alertan las que superan stoppageMinMinutes (default 3): bajo eso
+      // es ruido operacional que no amerita Telegram/push. `relevantes` ya
+      // viene filtrado por duración; acá se descartan las ya notificadas.
+      if (config.events.stoppage) {
+        const yaNotificadas = new Set(st.notifiedStopKeys || [])
+        // Migración desde el esquema por conteo: la primera pasada tras el
+        // deploy no tiene notifiedStopKeys → baseline con lo existente para no
+        // re-alertar el historial del turno en curso.
+        const esPrimeraConKeys = !('notifiedStopKeys' in st)
+        const nuevas = esPrimeraConKeys ? [] : relevantes.filter(({ key }) => !yaNotificadas.has(key))
+        for (const { stop } of nuevas) {
           const dMin   = Math.round((stop.durationSec || 0) / 60)
-          const durTxt = dMin > 0 ? `${dMin} min` : 'en curso'
           const reason = stop.reason || stop.name || 'Detención'
           toSend.push({
-            title: `⛔ Detención · ${machineName}`,
-            body:  `${reason} · ${durTxt} · ${plantLabel}`,
-            tg:    `⛔ <b>Detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${durTxt}`,
+            title: `⛔ Detención ${dMin} min · ${machineName}`,
+            body:  `${reason} · ${plantLabel}`,
+            tg:    `⛔ <b>Detención de ${dMin} min</b> — ${plantLabel}\n${machineName} · ${reason}`,
           })
+        }
+        if (esPrimeraConKeys || nuevas.length > 0) {
+          updates.notifiedStopKeys = [...new Set([...yaNotificadas, ...relevantes.map(r => r.key)])]
         }
         updates.downtimeCount = downtimes.length
       }
@@ -6887,6 +6943,143 @@ exports.checkShiftStartDelays = onSchedule(
         logger.error('[checkShiftStartDelays] error procesando', { plant, shiftDoc, err: e.message })
       }
       await doc.ref.update({ done: true })
+    }
+  },
+)
+
+// ── checkShiftEndBriefs ───────────────────────────────────────────────────────
+// Cron cada 5 minutos. Brief de FIN de turno a Telegram/push: piezas por Baader,
+// total vs target oficial, uptime, paros y calidad Grader si hay Excel.
+//
+// Diseño SIN colección de checks (a diferencia del delay-check de inicio): el
+// fin real de un turno derivado de intervals (`scheduledEnd`) CRECE sync a sync
+// mientras el turno sigue vivo — un check creado al inicio quedaría obsoleto.
+// En su lugar, cada corrida lee los docs padre de hoy y ayer (≤ ~8 docs por
+// planta), evalúa el fin vigente y marca `endBriefSentAt` en el propio doc
+// (transacción) como idempotencia. Sin colección nueva ni índice compuesto.
+//
+// Momento de envío: max(officialSchedule.end, scheduledEnd) + delayMinutes.
+// El max cubre turnos que se alargan más allá del horario oficial (hora extra
+// al final) y el delay deja que el último sync (cada 5 min) complete la data.
+exports.checkShiftEndBriefs = onSchedule(
+  { schedule: 'every 5 minutes', timeZone: 'America/Santiago', region: 'us-central1' },
+  async () => {
+    const now = new Date()
+    const hoy = shoplogixSyncMod.currentDateKey()
+    const ayer = (() => {
+      const d = new Date(`${hoy}T12:00:00Z`)
+      d.setUTCDate(d.getUTCDate() - 1)
+      return d.toISOString().slice(0, 10)
+    })()
+
+    for (const plant of shoplogixSyncMod.ACTIVE_PLANTS) {
+      let config = null
+      for (const dk of [ayer, hoy]) {
+        let snap
+        try {
+          snap = await db.collection(`shoplogix/${plant}/shifts`)
+            .where(FieldPath.documentId(), '>=', `${dk}_`)
+            .where(FieldPath.documentId(), '<=', `${dk}_\uf8ff`)
+            .get()
+        } catch (e) {
+          logger.error('[checkShiftEndBriefs] query error', { plant, dk, err: e.message })
+          continue
+        }
+
+        for (const docSnap of snap.docs) {
+          const data = docSnap.data()
+          const shiftId = data.shiftId || docSnap.id.split('_').slice(1).join('_')
+          if (shiftId === 'Unscheduled') continue          // no es un turno
+          if (data.endBriefSentAt) continue                 // ya enviado
+
+          const officialEnd  = data.officialSchedule?.end?.toDate?.() ?? null
+          const derivedEnd   = data.scheduledEnd?.toDate?.() ?? null
+          const end = officialEnd && derivedEnd
+            ? new Date(Math.max(officialEnd.getTime(), derivedEnd.getTime()))
+            : (officialEnd ?? derivedEnd)
+          if (!end) continue
+
+          config = config ?? await getShoplogixNotifConfig(plant)
+          if (!config.shiftEnd.enabled) continue
+          const fireAt = new Date(end.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
+          if (now < fireAt) continue
+
+          // Idempotencia: solo la corrida que logra estampar endBriefSentAt envía.
+          const gano = await db.runTransaction(async (tx) => {
+            const fresh = await tx.get(docSnap.ref)
+            if (fresh.data()?.endBriefSentAt) return false
+            tx.update(docSnap.ref, { endBriefSentAt: new Date() })
+            return true
+          }).catch((e) => {
+            logger.error('[checkShiftEndBriefs] tx error', { plant, doc: docSnap.id, err: e.message })
+            return false
+          })
+          if (!gano) continue
+
+          try {
+            const machinesSnap = await docSnap.ref.collection('machines').get()
+            const machines = machinesSnap.docs.map((m) => {
+              const x = m.data()
+              return {
+                machineName: x.machineName || m.id,
+                totalCycles: x.totalCycles || 0,
+                shiftRuntime: x.shiftRuntime || 0,
+                states: x.states || [],
+              }
+            }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
+
+            // Turnos sin producción real (bucket de ruido): marcar y no molestar.
+            const total = machines.reduce((a, m) => a + m.totalCycles, 0)
+            if (total < 50) {
+              logger.info('[checkShiftEndBriefs] turno sin producción — sin brief', { plant, doc: docSnap.id, total })
+              continue
+            }
+
+            // Calidad Grader si existe el summary (exacto; chonchi además usa
+            // nombres legacy "Turno día"/"Turno noche" en sus Excel).
+            let grader = null
+            const shiftIdCandidates = [shiftId]
+            if (plant === 'chonchi') {
+              const startHour = data.scheduledStart?.toDate?.()?.getUTCHours?.() ?? 12
+              shiftIdCandidates.push(startHour >= 19 || startHour < 7 ? 'Turno noche' : 'Turno día')
+            }
+            for (const cand of shiftIdCandidates) {
+              const gs = await db.collection('graderDailySummaries')
+                .where('dateKey', '==', data.dateKey ?? dk)
+                .where('shiftId', '==', cand)
+                .limit(1).get()
+              if (!gs.empty) {
+                const g = gs.docs[0].data()
+                grader = { pointZeroPct: g.pointZeroPct ?? 0, totalPieces: g.totalPieces ?? 0 }
+                break
+              }
+            }
+
+            const plantLabel = SHOPLOGIX_PLANT_LABEL[plant] || plant
+            const msg = turnoBriefMod.componerBriefFinTurno({
+              plantLabel,
+              shiftId,
+              dateKey: data.dateKey ?? dk,
+              machines,
+              officialTargets: data.officialTargetsByMachineId ?? null,
+              currentJob: data.currentJob ?? null,
+              grader,
+            })
+            const eligibleIds = await getShoplogixEligibleUsers(plant)
+            await dispatchShoplogixNotif(
+              config,
+              eligibleIds,
+              `🏁 Fin de turno · ${plantLabel}`,
+              `${shiftId}: ${total.toLocaleString('es-CL')} piezas`,
+              { plant, shiftDoc: docSnap.id },
+              msg,
+            )
+            logger.info('[checkShiftEndBriefs] brief enviado', { plant, doc: docSnap.id, total })
+          } catch (e) {
+            logger.error('[checkShiftEndBriefs] error componiendo/enviando', { plant, doc: docSnap.id, err: e.message })
+          }
+        }
+      }
     }
   },
 )
