@@ -614,6 +614,13 @@ export function subscribeShoplogixShiftAuto(
   const heard: boolean[] = []
   const unsubs: Array<() => void> = []
   const subscribedIds = new Set<string>()
+  // El rollup oficial (horario/especie/targets) puede existir ANTES de que
+  // haya piezas producidas (turno recién arrancado, o día sin proceso) — es
+  // justo el caso donde más sirve mostrarlo. No depende de qué candidato
+  // "gana" por piezas: se guarda apenas algún candidato lo trae, y se
+  // reenvía incluso cuando ningún candidato tiene datos reales (línea de
+  // abajo), en vez de descartarlo junto con el snapshot vacío.
+  let lastRollup: LoadShoplogixShiftResult['officialRollup'] = null
 
   /**
    * Umbral de validez para fallback `Unscheduled`. Sin esto, días donde la
@@ -631,6 +638,7 @@ export function subscribeShoplogixShiftAuto(
     const u = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
       if (!active) return
       heard[idx] = true
+      if (result.officialRollup) lastRollup = result.officialRollup
 
       const totalCycles = result.snapshot?.machines?.reduce(
         (sum, m) => sum + (m.totalCycles || 0), 0,
@@ -651,9 +659,11 @@ export function subscribeShoplogixShiftAuto(
         return
       }
 
-      // Si todos los candidatos ya emitieron y nadie tiene data → emitir null
+      // Si todos los candidatos ya emitieron y nadie tiene data → emitir null,
+      // pero conservando el rollup si algún candidato lo trajo (ver comentario
+      // de `lastRollup` arriba).
       if (winner.idx === null && heard.every(Boolean)) {
-        onUpdate({ snapshot: null, syncedAt: null })
+        onUpdate({ snapshot: null, syncedAt: null, officialRollup: lastRollup })
       }
       // Otros candidatos sin data: silencioso, esperar al ganador o que cambien
     })
