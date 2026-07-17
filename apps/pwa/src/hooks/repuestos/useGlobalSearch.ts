@@ -48,6 +48,24 @@ export function invalidateGlobalRepuestosCache() {
   cacheTimestamp = 0
 }
 
+// Nombres de nodos hierarchy (alias||nombre) — liviano (702 docs) y compartido
+// entre loadAll y loadArea, mismo TTL que el catálogo.
+let cachedNodeNames: Map<string, string> | null = null
+let nodeNamesTimestamp = 0
+
+async function loadNodeNames(): Promise<Map<string, string>> {
+  if (cachedNodeNames && Date.now() - nodeNamesTimestamp < CACHE_TTL) return cachedNodeNames
+  const hierSnap = await getDocs(query(collection(db, 'hierarchy'), where('activo', '==', true)))
+  const nodeName = new Map<string, string>()
+  hierSnap.docs.forEach((d) => {
+    const n = d.data()
+    nodeName.set(d.id, (n.alias || n.nombre || d.id) as string)
+  })
+  cachedNodeNames = nodeName
+  nodeNamesTimestamp = Date.now()
+  return nodeName
+}
+
 // ── Text normalization & search ───────────────────────────────────
 
 const normalizeText = (value: string) =>
@@ -180,6 +198,26 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
 
 // ── Helper: parsear un doc de la colección plana a Repuesto ───────
 
+/** Convierte docs de `repuestos` a `GlobalSearchResult[]` (un item por doc×equipo). */
+function docsToResults(
+  docs: { id: string; data: () => any }[],
+  nodeName: Map<string, string>,
+): GlobalSearchResult[] {
+  const results: GlobalSearchResult[] = []
+  for (const docSnap of docs) {
+    const rep = parseRepuestoDoc(docSnap)
+    const equipos = Array.isArray(rep.equipos) ? rep.equipos : []
+    if (equipos.length === 0) {
+      results.push({ repuesto: rep, machineId: '', machineName: 'Sin equipo' })
+      continue
+    }
+    for (const nodeId of equipos) {
+      results.push({ repuesto: rep, machineId: nodeId, machineName: nodeName.get(nodeId) || nodeId })
+    }
+  }
+  return results
+}
+
 function parseRepuestoDoc(docSnap: { id: string; data: () => any }): Repuesto {
   const data = docSnap.data()
   return {
@@ -202,6 +240,11 @@ export function useGlobalSearch(machines: Machine[]) {
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<LoadProgress>({ loaded: 0, total: 0, phase: 'done' })
   const loadingRef = useRef(false)
+  // Áreas ya consultadas por loadArea() en ESTA instancia del hook — evita
+  // re-consultar la misma área si el usuario vuelve a seleccionarla. A nivel
+  // de instancia (no de módulo, a diferencia de cachedRepuestos): perderlo al
+  // desmontar es aceptable, es solo una optimización de sesión.
+  const loadedAreaIdsRef = useRef<Set<string>>(new Set())
 
   // Si cambia el set de máquinas, invalidar cache solo si realmente cambió
   const prevMachineIdsRef = useRef<string>('')
@@ -236,32 +279,18 @@ export function useGlobalSearch(machines: Machine[]) {
 
     try {
       setProgress({ loaded: 0, total: 2, phase: 'hierarchy' })
-      const [hierSnap, repSnap] = await Promise.all([
-        getDocs(query(collection(db, 'hierarchy'), where('activo', '==', true))),
+      const [nodeName, repSnap] = await Promise.all([
+        loadNodeNames(),
         getDocs(collection(db, 'repuestos')),
       ])
       setProgress({ loaded: 1, total: 2, phase: 'machines' })
 
-      const nodeName = new Map<string, string>()
-      hierSnap.docs.forEach((d) => {
-        const n = d.data()
-        nodeName.set(d.id, (n.alias || n.nombre || d.id) as string)
-      })
+      const results = docsToResults(repSnap.docs, nodeName)
 
-      const results: GlobalSearchResult[] = []
-      for (const docSnap of repSnap.docs) {
-        const rep = parseRepuestoDoc(docSnap)
-        const equipos = Array.isArray(rep.equipos) ? rep.equipos : []
-        if (equipos.length === 0) {
-          results.push({ repuesto: rep, machineId: '', machineName: 'Sin equipo' })
-          continue
-        }
-        for (const nodeId of equipos) {
-          results.push({ repuesto: rep, machineId: nodeId, machineName: nodeName.get(nodeId) || nodeId })
-        }
-      }
-
-      // Guardar en caché módulo
+      // Guardar en caché módulo — ÚNICO productor de cachedRepuestos: es lo
+      // que `getGlobalRepuestosCache()` (useRepuestosExistentes y otros)
+      // asumen que es el maestro COMPLETO. loadArea() (abajo) NUNCA escribe
+      // acá — solo trae un subconjunto y sería un falso "catálogo completo".
       cachedRepuestos = results
       cacheTimestamp = Date.now()
 
@@ -273,6 +302,60 @@ export function useGlobalSearch(machines: Machine[]) {
       setError('Error al cargar el catálogo de repuestos')
     } finally {
       loadingRef.current = false
+      setLoading(false)
+    }
+  }, [])
+
+  /**
+   * Carga SOLO los repuestos de un área (query server-side por `areaIds`),
+   * en vez del maestro completo. Pensado para el aterrizaje del hub área-first
+   * (RepuestosAreaHub): antes, entrar a CUALQUIER área bajaba los ~7.700 docs
+   * del maestro completo aunque el área tuviera 20 repuestos.
+   *
+   * Si el catálogo completo YA está tibio (`getGlobalRepuestosCache()`), no
+   * consulta nada — mismo patrón "vía 1 caché / vía 2 query acotada" que
+   * `useRepuestosExistentes`. Los resultados se ACUMULAN en `allRepuestos`
+   * (merge, no replace) para que cambiar de área no pierda lo ya cargado.
+   *
+   * NO toca `loaded`/`cachedRepuestos`: esos significan "catálogo completo
+   * en memoria", y esto es a propósito un subconjunto.
+   */
+  const loadArea = useCallback(async (areaId: string) => {
+    if (!areaId || loadedAreaIdsRef.current.has(areaId)) return
+
+    const cached = getGlobalRepuestosCache()
+    if (cached) {
+      setAllRepuestos(cached)
+      loadedAreaIdsRef.current.add(areaId)
+      return
+    }
+
+    loadedAreaIdsRef.current.add(areaId)
+    setLoading(true)
+    setError(null)
+    try {
+      const [nodeName, repSnap] = await Promise.all([
+        loadNodeNames(),
+        getDocs(query(collection(db, 'repuestos'), where('areaIds', 'array-contains', areaId))),
+      ])
+      const results = docsToResults(repSnap.docs, nodeName)
+
+      setAllRepuestos((prev) => {
+        // Dedupe por (repuesto.id, machineId): la misma área puede volver a
+        // traer un doc ya presente (p.ej. si otra área ya lo cargó antes).
+        const seen = new Set(prev.map((r) => `${r.repuesto.id}|${r.machineId}`))
+        const merged = prev.slice()
+        for (const r of results) {
+          const key = `${r.repuesto.id}|${r.machineId}`
+          if (!seen.has(key)) { seen.add(key); merged.push(r) }
+        }
+        return merged
+      })
+    } catch (err) {
+      logger.error('Error cargando repuestos del área', err instanceof Error ? err : new Error(String(err)))
+      setError('Error al cargar los repuestos del área')
+      loadedAreaIdsRef.current.delete(areaId) // permitir reintentar
+    } finally {
       setLoading(false)
     }
   }, [])
@@ -315,6 +398,7 @@ export function useGlobalSearch(machines: Machine[]) {
     error,
     progress,
     loadAll,
+    loadArea,
     search,
     updateRepuestoAlias,
   }

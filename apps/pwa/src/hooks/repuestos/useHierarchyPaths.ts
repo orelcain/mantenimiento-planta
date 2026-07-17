@@ -22,7 +22,50 @@ const TTL = 5 * 60 * 1000
 
 export function invalidateHierarchyPathsCache() { cache = null; cacheTs = 0 }
 
-function build(nodes: { id: string; parentId: string | null; path: string[] }[]): Map<string, Set<string>> {
+async function loadAncestorsMap(): Promise<Map<string, Set<string>>> {
+  if (cache && Date.now() - cacheTs < TTL) return cache
+  const snap = await getDocs(collection(db, 'hierarchy'))
+  const nodes = snap.docs.map((d) => {
+    const data = d.data()
+    return {
+      id: d.id,
+      parentId: (data.parentId ?? null) as string | null,
+      path: Array.isArray(data.path) ? (data.path as string[]) : [],
+    }
+  })
+  const m = build(nodes)
+  cache = m
+  cacheTs = Date.now()
+  return m
+}
+
+/**
+ * `areaIds` de un repuesto = unión de {equipo + todos sus ancestros} para cada
+ * nodeId en `equipos[]`. Se persiste en el doc (ver `useRepuestoCrud` y
+ * `scripts/backfill-repuestos-area-ids.js`) para poder filtrar del lado del
+ * servidor con `where('areaIds', 'array-contains', areaId)` — sin esto, mirar
+ * un área implicaba bajar el maestro COMPLETO (~7.700 docs) y filtrar en el
+ * cliente. Misma lógica de ancestría que `isUnder`, expuesta standalone para
+ * usarla fuera de un componente React (flujos de guardado).
+ */
+export async function computeAreaIds(equipoIds: string[]): Promise<string[]> {
+  if (!equipoIds || equipoIds.length === 0) return []
+  const map = await loadAncestorsMap()
+  return unionAncestors(map, equipoIds)
+}
+
+/** Parte pura de `computeAreaIds` (sin Firestore) — testeable directo. */
+export function unionAncestors(map: Map<string, Set<string>>, equipoIds: string[]): string[] {
+  const out = new Set<string>()
+  for (const eq of equipoIds) {
+    const ancestors = map.get(eq)
+    if (ancestors) for (const a of ancestors) out.add(a)
+    else out.add(eq) // nodo no encontrado en hierarchy (raro) — igual queda matcheable por su propio id
+  }
+  return [...out]
+}
+
+export function build(nodes: { id: string; parentId: string | null; path: string[] }[]): Map<string, Set<string>> {
   const parentOf = new Map<string, string | null>()
   for (const n of nodes) parentOf.set(n.id, n.parentId)
   const out = new Map<string, Set<string>>()
@@ -51,26 +94,12 @@ export function useHierarchyPaths() {
   useEffect(() => {
     if (map) return
     let alive = true
-    ;(async () => {
-      try {
-        const snap = await getDocs(collection(db, 'hierarchy'))
-        const nodes = snap.docs.map((d) => {
-          const data = d.data()
-          return {
-            id: d.id,
-            parentId: (data.parentId ?? null) as string | null,
-            path: Array.isArray(data.path) ? (data.path as string[]) : [],
-          }
-        })
-        const m = build(nodes)
-        cache = m
-        cacheTs = Date.now()
-        if (alive) { setMap(m); setLoading(false) }
-      } catch (err) {
+    loadAncestorsMap()
+      .then((m) => { if (alive) { setMap(m); setLoading(false) } })
+      .catch((err) => {
         logger.error('useHierarchyPaths load error', err instanceof Error ? err : new Error(String(err)))
         if (alive) setLoading(false)
-      }
-    })()
+      })
     return () => { alive = false }
   }, [map])
 

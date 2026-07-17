@@ -29,6 +29,7 @@ import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store/authStore'
 import { writeAuditLog, moveToTrash } from '@/services/auditLog'
+import { computeAreaIds } from '@/hooks/repuestos/useHierarchyPaths'
 import type { Repuesto, RepuestoFormData, HistorialCambio } from '@/types/repuestos'
 
 export function useRepuestoCrud() {
@@ -79,6 +80,14 @@ export function useRepuestoCrud() {
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     }
+    // areaIds: denormalización para poder filtrar por área del lado del
+    // servidor (where('areaIds','array-contains', areaId)) en vez de bajar
+    // el maestro completo — ver useHierarchyPaths.computeAreaIds.
+    const newRepuestoBag = newRepuesto as unknown as Record<string, unknown>
+    const equiposDeCreacion = Array.isArray(newRepuestoBag.equipos) ? (newRepuestoBag.equipos as string[]) : []
+    if (equiposDeCreacion.length > 0) {
+      newRepuestoBag.areaIds = await computeAreaIds(equiposDeCreacion)
+    }
     const docRef = await addDoc(collection(db, colPath), newRepuesto)
     await addHistorial(colPath, docRef.id, 'creacion', null, JSON.stringify(data))
 
@@ -102,7 +111,13 @@ export function useRepuestoCrud() {
     data: Partial<Repuesto>,
     originalData?: Repuesto,
   ) => {
-    const updateData = { ...data, updatedAt: Timestamp.now() }
+    const updateData: Record<string, unknown> = { ...data, updatedAt: Timestamp.now() }
+    // Si esta actualización toca `equipos`, recalcular areaIds — si no se
+    // recalcula acá, mover un repuesto de equipo/área lo dejaría invisible
+    // en la carga acotada de su área nueva (y "fantasma" en la vieja).
+    if (Array.isArray(data.equipos)) {
+      updateData.areaIds = await computeAreaIds(data.equipos)
+    }
     await updateDoc(doc(db, colPath, id), updateData as Record<string, unknown>)
 
     if (originalData) {
