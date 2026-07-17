@@ -5,7 +5,7 @@
  */
 const { test } = require('node:test')
 const assert = require('node:assert')
-const { componerBriefInicioTurno, componerBriefFinTurno, resumenParos } = require('../turnoBrief')
+const { componerBriefInicioTurno, componerBriefFinTurno, resumenParos, evaluarDelayCheck } = require('../turnoBrief')
 
 // wall-clock-as-UTC (convención del proyecto)
 const wall = (h, m = 0) => new Date(Date.UTC(2026, 6, 16, h, m))
@@ -95,4 +95,64 @@ test('fin: cumplimiento bajo marca rojo', () => {
     officialTargets: { a: 5000 }, currentJob: null, grader: null,
   })
   assert.match(msg, /🔴 20% del target/)
+})
+
+// ── evaluarDelayCheck ─────────────────────────────────────────────────────────
+// Datos calcados del incidente real 2026-07-17: día sin proceso → cada máquina
+// con 0 ciclos y UN solo estado idle "Detencion" → la alerta vieja spameaba.
+
+const idleDay = [
+  { states: [{ type: 'break', name: 'Detencion' }] },
+  { states: [{ type: 'break', name: 'Detencion' }] },
+  { states: [{ type: 'downtime', name: 'Detencion' }] },
+]
+
+test('delayCheck: día sin proceso (solo estado idle) → wait, no alerta', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0, machines: idleDay,
+    checkAt: wall(9, 5), now: wall(10, 0),
+  })
+  assert.strictEqual(r, 'wait')
+})
+
+test('delayCheck: sin proceso y el turno quedó atrás (>12h) → expire silencioso', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0, machines: idleDay,
+    checkAt: wall(9, 5), now: new Date(wall(9, 5).getTime() + 13 * 3600 * 1000),
+  })
+  assert.strictEqual(r, 'expire')
+})
+
+test('delayCheck: actividad (uptime) pero 0 piezas → alert', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0,
+    machines: [{ states: [{ type: 'uptime', name: 'Produciendo' }] }],
+    checkAt: wall(9, 5), now: wall(10, 0),
+  })
+  assert.strictEqual(r, 'alert')
+})
+
+test('delayCheck: estados cambiando (>1 por máquina) sin uptime → alert', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0,
+    machines: [{ states: [{ type: 'break', name: 'Detencion' }, { type: 'downtime', name: 'Detencion' }] }],
+    checkAt: wall(9, 5), now: wall(10, 0),
+  })
+  assert.strictEqual(r, 'alert')
+})
+
+test('delayCheck: con piezas → ok aunque haya poca actividad', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 42, machines: idleDay,
+    checkAt: wall(9, 5), now: wall(10, 0),
+  })
+  assert.strictEqual(r, 'ok')
+})
+
+test('delayCheck: sin docs de máquinas todavía → wait (no alertar en vacío)', () => {
+  const r = evaluarDelayCheck({
+    totalCycles: 0, machines: [],
+    checkAt: wall(9, 5), now: wall(10, 0),
+  })
+  assert.strictEqual(r, 'wait')
 })

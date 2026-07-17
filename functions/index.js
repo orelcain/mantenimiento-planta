@@ -6608,14 +6608,13 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
       // (horario/especie/target quedan en el doc padre desde el sync que crea
       // el turno vigente; si faltan, el composer degrada a las 2 líneas de antes)
       if (config.channels.telegram) {
-        const topicId = getTopicId('general')
         const officialSchedule = data.officialSchedule?.start && data.officialSchedule?.end
           ? {
               start: data.officialSchedule.start.toDate?.() ?? data.officialSchedule.start,
               end:   data.officialSchedule.end.toDate?.()   ?? data.officialSchedule.end,
             }
           : null
-        await sendTelegramMessage(
+        await sendShoplogixTelegram(
           turnoBriefMod.componerBriefInicioTurno({
             plantLabel,
             shiftId,
@@ -6623,8 +6622,6 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
             currentJob: data.currentJob ?? null,
             officialTargets: data.officialTargetsByMachineId ?? null,
           }),
-          null,
-          topicId ? { topicId } : {},
         )
       }
     }
@@ -6699,6 +6696,17 @@ async function getShoplogixEligibleUsers(plant) {
   return ids
 }
 
+// Mientras los briefs Shoplogix están en rodaje, Telegram va SOLO al chat
+// privado del admin (DM con @antarfood_mant_bot), no al grupo. Cuando el
+// formato esté validado, poner en true para volver al grupo (topic General).
+const SHOPLOGIX_TELEGRAM_TO_GROUP = false
+
+function sendShoplogixTelegram(msg) {
+  if (!SHOPLOGIX_TELEGRAM_TO_GROUP) return sendTelegramMessage(msg, ARIA_ADMIN_CHAT_ID)
+  const topicId = getTopicId('general')
+  return sendTelegramMessage(msg, null, topicId ? { topicId } : {})
+}
+
 async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data = {}, telegramMsg = null) {
   // URL profunda al turno específico para que el click en la notificación
   // abra la vista correcta y no solo el home de la app.
@@ -6722,8 +6730,7 @@ async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data
     }
   }
   if (config.channels.telegram && telegramMsg) {
-    const topicId = getTopicId('general')
-    promises.push(sendTelegramMessage(telegramMsg, null, topicId ? { topicId } : {}))
+    promises.push(sendShoplogixTelegram(telegramMsg))
   }
   if (promises.length > 0) await Promise.all(promises)
 }
@@ -6892,7 +6899,10 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
 
 // ── checkShiftStartDelays ─────────────────────────────────────────────────────
 // Cron cada 5 minutos. Revisa docs pendientes en shoplogixShiftDelayChecks.
-// Si checkAt ya pasó y el turno aún tiene 0 piezas totales → alerta de retraso.
+// Un check vencido NO alerta a ciegas: evaluarDelayCheck (turnoBrief.js)
+// distingue día sin proceso (solo estado idle → el check espera un cambio real
+// en Shoplogix y expira en silencio si nunca llega) de turno con actividad
+// pero 0 piezas (→ alerta exactamente una vez).
 exports.checkShiftStartDelays = onSchedule(
   { schedule: 'every 5 minutes', region: 'us-central1' },
   async () => {
@@ -6906,6 +6916,7 @@ exports.checkShiftStartDelays = onSchedule(
 
     for (const doc of pending.docs) {
       const { plant, shiftDoc, shiftId, plantLabel } = doc.data()
+      const checkAt = doc.data().checkAt?.toDate?.() || now
       try {
         const config = await getShoplogixNotifConfig(plant)
         if (!config.shiftStart.enabled) {
@@ -6922,8 +6933,21 @@ exports.checkShiftStartDelays = onSchedule(
           (sum, m) => sum + (m.data().totalCycles || 0), 0
         )
 
-        if (totalCycles === 0) {
-          // Turno inició pero sin piezas — emitir alerta
+        const veredicto = turnoBriefMod.evaluarDelayCheck({
+          totalCycles,
+          machines: machinesSnap.docs.map((m) => ({ states: m.data().states || [] })),
+          checkAt,
+          now,
+        })
+
+        if (veredicto === 'wait') {
+          // Sin actividad todavía (día sin proceso, o Shoplogix aún no registra
+          // nada): dejar el check pendiente — la próxima corrida re-evalúa.
+          logger.info('[checkShiftStartDelays] sin actividad — esperando cambio', { plant, shiftDoc })
+          continue
+        }
+
+        if (veredicto === 'alert') {
           const label = plantLabel || SHOPLOGIX_PLANT_LABEL[plant] || plant
           const graceMins = config.shiftStart.gracePeriodMinutes || 20
           const eligibleIds = await getShoplogixEligibleUsers(plant)
@@ -6933,9 +6957,11 @@ exports.checkShiftStartDelays = onSchedule(
             `⚠️ Sin piezas · ${label}`,
             `${shiftId} arrancó hace ${graceMins} min pero sin piezas registradas`,
             { plant, shiftDoc },
-            `⚠️ <b>Sin piezas registradas</b> — ${label}\n${shiftId} arrancó hace ${graceMins} min · Shoplogix no registra actividad`,
+            `⚠️ <b>Sin piezas registradas</b> — ${label}\n${shiftId} arrancó hace ${graceMins} min · Shoplogix registra actividad pero ninguna pieza`,
           )
           logger.warn('[checkShiftStartDelays] alerta emitida', { plant, shiftDoc, totalCycles })
+        } else if (veredicto === 'expire') {
+          logger.info('[checkShiftStartDelays] expirado sin proceso (día sin producción)', { plant, shiftDoc })
         } else {
           logger.info('[checkShiftStartDelays] turno con piezas OK', { plant, shiftDoc, totalCycles })
         }

@@ -152,4 +152,37 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
   return lineas.join('\n')
 }
 
-module.exports = { componerBriefInicioTurno, componerBriefFinTurno, resumenParos }
+/**
+ * Evalúa un delay-check de inicio de turno vencido (alerta "Sin piezas").
+ *
+ * En un día SIN proceso, Shoplogix igual crea los turnos programados: cada
+ * máquina queda con 0 ciclos y un único estado idle de fondo ("Detencion",
+ * type break o downtime según la planta). Eso NO es un turno demorado — es un
+ * día sin producción, y alertar ahí es puro ruido. Actividad real = aparece
+ * algún estado uptime, o los estados empiezan a cambiar (más de un estado por
+ * máquina: la línea está intentando algo).
+ *
+ * @param {Object} p
+ * @param {number} p.totalCycles   suma de ciclos de todas las máquinas
+ * @param {Array<{states: Array}>} p.machines  máquinas del turno (states normalizados)
+ * @param {Date}   p.checkAt       cuándo venció el check
+ * @param {Date}   p.now
+ * @param {number} [p.expireHours] horas tras checkAt para dar el turno por perdido
+ * @returns {'ok'|'alert'|'wait'|'expire'}
+ *   ok     — hay piezas: cerrar sin alertar
+ *   expire — sin piezas y el turno quedó atrás: cerrar en silencio (día sin proceso)
+ *   alert  — hay actividad en Shoplogix pero 0 piezas: alertar UNA vez y cerrar
+ *   wait   — sin actividad todavía: dejar el check pendiente hasta que Shoplogix
+ *            registre un cambio (piezas o estado nuevo fuera del idle de fondo)
+ */
+function evaluarDelayCheck({ totalCycles, machines, checkAt, now, expireHours = 12 }) {
+  if (totalCycles > 0) return 'ok'
+  if (now.getTime() - checkAt.getTime() >= expireHours * 3600 * 1000) return 'expire'
+  const hayActividad = (machines || []).some((m) => {
+    const states = m.states || []
+    return states.some((s) => s?.type === 'uptime') || states.length > 1
+  })
+  return hayActividad ? 'alert' : 'wait'
+}
+
+module.exports = { componerBriefInicioTurno, componerBriefFinTurno, resumenParos, evaluarDelayCheck }
