@@ -31,14 +31,21 @@ export interface MachineCapacityConfig {
 }
 
 /**
- * Velocidades físicas default por posición dentro de la planta.
- * index 0 = M1 (modelo antiguo, carros más cortos → mayor cadencia)
- * index 1,2 = M2, M3 (modelo nuevo, carros más largos → menor cadencia)
+ * Velocidades físicas default por posición dentro de la planta (`PLANT_MACHINES`).
+ *
+ * Las 3 Baader 142 de yal NO son iguales: hay dos versiones.
+ *   index 0,1 = Evisceradoras 1 y 2 → modelo NUEVO,   tope 16 pz/min
+ *   index 2   = Evisceradora 3      → modelo ANTIGUO, rinde 19 pz/min
+ *
+ * Coincide con los targets que Shoplogix tiene configurados (16 / 16 / 19),
+ * estables en los 96 días de histórico. El mapeo anterior estaba INVERTIDO
+ * (daba el modelo antiguo al index 0 = Evisceradora 1) y usaba un nominal de
+ * 21 pz/min que ninguna máquina alcanzó jamás.
  */
 const DEFAULT_NAMEPLATE_CPM: Record<number, number> = {
-  0: 21,
+  0: 16,
   1: 16,
-  2: 16,
+  2: 19,
 }
 
 /** Carga la config de capacidad para todas las máquinas de una planta. */

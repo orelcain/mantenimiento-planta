@@ -162,27 +162,38 @@ export function PlantKPIBoard({
     graderSummaries,
   )
 
-  // Diagnóstico "¿qué Baader arrastra el OEE?" — A×R por máquina (la Calidad es
-  // de línea, no por máquina). Identifica la peor y su pérdida dominante.
+  // Diagnóstico "¿qué Baader arrastra la línea?" — PIEZAS PERDIDAS, no A×R.
+  //
+  // Antes ordenábamos por OEE de máquina (A×R). Eso es inválido para comparar
+  // entre sí a las 3 Baader: R se mide contra el target de cada una, y no son
+  // el mismo modelo. La Evisceradora 3 es la antigua (19 pz/min); las 1 y 2 son
+  // el modelo nuevo (16 pz/min). Alimentadas parejo, la Ev3 entrega MÁS piezas
+  // y su R sale ~12 pts más bajo → el board acusaba justo a la mejor máquina.
+  //
+  // Las piezas perdidas se miden contra la cadencia de la LÍNEA (referencia
+  // común), no contra el target propio: así la máquina con más capacidad no
+  // queda castigada por tenerla. Ver `computeLostPieces`.
   const machineDiag = useMemo(() => {
     if (!kpis || kpis.graderOnly) return null
     const withData = kpis.machines
-      .filter((m) => m.availability !== null && m.performance !== null && (m.totalCycles ?? 0) > 0)
+      .filter((m) => (m.totalCycles ?? 0) > 0)
       .map((m) => {
-        const a = m.availability as number
-        const p = m.performance as number
+        const lost = m.lostBySpeed + m.lostByStops
         return {
           id: m.machineid,
           name: m.machineName,
-          oeeMaq: a * p,
-          dominant: (1 - a) >= (1 - p) ? ('disponibilidad' as const) : ('rendimiento' as const),
+          lost,
+          lostByStops: m.lostByStops,
+          stopsPct: lost > 0 ? m.lostByStops / lost : 0,
+          dominant: m.lostByStops >= m.lostBySpeed ? ('paros' as const) : ('velocidad' as const),
         }
       })
     if (withData.length < 2) return null
-    const sorted = [...withData].sort((x, y) => x.oeeMaq - y.oeeMaq)
+    const sorted = [...withData].sort((x, y) => y.lost - x.lost)
     const worst = sorted[0]!
     const best = sorted[sorted.length - 1]!
-    if (best.oeeMaq - worst.oeeMaq < 0.05) return null // sin diferencia material entre máquinas
+    // Sin diferencia material entre máquinas (<15% sobre la mejor) → no señalar a nadie.
+    if (worst.lost <= 0 || worst.lost - best.lost < worst.lost * 0.15) return null
     return { worst }
   }, [kpis])
 
@@ -368,13 +379,17 @@ export function PlantKPIBoard({
             </>
             )}
 
-            {/* Diagnóstico: ¿qué Baader arrastra el OEE? (A×R por máquina) */}
+            {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
               <div className="flex items-start gap-1.5 text-[10px] text-amber-300/90 bg-amber-500/[0.06] border border-amber-500/20 rounded-md px-2 py-1.5">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
-                <span>
-                  <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} — OEE máq (A×R) {pct(machineDiag.worst.oeeMaq, 0)} · pérdida dominante:{' '}
-                  <b>{machineDiag.worst.dominant === 'disponibilidad' ? 'Disponibilidad (paros)' : 'Rendimiento (micro-paradas / velocidad)'}</b>.
+                <span
+                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
+                >
+                  <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} —{' '}
+                  <b>{Math.round(machineDiag.worst.lost).toLocaleString('es-CL')} piezas perdidas</b>
+                  {' '}({pct(machineDiag.worst.stopsPct, 0)} por paros) · pérdida dominante:{' '}
+                  <b>{machineDiag.worst.dominant === 'paros' ? 'Paros (disponibilidad)' : 'Velocidad (micro-paradas / cadencia)'}</b>.
                 </span>
               </div>
             )}
@@ -397,7 +412,7 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
-                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más arrastra el OEE del grupo' : ''}`}
+                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
@@ -415,7 +430,7 @@ export function PlantKPIBoard({
                   </span>
                   <span
                     className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}
-                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico`}
+                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico\n\n⚠ NO comparable entre máquinas: cada una se mide contra su propio target y las 3 Baader no tienen la misma capacidad. Para comparar, usar piezas perdidas.`}
                   >
                     P {pct(m.performance, 0)}
                   </span>

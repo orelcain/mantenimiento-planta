@@ -100,7 +100,7 @@ const ADMIN_ITEMS: AdminItem[] = [
   {
     to: '/admin/machine-capacity',
     title: 'Velocidad Nameplate Baader',
-    description: 'Capacidad física máxima (pz/min) de cada Evisceradora. Usada para OEE y para detectar objetivos mal calibrados en Shoplogix.',
+    description: 'Capacidad física máxima (pz/min) de cada Evisceradora. Referencia documental: hoy NO alimenta el cálculo de OEE — el Rendimiento usa el target de Shoplogix.',
     icon: <Gauge className="w-5 h-5" />,
     iconColor: 'text-cyan-400',
     section: 'sensible',
