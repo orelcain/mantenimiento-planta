@@ -470,7 +470,7 @@ export function Visor3DPublicPage() {
 
       {/* Dimension creation indicator */}
       {activeView === 'model' && creatingDimension && (
-        <div className="flex flex-col gap-1 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 shrink-0">
+        <div className="flex flex-col gap-1 px-3 py-1.5 bg-blue-500/15 border-b border-blue-500/30 shrink-0">
           {/* Measurement type selector */}
           <div className="flex items-center gap-1 flex-wrap">
             {([

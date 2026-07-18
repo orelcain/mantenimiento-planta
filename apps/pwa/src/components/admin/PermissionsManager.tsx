@@ -235,7 +235,7 @@ export function PermissionsManager() {
                         className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                           isActive
                             ? 'bg-primary/10 border-primary'
-                            : 'bg-muted/30 border-muted'
+                            : 'bg-muted border-muted'
                         } ${isDisabled ? 'opacity-50' : 'cursor-pointer hover:border-primary/50'}`}
                         onClick={() => !isDisabled && handleTogglePermission(perm.key)}
                       >

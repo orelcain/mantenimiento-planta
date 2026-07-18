@@ -754,7 +754,7 @@ export function AnalisisGraderGatesConfigPage({
                     setSavingShiftThresholds(false)
                   }
                 }}
-                className="text-xs h-7 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                className="text-xs h-7 border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
               >
                 {savingShiftThresholds && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
                 {hasShiftThresholdsOverride ? 'Actualizar override de este turno' : 'Guardar solo para este turno'}
@@ -798,7 +798,7 @@ export function AnalisisGraderGatesConfigPage({
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (
                 <div key={shift.shiftId} className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-xs bg-zinc-800 ring-1 ring-zinc-700 whitespace-nowrap">{shift.shiftId}</Badge>
+                  <Badge variant="outline" className="text-xs bg-muted ring-1 ring-border dark:bg-zinc-800 dark:ring-zinc-700 whitespace-nowrap">{shift.shiftId}</Badge>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Inicio</span>
                     <Input
@@ -832,7 +832,7 @@ export function AnalisisGraderGatesConfigPage({
               ))}
             </div>
             {shiftGapMinutes > 0 && (
-              <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-3 py-2">
                 <span className="text-amber-400 mt-px">⚠</span>
                 <p className="text-xs text-amber-800 dark:text-amber-300">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
@@ -967,7 +967,7 @@ export function AnalisisGraderGatesConfigPage({
               </thead>
               <tbody>
                 {gates.map((gate, idx) => (
-                  <tr key={gate.gateNumber} className={`border-b border-border/30 hover:bg-muted/40 transition-colors ${idx % 2 === 1 ? 'bg-muted/10' : ''}`}>
+                  <tr key={gate.gateNumber} className={`border-b border-border/30 hover:bg-muted/40 transition-colors ${idx % 2 === 1 ? 'bg-muted/40' : ''}`}>
                     <td className="py-2 px-2 font-medium text-center">
                       <Badge variant="outline">{gate.gateNumber}</Badge>
                     </td>
@@ -1122,7 +1122,7 @@ export function AnalisisGraderGatesConfigPage({
                 <div className="space-y-1.5">
                   {shiftRangesDraft.map((r, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">
-                      <span className="text-xs font-mono px-2 py-1.5 bg-muted/40 rounded border border-border/40 truncate">{r.calibre}</span>
+                      <span className="text-xs font-mono px-2 py-1.5 bg-muted rounded border border-border truncate">{r.calibre}</span>
                       <Input
                         type="number"
                         value={r.minGrams}
@@ -1243,7 +1243,7 @@ export function AnalisisGraderGatesConfigPage({
               <span>Esta configuración también está disponible en <strong className="text-foreground">Configuración Global → Línea física</strong>, donde se puede editar sin pasar por el wizard.</span>
             </div>
             {/* Sub-tabs Física */}
-            <div className="flex gap-0 border-b border-border/50">
+            <div className="flex gap-0 border-b border-border">
               {([
                 { id: 'producto',     label: 'Producto' },
                 { id: 'cintas',       label: 'Cintas' },
@@ -1268,7 +1268,7 @@ export function AnalisisGraderGatesConfigPage({
 
             {/* Sub-tabs Calibración */}
             {fisicaSubTab === 'calibracion' && (
-              <div className="flex gap-0 border-b border-border/30 -mt-2">
+              <div className="flex gap-0 border-b border-border -mt-2">
                 {([
                   { id: 'danfoss',      label: 'Danfoss VFD' },
                   { id: 'neumatica',    label: 'Neumática' },
@@ -1293,7 +1293,7 @@ export function AnalisisGraderGatesConfigPage({
 
             {/* Sub-tabs Producto */}
             {fisicaSubTab === 'producto' && (
-              <div className="flex gap-0 border-b border-border/30 -mt-2">
+              <div className="flex gap-0 border-b border-border -mt-2">
                 {([
                   { id: 'resumen',     label: 'Resumen' },
                   { id: 'flipper',     label: 'Flipper' },

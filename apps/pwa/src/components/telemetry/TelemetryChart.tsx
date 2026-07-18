@@ -832,7 +832,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
         <div className="rounded-md border overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b bg-muted/30">
+              <tr className="border-b bg-muted">
                 <th className="py-1.5 px-2 text-left">Hora</th>
                 <th className="py-1.5 px-2 text-right">Temperatura</th>
                 <th className="py-1.5 px-2 text-right">Humedad</th>

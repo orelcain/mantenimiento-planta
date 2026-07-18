@@ -109,7 +109,7 @@ function SortableItem({ item, isDragging }: { item: Item; isDragging?: boolean }
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-card text-sm text-foreground select-none"
+      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm text-foreground select-none"
     >
       <button
         {...attributes}
@@ -139,7 +139,7 @@ function SortableGroup({
   return (
     <div ref={setNodeRef} style={style} className="rounded-xl border border-border bg-card/50">
       {/* Group header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border/50">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
         <button
           {...attributes}
           {...listeners}
@@ -356,7 +356,7 @@ export function SidebarEditorPage() {
       </div>
 
       {/* Info */}
-      <div className="flex items-start gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 mb-5 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 mb-5 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           Los cambios se aplican al <strong>recargar la app</strong>. El grupo "Administración" siempre es solo visible para admins.

@@ -26,22 +26,22 @@ interface PhotoEvidenceCardProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+    color: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-500 border-yellow-500/20',
     icon: Clock,
   },
   en_proceso: {
     label: 'En Proceso',
-    color: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    color: 'bg-blue-500/15 text-blue-700 dark:text-blue-500 border-blue-500/20',
     icon: AlertCircle,
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/10 text-green-500 border-green-500/20',
+    color: 'bg-green-500/15 text-green-700 dark:text-green-500 border-green-500/20',
     icon: CheckCircle,
   },
   verificada: {
     label: 'Verificada',
-    color: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    color: 'bg-purple-500/15 text-purple-700 dark:text-purple-500 border-purple-500/20',
     icon: CheckCircle,
   },
 }

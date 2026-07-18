@@ -298,7 +298,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
+              <div className="p-2 bg-blue-500/15 rounded-lg">
                 <ClipboardCheck className="h-5 w-5 text-blue-500" />
               </div>
               <div>
@@ -311,7 +311,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/10 rounded-lg">
+              <div className="p-2 bg-red-500/15 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <div>
@@ -324,7 +324,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-500/10 rounded-lg">
+              <div className="p-2 bg-yellow-500/15 rounded-lg">
                 <Clock className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
@@ -337,7 +337,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/10 rounded-lg">
+              <div className="p-2 bg-green-500/15 rounded-lg">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
               </div>
               <div>
@@ -655,7 +655,7 @@ export function PreventivePage() {
                         className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-500/10 rounded-lg">
+                          <div className="p-2 bg-green-500/15 rounded-lg">
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                           </div>
                           <div>
@@ -829,14 +829,14 @@ function TaskCard({
     <div
       className={cn(
         'flex items-center justify-between p-3 rounded-lg border',
-        isOverdue ? 'border-red-500/50 bg-red-500/5' : 'bg-muted/50'
+        isOverdue ? 'border-red-500/50 bg-red-500/15' : 'bg-muted'
       )}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
             'p-2 rounded-lg',
-            isOverdue ? 'bg-red-500/10' : 'bg-blue-500/10'
+            isOverdue ? 'bg-red-500/15' : 'bg-blue-500/15'
           )}
         >
           <Wrench className={cn('h-4 w-4', isOverdue ? 'text-red-500' : 'text-blue-500')} />

@@ -375,7 +375,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             </Button>
           )
         ) : (
-          <div className="mb-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <div className="mb-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/15 px-3 py-2">
             <p className="text-[11px] text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>

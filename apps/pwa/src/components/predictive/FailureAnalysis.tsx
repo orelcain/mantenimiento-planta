@@ -131,7 +131,7 @@ export function FailureAnalysis() {
 
   if (incidents.length === 0) {
       return (
-          <div className="p-8 text-center border rounded-lg bg-muted/20">
+          <div className="p-8 text-center border rounded-lg bg-muted">
               <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
               <p>No hay suficientes datos para realizar un análisis de fallas aún.</p>
           </div>
@@ -307,7 +307,7 @@ export function FailureAnalysis() {
                              <div 
                                 key={inc.id} 
                                 onClick={() => setSelectedIncident(inc)}
-                                className="border rounded-lg p-4 bg-card/50 hover:bg-muted/30 transition-colors animate-in slide-in-from-bottom-2 duration-300 cursor-pointer group"
+                                className="border rounded-lg p-4 bg-card hover:bg-muted transition-colors animate-in slide-in-from-bottom-2 duration-300 cursor-pointer group"
                              >
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-2">
                                     <h4 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{inc.titulo}</h4>
@@ -378,7 +378,7 @@ export function FailureAnalysis() {
                             {/* Descripción */}
                             <div>
                                 <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Descripción del Hallazgo</h4>
-                                <div className="p-4 bg-muted/30 rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
+                                <div className="p-4 bg-muted rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
                                     {selectedIncident.descripcion}
                                 </div>
                             </div>

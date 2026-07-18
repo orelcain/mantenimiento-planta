@@ -632,7 +632,7 @@ export function Visor3DViewerPage() {
 
       {/* Dimension creation mode indicator */}
       {activeView === 'model' && creatingDimension && (
-        <div className="flex flex-col gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <div className="flex flex-col gap-2 p-3 bg-blue-500/15 border border-blue-500/30 rounded-lg">
           {/* Measurement type selector */}
           <div className="flex items-center gap-1.5 flex-wrap">
             {([
@@ -701,7 +701,7 @@ export function Visor3DViewerPage() {
 
       {/* Annotation mode indicator */}
       {activeView === 'model' && annotationMode && (
-        <div className="flex flex-col gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+        <div className="flex flex-col gap-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-lg">
           <div className="flex items-center gap-3">
             <MapPin className="h-5 w-5 text-amber-500 shrink-0" />
             <div className="flex-1">

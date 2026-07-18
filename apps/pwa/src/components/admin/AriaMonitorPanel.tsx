@@ -144,7 +144,7 @@ export function AriaMonitorPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-500/10 rounded-lg">
+          <div className="p-2 bg-purple-500/15 rounded-lg">
             <Brain className="h-5 w-5 text-purple-500" />
           </div>
           <div>

@@ -275,7 +275,7 @@ export function IncidentsPage() {
         {/* Por Validar (Técnico ha resuelto) - Solo Admin/Supervisor */}
         {isAdminOrSupervisor && (
           <Card
-            className={`cursor-pointer transition-all hover:border-violet-500/50 ${activeFilter === 'por-validar' ? 'border-violet-500 bg-violet-500/10' : ''}`}
+            className={`cursor-pointer transition-all hover:border-violet-500/50 ${activeFilter === 'por-validar' ? 'border-violet-500 bg-violet-500/15' : ''}`}
             onClick={() => setActiveFilter('por-validar')}
           >
             <CardContent className="p-4">
@@ -331,7 +331,7 @@ export function IncidentsPage() {
 
         {/* En Proceso */}
         <Card
-          className={`cursor-pointer transition-all hover:border-blue-500/50 ${activeFilter === 'en-proceso' ? 'border-blue-500 bg-blue-500/10' : ''}`}
+          className={`cursor-pointer transition-all hover:border-blue-500/50 ${activeFilter === 'en-proceso' ? 'border-blue-500 bg-blue-500/15' : ''}`}
           onClick={() => setActiveFilter('en-proceso')}
         >
           <CardContent className="p-4">
@@ -353,7 +353,7 @@ export function IncidentsPage() {
 
         {/* Cerradas */}
         <Card
-          className={`cursor-pointer transition-all hover:border-green-500/50 ${activeFilter === 'cerradas' ? 'border-green-500 bg-green-500/10' : ''}`}
+          className={`cursor-pointer transition-all hover:border-green-500/50 ${activeFilter === 'cerradas' ? 'border-green-500 bg-green-500/15' : ''}`}
           onClick={() => setActiveFilter('cerradas')}
         >
           <CardContent className="p-4">
@@ -364,7 +364,7 @@ export function IncidentsPage() {
 
         {/* Rechazadas */}
         <Card
-          className={`cursor-pointer transition-all hover:border-red-500/50 ${activeFilter === 'rechazadas' ? 'border-red-500 bg-red-500/10' : ''}`}
+          className={`cursor-pointer transition-all hover:border-red-500/50 ${activeFilter === 'rechazadas' ? 'border-red-500 bg-red-500/15' : ''}`}
           onClick={() => setActiveFilter('rechazadas')}
         >
           <CardContent className="p-4">

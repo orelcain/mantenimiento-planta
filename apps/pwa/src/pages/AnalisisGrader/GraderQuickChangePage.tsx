@@ -114,7 +114,7 @@ export function GraderQuickChangePage() {
 
       {/* Cambio rápido no aplica a plantas sin clasificación (Yal) */}
       {!isClassificationPlant ? (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-amber-500/30 bg-amber-500/15">
           <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
             <AlertCircle className="w-8 h-8 text-amber-400" />
             <p className="font-medium">Cambio de gate no aplica</p>
@@ -138,7 +138,7 @@ export function GraderQuickChangePage() {
         <>
           {/* Banner: EN VIVO (turno activo) o RETROACTIVO (override por param) */}
           {overrideDisplay ? (
-            <Card className="border-amber-500/30 bg-amber-500/5">
+            <Card className="border-amber-500/30 bg-amber-500/15">
               <CardContent className="p-4 flex items-center gap-3">
                 <History className="w-5 h-5 text-amber-400 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -161,7 +161,7 @@ export function GraderQuickChangePage() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-red-500/30 bg-red-500/5">
+            <Card className="border-red-500/30 bg-red-500/15">
               <CardContent className="p-4 flex items-center gap-3">
                 <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -190,7 +190,7 @@ export function GraderQuickChangePage() {
 
           {/* Feedback de cambios guardados */}
           {savedCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-sm text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               {savedCount === 1
                 ? 'Cambio registrado exitosamente'

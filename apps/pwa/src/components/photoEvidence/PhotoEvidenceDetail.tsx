@@ -60,22 +60,22 @@ interface PhotoEvidenceDetailProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+    color: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-500 border-yellow-500/20',
     icon: Clock,
   },
   en_proceso: {
     label: 'En Proceso',
-    color: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    color: 'bg-blue-500/15 text-blue-700 dark:text-blue-500 border-blue-500/20',
     icon: AlertCircle,
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/10 text-green-500 border-green-500/20',
+    color: 'bg-green-500/15 text-green-700 dark:text-green-500 border-green-500/20',
     icon: CheckCircle,
   },
   verificada: {
     label: 'Verificada',
-    color: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    color: 'bg-purple-500/15 text-purple-700 dark:text-purple-500 border-purple-500/20',
     icon: CheckCircle,
   },
 }
@@ -518,7 +518,7 @@ export function PhotoEvidenceDetail({
                 />
 
                 {canEditPairMeta && (
-                  <div className="mt-3 p-3 rounded-lg border border-border bg-muted/30 space-y-3">
+                  <div className="mt-3 p-3 rounded-lg border border-border bg-muted space-y-3">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">

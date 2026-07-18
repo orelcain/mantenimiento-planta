@@ -1693,7 +1693,7 @@ export function SensorsPage() {
                     )}
                   </div>
 
-                <div className="rounded border p-3 bg-muted/30">
+                <div className="rounded border p-3 bg-muted">
                   <div className="text-sm font-medium mb-1">Asignación actual</div>
                   <div className="text-xs">
                     {assignedEquipment ? (
@@ -2003,7 +2003,7 @@ export function SensorsPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted/20">
+                    <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted">
                       {equipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
                           <div className="text-muted-foreground">⏳ Cargando equipos...</div>
@@ -2080,7 +2080,7 @@ export function SensorsPage() {
                         </>
                       )}
                       {filteredEquipment.length > 100 && (
-                        <div className="p-2 text-xs text-center text-muted-foreground bg-muted/40 border-t">
+                        <div className="p-2 text-xs text-center text-muted-foreground bg-muted border-t">
                           Mostrando primeros 100 de {filteredEquipment.length}. Usa los filtros para refinar la búsqueda.
                         </div>
                       )}

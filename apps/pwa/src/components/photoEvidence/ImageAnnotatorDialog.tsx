@@ -1163,7 +1163,7 @@ export function ImageAnnotatorDialog({
             {isLoading && <div className="text-sm text-muted-foreground">Cargando imagen…</div>}
             {loadError && <div className="text-sm text-red-600">{loadError}</div>}
 
-            <div className={cn('w-full rounded-md border border-border bg-muted/20 overflow-auto', isLoading && 'opacity-60')}>
+            <div className={cn('w-full rounded-md border border-border bg-muted overflow-auto', isLoading && 'opacity-60')}>
               <canvas
                 ref={canvasRef}
                 onPointerDown={handleCanvasPointerDown}

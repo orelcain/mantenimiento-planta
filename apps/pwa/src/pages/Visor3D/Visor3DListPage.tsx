@@ -387,13 +387,13 @@ export function Visor3DListPage() {
                     <p className="text-sm text-muted-foreground">{experience.description}</p>
                     {experience.id === 'sopladorasBaader142' && (
                       <div className="grid gap-2 text-xs text-muted-foreground">
-                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <div className="rounded-lg border bg-muted px-3 py-2">
                           Define el estado operativo de cada sopladora.
                         </div>
-                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <div className="rounded-lg border bg-muted px-3 py-2">
                           Cambia el contexto entre produccion, lavado y mantencion.
                         </div>
-                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                        <div className="rounded-lg border bg-muted px-3 py-2">
                           Prepara la logica que despues se conectara a hotspots y puntos criticos del modelo.
                         </div>
                       </div>
@@ -411,7 +411,7 @@ export function Visor3DListPage() {
       </Tabs>
 
       {/* SketchUp note */}
-      <Card className="border-blue-500/30 bg-blue-500/5">
+      <Card className="border-blue-500/30 bg-blue-500/15">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
             <FileBox className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />

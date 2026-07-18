@@ -78,7 +78,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   onToggle: (id: string, active: boolean) => void
 }) {
   return (
-    <div className={`flex items-start gap-2 p-2 rounded border text-xs ${c.active ? 'border-amber-500/20 bg-amber-500/5' : 'border-border bg-muted/30 opacity-60'}`}>
+    <div className={`flex items-start gap-2 p-2 rounded border text-xs ${c.active ? 'border-amber-500/30 bg-amber-500/15' : 'border-border bg-muted opacity-60'}`}>
       <div className="flex-1 min-w-0">
         <div className="text-muted-foreground truncate" title={c.userQuery}>❓ "{c.userQuery}"</div>
         <div className="text-red-400 truncate text-[10px]" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
@@ -344,10 +344,10 @@ export function MissionControlPanel() {
                 key={agent.id}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                   agent.status === 'online'
-                    ? 'border-green-500/20 bg-green-500/5'
+                    ? 'border-green-500/30 bg-green-500/15'
                     : agent.status === 'rate-limited'
-                    ? 'border-amber-500/20 bg-amber-500/5'
-                    : 'border-border bg-muted/30'
+                    ? 'border-amber-500/30 bg-amber-500/15'
+                    : 'border-border bg-muted'
                 }`}
               >
                 {/* Status dot */}
@@ -567,14 +567,14 @@ export function MissionControlPanel() {
 
               {/* Desglose de métricas */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 p-2 bg-green-500/5 rounded border border-green-500/10">
+                <div className="flex items-center gap-2 p-2 bg-green-500/15 rounded border border-green-500/30">
                   <MessageSquare className="h-3.5 w-3.5 text-green-500" />
                   <div>
                     <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
                     <div className="text-[10px] text-muted-foreground">Respuestas marcadas útiles</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2 bg-red-500/5 rounded border border-red-500/10">
+                <div className="flex items-center gap-2 p-2 bg-red-500/15 rounded border border-red-500/30">
                   <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                   <div>
                     <div className="font-medium">{learningStats.negativeFeedback} negativos</div>
@@ -702,9 +702,9 @@ export function MissionControlPanel() {
                 <div key={agent.id} className="flex items-center gap-1">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
                     agent.status === 'online'
-                      ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
+                      ? 'border-green-500/30 bg-green-500/15 text-green-700 dark:text-green-400'
                       : agent.status === 'rate-limited'
-                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                      ? 'border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-400'
                       : 'border-border bg-muted text-muted-foreground'
                   }`}>
                     <span>{agent.emoji}</span>

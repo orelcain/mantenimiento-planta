@@ -368,7 +368,7 @@ export function TechnicalSpecsModal({
           </div>
 
           {/* Datos Comunes */}
-          <div className="space-y-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+          <div className="space-y-3 p-3 bg-blue-500/15 rounded-lg border border-blue-500/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />

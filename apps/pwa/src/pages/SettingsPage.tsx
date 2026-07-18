@@ -844,7 +844,7 @@ function SystemSettings() {
 
               {/* Mensajes de estado */}
               {initSuccess && (
-                <div className="p-3 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-green-500/15 text-green-700 dark:text-green-400 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
                   <span className="text-sm">Sistema inicializado correctamente</span>
                 </div>
@@ -909,7 +909,7 @@ function SystemSettings() {
 
               {/* Advertencia */}
               {!isInitialized && (
-                <div className="p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+                <div className="p-3 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400 text-sm">
                   <strong>Nota:</strong> La inicialización creará la estructura base de Aquachile Antarfood Chonchi 
                   con 4 áreas principales y ejemplos de sub-estructuras.
                 </div>
@@ -1034,7 +1034,7 @@ function HmiTooltipPwdCard() {
                 <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
               )}
               {success && (
-                <div className="p-3 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 flex items-center gap-2 text-sm">
+                <div className="p-3 rounded-lg bg-green-500/15 text-green-700 dark:text-green-400 flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4" /> Clave guardada en Firestore
                 </div>
               )}
@@ -1108,8 +1108,8 @@ function FixPCBOButton() {
       {result && (
         <div className={`p-3 rounded-lg ${
           result.success 
-            ? 'bg-green-500/10 text-green-700 dark:text-green-400' 
-            : 'bg-red-500/10 text-red-700 dark:text-red-400'
+            ? 'bg-green-500/15 text-green-700 dark:text-green-400' 
+            : 'bg-red-500/15 text-red-700 dark:text-red-400'
         }`}>
           {result.success ? (
             <div>

@@ -85,7 +85,7 @@ export function DevModulesPage() {
         </p>
       </div>
 
-      <Card className="border-amber-500/20 bg-amber-500/5">
+      <Card className="border-amber-500/20 bg-amber-500/15">
         <CardContent className="p-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
           <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
           <span>

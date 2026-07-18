@@ -163,7 +163,7 @@ export function ShoplogixCredentialsPage() {
       </div>
 
       {error && (
-        <Card className="border-rose-500/40 bg-rose-500/5">
+        <Card className="border-rose-500/40 bg-rose-500/15">
           <CardContent className="flex items-start gap-2 py-3 text-sm text-rose-800 dark:text-rose-200">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>

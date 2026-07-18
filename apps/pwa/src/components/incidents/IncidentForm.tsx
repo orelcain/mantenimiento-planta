@@ -455,7 +455,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               <Label className="text-sm font-medium">📍 Ubicación *</Label>
               
               <div 
-                className="border rounded-lg p-3 bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors flex items-center justify-between group"
+                className="border rounded-lg p-3 bg-muted hover:bg-accent cursor-pointer transition-colors flex items-center justify-between group"
                 onClick={() => setIsLocationModalOpen(true)}
               >
                   <div className="flex flex-col gap-1 overflow-hidden">
@@ -505,7 +505,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                             error={validationErrors.hierarchyNodeId}
                         />
                       </div>
-                      <div className="p-4 border-t bg-muted/20 flex justify-end">
+                      <div className="p-4 border-t bg-muted flex justify-end">
                           <Button onClick={() => setIsLocationModalOpen(false)}>
                               Confirmar Ubicación
                           </Button>
@@ -556,7 +556,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               </Label>
               
               {mapLocation ? (
-                <div className="border rounded-lg p-3 bg-muted/20">
+                <div className="border rounded-lg p-3 bg-muted">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -824,7 +824,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     onClick={() => setIsAddingSymptom(true)}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs border border-dashed transition-colors',
-                       'bg-muted/30 border-muted hover:border-primary/50 text-muted-foreground'
+                       'bg-muted border-muted hover:border-primary/50 text-muted-foreground'
                     )}
                 >
                     Otro...
@@ -903,7 +903,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted/30"
+                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
                   >
                     <Camera className="h-8 w-8" />
                     <span className="text-xs mt-1">Cámara</span>
@@ -912,7 +912,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   <button
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted/30"
+                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
                   >
                     <ImageIcon className="h-8 w-8" />
                     <span className="text-xs mt-1">Galería</span>

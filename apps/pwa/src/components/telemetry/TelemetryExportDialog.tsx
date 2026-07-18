@@ -450,7 +450,7 @@ export function TelemetryExportDialog(props: {
           )}
 
           {lastInfo && (
-            <div className="rounded border bg-muted/30 p-3 text-sm">
+            <div className="rounded border bg-muted p-3 text-sm">
               {lastInfo}
             </div>
           )}

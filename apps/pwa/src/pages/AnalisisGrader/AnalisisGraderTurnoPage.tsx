@@ -1263,7 +1263,7 @@ export function AnalisisGraderTurnoPage() {
               variant="outline"
               size="sm"
               onClick={() => setNextPauseOpen(true)}
-              className="gap-1.5 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              className="gap-1.5 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
               title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
             >
               <Tag className="w-3.5 h-3.5" />
@@ -1333,8 +1333,8 @@ export function AnalisisGraderTurnoPage() {
         <div
           className={`mt-2 mx-1 px-3 py-1.5 rounded-md border text-xs flex items-start gap-2 ${
             turnoContext.type === 'orphan'
-              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
-              : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200'
+              ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
+              : 'bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-200'
           }`}
         >
           <span className="text-base leading-none mt-0.5 select-none" aria-hidden>
@@ -1414,7 +1414,7 @@ export function AnalisisGraderTurnoPage() {
               Mobile: texto en línea propia (basis-full) para evitar comprimirse
               en una columna vertical de 1 palabra cuando los botones le roban
               ancho. Desktop: una sola línea con todos los elementos. */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-700 dark:text-sky-400 text-sm">
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
@@ -1436,7 +1436,7 @@ export function AnalisisGraderTurnoPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
+              className="h-7 text-xs border-sky-500/40 text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 shrink-0"
               onClick={handleSlxRefresh}
               disabled={slxSyncing}
               title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -1449,7 +1449,7 @@ export function AnalisisGraderTurnoPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
+                className="h-7 text-xs border-sky-500/40 text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 shrink-0"
                 onClick={() => navigate(wizardUrl)}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
@@ -1503,7 +1503,7 @@ export function AnalisisGraderTurnoPage() {
             </p>
 
             {/* Shoplogix — automático */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-950/30 border border-violet-900/40">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/30 dark:bg-violet-950/30 dark:border-violet-900/40">
               <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Shoplogix — Evisceradoras Baader 142</p>
@@ -1542,7 +1542,7 @@ export function AnalisisGraderTurnoPage() {
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-950/30 border border-amber-900/40">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-900/40">
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Marel HG — Corta-cabeza</p>
@@ -1846,7 +1846,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
           {summary && isAdmin && (
-            <div className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2">
+            <div className="rounded-lg border border-border bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Compartir turno</span>

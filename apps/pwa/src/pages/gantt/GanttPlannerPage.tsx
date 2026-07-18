@@ -268,13 +268,13 @@ export function GanttPlannerPage() {
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge variant="outline">{filtered.length} tareas</Badge>
-        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
           {filtered.filter((t) => t.status === 'completada').length} completadas
         </Badge>
-        <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30">
+        <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
           {filtered.filter((t) => t.status === 'en_progreso').length} en progreso
         </Badge>
-        <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30">
+        <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
           {cpm.criticalPath.length} ruta crítica
         </Badge>
       </div>
@@ -312,7 +312,7 @@ export function GanttPlannerPage() {
                   <div
                     key={task.id}
                     className={`flex items-center border-b text-xs hover:bg-muted/30 cursor-pointer transition-colors ${
-                      criticalSet.has(task.id) ? 'bg-red-500/5' : ''
+                      criticalSet.has(task.id) ? 'bg-red-500/10' : ''
                     }`}
                     style={{ height: ROW_H }}
                     onClick={() => setEditTask(task)}
@@ -406,7 +406,7 @@ export function GanttPlannerPage() {
                         <div key={task.id}>
                           {/* Background row stripe */}
                           <div
-                            className={`absolute w-full ${idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/20'}`}
+                            className={`absolute w-full ${idx % 2 === 0 ? 'bg-transparent' : 'bg-muted/40'}`}
                             style={{ top: HEADER_H + idx * ROW_H, height: ROW_H }}
                           />
 

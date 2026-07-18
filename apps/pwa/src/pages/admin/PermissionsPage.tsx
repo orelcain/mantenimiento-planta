@@ -269,7 +269,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
               </div>
 
               {filteredUsers.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted/10">
+                <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted">
                   No se encontraron usuarios
                 </div>
               ) : (

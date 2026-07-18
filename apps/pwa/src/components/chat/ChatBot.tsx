@@ -404,7 +404,7 @@ function MessageBubble({
 
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
-            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-1.5">
+            <div className="mt-2 p-2 bg-amber-500/15 border border-amber-500/20 rounded-lg space-y-1.5">
               <div className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
                 ✏️ ¿Cuál era la respuesta correcta?
               </div>

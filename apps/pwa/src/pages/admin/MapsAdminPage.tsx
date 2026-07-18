@@ -393,7 +393,7 @@ export function MapsAdminPage() {
                                 <span className="text-white text-sm">Ver mapa</span>
                               </div>
                             </button>
-                            <div className="p-2 flex items-center justify-between bg-muted/30">
+                            <div className="p-2 flex items-center justify-between bg-muted">
                               <div className="text-xs">
                                 <span className="font-medium">v{version.version}</span>
                                 <span className="text-muted-foreground ml-2">

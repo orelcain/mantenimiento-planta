@@ -505,7 +505,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Datos IoT del equipo */}
             {incident.equipmentId && (
-              <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+              <div className="p-4 border rounded-lg bg-muted space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-primary" />

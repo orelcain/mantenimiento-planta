@@ -35,7 +35,7 @@ function Sparkline({
 }) {
   const values = points.filter((p) => Number.isFinite(p))
   if (values.length < 2) {
-    return <div className="h-14 rounded border bg-muted/20" />
+    return <div className="h-14 rounded border bg-muted" />
   }
 
   const min = Math.min(...values)

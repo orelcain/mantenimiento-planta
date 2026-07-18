@@ -253,7 +253,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
               {existe === undefined ? null : existe ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                  className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
                   title={existe.textoBreve || 'Ya está en el maestro'}
                 >
                   <CircleCheck className="h-3 w-3" />
