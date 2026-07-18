@@ -1471,7 +1471,7 @@ export function CalendarioMantencionPage() {
     if (key === 'A') return 'border-cyan-500/50 bg-cyan-500/15 text-cyan-800 dark:text-cyan-200'
     if (key === 'B') return 'border-amber-500/50 bg-amber-500/15 text-amber-800 dark:text-amber-200'
     if (key === 'C') return 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200'
-    return 'border-border bg-muted/40 text-foreground'
+    return 'border-border bg-muted text-foreground'
   }
 
   useEffect(() => {
@@ -1974,8 +1974,8 @@ export function CalendarioMantencionPage() {
                     const turnoKey = tech.turno.trim().toUpperCase()
                     const nextTurno = techRows[idx + 1]?.turno.trim().toUpperCase()
                     const isLastOfGroup = nextTurno && nextTurno !== turnoKey
-                    const rowBg = turnoKey === 'A' ? 'bg-cyan-500/5' : turnoKey === 'B' ? 'bg-amber-500/5' : turnoKey === 'C' ? 'bg-violet-500/5' : idx % 2 === 1 ? 'bg-muted/50' : ''
-                    const stickyBg = turnoKey === 'A' ? 'bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-950/60' : 'bg-card'
+                    const rowBg = turnoKey === 'A' ? 'bg-cyan-500/10' : turnoKey === 'B' ? 'bg-amber-500/10' : turnoKey === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
+                    const stickyBg = turnoKey === 'A' ? 'bg-cyan-500/20 dark:bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-500/20 dark:bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-500/20 dark:bg-violet-950/60' : 'bg-card'
                     const cellPy = isLandscape ? 'py-0' : 'py-1.5'
                     return (
                     <tr key={tech.r} className={`${isLastOfGroup ? 'border-b-2 border-border' : 'border-b border-border/40'} ${rowBg}`}>
@@ -2133,7 +2133,7 @@ export function CalendarioMantencionPage() {
                     )
                   })}
                   {/* Fila resumen: personal trabajando por día */}
-                  <tr className="border-t border-border/40 bg-muted/60">
+                  <tr className="border-t border-border/40 bg-muted">
                     <td className="sticky left-0 z-[5] bg-muted border-r border-border/30 px-1.5 py-1" style={{ minWidth: 110, maxWidth: 110 }}>
                       <span className="text-[9px] text-muted-foreground font-medium">Trabajando</span>
                     </td>
@@ -2277,7 +2277,7 @@ export function CalendarioMantencionPage() {
                 value={mobileAdminGateInput}
                 onChange={(e) => { setMobileAdminGateInput(e.target.value); setMobileAdminGateError('') }}
                 placeholder="Ingresa la clave…"
-                className="w-full h-10 px-3 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
+                className="w-full h-10 px-3 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
               />
               {mobileAdminGateError && (
                 <p className="text-xs text-destructive">{mobileAdminGateError}</p>
@@ -2452,23 +2452,23 @@ export function CalendarioMantencionPage() {
               <input type="checkbox" checked={hoursConfig.holidayBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayBusinessDaysOnly: e.target.checked }))} />
               <span title="Activado: el feriado solo se considera en días hábiles. Desactivado: se considera sin restricción de día.">Feriados descuentan solo días hábiles</span>
             </label>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
               Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
               Jornada objetivo diaria legal = Jornada objetivo semanal / Días trabajo/semana = {expectedWeekBase.toFixed(1)} / {workDaysPerWeekBase} = {legalDailyTarget.toFixed(2)} h.
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
               {hoursConfig.expectedFromPlannedDays
                 ? 'Semanal esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en la semana.'
                 : `Semanal esperado (prorrateo) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: ${expectedWeekBase.toFixed(1)} × (${weekDays.length}/7).`}
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
               {hoursConfig.expectedFromPlannedDays
                 ? 'Mensual esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en el mes.'
                 : `Mensual esperado (prorrateo) = Jornada semanal legal × (días calendario del mes / 7). En este período: ${expectedWeekBase.toFixed(1)} × (${monthCalendarDays}/7) = ${expectedMonthAutoBase.toFixed(1)} h.`}
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
               {legalWeekLabel}
             </div>
             <div className="col-span-2 sm:col-span-4">
@@ -2509,7 +2509,7 @@ export function CalendarioMantencionPage() {
             {/* Cards — móvil */}
             <div className="md:hidden space-y-2">
               {techRows.map((tech) => (
-                <div key={tech.r} className="rounded border border-border bg-muted/20 p-3 space-y-2">
+                <div key={tech.r} className="rounded border border-border bg-muted p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded border text-xs font-bold ${turnoBadgeClass(tech.turno)}`}>
                       {tech.turno || '-'}
@@ -2557,7 +2557,7 @@ export function CalendarioMantencionPage() {
                 <tbody>
                   {techRows.map((tech) => {
                     return (
-                    <tr key={tech.r} className="border-t border-border hover:bg-muted/30">
+                    <tr key={tech.r} className="border-t border-border hover:bg-muted">
                       <td className="px-2 py-1">{tech.name}</td>
                       <td className="px-2 py-1">{tech.rut || '-'}</td>
                       <td className="px-2 py-1">
@@ -2619,42 +2619,42 @@ export function CalendarioMantencionPage() {
                     <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-muted px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
-                    <th colSpan={6} className="border-b border-l border-border/30 bg-gradient-to-r from-blue-950/80 to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                    <th colSpan={6} className="border-b border-l border-border/30 bg-blue-500/10 dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
                     </th>
-                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-gradient-to-r from-indigo-950/80 to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-indigo-500/10 dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />Resumen Mensual</span>
                     </th>
-                    <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-zinc-800/80 px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
-                      <div className="text-[10px] font-bold text-zinc-300">Vac.</div>
-                      <div className="text-[9px] font-normal text-zinc-500">Acum.</div>
+                    <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-muted px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
+                      <div className="text-[10px] font-bold text-foreground">Vac.</div>
+                      <div className="text-[9px] font-normal text-muted-foreground">Acum.</div>
                     </th>
                   </tr>
-                  <tr className="bg-muted/60">
-                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-blue-400/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
+                  <tr className="bg-muted">
+                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
                       <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días efectivamente trabajados (turnos asignados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días efectivamente trabajados (turnos asignados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
-                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-indigo-400/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
+                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
                       <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días efectivamente trabajados en el mes">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días efectivamente trabajados en el mes">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días de vacaciones del mes">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días feriados del mes">Fer.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de vacaciones del mes">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días feriados del mes">Fer.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2670,8 +2670,8 @@ export function CalendarioMantencionPage() {
                     const riskM = mUnder
                     const isRisk = wUnder || mUnder
                     const isOvertime = wOver || mOver
-                    const zebra = idx % 2 === 1 ? 'bg-muted/50' : ''
-                    const rowBg = isRisk ? 'bg-red-950/15 hover:bg-red-950/25' : isOvertime ? 'bg-orange-950/15 hover:bg-orange-950/25' : `${zebra} hover:bg-muted/50`
+                    const zebra = idx % 2 === 1 ? 'bg-muted' : ''
+                    const rowBg = isRisk ? 'bg-red-500/10 dark:bg-red-950/15 hover:bg-red-500/15 dark:hover:bg-red-950/25' : isOvertime ? 'bg-orange-500/10 dark:bg-orange-950/15 hover:bg-orange-500/15 dark:hover:bg-orange-950/25' : `${zebra} hover:bg-muted/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
                         <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
@@ -2858,7 +2858,7 @@ export function CalendarioMantencionPage() {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 const dtk = tech.turno.trim().toUpperCase()
-                const dRowBg = dtk === 'A' ? 'bg-cyan-500/5' : dtk === 'B' ? 'bg-amber-500/5' : dtk === 'C' ? 'bg-violet-500/5' : idx % 2 === 1 ? 'bg-muted/30' : ''
+                const dRowBg = dtk === 'A' ? 'bg-cyan-500/10' : dtk === 'B' ? 'bg-amber-500/10' : dtk === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
                 return (
                   <tr key={tech.r} className={`border-b border-border/20 ${dRowBg} ${isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}`}>
                     {visibleMetaIndices.map((gi, vi) => (

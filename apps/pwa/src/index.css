@@ -278,14 +278,15 @@
   border-color: var(--hc-border) !important;
 }
 
-/* Tints de turno (bg-cyan/amber/violet-500/5) → aumentar opacidad para visibilidad */
-.high-contrast [class*="bg-cyan-500/5"] {
+/* Tints de turno (bg-cyan/amber/violet-500/10 desde el barrido de vista clara
+   2026-07-18, antes /5) → aumentar opacidad para visibilidad */
+.high-contrast [class*="bg-cyan-500/10"] {
   background-color: rgba(34, 211, 238, 0.18) !important;
 }
-.high-contrast [class*="bg-amber-500/5"] {
+.high-contrast [class*="bg-amber-500/10"] {
   background-color: rgba(251, 191, 36, 0.18) !important;
 }
-.high-contrast [class*="bg-violet-500/5"] {
+.high-contrast [class*="bg-violet-500/10"] {
   background-color: rgba(167, 139, 250, 0.18) !important;
 }
 
