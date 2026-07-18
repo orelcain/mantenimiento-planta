@@ -686,8 +686,8 @@ export function AnalisisGraderWizardPage() {
       {savedToCalendar && (
         <Card className="border-emerald-500/40 bg-emerald-500/10">
           <CardContent className="py-3 px-4 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-            <p className="text-sm text-emerald-300 font-medium">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
               Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
             </p>
           </CardContent>
@@ -696,18 +696,18 @@ export function AnalisisGraderWizardPage() {
       {saveError && (
         <Card className="border-red-500/40 bg-red-500/10">
           <CardContent className="py-3 px-4 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-red-300 font-medium">No se pudo guardar el turno</p>
-              <p className="text-xs text-red-200/80 mt-0.5 break-words">{saveError}</p>
-              <p className="text-[11px] text-red-200/60 mt-1">
+              <p className="text-sm text-red-800 dark:text-red-300 font-medium">No se pudo guardar el turno</p>
+              <p className="text-xs text-red-700/90 dark:text-red-200/80 mt-0.5 break-words">{saveError}</p>
+              <p className="text-[11px] text-red-700/70 dark:text-red-200/60 mt-1">
                 El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
               </p>
             </div>
             <Button
               size="sm"
               variant="ghost"
-              className="text-red-300 hover:bg-red-500/20 shrink-0"
+              className="text-red-700 dark:text-red-300 hover:bg-red-500/20 shrink-0"
               onClick={() => setSaveError(null)}
             >
               Cerrar
@@ -750,21 +750,21 @@ export function AnalisisGraderWizardPage() {
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-300/80 hover:bg-blue-500/10 transition-colors rounded-lg"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-blue-500/10 transition-colors rounded-lg"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />
                 <span className="flex-1 text-left">
-                  Cargar Excel del Grader · <b className="text-blue-200">{lineConfig.label}</b>
+                  Cargar Excel del Grader · <b className="text-blue-800 dark:text-blue-200">{lineConfig.label}</b>
                 </span>
                 {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-200 font-medium">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-800 dark:text-blue-200 font-medium">
                     {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
                   </span>
                 )}
                 <ChevronDown
                   className={cn(
-                    'h-3.5 w-3.5 shrink-0 transition-transform text-blue-300/60',
+                    'h-3.5 w-3.5 shrink-0 transition-transform text-blue-700/60 dark:text-blue-300/60',
                     uploadPanelExpanded && 'rotate-180',
                   )}
                 />

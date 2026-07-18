@@ -181,7 +181,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
-            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-sky-400' : 'text-muted-foreground'}`}>
+            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-sky-700 dark:text-sky-400' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
@@ -190,8 +190,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             </p>
             {slxStats && (
               <p className={`text-[10px] mt-0.5 ${
-                slxStats.avgUptimePct >= 70 ? 'text-emerald-400'
-                : slxStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400'
+                slxStats.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-400'
+                : slxStats.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400'
               }`}>
                 {slxStats.avgUptimePct.toFixed(0)}% uptime
               </p>
