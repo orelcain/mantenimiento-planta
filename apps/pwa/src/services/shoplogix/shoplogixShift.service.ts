@@ -6,9 +6,19 @@
  *
  * El Cloud Function `shoplogixSyncHttp` / `shoplogixSyncWakeup` escribe acá
  * cada pocos minutos durante horas de turno.
+ *
+ * ── Política de lectura (costo Firestore) ───────────────────────────────────
+ * `getDoc`/`getDocs` van SIEMPRE al servidor cuando hay red: el
+ * `persistentLocalCache` configurado en `services/firebase.ts` solo actúa como
+ * respaldo offline, no ahorra reads. Como la vista mensual releía ~60 docs por
+ * carga (turnos de semanas atrás que ya nunca cambian), los turnos cerrados hace
+ * más de `FROZEN_AFTER_DAYS` se leen `*FromCache` primero y solo caen al servidor
+ * si hay cache miss. Un turno cerrado es inmutable, así que la primera visita lo
+ * paga y las siguientes son gratis.
  */
 
-import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit, where, documentId } from 'firebase/firestore'
+import { collection, getDocs, getDocsFromServer, getDocsFromCache, doc, getDoc, getDocFromServer, getDocFromCache, Timestamp, onSnapshot, query, limit, where, documentId } from 'firebase/firestore'
+import type { DocumentData, DocumentReference, DocumentSnapshot, Query, QuerySnapshot } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -18,7 +28,72 @@ import type {
   UpstreamShiftComment,
 } from './types'
 import { buildLineSnapshot } from './shoplogixNormalizer'
+import { PLANT_MACHINES } from './shoplogixMachines'
 import type { PlantSlug } from './shoplogixMachines'
+
+// ── Congelamiento de turnos históricos ───────────────────────────────────────
+
+/**
+ * Días tras los cuales un turno se considera inmutable y se sirve desde el caché
+ * local sin cobrar reads.
+ *
+ * 3 días da margen de sobra al canal de corrección retroactiva del backend: el
+ * sync re-escribe "ayer" cada hora y "hace 2 y 3 días" una vez al día (ver
+ * `extraDateKeys` en functions/index.js). Pasado ese plazo el doc ya no cambia.
+ */
+const FROZEN_AFTER_DAYS = 3
+
+/**
+ * ¿El turno de este `dateKey` ya está congelado?
+ *
+ * Se ancla al FIN del día (23:59:59Z) y no a su inicio: un turno con dateKey D
+ * puede terminar a las 07:45 de D+1, así que medir desde el final del día
+ * garantiza al menos 3 días completos de gracia desde el cierre real.
+ *
+ * Ante un dateKey inválido devuelve false → lectura normal desde servidor.
+ */
+export function isFrozenDateKey(dateKey: string, now: number = Date.now()): boolean {
+  const endOfDayMs = Date.parse(`${dateKey}T23:59:59Z`)
+  if (Number.isNaN(endOfDayMs)) return false
+  return now - endOfDayMs > FROZEN_AFTER_DAYS * 86_400_000
+}
+
+/**
+ * Lee una query desde el caché local. Devuelve null si hay miss o error, para
+ * que el caller caiga al servidor.
+ *
+ * Un snapshot vacío se trata como MISS (null), no como "no hay datos": los docs
+ * solo entran al caché si alguna vez se leyeron del servidor en este navegador,
+ * y IndexedDB puede ser desalojado por el browser en cualquier momento.
+ *
+ * `minSize` protege contra el CACHE HIT PARCIAL, que es el modo de falla real de
+ * esta optimización: `getDocsFromCache` devuelve los docs de la colección que
+ * estén en caché, aunque sean menos de los que hay en el servidor. Como
+ * `loadMachineTrend` cachea docs de máquina SUELTOS (un `getDoc` por día), un
+ * turno podía resolverse desde caché con 1 Baader en vez de 3 — snapshot no
+ * vacío, KPIs silenciosamente mal. Si no está la colección completa: miss.
+ */
+async function tryGetDocsFromCache(
+  q: Query<DocumentData>,
+  minSize = 1,
+): Promise<QuerySnapshot<DocumentData> | null> {
+  try {
+    const snap = await getDocsFromCache(q)
+    return snap.size >= minSize ? snap : null
+  } catch {
+    return null
+  }
+}
+
+/** Igual que `tryGetDocsFromCache` pero para un doc suelto. `getDocFromCache` lanza en miss. */
+async function tryGetDocFromCache(ref: DocumentReference<DocumentData>): Promise<DocumentSnapshot<DocumentData> | null> {
+  try {
+    const snap = await getDocFromCache(ref)
+    return snap.exists() ? snap : null
+  } catch {
+    return null
+  }
+}
 
 // Firestore devuelve Timestamp — las funciones backend pueden escribir Date
 // (Admin SDK los convierte a Timestamp automáticamente). Al leer, siempre es
@@ -372,8 +447,12 @@ export async function loadMachineTrend(
     d.setDate(d.getDate() - i)
     const dk = d.toISOString().slice(0, 10)
     const ref = doc(db, `shoplogix/${plantSlug}/shifts/${dk}_${shiftId}/machines/${machineid}`)
+    // Tendencia = puros turnos históricos. Los congelados salen del caché (0 reads).
+    const fetchDoc = isFrozenDateKey(dk)
+      ? tryGetDocFromCache(ref).then(s => s ?? getDoc(ref))
+      : getDoc(ref)
     promises.push(
-      getDoc(ref).then(snap => {
+      fetchDoc.then(snap => {
         if (!snap.exists()) return
         const raw = snap.data() as FirestoreData
         // Usamos los campos almacenados directamente (sin full-deserialization).
@@ -488,12 +567,29 @@ export async function loadShoplogixShift(
   const parentRef = doc(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}`)
   const machinesRef = collection(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`)
 
-  // forceServer=true: bypasea el IndexedDB local cache.
-  // Usar solo en recargas puntuales (no en el preloader mensual masivo).
-  const fetcher = forceServer
-    ? Promise.all([getDocFromServer(parentRef), getDocsFromServer(machinesRef)])
-    : Promise.all([getDoc(parentRef),           getDocs(machinesRef)])
-  const [parentSnap, machinesSnap] = await fetcher
+  let parentSnap: DocumentSnapshot<DocumentData> | null = null
+  let machinesSnap: QuerySnapshot<DocumentData> | null = null
+
+  // Turno congelado (cerrado hace >3 días): servirlo desde el caché local cuesta
+  // 0 reads. En cache miss, `machinesSnap` queda null y caemos al servidor abajo,
+  // que además repuebla el caché para la próxima carga.
+  //
+  // Solo se acepta el hit si el caché tiene TODAS las máquinas de la planta: un
+  // hit parcial daría un turno con menos Baaders y KPIs promediados mal.
+  if (!forceServer && isFrozenDateKey(dateKey)) {
+    const expectedMachines = PLANT_MACHINES[plantSlug]?.length ?? 1
+    machinesSnap = await tryGetDocsFromCache(machinesRef, expectedMachines)
+    if (machinesSnap) parentSnap = await tryGetDocFromCache(parentRef)
+  }
+
+  if (!machinesSnap) {
+    // forceServer=true: bypasea el IndexedDB local cache.
+    // Usar solo en recargas puntuales (no en el preloader mensual masivo).
+    const fetcher = forceServer
+      ? Promise.all([getDocFromServer(parentRef), getDocsFromServer(machinesRef)])
+      : Promise.all([getDoc(parentRef),           getDocs(machinesRef)])
+    ;[parentSnap, machinesSnap] = await fetcher
+  }
 
   if (machinesSnap.empty) {
     return { snapshot: null, syncedAt: null }
@@ -509,7 +605,10 @@ export async function loadShoplogixShift(
 
   const snapshot = buildLineSnapshot({ dateKey, shiftId, machines })
 
-  const parentData = parentSnap.exists() ? parentSnap.data() : null
+  // parentSnap puede ser null si el doc padre no estaba en caché (turnos legacy
+  // sin doc padre, o miss parcial). syncedAt = null solo afecta el "hace X min"
+  // del footer, no los datos del turno.
+  const parentData = parentSnap?.exists() ? parentSnap.data() : null
   const syncedAt = parentData?.lastSyncAt ? toDateSafe(parentData.lastSyncAt) : null
 
   return { snapshot, syncedAt }
@@ -762,11 +861,18 @@ export async function listShiftInfosForDay(
   plantSlug: PlantSlug = 'chonchi',
 ): Promise<ShoplogixShiftDayInfo[]> {
   const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
-  const snap = await getDocs(query(
+  const dayQuery = query(
     shiftsRef,
     where(documentId(), '>=', `${dateKey}_`),
     where(documentId(), '<=', `${dateKey}_` + SHIFT_DOC_RANGE_END),
-  )).catch(() => null)
+  )
+
+  // A propósito SIN cache-first, aunque el día esté congelado: esta es una query
+  // de DESCUBRIMIENTO ("qué turnos existen") y no hay forma de saber si el caché
+  // los tiene todos — un hit parcial haría desaparecer turnos de la UI. El ahorro
+  // sería ~1 read por día; el riesgo, perder un turno. La lectura de los datos
+  // pesados (subcolección `machines`) sí va cache-first en `loadShoplogixShift`.
+  const snap = await getDocs(dayQuery).catch(() => null)
 
   if (snap && !snap.empty) {
     const infos = snap.docs
