@@ -453,8 +453,15 @@ export async function callAgent(
       latencyMs: Date.now() - start,
     }
   } catch (err) {
+    // El proxy (Cloud Function) mapea 429/413 upstream a HttpsError con
+    // code 'functions/resource-exhausted' y details.status. Lo tratamos como
+    // rate-limit (cooldown corto) igual que RateLimitError, en vez de offline.
+    const fbCode = (err as { code?: string })?.code
+    const upstreamStatus = (err as { details?: { status?: number } })?.details?.status
     if (err instanceof RateLimitError) {
       markRateLimited(agentId, err.retryAfterMs)
+    } else if (fbCode === 'functions/resource-exhausted' || upstreamStatus === 429 || upstreamStatus === 413) {
+      markRateLimited(agentId, 60_000)
     } else {
       markAgentError(agentId, err instanceof Error ? err.message : String(err))
     }
@@ -507,8 +514,15 @@ export async function callAgentStream(
       latencyMs: Date.now() - start,
     }
   } catch (err) {
+    // El proxy (Cloud Function) mapea 429/413 upstream a HttpsError con
+    // code 'functions/resource-exhausted' y details.status. Lo tratamos como
+    // rate-limit (cooldown corto) igual que RateLimitError, en vez de offline.
+    const fbCode = (err as { code?: string })?.code
+    const upstreamStatus = (err as { details?: { status?: number } })?.details?.status
     if (err instanceof RateLimitError) {
       markRateLimited(agentId, err.retryAfterMs)
+    } else if (fbCode === 'functions/resource-exhausted' || upstreamStatus === 429 || upstreamStatus === 413) {
+      markRateLimited(agentId, 60_000)
     } else {
       markAgentError(agentId, err instanceof Error ? err.message : String(err))
     }

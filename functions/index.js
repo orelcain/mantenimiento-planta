@@ -895,6 +895,85 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   }
 })
 
+// ==================== HELPER: status upstream -> HttpsError ====================
+
+/**
+ * Convierte el status HTTP de un proveedor upstream (Groq/Gemini/DeepSeek) en un
+ * HttpsError con code canonico y un mensaje corto SIN filtrar el body crudo del
+ * proveedor (el body real ya quedo en logger.error). El status viaja en details
+ * para que el cliente pueda distinguir rate-limit (429/413) de error generico.
+ */
+function upstreamHttpsError(provider, status) {
+  const code = (status === 429 || status === 413) ? 'resource-exhausted'
+    : (status >= 500) ? 'unavailable'
+    : 'internal'
+  const hint = status === 413 ? 'TPM excedido'
+    : status === 429 ? 'rate limit'
+    : status === 402 ? 'sin saldo'
+    : 'upstream'
+  return new HttpsError(code, `${provider} ${status} (${hint})`, { provider, status })
+}
+
+// ==================== GROQ: GUARD DE CONTEXTO (TPM=8000) ====================
+
+// Limite de tokens/minuto de la cuenta GRATIS de Groq para gpt-oss-120b/Qwen.
+// Un contexto largo (~10-12k tokens) da HTTP 413 y tumba la cadena gratis ->
+// cae a DeepSeek (paga). El guard recorta el historial para quedar bajo esto.
+const GROQ_TPM_LIMIT = 8000
+
+/**
+ * Estima tokens de UN mensaje. chars/4 subestima en espanol, asi que usamos
+ * chars/3.2 + overhead de rol/estructura como margen de seguridad.
+ * Mensajes multimodales (content = array de parts): solo se suman las partes de
+ * texto; las imagenes NO se estiman por chars.
+ */
+function estimateMessageTokens(m) {
+  const c = m && m.content
+  if (typeof c === 'string') return Math.ceil(c.length / 3.2) + 8
+  if (Array.isArray(c)) {
+    let chars = 0
+    for (const p of c) {
+      if (p && typeof p.text === 'string') chars += p.text.length
+      else if (typeof p === 'string') chars += p.length
+    }
+    return Math.ceil(chars / 3.2) + 8
+  }
+  return 8
+}
+
+/**
+ * Recorta el historial para que la ENTRADA a Groq quepa bajo el TPM=8000.
+ * Presupuesto de entrada = 8000 - max_tokens_salida - colchon, con techo duro
+ * ~5800. SIEMPRE preserva: (a) todos los role:'system', (b) el ultimo mensaje.
+ * Si el contexto ya cabe, devuelve el array TAL CUAL (no-op). No reordena ni
+ * modifica el contenido de ningun mensaje (no rompe json:true ni multimodal).
+ */
+function trimMessagesForGroq(messages, maxOutputTokens = 600) {
+  if (!Array.isArray(messages) || messages.length <= 2) return messages
+  const outBudget = Math.min(Math.max(Number(maxOutputTokens) || 600, 256), 4096)
+  const inputBudget = Math.min(GROQ_TPM_LIMIT - outBudget - 700, 5800)
+
+  const total = messages.reduce((s, m) => s + estimateMessageTokens(m), 0)
+  if (total <= inputBudget) return messages // ya cabe: no tocar nada
+
+  const lastIdx = messages.length - 1
+  const isProtected = (i) => (messages[i] && messages[i].role === 'system') || i === lastIdx
+  const keep = new Array(messages.length).fill(false)
+  let running = 0
+  for (let i = 0; i < messages.length; i++) {
+    if (isProtected(i)) { keep[i] = true; running += estimateMessageTokens(messages[i]) }
+  }
+  // Agregamos mensajes NO protegidos del mas nuevo al mas viejo hasta llenar.
+  for (let i = lastIdx - 1; i >= 0; i--) {
+    if (keep[i]) continue // system ya protegido
+    const t = estimateMessageTokens(messages[i])
+    if (running + t > inputBudget) break // de aca para atras, todo se descarta
+    running += t
+    keep[i] = true
+  }
+  return messages.filter((_, i) => keep[i])
+}
+
 // ==================== GROQ AI PROXY ====================
 
 /**
@@ -927,6 +1006,8 @@ exports.groqProxy = onCall(
     }
 
     try {
+      // Guard TPM=8000 de Groq: recorta historial viejo para no dar 413 y caer a DeepSeek (paga).
+      const safeMessages = trimMessagesForGroq(messages, max_tokens || 2048)
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -935,7 +1016,7 @@ exports.groqProxy = onCall(
         },
         body: JSON.stringify({
           model: model || 'llama-3.3-70b-versatile',
-          messages,
+          messages: safeMessages,
           temperature: temperature ?? 0.3,
           max_tokens: max_tokens || 2048,
         }),
@@ -944,7 +1025,7 @@ exports.groqProxy = onCall(
       if (!response.ok) {
         const errorText = await response.text()
         logger.error('Groq API error', { status: response.status, body: errorText })
-        throw new Error(`Error del servicio de IA (${response.status})`)
+        throw upstreamHttpsError('Groq', response.status)
       }
 
       const data = await response.json()
@@ -953,8 +1034,11 @@ exports.groqProxy = onCall(
         usage: data.usage,
       }
     } catch (error) {
+      // Si ya es un HttpsError (status upstream mapeado), propagarlo tal cual
+      // para que el code/status real lleguen al cliente y al missionLog.
+      if (error instanceof HttpsError) throw error
       logger.error('Groq proxy error:', error)
-      throw new Error('Error al procesar la solicitud de IA')
+      throw new HttpsError('internal', 'Groq: error interno del proxy')
     }
   }
 )
@@ -1093,15 +1177,18 @@ exports.geminiProxy = onCall(
       if (!response.ok) {
         const errorText = await response.text()
         logger.error('Gemini API error', { status: response.status, body: errorText })
-        throw new Error(`Error del servicio Gemini (${response.status})`)
+        throw upstreamHttpsError('Gemini', response.status)
       }
 
       const data = await response.json()
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
       return { content: text, usage: data.usageMetadata }
     } catch (error) {
+      // Si ya es un HttpsError (status upstream mapeado), propagarlo tal cual
+      // para que el code/status real lleguen al cliente y al missionLog.
+      if (error instanceof HttpsError) throw error
       logger.error('Gemini proxy error:', error)
-      throw new Error('Error al procesar la solicitud de Gemini')
+      throw new HttpsError('internal', 'Gemini: error interno del proxy')
     }
   }
 )
@@ -1149,7 +1236,7 @@ exports.deepseekProxy = onCall(
       if (!response.ok) {
         const errorText = await response.text()
         logger.error('DeepSeek API error', { status: response.status, body: errorText })
-        throw new Error(`Error del servicio DeepSeek (${response.status})`)
+        throw upstreamHttpsError('DeepSeek', response.status)
       }
 
       const data = await response.json()
@@ -1158,8 +1245,11 @@ exports.deepseekProxy = onCall(
         usage: data.usage,
       }
     } catch (error) {
+      // Si ya es un HttpsError (status upstream mapeado), propagarlo tal cual
+      // para que el code/status real lleguen al cliente y al missionLog.
+      if (error instanceof HttpsError) throw error
       logger.error('DeepSeek proxy error:', error)
-      throw new Error('Error al procesar la solicitud de DeepSeek')
+      throw new HttpsError('internal', 'DeepSeek: error interno del proxy')
     }
   }
 )
@@ -2714,7 +2804,9 @@ function ariaFormatTelegram(text) {
 async function _ariaGroqChatRaw(model, messages, { temperature = 0.3, maxTokens = 600, json = false } = {}) {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY no configurado')
-  const body = { model, messages, temperature, max_tokens: maxTokens }
+  // Guard TPM=8000 de Groq: recorta historial viejo para no dar 413 y caer a DeepSeek (paga).
+  const safeMessages = trimMessagesForGroq(messages, maxTokens)
+  const body = { model, messages: safeMessages, temperature, max_tokens: maxTokens }
   if (json) body.response_format = { type: 'json_object' }
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -2778,6 +2870,20 @@ async function _ariaDeepSeekChat(messages, { temperature = 0.3, maxTokens = 600,
  * dos veces): Groq gpt-oss-120b → Gemini 3.5 Flash (gratis) → DeepSeek
  * v4-flash (paga centavos, último recurso). ARIA no queda muda aunque se
  * agote la cuota gratis de Groq Y de Gemini el mismo día.
+ *
+ * "Una sola ARIA" — divergencia INTENCIONAL con el PWA: el chat PWA usa el
+ * orden Gemini → Qwen → GPT-OSS → DeepSeek (ver apps/pwa/src/services/
+ * aiAgents.ts) porque el browser PERSISTE el cooldown de rate-limit y enmascara
+ * la latencia de Gemini con streaming. Telegram lidera con Groq A PROPÓSITO: es
+ * un webhook síncrono con ~2 llamadas LLM por mensaje (router + respuesta) y
+ * Gemini en modo thinking tarda decenas de segundos (observado 2026-07: ~19-27s)
+ * → liderar con Gemini chocaría con el timeout del webhook; Groq responde en
+ * pocos segundos. Ambas cadenas terminan en DeepSeek (último recurso) → son
+ * coherentes por diseño, no por accidente. El gasto real de DeepSeek se corta
+ * RECORTANDO el contexto por debajo del límite TPM=8000 de Groq (fix recorte),
+ * NO reordenando esta cadena: un request de ~10-12k tokens excede el TPM por sí
+ * solo, así que ningún modelo de Groq (gpt-oss NI qwen) podría servirlo. NO
+ * reordenar Telegram a Gemini-first.
  */
 async function ariaGroqChat(messages, opts = {}) {
   try {
