@@ -23,30 +23,34 @@
    quienes prefieren fondo blanco. Toggle: useTheme (header + Ajustes). */
 :root {
   color-scheme: light;
-  --background: 242 245 247;        /* #f2f5f7 papel azulado */
+  /* Claro "mate azulado" (pedido de Orel 2026-07-17): nada de blanco puro ni
+     brillos — gris-azul desaturado tipo pantone corporativo, tinta AquaChile.
+     Las cards NO son #fff: elevan apenas un paso sobre el papel. */
+  --background: 214 223 231;        /* #d6dfe7 papel gris-azul mate */
   --foreground: 22 36 47;           /* #16242f tinta */
-  --card: 255 255 255;              /* #ffffff */
-  --secondary: 221 229 235;         /* #dde5eb */
-  --muted: 231 237 241;             /* #e7edf1 */
-  --muted-foreground: 90 108 125;   /* #5a6c7d */
-  --accent: 219 231 240;            /* #dbe7f0 */
-  --border: 204 215 223;            /* #ccd7df */
+  --card: 233 238 243;              /* #e9eef3 superficie mate (no blanco) */
+  --secondary: 194 207 218;         /* #c2cfda */
+  --muted: 206 216 225;             /* #ced8e1 */
+  --muted-foreground: 74 93 113;    /* #4a5d71 */
+  --accent: 191 210 226;            /* #bfd2e2 */
+  --border: 170 185 200;            /* #aab9c8 */
 
-  /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara */
-  --lc-bg: #f2f5f7;
-  --lc-bg-panel: #e9eef2;
-  --lc-surface: #ffffff;
-  --lc-surface-hi: #edf1f4;
+  /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
+     (mismo criterio mate azulado: superficies sin blanco puro) */
+  --lc-bg: #d6dfe7;
+  --lc-bg-panel: #ccd7e0;
+  --lc-surface: #e9eef3;
+  --lc-surface-hi: #dde5ec;
   --lc-ink: #16242f;
   --lc-ink-mid: #45596c;
-  --lc-ink-lo: #6b7f92;
-  --lc-ink-ghost: #94a5b5;
+  --lc-ink-lo: #64798c;
+  --lc-ink-ghost: #8c9fb0;
   --lc-aqua: #2E75B6;
   --lc-aqua-bright: #245a8c;
   --lc-aqua-light: #2a6aa6;
   --lc-aqua-soft: rgba(46, 117, 182, 0.10);
-  --lc-border: #d5dee5;
-  --lc-border-hi: #bccbd6;
+  --lc-border: #bccbd6;
+  --lc-border-hi: #a7bac8;
   --lc-danger: #b8394f;
   --lc-danger-soft: rgba(184, 57, 79, 0.10);
   --lc-prep: #8a6a2f;
