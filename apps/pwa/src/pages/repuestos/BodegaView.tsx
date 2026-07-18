@@ -1399,93 +1399,117 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
   const isSin = has && item.stockActual === 0 && item.stockMinimo > 0
   const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
-  const foto = item.fotos?.[0]
+  // Foto propia de bodega o, en su defecto, del catálogo (fotosReales/manual).
+  const foto = item.fotos?.[0] || item.fotosCatalogo?.[0]
+
+  // Acento lateral por estado: la respuesta "¿hay?" se lee de un vistazo al
+  // escanear la grilla, sin leer números.
+  // Stock 0 sin mínimo configurado no es alerta (regla de negocio), pero
+  // tampoco puede pintarse verde: un "0" en verde se lee como "hay".
+  const isCeroNeutro = has && item.stockActual === 0 && !isSin
+  const accent = !has
+    ? 'border-l-zinc-400/40 dark:border-l-zinc-500/40'
+    : isSin
+      ? 'border-l-red-500'
+      : isBajo
+        ? 'border-l-amber-400'
+        : isCeroNeutro
+          ? 'border-l-zinc-400/40 dark:border-l-zinc-500/40'
+          : 'border-l-emerald-500/80'
+  const stockColor = isSin
+    ? 'text-red-600 dark:text-red-400'
+    : isBajo
+      ? 'text-amber-600 dark:text-amber-400'
+      : isCeroNeutro
+        ? 'text-zinc-500 dark:text-zinc-400'
+        : 'text-emerald-600 dark:text-emerald-400'
 
   return (
     <div
       className={[
-        'group relative rounded-xl border transition-all cursor-pointer',
+        'group relative flex flex-col rounded-xl border border-l-4 transition-all cursor-pointer',
+        accent,
         isSin ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' :
         isBajo ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10' :
         'border-border bg-card hover:bg-muted/20',
       ].join(' ')}
       onClick={onOpenDrawer}
     >
-      <div className="flex gap-3 p-3">
-        {/* Thumbnail */}
-        <div className="shrink-0 h-14 w-14 rounded-lg bg-muted/30 overflow-hidden flex items-center justify-center">
-          {foto ? (
-            <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+      <div className="flex-1 p-3">
+        {/* Nombre (2 líneas, sin cortar lo importante) + foto real si existe + favorito */}
+        <div className="flex items-start gap-2">
+          {foto && (
+            <img src={foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" loading="lazy" />
+          )}
+          {item.textoBreve ? (
+            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">{item.textoBreve}</p>
           ) : (
-            <Package className="h-6 w-6 text-muted-foreground/30" />
+            <p className="min-w-0 flex-1 text-sm font-medium italic leading-snug text-muted-foreground line-clamp-2">(sin nombre — SAP {item.codigoSAP})</p>
+          )}
+          <div className="shrink-0" onClick={e => e.stopPropagation()}>
+            <button onClick={onToggleWatch} className="-m-1 p-1.5 rounded hover:bg-yellow-500/10 transition-colors">
+              <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Lo que el técnico vino a buscar: ¿CUÁNTO hay? y ¿DÓNDE está? */}
+        <div className="mt-2.5 flex items-end justify-between gap-2">
+          {has ? (
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className={`text-2xl font-bold leading-none tabular-nums ${stockColor}`}>{item.stockActual}</span>
+              <span className="text-[11px] text-muted-foreground">{item.unidad}</span>
+              {isSin && <span className="text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">sin stock</span>}
+              {isBajo && <span className="text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">bajo mín</span>}
+              {!isSin && !isBajo && item.stockMinimo > 0 && (
+                <span className="text-[10px] text-muted-foreground">mín {item.stockMinimo}</span>
+              )}
+            </div>
+          ) : (
+            <span className="rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">Sin configurar</span>
+          )}
+          {item.ubicacionBodega && (
+            <span className="inline-flex max-w-[55%] items-center gap-1 rounded-md bg-muted/60 px-2 py-1 text-xs font-medium text-foreground" title={item.ubicacionBodega}>
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{item.ubicacionBodega}</span>
+            </span>
           )}
         </div>
 
-        {/* Contenido */}
-        <div className="flex-1 min-w-0">
-          {/* Nombre + status */}
-          <div className="flex items-start justify-between gap-2">
-            {item.textoBreve ? (
-              <p className="text-sm font-medium text-foreground truncate leading-tight">{item.textoBreve}</p>
-            ) : (
-              <p className="text-sm font-medium italic text-muted-foreground truncate leading-tight">(sin nombre — SAP {item.codigoSAP})</p>
-            )}
-            <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-              <button onClick={onToggleWatch} className="p-1 rounded hover:bg-yellow-500/10 transition-colors">
-                <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
-              </button>
-            </div>
+        {has && (
+          <div className="mt-2">
+            <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
           </div>
+        )}
 
-          {/* Badges */}
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
-            {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
-            {item.equipos.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-0.5" title={item.equipos.map(e => e.machineName).join(', ')}>
-                <Layers className="h-2.5 w-2.5" />{item.equipos.length}
-              </span>
-            )}
-            {item.ubicacionBodega && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-0.5 truncate max-w-[100px]">
-                <MapPin className="h-2.5 w-2.5 shrink-0" />{item.ubicacionBodega}
-              </span>
-            )}
-          </div>
-
-          {/* Stock bar + números */}
-          {has ? (
-            <div className="mt-2 space-y-1">
-              <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
-              <div className="flex items-center justify-between text-[10px]">
-                <div className="flex items-center gap-2">
-                  <span className={`font-bold tabular-nums ${isSin ? 'text-red-400' : isBajo ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {item.stockActual} {item.unidad}
-                  </span>
-                  <span className="text-muted-foreground">mín {item.stockMinimo}</span>
-                </div>
-                {valorTotal > 0 && (
-                  <span className="text-violet-400 font-medium tabular-nums">
-                    ${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-2">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-400">Sin configurar</span>
-            </div>
+        {/* Meta secundaria */}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="rounded bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] text-blue-600 dark:text-blue-400">{item.codigoSAP}</span>
+          {item.tipo && <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
+          {item.equipos.length > 0 && (
+            <span className="flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" title={item.equipos.map(e => e.machineName).join(', ')}>
+              <Layers className="h-2.5 w-2.5" />{item.equipos.length}
+            </span>
+          )}
+          {valorTotal > 0 && (
+            <span className="ml-auto text-[10px] font-medium tabular-nums text-violet-600 dark:text-violet-400">
+              ${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Acciones (hover en desktop, siempre visible mobile) */}
-      <div className="flex items-center justify-end gap-0.5 px-3 pb-2 sm:pb-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-400 transition-colors">
+      {/* Acciones: fila propia en móvil; en desktop flotan sobre la esquina al
+          hacer hover (sin reservar una franja vacía en cada card). */}
+      <div
+        className="flex items-center justify-end gap-0.5 px-3 pb-2 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:rounded-lg sm:border sm:border-border sm:bg-card/90 sm:p-0.5 sm:px-1 sm:pb-0.5 sm:shadow-sm sm:backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+        onClick={e => e.stopPropagation()}
+      >
+        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors">
           <ArrowDownCircle className="h-3.5 w-3.5" />
         </button>
         {has && (
-          <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-400 transition-colors">
+          <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-colors">
             <History className="h-3.5 w-3.5" />
           </button>
         )}
@@ -1493,10 +1517,6 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
           {has ? <Pencil className="h-3.5 w-3.5" /> : <Settings2 className="h-3.5 w-3.5" />}
         </button>
       </div>
-
-      {/* Status indicators */}
-      {isSin && <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
-      {isBajo && !isSin && <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-amber-500" />}
     </div>
   )
 }
