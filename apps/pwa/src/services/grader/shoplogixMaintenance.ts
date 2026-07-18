@@ -27,6 +27,21 @@
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 
 /**
+ * Shape mínimo para clasificar un paro. Lo cumplen tanto un `UpstreamMachineState`
+ * (de la subcolección `machines`) como un `StateAggregate` (el resumen por razón
+ * que el sync guarda en el doc padre del turno).
+ *
+ * Existe para que la REGLA de qué cuenta como avería viva en un solo lugar y se
+ * aplique igual a ambas representaciones. Sin esto habría dos copias de la lista
+ * de exclusiones y terminarían divergiendo.
+ */
+export interface ClassifiableState {
+  type: UpstreamMachineState['type']
+  name?: string
+  reason?: string
+}
+
+/**
  * Reasons que aparecen como `type='downtime'` en Shoplogix pero NO son
  * averías técnicas — son paros operacionales (cambio de operación,
  * falta de suministro, calibración planificada). Se excluyen de MTTR.
@@ -40,8 +55,11 @@ export const MAINTENANCE_EXCLUDED_REASONS: ReadonlySet<string> = new Set([
   'AJUSTE OPERADOR',
 ])
 
+/** Nombre con el que Shoplogix etiqueta las interferencias breves y frecuentes. */
+export const MICRO_STOP_NAME = 'Micro Detencion'
+
 /** ¿Es este state una avería (macro o micro)? */
-export function isMaintenanceState(state: UpstreamMachineState): boolean {
+export function isMaintenanceState(state: ClassifiableState): boolean {
   if (state.type !== 'downtime') return false
   const reason = (state.reason || '').trim().toUpperCase()
   if (reason && MAINTENANCE_EXCLUDED_REASONS.has(reason)) return false
@@ -52,15 +70,15 @@ export function isMaintenanceState(state: UpstreamMachineState): boolean {
  * Micro Detencion (interferencias mecánicas): paros muy cortos y frecuentes.
  * Suelen no llevar reason categorizado.
  */
-export function isMaintenanceMicro(state: UpstreamMachineState): boolean {
+export function isMaintenanceMicro(state: ClassifiableState): boolean {
   if (!isMaintenanceState(state)) return false
-  return (state.name || '').trim() === 'Micro Detencion'
+  return (state.name || '').trim() === MICRO_STOP_NAME
 }
 
 /** Avería macro: avería excluyendo Micro Detencion (paros relevantes). */
-export function isMaintenanceMacro(state: UpstreamMachineState): boolean {
+export function isMaintenanceMacro(state: ClassifiableState): boolean {
   if (!isMaintenanceState(state)) return false
-  return (state.name || '').trim() !== 'Micro Detencion'
+  return (state.name || '').trim() !== MICRO_STOP_NAME
 }
 
 /**

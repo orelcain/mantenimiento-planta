@@ -899,6 +899,141 @@ export async function listShiftInfosForDay(
   }))
 }
 
+// ── Doc padre del turno: resumen precomputado por el sync ────────────────────
+
+/**
+ * Versión de esquema del doc padre a partir de la cual `machines[]` trae los
+ * agregados (uptimeSec, shiftRuntime, breakdown, stateAggregates) suficientes
+ * para pintar la vista MENSUAL sin bajar la subcolección `machines`.
+ *
+ * Debe coincidir con `PARENT_SCHEMA_VERSION` en `functions/shoplogix/sync.js`.
+ * Docs con versión menor (o sin el campo) obligan al camino lento.
+ */
+export const PARENT_SCHEMA_VERSION_WITH_AGGREGATES = 2
+
+/** Resumen de una máquina dentro del doc padre del turno. */
+export interface ParentMachineSummary {
+  machineid: string
+  name: string
+  totalCycles: number
+  uptimeSec: number
+  shiftRuntime: number
+  overallRatio: number
+  expectedTotalCycles: number
+  breakdown: {
+    uptimeSec: number
+    breakSec: number
+    downtimeSec: number
+    setupSec: number
+    plannedDowntimeSec: number
+    totalTrackedSec: number
+  } | null
+  /** States agregados por (type, name, reason). Vacío en docs de esquema viejo. */
+  stateAggregates: unknown
+}
+
+/** Doc padre de un turno, con lo que la vista mensual necesita. */
+export interface ShoplogixShiftParent {
+  dateKey: string
+  shiftId: string
+  scheduledStart: Date | null
+  scheduledEnd: Date | null
+  lastSyncAt: Date | null
+  /** 1 (o ausente) = esquema viejo, sin agregados por máquina. */
+  parentSchemaVersion: number
+  machines: ParentMachineSummary[]
+  /** true si `machines[]` trae los agregados → el mes se resuelve sin subcolección. */
+  hasAggregates: boolean
+}
+
+function parseParentMachine(raw: unknown): ParentMachineSummary | null {
+  if (!raw || typeof raw !== 'object') return null
+  const m = raw as Record<string, unknown>
+  const machineid = String(m.machineid ?? '')
+  if (!machineid) return null
+  const bd = m.breakdown && typeof m.breakdown === 'object' ? m.breakdown as Record<string, unknown> : null
+  return {
+    machineid,
+    name:                String(m.name ?? ''),
+    totalCycles:         Number(m.totalCycles ?? 0),
+    uptimeSec:           Number(m.uptimeSec ?? 0),
+    shiftRuntime:        Number(m.shiftRuntime ?? 0),
+    overallRatio:        Number(m.overallRatio ?? 0),
+    expectedTotalCycles: Number(m.expectedTotalCycles ?? 0),
+    breakdown: bd ? {
+      uptimeSec:          Number(bd.uptimeSec ?? 0),
+      breakSec:           Number(bd.breakSec ?? 0),
+      downtimeSec:        Number(bd.downtimeSec ?? 0),
+      setupSec:           Number(bd.setupSec ?? 0),
+      plannedDowntimeSec: Number(bd.plannedDowntimeSec ?? 0),
+      totalTrackedSec:    Number(bd.totalTrackedSec ?? 0),
+    } : null,
+    stateAggregates: m.stateAggregates,
+  }
+}
+
+function parseShiftParent(docId: string, data: FirestoreData): ShoplogixShiftParent | null {
+  const parsed = parseShiftDocId(docId)
+  if (!parsed) return null
+
+  const machines = (Array.isArray(data.machines) ? data.machines : [])
+    .map(parseParentMachine)
+    .filter((x): x is ParentMachineSummary => x !== null)
+
+  const parentSchemaVersion = Number(data.parentSchemaVersion ?? 1)
+
+  // No basta la versión: una máquina en `status:'error'` no trae agregados. Se
+  // exige que TODAS traigan `stateAggregates` como array, o el pareto del mes
+  // saldría corto sin que nadie lo note. Si no, se cae al camino con subcolección.
+  const hasAggregates =
+    parentSchemaVersion >= PARENT_SCHEMA_VERSION_WITH_AGGREGATES &&
+    machines.length > 0 &&
+    machines.every(m => Array.isArray(m.stateAggregates))
+
+  return {
+    dateKey: parsed.dateKey,
+    shiftId: parsed.shiftId,
+    scheduledStart: data.scheduledStart != null ? toDateSafe(data.scheduledStart) : null,
+    scheduledEnd:   data.scheduledEnd   != null ? toDateSafe(data.scheduledEnd)   : null,
+    lastSyncAt:     data.lastSyncAt     != null ? toDateSafe(data.lastSyncAt)     : null,
+    parentSchemaVersion,
+    machines,
+    hasAggregates,
+  }
+}
+
+/**
+ * Docs PADRE de todos los turnos de un mes, con sus datos.
+ *
+ * UNA query de rango. Para los turnos cuyo padre trae agregados
+ * (`hasAggregates`), esto es todo lo que la vista mensual necesita: 0 reads
+ * adicionales. Para los demás hay que bajar la subcolección `machines`.
+ *
+ * `null` solo ante error de red, para que el caller haga fallback.
+ */
+export async function listShoplogixShiftParentsForMonth(
+  year: number,
+  month: number,   // 0-indexed
+  plantSlug: PlantSlug,
+): Promise<ShoplogixShiftParent[] | null> {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
+  const lastDay     = String(daysInMonth).padStart(2, '0')
+
+  const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+  const snap = await getDocs(query(
+    shiftsRef,
+    where(documentId(), '>=', `${monthPrefix}-01_`),
+    where(documentId(), '<=', `${monthPrefix}-${lastDay}_` + SHIFT_DOC_RANGE_END),
+  )).catch(() => null)
+
+  if (!snap) return null
+
+  return snap.docs
+    .map(d => parseShiftParent(d.id, d.data() as FirestoreData))
+    .filter((x): x is ShoplogixShiftParent => x !== null)
+}
+
 /**
  * IDs de documentos shift que existen en Firestore entre dos dateKeys, inclusive.
  *

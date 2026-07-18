@@ -38,7 +38,14 @@ import {
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
-import { isMaintenanceState, computeMaintenanceTotals } from '@/services/grader/shoplogixMaintenance'
+import {
+  aggregatesFromStates,
+  deserializeStateAggregates,
+  maintenanceTotalsFromAggregates,
+  paretoFromAggregates,
+  type StateAggregate,
+} from '@/services/grader/shoplogixStateAggregates'
+import { resolveMonthShiftKeys } from '@/services/grader/slxMonthResolve'
 import { BaaderTrendMultiChart } from '@/components/grader/UpstreamMachinesPanel'
 import {
   DEFAULT_SHIFT_SCHEDULE,
@@ -55,8 +62,8 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
-import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShiftAuto, getSlxShiftCandidates } from '@/services/shoplogix/shoplogixShift.service'
-import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
+import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, listShoplogixShiftParentsForMonth, subscribeShoplogixShiftAuto, getSlxShiftCandidates } from '@/services/shoplogix/shoplogixShift.service'
+import type { MachineTrendPoint, ShoplogixShiftParent } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 import {
   getShiftDisplayDateKey,
@@ -921,6 +928,18 @@ function getDaysInMonth(date: Date): (Date | null)[] {
 //  - breakdown (uptime/break/downtime/setup/plannedDowntime sec) para la justificación
 interface SlxShiftCache {
   states: UpstreamMachineState[]
+  /**
+   * ¿`states` (y `perMachine[].states`) reflejan la subcolección `machines`?
+   *
+   * La vista mensual se arma desde el doc PADRE del turno, que trae agregados
+   * pero no los states individuales. Para esos turnos `states` queda vacío y
+   * esto en `false`: el timeline usará el horario programado en vez de la
+   * ventana efectiva, hasta que se abra ese día y se cargue la subcolección.
+   *
+   * `true` también en el caché vacío (no hay states que traer) — si no, el
+   * effect del día seleccionado reintentaría leer turnos que no existen.
+   */
+  statesLoaded: boolean
   shiftStart: Date | null
   shiftEnd: Date | null
   /** Horario real del turno según Shoplogix (de intervals.shift en syncDay). */
@@ -953,6 +972,16 @@ interface SlxShiftCache {
     /** Lista de states (uptime/break/downtime/setup) para esta máquina — usado
      *  para reconstruir el pareto filtrando por máquina. */
     states: UpstreamMachineState[]
+    /** Resumen de `states` agrupado por (type, name, reason).
+     *
+     *  Es lo ÚNICO que la vista MENSUAL necesita de los states: el pareto de
+     *  paros y los totales de avería macro/micro. Y a diferencia de `states`,
+     *  viaja dentro del doc PADRE del turno — así el mes no obliga a bajar la
+     *  subcolección `machines` de cada turno.
+     *
+     *  Derivarlo de `states` da exactamente los mismos números; verificado sobre
+     *  turnos reales en `shoplogixStateAggregates.test.ts`. */
+    stateAggregates: StateAggregate[]
   }>
   breakdown: {
     uptimeSec: number
@@ -962,6 +991,51 @@ interface SlxShiftCache {
     plannedDowntimeSec: number
     totalTrackedSec: number
   } | null
+}
+
+/**
+ * Construye el caché de un turno desde su doc PADRE, sin tocar la subcolección.
+ *
+ * Es el camino barato de la vista mensual: el doc padre ya viaja en la única
+ * query de rango del mes, así que esto cuesta 0 reads adicionales. Trae todo lo
+ * que el mes necesita (uptime, ciclos, breakdown, pareto y MTTR vía
+ * `stateAggregates`) y deja `states` vacío con `statesLoaded: false`.
+ *
+ * Solo debe llamarse cuando `parent.hasAggregates` es true.
+ */
+function buildCacheFromParent(parent: ShoplogixShiftParent): SlxShiftCache {
+  const ms = parent.machines
+  const m0 = ms[0]
+  const totalCycles = ms.reduce((a, m) => a + m.totalCycles, 0)
+  const avgShiftRuntime = ms.length > 0
+    ? ms.reduce((s, m) => s + m.shiftRuntime, 0) / ms.length
+    : 0
+
+  return {
+    states: [],
+    statesLoaded: false,
+    // El padre no guarda los bounds de consulta (shiftStart/End), solo el horario
+    // real del turno. Para todo lo que la UI hace con ellos, `scheduled*` sirve.
+    shiftStart:     parent.scheduledStart,
+    shiftEnd:       parent.scheduledEnd,
+    scheduledStart: parent.scheduledStart,
+    scheduledEnd:   parent.scheduledEnd,
+    shiftRuntime:   m0?.shiftRuntime ?? 0,
+    avgShiftRuntime,
+    overallRatio:   m0?.overallRatio ?? 0,
+    totalCycles,
+    totalUptimeSecAllMachines: ms.reduce((a, m) => a + m.uptimeSec, 0),
+    perMachine: ms.map((m) => ({
+      machineid:       m.machineid,
+      name:            m.name,
+      uptimeSec:       m.uptimeSec,
+      totalCycles:     m.totalCycles,
+      shiftRuntime:    m.shiftRuntime,
+      states:          [],
+      stateAggregates: deserializeStateAggregates(m.stateAggregates),
+    })),
+    breakdown: m0?.breakdown ?? null,
+  }
 }
 
 /** Stats mensuales Shoplogix — emitidos por `onSlxMonthStatsLoaded` para el panel lateral */
@@ -1639,7 +1713,12 @@ export function GraderHistoricalCalendar({
     let cancelled = false
     for (const c of candidates) {
       const key = `${c.dateKey}__${c.shiftId}`
-      if (slxByShift.has(key)) continue
+      // `statesLoaded` y no `has(key)`: la pre-carga mensual ya dejó una entrada
+      // para este turno, pero construida desde el doc padre y por tanto SIN los
+      // states individuales. El timeline del día abierto los necesita para dibujar
+      // la ventana efectiva (dónde arrancó y paró de verdad), así que acá sí se
+      // baja la subcolección. Es la única lectura de states que hace la vista.
+      if (slxByShift.get(key)?.statesLoaded) continue
       loadShoplogixShift(c.dateKey, c.shiftId, plantSlug)
         .then((res) => {
           if (cancelled) return
@@ -1660,9 +1739,11 @@ export function GraderHistoricalCalendar({
             totalCycles:  m.totalCycles ?? 0,
             shiftRuntime: m.shiftRuntime ?? 0,
             states:       m.states ?? [],
+            stateAggregates: aggregatesFromStates(m.states),
           }))
           const cache: SlxShiftCache = {
             states,
+            statesLoaded: true,   // viene de la subcolección `machines`
             shiftStart:     m0?.shiftStart     ?? null,
             shiftEnd:       m0?.shiftEnd       ?? null,
             scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
@@ -1688,7 +1769,7 @@ export function GraderHistoricalCalendar({
         .catch(() => {
           if (!cancelled) {
             setSlxByShift((prev) => new Map(prev).set(key, {
-              states: [], shiftStart: null, shiftEnd: null,
+              states: [], statesLoaded: true, shiftStart: null, shiftEnd: null,
               scheduledStart: null, scheduledEnd: null,
               shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0,
               totalUptimeSecAllMachines: 0,
@@ -1722,7 +1803,9 @@ export function GraderHistoricalCalendar({
     const monthShiftIds = ['Turno día', 'Turno noche', 'Turno 1', 'Turno 2', 'Turno 3']
 
     const EMPTY_CACHE: SlxShiftCache = {
-      states: [], shiftStart: null, shiftEnd: null,
+      // `statesLoaded: true` — un turno vacío confirmado no tiene states que traer.
+      // Si fuera false, el effect del día seleccionado reintentaría leerlo cada vez.
+      states: [], statesLoaded: true, shiftStart: null, shiftEnd: null,
       scheduledStart: null, scheduledEnd: null,
       shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0,
       totalUptimeSecAllMachines: 0,
@@ -1774,6 +1857,7 @@ export function GraderHistoricalCalendar({
         (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
       )
       const perMachine2 = mAll.map((m) => ({
+        stateAggregates: aggregatesFromStates(m.states),
         machineid:    m.machineid,
         name:         m.machineName,
         uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
@@ -1783,6 +1867,7 @@ export function GraderHistoricalCalendar({
       }))
       const cache: SlxShiftCache = {
         states,
+        statesLoaded: true,   // viene de la subcolección `machines`
         shiftStart:     m0?.shiftStart     ?? null,
         shiftEnd:       m0?.shiftEnd       ?? null,
         scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
@@ -1807,11 +1892,67 @@ export function GraderHistoricalCalendar({
       return cycles
     }
 
+    /**
+     * Fase 1b — resolver turnos desde el doc PADRE, sin leer subcolecciones.
+     *
+     * El padre ya viene en la query de Fase 1 y (desde `PARENT_SCHEMA_VERSION` 2)
+     * trae uptime, ciclos, breakdown y los states agregados: todo lo que la vista
+     * mensual necesita. Los turnos que resuelve acá cuestan 0 reads adicionales;
+     * el resto (docs de esquema viejo) sigue por el camino con subcolección.
+     *
+     * Devuelve los doc IDs que quedaron resueltos.
+     */
+    function resolveFromParents(parents: ShoplogixShiftParent[]): void {
+      const keyToParent = resolveMonthShiftKeys(
+        parents, monthShiftIds, (base) => getSlxShiftCandidates(base, plantSlug),
+      )
+      if (keyToParent.size === 0) return
+
+      // Varias claves pueden apuntar al mismo padre (p. ej. `Turno día` y `Turno 2`):
+      // construir el caché una sola vez por padre y compartir la referencia.
+      const cacheByParent = new Map<ShoplogixShiftParent, SlxShiftCache>()
+      const updates = new Map<string, SlxShiftCache>()
+      for (const [key, parent] of keyToParent) {
+        let cache = cacheByParent.get(parent)
+        if (!cache) {
+          cache = buildCacheFromParent(parent)
+          cacheByParent.set(parent, cache)
+        }
+        updates.set(key, cache)
+      }
+
+      // Marcarlas como ya encoladas para que las fases siguientes no las carguen.
+      for (const key of updates.keys()) slxMonthQueuedRef.current.add(key)
+
+      setSlxByShift((prev) => {
+        const next = new Map(prev)
+        for (const [k, v] of updates) next.set(k, v)
+        return next
+      })
+      setSlxTotalsByShift((prev) => {
+        const next = new Map(prev)
+        for (const [k, v] of updates) next.set(k, v.totalCycles)
+        return next
+      })
+    }
+
     async function run() {
       // ── Fase 1: descubrir qué shifts existen en el mes (1 query) ──────────────
-      const existingDocIds = await listShoplogixShiftDocIdsForMonth(year, month, plantSlug)
+      // Trae los docs padre COMPLETOS: los que ya tienen agregados se resuelven
+      // sin un solo read más (Fase 1b).
+      const parents = await listShoplogixShiftParentsForMonth(year, month, plantSlug)
       if (cancelled) return
+
+      if (parents && parents.length > 0) {
+        resolveFromParents(parents)
+        if (cancelled) return
+      }
+
       // null = query falló → fallback a cargar todo individualmente
+      const existingDocIds = parents
+        ? parents.map(p => `${p.dateKey}_${p.shiftId}`)
+        : await listShoplogixShiftDocIdsForMonth(year, month, plantSlug)
+      if (cancelled) return
       const existingSet = existingDocIds ? new Set(existingDocIds) : null
 
       // ── Fase 2: clasificar en "vacío confirmado" vs "a cargar" ────────────────
@@ -1958,6 +2099,7 @@ export function GraderHistoricalCalendar({
           (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
         )
         const perMachine3 = mAll.map((m) => ({
+          stateAggregates: aggregatesFromStates(m.states),
           machineid:    m.machineid,
           name:         m.machineName,
           uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
@@ -1966,6 +2108,7 @@ export function GraderHistoricalCalendar({
           states:       m.states ?? [],
         }))
         const cache: SlxShiftCache = {
+          statesLoaded:   true,   // viene del listener sobre la subcolección
           states:         m0?.states         ?? [],
           shiftStart:     m0?.shiftStart     ?? null,
           shiftEnd:       m0?.shiftEnd       ?? null,
@@ -2066,7 +2209,9 @@ export function GraderHistoricalCalendar({
       totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
       // Agregación por Baader individual del mes (uptime + MTTR macro/micro)
       for (const pm of cache.perMachine ?? []) {
-        const maint = computeMaintenanceTotals(pm.states)
+        // Desde los agregados, no desde `states`: mismos números (paridad
+        // verificada) y así el mes no depende de la subcolección `machines`.
+        const maint = maintenanceTotalsFromAggregates(pm.stateAggregates ?? [])
         const acc = perMachineAcc.get(pm.machineid)
         if (acc) {
           acc.uptimeSec       += pm.uptimeSec
@@ -2145,7 +2290,10 @@ export function GraderHistoricalCalendar({
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
-    const reasonMap = new Map<string, { durationSec: number; color: string; count: number; type: string }>()
+    // Agregados de todos los turnos del mes; el bucketing por razón lo hace
+    // `paretoFromAggregates` al final, igual que antes lo hacía este bucle sobre
+    // `states[]` (equivalencia verificada en shoplogixStateAggregates.test.ts).
+    const monthAggregates: StateAggregate[] = []
     // Filtro de ruido SLX vía helper centralizado: turnos con <SLX_NOISE_THRESHOLD
     // ciclos no aportan al pareto del mes (paros aislados, datos pre-startup).
     for (const [key, cache] of slxByShift) {
@@ -2162,47 +2310,29 @@ export function GraderHistoricalCalendar({
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
-      // Fuente de states según filtro:
-      //   - 'all' → suma states de las 3 Baaders (perMachine.flatMap). Antes
-      //     usaba `cache.states` que es SOLO M0 → "Todas" daba lo mismo que
-      //     "Ev 1" (M0). Bug detectado al hacer click en el filtro.
-      //   - machineid específico → states solo de esa Baader.
-      // Fallback al cache.states (M0) si perMachine está vacío (caches legacy).
-      let sourceStates: UpstreamMachineState[]
+      // Fuente de agregados según filtro:
+      //   - 'all' → suma las 3 Baaders (perMachine.flatMap). Antes usaba
+      //     `cache.states` que es SOLO M0 → "Todas" daba lo mismo que "Ev 1".
+      //     Bug detectado al hacer click en el filtro.
+      //   - machineid específico → solo esa Baader.
+      // Fallback a `cache.states` (M0) si perMachine está vacío (caches legacy).
       if (paretoMachineFilter === 'all') {
         const hasPerMachine = (cache.perMachine?.length ?? 0) > 0
-        sourceStates = hasPerMachine
-          ? cache.perMachine.flatMap((m) => m.states)
-          : cache.states
+        if (hasPerMachine) {
+          for (const m of cache.perMachine) monthAggregates.push(...(m.stateAggregates ?? []))
+        } else {
+          monthAggregates.push(...aggregatesFromStates(cache.states))
+        }
       } else {
         const pm = cache.perMachine?.find((m) => m.machineid === paretoMachineFilter)
-        sourceStates = pm?.states ?? []
-      }
-      for (const s of sourceStates) {
-        // Incluir TODAS las paradas (no solo downtime): break (colación, MMPP,
-        // paros programados según reason del supervisor), downtime (averías),
-        // setup (cambios). Excluir solo uptime (producción real).
-        if (s.type === 'uptime') continue
-        // Toggle "Solo mantención": dejar solo states clasificados como avería
-        // (type='downtime' menos reasons operacionales). Ver shoplogixMaintenance.ts.
-        if (paretoMaintOnly && !isMaintenanceState(s)) continue
-        // Clave del bucket: preferir `reason` específico (la causa que el
-        // supervisor o sistema agregó: COLACION, MMPP, REUNION INICIO TURNO,
-        // Paro Programado, etc.). Fallback a `name` (la categoría genérica
-        // tipo "Detencion" / "Micro Detencion"). Sin reason ni name → "Sin causa".
-        const reason = s.reason?.trim() || s.name?.trim() || 'Sin causa'
-        const entry  = reasonMap.get(reason)
-        if (entry) {
-          entry.durationSec += s.durationSec
-          entry.count       += 1
-        } else {
-          reasonMap.set(reason, { durationSec: s.durationSec, color: s.color, count: 1, type: s.type })
-        }
+        if (pm) monthAggregates.push(...(pm.stateAggregates ?? []))
       }
     }
-    return [...reasonMap.entries()]
-      .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.durationSec - a.durationSec)
+    // Incluye TODAS las paradas (break, downtime, setup) y excluye uptime.
+    // `paretoMaintOnly` deja solo las averías (type='downtime' menos los reasons
+    // operacionales). El bucket prefiere `reason` (la causa que registró el
+    // supervisor) sobre `name` (la categoría genérica de Shoplogix).
+    return paretoFromAggregates(monthAggregates, paretoMaintOnly)
   }, [slxByShift, currentMonth, paretoMachineFilter, paretoMaintOnly])
 
   // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
@@ -3926,7 +4056,17 @@ export function GraderHistoricalCalendar({
                     ]
                   : slxDisplayShifts(selectedKey, slxByShift, { isClassificationPlant: plantLine.isClassificationPlant })
                 ).map(({ shiftId, cfDateKey, slxKey }) => {
-                  const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
+                  // "¿Hay datos Shoplogix para este turno?" — NO se puede preguntar por
+                  // `states.length`: los turnos resueltos desde el doc padre traen los
+                  // agregados pero no los states individuales. `perMachine` sí está
+                  // siempre. Se conserva `states` para turnos con paro total (0 ciclos
+                  // pero con downtime registrado), que antes sí se mostraban.
+                  const slxForShift = slxByShift.get(slxKey)
+                  const hasSlx = !!slxForShift && (
+                    slxForShift.totalCycles > 0 ||
+                    slxForShift.perMachine.length > 0 ||
+                    slxForShift.states.length > 0
+                  )
                   const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
                     ? `?linea=${encodeURIComponent(plantLineId)}`
                     : ''
