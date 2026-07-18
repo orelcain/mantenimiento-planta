@@ -35,9 +35,14 @@
   --card: 227 233 238;              /* #e3e9ee superficie clara, salto grande vs fondo */
   --secondary: 181 199 211;         /* #b5c7d3 Baby Blue 13-4308 TCX exacto */
   --muted: 190 200 208;             /* #bec8d0 */
-  --muted-foreground: 61 80 100;    /* #3d5064 */
+  --muted-foreground: 49 64 80;     /* #314050 recalibrado 2026-07-18 para WCAG AA
+                                        4.5:1 real (medido, no a ojo) — el valor
+                                        anterior #3d5064 daba 3.98:1 contra
+                                        background y 3.68:1 contra accent */
   --accent: 159 175 186;            /* #9fafba */
-  --border: 135 145 154;            /* #87919a el más marcado, delimita superficies */
+  --border: 88 94 100;              /* #585e64 recalibrado 2026-07-18 para AA 3:1
+                                        no-textual real — el anterior #87919a daba
+                                        1.54:1 contra background y 2.62:1 contra card */
 
   /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
      (mismo criterio mate azulado: superficies sin blanco puro) */
@@ -46,15 +51,15 @@
   --lc-surface: #e3e9ee;
   --lc-surface-hi: #b8c2cc;
   --lc-ink: #16242f;
-  --lc-ink-mid: #45596c;
-  --lc-ink-lo: #64798c;
+  --lc-ink-mid: #374756;
+  --lc-ink-lo: #4b5b69;
   --lc-ink-ghost: #8c9fb0;
   --lc-aqua: #2E75B6;
   --lc-aqua-bright: #245a8c;
   --lc-aqua-light: #2a6aa6;
   --lc-aqua-soft: rgba(46, 117, 182, 0.10);
-  --lc-border: #87919a;
-  --lc-border-hi: #7a838b;
+  --lc-border: #585e64;
+  --lc-border-hi: #555c61;
   --lc-danger: #b8394f;
   --lc-danger-soft: rgba(184, 57, 79, 0.10);
   --lc-prep: #8a6a2f;
