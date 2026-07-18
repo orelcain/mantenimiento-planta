@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v3.97.0**
+## Versión Actual: **v3.98.0**
 
 **Fecha de lanzamiento**: 22 de mayo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,9 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v3.98.0 — Repuestos: catálogo Enzunchadora TP-6000 (18/07/2026)
+- 📦 **Catálogo Enzunchadora TP-6000** en el buscador de códigos de fabricante, con cruce códigos de distribuidor (Garibaldi) ↔ SAP
 
 ### v3.97.0 — Grader: líneas de cadencia en el timeline (18/07/2026)
 - 📈 **Líneas de ritmo típico + máx sostenida (10 min)** en el timeline del turno del Grader
