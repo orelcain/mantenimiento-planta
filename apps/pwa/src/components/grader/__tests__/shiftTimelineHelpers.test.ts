@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBaaderTimelineMarkers,
+  buildCadenceMarkLines,
   buildConfigSegmentMarkAreas,
   buildScatterData,
+  computeCadenceStats,
   computeProductionWindow,
   median,
   scatterBaaderMedian,
@@ -10,6 +12,7 @@ import {
   scatterSlopeMagnitude,
   usableScatterPoints,
   verdictBandColor,
+  type CadenceStats,
   type ProductionWindow,
   type ScatterSeriesData,
 } from '../shiftTimelineHelpers'
@@ -703,5 +706,82 @@ describe('buildConfigSegmentMarkAreas', () => {
     const verdicts = new Map([['a', mkVerdict('improved', -2)]])
     // El segmento iría de 17:00 a 17:00 (fin window) → vacío, se descarta.
     expect(buildConfigSegmentMarkAreas(snaps, verdicts, window)).toEqual([])
+  })
+})
+
+// ── computeCadenceStats / buildCadenceMarkLines ───────────────────────────────
+
+/** Construye N buckets activos consecutivos a partir de un array de pz/min. */
+function mkCadenceBuckets(piecesPerMin: number[]): TimelineBucket[] {
+  return piecesPerMin.map((pieces, i) => {
+    const min = String(i).padStart(2, '0')
+    return mkBucket(`2026-02-26T09:${min}:00Z`, pieces, 0)
+  })
+}
+
+describe('computeCadenceStats', () => {
+  it('caso normal: mediana sobre minutos activos + mejor ventana móvil de 10', () => {
+    // 12 minutos activos. Mediana clásica de los 12 valores = 45.
+    // Mejor ventana de 10 consecutivos: los primeros 10 (suma 550) → 55 pz/min,
+    // por encima de las otras 2 ventanas posibles (54.5 y 53).
+    const buckets = mkCadenceBuckets([10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 5, 5])
+    const stats = computeCadenceStats(buckets)
+    expect(stats.typicalPzMin).toBe(45)
+    expect(stats.bestSustained10MinPzMin).toBe(55)
+  })
+
+  it('turno vacío: sin buckets activos → ambas líneas null (nunca NaN)', () => {
+    const stats = computeCadenceStats([])
+    expect(stats.typicalPzMin).toBeNull()
+    expect(stats.bestSustained10MinPzMin).toBeNull()
+  })
+
+  it('turno corto (<10 min activos): mediana se calcula, sostenida se oculta', () => {
+    // 5 minutos activos, mediana clásica (n impar) = 30. No hay ventana de 10
+    // minutos posible → bestSustained10MinPzMin queda null (se oculta la línea).
+    const buckets = mkCadenceBuckets([10, 20, 30, 40, 50])
+    const stats = computeCadenceStats(buckets)
+    expect(stats.typicalPzMin).toBe(30)
+    expect(stats.bestSustained10MinPzMin).toBeNull()
+  })
+
+  it('exactamente 10 min activos: sostenida SÍ se calcula (borde inclusive)', () => {
+    const buckets = mkCadenceBuckets([10, 10, 10, 10, 10, 10, 10, 10, 10, 10])
+    const stats = computeCadenceStats(buckets)
+    expect(stats.bestSustained10MinPzMin).toBe(10)
+  })
+
+  it('la mejor ventana no es necesariamente la primera', () => {
+    // Ráfaga alta en el medio: la ventana de índices 2..11 (10 valores de
+    // 100 consecutivos) debe ganarle a cualquier ventana que incluya un 5.
+    const buckets = mkCadenceBuckets([5, 5, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 5])
+    const stats = computeCadenceStats(buckets)
+    expect(stats.bestSustained10MinPzMin).toBe(100)
+  })
+})
+
+describe('buildCadenceMarkLines', () => {
+  it('caso normal: 2 líneas con el valor y label esperados', () => {
+    const stats: CadenceStats = { typicalPzMin: 45, bestSustained10MinPzMin: 55 }
+    const lines = buildCadenceMarkLines(stats) as Array<{ name: string; yAxis: number; label: { formatter: string } }>
+    expect(lines).toHaveLength(2)
+    expect(lines[0]!.name).toBe('Ritmo típico')
+    expect(lines[0]!.yAxis).toBe(45)
+    expect(lines[0]!.label.formatter).toBe('típico 45')
+    expect(lines[1]!.name).toBe('Máx sostenida (10min)')
+    expect(lines[1]!.yAxis).toBe(55)
+    expect(lines[1]!.label.formatter).toBe('máx 10min 55')
+  })
+
+  it('turno vacío: sin stats → sin líneas (nunca NaN visible)', () => {
+    const stats: CadenceStats = { typicalPzMin: null, bestSustained10MinPzMin: null }
+    expect(buildCadenceMarkLines(stats)).toEqual([])
+  })
+
+  it('turno corto: solo la línea de ritmo típico, sostenida oculta', () => {
+    const stats: CadenceStats = { typicalPzMin: 30, bestSustained10MinPzMin: null }
+    const lines = buildCadenceMarkLines(stats) as Array<{ name: string }>
+    expect(lines).toHaveLength(1)
+    expect(lines[0]!.name).toBe('Ritmo típico')
   })
 })

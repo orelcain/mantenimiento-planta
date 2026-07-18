@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v3.96.0**
+## Versión Actual: **v3.97.0**
 
 **Fecha de lanzamiento**: 22 de mayo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,9 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v3.97.0 — Grader: líneas de cadencia en el timeline (18/07/2026)
+- 📈 **Líneas de ritmo típico + máx sostenida (10 min)** en el timeline del turno del Grader
 
 ### v3.32.3 — Panel Admin: visibilidad de TODOS los módulos del sidebar (22/05/2026)
 - 🧩 **Panel "Módulos del sidebar" (`/admin/dev-modules`)**: ahora lista los 19 items en dos secciones (**En desarrollo** ocultos por default / **En producción** visibles por default) en vez de solo los ocultos
