@@ -4198,9 +4198,9 @@ export function GraderHistoricalCalendar({
                       {slxMonthlyStats.perMachineMonth.map((pm) => {
                         const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
                         const uptimeColor =
-                          pm.avgUptimePct >= 70 ? 'text-emerald-300'
-                          : pm.avgUptimePct >= 40 ? 'text-amber-300'
-                          : 'text-rose-300'
+                          pm.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-300'
+                          : pm.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-rose-700 dark:text-rose-300'
                         // MTTR = total seg / N° eventos. 0 si no hubo eventos.
                         const mttrMacroSec = pm.maintMacroCount > 0
                           ? pm.maintMacroSec / pm.maintMacroCount : 0
