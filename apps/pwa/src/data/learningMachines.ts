@@ -7,7 +7,7 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import {
-  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes, HeartPulse, ShieldCheck,
+  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes, HeartPulse, ShieldCheck, Cable,
 } from 'lucide-react'
 
 export type LearningSection = 'manual' | 'procedures' | 'flows' | 'diagnosis'
@@ -179,6 +179,18 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Norma NFPA 70B 2023: mantenimiento del equipo electrico. MEP, 4 pilares, criticidad y riesgo, tipos de mantenimiento, pruebas (termografia, puesta a tierra) y mejora continua (PHVA).',
     icon: ShieldCheck,
     color: '#bf8b3e',
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
+  },
+  {
+    slug: 'codigo-electrico-nec',
+    name: 'Codigo Electrico Nacional (NFPA 70/NEC)',
+    area: CAPACITACION_AREA,
+    programa: 'Programa Electricidad - Mantenimiento Industrial',
+    modulo: 4,
+    nivel: 1,
+    description: 'Codigo Electrico Nacional NFPA 70 (NEC) 2023 + reglamentos SEC (RIC / RPTD). Estructura y lenguaje del codigo, Articulo 110 y 250, puesta a tierra, protecciones (disyuntor, diferencial, SPD, AFDD), dimensionamiento de conductores (sobrecarga, caida de tension, cortocircuito) y calculo de protecciones.',
+    icon: Cable,
+    color: '#3f7c78',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
 ]
