@@ -24,6 +24,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
+import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
@@ -147,8 +148,9 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-6 max-w-6xl mx-auto">
-      {/* Sub-tabs (scrollable en mobile) */}
-      <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg w-fit overflow-x-auto no-scrollbar">
+      {/* Sub-tabs: compactas en móvil (sin ícono, menos padding) para que las 4
+          quepan en 375px — antes "Estadísticas" quedaba cortada fuera de vista. */}
+      <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg w-fit max-w-full overflow-x-auto no-scrollbar">
         {SUB_TABS.map(t => {
           const Icon = t.icon
           const active = subTab === t.id
@@ -157,11 +159,11 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
               key={t.id}
               onClick={() => setSubTab(t.id)}
               className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                'flex shrink-0 items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all',
                 active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
               ].join(' ')}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="hidden sm:block h-3.5 w-3.5" />
               {t.label}
               {t.id === 'stock' && bodega.stats.bajoStock + bodega.stats.sinStock > 0 && (
                 <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/80 text-white text-[9px] font-bold flex items-center justify-center">
@@ -236,10 +238,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
 
     if (searchQuery.trim()) {
-      const terms = searchQuery.toLowerCase().trim().split(/\s+/)
+      const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
       result = result.filter(i => {
-        const h = `${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`.toLowerCase()
-        return terms.every(t => h.includes(t))
+        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
+        return haystackMatchesAll(h, terms)
       })
     }
 
@@ -254,7 +256,13 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           return dir * (va - vb)
         }
         case 'equipos': return dir * (a.equipos.length - b.equipos.length)
-        default: return dir * (a.textoBreve || '').localeCompare(b.textoBreve || '')
+        default: {
+          // Sin nombre SIEMPRE al final (aun en desc): '' ordena antes que todo
+          // y dejaba los docs sucios como primera pantalla de Bodega.
+          if (a.textoBreve && !b.textoBreve) return -1
+          if (!a.textoBreve && b.textoBreve) return 1
+          return dir * (a.textoBreve || '').localeCompare(b.textoBreve || '')
+        }
       }
     })
     return result
@@ -565,10 +573,10 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
   const baseList = tab === 'pendientes' ? pendientes : tab === 'diferencias' ? conDif : contados
   const visible = useMemo(() => {
     if (!conteoSearch.trim()) return baseList
-    const terms = conteoSearch.toLowerCase().trim().split(/\s+/)
+    const terms = normalizeForSearch(conteoSearch).split(/\s+/).filter(Boolean)
     return baseList.filter(c => {
-      const h = `${c.codigoSAP} ${c.textoBreve}`.toLowerCase()
-      return terms.every(t => h.includes(t))
+      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve}`)
+      return haystackMatchesAll(h, terms)
     })
   }, [baseList, conteoSearch])
 
@@ -715,10 +723,10 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
     let result = movimientos
     if (filtroTipo !== 'todos') result = result.filter(m => m.tipo === filtroTipo)
     if (searchMov.trim()) {
-      const terms = searchMov.toLowerCase().trim().split(/\s+/)
+      const terms = normalizeForSearch(searchMov).split(/\s+/).filter(Boolean)
       result = result.filter(m => {
-        const h = `${m.bodegaItemId} ${m.motivo} ${m.realizadoPorNombre}`.toLowerCase()
-        return terms.every(t => h.includes(t))
+        const h = normalizeForSearch(`${m.bodegaItemId} ${m.motivo} ${m.realizadoPorNombre}`)
+        return haystackMatchesAll(h, terms)
       })
     }
     return result
@@ -1417,7 +1425,11 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
         <div className="flex-1 min-w-0">
           {/* Nombre + status */}
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium text-foreground truncate leading-tight">{item.textoBreve}</p>
+            {item.textoBreve ? (
+              <p className="text-sm font-medium text-foreground truncate leading-tight">{item.textoBreve}</p>
+            ) : (
+              <p className="text-sm font-medium italic text-muted-foreground truncate leading-tight">(sin nombre — SAP {item.codigoSAP})</p>
+            )}
             <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
               <button onClick={onToggleWatch} className="p-1 rounded hover:bg-yellow-500/10 transition-colors">
                 <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
@@ -1558,7 +1570,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
         <div className="sticky top-0 bg-card border-b border-border px-5 py-4 z-10">
           <div className="flex items-start justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-base font-bold text-foreground">{item.textoBreve}</p>
+              <p className={item.textoBreve ? 'text-base font-bold text-foreground' : 'text-base font-bold italic text-muted-foreground'}>{item.textoBreve || `(sin nombre — SAP ${item.codigoSAP})`}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 font-mono">{item.codigoFabricante}</span>}
@@ -2066,10 +2078,10 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
 
   const visible = useMemo(() => {
     if (!searchBatch.trim()) return items
-    const terms = searchBatch.toLowerCase().split(/\s+/)
+    const terms = normalizeForSearch(searchBatch).split(/\s+/).filter(Boolean)
     return items.filter(i => {
-      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
-      return terms.every(t => h.includes(t))
+      const h = normalizeForSearch(`${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`)
+      return haystackMatchesAll(h, terms)
     })
   }, [items, searchBatch])
 
@@ -2195,10 +2207,10 @@ function BulkConfigModal({ items, saveStock, onClose }: {
 
   const visible = useMemo(() => {
     if (!searchBulk.trim()) return items
-    const terms = searchBulk.toLowerCase().split(/\s+/)
+    const terms = normalizeForSearch(searchBulk).split(/\s+/).filter(Boolean)
     return items.filter(i => {
-      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
-      return terms.every(t => h.includes(t))
+      const h = normalizeForSearch(`${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`)
+      return haystackMatchesAll(h, terms)
     })
   }, [items, searchBulk])
 

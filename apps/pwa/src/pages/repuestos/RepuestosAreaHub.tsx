@@ -41,7 +41,7 @@ import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
-import { normalizeForSearch } from '@/utils/repuestos'
+import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 
@@ -772,7 +772,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             ...r.equipos.map((e) => e.machineName),
           ].join(' '),
         )
-        return terms.every((t) => hay.includes(t))
+        return haystackMatchesAll(hay, terms)
       })
     }
     return res
@@ -873,7 +873,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         if (sap && sap === q) return 0
         if (sap && sap.startsWith(q)) return 1
         const nombre = normalizeForSearch(`${r.textoBreve} ${r.alias ?? ''} ${(r.nombresComunes ?? []).join(' ')}`)
-        if (terms.every((t) => nombre.includes(t))) return 2
+        if (haystackMatchesAll(nombre, terms)) return 2
         return 3
       }
       return tierFirst([...filteredRep].sort((a, b) => {
@@ -1480,7 +1480,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       {/* Columna principal */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header del módulo: búsqueda global + acciones */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5 sm:px-4">
+        {/* gap/min-w reducidos en móvil: la fila completa (menú+buscador+acciones+⋮)
+            debe caber en 375px — si no, el "⋮" salta a una segunda fila entera. */}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:gap-2 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
             className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
@@ -1488,7 +1490,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="relative min-w-[160px] max-w-md flex-1">
+          <div className="relative min-w-[96px] max-w-md flex-1 sm:min-w-[160px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={repQuery}
@@ -2202,7 +2204,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               if (terms.length) {
                 groups = groups.filter((g) => {
                   const hay = normalizeForSearch(`${g.label} ${g.codigos.join(' ')}`)
-                  return terms.every((t) => hay.includes(t))
+                  return haystackMatchesAll(hay, terms)
                 })
               } else if (selectedAreaId && !showingAll) {
                 groups = groups.filter((g) => g.nodeIds.some((id) => machineInArea(id, selectedAreaId)))

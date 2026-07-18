@@ -6,22 +6,18 @@
  *  - sin preselección (desde el topbar) → selector acotado a los repuestos del área (`options`).
  */
 import { useState, useEffect, useMemo } from 'react'
-import { Loader2, Package } from 'lucide-react'
+import { Loader2, Package, Search, X } from 'lucide-react'
 import {
   Button,
   Input,
   Textarea,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/components/ui'
+import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
 
 export interface RepuestoLite {
@@ -41,6 +37,7 @@ interface Props {
 
 export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options = [], onSubmit }: Props) {
   const [sap, setSap] = useState('')
+  const [query, setQuery] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [observaciones, setObservaciones] = useState('')
   const [saving, setSaving] = useState(false)
@@ -50,6 +47,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
   useEffect(() => {
     if (open) {
       setSap(repuesto?.codigoSAP ?? '')
+      setQuery('')
       setCantidad(1)
       setObservaciones('')
       setError(null)
@@ -66,6 +64,18 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
     if (repuesto) return repuesto
     return optionsWithSap.find((o) => o.codigoSAP === sap) ?? null
   }, [repuesto, optionsWithSap, sap])
+
+  // Búsqueda sobre las opciones del área: el dropdown plano era inusable en
+  // móvil (cientos de opciones alfabéticas sin filtro). Mismo matcher que el
+  // buscador principal (acentos + singular/plural).
+  const MAX_RESULTADOS = 50
+  const filtered = useMemo(() => {
+    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean)
+    if (!terms.length) return optionsWithSap.slice(0, MAX_RESULTADOS)
+    return optionsWithSap
+      .filter((o) => haystackMatchesAll(normalizeForSearch(`${o.textoBreve} ${o.codigoSAP}`), terms))
+      .slice(0, MAX_RESULTADOS)
+  }, [optionsWithSap, query])
 
   const submit = async () => {
     if (!selected) { setError('Selecciona un repuesto.'); return }
@@ -103,19 +113,57 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
               <div className="text-sm font-medium text-foreground">{repuesto.textoBreve || '(sin nombre)'}</div>
               <div className="font-mono text-xs text-muted-foreground">SAP {repuesto.codigoSAP}</div>
             </div>
+          ) : selected ? (
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Repuesto</label>
+              <div className="flex items-start justify-between gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-foreground">{selected.textoBreve || '(sin nombre)'}</div>
+                  <div className="font-mono text-xs text-muted-foreground">SAP {selected.codigoSAP}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSap(''); setQuery('') }}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Quitar repuesto seleccionado"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           ) : (
             <div>
               <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Repuesto</label>
-              <Select value={sap} onValueChange={setSap}>
-                <SelectTrigger><SelectValue placeholder="Selecciona un repuesto del área…" /></SelectTrigger>
-                <SelectContent>
-                  {optionsWithSap.map((o) => (
-                    <SelectItem key={o.codigoSAP} value={o.codigoSAP}>
-                      {o.textoBreve || o.codigoSAP} · {o.codigoSAP}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar por nombre o SAP…"
+                  className="pl-9"
+                  autoFocus
+                />
+              </div>
+              <div className="mt-1 max-h-52 overflow-y-auto rounded-lg border border-border">
+                {filtered.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-muted-foreground">Sin coincidencias en el área.</p>
+                ) : (
+                  filtered.map((o) => (
+                    <button
+                      key={o.codigoSAP}
+                      type="button"
+                      onClick={() => setSap(o.codigoSAP)}
+                      className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left hover:bg-muted/40"
+                    >
+                      <span className="min-w-0 truncate text-sm text-foreground">{o.textoBreve || o.codigoSAP}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{o.codigoSAP}</span>
+                    </button>
+                  ))
+                )}
+                {filtered.length === MAX_RESULTADOS && (
+                  <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">Mostrando {MAX_RESULTADOS} — afina la búsqueda para ver el resto.</p>
+                )}
+              </div>
             </div>
           )}
 
