@@ -1,8 +1,8 @@
 {
-  "version": "3.98.0",
+  "version": "3.99.0",
   "buildDate": "2026-07-18",
-  "buildTimestamp": 1784357659562,
+  "buildTimestamp": 1784357659563,
   "features": [
-    "Repuestos: catálogo Enzunchadora TP-6000 con códigos de distribuidor (Garibaldi) y SAP"
+    "Fix: HomeRedirect detecta viewport — mobile va a /dashboard (MobileHomeGrid), desktop usa la ruta configurada"
   ]
 }
