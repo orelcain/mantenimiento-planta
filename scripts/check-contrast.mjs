@@ -130,7 +130,7 @@ check('mutedFg / background', DARK.mutedFg, DARK.background, 4.5)
 check('mutedFg / card', DARK.mutedFg, DARK.card, 4.5)
 check('border / background (3:1, FALLA pre-existente conocida)', DARK.border, DARK.background, 3)
 
-console.log('\n=== DARK — chips de estado (texto-300/400 sobre bg-color/10-20 mezclado con card) ===')
+console.log('\n=== DARK — chips de estado (texto-300/400 sobre bg-color/10-15; los /20 riesgosos llevan dark:bg-*/10 desde 2026-07-18) ===')
 for (const [name, textHex, colorHex] of [
   ['emerald', T.emerald400, T.emerald500],
   ['red', T.red400, T.red500],
@@ -141,7 +141,7 @@ for (const [name, textHex, colorHex] of [
   ['sky', T.sky400, T.sky500],
   ['cyan', T.cyan400, T.cyan500],
 ]) {
-  for (const alpha of [0.10, 0.20]) {
+  for (const alpha of [0.10, 0.15]) {
     const bg = composite(DARK.card, colorHex, alpha)
     check(`${name} text/${Math.round(alpha * 100)}%`, textHex, bg, 4.5)
   }

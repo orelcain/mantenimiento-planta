@@ -167,7 +167,7 @@ export function GraderQuickChangePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
+                    <Badge className="bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
                   </div>
                   {shiftStart && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">

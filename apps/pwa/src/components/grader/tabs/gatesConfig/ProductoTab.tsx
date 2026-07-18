@@ -80,7 +80,7 @@ export function ProductoTab({
     : null
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
-    ? 'bg-red-500/20 text-red-400 border-red-500/40'
+    ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/40'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
       ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
       : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'

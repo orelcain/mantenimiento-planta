@@ -4,9 +4,9 @@ import { ChevronDown } from 'lucide-react'
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
-  warning:     { border: 'border-red-500/40',    bg: 'bg-red-500/15',    badge: 'bg-red-500/20 text-red-700 dark:text-red-400',    dot: 'bg-red-400'    },
+  warning:     { border: 'border-red-500/40',    bg: 'bg-red-500/15',    badge: 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400',    dot: 'bg-red-400'    },
   recommended: { border: 'border-amber-500/40',  bg: 'bg-amber-500/15',  badge: 'bg-amber-500/20 text-amber-700 dark:text-amber-400', dot: 'bg-amber-400'  },
-  info:        { border: 'border-sky-500/30',     bg: 'bg-sky-500/8',     badge: 'bg-sky-500/20 text-sky-400',    dot: 'bg-sky-400'    },
+  info:        { border: 'border-sky-500/30',     bg: 'bg-sky-500/8',     badge: 'bg-sky-500/20 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400',    dot: 'bg-sky-400'    },
 } as const
 
 const CONFIDENCE_LABELS = {

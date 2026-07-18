@@ -1288,7 +1288,7 @@ export function ShiftTimelineView({
             <button
               type="button"
               onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-sky-500/40 bg-sky-500/20 text-sky-700 dark:text-sky-400 hover:bg-sky-500/30 active:bg-sky-500/40 transition-colors text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-sky-500/40 bg-sky-500/20 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 hover:bg-sky-500/30 active:bg-sky-500/40 transition-colors text-[11px] font-medium"
               title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
             >
               <Upload className="w-3 h-3" />

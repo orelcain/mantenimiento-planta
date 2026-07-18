@@ -17,7 +17,9 @@
     "seed:user:help": "node scripts/seed_user_profile.js --help",
     "sync:equipment": "node scripts/sync_equipment_from_hierarchy.js",
     "sync:equipment:help": "node scripts/sync_equipment_from_hierarchy.js --help",
-    "migrate:gantt:default-project": "node scripts/migrate_gantt_default_project.js --apply"
+    "migrate:gantt:default-project": "node scripts/migrate_gantt_default_project.js --apply",
+    "audit:theme": "node scripts/audit-theme.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "devDependencies": {
     "mammoth": "^1.11.0",

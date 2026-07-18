@@ -329,7 +329,7 @@ export function GateBreakdownCard({
         {calibreGroups.length > 0 && (
           <div className="flex items-center gap-2 pb-1 flex-wrap">
             {kpi.saturado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-[11px] font-medium text-red-700 dark:text-red-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 dark:bg-red-500/10 border border-red-500/30 text-[11px] font-medium text-red-700 dark:text-red-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
               </span>
@@ -522,7 +522,7 @@ export function GateBreakdownCard({
                           <span className={cn(
                             'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5',
                             isTop
-                              ? 'bg-red-500/20 text-red-400'
+                              ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400'
                               : 'bg-amber-500/15 text-amber-400',
                           )}>
                             {i + 1}

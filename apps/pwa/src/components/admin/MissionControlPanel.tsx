@@ -96,7 +96,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
         </button>
         <button
           onClick={() => onDelete(c.id!)}
-          className="p-0.5 rounded hover:bg-red-500/20 text-red-400"
+          className="p-0.5 rounded hover:bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400"
           title="Eliminar corrección"
         >
           <Trash2 className="h-3 w-3" />

@@ -156,7 +156,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
           </div>
           <div className="w-12" /> {/* spacer */}
           <div className="text-left">
-            <Badge variant="outline" className="gap-1 text-indigo-700 dark:text-indigo-400 border-indigo-500/40 bg-indigo-500/20">
+            <Badge variant="outline" className="gap-1 text-indigo-700 dark:text-indigo-400 border-indigo-500/40 bg-indigo-500/20 dark:bg-indigo-500/10">
               <Moon className="h-3 w-3" /> {noche.shiftId}
             </Badge>
           </div>

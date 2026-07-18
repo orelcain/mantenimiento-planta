@@ -300,7 +300,7 @@ export function GraderResumenRapido({
                     className={cn(
                       'shrink-0 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center mt-0.5',
                       a.severity === 'critical'
-                        ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+                        ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
                         : 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
                     )}
                   >
