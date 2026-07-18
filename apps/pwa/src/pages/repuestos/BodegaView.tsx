@@ -24,7 +24,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
-import { haystackMatchesAll } from '@/utils/repuestos'
+import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
@@ -238,9 +238,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
 
     if (searchQuery.trim()) {
-      const terms = searchQuery.toLowerCase().trim().split(/\s+/)
+      const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
       result = result.filter(i => {
-        const h = `${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`.toLowerCase()
+        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
         return haystackMatchesAll(h, terms)
       })
     }
@@ -573,9 +573,9 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
   const baseList = tab === 'pendientes' ? pendientes : tab === 'diferencias' ? conDif : contados
   const visible = useMemo(() => {
     if (!conteoSearch.trim()) return baseList
-    const terms = conteoSearch.toLowerCase().trim().split(/\s+/)
+    const terms = normalizeForSearch(conteoSearch).split(/\s+/).filter(Boolean)
     return baseList.filter(c => {
-      const h = `${c.codigoSAP} ${c.textoBreve}`.toLowerCase()
+      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve}`)
       return haystackMatchesAll(h, terms)
     })
   }, [baseList, conteoSearch])
@@ -723,9 +723,9 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
     let result = movimientos
     if (filtroTipo !== 'todos') result = result.filter(m => m.tipo === filtroTipo)
     if (searchMov.trim()) {
-      const terms = searchMov.toLowerCase().trim().split(/\s+/)
+      const terms = normalizeForSearch(searchMov).split(/\s+/).filter(Boolean)
       result = result.filter(m => {
-        const h = `${m.bodegaItemId} ${m.motivo} ${m.realizadoPorNombre}`.toLowerCase()
+        const h = normalizeForSearch(`${m.bodegaItemId} ${m.motivo} ${m.realizadoPorNombre}`)
         return haystackMatchesAll(h, terms)
       })
     }
@@ -2078,9 +2078,9 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
 
   const visible = useMemo(() => {
     if (!searchBatch.trim()) return items
-    const terms = searchBatch.toLowerCase().split(/\s+/)
+    const terms = normalizeForSearch(searchBatch).split(/\s+/).filter(Boolean)
     return items.filter(i => {
-      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
+      const h = normalizeForSearch(`${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`)
       return haystackMatchesAll(h, terms)
     })
   }, [items, searchBatch])
@@ -2207,9 +2207,9 @@ function BulkConfigModal({ items, saveStock, onClose }: {
 
   const visible = useMemo(() => {
     if (!searchBulk.trim()) return items
-    const terms = searchBulk.toLowerCase().split(/\s+/)
+    const terms = normalizeForSearch(searchBulk).split(/\s+/).filter(Boolean)
     return items.filter(i => {
-      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
+      const h = normalizeForSearch(`${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`)
       return haystackMatchesAll(h, terms)
     })
   }, [items, searchBulk])
