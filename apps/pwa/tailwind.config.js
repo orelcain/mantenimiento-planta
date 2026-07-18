@@ -25,6 +25,7 @@ export default {
         cyan: { ...colors.cyan, 400: '#56b8cc' },
         sky: { ...colors.sky, 400: '#57a9d3' },
         rose: { ...colors.rose, 400: '#e07d8c' },
+        indigo: { ...colors.indigo, 400: '#8992d1', 500: '#6870b8' },
         // Neutros por VARIABLE CSS (canales RGB en index.css): tema oscuro AquaChile
         // (el de siempre, default) bajo `.dark`, y tema claro bajo `:root`.
         // Toggle en el header (useTheme, clase `dark` en <html>, anti-flash en index.html).
