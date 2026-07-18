@@ -34,9 +34,9 @@ export function useTheme() {
     localStorage.setItem(STORAGE_KEY, theme);
 
     // theme-color del chrome del navegador móvil acompaña el tema
-    // (#0d1722 = --background oscuro, #c5d9eb = --background claro)
+    // (#0d1722 = --background oscuro, #d7e5f2 = --background claro)
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0d1722' : '#c5d9eb');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0d1722' : '#d7e5f2');
   }, [theme]);
 
   const toggleTheme = () => {
