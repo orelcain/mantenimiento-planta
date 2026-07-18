@@ -294,7 +294,7 @@ export function GanttPlannerPage() {
         <div className="border rounded-lg overflow-hidden bg-card" style={{ height: Math.min(700, HEADER_H + filtered.length * ROW_H + 2) }}>
           <div className="flex h-full">
             {/* ─── LEFT TABLE ─────────────────────────────────── */}
-            <div style={{ width: splitterX, minWidth: 200 }} className="flex flex-col border-r">
+            <div style={{ width: splitterX, minWidth: 200 }} className="flex flex-col border-r bg-[var(--panel-surface)] dark:bg-transparent">
               {/* Table header */}
               <div className="flex items-center text-xs font-semibold text-muted-foreground border-b bg-muted/50 select-none"
                 style={{ height: HEADER_H }}>

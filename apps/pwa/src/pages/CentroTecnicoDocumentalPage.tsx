@@ -344,7 +344,7 @@ export function CentroTecnicoDocumentalPage() {
     <div className="relative flex h-full bg-background">
       {/* Izquierda: jerarquía del equipo seleccionado (desktop) */}
       {detailEquipment && (
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r p-3 lg:flex">
+        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r bg-[var(--panel-surface)] dark:bg-transparent p-3 lg:flex">
           <UbicacionRail equipment={detailEquipment} onMoved={reload} />
         </aside>
       )}
@@ -1832,7 +1832,7 @@ function ExpedienteDialog({
 
   return (
     <section
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-[var(--panel-surface)] dark:bg-background lg:static lg:z-auto lg:w-[44%] lg:min-w-[440px] lg:max-w-[680px] lg:shrink-0 lg:border-l xl:w-[40%]"
       role="dialog"
       aria-modal="true"
     >

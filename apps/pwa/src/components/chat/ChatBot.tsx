@@ -1522,7 +1522,7 @@ export function ChatBot() {
           <div className="flex flex-1 overflow-hidden">
           {/* Avatar de video de ARIA — riel izquierdo (idle ↔ habla, blob-load + lockstep) */}
           {avatarShow && (
-            <div className="shrink-0 w-80 border-r border-border bg-card flex flex-col items-stretch p-3">
+            <div className="shrink-0 w-80 border-r border-border bg-[var(--panel-surface)] flex flex-col items-stretch p-3">
               <AriaAvatar visible={avatarShow} />
             </div>
           )}
