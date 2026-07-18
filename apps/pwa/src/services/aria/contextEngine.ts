@@ -1,19 +1,23 @@
 /**
  * ARIA Context Engine — detect → execute → inject.
  *
- * Pattern: tool-as-context-injection.
- *  1. Detecta tools relevantes por triggers regex (sin LLM call).
- *  2. Infiere params del texto libre.
- *  3. Ejecuta las tools en paralelo.
- *  4. Formatea resultados como bloque markdown para inyectar como system message.
+ * Selección de tools HÍBRIDA (aditiva, nunca pierde cobertura):
+ *  1. Regex triggers (matchTools) — rápido, sin LLM, cubre lo obvio.
+ *  2. Tools elegidas por el LLM (extraToolNames) — por INTENCIÓN, rompe el
+ *     techo del regex: si el usuario no dice la frase-gatillo exacta pero el
+ *     sentido pide una tool que existe, el LLM la elige igual.
+ *  Se ejecuta la UNIÓN (dedup + cap). Los params SIEMPRE los rellena el
+ *  inferidor determinista (inferToolParams) — el LLM solo elige el NOMBRE, no
+ *  inventa params.
  *
+ * Formatea resultados como bloque markdown para inyectar como system message.
  * Mantiene a ARIA independiente del modelo: cualquier agente del orquestador
- * (Gemini/Groq/Claude/OpenAI) consume el mismo contexto.
+ * (Gemini/Groq/DeepSeek/Claude) consume el mismo contexto.
  */
 import { logger } from '@/lib/logger'
-import { executeTool, inferToolParams, matchTools } from './tools'
+import { executeTool, getTool, inferToolParams, listTools, matchTools } from './tools'
 
-const MAX_TOOLS_PER_MESSAGE = 3
+const MAX_TOOLS_PER_MESSAGE = 4
 
 export interface AriaContext {
   hasResults: boolean
@@ -24,20 +28,53 @@ export interface AriaContext {
 }
 
 /**
- * Detecta y ejecuta tools relevantes al mensaje del usuario.
- * Hard limit de 3 tools por mensaje para no inflar el prompt.
+ * Catálogo compacto (nombre: descripción) de TODAS las tools registradas, para
+ * que el LLM del pre-análisis elija por intención. No incluye params (los
+ * infiere el código).
  */
-export async function buildAriaContext(userMessage: string): Promise<AriaContext> {
-  const matches = matchTools(userMessage).slice(0, MAX_TOOLS_PER_MESSAGE)
-  if (matches.length === 0) {
+export function buildToolCatalog(): string {
+  return listTools()
+    .map((t) => `- ${t.name}: ${t.description}`)
+    .join('\n')
+}
+
+/**
+ * Resuelve los NOMBRES de tools a ejecutar: unión de (a) match por regex y
+ * (b) tools elegidas por el LLM (validadas contra el registry). Dedup + cap.
+ * El LLM va primero (intención explícita), luego los del regex.
+ */
+export function resolveToolNames(userMessage: string, extraToolNames: string[] = []): string[] {
+  const fromRegex = matchTools(userMessage).map((m) => m.tool.name)
+  const fromLLM = extraToolNames.filter((n) => typeof n === 'string' && !!getTool(n))
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  for (const name of [...fromLLM, ...fromRegex]) {
+    if (!seen.has(name)) {
+      seen.add(name)
+      ordered.push(name)
+    }
+  }
+  return ordered.slice(0, MAX_TOOLS_PER_MESSAGE)
+}
+
+/**
+ * Detecta y ejecuta tools relevantes al mensaje del usuario.
+ * @param extraToolNames tools que el LLM eligió (opcional) — se unen a las del regex.
+ */
+export async function buildAriaContext(
+  userMessage: string,
+  extraToolNames: string[] = [],
+): Promise<AriaContext> {
+  const toolNames = resolveToolNames(userMessage, extraToolNames)
+  if (toolNames.length === 0) {
     return { hasResults: false, contextBlock: '', invocations: [] }
   }
 
   const results = await Promise.all(
-    matches.map(async (m) => {
-      const params = inferToolParams(m.tool.name, userMessage)
-      const result = await executeTool(m.tool.name, params)
-      return { tool: m.tool.name, result }
+    toolNames.map(async (name) => {
+      const params = inferToolParams(name, userMessage)
+      const result = await executeTool(name, params)
+      return { tool: name, result }
     }),
   )
 
