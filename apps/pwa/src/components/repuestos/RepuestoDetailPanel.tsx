@@ -272,7 +272,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   return (
     <aside
       style={isDesktop ? { width } : undefined}
-      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:bg-card/40 relative"
+      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-auto sm:shrink-0 sm:bg-card relative"
     >
       {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
       <div
@@ -351,7 +351,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             detrás de secciones administrativas. La tarjeta detallada
             (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
         {item.bodegaId && (
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted px-3 py-2">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
               <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
               <span className={item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'}>
@@ -375,7 +375,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             </Button>
           )
         ) : (
-          <div className="mb-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2">
+          <div className="mb-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2">
             <p className="text-[11px] text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
@@ -418,7 +418,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           {equiposReales.length > 0 ? (
             <div className="space-y-1">
               {familiasEquipos.slice(0, 6).map((f) => (
-                <div key={f.familia} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-[12.5px] text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
+                <div key={f.familia} className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[12.5px] text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
                   <span className="min-w-0 truncate">{f.familia}</span>
                   {f.unidades.length > 0 && (
                     <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">

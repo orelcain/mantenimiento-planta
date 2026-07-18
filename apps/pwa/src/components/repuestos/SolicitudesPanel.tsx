@@ -119,7 +119,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
         ) : (
           <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 border-b border-border bg-muted/60 text-left">
+              <thead className="sticky top-0 border-b border-border bg-muted text-left">
                 <tr>
                   <th className="px-3 py-2 font-semibold">Repuesto</th>
                   <th className="px-3 py-2 font-semibold">Cant.</th>

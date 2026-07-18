@@ -146,7 +146,7 @@ export function RepuestoGalleryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="p-4 border-b bg-muted/20 flex flex-col gap-1">
+        <div className="p-4 border-b bg-muted flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <ImageIcon className="w-4 h-4" />
             <span className="text-xs font-mono uppercase tracking-wider">Galería de Imágenes</span>

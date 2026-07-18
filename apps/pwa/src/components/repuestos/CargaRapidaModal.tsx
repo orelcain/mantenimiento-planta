@@ -19,7 +19,7 @@ interface Props {
 
 interface Edit { stock: string; pasillo: string; estante: string; nivel: string }
 
-const INPUT = 'w-full px-2 py-1.5 text-sm bg-muted/30 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
+const INPUT = 'w-full px-2 py-1.5 text-sm bg-muted border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
 const faltaUbicacion = (i: BodegaMergedItem) => !i.pasillo && !i.estante && !i.nivel && !i.ubicacionBodega
 const faltaStock = (i: BodegaMergedItem) => !i.bodegaId || (i.stockActual ?? 0) === 0

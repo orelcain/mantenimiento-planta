@@ -316,7 +316,7 @@ export function RepuestoFormModal({
 
           {/* Stock en bodega — solo con SAP (el stock vive en `bodega` por SAP) */}
           {form.codigoSAP.trim() ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-3">
+            <div className="space-y-3 rounded-lg border border-border bg-muted p-3">
               <Label className="text-xs font-semibold text-muted-foreground">
                 Stock en bodega <span className="font-normal">· se guarda por SAP</span>
               </Label>
@@ -344,7 +344,7 @@ export function RepuestoFormModal({
 
           {/* Destino y multi-equipo (solo en crear) */}
           {mode === 'create' && (
-            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/10">
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted">
               {/* Toggle: propio vs compartido */}
               {hasLinkedMachine && (
                 <div className="space-y-1.5">

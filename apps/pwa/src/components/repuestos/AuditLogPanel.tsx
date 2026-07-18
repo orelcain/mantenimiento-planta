@@ -189,7 +189,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                     'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors border',
                     isActive
                       ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted',
+                      : 'border-transparent bg-muted text-muted-foreground hover:bg-muted',
                   ].join(' ')}
                 >
                   <cfg.icon className="h-3 w-3" />
@@ -219,7 +219,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                   key={entry.id}
                   className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0"
                 >
-                  <div className={`shrink-0 mt-0.5 p-1 rounded-md bg-muted/50 ${cfg.color}`}>
+                  <div className={`shrink-0 mt-0.5 p-1 rounded-md bg-muted ${cfg.color}`}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">

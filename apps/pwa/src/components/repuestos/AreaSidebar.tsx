@@ -368,7 +368,7 @@ export function AreaSidebar({
         style={{ ['--sidebar-w' as string]: `${width}px` } as React.CSSProperties}
         className={[
           // Móvil: ancho fijo w-72 (drawer). Desktop: ancho ajustable vía CSS var.
-          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card sm:w-[var(--sidebar-w)] sm:bg-card/40',
+          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card sm:w-[var(--sidebar-w)] sm:bg-card',
           // Base (móvil): drawer fijo deslizable
           'fixed inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',

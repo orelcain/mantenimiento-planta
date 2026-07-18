@@ -315,7 +315,7 @@ export function TechnicalSpecsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="p-4 border-b bg-muted/20 flex flex-col gap-1">
+        <div className="p-4 border-b bg-muted flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <ClipboardList className="w-4 h-4" />
             <span className="text-xs font-mono uppercase tracking-wider">Ficha Técnica</span>
@@ -368,7 +368,7 @@ export function TechnicalSpecsModal({
           </div>
 
           {/* Datos Comunes */}
-          <div className="space-y-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+          <div className="space-y-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -396,7 +396,7 @@ export function TechnicalSpecsModal({
 
           {/* Campos Específicos del Tipo */}
           {Object.keys(currentTemplate.fields).length > 0 && (
-            <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+            <div className="space-y-3 p-3 bg-muted rounded-lg border border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon className={`h-3.5 w-3.5 ${currentTemplate.color}`} />

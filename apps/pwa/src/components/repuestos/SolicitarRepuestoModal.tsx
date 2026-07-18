@@ -109,7 +109,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
         <div className="space-y-4">
           {/* Repuesto: fijo (preseleccionado) o selector */}
           {repuesto ? (
-            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2">
+            <div className="rounded-lg border border-border bg-muted px-3 py-2">
               <div className="text-sm font-medium text-foreground">{repuesto.textoBreve || '(sin nombre)'}</div>
               <div className="font-mono text-xs text-muted-foreground">SAP {repuesto.codigoSAP}</div>
             </div>
@@ -153,7 +153,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
                       key={o.codigoSAP}
                       type="button"
                       onClick={() => setSap(o.codigoSAP)}
-                      className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left hover:bg-muted/40"
+                      className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
                     >
                       <span className="min-w-0 truncate text-sm text-foreground">{o.textoBreve || o.codigoSAP}</span>
                       <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{o.codigoSAP}</span>

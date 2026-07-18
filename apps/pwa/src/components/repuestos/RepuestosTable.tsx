@@ -270,7 +270,7 @@ export function RepuestosTable({
 
   if (repuestos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border rounded-xl bg-card/30 gap-3">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border rounded-xl bg-muted gap-3">
         <Package className="h-10 w-10 text-muted-foreground/30" />
         <span>No hay repuestos en esta máquina.</span>
       </div>
@@ -353,7 +353,7 @@ export function RepuestosTable({
       <div className="hidden sm:block overflow-auto rounded-xl border bg-card shadow-sm">
         <table className="min-w-full divide-y divide-border">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/30">
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-muted">
               <th className="pl-4 pr-2 py-3 font-semibold w-12"></th>
               <SortableTh column="codigoSAP" label="Código SAP" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
               <SortableTh column="textoBreve" label="Repuesto" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
@@ -380,7 +380,7 @@ export function RepuestosTable({
                   </td>
                   {/* Código SAP */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
-                    <span className="font-mono text-xs text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       {rep.codigoSAP || '—'}
                     </span>
                   </td>
@@ -421,7 +421,7 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {rep.codigoFabricante ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                        <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           {rep.codigoFabricante}
                         </span>
                         {onSearchInManual && (
