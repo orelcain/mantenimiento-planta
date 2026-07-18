@@ -81,16 +81,16 @@ function CorrelationRow({ corr, expanded, onToggle }: {
       </button>
 
       {expanded && corr.contributors.length > 0 && (
-        <div className="mt-2 ml-6 space-y-1 text-[11px] text-slate-400 border-l-2 border-slate-800/60 pl-3">
+        <div className="mt-2 ml-6 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border/60 pl-3">
           {corr.contributors.map(c => (
             <div key={c.machineid} className="flex items-center gap-2">
-              <span className="text-slate-300 min-w-[9rem]">{c.machineName}</span>
+              <span className="text-foreground min-w-[9rem]">{c.machineName}</span>
               <span>{c.stateName}</span>
-              {c.reason && <span className="text-slate-500">· {c.reason}</span>}
-              <span className="ml-auto tabular-nums text-slate-500">
+              {c.reason && <span className="text-muted-foreground">· {c.reason}</span>}
+              <span className="ml-auto tabular-nums text-muted-foreground">
                 {fmtTime(c.stateStart)}–{fmtTime(c.stateEnd)}
               </span>
-              <span className="tabular-nums text-slate-600 w-16 text-right">
+              <span className="tabular-nums text-muted-foreground w-16 text-right">
                 lead {fmtLead(c.leadSec)}
               </span>
             </div>
@@ -148,7 +148,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
     : 0
 
   return (
-    <Card className="border-slate-800 bg-slate-950/50">
+    <Card className="border-border bg-muted/50">
       <CardContent className="py-3 px-4">
         {/* Header — KPI accionable: tiempo muerto causado por upstream */}
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -159,7 +159,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
           {summary.upstreamCaused > 0 && (
             <div
-              className="flex items-center gap-1.5 text-xs text-rose-300 tabular-nums"
+              className="flex items-center gap-1.5 text-xs text-rose-800 dark:text-rose-300 tabular-nums"
               title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -183,7 +183,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         )}
 
         {summary.upstreamCaused === 0 && coincidentalCount === 0 ? (
-          <div className="text-xs text-slate-500 py-2 flex items-center gap-2">
+          <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
           </div>
@@ -191,8 +191,8 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           <>
             {/* Breakdown por máquina — qué Evisceradora atender primero */}
             {summary.byMachine.length > 0 && (
-              <div className="mb-3 p-2 rounded border border-slate-800/80 bg-slate-900/40">
-                <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+              <div className="mb-3 p-2 rounded border border-border/80 bg-muted/40">
+                <div className="text-[10px] text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Factory className="w-3 h-3" />
                   Impacto por máquina (paros del Grader donde la máquina contribuyó)
                 </div>
@@ -205,14 +205,14 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     return (
                       <div
                         key={m.machineid}
-                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-300' : 'text-slate-400'}`}
+                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-800 dark:text-rose-300' : 'text-muted-foreground'}`}
                       >
                         <span className="min-w-[8rem]">{m.machineName}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
                         <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>
                         {/* Barra visual proporcional al share */}
-                        <div className="flex-1 h-1.5 rounded-full bg-slate-800/80 overflow-hidden ml-1 max-w-[120px]">
+                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden ml-1 max-w-[120px]">
                           <div
                             className={`h-full rounded-full ${isTop ? 'bg-rose-400' : 'bg-slate-500'}`}
                             style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
@@ -223,13 +223,13 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     )
                   })}
                 </div>
-                <div className="text-[9px] text-slate-600 mt-1.5">
+                <div className="text-[9px] text-muted-foreground mt-1.5">
                   Recomendación: priorizar mantención en la máquina con mayor overlap.
                 </div>
               </div>
             )}
 
-            <div className="divide-y divide-slate-800/60">
+            <div className="divide-y divide-border/60">
               {sorted.slice(0, 10).map(corr => (
                 <CorrelationRow
                   key={corr.pauseId}
@@ -239,7 +239,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                 />
               ))}
               {sorted.length > 10 && (
-                <div className="text-[11px] text-slate-600 py-2 text-center">
+                <div className="text-[11px] text-muted-foreground py-2 text-center">
                   … y {sorted.length - 10} paros más
                 </div>
               )}

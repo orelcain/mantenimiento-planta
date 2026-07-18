@@ -307,7 +307,7 @@ export function CategorySelector({
                   href="https://lucide.dev/icons"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-400 hover:text-slate-300 hover:underline"
+                  className="text-muted-foreground hover:text-foreground hover:underline"
                 >
                   lucide.dev/icons
                 </a>

@@ -1274,7 +1274,7 @@ export function ShiftTimelineView({
           )}
           {productionWindow && productionWindow.excludedPieces > 0 && (
             <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-500/40 bg-zinc-500/10 text-zinc-300 text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-500/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium"
               title={`Calibración/aseo detectado por lotes no-correlativos${productionWindow.dummyLots.size > 0 ? ` (${[...productionWindow.dummyLots].join(', ')})` : ' (ej. 1111)'}. ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />

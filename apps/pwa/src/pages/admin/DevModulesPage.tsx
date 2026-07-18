@@ -86,14 +86,14 @@ export function DevModulesPage() {
       </div>
 
       <Card className="border-amber-500/20 bg-amber-500/5">
-        <CardContent className="p-3 flex items-start gap-2 text-xs text-amber-300">
+        <CardContent className="p-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
           <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             Visibles ahora: <b>{visibleCount}</b> de {ALL_NAV_ITEMS.length}.
             <Button
               variant="link"
               size="sm"
-              className="text-xs text-amber-300 underline ml-1 h-auto p-0"
+              className="text-xs text-amber-800 dark:text-amber-300 underline ml-1 h-auto p-0"
               onClick={reset}
             >
               <RotateCcw className="w-3 h-3 mr-1 inline" />

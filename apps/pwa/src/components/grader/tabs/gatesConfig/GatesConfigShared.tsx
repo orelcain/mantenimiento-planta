@@ -334,7 +334,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
             <button
               type="button"
               onClick={() => onChange(suggested)}
-              className="underline text-sky-400 hover:text-sky-300"
+              className="underline text-sky-700 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
             >
               Aplicar
             </button>

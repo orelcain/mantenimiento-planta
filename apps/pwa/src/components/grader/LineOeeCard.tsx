@@ -142,7 +142,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeBaader))}>{pct(calc.oeeBaader)}</div>
               </div>
               <div className="bg-sky-500/5 rounded-lg px-3 py-2 border border-sky-500/30">
-                <div className="text-[10px] text-sky-300/80 mb-0.5">OEE Línea (estimado)</div>
+                <div className="text-[10px] text-sky-800/90 dark:text-sky-300/80 mb-0.5">OEE Línea (estimado)</div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeLinea))}>{pct(calc.oeeLinea)}</div>
               </div>
             </div>
@@ -151,8 +151,8 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {calc.parosMin > 0
                 ? calc.baseTiempo
-                  ? <>Línea = Baader penalizado por <b className="text-rose-300">{fmtDur(calc.parosMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.aBaader)} → {pct(calc.aLinea)}). R y Q siguen siendo de Baader/Grader.</>
-                  : <>Hay <b className="text-rose-300">{fmtDur(calc.parosMin)}</b> de paros de etapa, pero sin averías Baader este mes no se puede derivar la base de tiempo → no se penaliza aún.</>
+                  ? <>Línea = Baader penalizado por <b className="text-rose-800 dark:text-rose-300">{fmtDur(calc.parosMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.aBaader)} → {pct(calc.aLinea)}). R y Q siguen siendo de Baader/Grader.</>
+                  : <>Hay <b className="text-rose-800 dark:text-rose-300">{fmtDur(calc.parosMin)}</b> de paros de etapa, pero sin averías Baader este mes no se puede derivar la base de tiempo → no se penaliza aún.</>
                 : <>Todavía no registraste paros de etapa → OEE línea ≈ OEE Baader. Empezá a registrarlos abajo y este número se separa.</>}
             </p>
 
@@ -168,7 +168,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                   return (
                     <div key={p.label} className="space-y-0.5">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className={cn('font-medium', i === 0 ? 'text-rose-300' : 'text-foreground')}>{i + 1}. {p.label}</span>
+                        <span className={cn('font-medium', i === 0 ? 'text-rose-800 dark:text-rose-300' : 'text-foreground')}>{i + 1}. {p.label}</span>
                         <span className="tabular-nums text-muted-foreground">{fmtDur(p.min)}</span>
                       </div>
                       <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">

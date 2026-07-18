@@ -164,12 +164,12 @@ export function ShoplogixCredentialsPage() {
 
       {error && (
         <Card className="border-rose-500/40 bg-rose-500/5">
-          <CardContent className="flex items-start gap-2 py-3 text-sm text-rose-200">
+          <CardContent className="flex items-start gap-2 py-3 text-sm text-rose-800 dark:text-rose-200">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
               <div className="font-medium">Error al cargar credenciales</div>
-              <div className="text-rose-200/80 text-xs mt-0.5">{error}</div>
-              <div className="text-rose-200/60 text-[11px] mt-1">
+              <div className="text-rose-700/90 dark:text-rose-200/80 text-xs mt-0.5">{error}</div>
+              <div className="text-rose-700/70 dark:text-rose-200/60 text-[11px] mt-1">
                 Verifica que la regla Firestore <code>system/shoplogixCredentials</code> permita acceso a admins.
               </div>
             </div>
@@ -219,7 +219,7 @@ export function ShoplogixCredentialsPage() {
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div>
-                  <div className="font-medium text-amber-200">Sin credenciales configuradas</div>
+                  <div className="font-medium text-amber-800 dark:text-amber-200">Sin credenciales configuradas</div>
                   <div className="text-muted-foreground/80 text-xs mt-1">
                     El sync está en modo <em>cookie legado</em> — solo funciona mientras el token Bearer
                     siga vigente. Configura credenciales para auto-login automático.
@@ -301,7 +301,7 @@ export function ShoplogixCredentialsPage() {
       {info?.hasPassword && (
         <Card className="border-rose-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base text-rose-300 flex items-center gap-2">
+            <CardTitle className="text-base text-rose-800 dark:text-rose-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               Zona peligrosa
             </CardTitle>
@@ -310,7 +310,7 @@ export function ShoplogixCredentialsPage() {
             <Button
               variant="outline"
               onClick={() => setDeleteOpen(true)}
-              className="text-rose-300 border-rose-500/40 hover:bg-rose-500/10"
+              className="text-rose-800 dark:text-rose-300 border-rose-500/40 hover:bg-rose-500/10"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar credenciales (volver al modo cookie)

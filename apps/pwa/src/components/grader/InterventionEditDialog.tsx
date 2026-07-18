@@ -23,9 +23,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/10 text-amber-300' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/10 text-red-300' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-300' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/10 text-red-800 dark:text-red-300' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -183,13 +183,13 @@ export function InterventionEditDialog({
             </div>
           </div>
           {!sapOrden.trim() && (
-            <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/40">
+            <Badge variant="outline" className="text-[10px] text-amber-800 dark:text-amber-300 border-amber-500/40">
               SAP pendiente · falta crear la OT
             </Badge>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-red-800 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -199,7 +199,7 @@ export function InterventionEditDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {isAdmin ? (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleting || saving}
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10">
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
               Eliminar
             </Button>

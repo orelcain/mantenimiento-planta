@@ -74,11 +74,11 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
 
   const reasonLabel = state.reason && state.reason.trim().length > 0
     ? state.reason
-    : <span className="text-slate-500 italic">sin categorizar</span>
+    : <span className="text-muted-foreground italic">sin categorizar</span>
 
   return (
     <div
-      className="rounded-md border border-slate-700/80 bg-slate-900/80 backdrop-blur-sm p-3 space-y-2"
+      className="rounded-md border border-border/80 bg-muted/80 backdrop-blur-sm p-3 space-y-2"
       role="region"
       aria-label="Detalle de estado seleccionado"
     >
@@ -92,8 +92,8 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
           <StateIcon type={state.type} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm text-slate-100">{state.name}</span>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-400">
+              <span className="font-semibold text-sm text-foreground">{state.name}</span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
                 {TYPE_LABEL[state.type] ?? state.type}
               </Badge>
               {state.isCurrent && (
@@ -102,12 +102,12 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
                 </Badge>
               )}
             </div>
-            <div className="text-xs text-slate-300 mt-0.5 truncate">{reasonLabel}</div>
+            <div className="text-xs text-foreground mt-0.5 truncate">{reasonLabel}</div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-200 transition-colors shrink-0"
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
           aria-label="Cerrar detalle"
           data-testid="state-detail-close"
         >
@@ -129,7 +129,7 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
         />
         <DataRow
           label="Duración"
-          value={<span className="font-semibold text-slate-100 tabular-nums">{fmtDurationSec(state.durationSec)}</span>}
+          value={<span className="font-semibold text-foreground tabular-nums">{fmtDurationSec(state.durationSec)}</span>}
         />
         <DataRow
           label="% del turno"
@@ -147,7 +147,7 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
             value={
               <span className="tabular-nums" title={`Estados con misma categoría "${state.name}${state.reason ? ' / ' + state.reason : ''}" en el turno`}>
                 {similarStates.length} × {fmtDurationSec(similarTotalSec)}{' '}
-                <span className="text-slate-500">({fmtPct(pctSimilarOfShift)})</span>
+                <span className="text-muted-foreground">({fmtPct(pctSimilarOfShift)})</span>
               </span>
             }
           />
@@ -168,9 +168,9 @@ function DataRow({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      {icon && <span className="text-slate-500">{icon}</span>}
-      <span className="text-slate-500 shrink-0">{label}:</span>
-      <span className="text-slate-200 truncate">{value}</span>
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-muted-foreground shrink-0">{label}:</span>
+      <span className="text-foreground truncate">{value}</span>
     </div>
   )
 }

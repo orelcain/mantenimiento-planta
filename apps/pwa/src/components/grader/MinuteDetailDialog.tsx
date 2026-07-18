@@ -381,7 +381,7 @@ export function MinuteDetailDialog({
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
             {/* Minuto sin rechazos — mensaje positivo cuando todo llegó a destino. */}
             {breakdown.total > 0 && breakdown.p0 === 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 text-xs text-emerald-300">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 text-xs text-emerald-800 dark:text-emerald-300">
                 <span className="text-base leading-none">✓</span>
                 <span>Sin rechazos este minuto — las {breakdown.total} piezas llegaron a destino.</span>
               </div>
@@ -419,11 +419,11 @@ export function MinuteDetailDialog({
             )}
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-500/30 bg-amber-500/5 text-xs text-amber-200">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-500/30 bg-amber-500/5 text-xs text-amber-800 dark:text-amber-200">
                 <span className="text-base leading-none">ℹ️</span>
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
-                  <div className="text-amber-200/80 mt-0.5">
+                  <div className="text-amber-800/90 dark:text-amber-200/80 mt-0.5">
                     Las piezas productivas (gates 1-12) se muestran agregadas por gate.
                     El detalle pieza-por-pieza solo está disponible para las P0 en turnos
                     históricos (bulk upload antiguo no subió las productivas).
@@ -453,7 +453,7 @@ export function MinuteDetailDialog({
                       <span
                         className={cn(
                           'inline-flex items-center justify-center w-12 h-6 rounded-md text-xs font-semibold shrink-0',
-                          isP0 ? 'bg-orange-500/20 text-orange-300' : 'bg-emerald-500/15 text-emerald-300',
+                          isP0 ? 'bg-orange-500/20 text-orange-800 dark:text-orange-300' : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
                         )}
                       >
                         {isP0 ? 'P0' : `G${gate}`}
@@ -502,7 +502,7 @@ export function MinuteDetailDialog({
                       const desc = getMatrixDescription(err)
                       return (
                         <div key={err}>
-                          <span className="text-orange-300/80">●</span>{' '}
+                          <span className="text-orange-700/90 dark:text-orange-300/80">●</span>{' '}
                           <span
                             className={cn(desc && 'underline decoration-dotted underline-offset-2 decoration-muted-foreground/50 cursor-help')}
                             title={desc}
@@ -598,7 +598,7 @@ export function MinuteDetailDialog({
                               const desc = getMatrixDescription(errorDisplay)
                               return (
                                 <span
-                                  className={cn('text-orange-300/80', desc && 'underline decoration-dotted underline-offset-2 decoration-orange-300/40 cursor-help')}
+                                  className={cn('text-orange-700/90 dark:text-orange-300/80', desc && 'underline decoration-dotted underline-offset-2 decoration-orange-300/40 cursor-help')}
                                   title={desc}
                                 >
                                   {errorDisplay}
