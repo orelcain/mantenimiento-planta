@@ -3,6 +3,14 @@
 > Sistema de mantenimiento industrial para plantas de procesamiento de pescado.
 > PWA con soporte offline, monorepo Turbo, React + Vite + Firebase.
 
+## 🤝 Equipo de agentes (local · Codex · Claude) — leer al iniciar
+
+Este repo lo trabajan varios agentes. Para no pisarse ni romper prod, leer:
+
+- **`.ai/MEMORY.md`, `.ai/WORKLOG.md`, `.ai/TASKS.md`** (en este repo) — estado, bitácora y tablero de tareas. Reclamar tarea en `TASKS.md` antes de trabajar.
+- **Memoria empresa** (en OneDrive, si tienes acceso local): `C:\Users\orelc\OneDrive\ANTARFOOD\AI_PROJECT_MEMORY.md`, `AI_TEAM_PROTOCOL.md`, `AI_PROJECT_REGISTRY.md`. (Codex cloud no las ve → guíate por `.ai/`.)
+- **Regla de oro:** `main` auto-despliega a producción → nunca commitear directo a `main`; 1 tarea = 1 rama; PR + tsc/eslint verde + revisión de otro agente; el merge lo aprueba el humano. Commits con pie `Agent: <nombre>`.
+
 ## Rutina de sesión (OBLIGATORIO — aplica a Claude Code desktop y claude.ai web)
 
 ### 🟢 INICIO — Flujo de 2 pasos
@@ -142,6 +150,33 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
    existentes con el método: *qué decisión opera, qué datos ya tenemos, dónde caen los
    falsos positivos*. Suele resultar en mejoras de los existentes en lugar de uno nuevo.
 
+### Sistema de diseño — IBM Plex + AquaChile (establecido 2026-05-22)
+
+Meta: que NO se vea como "dashboard hecho por IA genérica". Identidad propia.
+
+1. **Tokens AquaChile** (`apps/pwa/tailwind.config.js`): tema dark azul-tintado.
+   `background #0d1722` · `card #16242f` · `border #22384a` · `primary #2E75B6` (+escala)
+   · `foreground #e9eef3` (NUNCA `#fff`/`#000`) · `ring #5aa6e8`. destructive/success/warning
+   se mantienen vivos (status). Cambiar tokens = re-tema ~75% de la app (es token-based).
+2. **Paleta del módulo Aprendizaje** (`apps/pwa/src/data/learningTheme.ts`, `LC`): hub +
+   admin + machine page usan `import { LC }` (inline styles). Hub: `import { LC as C }`.
+3. **Tipografía IBM Plex** (self-hosted, `@fontsource`, imports en `main.tsx`):
+   `font-sans` = IBM Plex Sans (UI), `font-mono` = IBM Plex Mono (datos). **Regla global en
+   `index.css`: `.tabular-nums → mono`** — para que un número lea como instrumento, darle
+   clase `tabular-nums`. Datos = mono; texto/labels = sans. NO uppercase en labels largos (truncan).
+4. **Patrones editoriales reutilizables**: acordeón single-open (grid 0fr→1fr); cards
+   prominentes vs chips punteados ("documentado vs en preparación"); empty states que
+   ENSEÑAN (cuadro punteado + copy accionable, no "nada acá"); KPI card con valor prominente.
+5. **GOTCHA Vite**: agregar dependencia de fuente o cambiar `tailwind.config` (fontFamily/
+   colors) NO se toma en caliente → **reiniciar dev server** (`preview_stop` + `preview_start`).
+   HMR/reload del browser no alcanza (síntoma: `font-mono` cae al mono default de Tailwind).
+6. Aplicar con la skill `impeccable` (registro product). El craft VISIBLE viene de cambiar
+   layout/interacción sobre contenido real, no de pulir cajas densas/vacías.
+
+**Pendiente (rollout bespoke por módulo)**: títulos display, quebrar grillas, cards — cada
+header de página está hardcodeado distinto (no hay `PageHeader` compartido; considerar crearlo).
+Hecho: Aprendizaje 100% · Análisis de Turno (KPI+mono) · Repuestos (empty state). Resto: solo fundamentos.
+
 ### Preview y pruebas visuales (OBLIGATORIO leer antes de usar browser)
 
 **Regla principal: verificar en preview SIEMPRE después de cada avance**, antes de hacer commit.
@@ -220,6 +255,24 @@ GitHub (orelcain/mantenimiento-planta) ← FUENTE DE VERDAD ÚNICA
 - **PC trabajo**: claude.ai accede directo a GitHub, sin carpeta local ni OneDrive.
 - **No usar OneDrive para código**: rompe `node_modules` y pelea con `.git/objects`. Si quieres backup extra, usar 1 zip mensual del proyecto sin node_modules.
 
+## Planos: formato OSCURO estándar (OBLIGATORIO para todo plano nuevo)
+
+Todo módulo que muestre un plano (entregable AutoCAD blanco típico de los servicios) debe ofrecer una **versión oscura por defecto** (fondo navy, líneas claras, colores de líneas preservados) con toggle claro/oscuro. Pedido explícito del usuario (2026-05-24, validado en Planos de Aguas): sube contraste, integra con el tema dark de la PWA y se ve profesional.
+
+- **Pre-hornear** el PNG oscuro offline — NO usar `filter:invert()` CSS en runtime (penaliza pan/zoom).
+- Técnica: **inversión de LUMINANCIA** (HSL `L→1-L`, conservar H y S) → fondo blanco se oscurece, líneas negras se aclaran, y los colores (verde/cian agua, etc.) se mantienen. Un `invert()` plano rotaría los colores (verde→magenta). Elevar el punto negro al navy `#0c1620`.
+- Script reutilizable: **`scripts/make-dark-plano.py entrada.png salida-dark.png`** (numpy+PIL; si faltan `uv pip install --system numpy pillow`).
+- Servir ambos PNG (claro + `*-dark.png`), default oscuro, preferencia en localStorage. Versionar los PNG con excepción en `.gitignore`.
+- Referencia: módulo Planos de Aguas (`public/planos-aguas-embed.html`, ruta `/planos-aguas`).
+
+## Fotos: visor con PAN + ZOOM (OBLIGATORIO en toda la PWA)
+
+Toda foto que se muestre ampliada en la PWA (referenciales, evidencias, repuestos, incidencias, manuales, planos, etc.) **debe abrirse en un visor con pan + zoom**, no en una imagen estática. Pedido explícito del usuario (2026-05-25, validado en Planos de Aguas). Sirve para inspeccionar detalle (bajadas, fallas, números de parte).
+
+- Gestos: **rueda** (zoom anclado al cursor) · **pellizco** (móvil) · **arrastrar** para panear · **doble-clic/tap** para acercar/alejar. Ajustar (fit) al abrir.
+- Implementación de referencia: `openImg()` + `setupImgZoom()` en `public/planos-aguas-embed.html` (vanilla, modelo de punteros, `transform: translate+scale`). Para React, usar/crear un componente `ImageViewer` reutilizable con la misma UX.
+- **Pendiente de rollout**: aplicar el visor a los demás módulos que hoy muestran fotos sin zoom.
+
 ## Stack
 
 | Capa | Tecnologia |
@@ -256,7 +309,7 @@ apps/pwa/src/
 | **Principal** | Dashboard, Incidencias, Evidencias |
 | **Planificacion** | Inspecciones, Preventivo, Predictivo, Gantt, Calendario |
 | **Equipamiento** | Equipos, Repuestos, Sensores, Panel Sensores |
-| **Herramientas** | Visor de Mapas, Visor 3D, Analisis Grader |
+| **Herramientas** | Visor de Mapas, Visor 3D, Analisis Grader, Planos de Aguas (inDevelopment) |
 | **Aprendizaje** | Centro de Aprendizaje (/aprendizaje) |
 | **Admin** | Configuracion, Jerarquias, Mapas, ETT, Clima Puerto, HMI Knuro, Baader 200, Editor Sidebar |
 
@@ -300,7 +353,100 @@ sidebarConfig
 notificationConfig  ← config notif Shoplogix por planta
 shoplogixNotifState ← dedup state por máquina-turno (solo backend)
 shoplogixShiftDelayChecks ← control alertas inicio turno (solo backend)
+animelists          ← ⚠️ Usado por bot @anime_estreno_bot — rule debe permanecer `if true`
+anime_notifications ← ⚠️ Usado por bot @anime_estreno_bot — dedup de envíos diarios por dateKey
 ```
+
+### 🤖 Bot `@anime_estreno_bot` — vive dentro de este repo
+
+El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTracker) está implementado dentro de este monorepo. NO es un proyecto separado a pesar de su nombre.
+
+**Componentes del bot en este repo:**
+- **Backend:** `functions/index.js` — Cloud Functions deployadas en `mantenimiento-planta-771a3`:
+  - `telegramWebhook` (≈línea 2972) — recibe updates de Telegram (long-running HTTPS)
+  - `setTelegramWebhook` (≈3127) — configura URL del webhook
+  - `setupTelegramTopics` (≈3200) — setup topics de grupo
+  - `mintTelegramAuthToken` (≈3271) — emite tokens auth para la Mini App (firma para validar `initData` Telegram)
+  - `animeEstrenosDiarios` (≈4510) — scheduled diario, notifica películas/OVAs/specials que estrenan hoy
+  - `animeEstrenosManual` (≈4526) — trigger HTTP manual del mismo
+- **Mini App:** `apps/pwa/public/anime.html` (3000 líneas) — UI Telegram WebApp. Carga `telegram-web-app.js` + Firebase JS SDK
+- **Hosting:** `https://mantenimiento-planta-771a3.web.app/anime.html`
+- **Datos:** colección Firestore `animelists/{userId}` (ver rule actual línea ~1341 `firestore.rules`)
+- **Auth:** `mintTelegramAuthToken` valida `initData` de Telegram y emite custom token Firebase
+- **Estado actual rules:** `allow read, write: if true` para `animelists` (sin auth, asume bot personal)
+
+**Implicaciones de tocar este código:**
+- **Modificar `firestore.rules`:** preservar acceso a **ambas** colecciones del bot:
+  - `animelists/{userId}` (línea ~1341, rule actual `allow read, write: if true`) — **NO endurecer sin actualizar primero la Mini App** porque `anime.html` NO autentica con Firebase Auth, solo confía en la rule permissive.
+  - `anime_notifications/{dateKey}` — **no tiene rule explícita en firestore.rules actual.** Si aplicas un deny-all global, el bot envía notificaciones diarias DUPLICADAS porque no puede chequear "ya envié hoy".
+- **Modificar `functions/index.js`:** las 6 functions del bot conviven con las 25+ functions de la PWA. Cuidado al refactorizar o renombrar exports.
+- **Modificar `apps/pwa/public/anime.html`:** afecta directamente la Mini App en producción al hacer deploy de hosting.
+- **Bot Token y secrets:** viven en Firebase Functions config (`firebase functions:config:get`), no en código.
+
+**Mini App `anime.html` tiene DOS funciones de render del detalle** — al agregar cualquier feature al detalle de un anime, tocar AMBAS:
+- `renderDetailBody(a, listName)` — detalle de animes ya en tu lista (Viendo/Pendiente/etc.)
+- `openResultDetail(r)` — detalle de resultados de búsqueda + estrenos (aún no en lista)
+- `openSagaEntryDetail(id, r)` reusa las dos anteriores según si está en lista (no requiere cambios propios).
+
+**Verdad importante del bot de anime (verificada 2026-05-20):**
+- `@anime_estreno_bot` **NO procesa webhook entrante.** Es un bot pasivo: solo (a) envía notif diaria via `animeEstrenosDiarios` y (b) expone Menu Button "Abrir Mini App". Toda la interactividad real está en la Mini App.
+- `_runAnimeEstrenos` (línea ~4416 de `functions/index.js`) lee `animelists/52949422` (chat ID hardcoded en const `ANIME_CHAT_ID`) y escribe `anime_notifications/{YYYY-MM-DD}` para dedup.
+- Estructura `animelists/{userId}`: keys = nombres de listas (`viendo`, `interesante`, `pendiente`, `completado`, `descartado`), valores = arrays de `{id, title, episode, total, poster, ...campos AniList}`.
+
+**Backup histórico (Node-RED v0):** `github.com/orelcain/anime-estreno-bot-nodered-archive` (privado) — captura cómo era el bot ANTES de migrar a Cloud Functions (mediados 2025). NO restaurar como bot funcional — duplicaría el bot que ya corre 24/7.
+
+**Documentación exhaustiva:** `docs/anime-bot-CONTEXT.md` (620 líneas, 15 secciones) — fuente de verdad versionada. El Project "AnimeTracker Bot" en claude.ai web usa una copia. Al editar, correr `bash sync-claude-ai-bot.sh` para regenerar `_claude_ai_bot_upload/` y re-subir al Project.
+
+**Timezone (CORREGIDO 2026-05-20, commit `69f88c2a`):** `_runAnimeEstrenos` ahora calcula `dateKey` en `America/Santiago` (antes era UTC vía `toISOString()`, desincronizado del cron 23:00 Santiago). Usa helper `_tzOffsetMin()` DST-safe. Si en el futuro tocas la lógica de fechas del bot, mantener todo en Santiago (dateKey, from query AniList, dateLabel).
+
+### Cómo editar y deployar el bot
+
+**Flujo estándar (cambios de código):**
+1. **Editar local** según el componente:
+   - Lógica del bot / cron / webhook → `functions/index.js` (líneas ~2972 a ~4530)
+   - UI Mini App → `apps/pwa/public/anime.html`
+   - Reglas de acceso → `firestore.rules` sección `animelists/{userId}` (~línea 1341)
+2. **Testear Mini App local:** Claude Preview `anime-app` puerto 5758 sirve el archivo actual de `apps/pwa/public/anime.html`. Para testear con Telegram auth real (initData), hay que abrir desde Telegram contra producción — no hay shortcut local para esto.
+3. **Commit + push.** Workflows GitHub Actions deployan automáticamente:
+   - `deploy-functions.yml` → Cloud Functions (incluye las 6 del bot)
+   - `deploy.yml` → GitHub Pages (PWA principal canónica)
+   - `deploy-miniapps.yml` → Firebase Hosting (Mini Apps `anime.html` / `mant.html`), trigger en cambios a `apps/pwa/public/**`
+   - `deploy-firestore-rules.yml` → `firestore.rules` (solo si se modificó)
+4. **Verificar en producción:**
+   - Bot: probar `/start` o `/nav` en Telegram desde el chat con `@anime_estreno_bot`
+   - Mini App: abrir desde el botón del bot o vía `https://mantenimiento-planta-771a3.web.app/anime.html` (con initData válido)
+   - Logs: `firebase functions:log --only telegramWebhook` o `--only animeEstrenosDiarios`
+
+**Deploy de las Mini Apps a Firebase Hosting — AHORA AUTOMÁTICO.**
+`deploy-miniapps.yml` deploya Firebase Hosting en cada push a `main` que toque `apps/pwa/public/**` (Mini Apps + assets estáticos: manifest, icons, `firebase-messaging-sw.js`). Hace `pnpm build` (base path por defecto, idéntico al manual) + `firebase deploy --only hosting` con el service account (`secrets.FIREBASE_SERVICE_ACCOUNT`). Las Mini Apps son self-contained (`anime.html`: 100% CDN; `mant.html`: rutas relativas), por eso funcionan servidas desde el root de web.app aunque el bundle de la PWA use base `/mantenimiento-planta/`.
+
+> **Nota:** la PWA principal en `web.app` (root) NO se usa — la canónica es GitHub Pages. En `web.app` el `index.html` apunta a `/mantenimiento-planta/assets/…` (base GH Pages) que no resuelven ahí, así que la PWA-en-web.app queda rota por diseño; solo las Mini Apps importan en ese dominio.
+
+Tras editar `apps/pwa/public/anime.html` o `mant.html`, basta con `git push`. Verificar: `curl -s https://mantenimiento-planta-771a3.web.app/anime.html | grep <marca-del-cambio>`.
+
+**Deploy manual de hosting (solo si el workflow falla):**
+```
+cd apps/pwa && pnpm build          # genera dist/ con las Mini Apps actualizadas
+cd .. && firebase deploy --only hosting --project mantenimiento-planta-771a3
+```
+
+**Deploy manual (si los workflows fallan):**
+```
+firebase deploy --only functions:telegramWebhook,functions:animeEstrenosDiarios,functions:animeEstrenosManual,functions:mintTelegramAuthToken,functions:setTelegramWebhook,functions:setupTelegramTopics --project mantenimiento-planta-771a3
+firebase deploy --only hosting --project mantenimiento-planta-771a3
+firebase deploy --only firestore:rules --project mantenimiento-planta-771a3
+```
+
+**Secrets (BOT_TOKEN, etc.):** viven en Firebase Functions Config, no en código. Para verlos:
+```
+firebase functions:config:get --project mantenimiento-planta-771a3
+```
+
+**Rotar BOT_TOKEN si se compromete:**
+1. `@BotFather` → `/revoke` → nuevo token
+2. `firebase functions:config:set telegram.bot_token="nuevo_token" --project mantenimiento-planta-771a3`
+3. `firebase deploy --only functions --project mantenimiento-planta-771a3`
+4. Llamar `setTelegramWebhook` HTTPS para re-registrar webhook con el nuevo token
 
 ## Skills disponibles (.claude/skills/)
 
@@ -368,12 +514,42 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 
 ## Version actual
 
-- **v3.4.7** (2026-05-03)
+- **v3.30.0** (2026-05-16) — "feat(hmi-yal): validador manual con video real + paint mode + snapshots persistentes"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
 - Seguridad: 26 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-07-18 — Yal Shoplogix candidatos + hero rediseño + default route, 7 PRs `#61..#67`)
+
+Sesión enfocada en el flujo Grader/Shoplogix de Yal + configurabilidad del home.
+
+**PRs**:
+- **#61** `fix(shoplogix-yal): mapeo candidatos por planta — Turno día abarca T1+T2 SLX`. `GRADER_TO_SLX_SHIFT_CANDIDATES` convertido a `SHIFT_CANDIDATES_BY_PLANT` per-planta + helper `getSlxShiftCandidates(shiftId, plantSlug)`. Yal `Turno día` → `[Turno día, Turno 1, Turno 1*, Turno 2, Turno 2*]`; `Turno noche` → `[Turno noche, Turno 3, Turno 3*, Unscheduled]`. Chonchi sin cambio.
+- **#62** `fix(upstream-panel): eje base usa rango SLX completo`. `windowStart/End` en `UpstreamMachinesPanel` ahora prioriza `snapshot.machines[0].shiftStart/End` sobre `shiftWindow` prop. El panel muestra la ventana SLX real independiente de la cobertura Grader.
+- **#63** `fix(grader-timeline): chart Grader extiende eje a SLX + remueve fondo violeta`. `resolveAxisWindow` recibe nuevo param `outerBounds`; `ShiftTimelineView` computa `slxOuterBounds` desde upstream snapshot y lo pasa a las 5 llamadas. Removido markArea Baader `rgba(139,92,246,0.06)` que teñía el chart cuando 3 máquinas paraban simultáneamente.
+- **#64** `feat(grader-timeline): botón Cargar Excel inline en header del Timeline`. `ShiftTimelineView` nuevo prop `onUploadClick`. TurnoPage construye `wizardUrlForTurno` con `date+shift+linea` pre-cargados. Solo admins. Reduce 5-6 clicks → 3-4.
+- **#65** `fix(hero-scorecard): separar Shoplogix (en vivo) de Grader (subido) en columnas`. `HeroScorecard` rediseñado en 3 columnas: `P0% verdict | 📡 Shoplogix · hace Xs | 📊 Grader · hace Xs`. Footer con rechazo Baader + hint "convergen al cerrar el turno". Nuevo helper `fmtSyncRelative`. Fix `TS6133` post-refactor: removido `MetricTile`/`MetricTileProps` sin uso.
+- **#66** `feat(home): default route configurable + Dashboard oculto del sidebar`. Nueva service `defaultRouteConfig.ts` (`appConfig/defaultRoute`). Nueva página `/admin/default-route` con selector radio (6 opciones). Dashboard nav item marcado `inDevelopment: true` + href `/` → `/dashboard`. Nueva Firestore rule `match /appConfig/{docId}` (cubre `wipOverrides` también). `HomeRedirect` nuevo componente en `/` que lee la config.
+- **#67** `fix(home-redirect): mobile va a /dashboard, desktop a default config`. Bug: PR #66 rompió la home mobile (`MobileHomeGrid` vive dentro de `DashboardPage` con `md:hidden`). Fix: `HomeRedirect` detecta viewport — mobile (< 768px) → `/dashboard`, desktop → configured default.
+
+**Nuevos archivos**: `services/defaultRouteConfig.ts`, `components/HomeRedirect.tsx`, `pages/admin/DefaultRoutePage.tsx`.
+**Firestore rule nueva**: `appConfig/{docId}` — read auth, write admin.
+
+**Gotchas de sesión**:
+- Import path `@/hooks/useToast` (camelCase), NO `use-toast` (kebab). TS lo pasa pero el `Cannot find module` en runtime rompe el build (falló CI en #65 primero).
+- Repo con muchos agentes trabajando en paralelo → main se mueve constantemente. Rebase forzado casi por PR. **Aprendizaje**: agrupar cambios en menos PRs, bumpear versión SOLO al final del PR (no al empezar), no babysittear cada deploy.
+- Cross-device chat sync (Claude Code desktop ⇄ Claude.ai web) — feature nueva confirmada; la conversación se ve en ambos entornos aunque el CLAUDE.md solo referencia el share via GitHub.
+
+## Cambios recientes (sesión 2026-05-22 — Sistema de diseño AquaChile + IBM Plex, 6 commits `0b5b0215..34042a1f`)
+
+Transformación anti "IA genérica". Ver sección **"Sistema de diseño — IBM Plex + AquaChile"** arriba.
+- Tokens AquaChile globales (tailwind.config) + paleta `LC` (`learningTheme.ts`) compartida del módulo Aprendizaje.
+- Sistema tipográfico **IBM Plex** (Sans UI + Mono datos via `.tabular-nums` global). Deps `@fontsource/ibm-plex-{sans,mono}`.
+- Centro de Aprendizaje 100% editorial (editor diagnóstico título+vista previa+re-auth, acordeón, hub cards-vs-chips).
+- Análisis de Turno: KPI card craft + data en mono. Repuestos: empty state editorial.
+- **Pendiente**: rollout bespoke por módulo (títulos display/grillas) — considerar `PageHeader` reutilizable.
 
 ## Cambios recientes (sesión 2026-05-03 — Shoplogix Notification System + dedup fix)
 
@@ -926,6 +1102,81 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
+### ✅ HECHO — Catálogo Motores/Bombas + Levantamiento por áreas (2026-05-31)
+
+Toda esta línea quedó **en producción** (data directa a Firestore/Storage, sin deploy; la UI sí se deployó vía PRs #70-74):
+
+- **Seed 8 motores SUMITOMO** (`scripts/seed-sumitomo-motors.js`) — 8 docs `plantAssets` PLANTA CHONCHI + 4 fotos por SAP. ✅
+- **Pestaña "Motores/Bombas"** en Repuestos (`RepuestosPage` monta `CatalogoBases`, antes era código muerto sin rutear). Columnas Foto (miniatura → visor pan/zoom `ImageLightbox`) · Modelo · SAP (+descripción SAP). Búsqueda por equipo/modelo/marca/SAP/descripción. **Organizada por áreas**: chips de filtro por subárea + secciones agrupadas.
+- **Editor in-app** del detalle (`AssetDetailModal` editable): edita marca/modelo/SAP/specs + **sube fotos desde el celular** (`capture=environment` → WebP → Storage `plantAssets/<id>/imagenes/`), marcar principal / eliminar. Así se completan los huecos en terreno.
+- **Levantamiento importado** del doc `v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx`: **9 áreas, 65 equipos, 87 fotos** (8 con SAP real). Pipeline reproducible en `scripts/levantamiento-import/` (`extract_media_map.py` saca fotos+orden; JSONs curados por área) + `scripts/seed-levantamiento.js` (idempotente `asset-lev-<slug>`, `--dry-run`/`--force`/`--no-photos`, soporta `subarea`/`codigoSAP` por equipo). Mapeo plano: 1 motor/bomba = 1 doc; estructura/cinta/mantención → `observaciones`. Tachos de vacío y medidor de caudal omitidos (no son motor/bomba). Total `plantAssets`: 134 (65 lev + 8 sumitomo + 61 stubs viejos "Diverso/Motoreductor").
+
+### ✅ Módulo Repuestos "área-first" — F0–F7 COMPLETO + pulido (v3.42.0) · 🚧 rescate "Por equipo" EN CURSO
+
+Rediseño que colapsó los tabs en un **lente único área-first** (`RepuestosAreaHub.tsx`). Hoy el hub es la **pestaña por defecto** en desktop. Pestañas actuales (4): **Áreas** (hub) · **Por equipo** (legacy, a retirar tras rescatar features) · **Mapas** (`CatalogoBases`→solo `MapasViewer`) · **Bodega** (avanzada, intacta).
+
+**HECHO y deployado (v3.31 → v3.43):**
+- **F0–F4** — vínculo `plantAssets`↔jerarquía (mapa `scripts/levantamiento-import/area-hierarchy-map.json` + `scripts/migrate-plantassets-hierarchy.js`) · hub shell + sidebar áreas + KPIs + tabla + panel detalle lateral + ubicación estructurada Pasillo/Estante/Nivel.
+- **F5 (REFORMULADA)** — la planta tiene **UNA sola bodega** → se descartó el multi-bodega físico; en su lugar **filtro/columna "Tipo"** (campo `tipo` del catálogo, poblado por área).
+- **F6 Solicitar repuesto** — colección `solicitudes_repuestos/{id}` + `useSolicitudes` + modal + panel con filtros + **Cloud Function `onSolicitudRepuestoCreated`** (Telegram topic Repuestos + push FCM; `firestore.rules` con regla propia).
+- **F7** — búsqueda global en topbar · hub a default (desktop+móvil) · retiro tab "Motores/Bombas"→"Mapas".
+- **Pulido** — responsive móvil total (sidebar drawer, paneles full-screen, tablas con columnas ocultas+subtítulo), KPIs con acento de color, skeleton de carga.
+- **Hub muestra TODOS los repuestos del área** (no solo SAP): `useBodega` expone `allItems` (con/sin SAP; stock se engancha si hay SAP), `items`=subconjunto SAP. KPIs: total=todos, % stock sobre configurados.
+- **5→4 tabs**: retirada "Buscar pieza" (el hub ya busca global; "Buscar similar" enruta al hub vía `initialQuery`). Borrados `BuscadorGlobal.tsx` y `MotorasBombasTable.tsx` (muertos).
+- **Rescate "Por equipo" oleada 1/n** (v3.43.0): KPIs de catálogo (con SAP %/sin SAP/tipos/valor) + toolbar admin en topbar (Duplicados/Historial/Papelera, solo isAdmin).
+
+**Hallazgos clave (para retomar):** los ~4.700 repuestos viven en `machines/{id}/repuestos` (NO en hierarchy); máquinas con repuestos **archivadas** (`activa=false`) → `machines[]` desde **equipment cache** (`useGlobalEquipmentSearch('',999)`+`getGlobalEquipmentCache()`). Membership área = ancestría (`useHierarchyPaths`). **Firestore SIN `ignoreUndefinedProperties`** → stripear undefined antes de `saveStock`/`setDoc`. Solo ~890/4711 repuestos tienen SAP (el stock vive por SAP en `bodega/{codigoSAP}`, global, una bodega).
+
+**PENDIENTE — terminar rescate "Por equipo" (3 oleadas) y luego retirar la pestaña:**
+- **Wave 1 (la más pesada)** — acciones por repuesto en `RepuestoDetailPanel`: **+Repuesto** (crear, `RepuestoFormModal`), editar/renombrar (`InlineEditName`), **ficha técnica** (`TechnicalSpecsModal`), **fotos/galería** (`RepuestoPhotosModal`/`RepuestoGalleryModal`), **reubicar** (`RelocateRepuestoModal`/`BulkRelocateModal`). RETO: el hub maneja `BodegaMergedItem`/`AreaRepuestoRow` (agregado), pero esos modales piden el **doc `Repuesto` + `machineId`** específico → hay que resolver el repuesto subyacente desde la fila (cada fila agrega `equipos[]`).
+- **Wave 2** — **Manuales PDF** (`MachineManualPanel` + `ManualSearchModal`: subir/ver/buscar-en-PDF, por equipo) + **Favoritos** (listas de repuestos; hoy per-equipment en `userPreferences`).
+- **Wave 3 resto** — **Importar** Excel (necesita máquina destino; `ImportRepuestosModal`) + **Exportar** (`ExportReportModal` espera `Repuesto[]`+`categories` → adaptar datos del hub).
+- Tras paridad: **retirar "Por equipo"** (`Dashboard.tsx`+`EquipmentNavigator.tsx`).
+
+Detalle completo, inventario de ~22 features y gotchas en memoria auto `project_repuestos_area_first.md`. Plan F5 reformulado: `~/.claude/plans/stateless-prancing-sunset.md`.
+
+**Pulido UX móvil del hub (v3.60.0 — audit UX 2026-06-02):** verificado por DOM en preview (375/768/1280).
+- ✅ Botones de cabecera (Repuesto/Reubicar lote/Ver equipos del área) se recortaban fuera del viewport móvil (405px en 375px → "Ver equipos del área" inaccesible). Fix: `flex-wrap items-center justify-end` en el contenedor.
+- ✅ Columna SAP desperdiciaba ~82px en móvil (mayoría "-"). Fix: `hidden md:table-cell` en th+td; el SAP se pliega al subtítulo móvil en mono cuando existe (junto a equipo·tipo).
+- ✅ Filtros (3 selects) ocupaban ~5 filas apiladas en móvil. Fix: wrapper `grid grid-cols-2 gap-2 sm:contents` + triggers `w-full sm:w-[Npx]` → 2-up en móvil, fila única intacta en ≥sm (cero regresión desktop, validado top/anchos idénticos).
+
+**P2 audit pendiente (bajo valor, opcional):**
+- 🔲 Touch targets ≥40px: estrella de favorito en filas mide 17×17px; select triggers 34px de alto. Subir hit-area sin romper densidad (la fila completa ya abre el detalle, la estrella es la única acción fina).
+- 🔲 Señal de los KPIs de stock cuando no hay stock configurado (hoy 3 de 4 KPIs muestran 0 y "Sin stock 100%" sobre los configurados → bajo aporte; considerar enfatizar cobertura SAP en su lugar).
+- 🔲 Micro-interacciones (transición al seleccionar fila/área, feedback al togglear favorito).
+
+**Sidebar de áreas con equipos (v3.61.0 — incremento 1):** el `AreaSidebar` muestra los equipos SAP (nodos `hierarchy` numéricos) colgando de su área según la jerarquía, al expandir. Aditivo: `useHierarchyAreaTree` adjunta `equipment: EquipmentLeaf[]` a cada `AreaTreeNode` desde los nodos ya cargados en `allNodes` (sin refetch); `AreaSidebar` los renderiza como filas hoja (icono Cog, alias/nombre + código mono), ocultando `oculto`.
+
+**Pulido visual del sidebar (v3.62.0):** fuente más compacta en filas de área/equipo · +20% ancho (w-60→w-72) · colapsar/expandir en desktop imitando el sidebar general (botón ChevronsLeft + edge-tab; persistido en `localStorage['repuestos-area-sidebar-collapsed']`).
+
+**Seleccionar equipo enfoca el panel (v3.63.0 — incremento 2 ✅):** clic en un equipo del sidebar (o en un chip de "Favoritos de equipos") **reduce todo el panel a ese equipo** vía `scopedRepuestos` (= `areaRepuestos` filtrado por `repEquipoFilter` = nombre de la máquina vinculada): KPIs, cobertura SAP, tipos y tabla. Robusto por nombre de máquina (estable al cambiar de área). El equipo queda **resaltado** en el sidebar (`selectedEquipKey` = id del nodo) y aparece un **chip removible** en la cabecera. Los **motores/bombas** se muestran automáticamente al seleccionar área/equipo (se quitó el botón toggle "Ver equipos del área"); cuando hay equipo seleccionado, se reducen a los de ese equipo (`isUnder(asset.hierarchyNodeId, selectedEquipKey)`) → MAREL HG (balanza, sin M/B) auto-oculta la sección. Verificado por DOM: MAREL HG → 127 repuestos en KPIs+tabla (era 2086 del área), chip "BALANZA PESAJE MAREL", motores/bombas oculto; chip × restaura el área.
+**Favoritos de equipos desde el sidebar (v3.64.0):** cada fila de equipo tiene una estrella (reusa `handleEquipStar` → picker de lista, igual que "Estructura"). El toggle "ver solo favoritos" del sidebar ahora incluye equipos: `filterForFavorites` conserva áreas favoritas, con equipos favoritos, o con descendientes favoritos; con el toggle activo las hojas se limitan a equipos favoritos (`equipFavKeys` = set plano de machineIds de todas las listas). Verificado por DOM: con "solo favoritos", FILTRO INGRESO (no-fav) se poda y quedan los 6 equipos favoritos de EVISCERADO.
+**Auditoría UX del sidebar (v3.65.0):** meta del área en **una sola línea** con truncado (antes se partía a 2 líneas en tablet/móvil), reordenada por relevancia en Repuestos (`equipos · rep · M/B` → al truncar se corta primero el M/B) · chevron expandir/colapsar 16→21px · filas de equipo ~28→39px y áreas 42px (mejor con guantes) · estrellas favorito con más hit-area (`p-1`). Verificado por DOM en 3 breakpoints.
+- ✅ **Incremento 3 — sub-equipos anidados (v3.68.0):** `EquipmentLeaf` gana `children[]`; `buildAreaTree` arma el subárbol completo de equipos; `expandNode` carga los hijos de los equipos directos del nodo (helper `loadSubEquipmentNodes`, corre en camino caché Y fresco); `EquipmentRow` se vuelve recursivo/expandible (chevron si hay sub-equipos visibles, Cog si es hoja). **GOTCHA crítico (2 instancias):** `AreaSidebar` y el hub llaman cada uno a `useHierarchyAreaTree()` → **dos `allNodes` separados** (caché por nodeId compartida, sí). El `onToggleNode` del hub dispara el `expandNode` del HUB, no el del sidebar → el sidebar renderiza de SU árbol sin los sub-equipos. Fix: el sidebar envuelve el toggle (`toggleNode`) para llamar también a SU propio `expandNode(id)` al abrir (caché compartida → sin queries extra). Verificado: EVISCERADO → 5 equipos con chevron (badges 2,2,5,6,6); MAREL HG → MOTOTAMBOR + INDICADOR CONTROL anidados.
+- ✅ **Auto-expandir favoritos (v3.67.0):** al activar "solo favoritos", un efecto recorre el `areaTree` ya cargado y abre las áreas favoritas o con equipos favoritos (vía `getNodePath`), con un `ref` que evita re-expandir si luego colapsas a mano. Verificado: 4→42 filas, 23 equipos favoritos visibles. Favoritos profundos (nivel ≥6 no cargado) aún no se detectan hasta expandir.
+- ✅ **Guías de indentación (v3.67.0):** línea vertical (`bg-border/40`) en cada contenedor anidado, posicionada bajo el chevron del padre (`left: 10 + depth*14 + 11px`), contenedor `relative`. 15 guías al expandir EVISCERADO+favoritos.
+
+**Título = equipo + scroll independiente (v3.69.0):**
+- **Título = equipo seleccionado:** al seleccionar un equipo (sidebar o chip favoritos), el `<h1>` muestra el **nombre del equipo** (`selectedEquipName`, alias/nombre) con icono Cog, el **área baja al breadcrumb** (path completo), y aparece un botón **"‹ Volver a {área}"** para limpiar. `handleFavEquipClick(favKey, displayName?)`. Verificado: MAREL HG → h1 "MAREL HG", breadcrumb `...› EVISCERADO`.
+- **Scroll independiente de los 3 paneles (sidebar/lista/detalle):** la ruta `/repuestos` no estaba en la lista de rutas de **altura acotada** de `MainLayout` (`<main>`) → el hub crecía y scrolleaba TODA la página (las 3 partes juntas). Fix: agregar `isRepuestosRoute` a la condición que aplica `h-[calc(100vh-3.5rem...)] p-0 overflow-hidden`. Así `h-full` del hub resuelve y cada panel (`flex-1 overflow-y-auto`) scrollea solo. Verificado: `pageScrolls=false`, lista scrollea interna (scrollH 2259 > h 858), el detalle queda fijo al scrollear la lista. Las otras pestañas (Por equipo/Mapas/Bodega) siguen OK (su wrapper `flex-1 overflow-y-auto` las scrollea).
+- ✅ **Quitada "Estructura de equipos del área (admin)" del panel (v3.70.0):** la navegación de equipos ya vive en el sidebar. Removición typecheck-guided: sección JSX (147 líneas) + bloque admin-equipos (state/handlers, ~148 líneas) + modal borrar-equipo + Dialog fotos/manuales del equipo (`photoEquip`) + 9 imports huérfanos (`useEquipmentForArea`, `EquipmentCard`, `EquipmentHeaderPhoto`, `MachineManualPanel`, `useMachines`, firestore CRUD, `db`, `logger`, `getHmiTooltipPwd`, `moveToTrash`). **Se MANTIENE** `MachineManager` (admin tool "Gestionar equipos", modal aparte) e `InlineEditName` (rename de listas favoritas). **PERDIDO en el hub:** add/rename/ocultar/reordenar/eliminar equipos SAP + fotos/manuales por equipo (la gestión admin de equipos). Si se necesita de nuevo → moverla al sidebar. Verificado: estructura ausente, KPIs/tabla/favoritos/sidebar OK, 0 errores consola.
+- 🔲 **P2 audit sidebar:** guías de indentación (líneas) para jerarquía profunda · hit-area de estrella/chevron aún <40px (base 14px/rem lo limita; la fila completa ya es el target principal) · ancho del drawer móvil (252px sobre 375).
+
+**Fix móvil del sidebar (v3.66.0):** el drawer estaba translúcido (`bg-card/40` dejaba ver el contenido detrás) → ahora **opaco en móvil** (`bg-card sm:bg-card/40`). Las estrellas de favorito (área + equipo) usaban `opacity-0 group-hover:opacity-100` → invisibles en táctil (no se podían marcar favoritos en móvil) → patrón `opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100` (visible en touch, hover-reveal en mouse). Verificado: drawer `rgb(22,36,47)` sin alfa · tap equipo en móvil filtra a 127 + cierra drawer + chip · estrella `opacity-100` base + override hover:hover (preview reporta hover:hover, fix se valida por CSS).
+
+### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
+- **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
+- **Datos** (equipo · modelo · SAP): Baader 200 / desperdicio filete / filete / transversal Baader 142 / curva → `RNYM08-1320B-30` · `3300124073` | Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
+- Fotos en `scripts/sumitomo-photos/` por SAP (gitignored). SAP 3300124073 (5 motores) comparte foto.
+
+### Planos de Aguas — estado al 2026-05-25
+
+Módulo **Planos de Aguas** ✅ en producción: `apps/pwa/public/planos-aguas-embed.html` (standalone, ~1500 líneas vanilla JS) embebido vía `PlanosAguasPage.tsx` en `/planos-aguas`. **Un solo plano** PN10 (AQUA014), tema oscuro. Mini-CAD: crear bajada (tipo dulce/salada/caliente + correlativo + cañería con snap), **editar bajada desde el pin** (tipo/estado/correlativo/zona/redibujar, incluso fuera de Editar), cotas a escala con **valor manual** y reubicables, estructura (rect/círculo/línea/máscara/etiqueta), **fotos en 2 secciones** (entretecho/planta, multi-imagen), **zona editable** (datalist), **capa vector PDF.js** nítida al acercar, **QR solo-lectura** (`?view=1`).
+
+- **2 estados** (comparación con Calidad ELIMINADA): **Confirmada** / **Por confirmar**.
+- **Sync**: Firestore `planosAguas/main` = `{blob: JSON del estado}` (Firestore no admite arrays anidados). Escritura vía **PUENTE postMessage**: el iframe NO hereda la sesión Firebase del PWA → `PlanosAguasPage.tsx` (autenticado) hace las escrituras Firestore/Storage; lecturas públicas por el iframe. Chip de estado de sync + Export/Import JSON.
+- **Pendientes**: colores de agua sensibles al tema CLARO; snap a puntos medios de aristas; fix `NanoBanana` `.github/scripts/check_nanobanana.py:78`. Detalle técnico completo en memoria auto `project_planos_aguas_planta.md`.
+
 ### PENDIENTE — Análisis de Turno (actualizado sesión 2026-04-26)
 
 **Auditoría módulo completa (sesiones 2026-04-25/26):**
@@ -939,8 +1190,10 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 - ✅ 9 warnings ESLint + cap bajado a 5
 
 **P1 — Estructural (requiere planeación Opus):**
-- 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** (1-2 días, NECESITA OPUS)
+- ✅ **Refactor config Grader Fase A (Gates)** — audit 2026-05-20 reveló que el grueso ya estaba hecho en sesiones previas: storage Firestore (`graderShifts/{id}/configHistory/{snapId}`), editor inline embebido en TurnoPage (línea 1820 con `tabbed`+`shiftDocId`), QuickGateChangeButton mid-turno, `computeSegmentVerdicts` segmentación P0% antes/después (29 tests). Sub-task A — cleanup `ShiftGatesConfigAccordion` dead code (210 líneas) hecho en v3.32.2. Sub-tasks B+C ver abajo.
 - ✅ **GlobalSettingsModal en home** — move estructural completado 2026-04-26: rangos de GatesConfigPage ahora read-only, botón abre GlobalSettingsModal con reload al cerrar
+- 🔲 **Refactor Fase A · sub-B** — convertir ruta global `/analisis-grader/config` (tab Gates) en banner "Defaults · edita en el turno" + CTA al turno activo. Hoy sigue editable global, genera confusión. (~30-60min, bajo riesgo)
+- 🔲 **Refactor Fase A · sub-C** — mover **Física** al turno (NeumaticaTab, ProductoTab, DistanciasTab, DanfossTab, VerificacionTab — ~3182 líneas). Esto sí es 1-2 días reales, NECESITA OPUS para planear migración Firestore + backward compat.
 
 **P2 — Mejoras chicas:**
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
@@ -1015,10 +1268,11 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 **Quick wins completados en iter 10:**
 - ✅ **#5 QuickGateChangeButton deshabilitado en turno cerrado** (v2.147.0) — `allowEdit` prop cascada TurnoPage→ConfigChangeHistory→QuickGateChangeButton. Tooltip explica motivo.
 - ✅ **#4 Badge 🔧 en calendario histórico** (v2.148.0) — lazy-load count de snapshots manuales al seleccionar un día. Badge amber con icono Wrench + tooltip en la tarjeta de turno.
+- ✅ **#2 Ruta mobile `/grader/quick-change?turno=X`** — confirmado en audit 2026-05-20: ya estaba implementada en commits previos (7bc94d34 + 1267f267 + 894fd9b6 + 4b973e62). Container max-w-md, CTA h-14, banner RETROACTIVO con `?turno=X`. Pendiente en CLAUDE.md era stale.
 
 **P1 — Alta prioridad**
 
-- 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
+- ✅ **Refactor config Grader Fase A · Gates** — ver sección "PENDIENTE — Análisis de Turno" arriba para estado actual (audit 2026-05-20). Resumen: gates ya migradas, sub-A dead code cleanup hecho v3.32.2, sub-B (ruta global read-only) + sub-C (Física al turno) quedan separados.
 - ✅ **#1 GlobalSettingsModal en home** — COMPLETADO 2026-04-26: move estructural rangos GatesConfigPage → GlobalSettingsModal. Tab rangos ahora read-only + botón "Editar rangos en configuración global" que abre modal con reload de Firestore al cerrar.
 
 **P2 — Media prioridad**
