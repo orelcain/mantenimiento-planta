@@ -365,7 +365,7 @@ export function PauseAnnotationDialog({
               {/* Iter 2: contexto P0% antes/durante para clasificar el motivo */}
               {p0Context && (p0Context.beforePct !== null || p0Context.duringPct !== null) && (
                 <span
-                  className="inline-flex items-center gap-1.5 text-xs mt-2 px-2 py-1 rounded-md border border-border/40 bg-muted/20"
+                  className="inline-flex items-center gap-1.5 text-xs mt-2 px-2 py-1 rounded-md border border-border bg-muted"
                   title={`Ventana antes: ${contextWindowMin} min previos a la pausa (${p0Context.beforePieces} pzas). Durante: ${p0Context.duringPieces} pzas dentro del rango.`}
                 >
                   <TrendingDown className="w-3 h-3 text-muted-foreground" />
@@ -412,7 +412,7 @@ export function PauseAnnotationDialog({
                       'flex items-center gap-2.5 px-3 py-2 rounded-md border text-sm text-left transition-colors',
                       'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
                       isSelected ? 'border-2' : 'border',
-                      isSelected ? '' : 'border-border/60',
+                      isSelected ? '' : 'border-border',
                     )}
                     style={isSelected ? { borderColor: tag.color, backgroundColor: tag.bandFill } : undefined}
                   >
@@ -452,7 +452,7 @@ export function PauseAnnotationDialog({
           )}
 
           {/* ── Sección: Ajustar rango ── */}
-          <div className="border border-border/40 rounded-md p-3 space-y-3">
+          <div className="border border-border rounded-md p-3 space-y-3">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Clock className="w-3.5 h-3.5" />
               Ajustar rango detectado
@@ -532,7 +532,7 @@ export function PauseAnnotationDialog({
           </div>
 
           {/* ── M13: Historial de cambios ── */}
-          <div className="border border-border/40 rounded-md overflow-hidden">
+          <div className="border border-border rounded-md overflow-hidden">
             <div className="flex items-center">
               <button
                 type="button"

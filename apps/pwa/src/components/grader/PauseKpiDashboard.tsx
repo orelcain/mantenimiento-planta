@@ -74,7 +74,7 @@ function KpiCard({
   valueColor?: string
 }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
+    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
         {icon}
         {label}
@@ -173,7 +173,7 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
       <div key={e.id} className="flex items-center gap-2">
         <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
         <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
-        <div className="flex-1 h-2.5 bg-muted/30 rounded-sm overflow-hidden">
+        <div className="flex-1 h-2.5 bg-muted rounded-sm overflow-hidden">
           <div
             className="h-full rounded-sm transition-all duration-300"
             style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
@@ -247,7 +247,7 @@ function PauseAnnotationPanel({
             <span className="w-10 shrink-0 text-muted-foreground/60 truncate">{item.shiftId.replace('Turno ', '')}</span>
             <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{durLabel}</span>
             <select
-              className="flex-1 h-6 rounded border border-border/50 bg-background text-[11px] px-1"
+              className="flex-1 h-6 rounded border border-border bg-background text-[11px] px-1"
               value={selections[key] ?? ''}
               onChange={e => setSelections(s => ({ ...s, [key]: e.target.value }))}
               disabled={isSaving}
@@ -573,7 +573,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                   <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
                     {d.label}
                   </span>
-                  <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
+                  <div className="flex-1 h-3 bg-muted rounded-sm overflow-hidden">
                     <div
                       className="h-full rounded-sm bg-amber-500/60 transition-all duration-300"
                       style={{ width: `${d.pct}%` }}
@@ -618,7 +618,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                 <p className="text-[11px] text-muted-foreground">
                   Cargando pausas — {loadProgress.current}/{loadProgress.total} turnos…
                 </p>
-                <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-amber-500/50 transition-all duration-150"
                     style={{ width: `${(loadProgress.current / loadProgress.total) * 100}%` }}

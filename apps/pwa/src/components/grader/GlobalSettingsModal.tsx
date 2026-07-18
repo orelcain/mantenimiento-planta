@@ -223,7 +223,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
         </DialogHeader>
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-border/60">
+        <div className="flex gap-1 border-b border-border">
           {TABS.map(t => (
             <button
               key={t.id}
@@ -279,7 +279,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
               </div>
 
               {/* Preview visual de los umbrales */}
-              <div className="rounded-md border border-border/40 bg-muted/20 p-3">
+              <div className="rounded-md border border-border bg-muted p-3">
                 <p className="text-[11px] text-muted-foreground mb-2 font-medium">Vista previa de colores</p>
                 <div className="flex items-center gap-3 text-xs flex-wrap">
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 font-medium">
@@ -301,7 +301,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
               </p>
 
               {/* Umbrales de duración */}
-              <div className="border border-border/40 rounded-md p-3 space-y-3">
+              <div className="border border-border rounded-md p-3 space-y-3">
                 <p className="text-xs font-semibold text-foreground">Umbrales de duración</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   {([ ['microMinSec', 'Mín. tiempo muerto (s)', 'ej: 60'],
@@ -326,7 +326,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
               </div>
 
               {/* Colación */}
-              <div className="border border-border/40 rounded-md p-3 space-y-3">
+              <div className="border border-border rounded-md p-3 space-y-3">
                 <p className="text-xs font-semibold text-foreground">Auto-tag Colación</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
@@ -401,7 +401,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
                   {pauseTags.map(tag => (
                     <div
                       key={tag.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border/30 hover:bg-muted/20"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:bg-muted/20"
                     >
                       <span className="text-base leading-none w-6 text-center">{tag.emoji}</span>
                       <span className="flex-1 text-sm">{tag.label}</span>
@@ -426,7 +426,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) 
 
               {/* Formulario agregar nuevo tag */}
               {isAdmin && (
-                <div className="border border-border/40 rounded-md p-3 space-y-2">
+                <div className="border border-border rounded-md p-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Nuevo tag</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div>

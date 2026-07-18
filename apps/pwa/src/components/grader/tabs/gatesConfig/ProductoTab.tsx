@@ -247,7 +247,7 @@ export function ProductoTab({
             const delayClose = physicalConfig.flipperDelayCloseMs    ?? 150
             const cycleTotal = delayOpen + minOpen + delayClose
             return (
-              <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+              <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
                   {onOpenZ2Capture && (
@@ -295,7 +295,7 @@ export function ProductoTab({
           })()}
 
           {/* Sub-card B: Reset mecánico cilindro */}
-          <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+          <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
               <span className="inline-flex items-center rounded border px-1 py-0.5 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">⚠ Estimado</span>
@@ -319,7 +319,7 @@ export function ProductoTab({
           </div>
 
           {/* Sub-card C: Paleta flipper física */}
-          <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+          <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
             <p className="text-xs font-semibold text-violet-400">Paleta flipper física</p>
             <div>
               <Label className="text-xs">Largo paleta (mm)</Label>

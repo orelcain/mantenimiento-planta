@@ -1250,9 +1250,9 @@ export function ShiftTimelineView({
             <span
               className={cn(
                 'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium',
-                coverage.pct >= 95 && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-                coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-                coverage.pct < 85 && 'border-orange-500/40 bg-orange-500/10 text-orange-400',
+                coverage.pct >= 95 && 'border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+                coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/40 bg-amber-500/20 text-amber-700 dark:text-amber-400',
+                coverage.pct < 85 && 'border-orange-500/40 bg-orange-500/20 text-orange-700 dark:text-orange-400',
                 canAnnotate && coverage.unclassifiedMin > 0 && 'cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity',
               )}
               role={canAnnotate && coverage.unclassifiedMin > 0 ? 'button' : undefined}
@@ -1274,7 +1274,7 @@ export function ShiftTimelineView({
           )}
           {productionWindow && productionWindow.excludedPieces > 0 && (
             <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-500/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-500/40 bg-zinc-500/20 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium"
               title={`Calibración/aseo detectado por lotes no-correlativos${productionWindow.dummyLots.size > 0 ? ` (${[...productionWindow.dummyLots].join(', ')})` : ' (ej. 1111)'}. ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
@@ -1288,7 +1288,7 @@ export function ShiftTimelineView({
             <button
               type="button"
               onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 active:bg-sky-500/30 transition-colors text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-sky-500/40 bg-sky-500/20 text-sky-700 dark:text-sky-400 hover:bg-sky-500/30 active:bg-sky-500/40 transition-colors text-[11px] font-medium"
               title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
             >
               <Upload className="w-3 h-3" />
@@ -1299,7 +1299,7 @@ export function ShiftTimelineView({
       {hasData && (
         <div className="flex items-center gap-2 px-6 pb-2 flex-wrap">
           {/* Zoom horario dinámico — scroll horizontal en mobile, wrap en desktop */}
-          <div className="flex flex-nowrap sm:flex-wrap border border-border/40 rounded-md overflow-x-auto sm:overflow-hidden text-[11px] max-w-full scrollbar-thin">
+          <div className="flex flex-nowrap sm:flex-wrap border border-border rounded-md overflow-x-auto sm:overflow-hidden text-[11px] max-w-full scrollbar-thin">
             <button
               onClick={() => {
                 setActiveZoom('turno')
@@ -1357,7 +1357,7 @@ export function ShiftTimelineView({
 
       <CardContent className="space-y-4">
         {hasSelection && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/60 bg-muted/30 text-xs flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted text-xs flex-wrap">
             <span className="text-muted-foreground shrink-0">Mostrando:</span>
             {causesArr.map(cause => {
               const color = CAUSE_HEX[cause] ?? '#ef4444'

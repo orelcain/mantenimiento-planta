@@ -304,10 +304,10 @@ export function GateBreakdownCard({
           <span
             className={cn(
               'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium cursor-default',
-              diagnosis.color === 'emerald' && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-              diagnosis.color === 'amber'   && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-              diagnosis.color === 'blue'    && 'border-blue-500/40 bg-blue-500/10 text-blue-400',
-              diagnosis.color === 'zinc'    && 'border-zinc-500/40 bg-zinc-500/10 text-zinc-400',
+              diagnosis.color === 'emerald' && 'border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+              diagnosis.color === 'amber'   && 'border-amber-500/40 bg-amber-500/20 text-amber-700 dark:text-amber-400',
+              diagnosis.color === 'blue'    && 'border-blue-500/40 bg-blue-500/20 text-blue-700 dark:text-blue-400',
+              diagnosis.color === 'zinc'    && 'border-zinc-500/40 bg-zinc-500/20 text-zinc-700 dark:text-zinc-400',
             )}
             title={diagnosis.detail}
           >
@@ -329,19 +329,19 @@ export function GateBreakdownCard({
         {calibreGroups.length > 0 && (
           <div className="flex items-center gap-2 pb-1 flex-wrap">
             {kpi.saturado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[11px] font-medium text-red-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-[11px] font-medium text-red-700 dark:text-red-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
               </span>
             )}
             {kpi.optimo > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-medium text-emerald-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 {kpi.optimo} óptimo{kpi.optimo > 1 ? 's' : ''}
               </span>
             )}
             {kpi.sobredimensionado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-medium text-amber-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 {kpi.sobredimensionado} sobredim.
               </span>
@@ -386,7 +386,7 @@ export function GateBreakdownCard({
               </div>
 
               {/* Barra coloreada por status */}
-              <div className="flex-1 h-4 rounded-sm bg-muted/20 overflow-hidden">
+              <div className="flex-1 h-4 rounded-sm bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-sm transition-all duration-300"
                   style={{
@@ -416,7 +416,7 @@ export function GateBreakdownCard({
                 <span className="text-xs font-semibold text-orange-400 tabular-nums">P0</span>
               </div>
               <div className="w-32 shrink-0 text-[11px] text-orange-400/70">Rechazo</div>
-              <div className="flex-1 h-4 rounded-sm bg-muted/20 overflow-hidden">
+              <div className="flex-1 h-4 rounded-sm bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-sm bg-orange-500/50"
                   style={{ width: `${(pointZeroPieces / maxPieces) * 100}%` }}
@@ -445,9 +445,9 @@ export function GateBreakdownCard({
             {showAnalysis && (
               <div className="space-y-3 pt-1">
                 {/* Tabla de grupos */}
-                <div className="rounded-md border border-border/40 overflow-hidden text-xs">
+                <div className="rounded-md border border-border overflow-hidden text-xs">
                   <table className="w-full">
-                    <thead className="bg-muted/20 text-muted-foreground">
+                    <thead className="bg-muted text-muted-foreground">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-medium">Calibre · Calidad</th>
                         <th className="px-2 py-1.5 text-center font-medium">Gates</th>
@@ -494,7 +494,7 @@ export function GateBreakdownCard({
                       ))}
                     </tbody>
                   </table>
-                  <div className="px-2 py-1 bg-muted/10 text-[10px] text-muted-foreground border-t border-border/30">
+                  <div className="px-2 py-1 bg-muted text-[10px] text-muted-foreground border-t border-border/30">
                     Ratio = % producción ÷ % gates asignados · óptimo entre 0.5× y 1.5×
                   </div>
                 </div>
@@ -514,8 +514,8 @@ export function GateBreakdownCard({
                           className={cn(
                             'flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-xs transition-colors',
                             isTop
-                              ? 'border-red-500/30 bg-red-500/5'
-                              : 'border-amber-500/20 bg-amber-500/5',
+                              ? 'border-red-500/30 bg-red-500/15'
+                              : 'border-amber-500/20 bg-amber-500/15',
                           )}
                         >
                           {/* Número de prioridad */}

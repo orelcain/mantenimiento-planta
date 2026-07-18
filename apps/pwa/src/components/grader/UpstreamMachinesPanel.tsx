@@ -658,7 +658,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       <Badge
         variant="outline"
-        className="bg-slate-900/60 border-slate-700 text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-muted border-border text-muted-foreground dark:bg-slate-900/60 dark:border-slate-700 dark:text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title={
           `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
           `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`

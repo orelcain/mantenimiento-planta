@@ -182,7 +182,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
   if (processed.length < MIN_PIECES) return null
 
   return (
-    <Card className="border-slate-800 bg-slate-950/50">
+    <Card className="border-border bg-card dark:border-slate-800 dark:bg-slate-950/50">
       <CardContent className="py-3 px-4">
         {/* Header — clic para expandir/colapsar */}
         <button
