@@ -1,7 +1,8 @@
 # MEMORY — App Mantenimiento Planta (PWA)
 
 Estado canónico del proyecto. Actualizar cuando haya una decisión estable.
-Última actualización: 2026-06-25.
+Última actualización: 2026-07-18 (barrido de 13 PRs pendientes + diagnósticos, ver WORKLOG y
+`ARIA_MANTENIMIENTO_PLANTA\docs\INFORME_LOOP_PENDIENTES_2026-07-18.md`).
 
 ## ⭐ META GRANDE / PREMISA (PRIORITARIA — aplica a TODO desarrollo)
 
