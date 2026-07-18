@@ -1333,8 +1333,8 @@ export function AnalisisGraderTurnoPage() {
         <div
           className={`mt-2 mx-1 px-3 py-1.5 rounded-md border text-xs flex items-start gap-2 ${
             turnoContext.type === 'orphan'
-              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
-              : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200'
           }`}
         >
           <span className="text-base leading-none mt-0.5 select-none" aria-hidden>
@@ -1498,7 +1498,7 @@ export function AnalisisGraderTurnoPage() {
         && upstreamLine.source !== 'firestore' && (
         <Card className="border-slate-700/50">
           <CardContent className="p-5 space-y-3">
-            <p className="text-sm font-medium text-slate-300">
+            <p className="text-sm font-medium text-foreground">
               Sin datos registrados para este turno
             </p>
 
@@ -1506,7 +1506,7 @@ export function AnalisisGraderTurnoPage() {
             <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-950/30 border border-violet-900/40">
               <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-violet-300">Shoplogix — Evisceradoras Baader 142</p>
+                <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Shoplogix — Evisceradoras Baader 142</p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Se sincroniza automáticamente cada 5 min cuando las máquinas están en operación.
                   No requiere acción manual.
@@ -1521,7 +1521,7 @@ export function AnalisisGraderTurnoPage() {
             <div className="flex items-start gap-3 p-3 rounded-lg bg-sky-950/30 border border-sky-900/40">
               <Upload className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sky-300">Grader Matrix — Informe de turno</p>
+                <p className="text-sm font-medium text-sky-800 dark:text-sky-300">Grader Matrix — Informe de turno</p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Exportar Excel de Matrix al cierre del turno y cargarlo para ver P0%, causas y timeline.
                 </p>
@@ -1545,7 +1545,7 @@ export function AnalisisGraderTurnoPage() {
               <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-950/30 border border-amber-900/40">
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-amber-300">Marel HG — Corta-cabeza</p>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Marel HG — Corta-cabeza</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>

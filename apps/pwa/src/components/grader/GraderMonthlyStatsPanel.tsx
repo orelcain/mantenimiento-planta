@@ -295,14 +295,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className="border-slate-500/25 bg-slate-500/5">
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+              <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                 Fuera de turno configurado
               </p>
             </div>
             <div className="flex justify-around text-center">
               <div>
-                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {slxStats.unscheduled.cycles >= 1000
                     ? `${(slxStats.unscheduled.cycles / 1000).toFixed(1)}k`
                     : slxStats.unscheduled.cycles.toLocaleString('es-CL')}
@@ -311,14 +311,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               </div>
               <div className="w-px bg-border" />
               <div>
-                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {fmtSecPanoramic(slxStats.unscheduled.uptimeSec)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">horas-máquina</p>
               </div>
               <div className="w-px bg-border" />
               <div>
-                <p className="text-lg font-bold leading-none tabular-nums text-slate-300">
+                <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {slxStats.unscheduled.daysWithData}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">

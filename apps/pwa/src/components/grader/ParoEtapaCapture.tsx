@@ -147,14 +147,14 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
             {ETAPAS.map((e) => (
               <button key={e} type="button" onClick={() => setEtapaSel(e)}
                 className={cn('px-2.5 py-1 rounded-md border text-xs font-medium transition-colors',
-                  etapaSel === e ? 'border-rose-500/50 bg-rose-500/10 text-rose-300'
+                  etapaSel === e ? 'border-rose-500/50 bg-rose-500/10 text-rose-800 dark:text-rose-300'
                     : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
                 {e}
               </button>
             ))}
             <button type="button" onClick={() => setEtapaSel(OTRA)}
               className={cn('px-2.5 py-1 rounded-md border text-xs font-medium transition-colors',
-                etapaSel === OTRA ? 'border-rose-500/50 bg-rose-500/10 text-rose-300'
+                etapaSel === OTRA ? 'border-rose-500/50 bg-rose-500/10 text-rose-800 dark:text-rose-300'
                   : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
               Otra…
             </button>
@@ -183,7 +183,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+          <div className="flex items-start gap-2 text-xs text-red-800 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /><span className="break-words">{error}</span>
           </div>
         )}
@@ -212,7 +212,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
                 return (
                   <div key={r.etapa} className="space-y-0.5">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className={cn('font-medium', i === 0 ? 'text-rose-300' : 'text-foreground')}>{i + 1}. {r.etapa}</span>
+                      <span className={cn('font-medium', i === 0 ? 'text-rose-800 dark:text-rose-300' : 'text-foreground')}>{i + 1}. {r.etapa}</span>
                       <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} paro{r.n !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
@@ -230,7 +230,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
           <ul className="space-y-1 max-h-48 overflow-y-auto pr-1 pt-1">
             {paros.slice(0, 15).map((p) => (
               <li key={p.id} className="flex items-start gap-2 text-[11px] rounded-md border border-border/40 bg-background/40 px-2 py-1.5">
-                <span className="font-medium text-rose-300 shrink-0">{p.etapa}</span>
+                <span className="font-medium text-rose-800 dark:text-rose-300 shrink-0">{p.etapa}</span>
                 <span className="text-muted-foreground tabular-nums shrink-0">{fmtDur(p.duracionMin)}</span>
                 <span className="text-foreground/80 min-w-0 flex-1 break-words">{p.causa || '—'}</span>
                 <span className="text-muted-foreground/60 shrink-0 hidden sm:inline">{fmtFecha(p.fecha)}</span>

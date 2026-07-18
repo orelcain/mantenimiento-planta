@@ -205,8 +205,8 @@ export function QuickGateChangeButton({
             <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-xs">
               <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-amber-300">Configuración idéntica al último snapshot</p>
-                <p className="text-amber-200/80 mt-0.5">
+                <p className="font-medium text-amber-800 dark:text-amber-300">Configuración idéntica al último snapshot</p>
+                <p className="text-amber-800/90 dark:text-amber-200/80 mt-0.5">
                   Cambiá al menos un valor (calibre, calidad, conservación, producto o estado activa)
                   para registrar un nuevo cambio. El motivo solo no cuenta como cambio.
                 </p>

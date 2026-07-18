@@ -153,7 +153,7 @@ export function ShiftQuotaCard({
     if (!allowEdit) return null
     if (!editing) {
       return (
-        <Card className="border border-dashed border-zinc-700/60">
+        <Card className="border border-dashed border-border">
           <CardContent className="p-3 flex items-center gap-2 flex-wrap">
             <Target className="w-4 h-4 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground">Sin cuota definida para este turno.</span>
@@ -196,15 +196,15 @@ export function ShiftQuotaCard({
 
   const verdictTextClass =
     progressPct >= 100 ? 'text-emerald-400'
-    : progressPct >= 90 ? 'text-emerald-300'
-    : progressPct >= 50 ? 'text-amber-300'
-    : 'text-red-300'
+    : progressPct >= 90 ? 'text-emerald-800 dark:text-emerald-300'
+    : progressPct >= 50 ? 'text-amber-800 dark:text-amber-300'
+    : 'text-red-800 dark:text-red-300'
 
   const isClosed = shiftWindow.status === 'closed'
   const cumplio = isClosed && progressPct >= 100
 
   return (
-    <Card className="border-2 border-zinc-700/60">
+    <Card className="border-2 border-border">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           <Target className="w-4 h-4 text-primary shrink-0" />
@@ -301,7 +301,7 @@ export function ShiftQuotaCard({
                 title="Shoplogix reporta más ciclos en las Baaders que piezas pesadas en el Grader. Como todas las piezas deben pasar por el Grader, la diferencia podría ser: Excel parcial, fallas de registro Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
-                <div className="text-[11px] text-amber-300 leading-tight">
+                <div className="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
                   <span className="font-semibold tabular-nums">
                     {discrepancy.missing > 0
                       ? `${Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar`

@@ -834,7 +834,7 @@ export function AnalisisGraderGatesConfigPage({
             {shiftGapMinutes > 0 && (
               <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2">
                 <span className="text-amber-400 mt-px">⚠</span>
-                <p className="text-xs text-amber-300">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
                   Revisa que los horarios cubran el período operativo completo.
                 </p>

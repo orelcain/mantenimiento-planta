@@ -85,7 +85,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
           {runbook.formula && (
             <div className="mt-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Fórmula</p>
-              <div className="bg-black/30 rounded-md p-2.5 font-mono text-sm text-amber-300">
+              <div className="bg-black/30 rounded-md p-2.5 font-mono text-sm text-amber-800 dark:text-amber-300">
                 {runbook.formula.expression}
               </div>
               <div className="mt-1.5 space-y-0.5">

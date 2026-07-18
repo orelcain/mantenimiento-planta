@@ -642,7 +642,7 @@ export function AnalisisGraderWizardPage() {
               <Upload className="h-4 w-4 text-sky-400 shrink-0 animate-pulse" />
               <div className="text-sm min-w-0">
                 <p>
-                  <span className="font-semibold text-sky-100">
+                  <span className="font-semibold text-sky-900 dark:text-sky-100">
                     {multiDayInfo.isP0Only
                       ? `Archivo P0 — ${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''}`
                       : multiDayInfo.uniqueDays > 1
@@ -656,7 +656,7 @@ export function AnalisisGraderWizardPage() {
                     {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                   </span>
                 </p>
-                <p className="text-[11px] text-sky-300/70 mt-0.5">
+                <p className="text-[11px] text-sky-800/90 dark:text-sky-300/70 mt-0.5">
                   Se guardará en <b>{lineConfig.label}</b>
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>
