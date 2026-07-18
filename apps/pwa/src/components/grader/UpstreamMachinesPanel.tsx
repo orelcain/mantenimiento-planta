@@ -258,11 +258,11 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
                 Mobile: max 9rem + line-clamp-2 (puede ocupar 2 líneas). */}
-            <span className="text-slate-300 shrink-0 w-[7.5rem] sm:w-[7.5rem] truncate sm:truncate leading-tight">
+            <span className="text-foreground shrink-0 w-[7.5rem] sm:w-[7.5rem] truncate sm:truncate leading-tight">
               {r.reason || 'Sin categoría'}
             </span>
             {/* Barra proporcional — transformOrigin left para el scaleX 0→1 */}
-            <div className="flex-1 h-1.5 bg-slate-800/80 rounded-full overflow-hidden min-w-0">
+            <div className="flex-1 h-1.5 bg-muted/80 rounded-full overflow-hidden min-w-0">
               <div
                 data-pareto-bar=""
                 className="h-full rounded-full opacity-80"
@@ -274,11 +274,11 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
               />
             </div>
             {/* Duración */}
-            <span className="text-slate-500 tabular-nums shrink-0 w-12 text-right">
+            <span className="text-muted-foreground tabular-nums shrink-0 w-12 text-right">
               {fmtDurationSec(r.durationSec)}
             </span>
             {/* % del total downtime */}
-            <span className="text-slate-600 tabular-nums shrink-0 w-7 text-right">
+            <span className="text-muted-foreground tabular-nums shrink-0 w-7 text-right">
               {pct.toFixed(0)}%
             </span>
           </div>
@@ -334,7 +334,7 @@ function ShiftAvailabilityBar({
     <span className="flex items-center gap-1.5" title={tooltip}>
       <Timer className="w-3 h-3 shrink-0" />
       {/* Barra apilada — overflow-hidden recorta los divs al borde redondeado */}
-      <div className="flex h-2 w-14 rounded-full overflow-hidden bg-slate-800/60 shrink-0">
+      <div className="flex h-2 w-14 rounded-full overflow-hidden bg-muted/60 shrink-0">
         {upPct    > 0 && <div className="h-full bg-emerald-500/75" style={{ width: `${upPct}%`    }} />}
         {breakPct > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${breakPct}%` }} />}
         {downPct  > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${downPct}%`  }} />}
@@ -354,7 +354,7 @@ function ShiftAvailabilityBar({
 export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
   if (points.length < 2) {
     return (
-      <p className="text-[10px] text-slate-600 italic py-1">
+      <p className="text-[10px] text-muted-foreground italic py-1">
         Sin suficientes turnos históricos aún (mín. 2)
       </p>
     )
@@ -449,7 +449,7 @@ export function BaaderTrendMultiChart({
   const allDateKeys = [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
   if (allDateKeys.length < 2) {
     return (
-      <p className="text-[10px] text-slate-600 italic py-1">
+      <p className="text-[10px] text-muted-foreground italic py-1">
         Sin suficientes turnos históricos aún (mín. 2)
       </p>
     )
@@ -552,7 +552,7 @@ function StateTimeline({
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
 
   if (totalMs <= 0 || shift.states.length === 0) {
-    return <div className="h-5 rounded-md bg-slate-800/60" />
+    return <div className="h-5 rounded-md bg-muted/60" />
   }
 
   return (
@@ -561,7 +561,7 @@ function StateTimeline({
           con el chart Grader y los demás Gantts del mismo turno (Fase 2 del
           Synchronized Timeline). Mantiene el rendering visual del HTML viejo
           pero con interactividad nativa de ECharts. */}
-      <div className="rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
+      <div className="rounded-md overflow-hidden bg-muted/60 border border-border/70 shadow-inner">
         <StateTimelineEC
           shift={shift}
           windowStart={windowStart}
@@ -785,11 +785,11 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       >
         <div className="flex items-center gap-2 min-w-0">
           {expanded
-            ? <ChevronDown  className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
-            : <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />}
-          <Factory className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
+          <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="font-medium text-sm truncate">{shift.machineName}</span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-400">
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
             Baader 142
           </Badge>
           {microAlert && (
@@ -803,7 +803,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
             <RatioIcon className="w-3 h-3" />
             {fmtPct(shift.overallRatio)}
           </span>
-          <span className="text-slate-400 tabular-nums" title="Piezas totales">
+          <span className="text-muted-foreground tabular-nums" title="Piezas totales">
             {fmtInt(shift.totalCycles)} pz
           </span>
         </div>
@@ -858,7 +858,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       </div>
 
       {/* Mini stats footer */}
-      <div className="flex items-center gap-4 text-[11px] text-slate-500">
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
         <ShiftAvailabilityBar
           breakdown={shift.shiftRuntimeBreakdown}
           shiftRuntime={shift.shiftRuntime}
@@ -888,7 +888,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
             )}
           </span>
         )}
-        <span className="ml-auto text-[10px] text-slate-600">
+        <span className="ml-auto text-[10px] text-muted-foreground">
           {fmtTime(shift.shiftStart)} – {fmtTime(shift.shiftEnd)}
         </span>
       </div>
@@ -899,7 +899,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       {shift.comments.length > 0 && !expanded && (
         <button
           onClick={onToggle}
-          className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           title="Comentarios del operador — expandir para verlos junto a su motivo"
         >
           <MessageSquare className="w-3 h-3 shrink-0" />
@@ -909,22 +909,22 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
       {/* Detalle expandido */}
       {expanded && (
-        <div className="mt-2 pt-2 border-t border-slate-800/60 text-[11px] text-slate-500 space-y-1">
+        <div className="mt-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground space-y-1">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div>
-              <div className="text-slate-600">Intervalos</div>
-              <div className="text-slate-300 tabular-nums">{shift.intervals.length} × 5 min</div>
+              <div className="text-muted-foreground">Intervalos</div>
+              <div className="text-foreground tabular-nums">{shift.intervals.length} × 5 min</div>
             </div>
             <div>
-              <div className="text-slate-600">Eventos timeline</div>
-              <div className="text-slate-300 tabular-nums">{shift.states.length}</div>
+              <div className="text-muted-foreground">Eventos timeline</div>
+              <div className="text-foreground tabular-nums">{shift.states.length}</div>
             </div>
             <div>
-              <div className="text-slate-600">Unidad</div>
-              <div className="text-slate-300">{shift.productionUnit || '—'}</div>
+              <div className="text-muted-foreground">Unidad</div>
+              <div className="text-foreground">{shift.productionUnit || '—'}</div>
             </div>
             <div>
-              <div className="text-slate-600">Variance runtime</div>
+              <div className="text-muted-foreground">Variance runtime</div>
               {(() => {
                 const dir = varianceDirection(shift.runtimeVariance)
                 return (
@@ -946,10 +946,10 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               Los huérfanos (comentario sin evento que calce) van debajo. */}
           {analisis.eventos.length > 0 && (
             <div className="mt-2">
-              <div className="text-slate-600 mb-1">Análisis del turno ({analisis.eventos.length} eventos)</div>
-              <div className="max-h-64 overflow-y-auto rounded border border-slate-800/60">
+              <div className="text-muted-foreground mb-1">Análisis del turno ({analisis.eventos.length} eventos)</div>
+              <div className="max-h-64 overflow-y-auto rounded border border-border/60">
                 <table className="w-full text-[10px] tabular-nums">
-                  <thead className="text-slate-600 sticky top-0 bg-slate-950/95 backdrop-blur">
+                  <thead className="text-muted-foreground sticky top-0 bg-muted/95 backdrop-blur">
                     <tr>
                       <th className="text-left  px-2 py-1 font-medium">Inicio</th>
                       <th className="text-left  px-2 py-1 font-medium">Fin</th>
@@ -965,24 +965,24 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
                       const coms = analisis.byState.get(s) ?? []
                       const comentario = coms.map((c) => c.text).join(' · ')
                       return (
-                        <tr key={i} className="border-t border-slate-800/40 hover:bg-slate-900/40 align-top">
-                          <td className="px-2 py-1 text-slate-400 whitespace-nowrap">{fmtTime(s.startAt)}</td>
-                          <td className="px-2 py-1 text-slate-400 whitespace-nowrap">{fmtTime(s.endAt)}</td>
-                          <td className="px-2 py-1 text-right text-slate-300 whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
+                        <tr key={i} className="border-t border-border/40 hover:bg-muted/40 align-top">
+                          <td className="px-2 py-1 text-muted-foreground whitespace-nowrap">{fmtTime(s.startAt)}</td>
+                          <td className="px-2 py-1 text-muted-foreground whitespace-nowrap">{fmtTime(s.endAt)}</td>
+                          <td className="px-2 py-1 text-right text-foreground whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
                           <td className="px-2 py-1">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
                               <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
-                              <span className="text-slate-300 truncate">{motivo}</span>
+                              <span className="text-foreground truncate">{motivo}</span>
                             </span>
                           </td>
                           <td className="px-2 py-1">
                             {comentario ? (
-                              <span className="text-slate-400 italic inline-flex items-start gap-1">
-                                <MessageSquare className="w-2.5 h-2.5 shrink-0 mt-0.5 text-slate-500" />
+                              <span className="text-muted-foreground italic inline-flex items-start gap-1">
+                                <MessageSquare className="w-2.5 h-2.5 shrink-0 mt-0.5 text-muted-foreground" />
                                 <span>{comentario}</span>
                               </span>
                             ) : (
-                              <span className="text-slate-700">—</span>
+                              <span className="text-muted-foreground dark:text-slate-700">—</span>
                             )}
                           </td>
                         </tr>
@@ -999,8 +999,8 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
                     Comentarios sin evento asociado
                   </div>
                   {analisis.orphans.map((c) => (
-                    <p key={c.key} className="text-slate-400 italic text-[10px] pl-3.5">
-                      <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-slate-500" />
+                    <p key={c.key} className="text-muted-foreground italic text-[10px] pl-3.5">
+                      <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-muted-foreground" />
                       {c.reasonValue ? `[${c.reasonValue}] ${c.text}` : c.text}
                     </p>
                   ))}
@@ -1162,7 +1162,7 @@ export function UpstreamMachinesPanel({
   }
 
   return (
-    <Card className="border-slate-800 bg-slate-950/50">
+    <Card className="border-border bg-muted/50">
       <CardContent className="py-3 px-4">
         {/* Header del panel — colapsable + KPIs línea-completa siempre visibles */}
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
@@ -1172,8 +1172,8 @@ export function UpstreamMachinesPanel({
             aria-expanded={!collapsed}
           >
             {collapsed
-              ? <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-              : <ChevronDown  className="w-4 h-4 text-slate-400 shrink-0" />}
+              ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              : <ChevronDown  className="w-4 h-4 text-muted-foreground shrink-0" />}
             <Zap className="w-4 h-4 text-violet-400 shrink-0" />
             {/* 2 niveles:
                 - <sm (mobile portrait): "Línea Baader 142"
@@ -1200,7 +1200,7 @@ export function UpstreamMachinesPanel({
               </Badge>
             )}
           </button>
-          <div className="flex items-center gap-3 text-xs text-slate-500 ml-auto flex-wrap justify-end">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
             {lineTimeTotals && <LineTimeSummaryBadges totals={lineTimeTotals} />}
@@ -1280,7 +1280,7 @@ export function UpstreamMachinesPanel({
                     filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
                   }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))
                 }}
-                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-1 rounded border border-slate-700 hover:border-slate-500"
+                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded border border-border hover:border-foreground/30"
                 title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
               >
                 <Download className="w-3 h-3" />
@@ -1292,9 +1292,9 @@ export function UpstreamMachinesPanel({
 
         {/* Body */}
         {!collapsed && (
-          <div className="mt-3 pt-3 border-t border-slate-800">
+          <div className="mt-3 pt-3 border-t border-border">
             {loading && (
-              <div className="text-sm text-slate-500 py-4 text-center">
+              <div className="text-sm text-muted-foreground py-4 text-center">
                 Cargando datos de Shoplogix…
               </div>
             )}
@@ -1307,9 +1307,9 @@ export function UpstreamMachinesPanel({
             )}
 
             {empty && (
-              <div className="text-xs text-slate-500 py-3 space-y-1">
-                <p>📡 <strong className="text-slate-300">Sin datos Shoplogix para este turno.</strong></p>
-                <p className="text-slate-600">
+              <div className="text-xs text-muted-foreground py-3 space-y-1">
+                <p>📡 <strong className="text-foreground">Sin datos Shoplogix para este turno.</strong></p>
+                <p className="text-muted-foreground">
                   {plantSlug === 'yal'
                     ? 'La integración Shoplogix Yal aún no está conectada a Firestore. Cuando esté lista, mostrará el estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'
                     : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'}
@@ -1321,8 +1321,8 @@ export function UpstreamMachinesPanel({
                 Siempre visible cuando hay datos. Permite ver de un vistazo
                 qué máquina bajó primero y cuánto difiere del promedio. */}
             {snapshot && snapshot.machines.length > 0 && (
-              <div className="mb-3 pb-3 border-b border-slate-800/60">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+              <div className="mb-3 pb-3 border-b border-border/60">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
                   Tasa de producción por máquina · pz/min
                 </p>
                 {slxWindowMismatch && (
@@ -1339,7 +1339,7 @@ export function UpstreamMachinesPanel({
             )}
 
             {snapshot && snapshot.machines.length > 0 && (
-              <div className="divide-y divide-slate-800/60">
+              <div className="divide-y divide-border/60">
                 {snapshot.machines.map(m => (
                   <MachineRow
                     key={m.machineid}
@@ -1356,7 +1356,7 @@ export function UpstreamMachinesPanel({
             )}
 
             {snapshot && syncedAt && (
-              <div className="mt-2 pt-2 border-t border-slate-800 text-[11px] text-slate-600 text-right">
+              <div className="mt-2 pt-2 border-t border-border text-[11px] text-muted-foreground text-right">
                 Sincronizado: {syncedAt.toLocaleString('es-CL')}
               </div>
             )}
