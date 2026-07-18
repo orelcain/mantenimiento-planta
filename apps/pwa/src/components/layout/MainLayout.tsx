@@ -523,7 +523,7 @@ export function MainLayout() {
           la animación de colapsado del wrapper. */}
       <div
         className={cn(
-          'hidden lg:flex flex-col flex-shrink-0 bg-card border-r transition-[width] duration-200 overflow-hidden h-screen sticky top-0',
+          'hidden lg:flex flex-col flex-shrink-0 bg-[var(--sidebar-surface)] border-r transition-[width] duration-200 overflow-hidden h-screen sticky top-0',
           shouldHideDesktopSidebar ? 'w-0' : 'w-64'
         )}
       >
@@ -666,7 +666,7 @@ export function MainLayout() {
           <aside
             role="navigation"
             aria-label="Menú principal"
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-surface)] border-r"
           >
             <div className="flex flex-col h-full">
               {/* Logo */}

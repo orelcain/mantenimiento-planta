@@ -50,6 +50,11 @@
                                         item activo del sidebar en claro (~8.35:1
                                         con el texto de abajo, medido) */
   --sidebar-active-foreground: #173a5a; /* primary-900, texto legible sobre el celeste */
+  /* Profundidad por capas (pedido Orel 2026-07-18): sidebar de la app = el azul
+     más oscuro, panel lateral de módulo (ej. ÁREAS de Repuestos) = intermedio,
+     cards de contenido = lo más claro. En oscuro ambos vuelven al card de siempre. */
+  --sidebar-surface: #b0c7de;
+  --panel-surface: #cdddec;
 
   /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
      (mismo criterio mate azulado: superficies sin blanco puro) */
@@ -91,6 +96,8 @@
   --border: 34 56 74;               /* #22384a */
   --sidebar-active: #2E75B6;        /* oscuro byte-idéntico: el primary de siempre */
   --sidebar-active-foreground: #ffffff;
+  --sidebar-surface: #16242f;       /* oscuro byte-idéntico: el card de siempre */
+  --panel-surface: #16242f;
 
   /* Paleta LC — los valores oscuros de siempre (learningTheme.ts pre-tema) */
   --lc-bg: #0d1722;
