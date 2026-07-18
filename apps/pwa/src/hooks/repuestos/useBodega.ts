@@ -40,6 +40,11 @@ import type { MaterialClase } from '@/types/repuestos'
 export interface BodegaOverlay {
   id: string
   codigoSAP: string
+  /** Nombre denormalizado del catálogo (`repuestos.textoBreve`). Lo mantienen
+   *  los write-paths de este hook + scripts/backfill-bodega-texto-breve.js;
+   *  hace al doc de bodega auto-descriptivo (cards con nombre sin esperar el
+   *  merge con el maestro completo). */
+  textoBreve?: string
   stockActual: number
   stockMinimo: number
   stockMaximo?: number
@@ -314,6 +319,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         map.set(sap, {
           id: d.id,
           codigoSAP: sap,
+          textoBreve: data.textoBreve || undefined,
           stockActual: data.stockActual ?? 0,
           stockMinimo: data.stockMinimo ?? 0,
           stockMaximo: data.stockMaximo ?? undefined,
@@ -391,7 +397,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         rowKey: key,
         codigoSAP: sap,
         codigoFabricante: rep.codigoFabricante || '',
-        textoBreve: rep.textoBreve || rep.descripcion || '',
+        // Último fallback: nombre denormalizado en el doc de bodega (cubre docs
+        // de catálogo con textoBreve vacío que sí tienen nombre sembrado allá).
+        textoBreve: rep.textoBreve || rep.descripcion || overlay?.textoBreve || '',
         alias: rep.alias,
         nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
         comunEn: Array.isArray(rep.comunEn) ? rep.comunEn : undefined,
@@ -438,9 +446,31 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       .sort((a, b) => {
         if (a.bodegaId && !b.bodegaId) return -1
         if (!a.bodegaId && b.bodegaId) return 1
+        // Sin nombre AL FINAL: '' ordena antes que todo en localeCompare, y eso
+        // dejaba los docs sucios (textoBreve vacío) como primera pantalla de Bodega.
+        if (a.textoBreve && !b.textoBreve) return -1
+        if (!a.textoBreve && b.textoBreve) return 1
         return a.textoBreve.localeCompare(b.textoBreve, 'es')
       })
   }, [allItems])
+
+  // Nombre de catálogo por SAP — para denormalizar `textoBreve` en cada write
+  // de bodega (el doc queda auto-descriptivo; ver BodegaOverlay.textoBreve).
+  const nombrePorSap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const r of catalogRepuestos) {
+      const sap = (r.repuesto.codigoSAP || '').trim()
+      const nombre = r.repuesto.textoBreve || r.repuesto.descripcion || ''
+      if (sap && nombre && !m.has(sap)) m.set(sap, nombre)
+    }
+    return m
+  }, [catalogRepuestos])
+
+  /** Campo `textoBreve` a incluir en un write de bodega ({} si no hay nombre). */
+  const denormNombre = useCallback((sap: string): { textoBreve?: string } => {
+    const nombre = nombrePorSap.get(sap)
+    return nombre ? { textoBreve: nombre } : {}
+  }, [nombrePorSap])
 
   // ── Guardar/actualizar stock ──
   const saveStock = useCallback(async (codigoSAP: string, data: BodegaStockData) => {
@@ -448,13 +478,13 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     if (!key) return
     const existing = bodegaOverlays.get(key)
     if (existing) {
-      await updateDoc(doc(db, BODEGA_COL, existing.id), { ...data, updatedAt: serverTimestamp() })
+      await updateDoc(doc(db, BODEGA_COL, existing.id), { ...data, ...denormNombre(key), updatedAt: serverTimestamp() })
     } else {
-      await setDoc(doc(db, BODEGA_COL, key), { codigoSAP: key, ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+      await setDoc(doc(db, BODEGA_COL, key), { codigoSAP: key, ...data, ...denormNombre(key), createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
     }
     // Parche local en vez de releer los ~2.200 docs de la colección.
     patchOverlay(key, { ...data, id: existing?.id ?? key, codigoSAP: key, updatedAt: new Date() })
-  }, [bodegaOverlays, patchOverlay])
+  }, [bodegaOverlays, patchOverlay, denormNombre])
 
   // ── Registrar movimiento ──
   const registrarMovimiento = useCallback(async (
@@ -477,6 +507,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       await setDoc(doc(db, BODEGA_COL, key), {
         codigoSAP: key, stockActual: nuevoStock, stockMinimo: item.stockMinimo,
         ubicacionBodega: item.ubicacionBodega || '', unidad: item.unidad || 'pzas',
+        ...(item.textoBreve ? { textoBreve: item.textoBreve } : denormNombre(key)),
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
     } else {
@@ -489,7 +520,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
     patchOverlay(key, { id: bodegaDocId, codigoSAP: key, stockActual: nuevoStock, updatedAt: new Date() })
-  }, [patchOverlay])
+  }, [patchOverlay, denormNombre])
 
   /**
    * Conteo físico RÁPIDO de un repuesto, desde su ficha (v3.91.0). Fija el stock
@@ -529,6 +560,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         codigoSAP: key, stockMinimo: item.stockMinimo || 0,
         ubicacionBodega: item.ubicacionBodega?.trim() || 'Sin ubicación',
         unidad: item.unidad || 'pzas',
+        ...(item.textoBreve ? { textoBreve: item.textoBreve } : denormNombre(key)),
         createdAt: serverTimestamp(), ...sello,
       })
     }
@@ -542,7 +574,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       id: bodegaDocId, codigoSAP: key, stockActual: contado,
       ultimoConteoAt: new Date(), ultimoConteoPor: userName, updatedAt: new Date(),
     })
-  }, [patchOverlay])
+  }, [patchOverlay, denormNombre])
 
   // ── Cargar movimientos ──
   const loadMovimientos = useCallback(async (bodegaDocId: string, max = 30): Promise<MovimientoBodega[]> => {
@@ -720,6 +752,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         await setDoc(doc(db, BODEGA_COL, sap), {
           codigoSAP: sap, stockActual: conteo.stockFisico,
           stockMinimo: 0, ubicacionBodega: '', unidad: 'pzas',
+          ...denormNombre(sap),
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         })
       }
@@ -744,7 +777,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     // Finalizar ajusta el stock de MUCHOS ítems a la vez: acá sí conviene releer
     // la colección (forzando, para saltar la caché) en vez de parchear uno a uno.
     await reloadBodega(true)
-  }, [bodegaOverlays, loadConteos, reloadBodega])
+  }, [bodegaOverlays, loadConteos, reloadBodega, denormNombre])
 
   // ── Movimiento en lote ──
   const registrarMovimientoBatch = useCallback(async (
@@ -811,12 +844,13 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         codigoSAP: key, stockActual: 0, stockMinimo: 0,
         // `isValidBodega()` de las reglas exige ubicacionBodega no vacío al crear.
         ubicacionBodega: 'Sin ubicación', unidad: 'pzas', fotos: newFotos,
+        ...denormNombre(key),
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
     }
     patchOverlay(key, { id: existing?.id ?? key, codigoSAP: key, fotos: newFotos, updatedAt: new Date() })
     return url
-  }, [bodegaOverlays, patchOverlay])
+  }, [bodegaOverlays, patchOverlay, denormNombre])
 
   const removePhoto = useCallback(async (codigoSAP: string, url: string) => {
     await deleteBodegaPhoto(url)

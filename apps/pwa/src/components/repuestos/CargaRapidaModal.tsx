@@ -9,6 +9,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { X, Check, Loader2, Search, MapPin } from 'lucide-react'
 import type { BodegaMergedItem, BodegaStockData } from '@/hooks/repuestos/useBodega'
+import { haystackMatchesAll } from '@/utils/repuestos'
 
 interface Props {
   items: BodegaMergedItem[]
@@ -49,7 +50,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
     if (terms.length) {
       res = res.filter((i) => {
         const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo ?? ''}`.toLowerCase()
-        return terms.every((t) => h.includes(t))
+        return haystackMatchesAll(h, terms)
       })
     }
     return res
