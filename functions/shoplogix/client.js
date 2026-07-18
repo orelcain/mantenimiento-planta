@@ -75,7 +75,7 @@ async function queryShoplogix({ cookie, type, params = {} }) {
 async function validateCookie(cookie) {
   try {
     const data = await queryShoplogix({ cookie, type: 'tree' })
-    return !!(data && data.serverid)
+    return !!(data && data.serverId)
   } catch (e) {
     return false
   }
@@ -144,7 +144,7 @@ async function queryShoplogixBearer({ accessToken, type, params = {} }) {
 async function validateAccessToken(accessToken) {
   try {
     const data = await queryShoplogixBearer({ accessToken, type: 'tree' })
-    return !!(data && data.serverid)
+    return !!(data && data.serverId)
   } catch (_) {
     return false
   }
