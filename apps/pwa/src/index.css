@@ -95,11 +95,12 @@
   --lc-prep-soft: rgba(207, 159, 84, 0.13);
   --lc-nuevo: #3fb98f;
   --lc-nuevo-soft: rgba(63, 185, 143, 0.14);
-  --lc-ok: #10b981;
-  --lc-ok-soft: rgba(16, 185, 129, 0.14);
-  --lc-warn: #f59e0b;
-  --lc-crit: #ef4444;
-  --lc-star: #fbbf24;
+  /* Acentos desaturados "mate" (2026-07-17): misma luminosidad, menos croma */
+  --lc-ok: #2aa07e;
+  --lc-ok-soft: rgba(42, 160, 126, 0.14);
+  --lc-warn: #cf9636;
+  --lc-crit: #d95757;
+  --lc-star: #d9ab4e;
 }
 
 @layer base {
