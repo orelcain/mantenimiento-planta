@@ -762,7 +762,7 @@ export function FichaTecnicaNFPA70B({
                 const lid = e.source === 'log' ? e.logId : undefined
                 if (lid && editLogId === lid) {
                   return (
-                    <div key={e.key} className="space-y-2 rounded-md border bg-muted/30 p-2">
+                    <div key={e.key} className="space-y-2 rounded-md border bg-muted p-2">
                       <div className="grid grid-cols-2 gap-2">
                         <Input
                           type="date"

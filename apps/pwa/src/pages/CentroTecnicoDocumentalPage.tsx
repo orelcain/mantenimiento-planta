@@ -422,7 +422,7 @@ export function CentroTecnicoDocumentalPage() {
               onClick={() => setFiltro(k.key)}
               title={`Filtrar: ${k.label}`}
               className={`rounded-lg border p-3 text-center transition-colors ${
-                active ? 'border-primary ring-1 ring-primary bg-primary/10' : 'border-border bg-card hover:bg-muted'
+                active ? 'border-primary ring-1 ring-primary bg-primary/20' : 'border-border bg-card hover:bg-muted'
               }`}
             >
               <div className={`text-2xl font-extrabold leading-none ${k.cls ?? ''}`}>{k.n}</div>
@@ -1264,7 +1264,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
         </div>
 
         {adding && (
-          <div className="rounded-lg border p-3 space-y-3">
+          <div className="rounded-lg border bg-muted p-3 space-y-3">
             <div className="grid md:grid-cols-3 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Fecha</label>
@@ -1339,7 +1339,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
         ) : (
           <>
             {metricSel && (
-              <div className="rounded-lg border bg-muted/20 p-2">
+              <div className="rounded-lg border bg-muted p-2">
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <div className="text-xs font-medium">
                     {metricSel.label} <span className="text-muted-foreground">({metricSel.unidad})</span>
@@ -1475,7 +1475,7 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
         </div>
 
         {adding && (
-          <div className="space-y-2 rounded-lg border p-2">
+          <div className="space-y-2 rounded-lg border bg-muted p-2">
             <Input placeholder="Buscar repuesto por nombre o SAP…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
             {loadingMaestro ? (
               <p className="text-xs italic text-muted-foreground">Cargando maestro…</p>
@@ -1633,7 +1633,7 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
       )}
 
       {moving && (
-        <div className="mt-3 space-y-2 rounded-md border p-2">
+        <div className="mt-3 space-y-2 rounded-md border bg-muted p-2">
           <div className="text-[11px] font-medium">Mover bajo… (nuevo padre)</div>
           <Input placeholder="Buscar área/equipo destino…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           {loadingCands ? (
@@ -2152,7 +2152,7 @@ function ExpedienteDialog({
                   </div>
 
                   {woForm && (
-                    <div className="rounded-lg border p-3 space-y-3">
+                    <div className="rounded-lg border bg-muted p-3 space-y-3">
                       <Input
                         placeholder="Título de la OT…"
                         value={woDraft.titulo}
@@ -2567,7 +2567,7 @@ function CtdEquipoCard({
   const foto = e.photos?.[0]
   return (
     <Card
-      className={`overflow-hidden cursor-pointer transition-colors ${selected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'hover:bg-muted/30'}`}
+      className={`overflow-hidden cursor-pointer transition-colors ${selected ? 'ring-2 ring-primary border-primary bg-primary/15' : 'hover:bg-muted/30'}`}
       onClick={() => onOpen('info')}
     >
       <div className="relative aspect-video bg-muted flex items-center justify-center">
@@ -2631,7 +2631,7 @@ function CtdEquipoRow({
   const foto = e.photos?.[0]
   return (
     <div
-      className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted/40'}`}
+      className={`flex items-center gap-3 px-3 cursor-pointer border-l-2 ${compact ? 'py-1.5' : 'py-3'} ${selected ? 'border-primary bg-primary/20' : 'border-transparent hover:bg-muted/40'}`}
       onClick={() => onOpen('info')}
     >
       <button
