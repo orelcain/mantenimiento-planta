@@ -1860,6 +1860,657 @@ const M3_BIBLIO = [
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
+// MODULO 4 — Codigo Electrico Nacional NFPA 70 / NEC 2023 (slug codigo-electrico-nec)
+// Curso teorico (dia 1) + practico (dia 2): NEC + reglamentos SEC (RIC / RPTD).
+// ════════════════════════════════════════════════════════════════════════════
+
+const M4_MANUAL = [
+  {
+    id: 'm4-01-que-es-nec',
+    title: 'Que es el NEC y como se organiza',
+    intro: 'Objetivo: ubicar el Codigo Electrico Nacional NFPA 70 (NEC) 2023, Nivel 1, y entender como esta estructurado. El curso cruza el NEC (codigo internacional de referencia) con la normativa chilena de la SEC.',
+    clave: [
+      'NFPA 70 (NEC) = Codigo Electrico Nacional. Su objetivo es que las instalaciones esten esencialmente libres de peligros; NO garantiza que sean eficientes ni con capacidad para el futuro.',
+      'Estructura del codigo: Capitulos 1 al 4 = aplicacion general a todas las instalaciones; Capitulos 5 al 7 = ocupaciones, equipos y condiciones especiales; Capitulo 8 = comunicaciones (independiente salvo referencia).',
+      'Lenguaje del codigo (pregunta de examen): obligatorio = "debe" / "no debe" (mandatorio, no hay opcion); permisivo = "debe estar permitido". Las notas informativas son solo explicativas.',
+      'En Chile el NEC se aplica vinculado a la normativa de la SEC (Decreto 8 / RIC para consumo, Decreto 109 / RPTD para MT-AT).',
+    ],
+    terreno: [
+      'Regla mnemotecnica: si el codigo dice "debe", es obligatorio; subraya siempre los valores maximos y minimos, que son pregunta de prueba.',
+      'Autochequeo: ¿que capitulos del NEC son de aplicacion general? ¿que significa la palabra "debe"?',
+    ],
+  },
+  {
+    id: 'm4-02-articulo-110',
+    title: 'Articulo 110: requisitos generales de instalacion',
+    intro: 'Objetivo: conocer las exigencias basicas del Articulo 110 sobre como se instala y se accede a los equipos electricos. Es la base de todo el codigo.',
+    medidas: [
+      'Espacio de trabajo: ancho minimo 30 pulgadas (~76 cm) o el ancho del equipo, lo que sea mayor',
+      'Equipos grandes (>= 1200 A y > 6 pies / 1,8 m de ancho): accesos/salidas en ambos extremos para evacuacion',
+    ],
+    clave: [
+      'Solo se aceptan conductores y equipos APROBADOS. En Chile, los materiales deben estar certificados y llevar el codigo QR de la SEC.',
+      'Ejecucion mecanica profesional: cerrar las aberturas no utilizadas de cajas y gabinetes.',
+      'Identificacion: los medios de desconexion y circuitos deben estar marcados segun su proposito; tableros con etiqueta de Riesgo de Relampago de Arco y la corriente de falla calculada.',
+      'El espacio de trabajo del tablero es EXCLUSIVO: prohibido guardar material combustible o inflamable, o usarlo de bodega.',
+    ],
+    terreno: [
+      'Advertencia del relator: en Chile se comercializa de todo, por lo que no todos los materiales estan certificados; verifica el codigo QR de la SEC.',
+      'Autochequeo: ¿ancho minimo del espacio de trabajo? ¿que se exige para equipos de 1200 A o mas?',
+    ],
+  },
+  {
+    id: 'm4-03-dimensionamiento-proteccion',
+    title: 'Dimensionamiento de conductores y proteccion (Art. 210/215/240/310)',
+    intro: 'Objetivo: aplicar las reglas del NEC para que el conductor y su proteccion soporten la carga sin sobrecalentarse. Aca aparece la famosa regla del 125 %.',
+    medidas: [
+      'Carga continua: la corriente maxima persiste 3 horas o mas',
+      'Regla del 125 %: conductor y dispositivo de sobrecorriente (DSC) se dimensionan al 125 % de la carga continua',
+      'Temperatura de terminal: 60 °C o 75 °C (no el 90 °C del aislante)',
+      'Ocupacion de canalizacion: maximo 40 % de la seccion con mas de 2 conductores',
+    ],
+    clave: [
+      'Carga continua (3 h o mas) vs intermitente / breve duracion (menos de 3 h, ej. una que opera 15 min).',
+      'Error comun: dimensionar el conductor solo por el aislante (90 °C). Manda la clasificacion del TERMINAL (60/75 °C); ya no se permite conectar el conductor directo al automatico sin terminal.',
+      'Los DSC deben interrumpir los TRES: sobrecarga + cortocircuito + falla a tierra (pregunta de examen).',
+      'Falla a tierra = una fase que se va a la estructura/carcasa (ej. motor con perdida de aislacion que energiza el chasis). La corriente busca el camino mas corto a tierra.',
+    ],
+    terreno: [
+      'Si pones un conductor chico con un automatico grande, el conductor "funciona de hilo fusible" (se derrite antes de que opere la proteccion).',
+      'Autochequeo: ¿desde cuantas horas una carga es continua? ¿a que temperatura de terminal se dimensiona?',
+    ],
+  },
+  {
+    id: 'm4-04-articulo-250-tierra',
+    title: 'Articulo 250: puesta a tierra y conexion equipotencial',
+    intro: 'Objetivo: distinguir la puesta a tierra del sistema, la del equipo y el bonding, y por que la tierra fisica no basta. Es el pilar de la seguridad electrica.',
+    clave: [
+      'Puesta a tierra del sistema: conecta intencionalmente un conductor a tierra para limitar sobretensiones y estabilizar el voltaje.',
+      'Conexion equipotencial / bonding: une las partes metalicas no portadoras de corriente para crear una trayectoria de baja impedancia que haga operar rapido la proteccion.',
+      'La tierra fisica (el suelo) NO se considera trayectoria efectiva de falla por su alta impedancia; se requiere un conductor de cobre/metal instalado para ese fin.',
+      'Corte omnipolar: desconectar TODOS los conductores activos, incluido el neutro (obligatorio en tableros generales y de distribucion, salvo dispositivos > 630 A).',
+    ],
+    terreno: [
+      'En terreno: el bonding es lo que permite que el diferencial o el disyuntor "vean" la falla y corten; sin buena trayectoria de retorno, la proteccion no opera.',
+      'Autochequeo: ¿la tierra fisica sirve como trayectoria de falla? ¿que es el corte omnipolar?',
+    ],
+  },
+  {
+    id: 'm4-05-marco-sec',
+    title: 'Marco legal chileno: SEC, RIC y RPTD',
+    intro: 'Objetivo: conocer como Chile adopto el NEC a traves de la SEC y sus reglamentos. Aca estan los pliegos tecnicos que rigen el trabajo real.',
+    medidas: [
+      'Baja Tension (BT): <= 1 kV',
+      'Media Tension (MT): > 1 kV hasta 23 kV',
+      'Resistencia maxima de puesta a tierra de servicio en MT: 20 ohm',
+      'Tension de seguridad en lugares humedos: 24 V',
+      'Subestaciones: cierros exteriores altura minima 2,0 m',
+    ],
+    clave: [
+      'Autoridad Competente (AC) en Chile = la SEC (Superintendencia de Electricidad y Combustibles): interpreta reglas, aprueba equipos y metodos alternativos.',
+      'Decreto 8 -> RIC (Reglamento de Instalaciones de Consumo), reemplaza a la NCh Elec 4/2003; 19 pliegos tecnicos (RIC N°01 a N°19).',
+      'Decreto 109 -> RPTD (instalaciones de MT/AT, publicado 12-jun-2018); 17 pliegos (RPTD N°01 a N°17).',
+      'Pliegos RIC clave: N°02 Tableros (IP 41 minimo interior), N°05 Tensiones peligrosas (24 V humedos), N°06 Puesta a tierra, N°17 Operacion y mantenimiento, N°18 Presentacion de proyectos, N°19 Puesta en servicio.',
+    ],
+    terreno: [
+      'RIC N°18 exige el Informe de Imagenes (termografias) para declarar el proyecto. RIC N°19: el primer ensayo antes de la puesta en servicio es la continuidad de los conductores de proteccion, con instrumentos certificados IEC 61557.',
+      'Autochequeo: ¿quien es la AC en Chile? ¿cuantos pliegos RIC hay? ¿resistencia maxima de tierra en MT?',
+    ],
+  },
+  {
+    id: 'm4-06-spt-electrodos',
+    title: 'Sistemas de puesta a tierra (SPT) y electrodos',
+    intro: 'Objetivo: conocer los tipos de electrodos y para que sirve cada configuracion de puesta a tierra. Muy preguntado en el examen.',
+    clave: [
+      'El SPT limita las tensiones respecto a tierra en las masas metalicas, asegura la operacion de las protecciones y reduce el riesgo a personas y cosas.',
+      'Tipos de electrodos (pregunta de examen): barras verticales, conductores horizontales, placas, y la combinacion (malla de tierra). El material preferido es el COBRE.',
+      'Barras: la forma mas comun cuando no se requiere controlar potenciales de superficie; economicas; alcanzan capas profundas de baja resistividad.',
+      'Mallas: reticulado de conductores horizontales (+ barras verticales); se usan cuando el objetivo es controlar los potenciales de superficie con baja resistencia.',
+    ],
+    terreno: [
+      'Se DEBE evaluar cada caso segun el terreno; antes se echaba sal para "mejorar" la tierra, pero la sal es altamente corrosiva y dana el electrodo.',
+      'Autochequeo: ¿que material se prefiere para los electrodos? ¿cuando se usa una malla en vez de barras?',
+    ],
+  },
+  {
+    id: 'm4-07-reglas-oro-rescate',
+    title: 'Las 5 Reglas de Oro y el rescate electrico',
+    intro: 'Objetivo: aplicar la secuencia de trabajo sin tension (NFPA 70E) y conocer los requisitos de rescate. El Decreto 8 llamo a la NFPA 70E como referencia de seguridad.',
+    clave: [
+      'Las 5 Reglas de Oro: 1) corte efectivo de todas las fuentes de tension; 2) prevenir la realimentacion (bloqueo y etiquetado / LOTO); 3) verificar la ausencia de tension (3er paso obligatorio); 4) puesta a tierra y en cortocircuito; 5) senalizar la zona de trabajo.',
+      'La verificacion de ausencia de tension es una de las primeras pruebas antes de intervenir.',
+      'RIC N°17 (Op. y Mantenimiento), Art. 5: define el Programa de Seguridad Electrica (PSE), obligatorio en instalaciones > 300 kW o alimentadas en MT.',
+      'Rescate (NFPA 70E Ed. 2024, Art. 110.4): entrenamiento en liberacion de victimas, primeros auxilios, RCP y uso de DEA; verificacion y actualizacion anual.',
+    ],
+    terreno: [
+      'La empresa de mantenimiento debe tener al menos un instalador electrico autorizado por la SEC (RIC N°17, Art. 5.4).',
+      'Autochequeo: ¿cual es el 3er paso de las 5 Reglas? ¿desde que potencia es obligatorio el PSE?',
+    ],
+  },
+  {
+    id: 'm4-08-protecciones',
+    title: 'Protecciones electricas y tipos de diferencial',
+    intro: 'Objetivo: reconocer para que sirve cada proteccion y elegir el diferencial correcto. Base del Taller 2 (fallas electricas habituales).',
+    medidas: [
+      'Sensibilidad diferencial: 10 mA (alta, zonas humedas/hospitales) · 30 mA (estandar, proteccion de personas) · 300 mA (baja, incendios por arco)',
+      'Diferencial tipico en tablero: 2x25 A de 30 mA (bipolar, 25 A nominal, 30 mA de sensibilidad)',
+    ],
+    clave: [
+      'Disyuntor (termomagnetico): protege contra sobrecargas y cortocircuitos. Diferencial (RCD): protege del choque electrico (detecta fuga a masa). SPD: limita sobretensiones transitorias. AFDD: detecta falla de arco (previene incendios).',
+      'Clasificacion de diferenciales segun la falla que detectan: Tipo AC (alterna senoidal, cargas lineales), Tipo A (+ pulsantes CC, cargas no lineales/electronica), Tipo F (Ex Hpi, + alta frecuencia), Tipo B (+ fugas en CC: fotovoltaica, variadores, datacenters).',
+      'Forma constructiva: interruptor diferencial, bloque diferencial (se acopla a un magnetotermico), disyuntor diferencial (combina todo) y rele diferencial (industrial, con toroide externo).',
+      'AFDD: un microprocesador distingue el arco peligroso del arco convencional (conexion/desconexion), en serie y en paralelo. Norma IEC 62606.',
+    ],
+    terreno: [
+      'Ubicacion en planta: Tableros Generales (TG), Tableros de Distribucion (TD, max 25 circuitos por proteccion) y Centros de Control de Motores (CCM).',
+      'Criterio de seleccion: para cargas no lineales o motores con variador se usan diferenciales Tipo A o B (un Tipo AC comun no los "ve").',
+      'Autochequeo: ¿que protege el diferencial? ¿que tipo se usa con variadores de frecuencia?',
+    ],
+  },
+  {
+    id: 'm4-09-dimensionar-conductores',
+    title: 'Dimensionamiento de conductores: las 3 comprobaciones',
+    intro: 'Objetivo (dia 2, practico): dimensionar un conductor con las 3 comprobaciones que exige la norma. Es el corazon del dia 2.',
+    medidas: [
+      'Proteccion de sobrecarga: Iz > In (con correccion Iz x fn x ft > In)',
+      'Caida de tension: <= 3 % por tramo/circuito y <= 5 % total del voltaje nominal',
+      'En 220 V, el 3 % equivale a 6,6 V',
+      'Formula de caida de tension: Vp = (rho x L x I x k) / S  (rho = 0,018 cobre; k = 2 monofasico, √3 trifasico)',
+    ],
+    clave: [
+      'Las 3 comprobaciones del conductor: 1) proteccion de sobrecarga, 2) comprobacion de la caida de tension, 3) proteccion contra cortocircuitos.',
+      '1) Sobrecarga: la capacidad del conductor (Iz) siempre debe ser mayor que la corriente de la proteccion (In). Iz se corrige por numero de conductores (fn) y temperatura ambiente (ft).',
+      'La ampacidad se lee de la Tabla SEC (T° ambiente 30 °C): segun aislante 60/75/90 °C; Grupo A = hasta 3 conductores en ducto/enterrado; Grupo B = conductor simple al aire libre (mayor ampacidad).',
+      '2) Caida de tension: limite 3 % por tramo, 5 % total. 3) Cortocircuito: el conductor y la proteccion deben soportar/interrumpir la corriente de cortocircuito del punto.',
+    ],
+    terreno: [
+      'Subalimentadores: los que se derivan de un alimentador directamente o via un tablero general auxiliar (E -> TG -> TGAux -> TD).',
+      'Autochequeo: ¿cuales son las 3 comprobaciones? ¿limite de caida de tension por tramo y total?',
+    ],
+  },
+  {
+    id: 'm4-10-puesta-tierra-proteccion',
+    title: 'Puesta a tierra de proteccion (Taller 4, RIC N°6)',
+    intro: 'Objetivo: verificar los requisitos de la puesta a tierra de proteccion (T.p.) en una planta. Base del Taller 4 del dia 2.',
+    medidas: [
+      'Resistencia: Rtp = Vs / Io (Vs = tension de seguridad; Io = corriente de operacion de la proteccion)',
+      'Seccion del conductor de proteccion (PE): si S <= 25 mm² -> igual a la fase; si S > 50 mm² -> al menos S/2; minimo 4 mm²',
+      'Uniones enterradas: soldadura exotermica, vida util >= 15 anos',
+    ],
+    clave: [
+      'La tierra de proteccion = puesta a tierra de toda pieza conductora que NO forma parte del circuito activo pero que en falla puede quedar energizada.',
+      'Objetivos: proteger a las personas (tensiones de contacto peligrosas), limitar tensiones, asegurar la operacion de las protecciones y controlar riesgos.',
+      'Integridad del camino: PROHIBIDO intercalar dispositivos de desconexion o fusibles en el conductor de tierra de proteccion.',
+      'Prohibiciones: no usar como PE las tuberias de gas, liquidos inflamables, calefaccion ni cables fiadores.',
+    ],
+    terreno: [
+      'Rtp = Vs/Io: la resistencia no debe permitir tensiones de contacto superiores a la tension de seguridad.',
+      'Autochequeo: ¿como se calcula Rtp? ¿seccion minima del conductor de proteccion? ¿se pueden poner fusibles en el PE?',
+    ],
+  },
+  {
+    id: 'm4-11-pararrayos',
+    title: 'Pararrayos (Sistema de Proteccion contra Rayos)',
+    intro: 'Objetivo: conocer los requisitos de un sistema de proteccion contra rayos (SPCR). Parte 3 del Taller 4.',
+    medidas: [
+      'Terminal de captacion en cobre: cinta solida de area >= 50 mm² y espesor 2 mm',
+      'Conductores bajantes: al menos 2, seccion >= 50 mm², recorrido rectilineo y vertical (evitar curvas con radio < 20 cm)',
+    ],
+    clave: [
+      'Evaluacion de riesgo: la instalacion es obligatoria cuando lo defina el nivel isoceraunico de la region o una evaluacion segun IEC 62305-2 o NFPA 780.',
+      'Metodologia de diseno: metodo electrogeometrico o de "esfera rodante".',
+      'Bajantes: al menos 2 en el perimetro (preferentemente esquinas opuestas), recorrido rectilineo y vertical.',
+      'Interconexion: la puesta a tierra del pararrayos se une a la de la instalacion (equipotencialidad).',
+    ],
+    terreno: [
+      'Uso de estructuras: elementos metalicos que sobresalgan (antenas, chimeneas) pueden servir de captadores si se garantiza continuidad e interconexion.',
+      'Autochequeo: ¿que metodo de diseno se usa? ¿cuantas bajantes minimas y de que seccion?',
+    ],
+  },
+  {
+    id: 'm4-12-calculo-protecciones',
+    title: 'Calculo de protecciones (disyuntores y motores)',
+    intro: 'Objetivo: dimensionar el disyuntor de una carga y la proteccion de un motor. Base del Taller 3 (calculo y dimensionamiento).',
+    medidas: [
+      'Carga comun: proteccion al 125 % de la corriente (carga continua)',
+      'Motor: hasta 250 % de la CPC para permitir el arranque (Articulo 430)',
+      'Ejemplo carga 220 V / 2500 W: I = 2500/220 = 11,36 A -> x1,25 = 14,2 A -> disyuntor 16 A',
+      'Ejemplo motor 380 V / 3 HP (FP 0,85): I = 2238/(√3x380x0,85) = 4,0 A -> x2,5 = 10 A',
+    ],
+    clave: [
+      'Carga comun: I = P/V (monofasico) o I = P/(√3xVxFP) (trifasico); luego proteccion al 125 % y se sube al valor comercial (16, 20, 25 A...).',
+      'Motor (Art. 430): se calcula la Corriente a Plena Carga (CPC/FLC) y la proteccion contra cortocircuito/falla a tierra se permite hasta el 250 % de la CPC para tolerar el arranque.',
+      'El arranque de un motor puede ser 6 a 8 veces la corriente nominal; la proteccion debe soportarlo sin dispararse.',
+      'Regla mental: carga comun -> 125 %; motor -> CPC y hasta 250 % (Art. 430).',
+    ],
+    terreno: [
+      'Ejemplo del relator: "te sale 4 amperios -> te cambian el cable y te ponen proteccion de 4 A" (dimensionar la proteccion a la corriente real).',
+      'Autochequeo: ¿que porcentaje para carga comun? ¿y para el arranque de un motor?',
+    ],
+  },
+  {
+    id: 'm4-13-fundamentos',
+    title: 'Fundamentos electricos (repaso)',
+    intro: 'Objetivo: repasar los fundamentos que el relator uso de apoyo el dia 2: Ley de Ohm, factor de potencia y sistemas trifasicos.',
+    clave: [
+      'Ley de Ohm y potencia: P = V x I = I² x R = V²/R. De ahi se despejan V, I, R y P segun lo que se conozca.',
+      'Factor de potencia: FP = P/S = cos phi (relacion entre Potencia Activa P y Potencia Aparente S).',
+      'Sistemas trifasicos: hay 2 niveles de tension. Fase-Neutro (Vfn, tension de fase o simple) y Fase-Fase (Vff, tension de linea o compuesta); ambas desfasadas 120°.',
+      'Tipos de senal: continua (unidireccional, sin frecuencia, polaridad +/-) y alterna (ciclica sinusoidal, con frecuencia, fase/neutro).',
+    ],
+    terreno: [
+      'Etapas de un Sistema Electrico de Potencia (SEP): Generacion, Transmision y Distribucion.',
+      'Autochequeo: ¿que es el factor de potencia? ¿que desfase hay entre las tensiones en trifasico?',
+    ],
+  },
+];
+
+const M4_PROCEDURES = [
+  {
+    id: 'm4-proc-disyuntor-carga',
+    title: 'Dimensionar el disyuntor de una carga (regla del 125 %)',
+    description: 'Seleccionar la proteccion termomagnetica de una carga comun.\n\nEjemplo: una carga de 220 V / 2500 W da 11,36 A; al 125 % son 14,2 A, asi que instalas un disyuntor comercial de 16 A.',
+    steps: [
+      'Calcula la corriente de carga: I = P/V (monofasico) o I = P/(√3 x V x FP) (trifasico).',
+      'Determina si es carga continua (opera 3 h o mas).',
+      'Aplica el factor de seguridad: multiplica por 1,25 (125 %).',
+      'Sube al valor nominal comercial inmediato superior (16, 20, 25 A...).',
+      'Verifica que el conductor tenga ampacidad (Iz) mayor que la proteccion (In).',
+    ],
+  },
+  {
+    id: 'm4-proc-proteccion-motor',
+    title: 'Dimensionar la proteccion de un motor (Art. 430)',
+    description: 'Los motores siguen reglas especiales por la corriente de arranque.\n\nEjemplo: un motor de 380 V / 3 HP con FP 0,85 tiene CPC de 4,0 A; al 250 % da 10 A, asi que instalas una proteccion de 10 A (o un guardamotor ajustado a 4 A).',
+    steps: [
+      'Convierte la potencia mecanica a electrica: 1 HP = 746 W.',
+      'Calcula la Corriente a Plena Carga (CPC/FLC): I = P/(√3 x V x FP).',
+      'Para la proteccion contra cortocircuito y falla a tierra, permite hasta el 250 % de la CPC (interruptor de tiempo inverso).',
+      'Selecciona el valor nominal comercial que cumpla.',
+      'Confirma que soporta el arranque (6 a 8 veces la corriente nominal) sin dispararse.',
+    ],
+  },
+  {
+    id: 'm4-proc-caida-tension',
+    title: 'Comprobar la caida de tension de un circuito',
+    description: 'Verificar que la caida de tension este dentro de norma.\n\nEjemplo: un tramo de 63 A, 12 m y 21,2 mm² da Vp = 0,018x12x63x2/21,2 = 1,28 V, muy por debajo del 3 %.',
+    steps: [
+      'Aplica la formula: Vp = (rho x L x I x k) / S, con rho = 0,018 (cobre) y k = 2 (monofasico) o √3 (trifasico).',
+      'Calcula la caida de cada tramo y compara con el limite de 3 % del voltaje nominal.',
+      'Suma las caidas de todos los tramos en serie.',
+      'Verifica que la caida total no supere el 5 % del voltaje nominal.',
+      'Si se pasa, aumenta la seccion (S) del conductor o acorta el recorrido.',
+    ],
+  },
+  {
+    id: 'm4-proc-dimensionar-conductor',
+    title: 'Dimensionar un conductor (las 3 comprobaciones)',
+    description: 'Elegir la seccion del conductor cumpliendo sobrecarga, caida de tension y cortocircuito.\n\nEjemplo: para 32 A eliges una seccion de tabla cuya ampacidad (Iz corregida) supere los 32 A, verificas la caida < 3 % y que soporte el cortocircuito del punto.',
+    steps: [
+      'Sobrecarga: elige una seccion cuya ampacidad Iz (Tabla SEC) sea mayor que la corriente de la proteccion In.',
+      'Corrige Iz por numero de conductores (fn) y temperatura ambiente (ft): Iz x fn x ft > In.',
+      'Elige el Grupo correcto de la tabla: Grupo A (ducto/enterrado) o Grupo B (aire libre), y la temperatura del aislante (60/75/90 °C).',
+      'Caida de tension: comprueba que Vp <= 3 % por tramo y <= 5 % total.',
+      'Cortocircuito: verifica que el conductor soporte la corriente de cortocircuito del punto.',
+    ],
+  },
+  {
+    id: 'm4-proc-puesta-tierra-proteccion',
+    title: 'Verificar una puesta a tierra de proteccion (T.p.)',
+    description: 'Comprobar que la puesta a tierra de proteccion cumple los requisitos del RIC N°6.\n\nEjemplo: para una fase de 35 mm² el conductor de proteccion debe ser al menos 16 mm² (S/2, ya que 35 > 25), nunca menos de 4 mm².',
+    steps: [
+      'Confirma que todas las masas metalicas no activas esten conectadas a la puesta a tierra de proteccion.',
+      'Verifica la seccion del PE: si la fase S <= 25 mm² igual seccion; si S > 50 mm² al menos S/2; nunca menos de 4 mm².',
+      'Comprueba que NO haya fusibles ni desconectadores intercalados en el conductor de proteccion.',
+      'Revisa que las uniones enterradas sean con soldadura exotermica o conectores para enterramiento.',
+      'Verifica que Rtp = Vs/Io no permita tensiones de contacto peligrosas.',
+    ],
+  },
+  {
+    id: 'm4-proc-5-reglas-oro',
+    title: 'Aplicar las 5 Reglas de Oro',
+    description: 'Secuencia de trabajo sin tension antes de intervenir un equipo.\n\nEjemplo: para cambiar un automatico abres y bloqueas el interruptor general, verificas 0 V con el detector (probado antes y despues), pones a tierra y senalizas la zona.',
+    steps: [
+      'Corte efectivo de todas las fuentes de tension.',
+      'Prevenir la realimentacion: bloqueo y etiquetado (LOTO) con tarjeta "PELIGRO NO OPERAR".',
+      'Verificar la ausencia de tension (probar el detector antes y despues).',
+      'Puesta a tierra y en cortocircuito.',
+      'Senalizar y delimitar la zona de trabajo.',
+    ],
+  },
+  {
+    id: 'm4-proc-verificar-tablero',
+    title: 'Verificar los requisitos de un tablero',
+    description: 'Chequeo de un tablero segun el NEC y el RIC N°02.\n\nEjemplo: en un tablero interior confirmas grado IP 41, tapas las aberturas sin usar, revisas la etiqueta de arco y que el interruptor general corte fase y neutro (omnipolar).',
+    steps: [
+      'Verifica el grado de proteccion: minimo IP 41 para interiores (RIC N°02).',
+      'Confirma que las aberturas no utilizadas esten cerradas.',
+      'Revisa la identificacion de circuitos y medios de desconexion, y la etiqueta de Riesgo de Relampago de Arco.',
+      'Comprueba el corte omnipolar (fase + neutro) en el general y en distribucion.',
+      'Deja el espacio de trabajo despejado (30 pulgadas minimo), sin material combustible.',
+    ],
+  },
+];
+
+const M4_FLOWS = [
+  {
+    id: 'm4-flow-dimensionar-disyuntor',
+    title: 'Necesito dimensionar el disyuntor de una carga',
+    trigger: 'Tienes una carga (W y V) y debes elegir la proteccion.',
+    actions: [
+      'Calcula la corriente: I = P/V (monofasico) o I = P/(√3 x V x FP) (trifasico).',
+      '¿Es carga continua (3 h o mas)? Aplica el 125 %.',
+      'Sube al valor comercial inmediato superior (16, 20, 25 A...).',
+      'Si es un MOTOR, usa el Articulo 430: hasta 250 % de la CPC para el arranque.',
+      'Verifica que el conductor tenga ampacidad mayor que la proteccion (Iz > In).',
+    ],
+  },
+  {
+    id: 'm4-flow-elegir-diferencial',
+    title: 'Debo elegir el tipo de diferencial',
+    trigger: 'Vas a proteger un circuito y no sabes que tipo de diferencial usar.',
+    actions: [
+      'Carga lineal / instalacion comun: Tipo AC.',
+      'Cargas electronicas, generadores, fotovoltaica (pulsantes de CC): Tipo A.',
+      'Circuitos de computacion / alta frecuencia: Tipo F.',
+      'Variadores de frecuencia, ascensores, datacenters (fuga en CC pura): Tipo B.',
+      'Elige la sensibilidad: 30 mA para proteccion de personas; 10 mA en zonas humedas.',
+    ],
+  },
+  {
+    id: 'm4-flow-intervenir-equipo',
+    title: 'Voy a intervenir un equipo electrico',
+    trigger: 'Necesitas trabajar sobre un equipo o circuito.',
+    actions: [
+      'Corte efectivo de todas las fuentes de tension.',
+      'Bloqueo y etiquetado (LOTO); evita la realimentacion.',
+      'Verifica la ausencia de tension (detector probado antes y despues).',
+      'Puesta a tierra y en cortocircuito.',
+      'Senaliza la zona y recien entonces interviene.',
+    ],
+  },
+  {
+    id: 'm4-flow-verificar-caida',
+    title: 'Me piden verificar la caida de tension',
+    trigger: 'Un circuito es largo o hay equipos que "no arrancan bien".',
+    actions: [
+      'Aplica Vp = rho x L x I x k / S (rho = 0,018 cobre, k = 2 monofasico).',
+      'Calcula tramo por tramo y compara con el 3 % del voltaje nominal.',
+      'Suma las caidas: la total no debe superar el 5 %.',
+      'Si se pasa, aumenta la seccion del conductor o reduce el largo.',
+    ],
+  },
+  {
+    id: 'm4-flow-corte-omnipolar',
+    title: '¿Corte omnipolar si o no?',
+    trigger: 'Dudas si la proteccion debe cortar tambien el neutro.',
+    actions: [
+      'Regla general: corte omnipolar obligatorio en tableros generales y de distribucion.',
+      'Desconecta TODOS los conductores activos, incluido el neutro.',
+      'Excepcion: dispositivos > 630 A en alimentadores especificos.',
+      'Objetivo: que no queden retornos peligrosos energizados.',
+    ],
+  },
+  {
+    id: 'm4-flow-verificar-pararrayos',
+    title: 'Debo verificar un pararrayos',
+    trigger: 'Revision de un sistema de proteccion contra rayos (SPCR).',
+    actions: [
+      'Confirma que el diseno use el metodo de esfera rodante / electrogeometrico (IEC 62305-2 o NFPA 780).',
+      'Terminal de captacion: cobre, cinta >= 50 mm² y 2 mm de espesor, sin material radiactivo.',
+      'Al menos 2 bajantes en el perimetro (esquinas opuestas), seccion >= 50 mm², recorrido recto y vertical.',
+      'La puesta a tierra del pararrayos se interconecta con la de la instalacion (equipotencialidad).',
+    ],
+  },
+];
+
+const M4_DIAGNOSIS = [
+  {
+    id: 'm4-dx-disyuntor-dispara-arranque',
+    title: 'El disyuntor del motor dispara al arrancar',
+    symptom: 'Cada vez que arranca el motor, la proteccion se dispara aunque el motor este bien.',
+    possibleCauses: [
+      'Proteccion dimensionada a la corriente nominal sin margen de arranque',
+      'No se aplico el Articulo 430 (250 % de la CPC)',
+      'Curva de disparo inadecuada',
+    ],
+    solution: 'Redimensiona la proteccion segun el Art. 430: el arranque puede ser 6 a 8 veces la corriente nominal, y para cortocircuito/falla a tierra se permite hasta el 250 % de la CPC. Usa una curva adecuada (o un guardamotor). Ejemplo: motor con CPC 4,0 A -> proteccion de 10 A (4,0 x 2,5) para tolerar el arranque.',
+  },
+  {
+    id: 'm4-dx-caida-tension-alta',
+    title: 'Caida de tension excesiva en un circuito',
+    symptom: 'Al final de un circuito largo la tension llega baja y los equipos funcionan mal.',
+    possibleCauses: [
+      'Conductor de seccion insuficiente',
+      'Recorrido demasiado largo',
+      'Corriente elevada',
+    ],
+    solution: 'Calcula Vp = rho x L x I x k / S. Si supera el 3 % por tramo o el 5 % total, aumenta la seccion (S) del conductor o acorta el recorrido. Ejemplo: en 220 V el 3 % son 6,6 V; si un tramo da 9 V hay que subir la seccion del cable.',
+  },
+  {
+    id: 'm4-dx-diferencial-variador',
+    title: 'El diferencial no protege bien un equipo con variador',
+    symptom: 'Un equipo con variador de frecuencia tiene fugas que el diferencial comun no detecta, o dispara sin motivo.',
+    possibleCauses: [
+      'Diferencial Tipo AC en una carga no lineal',
+      'Fuga con componente continua que el Tipo AC no "ve"',
+    ],
+    solution: 'Cambia a un diferencial Tipo A o Tipo B, capaces de detectar corrientes con componentes continuas o pulsantes. El Tipo AC solo detecta alterna senoidal. Ejemplo: un variador trifasico requiere Tipo B (fuga en CC pura); un Tipo AC comun lo ignoraria.',
+  },
+  {
+    id: 'm4-dx-terminal-caliente',
+    title: 'Conexion sin terminal recalentada',
+    symptom: 'Un conductor conectado directo al automatico o a la barra se calienta en el punto de conexion.',
+    possibleCauses: [
+      'Conductor conectado sin terminal de compresion',
+      'Temperatura de operacion sobre la clasificacion del terminal',
+      'Apriete insuficiente',
+    ],
+    solution: 'Usa el terminal adecuado (ya no se permite entrar con el conductor directo). Dimensiona segun la clasificacion del terminal (60/75 °C), no solo por el aislante (90 °C). Reaprieta y vuelve a medir. Ejemplo: cambiar el cable directo por uno con terminal de compresion baja la temperatura del punto.',
+  },
+  {
+    id: 'm4-dx-pe-sin-continuidad',
+    title: 'Falla la continuidad del conductor de proteccion (PE)',
+    symptom: 'En la puesta en servicio, el ensayo de continuidad del conductor de proteccion no pasa.',
+    possibleCauses: [
+      'Union floja o corroida',
+      'Fusible o desconectador intercalado en el PE (prohibido)',
+      'Seccion del PE insuficiente',
+    ],
+    solution: 'Revisa y reaprieta las uniones; retira cualquier fusible o desconexion del conductor de proteccion (la integridad del camino es obligatoria). Verifica la seccion (minimo 4 mm²) y usa un instrumento certificado IEC 61557. El primer ensayo del RIC N°19 es justamente la continuidad del PE.',
+  },
+  {
+    id: 'm4-dx-material-sin-certificar',
+    title: 'Material electrico sin certificacion SEC',
+    symptom: 'Se instalo material que no tiene el codigo QR ni certificacion de la SEC.',
+    possibleCauses: [
+      'Compra de material no certificado (en Chile se comercializa de todo)',
+      'Falta de verificacion en la recepcion',
+    ],
+    solution: 'Solo se aceptan conductores y equipos aprobados (Art. 110). Verifica el codigo QR de la SEC en el material antes de instalarlo; retira y reemplaza lo no certificado. Ejemplo: un automatico sin sello ni QR de la SEC no debe montarse aunque "funcione".',
+  },
+];
+
+const M4_QUIZ = [
+  {
+    id: 'm4-q-lenguaje',
+    question: 'En el codigo, ¿que significa la palabra "debe"?',
+    options: ['Es una recomendacion', 'Es obligatorio / mandatorio', 'Es opcional', 'Es una nota informativa'],
+    correctIndex: 1,
+    explanation: '"Debe" / "no debe" es lenguaje obligatorio (mandatorio). "Debe estar permitido" es permisivo. Pregunta confirmada de examen.',
+  },
+  {
+    id: 'm4-q-estructura',
+    question: '¿Que capitulos del NEC son de aplicacion general a todas las instalaciones?',
+    options: ['Capitulos 5 al 7', 'Capitulo 8', 'Capitulos 1 al 4', 'Solo el capitulo 1'],
+    correctIndex: 2,
+    explanation: 'Capitulos 1 al 4 = aplicacion general; 5 al 7 = condiciones especiales; 8 = comunicaciones.',
+  },
+  {
+    id: 'm4-q-125',
+    question: '¿A que porcentaje se dimensiona el conductor y la proteccion de una carga continua?',
+    options: ['100 %', '110 %', '125 %', '150 %'],
+    correctIndex: 2,
+    explanation: 'Al 125 % de la carga continua (la que persiste 3 horas o mas).',
+  },
+  {
+    id: 'm4-q-terminal',
+    question: '¿A que temperatura de terminal se dimensiona normalmente un conductor?',
+    options: ['30 °C', '60 o 75 °C', '90 °C', '120 °C'],
+    correctIndex: 1,
+    explanation: 'Manda la clasificacion del terminal (60/75 °C), no el 90 °C del aislante.',
+  },
+  {
+    id: 'm4-q-dsc',
+    question: '¿Que debe ser capaz de interrumpir un dispositivo de sobrecorriente (DSC)?',
+    options: ['Solo sobrecarga', 'Sobrecarga y cortocircuito', 'Sobrecarga, cortocircuito y falla a tierra', 'Solo cortocircuito'],
+    correctIndex: 2,
+    explanation: 'Los tres: sobrecarga, cortocircuito y falla a tierra. Pregunta de examen.',
+  },
+  {
+    id: 'm4-q-tierra-fisica',
+    question: '¿La tierra fisica (el suelo) sirve como trayectoria efectiva de falla?',
+    options: ['Si, siempre', 'No, por su alta impedancia', 'Solo en media tension', 'Solo si esta humeda'],
+    correctIndex: 1,
+    explanation: 'No: por su alta impedancia se requiere un conductor de cobre instalado. El bonding crea la trayectoria de baja impedancia.',
+  },
+  {
+    id: 'm4-q-ac',
+    question: '¿Quien es la Autoridad Competente en Chile?',
+    options: ['El CDEC', 'La SEC', 'El INN', 'La mutualidad'],
+    correctIndex: 1,
+    explanation: 'La SEC (Superintendencia de Electricidad y Combustibles).',
+  },
+  {
+    id: 'm4-q-mt',
+    question: '¿Hasta que tension llega la Media Tension (MT) en Chile?',
+    options: ['1 kV', '23 kV', '110 kV', '230 kV'],
+    correctIndex: 1,
+    explanation: 'MT: > 1 kV hasta 23 kV. BT: <= 1 kV.',
+  },
+  {
+    id: 'm4-q-caida',
+    question: '¿Cuales son los limites de caida de tension?',
+    options: ['1 % por tramo, 3 % total', '3 % por tramo, 5 % total', '5 % por tramo, 10 % total', '10 % por tramo, 15 % total'],
+    correctIndex: 1,
+    explanation: '<= 3 % por tramo/circuito y <= 5 % total del voltaje nominal.',
+  },
+  {
+    id: 'm4-q-caida-220',
+    question: 'En un circuito de 220 V, ¿cuanto es el 3 % de caida de tension?',
+    options: ['2,2 V', '6,6 V', '11 V', '22 V'],
+    correctIndex: 1,
+    explanation: '3 % de 220 V = 6,6 V.',
+  },
+  {
+    id: 'm4-q-comprobaciones',
+    question: '¿Cuales son las 3 comprobaciones al dimensionar un conductor?',
+    options: [
+      'Sobrecarga, caida de tension y cortocircuito',
+      'Color, largo y marca',
+      'Generacion, transmision y distribucion',
+      'Continuo, alterno y trifasico',
+    ],
+    correctIndex: 0,
+    explanation: 'Proteccion de sobrecarga (Iz > In), comprobacion de la caida de tension y proteccion contra cortocircuitos.',
+  },
+  {
+    id: 'm4-q-rtp',
+    question: '¿Como se calcula la resistencia de la puesta a tierra de proteccion?',
+    options: ['Rtp = V x I', 'Rtp = Vs / Io', 'Rtp = P / V', 'Rtp = I / V'],
+    correctIndex: 1,
+    explanation: 'Rtp = Vs / Io (tension de seguridad / corriente de operacion de la proteccion).',
+  },
+  {
+    id: 'm4-q-pe',
+    question: '¿Cual es la seccion minima del conductor de proteccion (PE)?',
+    options: ['1,5 mm²', '2,5 mm²', '4 mm²', '10 mm²'],
+    correctIndex: 2,
+    explanation: 'Minimo 4 mm². Si la fase S <= 25 mm² el PE es igual; si S > 50 mm², al menos S/2.',
+  },
+  {
+    id: 'm4-q-pararrayos',
+    question: '¿Que metodo se usa para disenar un pararrayos?',
+    options: ['Metodo del 125 %', 'Esfera rodante / electrogeometrico', 'Regla de la mano derecha', 'Metodo de Ohm'],
+    correctIndex: 1,
+    explanation: 'Metodo electrogeometrico o de "esfera rodante" (IEC 62305-2 / NFPA 780).',
+  },
+  {
+    id: 'm4-q-motor-430',
+    question: 'Para un motor, ¿hasta que porcentaje de la CPC se permite la proteccion de cortocircuito?',
+    options: ['125 %', '150 %', '250 %', '400 %'],
+    correctIndex: 2,
+    explanation: 'Hasta el 250 % de la CPC para tolerar el arranque (Articulo 430).',
+  },
+  {
+    id: 'm4-q-diferencial-variador',
+    question: '¿Que tipo de diferencial se usa con variadores de frecuencia?',
+    options: ['Tipo AC', 'Tipo A o B', 'Ninguno', 'Solo fusible'],
+    correctIndex: 1,
+    explanation: 'Tipo A o B: detectan componentes continuas/pulsantes que el Tipo AC comun ignora.',
+  },
+  {
+    id: 'm4-q-omnipolar',
+    question: '¿Que significa corte omnipolar?',
+    options: [
+      'Cortar solo la fase',
+      'Desconectar todos los conductores activos, incluido el neutro',
+      'Cortar solo en emergencia',
+      'Cortar en media tension',
+    ],
+    correctIndex: 1,
+    explanation: 'Desconectar TODOS los conductores activos, incluido el neutro (obligatorio en TG y TD salvo > 630 A).',
+  },
+  {
+    id: 'm4-q-fp',
+    question: '¿Que es el factor de potencia?',
+    options: ['P x S', 'FP = P/S = cos phi', 'V x I', 'La frecuencia de la red'],
+    correctIndex: 1,
+    explanation: 'FP = P/S = cos phi (relacion entre Potencia Activa y Potencia Aparente).',
+  },
+];
+
+const M4_GLOSSARY = [
+  { term: 'NFPA 70 / NEC', definition: 'Codigo Electrico Nacional (National Electrical Code), la norma de este modulo.', lesson: 1 },
+  { term: 'NFPA 70E', definition: 'Norma de Seguridad Electrica en lugares de trabajo (5 Reglas de Oro, rescate).', lesson: 7 },
+  { term: 'SEC', definition: 'Superintendencia de Electricidad y Combustibles: la Autoridad Competente en Chile.', lesson: 5 },
+  { term: 'AC', definition: 'Autoridad Competente (en Chile = la SEC).', lesson: 5 },
+  { term: 'RIC', definition: 'Reglamento de Instalaciones de Consumo (Decreto 8): 19 pliegos tecnicos.', lesson: 5 },
+  { term: 'RPTD', definition: 'Reglamento de instalaciones de MT/AT (Decreto 109): 17 pliegos tecnicos.', lesson: 5 },
+  { term: 'BT / MT', definition: 'Baja Tension (<= 1 kV) / Media Tension (> 1 kV hasta 23 kV).', lesson: 5 },
+  { term: 'DSC', definition: 'Dispositivo de Sobrecorriente (disyuntor/proteccion): corta sobrecarga, cortocircuito y falla a tierra.', lesson: 3 },
+  { term: 'Bonding', definition: 'Conexion equipotencial: une partes metalicas para una trayectoria de baja impedancia.', lesson: 4 },
+  { term: 'RCD', definition: 'Interruptor diferencial: protege del choque electrico (detecta fuga a masa).', lesson: 8 },
+  { term: 'SPD', definition: 'Limitador de sobretension (Surge Protective Device).', lesson: 8 },
+  { term: 'AFDD', definition: 'Dispositivo de deteccion de falla de arco (norma IEC 62606).', lesson: 8 },
+  { term: 'TG / TD / CCM', definition: 'Tablero General / Tablero de Distribucion / Centro de Control de Motores.', lesson: 8 },
+  { term: 'Iz / In', definition: 'Ampacidad del conductor (Iz) / corriente nominal de la proteccion (In). Regla: Iz > In.', lesson: 9 },
+  { term: 'Vp', definition: 'Caida de tension: Vp = rho x L x I x k / S (rho = 0,018 cobre). Limite 3 % tramo, 5 % total.', lesson: 9 },
+  { term: 'T.p. / Rtp', definition: 'Tierra de proteccion y su resistencia (Rtp = Vs/Io). Seccion PE minima 4 mm².', lesson: 10 },
+  { term: 'PE', definition: 'Conductor de proteccion (tierra), verde/verde-amarillo. Sin fusibles intercalados.', lesson: 10 },
+  { term: 'SPCR', definition: 'Sistema de Proteccion contra Rayos (pararrayos): esfera rodante, IEC 62305-2 / NFPA 780.', lesson: 11 },
+  { term: 'CPC / FLC', definition: 'Corriente a Plena Carga de un motor (Full Load Current). Proteccion hasta 250 % (Art. 430).', lesson: 12 },
+  { term: 'FP / cos phi', definition: 'Factor de potencia: FP = P/S (Potencia Activa / Aparente).', lesson: 13 },
+  { term: 'SEP', definition: 'Sistema Electrico de Potencia: Generacion, Transmision y Distribucion.', lesson: 13 },
+  { term: 'IEC 61557', definition: 'Norma de certificacion de instrumentos de prueba (continuidad del PE, RIC N°19).', lesson: 5 },
+];
+
+const M4_BIBLIO = [
+  { label: 'NFPA 70 (NEC) — Codigo Electrico Nacional, edicion 2023.', url: 'https://link.nfpa.org/all-publications/70/2023' },
+  { label: 'NFPA 70E — Norma de Seguridad Electrica en Lugares de Trabajo, edicion 2024.', url: 'https://link.nfpa.org/all-publications/70E/2024' },
+  { label: 'NFPA 780 — Standard for the Installation of Lightning Protection Systems.', url: 'https://www.nfpa.org/product/nfpa-780-standard/p0780code' },
+  { label: 'SEC — Superintendencia de Electricidad y Combustibles.', url: 'https://www.sec.cl' },
+  { label: 'DS 08/2019 — Reglamento de Instalaciones de Consumo (RIC) y los 19 pliegos tecnicos.', url: 'https://www.sec.cl/reglamento-de-seguridad-de-las-instalaciones-de-consumo-de-energia-electrica-decreto-08/' },
+  { label: 'Decreto Supremo 109 (2018) — Reglamento de Seguridad de instalaciones de MT/AT (RPTD), Ministerio de Energia.', url: 'https://www.sec.cl/centro-de-descargas/' },
+  { label: 'Ley General de Servicios Electricos — DFL N°4/20.018 (2006).', url: 'https://www.bcn.cl/leychile/navegar?idNorma=258171' },
+  { label: 'IEC 62305 — Proteccion contra rayos (evaluacion de riesgo).', url: 'https://webstore.iec.ch/publication/6793' },
+  { label: 'IEC 62606 — Dispositivos de deteccion de falla de arco (AFDD).', url: 'https://webstore.iec.ch/publication/7297' },
+  { label: 'IEC 61557 — Seguridad electrica: equipos para ensayo y medicion de protecciones.', url: 'https://webstore.iec.ch/publication/5471' },
+  { label: 'Comision Nacional de Energia (CNE) y Ministerio de Energia.', url: 'https://www.cne.cl' },
+  { label: 'Manuales del curso NFPA 70 (NEC) Nivel 1, OTEC ADVISOR Capacitaciones SpA.', url: 'https://advisorcapacitacion.cl/' },
+];
+
+// ════════════════════════════════════════════════════════════════════════════
 // ENSAMBLAJE
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1867,6 +2518,7 @@ const MODULES = [
   { slug: 'seguridad-electrica', prefix: 'm1', name: 'Seguridad Electrica (NFPA 70E)', manual: M1_MANUAL, procedures: M1_PROCEDURES, flows: M1_FLOWS, diagnosis: M1_DIAGNOSIS, quiz: M1_QUIZ, glossary: M1_GLOSSARY, bibliografia: M1_BIBLIO },
   { slug: 'rescate-svb', prefix: 'm2', name: 'Rescate Electrico y SVB', manual: M2_MANUAL, procedures: M2_PROCEDURES, flows: M2_FLOWS, diagnosis: M2_DIAGNOSIS, quiz: M2_QUIZ, glossary: M2_GLOSSARY, bibliografia: M2_BIBLIO },
   { slug: 'nfpa-70b', prefix: 'm3', name: 'NFPA 70B Mantenimiento Electrico', manual: M3_MANUAL, procedures: M3_PROCEDURES, flows: M3_FLOWS, diagnosis: M3_DIAGNOSIS, quiz: M3_QUIZ, glossary: M3_GLOSSARY, bibliografia: M3_BIBLIO },
+  { slug: 'codigo-electrico-nec', prefix: 'm4', name: 'Codigo Electrico Nacional (NFPA 70/NEC)', manual: M4_MANUAL, procedures: M4_PROCEDURES, flows: M4_FLOWS, diagnosis: M4_DIAGNOSIS, quiz: M4_QUIZ, glossary: M4_GLOSSARY, bibliografia: M4_BIBLIO },
 ];
 
 function buildDocs(mod) {
