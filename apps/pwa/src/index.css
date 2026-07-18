@@ -30,16 +30,18 @@
      por virar a gris neutro o a teal), pero esta vez el SALTO entre fondo y
      card se triplicó a propósito (antes ~20/255 por canal, imperceptible;
      ahora ~55-60/255) para que la superficie "levante" de verdad. */
-  --background: 169 181 192;        /* #a9b5c0 Ballad Blue profundizado */
+  --background: 197 217 235;        /* #c5d9eb celeste (Opción A 2026-07-18: familia del
+                                        #BBDEFB del sidebar; mata el gris de la ronda Ballad
+                                        que a Orel le molestaba en toda la app) */
   --foreground: 22 36 47;           /* #16242f tinta */
-  --card: 227 233 238;              /* #e3e9ee superficie clara, salto grande vs fondo */
-  --secondary: 181 199 211;         /* #b5c7d3 Baby Blue 13-4308 TCX exacto */
-  --muted: 190 200 208;             /* #bec8d0 */
+  --card: 238 245 251;              /* #eef5fb superficie casi blanca, salto grande vs fondo */
+  --secondary: 181 207 230;         /* #b5cfe6 */
+  --muted: 179 203 224;             /* #b3cbe0 */
   --muted-foreground: 49 64 80;     /* #314050 recalibrado 2026-07-18 para WCAG AA
                                         4.5:1 real (medido, no a ojo) — el valor
                                         anterior #3d5064 daba 3.98:1 contra
                                         background y 3.68:1 contra accent */
-  --accent: 159 175 186;            /* #9fafba */
+  --accent: 169 198 224;            /* #a9c6e0 */
   --border: 88 94 100;              /* #585e64 recalibrado 2026-07-18 para AA 3:1
                                         no-textual real — el anterior #87919a daba
                                         1.54:1 contra background y 2.62:1 contra card */
@@ -50,10 +52,10 @@
 
   /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
      (mismo criterio mate azulado: superficies sin blanco puro) */
-  --lc-bg: #a9b5c0;
-  --lc-bg-panel: #98a3ad;
-  --lc-surface: #e3e9ee;
-  --lc-surface-hi: #b8c2cc;
+  --lc-bg: #c5d9eb;
+  --lc-bg-panel: #aac4dc;
+  --lc-surface: #eef5fb;
+  --lc-surface-hi: #c9dcee;
   --lc-ink: #16242f;
   --lc-ink-mid: #374756;
   --lc-ink-lo: #4b5b69;

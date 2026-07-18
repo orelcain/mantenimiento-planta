@@ -62,9 +62,9 @@ function check(label, textHex, bgHex, required) {
 
 // ── Tokens (index.css, 2026-07-18) ──────────────────────────────────────
 const LIGHT = {
-  background: '#a9b5c0', foreground: '#16242f', card: '#e3e9ee',
-  secondary: '#b5c7d3', muted: '#bec8d0', mutedFg: '#314050',
-  accent: '#9fafba', border: '#585e64',
+  background: '#c5d9eb', foreground: '#16242f', card: '#eef5fb',
+  secondary: '#b5cfe6', muted: '#b3cbe0', mutedFg: '#314050',
+  accent: '#a9c6e0', border: '#585e64',
 }
 const DARK = {
   background: '#0d1722', foreground: '#e9eef3', card: '#16242f',
