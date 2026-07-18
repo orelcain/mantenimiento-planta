@@ -57,14 +57,10 @@ export function OtherLearningModulesStrip({
   return (
     <nav
       aria-label="Otros módulos de aprendizaje"
-      className="mt-10 pt-6"
-      style={{ borderTop: '1px solid #1e3a5f' }}
+      className="mt-10 pt-6 border-t border-border"
     >
       <div className="flex items-center justify-between mb-3">
-        <h3
-          className="text-xs uppercase tracking-widest font-semibold"
-          style={{ color: '#6a90b8' }}
-        >
+        <h3 className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">
           Otros módulos
         </h3>
         <button
@@ -88,11 +84,10 @@ export function OtherLearningModulesStrip({
             <button
               key={item.key}
               onClick={() => navigate(item.href)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: `${item.color}10`,
                 border: `1px solid ${item.color}35`,
-                color: '#d8e4f0',
                 minHeight: '36px',
               }}
               title={item.label}
