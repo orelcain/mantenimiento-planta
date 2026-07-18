@@ -42,7 +42,7 @@ function KpiCard({
   label: string; value: string; sub: string; icon: React.ReactNode; valueColor?: string
 }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
+    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">{icon}{label}</div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
@@ -140,7 +140,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-orange-500/40 bg-orange-500/10 px-2.5 py-1 text-[11px] font-medium text-orange-500 transition hover:bg-orange-500/20 disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-orange-500/40 bg-orange-500/20 px-2.5 py-1 text-[11px] font-medium text-orange-700 dark:text-orange-500 transition hover:bg-orange-500/30 disabled:opacity-50"
               title="Descargar reporte PDF de impacto de mantención"
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
@@ -162,7 +162,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
         ) : (
           <>
             {/* Frase de demostración */}
-            <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-xs text-foreground/90">
+            <div className="rounded-lg border border-orange-500/30 bg-orange-500/15 px-3 py-2 text-xs text-foreground/90">
               Mantención atendió <span className="font-semibold text-orange-400">{rel!.eventsCount}</span> paros
               ({rel!.fallasCount} fallas · {rel!.intervencionesCount} intervenciones) por{' '}
               <span className="font-semibold">{fmt(rel!.maintenanceDowntimeSec)}</span> en el período.
@@ -211,7 +211,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
 
             {/* Micro-detenciones — aparte, poco accionables */}
             {rel!.microCount > 0 && (
-              <div className="flex items-center gap-2 rounded-md bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-[11px] text-muted-foreground">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400/70" />
                 <span>
                   Aparte: <span className="tabular-nums font-medium text-foreground">{rel!.microCount.toLocaleString('es-CL')}</span> micro-detenciones
@@ -231,7 +231,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                   {rel!.trend.map((t) => (
                     <div key={t.key} className="flex items-center gap-2 text-xs">
                       <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">{t.label}</span>
-                      <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
+                      <div className="flex-1 h-3 bg-muted rounded-sm overflow-hidden">
                         <div
                           className="h-full rounded-sm bg-orange-500/60 transition-all duration-300"
                           style={{ width: `${(t.downtimeSec / maxTrend) * 100}%` }}

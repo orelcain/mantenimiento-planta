@@ -215,7 +215,7 @@ export function ShiftQuotaCard({
           </span>
           {usingFallback && (
             <span
-              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-help"
+              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 cursor-help"
               title="No hay Excel del Grader cargado aún. Se muestra avance estimado desde ciclos Baader (Shoplogix), que será reemplazado por la cifra real cuando se cargue el Excel."
             >
               <Radio className="w-2.5 h-2.5 animate-pulse" />
@@ -223,7 +223,7 @@ export function ShiftQuotaCard({
             </span>
           )}
           {cumplio && (
-            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-2.5 h-2.5" />
               Cumplido
             </span>
@@ -297,7 +297,7 @@ export function ShiftQuotaCard({
             {/* Bandera de discrepancia — piezas no contabilizadas vs Shoplogix */}
             {discrepancy && (
               <div
-                className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5"
+                className="flex items-start gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5"
                 title="Shoplogix reporta más ciclos en las Baaders que piezas pesadas en el Grader. Como todas las piezas deben pasar por el Grader, la diferencia podría ser: Excel parcial, fallas de registro Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />

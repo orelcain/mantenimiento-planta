@@ -314,7 +314,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     <div className="space-y-4" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* ── Navegación entre turnos (mas visible + swipe) ──────────── */}
       {sortedAllTurns.length > 1 && (
-        <div className="flex items-center justify-between bg-muted/30 rounded-lg px-2 py-1.5">
+        <div className="flex items-center justify-between bg-muted rounded-lg px-2 py-1.5">
           <button
             type="button"
             disabled={!prevTurn}
@@ -669,9 +669,9 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
-              const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/5'
-                : sev === 'warn' ? 'border-amber-400/40 bg-amber-500/5'
-                : 'border-blue-400/30 bg-blue-500/5'
+              const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/15'
+                : sev === 'warn' ? 'border-amber-400/40 bg-amber-500/15'
+                : 'border-blue-400/30 bg-blue-500/15'
               const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 : <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />

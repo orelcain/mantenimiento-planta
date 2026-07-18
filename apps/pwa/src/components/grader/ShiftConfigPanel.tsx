@@ -22,8 +22,8 @@ type Species = 'coho' | 'salar'
 
 const SPECIES_LABEL: Record<Species, string> = { coho: 'Coho', salar: 'Salar' }
 const SPECIES_CSS: Record<Species, string> = {
-  coho: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  salar: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  coho: 'bg-teal-500/20 text-teal-700 dark:text-teal-400 border-teal-500/20',
+  salar: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/20',
 }
 
 function inferSpecies(breakdown?: Record<string, number>): Species | null {
@@ -153,14 +153,14 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}
 
           {isSynthetic && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40 cursor-help"
+              className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border cursor-help"
               title="Inferida desde la última asignación efectiva — no se subió un snapshot manual al inicio del turno."
             >
               inferida
@@ -179,7 +179,7 @@ export function ShiftConfigPanel({
               </button>
               <button
                 onClick={() => setRpmModalOpen(true)}
-                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-muted-foreground/20 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-muted-foreground/20 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Gauge className="w-2.5 h-2.5" />
                 Ajusté RPM

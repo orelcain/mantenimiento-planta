@@ -25,17 +25,17 @@ export function DanfossTab({ physicalConfig, setPhysicalConfig }: DanfossTabProp
       <div className="space-y-3">
         {/* Datos fijos del motor */}
         <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="bg-muted/30 rounded p-2">
+          <div className="bg-muted rounded p-2">
             <p className="text-muted-foreground">Motor</p>
             <p className="font-mono font-medium">{drive.motorKw} kW · {drive.motorNominalRpm} RPM</p>
             <CalibBadge status="verified" />
           </div>
-          <div className="bg-muted/30 rounded p-2">
+          <div className="bg-muted rounded p-2">
             <p className="text-muted-foreground">Reducción</p>
             <p className="font-mono font-medium">i = {drive.gearRatio}:1</p>
             <CalibBadge status="verified" />
           </div>
-          <div className="bg-muted/30 rounded p-2">
+          <div className="bg-muted rounded p-2">
             <p className="text-muted-foreground">Rango VFD</p>
             <p className="font-mono font-medium">{drive.vfdMinRpm}–{drive.vfdMaxRpm} RPM</p>
             <CalibBadge status="estimated" />

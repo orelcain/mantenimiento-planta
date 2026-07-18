@@ -66,7 +66,7 @@ export function LineStatusWidget({
 
   return (
     <div
-      className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5 cursor-pointer hover:bg-red-500/10 transition-colors"
+      className="rounded-lg border border-red-500/20 bg-red-500/15 px-3 py-2.5 cursor-pointer hover:bg-red-500/20 transition-colors"
       onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
       role="button"
       tabIndex={0}

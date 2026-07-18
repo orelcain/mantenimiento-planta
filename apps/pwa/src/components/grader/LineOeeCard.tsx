@@ -137,11 +137,11 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
           <>
             {/* OEE Baader → línea */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-muted/20 rounded-lg px-3 py-2 border border-border/40">
+              <div className="bg-muted rounded-lg px-3 py-2 border border-border">
                 <div className="text-[10px] text-muted-foreground mb-0.5">OEE Baader (máquina)</div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeBaader))}>{pct(calc.oeeBaader)}</div>
               </div>
-              <div className="bg-sky-500/5 rounded-lg px-3 py-2 border border-sky-500/30">
+              <div className="bg-sky-500/15 rounded-lg px-3 py-2 border border-sky-500/30">
                 <div className="text-[10px] text-sky-800/90 dark:text-sky-300/80 mb-0.5">OEE Línea (estimado)</div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeLinea))}>{pct(calc.oeeLinea)}</div>
               </div>
@@ -171,7 +171,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                         <span className={cn('font-medium', i === 0 ? 'text-rose-800 dark:text-rose-300' : 'text-foreground')}>{i + 1}. {p.label}</span>
                         <span className="tabular-nums text-muted-foreground">{fmtDur(p.min)}</span>
                       </div>
-                      <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <div className={cn('h-full rounded-full', i === 0 ? 'bg-rose-500' : 'bg-rose-500/50')} style={{ width: `${w}%` }} />
                       </div>
                     </div>

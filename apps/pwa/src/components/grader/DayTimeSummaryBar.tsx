@@ -80,7 +80,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
 
   return (
     <div className={cn(
-      'flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-md border border-border/40 bg-muted/20 text-xs',
+      'flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-md border border-border bg-muted text-xs',
       className,
     )}>
       <span className="flex items-center gap-1.5 text-muted-foreground font-medium shrink-0">

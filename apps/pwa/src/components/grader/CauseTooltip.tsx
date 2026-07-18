@@ -87,7 +87,7 @@ export function CauseTooltip({ meta }: Props) {
                   'text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-medium shrink-0',
                   meta.level === 'official'
                     ? 'border-primary/40 text-primary bg-primary/5'
-                    : 'border-muted-foreground/30 text-muted-foreground bg-muted/30',
+                    : 'border-muted-foreground/30 text-muted-foreground bg-muted',
                 )}
               >
                 {LEVEL_LABELS[meta.level]}

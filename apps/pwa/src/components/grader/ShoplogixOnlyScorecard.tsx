@@ -15,19 +15,19 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 const VERDICT_STYLE = {
   ok: {
     border: 'border-emerald-500',
-    bg: 'bg-emerald-500/5',
+    bg: 'bg-emerald-500/15',
     numColor: 'text-emerald-400',
     label: 'Línea en buen rendimiento',
   },
   warn: {
     border: 'border-amber-500',
-    bg: 'bg-amber-500/5',
+    bg: 'bg-amber-500/15',
     numColor: 'text-amber-400',
     label: 'Línea con oportunidades de mejora',
   },
   critical: {
     border: 'border-red-500',
-    bg: 'bg-red-500/5',
+    bg: 'bg-red-500/15',
     numColor: 'text-red-400',
     label: 'Línea con bajo rendimiento',
   },
@@ -94,7 +94,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
         <div className="flex items-center gap-2 flex-wrap">
           {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
           <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
@@ -224,7 +224,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 // Label corto en mobile: "Ev 1/2/3". Desktop: nombre completo.
                 const shortLabel = `Ev ${idx + 1}`
                 return (
-                  <div key={m.machineid} className="rounded-md bg-muted/20 border border-border/30 px-2 sm:px-3 py-1.5 sm:py-2">
+                  <div key={m.machineid} className="rounded-md bg-muted border border-border px-2 sm:px-3 py-1.5 sm:py-2">
                     <div className="text-[11px] text-muted-foreground truncate mb-1" title={m.machineName}>
                       <span className="hidden sm:inline">{m.machineName}</span>
                       <span className="sm:hidden">{shortLabel}</span>

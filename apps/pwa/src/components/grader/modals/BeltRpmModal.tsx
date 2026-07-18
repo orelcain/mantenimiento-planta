@@ -221,7 +221,7 @@ export function BeltRpmModal({
                 <div className={cn(
                   'w-24 text-right text-sm tabular-nums rounded-md px-2.5 py-2 border',
                   mps !== null
-                    ? 'border-border/60 bg-muted/30 text-foreground'
+                    ? 'border-border bg-muted text-foreground'
                     : 'border-border/30 bg-transparent text-muted-foreground/30',
                 )}>
                   {mps !== null ? `${mps.toFixed(3)} m/s` : '— m/s'}

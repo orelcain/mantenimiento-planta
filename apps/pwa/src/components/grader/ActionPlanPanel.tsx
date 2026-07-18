@@ -42,9 +42,9 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-  oficina: { label: 'Oficina', icon: Monitor, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-  verificar: { label: 'Verificar', icon: Eye, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/20 border-amber-500/20' },
+  oficina: { label: 'Oficina', icon: Monitor, color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/20 border-blue-500/20' },
+  verificar: { label: 'Verificar', icon: Eye, color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/20 border-purple-500/20' },
 }
 
 const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> = {
@@ -274,7 +274,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
 
         {relatedRunbooks.length > 0 && (
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-md border bg-zinc-500/10 border-zinc-500/20 text-zinc-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-md border bg-zinc-500/20 border-zinc-500/20 text-zinc-700 dark:text-zinc-400">
               <Eye className="w-3.5 h-3.5" />
               Runbooks relacionados
             </div>

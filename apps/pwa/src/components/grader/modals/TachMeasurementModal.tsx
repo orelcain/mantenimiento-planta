@@ -131,7 +131,7 @@ export function TachMeasurementModal({
                 onClick={() => setMethod('linear')}
                 className={cn(
                   'rounded border text-xs px-2 py-1.5 text-left',
-                  method === 'linear' ? 'border-primary bg-primary/5 text-primary' : 'border-muted hover:bg-muted/30',
+                  method === 'linear' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                 )}
               >
                 <div className="font-medium">Rueda sobre cinta</div>
@@ -143,7 +143,7 @@ export function TachMeasurementModal({
                 disabled={!effectiveMpsPerRpm}
                 className={cn(
                   'rounded border text-xs px-2 py-1.5 text-left',
-                  method === 'shaft' ? 'border-primary bg-primary/5 text-primary' : 'border-muted hover:bg-muted/30',
+                  method === 'shaft' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                   !effectiveMpsPerRpm && 'opacity-50 cursor-not-allowed',
                 )}
               >
@@ -202,7 +202,7 @@ export function TachMeasurementModal({
 
           {/* Comparación con actual */}
           {validNum && beltMps > 0 && (
-            <div className="bg-muted/30 rounded p-2 text-xs space-y-1">
+            <div className="bg-muted rounded p-2 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Medido:</span>
                 <span className="font-mono font-medium">{beltMps.toFixed(3)} m/s</span>

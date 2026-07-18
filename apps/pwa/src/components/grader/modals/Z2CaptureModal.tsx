@@ -114,7 +114,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
         </DialogHeader>
 
         {/* Guía de navegación Z2 */}
-        <div className="bg-muted/30 rounded p-2.5 text-[11px] text-muted-foreground space-y-1">
+        <div className="bg-muted rounded p-2.5 text-[11px] text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground text-xs">Procedimiento en Z2:</p>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Pantalla principal → <span className="font-mono text-foreground">Cambiar Parámetros</span></li>
@@ -174,7 +174,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
 
         {/* Resumen ciclo total */}
         {allValid && (
-          <div className="bg-sky-500/5 border border-sky-500/20 rounded p-2 text-xs flex items-center justify-between gap-3">
+          <div className="bg-sky-500/15 border border-sky-500/20 rounded p-2 text-xs flex items-center justify-between gap-3">
             <div>
               <span className="text-muted-foreground">Ciclo total nuevo: </span>
               <span className="font-mono font-semibold text-sky-400">{cycleTotalMs} ms</span>

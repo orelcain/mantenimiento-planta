@@ -93,7 +93,7 @@ export function MarelHgCaptureCard({ summaryId, capture, canEdit, onSaved }: Mar
 
             {/* Desglose por segmento si hubo reset en colación */}
             {hasTwoSegments && (
-              <div className="border border-border/40 rounded-md overflow-hidden">
+              <div className="border border-border rounded-md overflow-hidden">
                 <div className="grid grid-cols-2 divide-x divide-border/40">
                   {capture.segments!.map((seg) => {
                     const segPct = seg.totalInput > 0
@@ -119,7 +119,7 @@ export function MarelHgCaptureCard({ summaryId, capture, canEdit, onSaved }: Mar
             )}
 
             {capture.notes && (
-              <div className="text-xs bg-muted/30 rounded-md p-2">
+              <div className="text-xs bg-muted rounded-md p-2">
                 <span className="text-muted-foreground">Nota: </span>
                 {capture.notes}
               </div>
@@ -294,7 +294,7 @@ function MarelHgCaptureDialog({ open, onOpenChange, summaryId, initial, onSaved 
         <div className="space-y-4 py-2">
 
           {/* Toggle dos períodos */}
-          <div className="flex items-start gap-3 rounded-md border border-border/60 p-3 bg-muted/20">
+          <div className="flex items-start gap-3 rounded-md border border-border p-3 bg-muted">
             <input
               id="two-segments"
               type="checkbox"
@@ -342,7 +342,7 @@ function MarelHgCaptureDialog({ open, onOpenChange, summaryId, initial, onSaved 
 
               {/* Resumen combinado */}
               {combinedTotal > 0 && (
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-xs space-y-0.5">
+                <div className="rounded-md bg-muted px-3 py-2 text-xs space-y-0.5">
                   <div className="font-medium text-foreground">Total combinado del turno</div>
                   <div className="tabular-nums text-muted-foreground">
                     Entrada: <b className="text-foreground">{combinedTotal.toLocaleString('es-CL')}</b>

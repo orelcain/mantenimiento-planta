@@ -19,7 +19,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
         Seleccionar la fuente más confiable como "verdad" para los cálculos.
       </p>
       {/* Factor k configurable */}
-      <div className="flex items-center gap-3 mb-4 p-2.5 rounded-md bg-muted/40 border border-border">
+      <div className="flex items-center gap-3 mb-4 p-2.5 rounded-md bg-muted border border-border">
         <label className="text-xs text-muted-foreground whitespace-nowrap">
           Factor k (unidades Z2 → m/s)
         </label>
@@ -122,7 +122,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                 </thead>
                 <tbody>
                   {/* Fuente 1: Z2 units */}
-                  <tr className={cn('border-b', truthSource === 'z2' && 'bg-green-500/5')}>
+                  <tr className={cn('border-b', truthSource === 'z2' && 'bg-green-500/10')}>
                     <td className="py-1 px-2">Z2 controller</td>
                     <td className="py-1 px-2 font-mono">{z2Units ?? '—'} units × {k.toFixed(6)}</td>
                     <td className="py-1 px-2 text-right font-mono">{speedFromZ2?.toFixed(3) ?? '—'}</td>
@@ -135,7 +135,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 2: VFD RPM */}
-                  <tr className={cn('border-b', truthSource === 'vfd' && 'bg-green-500/5')}>
+                  <tr className={cn('border-b', truthSource === 'vfd' && 'bg-green-500/10')}>
                     <td className="py-1 px-2">VFD Danfoss</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -163,7 +163,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 3: Tachómetro en eje */}
-                  <tr className={cn('border-b', truthSource === 'tachShaft' && 'bg-green-500/5')}>
+                  <tr className={cn('border-b', truthSource === 'tachShaft' && 'bg-green-500/10')}>
                     <td className="py-1 px-2">Tacómetro eje</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -191,7 +191,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 4: Tachómetro lineal directo */}
-                  <tr className={cn(truthSource === 'tachLinear' && 'bg-green-500/5')}>
+                  <tr className={cn(truthSource === 'tachLinear' && 'bg-green-500/10')}>
                     <td className="py-1 px-2">Tacómetro lineal</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -222,7 +222,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
               </table>
               {/* Cuando hay tacómetro y VFD: derivar el factor effectiveMpsPerRpm */}
               {belt.vfd?.measuredBeltMps && belt.vfd?.vfdCurrentRpm && (
-                <div className="mt-2 p-2 rounded bg-green-500/5 border border-green-500/20">
+                <div className="mt-2 p-2 rounded bg-green-500/15 border border-green-500/30">
                   <span className="text-xs text-green-700 dark:text-green-300 font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>

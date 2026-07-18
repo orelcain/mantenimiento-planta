@@ -91,7 +91,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     ? 'border-l-red-500 bg-red-50/50 dark:bg-red-900/10'
                     : c.confidence === 'medium'
                     ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/10'
-                    : 'border-l-blue-400 bg-muted/30',
+                    : 'border-l-blue-400 bg-muted',
                 )}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -138,7 +138,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     ? 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/5'
                     : a.priority === 'medium'
                     ? 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/5'
-                    : 'border-muted bg-muted/20',
+                    : 'border-muted bg-muted',
                 )}
               >
                 <div
@@ -234,7 +234,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
       'p-3 rounded-lg border',
       suggestion.impactScore >= 70 ? 'border-red-200 bg-red-50/50 dark:bg-red-900/5' :
       suggestion.impactScore >= 40 ? 'border-amber-200 bg-amber-50/50 dark:bg-amber-900/5' :
-      'border-muted bg-muted/20',
+      'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="outline" className={cn('text-[10px]', typeColors[suggestion.type])}>

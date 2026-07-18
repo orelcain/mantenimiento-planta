@@ -60,7 +60,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
   return (
     <>
       {/* Allocation Score KPI */}
-      <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+      <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted">
         <div className={cn(
           'text-2xl font-bold',
           analytics.allocationScore >= 80 ? 'text-emerald-600' :
@@ -98,7 +98,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       ? 'border-red-300 bg-red-50 dark:bg-red-900/10'
                       : gb.severity === 'warn'
                       ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/10'
-                      : 'border-muted bg-muted/30',
+                      : 'border-muted bg-muted',
                   )}
                 >
                   {gb.severity === 'critical' ? (
@@ -422,9 +422,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       t.status === 'critical' ? 'text-red-600 dark:text-red-400' :
                       'text-muted-foreground'
                     const bg =
-                      t.status === 'ok' ? 'bg-emerald-500/5' :
-                      t.status === 'warn' ? 'bg-amber-500/5' :
-                      t.status === 'critical' ? 'bg-red-500/5' :
+                      t.status === 'ok' ? 'bg-emerald-500/10' :
+                      t.status === 'warn' ? 'bg-amber-500/10' :
+                      t.status === 'critical' ? 'bg-red-500/10' :
                       ''
                     const label =
                       t.status === 'ok' ? 'OK' :
@@ -521,7 +521,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       key={o.gateNumber}
                       className={cn(
                         'border-b hover:bg-muted/30',
-                        !o.isMatch && o.suggestedCalibre != null && 'bg-purple-500/5',
+                        !o.isMatch && o.suggestedCalibre != null && 'bg-purple-500/10',
                       )}
                     >
                       <td className="py-2 px-2 font-medium">Gate {o.gateNumber}</td>

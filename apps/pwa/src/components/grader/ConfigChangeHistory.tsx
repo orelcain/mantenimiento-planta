@@ -76,7 +76,7 @@ interface RowProps {
 function VerdictBadge({ v }: { v: SegmentVerdict }) {
   if (v.status === 'insufficient-data') {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/40 rounded px-2 py-1 mt-1">
+      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted rounded px-2 py-1 mt-1">
         <Hourglass className="w-3 h-3" />
         Esperando más datos
         {v.afterPieces > 0 && (
@@ -92,9 +92,9 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   // arrows unicode), pero el COLOR de texto y el LABEL vienen de helpers
   // compartidos en graderP0Segmentation.ts (consistencia entre componentes).
   const visualByStatus = {
-    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-    worsened: { Icon: TrendingUp,   bg: 'bg-rose-500/10',    border: 'border-rose-500/30'    },
-    neutral:  { Icon: Minus,        bg: 'bg-zinc-500/10',    border: 'border-zinc-500/30'    },
+    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
+    worsened: { Icon: TrendingUp,   bg: 'bg-rose-500/20',    border: 'border-rose-500/30'    },
+    neutral:  { Icon: Minus,        bg: 'bg-zinc-500/20',    border: 'border-zinc-500/30'    },
   }[v.status]
 
   const color = verdictColor(v.status)

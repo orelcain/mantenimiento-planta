@@ -150,13 +150,13 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* Shift headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-1">
           <div className="text-right">
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/40 bg-amber-500/10">
+            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/40 bg-amber-500/20">
               <Sun className="h-3 w-3" /> {dia.shiftId}
             </Badge>
           </div>
           <div className="w-12" /> {/* spacer */}
           <div className="text-left">
-            <Badge variant="outline" className="gap-1 text-indigo-400 border-indigo-500/40 bg-indigo-500/10">
+            <Badge variant="outline" className="gap-1 text-indigo-700 dark:text-indigo-400 border-indigo-500/40 bg-indigo-500/20">
               <Moon className="h-3 w-3" /> {noche.shiftId}
             </Badge>
           </div>

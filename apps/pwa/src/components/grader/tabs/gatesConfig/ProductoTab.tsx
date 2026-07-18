@@ -254,7 +254,7 @@ export function ProductoTab({
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-[10px] border border-sky-500/30 text-sky-400 rounded px-1.5 py-0.5 hover:bg-sky-500/10 transition-colors"
+                      className="inline-flex items-center gap-1 text-[10px] border border-sky-500/30 text-sky-700 dark:text-sky-400 rounded px-1.5 py-0.5 hover:bg-sky-500/10 transition-colors"
                     >
                       📟 Leer Z2
                     </button>
@@ -353,7 +353,7 @@ export function ProductoTab({
 
           {/* Timing flipper */}
           {minOpenTimeSec != null && (
-            <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+            <div className="p-3 rounded-lg bg-sky-500/15 border border-sky-500/20 space-y-1">
               <p className="font-medium text-sky-700 dark:text-sky-300">Timing flipper calculado</p>
               <p className="text-muted-foreground">
                 Apertura mínima (paleta pasa):{' '}
@@ -373,7 +373,7 @@ export function ProductoTab({
           )}
 
           {/* Análisis pockets */}
-          <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+          <div className="p-3 rounded-lg bg-sky-500/15 border border-sky-500/20 space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="font-medium text-sky-700 dark:text-sky-300">
                 Análisis pockets ({physicalConfig.pocketCount} activos)
@@ -441,7 +441,7 @@ export function ProductoTab({
             const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
             const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
             return (
-              <div className="p-2 rounded bg-slate-800/60 border border-slate-700/40 text-[10px] space-y-1">
+              <div className="p-2 rounded bg-muted border border-border dark:bg-slate-800/60 dark:border-slate-700/40 text-[10px] space-y-1">
                 <p className="font-medium text-muted-foreground">
                   {s.label} · {scientific} · FishBase ID {fishBaseId}
                 </p>

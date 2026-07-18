@@ -97,7 +97,7 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
                 {TYPE_LABEL[state.type] ?? state.type}
               </Badge>
               {state.isCurrent && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-900 bg-emerald-950/50 text-emerald-300">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
                   En curso
                 </Badge>
               )}

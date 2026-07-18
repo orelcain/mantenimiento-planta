@@ -109,7 +109,7 @@ export function SlowMoMeasurementModal({
         </DialogHeader>
 
         {/* Guía breve del procedimiento */}
-        <div className="bg-muted/30 rounded p-2 text-[11px] text-muted-foreground space-y-0.5">
+        <div className="bg-muted rounded p-2 text-[11px] text-muted-foreground space-y-0.5">
           <div className="font-medium text-foreground">Procedimiento:</div>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Z2 → Servicio → Probar salidas → gate {gateNumber} [<span className="font-mono">8620</span>]</li>

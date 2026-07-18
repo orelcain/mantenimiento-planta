@@ -202,7 +202,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Fila 2: Mejor / Peor turno ── */}
       <div className="grid grid-cols-2 gap-2">
-        <Card className={`border-emerald-500/20 bg-emerald-500/5 ${!best ? 'opacity-40' : ''}`}>
+        <Card className={`border-emerald-500/20 bg-emerald-500/15 ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
@@ -217,7 +217,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           </CardContent>
         </Card>
 
-        <Card className={`border-rose-500/20 bg-rose-500/5 ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-rose-500/20 bg-rose-500/15 ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
@@ -292,7 +292,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           concreta para pedirle a planta que configure ese turno si el bloque
           se repite seguido. Se oculta si el mes no tuvo nada fuera de turno. */}
       {slxStats && slxStats.unscheduled.cycles > 0 && (
-        <Card className="border-slate-500/25 bg-slate-500/5">
+        <Card className="border-slate-500/25 bg-slate-500/10">
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />

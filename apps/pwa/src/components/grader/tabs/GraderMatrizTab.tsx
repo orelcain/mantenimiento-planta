@@ -119,7 +119,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                 })}
                 {/* HHI by calibre row */}
                 {analytics.matrixEnhanced.hhiByCalibre.length > 0 && (
-                  <tr className="border-t-2 bg-muted/30">
+                  <tr className="border-t-2 bg-muted">
                     <td className="py-2 px-2 font-medium text-xs">
                       <span className="flex items-center gap-1">
                         Conc.

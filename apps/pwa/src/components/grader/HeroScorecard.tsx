@@ -26,19 +26,19 @@ function fmtSyncRelative(at: Date | null | undefined): string {
 const VERDICT_STYLE = {
   ok: {
     border: 'border-emerald-500',
-    bg: 'bg-emerald-500/5',
+    bg: 'bg-emerald-500/15',
     numColor: 'text-emerald-400',
     label: 'Turno en rango',
   },
   warn: {
     border: 'border-amber-500',
-    bg: 'bg-amber-500/5',
+    bg: 'bg-amber-500/15',
     numColor: 'text-amber-400',
     label: 'Turno con oportunidades',
   },
   critical: {
     border: 'border-red-500',
-    bg: 'bg-red-500/5',
+    bg: 'bg-red-500/15',
     numColor: 'text-red-400',
     label: 'Turno fuera de rango',
   },
@@ -97,7 +97,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
         <div className="flex items-center gap-2 flex-wrap">
           {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
           <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
@@ -255,7 +255,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
 
       {/* Footer — derivado: rechazo Baader (Grader vs Σciclos) cuando ambas fuentes presentes */}
       {baaderTotal > 0 && upstreamSnapshot && (baaderRejectionPure != null || rejectedRaw != null) && (
-        <div className="px-4 py-1.5 border-t bg-muted/20 flex items-center gap-2 flex-wrap text-[11px]">
+        <div className="px-4 py-1.5 border-t bg-muted flex items-center gap-2 flex-wrap text-[11px]">
           {baaderRejectionPure != null ? (
             <span
               className="text-amber-400 cursor-help"

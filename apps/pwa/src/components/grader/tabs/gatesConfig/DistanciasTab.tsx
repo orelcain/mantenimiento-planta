@@ -46,8 +46,8 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
             <div
               key={gateNum}
               className={cn(
-                'rounded-lg border bg-slate-900/40 p-3 space-y-2',
-                isCritical ? 'border-red-500/50 bg-red-500/5' : 'border-slate-700/60',
+                'rounded-lg border bg-muted dark:bg-slate-900/40 p-3 space-y-2',
+                isCritical ? 'border-red-500/50 bg-red-500/15 dark:bg-red-500/5' : 'border-border dark:border-slate-700/60',
               )}
             >
               {/* Header */}

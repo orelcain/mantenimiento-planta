@@ -66,7 +66,7 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
           )}
           {configChangesCount > 0 && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
+              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20"
               title={`La configuración de gates cambió ${configChangesCount} vez${configChangesCount > 1 ? 'es' : ''} durante el turno`}
             >
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
@@ -74,7 +74,7 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
           )}
           {isSynthetic && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40 cursor-help"
+              className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border cursor-help"
               title="Inferida desde la última asignación efectiva — no se subió un snapshot manual al inicio del turno."
             >
               inferida

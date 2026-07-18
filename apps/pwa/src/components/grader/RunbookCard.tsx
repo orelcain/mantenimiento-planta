@@ -80,7 +80,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
 
       {/* Body */}
       {expanded && (
-        <div className="border-t bg-muted/10 px-4 pb-4 space-y-4">
+        <div className="border-t bg-muted px-4 pb-4 space-y-4">
           {/* Fórmula */}
           {runbook.formula && (
             <div className="mt-3">
