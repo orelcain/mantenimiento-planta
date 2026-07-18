@@ -900,6 +900,38 @@ export async function listShiftInfosForDay(
 }
 
 /**
+ * IDs de documentos shift que existen en Firestore entre dos dateKeys, inclusive.
+ *
+ * UNA sola query de rango sobre los doc IDs (`${dateKey}_${shiftId}`), que ordenan
+ * lexicográficamente por fecha gracias al formato YYYY-MM-DD. Reemplaza el patrón
+ * de "una query por día", que en la vista Mes eran 31 queries para saber lo mismo.
+ *
+ * Retorna:
+ *   - array de doc IDs (posiblemente vacío) si la query corrió,
+ *   - `null` si hubo error de red, para que el caller decida el fallback.
+ */
+export async function listShoplogixShiftDocIdsForRange(
+  fromDateKey: string,
+  toDateKey: string,
+  plantSlug: PlantSlug,
+): Promise<string[] | null> {
+  const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+  const snap = await getDocs(query(
+    shiftsRef,
+    where(documentId(), '>=', `${fromDateKey}_`),
+    where(documentId(), '<=', `${toDateKey}_` + SHIFT_DOC_RANGE_END),
+  )).catch(() => null)
+
+  return snap ? snap.docs.map(d => d.id) : null
+}
+
+/** Parsea un doc ID `${dateKey}_${shiftId}`. Devuelve null si no calza el formato. */
+export function parseShiftDocId(docId: string): { dateKey: string; shiftId: string } | null {
+  const m = docId.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/)
+  return m ? { dateKey: m[1]!, shiftId: m[2]! } : null
+}
+
+/**
  * Devuelve los IDs de documentos shift que existen en Firestore para un mes completo.
  *
  * Implementación: UNA query de rango sobre los docs padre del mes (el CF syncDay
@@ -917,23 +949,21 @@ export async function listShoplogixShiftDocIdsForMonth(
   try {
     const daysInMonth  = new Date(year, month + 1, 0).getDate()
     const monthPrefix  = `${year}-${String(month + 1).padStart(2, '0')}`
+    const lastDay      = String(daysInMonth).padStart(2, '0')
 
-    const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
-    const snap = await getDocs(query(
-      shiftsRef,
-      where(documentId(), '>=', `${monthPrefix}-01_`),
-      where(documentId(), '<=', `${monthPrefix}-${String(daysInMonth).padStart(2, '0')}_` + SHIFT_DOC_RANGE_END),
-    )).catch(() => null)
+    const ids = await listShoplogixShiftDocIdsForRange(
+      `${monthPrefix}-01`, `${monthPrefix}-${lastDay}`, plantSlug,
+    )
 
-    if (snap && !snap.empty) {
-      return snap.docs.map(d => d.id)
-    }
+    if (ids && ids.length > 0) return ids
 
-    // Fallback legacy (meses sin docs padre): sondeo por día en paralelo.
+    // Fallback legacy (meses sin docs padre, o error de red): sondeo por día en
+    // paralelo. Caro (1 query/día) pero solo se paga cuando la query de rango no
+    // devolvió nada — meses de la era pre-syncDay.
     const perDay = Array.from({ length: daysInMonth }, (_, i) => {
       const dk = `${monthPrefix}-${String(i + 1).padStart(2, '0')}`
       return listShoplogixShiftIdsForDay(dk, plantSlug)
-        .then(ids => ids.map(id => `${dk}_${id}`))
+        .then(ids2 => ids2.map(id => `${dk}_${id}`))
         .catch(() => [] as string[])
     })
 

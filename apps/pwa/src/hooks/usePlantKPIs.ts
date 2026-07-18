@@ -13,6 +13,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   listShoplogixShiftIdsForDay,
+  listShoplogixShiftDocIdsForRange,
+  parseShiftDocId,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
 import { avg, computeMachineKPI, aggregateShifts, cadenceCpm, lineCadenceCpm } from '@/services/grader/plantKpiCompute'
@@ -77,30 +79,69 @@ function getPeriodLabel(period: KpiPeriod, anchor: string, currentMonth: Date): 
   return anchorDate.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
 }
 
+/**
+ * Descubre qué turnos existen en un rango de días.
+ *
+ * Camino rápido: UNA query de rango sobre los doc IDs (`${dateKey}_${shiftId}`).
+ * Antes se hacía una query POR DÍA — 31 queries para pintar la vista Mes, más
+ * otras 7 para Semana, y todas devolvían lo mismo que esta única query.
+ *
+ * Fallback: si la query de rango falla (red) o no devuelve nada (meses de la era
+ * pre-syncDay, sin docs padre), se cae al sondeo por día — el comportamiento
+ * anterior. Se paga solo cuando no hay otra forma de descubrir los turnos.
+ */
+async function discoverShiftsInRange(
+  dateKeys: string[],
+  plantSlug: PlantSlug,
+): Promise<{ dateKey: string; shiftId: string }[]> {
+  if (dateKeys.length === 0) return []
+
+  // `dateKeys` viene ordenado ascendente desde `getDateKeys`.
+  const from = dateKeys[0]!
+  const to   = dateKeys[dateKeys.length - 1]!
+
+  const docIds = await listShoplogixShiftDocIdsForRange(from, to, plantSlug)
+
+  if (docIds && docIds.length > 0) {
+    // La query de rango puede traer días fuera de `dateKeys` (p.ej. semana que
+    // cruza meses no es el caso, pero un rango no contiguo sí): filtrar.
+    const allowed = new Set(dateKeys)
+    return docIds
+      .map(parseShiftDocId)
+      .filter((x): x is { dateKey: string; shiftId: string } => x !== null && allowed.has(x.dateKey))
+  }
+
+  const perDay = await Promise.all(
+    dateKeys.map(dk =>
+      listShoplogixShiftIdsForDay(dk, plantSlug)
+        .then(ids => ids.map(sid => ({ dateKey: dk, shiftId: sid })))
+        .catch(() => [] as { dateKey: string; shiftId: string }[]),
+    ),
+  )
+  return perDay.flat()
+}
+
 /** Carga todos los turnos de un array de dateKeys en paralelo. */
 async function loadShiftsForDates(
   dateKeys: string[],
   plantSlug: PlantSlug,
 ): Promise<{ dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[]> {
-  const perDay = await Promise.all(
-    dateKeys.map(async (dk) => {
-      const allIds = await listShoplogixShiftIdsForDay(dk, plantSlug).catch(() => [] as string[])
-      // "Unscheduled" no es un turno (no tiene ventana programada) — no debe
-      // entrar a la agregación de KPIs de Día/Semana/Mes: infla shiftsCount y
-      // diluye disponibilidad/rendimiento con un bucket que no es comparable
-      // (misma razón que en slxMonthlyStats del calendario histórico).
-      const ids = allIds.filter((sid) => !isUnscheduledShift(sid))
-      const loaded = await Promise.all(
-        ids.map(async (sid) => {
-          const res = await loadShoplogixShift(dk, sid, plantSlug).catch(() => null)
-          if (!res?.snapshot || res.snapshot.machines.length === 0) return null
-          return { dateKey: dk, shiftId: sid, machines: res.snapshot.machines }
-        }),
-      )
-      return loaded.filter((x): x is NonNullable<typeof x> => x !== null)
+  const allPairs = await discoverShiftsInRange(dateKeys, plantSlug)
+
+  // "Unscheduled" no es un turno (no tiene ventana programada) — no debe
+  // entrar a la agregación de KPIs de Día/Semana/Mes: infla shiftsCount y
+  // diluye disponibilidad/rendimiento con un bucket que no es comparable
+  // (misma razón que en slxMonthlyStats del calendario histórico).
+  const pairs = allPairs.filter(({ shiftId }) => !isUnscheduledShift(shiftId))
+
+  const loaded = await Promise.all(
+    pairs.map(async ({ dateKey, shiftId }) => {
+      const res = await loadShoplogixShift(dateKey, shiftId, plantSlug).catch(() => null)
+      if (!res?.snapshot || res.snapshot.machines.length === 0) return null
+      return { dateKey, shiftId, machines: res.snapshot.machines }
     }),
   )
-  return perDay.flat()
+  return loaded.filter((x): x is NonNullable<typeof x> => x !== null)
 }
 
 // ── Hook original (un turno auto-detectado) ───────────────────────────────────
