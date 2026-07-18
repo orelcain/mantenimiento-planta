@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#121212" />
+    <meta name="theme-color" content="#0d1722" />
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -28,6 +28,9 @@
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }
+        // theme-color del chrome móvil acorde al tema, antes de que cargue React
+        var tc = document.querySelector('meta[name="theme-color"]');
+        if (tc) tc.setAttribute('content', theme === 'dark' ? '#0d1722' : '#a9b5c0');
       })();
     </script>
   </head>

@@ -6,8 +6,8 @@
   "start_url": "/mantenimiento-planta/",
   "scope": "/mantenimiento-planta/",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#0d1722",
+  "theme_color": "#0d1722",
   "lang": "es",
   "orientation": "portrait",
   "icons": [
