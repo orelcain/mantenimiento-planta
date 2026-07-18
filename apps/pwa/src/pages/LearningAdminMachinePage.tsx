@@ -815,10 +815,12 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                     <button
                       onClick={() => updateItem(qi, { correctIndex: oi })}
                       title={oi === q.correctIndex ? 'Opción correcta' : 'Marcar como correcta'}
-                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
+                      className={oi === q.correctIndex
+                        ? 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold'
+                        : 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-bold text-muted-foreground'}
                       style={oi === q.correctIndex
                         ? { background: LC.nuevo, borderColor: LC.nuevo, color: '#0d1722' }
-                        : { borderColor: '#22384a', color: '#6d8298' }}
+                        : undefined}
                     >
                       {oi === q.correctIndex ? '✓' : String.fromCharCode(65 + oi)}
                     </button>
