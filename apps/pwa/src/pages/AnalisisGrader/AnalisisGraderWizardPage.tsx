@@ -746,11 +746,11 @@ export function AnalisisGraderWizardPage() {
               `lineId` de la pestaña activa se propaga al guardar el doc
               con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
           {lineConfig.hasGraderData && (
-            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5">
+            <div className="rounded-lg border border-blue-500/25 bg-blue-500/10">
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-blue-500/10 transition-colors rounded-lg"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-blue-500/15 transition-colors rounded-lg"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />

@@ -37,7 +37,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
   return (
     <div className={cn('space-y-1.5', className)}>
       {/* ── Nivel 1: Plantas ── */}
-      <div className="flex gap-1 p-1 bg-muted/30 rounded-lg border border-border/40">
+      <div className="flex gap-1 p-1 bg-muted rounded-lg border border-border">
         {PLANTS.map((p) => {
           const isActive = p.id === activePlant
           const soon = isPlantComingSoon(p.id)
@@ -53,7 +53,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                   ? 'bg-background shadow-sm ring-1 ring-primary/30'
                   : soon
                   ? 'text-muted-foreground/45 cursor-not-allowed bg-muted/15'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer',
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer',
               )}
             >
               <span
@@ -89,10 +89,10 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium border transition-colors',
                   isActive
-                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    ? 'border-primary/40 bg-primary/20 text-primary'
                     : area.comingSoon
                     ? 'border-border/40 bg-muted/15 text-muted-foreground/45 cursor-not-allowed'
-                    : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                    : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
                 )}
               >
                 {area.areaLabel}

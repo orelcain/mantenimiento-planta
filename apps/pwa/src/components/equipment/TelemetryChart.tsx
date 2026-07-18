@@ -214,22 +214,22 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
       <CardContent className="flex-1 min-h-[300px] relative">
         {visibleStats && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-            <div className="rounded-md border p-2 bg-card/40">
+            <div className="rounded-md border p-2 bg-muted">
               <div className="text-[10px] text-muted-foreground">Temperatura actual</div>
               <div className="text-sm font-semibold">{visibleStats.temp.latest.toFixed(1)} °C</div>
             </div>
-            <div className="rounded-md border p-2 bg-card/40">
+            <div className="rounded-md border p-2 bg-muted">
               <div className="text-[10px] text-muted-foreground">Humedad actual</div>
               <div className="text-sm font-semibold">{visibleStats.hum.latest.toFixed(1)} %</div>
             </div>
-            <div className="rounded-md border p-2 bg-card/40">
+            <div className="rounded-md border p-2 bg-muted">
               <div className="text-[10px] text-muted-foreground">Temp promedio / min-max</div>
               <div className="text-sm font-semibold">
                 {visibleStats.temp.avg.toFixed(1)} °C
                 <span className="text-xs text-muted-foreground"> · {visibleStats.temp.min.toFixed(1)}-{visibleStats.temp.max.toFixed(1)}</span>
               </div>
             </div>
-            <div className="rounded-md border p-2 bg-card/40">
+            <div className="rounded-md border p-2 bg-muted">
               <div className="text-[10px] text-muted-foreground">Hum promedio / min-max</div>
               <div className="text-sm font-semibold">
                 {visibleStats.hum.avg.toFixed(1)} %

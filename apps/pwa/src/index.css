@@ -23,24 +23,28 @@
    quienes prefieren fondo blanco. Toggle: useTheme (header + Ajustes). */
 :root {
   color-scheme: light;
-  /* Claro "mate azulado" (pedido de Orel 2026-07-17): nada de blanco puro ni
-     brillos — gris-azul desaturado tipo pantone corporativo, tinta AquaChile.
-     Las cards NO son #fff: elevan apenas un paso sobre el papel. */
-  --background: 200 212 222;        /* #c8d4de papel gris-azul mate profundo */
+  /* Claro "mate azulado" (pedido de Orel 2026-07-17, recalibrado 2026-07-18
+     contra Pantone Fashion&Home real, ronda 2 tras feedback "no veo mayor
+     cambio"): el eje de hue viene de Ballad/Baby Blue TCX (13-4304/13-4308,
+     comparten hue con la marca #2E75B6; Dawn/Misty/Pale Blue quedaron afuera
+     por virar a gris neutro o a teal), pero esta vez el SALTO entre fondo y
+     card se triplicó a propósito (antes ~20/255 por canal, imperceptible;
+     ahora ~55-60/255) para que la superficie "levante" de verdad. */
+  --background: 169 181 192;        /* #a9b5c0 Ballad Blue profundizado */
   --foreground: 22 36 47;           /* #16242f tinta */
-  --card: 223 230 237;              /* #dfe6ed superficie mate (no blanco) */
-  --secondary: 180 195 209;         /* #b4c3d1 */
-  --muted: 191 204 216;             /* #bfccd8 */
-  --muted-foreground: 67 86 106;    /* #43566a */
-  --accent: 174 196 214;            /* #aec4d6 */
-  --border: 156 175 192;            /* #9cafc0 */
+  --card: 227 233 238;              /* #e3e9ee superficie clara, salto grande vs fondo */
+  --secondary: 181 199 211;         /* #b5c7d3 Baby Blue 13-4308 TCX exacto */
+  --muted: 190 200 208;             /* #bec8d0 */
+  --muted-foreground: 61 80 100;    /* #3d5064 */
+  --accent: 159 175 186;            /* #9fafba */
+  --border: 135 145 154;            /* #87919a el más marcado, delimita superficies */
 
   /* Paleta LC del Centro de Aprendizaje (data/learningTheme.ts) — variante clara
      (mismo criterio mate azulado: superficies sin blanco puro) */
-  --lc-bg: #c8d4de;
-  --lc-bg-panel: #bdcad6;
-  --lc-surface: #dfe6ed;
-  --lc-surface-hi: #d2dce5;
+  --lc-bg: #a9b5c0;
+  --lc-bg-panel: #98a3ad;
+  --lc-surface: #e3e9ee;
+  --lc-surface-hi: #b8c2cc;
   --lc-ink: #16242f;
   --lc-ink-mid: #45596c;
   --lc-ink-lo: #64798c;
@@ -49,8 +53,8 @@
   --lc-aqua-bright: #245a8c;
   --lc-aqua-light: #2a6aa6;
   --lc-aqua-soft: rgba(46, 117, 182, 0.10);
-  --lc-border: #a5b7c6;
-  --lc-border-hi: #92a7b9;
+  --lc-border: #87919a;
+  --lc-border-hi: #7a838b;
   --lc-danger: #b8394f;
   --lc-danger-soft: rgba(184, 57, 79, 0.10);
   --lc-prep: #8a6a2f;

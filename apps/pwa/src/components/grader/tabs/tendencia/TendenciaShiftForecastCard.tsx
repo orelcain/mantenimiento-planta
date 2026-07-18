@@ -29,9 +29,9 @@ export function TendenciaShiftForecastCard({
 
   const severity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
   const severityBorder =
-    severity === 'critical' ? 'border-red-500/60 bg-red-500/5' :
-    severity === 'warn' ? 'border-amber-500/60 bg-amber-500/5' :
-    'border-emerald-500/60 bg-emerald-500/5'
+    severity === 'critical' ? 'border-red-500/60 bg-red-500/10' :
+    severity === 'warn' ? 'border-amber-500/60 bg-amber-500/10' :
+    'border-emerald-500/60 bg-emerald-500/10'
   const severityText =
     severity === 'critical' ? 'text-red-600 dark:text-red-400' :
     severity === 'warn' ? 'text-amber-600 dark:text-amber-400' :
@@ -67,7 +67,7 @@ export function TendenciaShiftForecastCard({
       <CardContent>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Tiempo restante */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tiempo restante</p>
             <p className="text-2xl font-bold tabular-nums">{shiftProgressView.remainingLabel}</p>
             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
@@ -80,7 +80,7 @@ export function TendenciaShiftForecastCard({
           </div>
 
           {/* P0 proyectado al cierre */}
-          <div className={cn('flex flex-col gap-1 p-3 rounded-lg bg-background/60 border-2', severityBorder)}>
+          <div className={cn('flex flex-col gap-1 p-3 rounded-lg bg-background border-2', severityBorder)}>
             <div className="flex items-center justify-between">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">P0 al cierre</p>
               <Badge variant="outline" className={cn('text-[9px] px-1.5 py-0', severityText, 'border-current')}>
@@ -99,7 +99,7 @@ export function TendenciaShiftForecastCard({
           </div>
 
           {/* Piezas proyectadas al cierre */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Piezas al cierre</p>
             <p className="text-2xl font-bold tabular-nums">
               {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
@@ -113,7 +113,7 @@ export function TendenciaShiftForecastCard({
           </div>
 
           {/* Tendencia del peso */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tendencia peso</p>
             <div className="flex items-center gap-2">
               <TrendIcon className={cn('h-6 w-6', trendColor)} />

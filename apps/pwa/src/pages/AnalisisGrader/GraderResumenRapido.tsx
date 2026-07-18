@@ -74,9 +74,9 @@ export function GraderResumenRapido({
     p0Status === 'warn'     ? 'border-amber-500/40' :
                               'border-emerald-500/30'
   const bgColor =
-    p0Status === 'critical' ? 'bg-red-500/5' :
-    p0Status === 'warn'     ? 'bg-amber-500/5' :
-                              'bg-emerald-500/5'
+    p0Status === 'critical' ? 'bg-red-500/10' :
+    p0Status === 'warn'     ? 'bg-amber-500/10' :
+                              'bg-emerald-500/10'
   const p0Color =
     p0Status === 'critical' ? 'text-red-500' :
     p0Status === 'warn'     ? 'text-amber-500' :
@@ -185,7 +185,7 @@ export function GraderResumenRapido({
           {kpis.topPointZeroErrors.slice(0, 4).map((e, i) => (
             <span
               key={i}
-              className="text-xs bg-background/60 border rounded-full px-2.5 py-0.5 text-muted-foreground"
+              className="text-xs bg-background border rounded-full px-2.5 py-0.5 text-muted-foreground"
             >
               {e.error}{' '}
               <span className="font-semibold text-foreground">{e.pct}%</span>
@@ -195,7 +195,7 @@ export function GraderResumenRapido({
       )}
 
       {/* ─── Velocidades de cintas ─── */}
-      <div className="bg-background/40 border border-border/50 rounded-md overflow-hidden">
+      <div className="bg-background border border-border rounded-md overflow-hidden">
         <button
           type="button"
           onClick={() => setBeltSpeedsOpen((o) => !o)}

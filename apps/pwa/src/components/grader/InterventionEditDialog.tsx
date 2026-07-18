@@ -23,9 +23,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-300' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/10 text-red-800 dark:text-red-300' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/20 text-amber-800 dark:text-amber-300' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/20 text-red-800 dark:text-red-300' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -123,7 +123,7 @@ export function InterventionEditDialog({
           {/* Fecha y hora */}
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Fecha y hora</label>
-            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background/60" />
+            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background" />
           </div>
 
           {/* Equipo */}
@@ -139,8 +139,8 @@ export function InterventionEditDialog({
               {TIPOS.map((t) => (
                 <button key={t.id} type="button" onClick={() => setTipo(t.id)}
                   className={cn('px-2 py-2 rounded-md border text-xs font-medium transition-colors',
-                    tipo === t.id ? 'border-primary/50 bg-primary/10 text-primary'
-                      : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
+                    tipo === t.id ? 'border-primary/50 bg-primary/20 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   {t.label}
                 </button>
               ))}
@@ -154,7 +154,7 @@ export function InterventionEditDialog({
               {SEVS.map((s) => (
                 <button key={s.id} type="button" onClick={() => setSeveridad(s.id)}
                   className={cn('flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border text-xs font-medium transition-colors',
-                    severidad === s.id ? s.active : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
+                    severidad === s.id ? s.active : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   <span className={cn('h-2 w-2 rounded-full', s.dot)} />{s.label}
                 </button>
               ))}
@@ -168,18 +168,18 @@ export function InterventionEditDialog({
           {/* Detalle */}
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Detalle</label>
-            <Textarea value={hallazgo} onChange={(e) => setHallazgo(e.target.value)} rows={3} className="text-sm bg-background/60 resize-none" />
+            <Textarea value={hallazgo} onChange={(e) => setHallazgo(e.target.value)} rows={3} className="text-sm bg-background resize-none" />
           </div>
 
           {/* SAP */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-[11px] font-medium text-muted-foreground">N° Aviso SAP</label>
-              <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="ej. 10012345" className="text-sm bg-background/60" inputMode="numeric" />
+              <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="ej. 10012345" className="text-sm bg-background" inputMode="numeric" />
             </div>
             <div className="space-y-1">
               <label className="text-[11px] font-medium text-muted-foreground">N° Orden (OT) SAP</label>
-              <Input value={sapOrden} onChange={(e) => setSapOrden(e.target.value)} placeholder="ej. 40098765" className="text-sm bg-background/60" inputMode="numeric" />
+              <Input value={sapOrden} onChange={(e) => setSapOrden(e.target.value)} placeholder="ej. 40098765" className="text-sm bg-background" inputMode="numeric" />
             </div>
           </div>
           {!sapOrden.trim() && (

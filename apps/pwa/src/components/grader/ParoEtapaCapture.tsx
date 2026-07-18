@@ -147,20 +147,20 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
             {ETAPAS.map((e) => (
               <button key={e} type="button" onClick={() => setEtapaSel(e)}
                 className={cn('px-2.5 py-1 rounded-md border text-xs font-medium transition-colors',
-                  etapaSel === e ? 'border-rose-500/50 bg-rose-500/10 text-rose-800 dark:text-rose-300'
-                    : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
+                  etapaSel === e ? 'border-rose-500/50 bg-rose-500/20 text-rose-800 dark:text-rose-300'
+                    : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                 {e}
               </button>
             ))}
             <button type="button" onClick={() => setEtapaSel(OTRA)}
               className={cn('px-2.5 py-1 rounded-md border text-xs font-medium transition-colors',
-                etapaSel === OTRA ? 'border-rose-500/50 bg-rose-500/10 text-rose-800 dark:text-rose-300'
-                  : 'border-border bg-background/40 text-muted-foreground hover:bg-muted/40')}>
+                etapaSel === OTRA ? 'border-rose-500/50 bg-rose-500/20 text-rose-800 dark:text-rose-300'
+                  : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
               Otra…
             </button>
           </div>
           {etapaSel === OTRA && (
-            <Input value={etapaCustom} onChange={(e) => setEtapaCustom(e.target.value)} placeholder="Nombre de la etapa" className="text-sm bg-background/60 mt-1" />
+            <Input value={etapaCustom} onChange={(e) => setEtapaCustom(e.target.value)} placeholder="Nombre de la etapa" className="text-sm bg-background mt-1" />
           )}
         </div>
 
@@ -168,18 +168,18 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Duración (min)</label>
-            <Input type="number" inputMode="numeric" value={duracion} onChange={(e) => setDuracion(e.target.value)} placeholder="ej. 25" className="text-sm bg-background/60" />
+            <Input type="number" inputMode="numeric" value={duracion} onChange={(e) => setDuracion(e.target.value)} placeholder="ej. 25" className="text-sm bg-background" />
           </div>
           <div className="space-y-1">
             <label className="text-[11px] font-medium text-muted-foreground">Fecha y hora</label>
-            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background/60" />
+            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background" />
           </div>
         </div>
 
         {/* Causa */}
         <div className="space-y-1">
           <label className="text-[11px] font-medium text-muted-foreground">Causa <span className="text-muted-foreground/60">(opcional)</span></label>
-          <SpeechTextarea value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="Por qué se detuvo (podés dictar)…" rows={2} className="text-sm bg-background/60" />
+          <SpeechTextarea value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="Por qué se detuvo (podés dictar)…" rows={2} className="text-sm bg-background" />
         </div>
 
         {error && (
@@ -229,7 +229,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
         {!loading && paros.length > 0 && (
           <ul className="space-y-1 max-h-48 overflow-y-auto pr-1 pt-1">
             {paros.slice(0, 15).map((p) => (
-              <li key={p.id} className="flex items-start gap-2 text-[11px] rounded-md border border-border/40 bg-background/40 px-2 py-1.5">
+              <li key={p.id} className="flex items-start gap-2 text-[11px] rounded-md border border-border bg-background px-2 py-1.5">
                 <span className="font-medium text-rose-800 dark:text-rose-300 shrink-0">{p.etapa}</span>
                 <span className="text-muted-foreground tabular-nums shrink-0">{fmtDur(p.duracionMin)}</span>
                 <span className="text-foreground/80 min-w-0 flex-1 break-words">{p.causa || '—'}</span>

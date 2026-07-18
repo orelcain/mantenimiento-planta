@@ -338,7 +338,7 @@ function SubCauseRow({
     <div
       className={cn(
         'flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all',
-        hasPieces ? 'bg-background/50' : 'opacity-40',
+        hasPieces ? 'bg-background' : 'opacity-40',
         selected && 'ring-1 ring-offset-1 ring-offset-background',
       )}
       style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS[cause] ?? '#ef4444' } as React.CSSProperties : undefined}

@@ -890,7 +890,7 @@ export function HierarchyPage() {
                   {equipmentByNode.get(node.id)!.map((eq) => (
                     <div
                       key={eq.id}
-                      className="flex items-center gap-2 p-2 rounded border border-border hover:border-primary/50 bg-background/50"
+                      className="flex items-center gap-2 p-2 rounded border border-border hover:border-primary/50 bg-background"
                     >
                       <Checkbox
                         checked={selectedEquipmentIds.has(eq.id)}
@@ -1183,7 +1183,7 @@ export function HierarchyPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted">
               <div>
                 <p className="text-sm font-medium">Activo</p>
                 <p className="text-xs text-muted-foreground">

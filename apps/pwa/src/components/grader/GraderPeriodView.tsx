@@ -652,7 +652,7 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:bg-emerald-500/10 transition-colors"
+              className="border-emerald-500/30 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/15 transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -671,7 +671,7 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-red-500/30 bg-red-500/5 cursor-pointer hover:bg-red-500/10 transition-colors"
+              className="border-red-500/30 bg-red-500/10 cursor-pointer hover:bg-red-500/15 transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -693,7 +693,7 @@ export function GraderPeriodView({ data }: Props) {
 
       {/* ── Panel de insights automáticos ───────────────────────────────── */}
       {insights && (
-        <Card className="border-blue-500/20 bg-blue-500/5">
+        <Card className="border-blue-500/20 bg-blue-500/10">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -703,7 +703,7 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               {/* Tendencia */}
-              <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
@@ -719,7 +719,7 @@ export function GraderPeriodView({ data }: Props) {
                 </p>
               </div>
               {/* Días críticos */}
-              <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
                 <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-emerald-600')}>
                   {insights.criticalCount} / {insights.totalDays}
@@ -731,7 +731,7 @@ export function GraderPeriodView({ data }: Props) {
               </div>
               {/* Día vs Noche */}
               {insights.diaAvg !== null && insights.nocheAvg !== null && (
-                <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                <div className="rounded-lg border border-border bg-background px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Día vs Noche (prom.)</p>
                   <p className="font-semibold text-sm">
                     <span className="text-amber-500">{insights.diaAvg}%</span>
@@ -749,7 +749,7 @@ export function GraderPeriodView({ data }: Props) {
               )}
               {/* Mejor semana */}
               {insights.bestWeekStart && (
-                <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                <div className="rounded-lg border border-border bg-background px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
                   <p className="font-semibold text-sm text-emerald-600">{insights.bestWeekAvg}% P0 prom.</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -948,11 +948,11 @@ export function GraderPeriodView({ data }: Props) {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                  <div className="rounded bg-background/60 px-2 py-1">
+                  <div className="rounded bg-background px-2 py-1">
                     <p className="text-muted-foreground">Piezas</p>
                     <p className="font-semibold">{formatNumber(g.totalPieces)}</p>
                   </div>
-                  <div className="rounded bg-background/60 px-2 py-1">
+                  <div className="rounded bg-background px-2 py-1">
                     <p className="text-muted-foreground">P0 pz</p>
                     <p className="font-semibold">{formatNumber(g.totalP0Pieces)}</p>
                   </div>

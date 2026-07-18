@@ -422,7 +422,7 @@ export function CentroTecnicoDocumentalPage() {
               onClick={() => setFiltro(k.key)}
               title={`Filtrar: ${k.label}`}
               className={`rounded-lg border p-3 text-center transition-colors ${
-                active ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border hover:bg-muted/40'
+                active ? 'border-primary ring-1 ring-primary bg-primary/10' : 'border-border bg-card hover:bg-muted'
               }`}
             >
               <div className={`text-2xl font-extrabold leading-none ${k.cls ?? ''}`}>{k.n}</div>

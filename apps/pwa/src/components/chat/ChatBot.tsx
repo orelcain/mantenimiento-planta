@@ -62,7 +62,7 @@ function renderTable(rows: string[][]): string {
   let html = '<table class="text-xs w-full border-collapse mt-1 mb-1">'
   html += '<thead><tr>'
   for (const cell of header) {
-    html += `<th class="border border-border/50 px-2 py-1 bg-muted/50 text-left font-semibold">${formatLine(cell)}</th>`
+    html += `<th class="border border-border px-2 py-1 bg-muted text-left font-semibold">${formatLine(cell)}</th>`
   }
   html += '</tr></thead>'
   if (body.length > 0) {
@@ -332,7 +332,7 @@ function MessageBubble({
       </div>
 
       <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-        isUser ? 'bg-primary text-primary-foreground' : 'bg-background border border-border/60 text-foreground'
+        isUser ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground'
       }`}>
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(msg.content)) }} />
         {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
@@ -448,7 +448,7 @@ function StreamingBubble({ content }: { content: string }) {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-background border border-border/60 text-foreground">
+      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-card border border-border text-foreground">
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(content)) }} />
         <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
       </div>
@@ -463,7 +463,7 @@ function LoadingIndicator() {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="bg-background border border-border/60 rounded-lg px-3 py-2 flex gap-1.5 items-center">
+      <div className="bg-card border border-border rounded-lg px-3 py-2 flex gap-1.5 items-center">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Consultando datos de la planta...</span>
       </div>
@@ -554,7 +554,7 @@ const QUICK_SUGGESTIONS = [
 
 function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-t border-border bg-muted/30">
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-t border-border bg-muted">
       <span className="w-full text-[10px] text-muted-foreground mb-0.5">Sugerencias rápidas:</span>
       {QUICK_SUGGESTIONS.map(suggestion => (
         <button
@@ -775,7 +775,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                   value={equipmentSearch}
                   onChange={e => setEquipmentSearch(e.target.value)}
                   placeholder="🔍 Buscar equipo..."
-                  className="w-full text-xs px-2 py-1 rounded border border-border bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                   autoFocus
                 />
               </div>
@@ -857,7 +857,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                       value={techSearch}
                       onChange={e => setTechSearch(e.target.value)}
                       placeholder="🔍 Buscar técnico..."
-                      className="w-full text-xs px-2 py-1 rounded border border-border bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                       autoFocus
                     />
                   </div>
@@ -1378,7 +1378,7 @@ export function ChatBot() {
             </div>
           </div>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-primary" />
@@ -1522,7 +1522,7 @@ export function ChatBot() {
           <div className="flex flex-1 overflow-hidden">
           {/* Avatar de video de ARIA — riel izquierdo (idle ↔ habla, blob-load + lockstep) */}
           {avatarShow && (
-            <div className="shrink-0 w-80 border-r border-border bg-background/40 flex flex-col items-stretch p-3">
+            <div className="shrink-0 w-80 border-r border-border bg-card flex flex-col items-stretch p-3">
               <AriaAvatar visible={avatarShow} />
             </div>
           )}

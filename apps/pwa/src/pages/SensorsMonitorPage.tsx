@@ -147,7 +147,7 @@ function ThresholdEditor({ deviceId, current, onClose }: {
         step="0.5"
         value={form[key]}
         onChange={e => set(key, e.target.value)}
-        className="h-7 w-16 rounded border border-border/50 bg-background/60 px-1.5 text-xs text-center tabular-nums"
+        className="h-7 w-16 rounded border border-border bg-background px-1.5 text-xs text-center tabular-nums"
       />
     </div>
   )
@@ -633,7 +633,7 @@ function TrendSparkline({
   const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - countdownMs) / 1000)) : undefined
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card/30 p-3 space-y-2.5">
+    <div className="rounded-xl border border-border/40 bg-muted p-3 space-y-2.5">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2.5">
           <h4 className="text-xs font-semibold text-foreground tracking-wide">Tendencia</h4>
@@ -650,7 +650,7 @@ function TrendSparkline({
           <select
             value={chartMode}
             onChange={(e) => setChartMode(e.target.value as ChartMode)}
-            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+            className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
           >
             <option value="dual">Temp + Humedad</option>
             <option value="temperature">Solo Temperatura</option>
@@ -668,7 +668,7 @@ function TrendSparkline({
           <select
             value={timeFilterPreset}
             onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
-            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+            className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
             title="Filtrar por rango de tiempo"
           >
             <option value="all">Todo tiempo</option>
@@ -684,14 +684,14 @@ function TrendSparkline({
                 type="datetime-local"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
                 title="Desde"
               />
               <input
                 type="datetime-local"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
                 title="Hasta"
               />
             </>
@@ -705,7 +705,7 @@ function TrendSparkline({
                   setChartH(next)
                   persistHeight(next)
                 }}
-                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
               >
                 Alto -
               </button>
@@ -716,7 +716,7 @@ function TrendSparkline({
                   setChartH(next)
                   persistHeight(next)
                 }}
-                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
               >
                 Alto +
               </button>
@@ -726,7 +726,7 @@ function TrendSparkline({
                   setChartH(CHART_DEFAULT_H)
                   persistHeight(CHART_DEFAULT_H)
                 }}
-                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
               >
                 Reset
               </button>
@@ -740,7 +740,7 @@ function TrendSparkline({
               <select
                 value={tempInterval ?? 'auto'}
                 onChange={(e) => setTempInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
-                className="h-5 rounded border border-border/50 bg-background/60 px-1 text-[10px] text-muted-foreground"
+                className="h-5 rounded border border-border bg-background px-1 text-[10px] text-muted-foreground"
                 title="Intervalo eje Temperatura"
               >
                 <option value="auto">Auto</option>
@@ -759,7 +759,7 @@ function TrendSparkline({
               <select
                 value={humInterval ?? 'auto'}
                 onChange={(e) => setHumInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
-                className="h-5 rounded border border-border/50 bg-background/60 px-1 text-[10px] text-muted-foreground"
+                className="h-5 rounded border border-border bg-background px-1 text-[10px] text-muted-foreground"
                 title="Intervalo eje Humedad"
               >
                 <option value="auto">Auto</option>
@@ -793,7 +793,7 @@ function TrendSparkline({
             className={`h-6 rounded-md px-2 text-[10px] font-medium transition-colors ${
               activeZoom === val
                 ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                : 'border border-border/50 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                : 'border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             {label}
@@ -977,11 +977,11 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
             </div>
             <div className="mt-1 text-[11px] text-cyan-400/80">{humThresholdInfo}</div>
           </div>
-          <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="rounded-xl border border-border/40 bg-muted p-4">
             <div className="text-xs text-muted-foreground mb-1">Última actualización</div>
             <div className="text-sm font-medium">{formatDateTime(lastUpdateTs || undefined)}</div>
           </div>
-          <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="rounded-xl border border-border/40 bg-muted p-4">
             <div className="text-xs text-muted-foreground mb-1">Muestras disponibles</div>
             <div className="text-sm font-medium">{trendReadings?.length ?? 0}</div>
           </div>

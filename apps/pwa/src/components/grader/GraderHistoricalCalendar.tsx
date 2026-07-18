@@ -2922,18 +2922,18 @@ export function GraderHistoricalCalendar({
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
-                  <div className="rounded bg-background/60 px-2 py-1">
+                  <div className="rounded bg-background px-2 py-1">
                     <p className="text-muted-foreground">{isVirtual ? 'Ciclos Baader' : 'Piezas'}</p>
                     <p className="font-semibold tabular-nums">{fragPieces.toLocaleString('es-CL')}</p>
                   </div>
                   {!isVirtual && (
-                    <div className="rounded bg-background/60 px-2 py-1">
+                    <div className="rounded bg-background px-2 py-1">
                       <p className="text-muted-foreground">P0 piezas</p>
                       <p className="font-semibold tabular-nums">{fragP0Pieces.toLocaleString('es-CL')}</p>
                     </div>
                   )}
                   {!isVirtual && fragWeight != null && (
-                    <div className="rounded bg-background/60 px-2 py-1">
+                    <div className="rounded bg-background px-2 py-1">
                       <p className="text-muted-foreground">Peso</p>
                       <p className="font-semibold tabular-nums">
                         {fragWeight >= 1000
@@ -2945,7 +2945,7 @@ export function GraderHistoricalCalendar({
                   {!isVirtual && (() => {
                     const rate = safeRate(hist)
                     return rate != null ? (
-                      <div className="rounded bg-background/60 px-2 py-1">
+                      <div className="rounded bg-background px-2 py-1">
                         <p className="text-muted-foreground">pz/hora</p>
                         <p className="font-semibold tabular-nums">{rate.toLocaleString('es-CL')}</p>
                       </div>
@@ -4216,7 +4216,7 @@ export function GraderHistoricalCalendar({
                         return (
                           <div
                             key={pm.machineid}
-                            className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
+                            className="rounded bg-muted border border-border px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
                             title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}\n\nMTTR macro: ${fmtMttr(mttrMacroSec)} (${pm.maintMacroCount} ev · ${fmtSecPanoramic(pm.maintMacroSec)} total)\nMTTR micro: ${fmtMttr(mttrMicroSec)} (${pm.maintMicroCount} ev · ${fmtSecPanoramic(pm.maintMicroSec)} total)`}
                           >
                             <div className="flex items-center gap-1">
@@ -4262,8 +4262,8 @@ export function GraderHistoricalCalendar({
                         className={cn(
                           'text-[9px] px-1.5 py-0.5 rounded border transition-colors',
                           paretoMachineFilter === 'all'
-                            ? 'bg-primary/15 text-primary border-primary/30'
-                            : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                            ? 'bg-primary/20 text-primary border-primary/30'
+                            : 'bg-muted text-muted-foreground border-border hover:bg-accent',
                         )}
                       >
                         Todas
@@ -4279,8 +4279,8 @@ export function GraderHistoricalCalendar({
                             className={cn(
                               'text-[9px] px-1.5 py-0.5 rounded border transition-colors tabular-nums',
                               active
-                                ? 'bg-primary/15 text-primary border-primary/30'
-                                : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                                ? 'bg-primary/20 text-primary border-primary/30'
+                                : 'bg-muted text-muted-foreground border-border hover:bg-accent',
                             )}
                             title={`Filtrar paros solo de ${pm.name}`}
                           >
@@ -4296,8 +4296,8 @@ export function GraderHistoricalCalendar({
                         className={cn(
                           'text-[9px] px-1.5 py-0.5 rounded border transition-colors',
                           paretoMaintOnly
-                            ? 'bg-amber-500/15 text-amber-500 border-amber-500/40'
-                            : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                            ? 'bg-amber-500/20 text-amber-500 border-amber-500/40'
+                            : 'bg-muted text-muted-foreground border-border hover:bg-accent',
                         )}
                         title="Solo paros tipo avería (excluye COLACION, MMPP, CUMPLIMIENTO CUOTA y otros paros operacionales). type='downtime' menos reasons operativos."
                       >
@@ -4483,7 +4483,7 @@ export function GraderHistoricalCalendar({
                         'text-[9px] px-2 py-0.5 rounded border transition-colors',
                         trendByMachine
                           ? 'bg-primary/15 text-primary border-primary/30'
-                          : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                          : 'bg-muted text-muted-foreground border-border hover:bg-accent',
                       )}
                       title="Alternar entre tendencia agregada (1 línea: ritmo+uptime de la línea) y por máquina (3 líneas: uptime% de cada Baader)"
                     >

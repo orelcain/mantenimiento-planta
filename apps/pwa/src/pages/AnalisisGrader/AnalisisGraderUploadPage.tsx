@@ -467,12 +467,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               'border-2 border-dashed rounded-xl p-5 lg:p-8 text-center cursor-pointer transition-all duration-200 group',
               dragOver
                 ? 'border-primary bg-primary/10 scale-[1.02] shadow-lg shadow-primary/10'
-                : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/[0.02]',
+                : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/10',
             )}
           >
             <div className={cn(
               'h-10 w-10 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-3 rounded-full flex items-center justify-center transition-colors',
-              dragOver ? 'bg-primary/20' : 'bg-muted/50 group-hover:bg-primary/10',
+              dragOver ? 'bg-primary/20' : 'bg-muted group-hover:bg-primary/10',
             )}>
               <FileSpreadsheet className={cn('h-5 w-5 lg:h-6 lg:w-6', dragOver ? 'text-primary' : 'text-muted-foreground group-hover:text-primary/70')} />
             </div>
@@ -498,7 +498,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           {files.length > 0 && (
             <div className="space-y-1.5">
               {files.map((f) => (
-                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
+                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded px-2 py-1.5 text-xs">
                   <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
                   <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
                     {KIND_LABELS[f.fileMeta.kind]}

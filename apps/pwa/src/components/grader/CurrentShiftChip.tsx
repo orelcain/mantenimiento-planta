@@ -238,7 +238,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         type="button"
         onClick={() => navigate(href)}
         className={cn(
-          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left',
+          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/12 hover:bg-amber-500/18 transition-colors text-left',
           className,
         )}
         title={`El horario del ${meta.label} (${live.dateKey}) está activo pero no hay producción registrada en Shoplogix en los últimos ${ACTIVITY_MAX_AGE_MIN} min. Click para ver el detalle igual.`}
