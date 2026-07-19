@@ -1557,6 +1557,31 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // ── Export KPIs → Power BI (doc de control por planta) ──────────────────
+    // La PWA (solo admin) escribe la orden "actualizar ahora". El agente del
+    // PC (automation/agente_powerbi.py) ejecuta export+refresh y reporta
+    // estado vía Admin SDK (bypass de rules). Validamos que el cliente no
+    // toque los campos de estado que reporta el agente.
+    match /powerbiExport/{plantId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin()
+        && request.resource.data.ordenPendiente is bool
+        // los campos de estado los reporta SOLO el agente (Admin SDK):
+        // en creación deben venir en null/idle; en update no pueden cambiar.
+        && (resource == null
+              ? (request.resource.data.estado == 'idle'
+                 && request.resource.data.ultimaCorridaAt == null
+                 && request.resource.data.refreshOk == null)
+              : (request.resource.data.estado == resource.data.estado
+                 && request.resource.data.ultimaCorridaAt == resource.data.ultimaCorridaAt
+                 && request.resource.data.refreshOk == resource.data.refreshOk
+                 && request.resource.data.agenteVistoAt == resource.data.agenteVistoAt));
+      // Historial de corridas: lo escribe SOLO el agente (Admin SDK)
+      match /corridas/{corridaId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
     // Estado interno de notificaciones por máquina/turno — solo Admin SDK
     match /shoplogixNotifState/{docId} {
       allow read, write: if false;

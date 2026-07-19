@@ -33,6 +33,7 @@ import {
   Wrench,
   LayoutDashboard,
   Send,
+  BarChart3,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -121,6 +122,14 @@ const ADMIN_ITEMS: AdminItem[] = [
     description: 'Baja lo nuevo del grupo de mantención a las carpetas de equipo y alimenta la bandeja de novedades. Orden inmediata o periodicidad automática.',
     icon: <Send className="w-5 h-5" />,
     iconColor: 'text-sky-400',
+    section: 'config',
+  },
+  {
+    to: '/admin/powerbi-export',
+    title: 'Actualizar Power BI',
+    description: 'Exporta los KPIs de Mantención a OneDrive empresa y refresca el dataset en Power BI Service. Para tener datos frescos antes de una reunión.',
+    icon: <BarChart3 className="w-5 h-5" />,
+    iconColor: 'text-yellow-400',
     section: 'config',
   },
   {
