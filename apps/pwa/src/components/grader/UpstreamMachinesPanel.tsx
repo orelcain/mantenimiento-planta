@@ -55,6 +55,7 @@ import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
+import { softenAccentHex } from '@/lib/softenColor'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -251,10 +252,10 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
             className="flex items-center gap-1.5 text-[10px]"
             title={`${r.reason || 'Sin categoría'} · ${r.count} evento${r.count !== 1 ? 's' : ''} · ${fmtDurationSec(r.durationSec)} total`}
           >
-            {/* Color del state (viene de Shoplogix) */}
+            {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
               className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-slate-900/60"
-              style={{ backgroundColor: r.color }}
+              style={{ backgroundColor: softenAccentHex(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
                 Mobile: max 9rem + line-clamp-2 (puede ocupar 2 líneas). */}
@@ -268,7 +269,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
                 className="h-full rounded-full opacity-80"
                 style={{
                   width: `${Math.max(pct, 1)}%`,
-                  backgroundColor: r.color,
+                  backgroundColor: softenAccentHex(r.color),
                   transformOrigin: 'left center',
                 }}
               />

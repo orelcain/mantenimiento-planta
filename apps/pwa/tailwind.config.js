@@ -25,10 +25,13 @@ export default {
         // chip oscuro es difícil de leer, esto es la causa — no es un bug
         // nuevo, es esta decisión (memoria Claude:
         // reference_skill_antarfood_design_system.md tiene el detalle completo).
-        emerald: { ...colors.emerald, 400: '#6c9a8a', 500: '#62917f' },
-        green: { ...colors.green, 400: '#779f85', 500: '#679576' },
-        red: { ...colors.red, 400: '#b2807f', 500: '#b0706d' },
-        amber: { ...colors.amber, 400: '#ac966e', 500: '#a88c64' },
+        // 2ª pasada 2026-07-19: también los -600 (el semáforo del calendario
+        // histórico, badges PP/P0 y botones de borrar usaban red-600 stock y
+        // seguían brillando; los -600 son la mitad "claro" del mismo semáforo).
+        emerald: { ...colors.emerald, 400: '#6c9a8a', 500: '#62917f', 600: '#5b8c75' },
+        green: { ...colors.green, 400: '#779f85', 500: '#679576', 600: '#5f9368' },
+        red: { ...colors.red, 400: '#b2807f', 500: '#b0706d', 600: '#b46259' },
+        amber: { ...colors.amber, 400: '#ac966e', 500: '#a88c64', 600: '#ae7e59' },
         yellow: { ...colors.yellow, 400: '#d9bc4a' },
         blue: { ...colors.blue, 400: '#6da3d8', 500: '#4a86c8' },
         violet: { ...colors.violet, 400: '#a190d6', 500: '#7d68c4' },

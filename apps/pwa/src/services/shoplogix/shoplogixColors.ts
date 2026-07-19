@@ -19,8 +19,12 @@
  *   - Planned Downtime     → slate claro  #94a3b8
  */
 
+import { softenAccentHex } from '@/lib/softenColor'
+
 /**
- * Retorna el color CSS (#rrggbb) para un estado de máquina.
+ * Retorna el color CSS (#rrggbb) para un estado de máquina, ya atenuado a
+ * −50% croma (mismo tratamiento que la paleta semántica de tailwind.config,
+ * 2026-07-19 — los colores de Shoplogix son neón de fábrica).
  *
  * @param type    - Tipo normalizado: 'uptime' | 'downtime' | 'break' | 'setup'
  * @param reason  - Razón del paro (puede ser vacío "")
@@ -28,6 +32,14 @@
  *                  si no es rojo genérico '#ff0000')
  */
 export function slxStateColor(
+  type: string,
+  reason: string,
+  stored?: string,
+): string {
+  return softenAccentHex(slxStateColorRaw(type, reason, stored))
+}
+
+function slxStateColorRaw(
   type: string,
   reason: string,
   stored?: string,
