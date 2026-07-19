@@ -53,6 +53,8 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacrit
 interface SpecialModule {
   id: string; title: string; subtitle: string; description: string
   icon: React.ElementType; href: string; tint: string; stats: string
+  /** En desarrollo: oculto para usuarios normales; los admins lo ven con etiqueta. */
+  inDevelopment?: boolean
 }
 
 const SPECIAL_MODULES: SpecialModule[] = [
@@ -70,6 +72,8 @@ const SPECIAL_MODULES: SpecialModule[] = [
     id: 'hmi-bombeo-s2', title: 'HMI Bombeo Acopio S2', subtitle: 'Ciclo PLC · planta Yal',
     description: 'Bombeo Sistema 2. Motor de ciclo Fase A ↔ Fase B con eventos PLC reales y sidebar interactivo.',
     icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5a7d9e', stats: 'ciclo 90 s · 10 válvulas',
+    // Oculto del hub mientras se rediseña (decisión Orel 2026-07-19); admins lo ven con etiqueta.
+    inDevelopment: true,
   },
 ]
 
@@ -155,16 +159,19 @@ export function LearningHubPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, symptomsLoaded])
 
+  // Simuladores visibles: los inDevelopment solo los ven admins (con etiqueta).
+  const visibleSims = SPECIAL_MODULES.filter(s => !s.inDevelopment || isAdmin)
+
   // Métricas: catálogo = máquinas + simuladores (los simuladores siempre tienen contenido).
   const documentedMachines = allMachines.filter(m => hasAnyContent(m, metaMap[m.slug])).length
-  const totalCatalog = allMachines.length + SPECIAL_MODULES.length
-  const itemsWithContent = documentedMachines + SPECIAL_MODULES.length
+  const totalCatalog = allMachines.length + visibleSims.length
+  const itemsWithContent = documentedMachines + visibleSims.length
 
   // ── Búsqueda ──
   const q = norm(query.trim())
   const searching = q.length >= 2
   const machineHits = searching ? allMachines.filter(m => norm(m.name).includes(q)) : []
-  const simHits = searching ? SPECIAL_MODULES.filter(s => norm(s.title).includes(q) || norm(s.subtitle).includes(q)) : []
+  const simHits = searching ? visibleSims.filter(s => norm(s.title).includes(q) || norm(s.subtitle).includes(q)) : []
   const symptomHits = searching
     ? symptoms.filter(h => norm(h.title).includes(q) || norm(h.symptom).includes(q)).slice(0, 8)
     : []
@@ -350,7 +357,7 @@ export function LearningHubPage() {
             <section>
               <SectionLabel n="01">Simuladores interactivos</SectionLabel>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-5">
-                {SPECIAL_MODULES.map(mod => (
+                {visibleSims.map(mod => (
                   <SimulatorCard key={mod.id} mod={mod} onClick={() => navigate(mod.href)} />
                 ))}
               </div>
@@ -611,7 +618,10 @@ function SimulatorCard({ mod, onClick }: { mod: SpecialModule; onClick: () => vo
         style={{ background: `${mod.tint}1a`, border: `1px solid ${mod.tint}33` }}>
         <Icon className="h-5 w-5" style={{ color: mod.tint }} />
       </div>
-      <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{mod.title}</h3>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{mod.title}</h3>
+        {mod.inDevelopment && <StatusTag tone={C.prep}>En desarrollo</StatusTag>}
+      </div>
       <p className="text-xs mt-0.5" style={{ color: C.inkMid }}>{mod.subtitle}</p>
       <p className="text-sm leading-relaxed mt-2 flex-1" style={{ color: C.inkMid }}>{mod.description}</p>
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
