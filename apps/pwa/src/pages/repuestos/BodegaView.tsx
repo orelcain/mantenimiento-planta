@@ -21,6 +21,7 @@ import {
   Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { escapeHtml } from '@/lib/escapeHtml'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
@@ -1578,7 +1579,9 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
     if (!w) return
     const svg = document.getElementById('bodega-qr-svg')
     const svgHtml = svg ? new XMLSerializer().serializeToString(svg) : ''
-    w.document.write(`<html><head><title>QR ${item.codigoSAP}</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h2{margin:0 0 4px}p{margin:2px 0;color:#666;font-size:12px}.qr{margin:16px auto}</style></head><body><h2>${item.textoBreve}</h2><p>${item.codigoSAP}</p>${item.codigoFabricante ? `<p>${item.codigoFabricante}</p>` : ''}<div class="qr">${svgHtml}</div><p>${item.ubicacionBodega || ''}</p><script>setTimeout(()=>{window.print();window.close()},300)</script></body></html>`)
+    // escapeHtml en los campos del maestro: vienen de Firestore y un valor con
+    // <script> imprimiría ejecutándose en la ventana nueva (stored XSS).
+    w.document.write(`<html><head><title>QR ${escapeHtml(item.codigoSAP)}</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h2{margin:0 0 4px}p{margin:2px 0;color:#666;font-size:12px}.qr{margin:16px auto}</style></head><body><h2>${escapeHtml(item.textoBreve)}</h2><p>${escapeHtml(item.codigoSAP)}</p>${item.codigoFabricante ? `<p>${escapeHtml(item.codigoFabricante)}</p>` : ''}<div class="qr">${svgHtml}</div><p>${escapeHtml(item.ubicacionBodega || '')}</p><script>setTimeout(()=>{window.print();window.close()},300)</script></body></html>`)
     w.document.close()
   }
 
