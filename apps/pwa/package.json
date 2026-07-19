@@ -64,6 +64,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.468.0",
     "maplibre-gl": "^5.23.0",
+    "motion": "^12.42.2",
     "pdfjs-dist": "4.10.38",
     "pizzip": "^3.2.0",
     "postprocessing": "^6.39.1",
