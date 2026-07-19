@@ -78,6 +78,7 @@ import {
 } from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
+import { softenAccentHex } from '@/lib/softenColor'
 
 interface TurnoSummary {
   totalPieces: number
@@ -4461,7 +4462,7 @@ export function GraderHistoricalCalendar({
                             >
                               <span
                                 className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-black/30"
-                                style={{ backgroundColor: item.color || '#64748b' }}
+                                style={{ backgroundColor: softenAccentHex(item.color || '#64748b') }}
                               />
                               <span className="text-foreground/70 truncate shrink-0 w-[7.5rem]">
                                 {item.name || 'Sin categoría'}
@@ -4472,7 +4473,7 @@ export function GraderHistoricalCalendar({
                                   className="h-full rounded-full opacity-80"
                                   style={{
                                     width:           `${Math.max(pct, 1)}%`,
-                                    backgroundColor: item.color || '#64748b',
+                                    backgroundColor: softenAccentHex(item.color || '#64748b'),
                                     transformOrigin: 'left center',
                                   }}
                                 />

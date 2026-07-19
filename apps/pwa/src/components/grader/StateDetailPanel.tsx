@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui'
 import { X, Clock, Activity, AlertCircle, Pause, Wrench } from 'lucide-react'
 import type { UpstreamMachineShift, UpstreamMachineState } from '@/services/shoplogix/types'
 import { fmtTimeWithSec, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { softenAccentHex } from '@/lib/softenColor'
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
         <div className="flex items-center gap-2 min-w-0">
           <span
             className="w-3 h-3 rounded-sm shrink-0 ring-1 ring-slate-900/50"
-            style={{ backgroundColor: state.color }}
+            style={{ backgroundColor: softenAccentHex(state.color) }}
           />
           <StateIcon type={state.type} />
           <div className="min-w-0">
