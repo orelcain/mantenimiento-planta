@@ -8,7 +8,7 @@ const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestor
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
-const { randomUUID, createHmac } = require('crypto')
+const { randomUUID, createHmac, timingSafeEqual } = require('crypto')
 const { getAuth } = require('firebase-admin/auth')
 
 initializeApp()
@@ -5809,8 +5809,14 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest()
   const expectedHash = createHmac('sha256', secretKey).update(checkString).digest('hex')
 
-  if (expectedHash !== hash) {
-    logger.warn('mintTelegramAuthToken: HMAC inválido', { expected: expectedHash, got: hash })
+  // Comparación en tiempo constante (timingSafeEqual exige longitudes iguales,
+  // así que un hash malformado se rechaza antes). No loggear los valores: el
+  // esperado se deriva del bot token y filtrarlo en logs regala material de
+  // ataque; con el prefijo del checkString basta para depurar.
+  const expectedBuf = Buffer.from(expectedHash, 'utf8')
+  const gotBuf = Buffer.from(String(hash), 'utf8')
+  if (expectedBuf.length !== gotBuf.length || !timingSafeEqual(expectedBuf, gotBuf)) {
+    logger.warn('mintTelegramAuthToken: HMAC inválido', { checkStringPreview: checkString.slice(0, 80) })
     res.status(401).json({ error: 'Datos de autenticación inválidos' })
     return
   }
