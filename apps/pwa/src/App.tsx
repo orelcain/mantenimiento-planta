@@ -64,6 +64,7 @@ const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage
 const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
 const ShoplogixNotificationsConfigPage = lazyWithReload(() => import('@/pages/admin/ShoplogixNotificationsConfigPage').then((mod) => ({ default: mod.ShoplogixNotificationsConfigPage })))
 const TelegramSyncPage = lazyWithReload(() => import('@/pages/admin/TelegramSyncPage').then((mod) => ({ default: mod.TelegramSyncPage })))
+const PowerBIExportPage = lazyWithReload(() => import('@/pages/admin/PowerBIExportPage').then((mod) => ({ default: mod.PowerBIExportPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
@@ -554,6 +555,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <TelegramSyncPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="admin/powerbi-export" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <PowerBIExportPage />
                 </Suspense>
               </AdminRoute>
             } />
