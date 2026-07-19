@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
 import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
-import { useAuthStore, usePermissionsStore } from '@/store'
+import { useAuthStore, usePermissionsStore, startSessionWatchdog } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
@@ -216,6 +216,11 @@ export function App() {
 
     return () => unsubscribe()
   }, [setUser, setLoading, loadPermissions, clearPermissions])
+
+  // Watchdog de sesión: expira por inactividad real con la pestaña abierta
+  // (antes solo se chequeaba al recargar) y refresca lastActivity con la
+  // interacción del usuario. Ver startSessionWatchdog en authStore.
+  useEffect(() => startSessionWatchdog(), [])
 
   return (
     <HelpProvider>

@@ -197,3 +197,75 @@ export class ActionQueue<T = any> {
     return this.processing
   }
 }
+
+/**
+ * Limitador de INTENTOS FALLIDOS persistente en localStorage.
+ *
+ * A diferencia de RateLimiter (en memoria, se resetea con recargar la página):
+ *  - Solo cuenta FALLOS explícitos (recordFailure) — un login exitoso o un
+ *    error de validación local no consumen intentos.
+ *  - Persiste entre recargas/pestañas: recargar la página NO burla el lockout.
+ *  - isBlocked() no tiene efectos secundarios (se puede consultar libremente).
+ *
+ * Sigue siendo defensa del lado del cliente (la protección server-side real la
+ * da el throttling propio de Firebase Auth); esto elimina el bypass trivial.
+ */
+export class PersistentFailureLimiter {
+  private storageKey: string
+  private maxFailures: number
+  private windowMs: number
+
+  constructor(storageKey: string, maxFailures: number, windowMs: number) {
+    this.storageKey = storageKey
+    this.maxFailures = maxFailures
+    this.windowMs = windowMs
+  }
+
+  private load(): number[] {
+    try {
+      const raw = localStorage.getItem(this.storageKey)
+      if (!raw) return []
+      const parsed: unknown = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      const windowStart = Date.now() - this.windowMs
+      return parsed.filter((ts): ts is number => typeof ts === 'number' && ts > windowStart)
+    } catch {
+      return [] // localStorage inaccesible (modo privado) → degrada a sin lockout
+    }
+  }
+
+  private save(timestamps: number[]): void {
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(timestamps))
+    } catch {
+      // sin persistencia disponible: el lockout queda solo en memoria de esta carga
+    }
+  }
+
+  isBlocked(): boolean {
+    return this.load().length >= this.maxFailures
+  }
+
+  recordFailure(): void {
+    const timestamps = this.load()
+    timestamps.push(Date.now())
+    this.save(timestamps)
+  }
+
+  /** Tiempo restante de bloqueo en ms (0 si no está bloqueado). */
+  timeUntilNext(): number {
+    const timestamps = this.load()
+    if (timestamps.length < this.maxFailures) return 0
+    const oldest = timestamps[0] ?? Date.now()
+    return Math.max(0, oldest + this.windowMs - Date.now())
+  }
+
+  /** Limpia el historial (llamar tras un login exitoso). */
+  reset(): void {
+    try {
+      localStorage.removeItem(this.storageKey)
+    } catch {
+      // nada que limpiar si no hay storage
+    }
+  }
+}
