@@ -10,15 +10,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Acentos "mate" (pedido de Orel 2026-07-17): las familias stock de
-        // Tailwind que usamos como acento (~1.600 usos) quedan desaturadas en
-        // los tonos 400/500 — misma luminosidad (el contraste texto/fondo no
-        // cambia en ningún tema), menos croma (nada neón). El claro usa
+        // Acentos "mate" (pedido de Orel 2026-07-17, recroma'ados -50% en oklch
+        // 2026-07-19 — el semáforo se sentía "muy brillante" usado como bloque;
+        // ver /antarfood-design-system para el detalle). Las familias stock de
+        // Tailwind que usamos como acento quedan desaturadas en los tonos
+        // 400/500 — mismo hue, menos croma (nada neón). El claro usa
         // mayormente -600 (intactos); el oscuro -400/-500.
-        emerald: { ...colors.emerald, 400: '#45b493', 500: '#2aa07e' },
-        green: { ...colors.green, 400: '#66bd88', 500: '#3aa869' },
-        red: { ...colors.red, 400: '#e07d7d', 500: '#d95757' },
-        amber: { ...colors.amber, 400: '#d9ab4e', 500: '#cf9636' },
+        //
+        // ⚠ TRADE-OFF CONSCIENTE: a -50% el patrón text-400/dark:text-400 sobre
+        // bg-500/15 (badges/chips oscuros, ~30+ usos solo en BodegaView) cae
+        // BAJO 4.5:1 WCAG AA en emerald (4.09:1) y red (3.99:1); amber queda
+        // justo (4.44:1). Orel decidió mantener -50% aceptando el trade-off de
+        // contraste por el look menos "neón". Si algún día se reporta que un
+        // chip oscuro es difícil de leer, esto es la causa — no es un bug
+        // nuevo, es esta decisión (memoria Claude:
+        // reference_skill_antarfood_design_system.md tiene el detalle completo).
+        emerald: { ...colors.emerald, 400: '#6c9a8a', 500: '#62917f' },
+        green: { ...colors.green, 400: '#779f85', 500: '#679576' },
+        red: { ...colors.red, 400: '#b2807f', 500: '#b0706d' },
+        amber: { ...colors.amber, 400: '#ac966e', 500: '#a88c64' },
         yellow: { ...colors.yellow, 400: '#d9bc4a' },
         blue: { ...colors.blue, 400: '#6da3d8', 500: '#4a86c8' },
         violet: { ...colors.violet, 400: '#a190d6', 500: '#7d68c4' },
@@ -67,15 +77,15 @@ export default {
           foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         destructive: {
-          DEFAULT: '#f44336',
+          DEFAULT: '#bf6c61',
           foreground: '#ffffff',
         },
         success: {
-          DEFAULT: '#4caf50',
+          DEFAULT: '#6c986c',
           foreground: '#ffffff',
         },
         warning: {
-          DEFAULT: '#ff9800',
+          DEFAULT: '#c08e5f',
           foreground: '#000000',
         },
         border: 'rgb(var(--border) / <alpha-value>)',
