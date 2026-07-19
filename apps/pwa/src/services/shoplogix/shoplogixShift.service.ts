@@ -273,9 +273,13 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
   }
 
   // Función de detección "Planned Downtime" — igual que en shoplogixNormalizer.ts.
-  // type='break' + reason contains 'planned downtime' (case-insensitive).
-  const isPlannedDT = (s: UpstreamMachineState) =>
-    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime')
+  // Shoplogix cambió el idioma del reason (feb-2026 en español, jul-2026 en
+  // inglés) — aceptar ambos, case-insensitive.
+  const isPlannedDT = (s: UpstreamMachineState) => {
+    if (s.type !== 'break') return false
+    const r = s.reason.toLowerCase()
+    return r.includes('planned downtime') || r.includes('detencion programada') || r.includes('detención programada')
+  }
 
   // Si los docs Firestore aún no traen shiftRuntime/breakdown (data legacy),
   // los recomputamos desde states. Si sí traen breakdown, lo completamos con
