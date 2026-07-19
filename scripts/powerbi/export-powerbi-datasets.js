@@ -12,6 +12,9 @@
  *   fact_incidencias.csv        ← incidents (con horas de resolución para MTTR)
  *   fact_shoplogix_turnos.csv   ← shoplogix > shifts > machines (1 fila máquina-turno)
  *   fact_shoplogix_estados.csv  ← states agregados por causa (Pareto avería vs operacional)
+ *   fact_grader_turnos.csv      ← graderDailySummaries (1 fila por turno del Grader/Marelec)
+ *   fact_grader_p0_causas.csv   ← topP0Causes por turno (Pareto de rechazo P0)
+ *   fact_grader_calibres.csv    ← calibreDistribution por turno (mix de calibres)
  * Dimensiones:
  *   dim_equipos.csv             ← hierarchy (con ruta y área resueltas)
  *   dim_equipment.csv           ← equipment (criticidad NFPA 70B, tipo, marca)
@@ -202,6 +205,8 @@ async function exportShoplogix() {
 
   for (const doc of machineDocs) {
     const d = doc.data()
+    // Ruta: shoplogix/{plantSlug}/shifts/{dateKey}_{shiftId}/machines/{machineid}
+    const plantSlug = doc.ref.path.split('/')[1] || 'chonchi'
     const shiftDocId = doc.ref.parent.parent ? doc.ref.parent.parent.id : ''
     const dateKey = d.dateKey ?? shiftDocId.split('_')[0] ?? ''
     const shiftId = d.shiftId ?? shiftDocId.slice(dateKey.length + 1)
@@ -223,10 +228,11 @@ async function exportShoplogix() {
       // Agregado por causa para el Pareto
       const name = clean(s.name ?? '')
       const reason = clean(s.reason ?? '')
-      const key = [dateKey, shiftId, maquina, type, name, reason].join('|')
+      const key = [plantSlug, dateKey, shiftId, maquina, type, name, reason].join('|')
       const prev = estadosAgg.get(key) ?? {
         dateKey, shiftId, maquina, tipo: type, estado: name, causa: reason,
         categoria: c.categoria, esAveria: c.esAveria ? 1 : 0, totalSec: 0, eventos: 0,
+        plantId: plantSlug,
       }
       prev.totalSec += dur
       prev.eventos += 1
@@ -258,7 +264,7 @@ async function exportShoplogix() {
       averiaMacroCount: acc.averiaMacroCount,
       averiaMicroSec: Math.round(acc.averiaMicroSec),
       averiaMicroCount: acc.averiaMicroCount,
-      plantId: 'chonchi',
+      plantId: plantSlug,
     })
   }
 
@@ -268,6 +274,68 @@ async function exportShoplogix() {
   const estadoRows = [...estadosAgg.values()].map((r) => ({ ...r, totalSec: Math.round(r.totalSec) }))
   estadoRows.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))
   writeCsv('fact_shoplogix_estados.csv', Object.keys(estadoRows[0] ?? { dateKey: '' }), estadoRows)
+}
+
+/**
+ * Grader (Excel del Marelec): 1 fila por turno + Paretos de P0 y calibres.
+ * Fuente: `graderDailySummaries` (ID `${plantLineId?}__${dateKey}__${shiftId}`;
+ * sin plantLineId = 'chonchi-eviscerado' legacy). La data existe solo si el
+ * supervisor subió el Excel del turno — por eso las filas son más ralas que
+ * Shoplogix: el join natural con el resto del modelo es por fecha + planta.
+ */
+/**
+ * Los timestamps del Grader vienen en la convención `Z-as-wall-clock-local`
+ * del módulo (hora Chile del Excel con sufijo Z falso — ver graderExcelParser
+ * `toWallClockIso`). NO pasar por fmt(): eso restaría el offset de Chile a una
+ * hora que ya es local. Solo se limpia el formato.
+ */
+function wallIso(v) {
+  if (typeof v !== 'string' || !v.includes('T')) return ''
+  return v.replace('T', ' ').slice(0, 19)
+}
+
+async function exportGrader() {
+  const docs = await fetchAll('graderDailySummaries')
+  const turnoRows = []
+  const p0Rows = []
+  const calibreRows = []
+
+  for (const d of docs) {
+    const plantLineId = d.plantLineId || 'chonchi-eviscerado'
+    const base = { plantLineId, dateKey: d.dateKey ?? '', shiftId: d.shiftId ?? '' }
+    const durMin = Number(d.durationMinutes) || 0
+    const totalPieces = Number(d.totalPieces) || 0
+    turnoRows.push({
+      id: d.id,
+      ...base,
+      turnoLabel: d.turnoLabel ?? '',
+      especie: d.species ?? '',
+      totalPieces,
+      pointZeroPieces: Number(d.pointZeroPieces) || 0,
+      pointZeroPct: Number(d.pointZeroPct) || 0,
+      totalWeightKg: Number(d.totalWeightKg) || 0,
+      avgWeightGrams: Number(d.avgWeightGrams) || 0,
+      productionRatePerHour: Number(d.productionRatePerHour) || 0,
+      durationMinutes: durMin,
+      cadenciaPzMin: durMin > 0 ? Number((totalPieces / durMin).toFixed(1)) : 0,
+      startAt: wallIso(d.startAt),
+      endAt: wallIso(d.endAt),
+      updatedAt: fmt(d.updatedAt),
+    })
+    for (const c of Array.isArray(d.topP0Causes) ? d.topP0Causes : []) {
+      p0Rows.push({ ...base, causa: c.error ?? '', piezas: Number(c.pieces) || 0, pct: Number(c.pct) || 0 })
+    }
+    for (const c of Array.isArray(d.calibreDistribution) ? d.calibreDistribution : []) {
+      calibreRows.push({ ...base, calibre: c.calibre ?? '', piezas: Number(c.pieces) || 0, pct: Number(c.pct) || 0 })
+    }
+  }
+
+  turnoRows.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))
+  p0Rows.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))
+  calibreRows.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))
+  writeCsv('fact_grader_turnos.csv', Object.keys(turnoRows[0] ?? { id: '' }), turnoRows)
+  writeCsv('fact_grader_p0_causas.csv', Object.keys(p0Rows[0] ?? { dateKey: '' }), p0Rows)
+  writeCsv('fact_grader_calibres.csv', Object.keys(calibreRows[0] ?? { dateKey: '' }), calibreRows)
 }
 
 async function exportDimEquipos() {
@@ -333,6 +401,7 @@ async function main() {
   await exportParosManuales()
   await exportIncidencias()
   await exportShoplogix()
+  await exportGrader()
   await exportDimEquipos()
   await exportDimEquipment()
   const stamp = { exportadoEn: new Date().toISOString(), zonaHoraria: 'America/Santiago (fechas de los CSV)' }
