@@ -190,11 +190,15 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
         .map(s => clipStateToWindow(s, shiftStart, shiftEnd))
     : allStates
 
-  // "Planned Downtime" (type='break', reason contains 'planned downtime') =
-  // período POST-TURNO capturado por la ventana de consulta. Debe excluirse
-  // del denominador de shiftRuntime.
-  const isPlannedDT = (s) =>
-    s.type === 'break' && (s.reason || '').toLowerCase().includes('planned downtime')
+  // "Planned Downtime" (type='break') = período POST-TURNO capturado por la
+  // ventana de consulta. Debe excluirse del denominador de shiftRuntime.
+  // Shoplogix cambió el idioma del reason entre feb-2026 ("DETENCION
+  // PROGRAMADA") y jul-2026 ("Planned Downtime") — aceptar ambos.
+  const isPlannedDT = (s) => {
+    if (s.type !== 'break') return false
+    const r = (s.reason || '').toLowerCase()
+    return r.includes('planned downtime') || r.includes('detencion programada') || r.includes('detención programada')
+  }
 
   const shiftRuntimeBreakdown = {
     uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),

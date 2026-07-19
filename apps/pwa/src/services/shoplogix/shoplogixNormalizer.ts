@@ -206,8 +206,14 @@ export function normalizeShift(params: {
   //
   // El `actualRuntime` crudo de Shoplogix usa un denominador opaco (ej. 11.2%
   // cuando el Uptime real era 46% del turno Feb 26 E1) — no usar.
-  const isPlannedDT = (s: UpstreamMachineState) =>
-    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime');
+  // Shoplogix cambió el idioma del reason entre feb-2026 ("DETENCION PROGRAMADA",
+  // 45 states reales de ese mes) y jul-2026 ("Planned Downtime") — aceptar ambos
+  // o los turnos de feb deflactan la disponibilidad contándolos como break.
+  const isPlannedDT = (s: UpstreamMachineState) => {
+    if (s.type !== 'break') return false;
+    const r = s.reason.toLowerCase();
+    return r.includes('planned downtime') || r.includes('detencion programada') || r.includes('detención programada');
+  };
 
   const shiftRuntimeBreakdown = {
     uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),

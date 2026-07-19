@@ -85,8 +85,12 @@ function makeShift(
 
   // Mismo cálculo que el normalizer real para mantener parity en demo data.
   // Demo data no tiene "Planned Downtime" (post-shift) → plannedDowntimeSec = 0.
-  const isPlannedDT = (s: UpstreamMachineState) =>
-    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime');
+  const isPlannedDT = (s: UpstreamMachineState) => {
+    if (s.type !== 'break') return false;
+    const r = s.reason.toLowerCase();
+    // Bilingüe, igual que el normalizer real (feb-2026 español / jul-2026 inglés).
+    return r.includes('planned downtime') || r.includes('detencion programada') || r.includes('detención programada');
+  };
   const breakdown = {
     uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
     breakSec:           states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0),
