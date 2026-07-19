@@ -5,6 +5,7 @@
 
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { escapeHtml } from '@/lib/escapeHtml'
 import type { PhotoComparison, PhotoEvidence, PhotoEvidenceStatus, PhotoItem } from '@/types'
 
 // Configuración del PDF
@@ -697,7 +698,7 @@ async function downloadAsPDF(canvases: HTMLCanvasElement[], title: string): Prom
     <!DOCTYPE html>
     <html>
     <head>
-      <title>${title}</title>
+      <title>${escapeHtml(title)}</title>
       <style>
         @page {
           size: A4;
