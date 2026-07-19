@@ -23,11 +23,13 @@ import {
 import { useAuthStore } from '@/store'
 import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
-import { RateLimiter } from '@/lib/rate-limit'
+import { PersistentFailureLimiter } from '@/lib/rate-limit'
 import { APP_VERSION } from '@/constants/version'
 
-// Max 5 intentos de login/registro cada 2 minutos
-const authRateLimiter = new RateLimiter(5, 2 * 60 * 1000)
+// Max 5 FALLOS de login/registro cada 2 minutos. Persistente en localStorage:
+// recargar la página no resetea el lockout (el RateLimiter anterior era en
+// memoria y además contaba éxitos y errores de validación como intentos).
+const authFailureLimiter = new PersistentFailureLimiter('auth-failed-attempts', 5, 2 * 60 * 1000)
 
 type AuthMode = 'login' | 'register'
 
@@ -101,10 +103,10 @@ export function LoginPage() {
     setError(null)
     setValidationErrors({})
 
-    // Rate limit: max 5 intentos cada 2 min
-    if (!authRateLimiter.canExecute()) {
-      const waitSec = Math.ceil(authRateLimiter.timeUntilNext() / 1000)
-      setError(`Demasiados intentos. Espera ${waitSec}s antes de intentar de nuevo.`)
+    // Lockout: max 5 fallos cada 2 min (persiste entre recargas)
+    if (authFailureLimiter.isBlocked()) {
+      const waitSec = Math.ceil(authFailureLimiter.timeUntilNext() / 1000)
+      setError(`Demasiados intentos fallidos. Espera ${waitSec}s antes de intentar de nuevo.`)
       return
     }
 
@@ -154,9 +156,11 @@ export function LoginPage() {
       }
       
       setUser(user)
+      authFailureLimiter.reset() // login OK → limpiar historial de fallos
       logger.info(`${mode} successful`, { userId: user.id, email: user.email })
       navigate(redirectTo)
     } catch (err: unknown) {
+      authFailureLimiter.recordFailure() // solo los fallos reales consumen intentos
       const errorObj = err instanceof Error ? err : new Error('Authentication error')
       logger.error('Auth error', errorObj)
       setError(getErrorMessage((err as any).code || (err as any).message))

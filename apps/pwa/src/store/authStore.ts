@@ -64,6 +64,62 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
+/**
+ * Watchdog de sesión — cierra dos agujeros del timeout de inactividad:
+ *
+ *  1. La expiración solo se evaluaba en onRehydrateStorage (al recargar la
+ *     app): una pestaña abierta sin recargar = sesión eterna. Ahora se
+ *     re-evalúa cada minuto y al volver a la pestaña (visibilitychange).
+ *  2. `refreshActivity` no lo llamaba nadie: `lastActivity` quedaba clavado
+ *     en el momento del login, así que "24h de inactividad" era en realidad
+ *     "24h desde el login" aunque el usuario estuviera usando la app en
+ *     pleno turno. Ahora la interacción real (tap/tecla) refresca la marca,
+ *     con throttle de 1 min para no spamear el storage.
+ *
+ * Llamar UNA vez al montar la app. Devuelve cleanup.
+ */
+export function startSessionWatchdog(): () => void {
+  const expireIfInactive = () => {
+    const { isAuthenticated, lastActivity, logout } = useAuthStore.getState()
+    if (
+      isAuthenticated &&
+      lastActivity !== null &&
+      Date.now() - lastActivity > INACTIVITY_TIMEOUT_MS
+    ) {
+      // Mismo semántica que el check de onRehydrateStorage: limpiar el estado
+      // local; Firebase Auth confirma vía onAuthChange en la próxima carga.
+      logout()
+    }
+  }
+
+  let lastRefresh = 0
+  const onActivity = () => {
+    const now = Date.now()
+    if (now - lastRefresh < 60_000) return // throttle 1/min
+    const { isAuthenticated, refreshActivity } = useAuthStore.getState()
+    if (isAuthenticated) {
+      lastRefresh = now
+      refreshActivity()
+    }
+  }
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') expireIfInactive()
+  }
+
+  const intervalId = setInterval(expireIfInactive, 60_000)
+  window.addEventListener('pointerdown', onActivity, { passive: true })
+  window.addEventListener('keydown', onActivity, { passive: true })
+  document.addEventListener('visibilitychange', onVisibility)
+
+  return () => {
+    clearInterval(intervalId)
+    window.removeEventListener('pointerdown', onActivity)
+    window.removeEventListener('keydown', onActivity)
+    document.removeEventListener('visibilitychange', onVisibility)
+  }
+}
+
 // Helpers para verificar roles
 export function useIsAdmin() {
   const user = useAuthStore((state) => state.user)
