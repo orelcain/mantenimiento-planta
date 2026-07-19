@@ -1911,7 +1911,7 @@ export function AnalisisGraderTurnoPage() {
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground/40">
-                Link válido 7 días · sin login · solo lectura
+                Link válido 24 horas · sin login · solo lectura
               </p>
             </div>
           )}
