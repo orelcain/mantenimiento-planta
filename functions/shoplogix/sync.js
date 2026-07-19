@@ -23,7 +23,7 @@ const { PLANT_MACHINES, PLANT_AREA_ID } = require('./machines')
 const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
-const { pauseBetweenMachines, currentShift, toChileWall } = require('./polling')
+const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours } = require('./polling')
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
@@ -514,9 +514,19 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
 
     // Turno cerrado y ya capturado en su forma final → no reescribir.
+    // OJO escalas de tiempo: `group.scheduledEnd` viene en wall-clock-as-UTC
+    // (hora Chile "disfrazada" de UTC, como todo lo derivado de intervals),
+    // pero `syncedAt` y el `lastSyncAt` del doc son UTC REALES. Convertir el
+    // cierre a UTC real antes de comparar: sin esto `closedForMs` queda
+    // inflado en +3/4h (offset Chile) > gracia de 2h, y un turno EN CURSO se
+    // "congela" tras su primera escritura (bug 19-07: vista en vivo muerta
+    // mientras Shoplogix seguía entregando datos).
+    const scheduledEndReal = new Date(
+      group.scheduledEnd.getTime() + chileUtcOffsetHours(syncedAt) * 3600_000,
+    )
     if (!forceAll && await isShiftAlreadyFrozen({
       db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
-      scheduledEnd: group.scheduledEnd, now: syncedAt, logger,
+      scheduledEnd: scheduledEndReal, now: syncedAt, logger,
     })) {
       frozenSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
       allShiftResults.push({ shiftId: group.shiftId, skipped: 'frozen' })
