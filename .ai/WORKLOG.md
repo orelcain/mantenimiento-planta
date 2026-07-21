@@ -13,6 +13,39 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-21 - claude - Calendario Grader: tooltips mobile + total 24h + reconciliación post-brief Shoplogix
+
+- Hecho: (1) `ChipTooltip` en `GraderHistoricalCalendar` — tooltip tap+hover (portal, cierre tap-fuera, patrón de `ui/InfoTooltip`) reemplaza los `title=` nativos de los chips Excel (primary/secondary/orphan), que eran invisibles en mobile; `renderShiftChip` pasó a componente `ShiftChip`. (2) Footer "Σ 24h" por celda: total del día calendario 00:00→24:00 sumando chips Excel primary + SLX día/noche visibles (sin doble conteo — mutuamente excluyentes vía hasExcelDay/Night); tooltip con desglose por turno, escala solo cuando Yal retome 3 turnos. (3) `checkShiftReconciliation` (CF NUEVA, cron 30 min): al enviar el brief de fin de turno se guarda `endBriefSnapshot`; se re-verifica +3h y +24h contra el doc padre; si el total cambió >20 pz o >3% → alerta Telegram "🔄 Corrección Shoplogix" (antes/después por máquina) + `correctionDetected`/`reconciliationNote` en el doc. (4) Brief de FIN de turno gana línea `🕐 Horario real` (scheduledStart/End de intervals — el de INICIO muestra la plantilla oficial del rollup, que puede diferir del horario real trabajado; no había horas hardcodeadas). (5) PWA lee los campos nuevos (`parseShiftParent`) y muestra badge 🔄 en los chips SLX del calendario con el detalle en tooltip.
+- Archivos: `apps/pwa/src/components/grader/GraderHistoricalCalendar.tsx`, `apps/pwa/src/services/shoplogix/shoplogixShift.service.ts`, `apps/pwa/src/services/grader/__tests__/slxMonthResolve.test.ts`, `functions/index.js`, `functions/shoplogix/turnoBrief.js`.
+- Verificación: tsc 0, vitest slxMonthResolve 16/16, node --test turnoBrief 16/16, `node --check` functions OK. Functions DESPLEGADAS a mano (service account) y confirmadas con `functions:list`: checkShiftReconciliation creada, checkShiftEndBriefs actualizada.
+- Estado: HECHO — functions en prod; PWA se despliega con este push a main.
+- Sigue: verificar la 1ª corrección real detectada (alerta 🔄 + badge en calendario); probar tooltips en mobile real.
+
+## 2026-07-19 - claude - Power BI: export Grader + página "Análisis de Turno" — PR #252
+
+- Hecho: retomado el pendiente de pulir el tablero Power BI piloto. `scripts/powerbi/export-powerbi-datasets.js` gana 3 tablas nuevas del Grader (`graderDailySummaries` → `fact_grader_turnos`/`fact_grader_p0_causas`/`fact_grader_calibres`) más fix de `plantId` hardcodeado en `fact_shoplogix_turnos/estados` (afectaba 781/1582 filas con Yal en temporada). El resto del trabajo (modelo, medidas DAX, página nueva, publish) fue en Power BI Desktop directamente (fuera de este repo) vía sesión de computer-use: relaciones dims↔facts + `dim_fecha`, medidas `P0 %`/`Disponibilidad %`/`Averia Macro Horas`/`Piezas Grader`, página "Análisis de Turno" con 4 KPIs + Pareto P0 + mix calibres + Pareto averías Shoplogix (filtrado `esAveria=1`, excluye Planned Downtime). Publicado y verificado en vivo en app.powerbi.com.
+- Archivos: `scripts/powerbi/export-powerbi-datasets.js` (+71). Detalle completo (medidas, relaciones, gotchas del publish) en memoria de Claude `project_correo_empresa_m365_orelcain.md`.
+- Verificación: export corrido contra Firestore real (10 CSVs OK). Publish a Power BI Service confirmado vía navegador (timestamp + página visible con datos).
+- Estado: HECHO — PR #252 mergeado, `.pbix` publicado.
+- Sigue (no bloqueante): slicer de fecha en la página, medidas MTTR/MTBF, filtro Planned Downtime a nivel de página en vez de solo el gráfico de averías.
+
+## 2026-07-19 - claude - Shoplogix: turnos EN CURSO se congelaban tras la 1ª escritura — PR #251 (URGENTE)
+
+- Origen: Orel reporta que la PWA no muestra data de Yal Turno 2 con Shoplogix entregando hace +20 min. Diagnóstico con Firestore + logs de `shoplogixSyncWakeup`: el poller vivo y con datos frescos, pero cada poll saltea el turno por "congelado" — doc pegado en su 1ª escritura (16:23, 0 ciclos).
+- Causa raíz: `isShiftAlreadyFrozen` compara `scheduledEnd` (wall-clock-as-UTC) contra `now`/`lastSyncAt` (UTC reales) → `closedForMs` inflado +4h (invierno) > gracia 2h → cualquier turno, incluso en curso, se congela apenas tiene una escritura. No se vio antes: freeze reciente (optimización writes) y sin turnos vivos con producción (Chonchi 0 ciclos desde 21-06; Yal arrancó temporada HOY). Días pasados se ven bien porque el re-sync retroactivo usa forceAll.
+- Fix: convertir el cierre a UTC real (`+ chileUtcOffsetHours(syncedAt)`) antes del freeze check, en el call site de `syncDay`. Self-healing al desplegar (el próximo poll reescribe los turnos pegados del día; no hay pérdida de data).
+- Archivos: `functions/shoplogix/sync.js` (+12/-2).
+- Verificación: 71/71 tests del módulo shoplogix OK (frozenShift 15/15). Diagnóstico validado contra doc real `shoplogix/yal/shifts/2026-07-19_Turno 2` y logs de prod.
+- Estado: HECHO — mergeado (squash, OK de Orel) 22:00Z, deploy functions verde 2m46s, y VERIFICADO en prod: wakeup 22:03Z reescribió `2026-07-19_Turno 2` (ciclos 581/592/448, frozenSkipped=0, paros reales CINTAS/FALTA MMPP). Vista en vivo revivida sin pérdida de data.
+
+## 2026-07-19 - claude - Admin: botón "Actualizar Power BI" (export + refresh a demanda) — PR #250
+
+- Hecho: página `/admin/powerbi-export` (patrón sync-telegram): la PWA deja la orden en el doc de control `powerbiExport/chonchi`; el agente del PC (`C:\Users\orelc\automation\agente_powerbi.py`, tarea "ANTARFOOD PowerBI Agente" c/15 min, YA creada y probada) corre el export de CSVs → OneDrive empresa y dispara el refresh del dataset `KPIs_Mantencion_Piloto` en Power BI Service (REST + token MSAL en caché, `powerbi_auth.py`). La página muestra heartbeat, estado, refreshOk, duración e historial (`corridas`, solo Admin SDK). También se commiteó `scripts/powerbi/export-powerbi-datasets.js` (corría en prod local pero estaba fuera de git).
+- Archivos: `apps/pwa/src/services/powerbiExport.service.ts` (nuevo), `apps/pwa/src/pages/admin/PowerBIExportPage.tsx` (nuevo), `App.tsx`, `AdminPanelPage.tsx`, `firestore.rules` (bloque `powerbiExport/{plantId}` calcado de `telegramSync`), `scripts/powerbi/export-powerbi-datasets.js`.
+- Verificación: tsc 0 + eslint 0 + build prod OK (worktree `D:\a\wt-powerbi-button`). Ciclo end-to-end probado con orden simulada vía Admin SDK: export real OK (31,4 s), refresh falla limpio con "Power BI requiere login" (esperado), doc + corrida escritos.
+- Estado: HECHO — Danilo corrió el login device-code (token OK), PR #250 mergeado con su OK (squash 22:09Z), deploys PWA + rules verdes, y ciclo E2E verificado: orden→agente→export 33 s→refresh ViaApi **Completed** en Power BI Service (22:10:48→22:11:10). Doc de control: estado ok / refreshOk true.
+- Sigue: solo el clic real de Orel en `/admin/powerbi-export` cuando quiera usarlo.
+
 ## 2026-07-14 - claude - PWA: recuperación robusta ante "Failed to fetch dynamically imported module" post-deploy
 
 - Origen: usuarios con la app abierta al entrar un deploy ven la pantalla de error del ErrorBoundary. Causa raíz: GitHub Pages sirve con `Cache-Control: max-age=600` y los chunks con hash viejo desaparecen; el `lazyWithReload` viejo solo recargaba 1 vez (si el index seguía cacheado, el 2º fallo tiraba al boundary) y su flag de sessionStorage quedaba seteado tras una recuperación exitosa, así que el siguiente deploy en la misma pestaña caía al boundary SIN reintentar. El parche de auto-reload que había en `componentDidCatch` renderizaba igual la pantalla de error (getDerivedStateFromError pinta antes) y no bustea caché.

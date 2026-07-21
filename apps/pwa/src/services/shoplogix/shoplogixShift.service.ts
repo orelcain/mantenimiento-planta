@@ -948,6 +948,14 @@ export interface ShoplogixShiftParent {
   machines: ParentMachineSummary[]
   /** true si `machines[]` trae los agregados → el mes se resuelve sin subcolección. */
   hasAggregates: boolean
+  /**
+   * true si `checkShiftReconciliation` (Cloud Function) detectó que Shoplogix
+   * cambió los datos de este turno DESPUÉS de haberse enviado el brief de fin
+   * de turno por Telegram — ej. re-etiquetado retroactivo. Ver `reconciliationNote`
+   * para el detalle (antes/después).
+   */
+  correctionDetected: boolean
+  reconciliationNote: string | null
 }
 
 function parseParentMachine(raw: unknown): ParentMachineSummary | null {
@@ -1003,6 +1011,8 @@ function parseShiftParent(docId: string, data: FirestoreData): ShoplogixShiftPar
     parentSchemaVersion,
     machines,
     hasAggregates,
+    correctionDetected: data.correctionDetected === true,
+    reconciliationNote: typeof data.reconciliationNote === 'string' ? data.reconciliationNote : null,
   }
 }
 

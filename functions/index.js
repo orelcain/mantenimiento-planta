@@ -7252,6 +7252,13 @@ exports.checkShiftEndBriefs = onSchedule(
             }
 
             const plantLabel = SHOPLOGIX_PLANT_LABEL[plant] || plant
+            // Horario REAL (derivado de intervals, no la plantilla oficial) — el
+            // mismo campo que ya usa toda la app para mostrar turnos históricos.
+            // officialSchedule (si existe) es la plantilla fija de Shoplogix y
+            // puede no coincidir con lo que realmente se trabajó ese turno.
+            const realSchedule = data.scheduledStart?.toDate?.() && data.scheduledEnd?.toDate?.()
+              ? { start: data.scheduledStart.toDate(), end: data.scheduledEnd.toDate() }
+              : null
             const msg = turnoBriefMod.componerBriefFinTurno({
               plantLabel,
               shiftId,
@@ -7260,6 +7267,7 @@ exports.checkShiftEndBriefs = onSchedule(
               officialTargets: data.officialTargetsByMachineId ?? null,
               currentJob: data.currentJob ?? null,
               grader,
+              realSchedule,
             })
             const eligibleIds = await getShoplogixEligibleUsers(plant)
             await dispatchShoplogixNotif(
@@ -7270,9 +7278,153 @@ exports.checkShiftEndBriefs = onSchedule(
               { plant, shiftDoc: docSnap.id },
               msg,
             )
+
+            // Foto de lo reportado — la usa checkShiftReconciliation para
+            // detectar si Shoplogix corrige el turno DESPUÉS de haberlo avisado
+            // (pasa: re-etiquetado retroactivo, ver shoplogixSyncWakeup).
+            await docSnap.ref.set({
+              endBriefSnapshot: {
+                total,
+                perMachine: machines.map((m) => ({ name: m.machineName, totalCycles: m.totalCycles })),
+                sentAt: new Date(),
+              },
+            }, { merge: true })
+
             logger.info('[checkShiftEndBriefs] brief enviado', { plant, doc: docSnap.id, total })
           } catch (e) {
             logger.error('[checkShiftEndBriefs] error componiendo/enviando', { plant, doc: docSnap.id, err: e.message })
+          }
+        }
+      }
+    }
+  },
+)
+
+// ── checkShiftReconciliation ─────────────────────────────────────────────────
+// Cron cada 30 minutos. Verifica que el brief de FIN de turno ya enviado (ver
+// `endBriefSnapshot` en checkShiftEndBriefs) siga coincidiendo con lo que
+// Shoplogix reporta ahora. Existe porque Shoplogix corrige datos DESPUÉS de
+// cerrado el turno (re-etiquetado retroactivo — el mismo motivo por el que
+// `shoplogixSyncWakeup` re-sincroniza "ayer" cada hora): sin esto, una
+// corrección llega calladita a Firestore y nadie se entera de que el número
+// que ya se reportó cambió.
+//
+// Dos pasadas por turno (+3h y +24h desde el envío del brief): la de 3h agarra
+// correcciones rápidas (Shoplogix termina de cuadrar el cierre); la de 24h
+// coincide con la ventana en que shoplogixSyncWakeup re-sincroniza el día
+// anterior. Idempotente vía `reconciliationChecks.{3h,24h}.done` en el propio doc.
+exports.checkShiftReconciliation = onSchedule(
+  { schedule: 'every 30 minutes', timeZone: 'America/Santiago', region: 'us-central1' },
+  async () => {
+    const now = new Date()
+    const hoy = shoplogixSyncMod.currentDateKey()
+    const dateKeysToScan = [0, 1, 2].map((n) => {
+      const d = new Date(`${hoy}T12:00:00Z`)
+      d.setUTCDate(d.getUTCDate() - n)
+      return d.toISOString().slice(0, 10)
+    })
+
+    const CHECKS = [
+      { key: '3h', afterMs: 3 * 3600 * 1000 },
+      { key: '24h', afterMs: 24 * 3600 * 1000 },
+    ]
+    // Umbral de "corrección real" (no ruido de redondeo): diferencia absoluta
+    // relevante O relativa, lo que dispare primero.
+    const DIFF_ABS_THRESHOLD = 20
+    const DIFF_PCT_THRESHOLD = 3
+
+    for (const plant of shoplogixSyncMod.ACTIVE_PLANTS) {
+      for (const dk of dateKeysToScan) {
+        let snap
+        try {
+          snap = await db.collection(`shoplogix/${plant}/shifts`)
+            .where(FieldPath.documentId(), '>=', `${dk}_`)
+            .where(FieldPath.documentId(), '<=', `${dk}_`)
+            .get()
+        } catch (e) {
+          logger.error('[checkShiftReconciliation] query error', { plant, dk, err: e.message })
+          continue
+        }
+
+        for (const docSnap of snap.docs) {
+          const data = docSnap.data()
+          const snapshot = data.endBriefSnapshot
+          if (!snapshot?.sentAt) continue // sin brief enviado, nada que verificar
+
+          const sentAt = snapshot.sentAt.toDate?.() ?? new Date(snapshot.sentAt)
+          const checks = data.reconciliationChecks || {}
+          const dueCheck = CHECKS.find(
+            (c) => !checks[c.key]?.done && (now.getTime() - sentAt.getTime()) >= c.afterMs,
+          )
+          if (!dueCheck) continue
+
+          try {
+            // `machines` del doc padre ya trae los agregados (mismo array que
+            // usa la vista mensual) — 0 reads extra a la subcolección.
+            const currentMachines = Array.isArray(data.machines) ? data.machines : []
+            const currentTotal = currentMachines.reduce((a, m) => a + (m.totalCycles || 0), 0)
+            const snapshotTotal = snapshot.total || 0
+            const diff = currentTotal - snapshotTotal
+            const pct = snapshotTotal > 0 ? (Math.abs(diff) / snapshotTotal) * 100 : (currentTotal > 0 ? 100 : 0)
+            const isCorrection = Math.abs(diff) > DIFF_ABS_THRESHOLD || pct > DIFF_PCT_THRESHOLD
+
+            const update = {
+              reconciliationChecks: {
+                ...checks,
+                [dueCheck.key]: { done: true, at: now, diff, pctDiff: Math.round(pct * 10) / 10 },
+              },
+            }
+
+            if (isCorrection) {
+              const shiftId = data.shiftId || docSnap.id.split('_').slice(1).join('_')
+              const plantLabel = SHOPLOGIX_PLANT_LABEL[plant] || plant
+              const dateKey = data.dateKey ?? dk
+              update.correctionDetected = true
+              update.reconciliationNote =
+                `Total cambió de ${snapshotTotal.toLocaleString('es-CL')} a ${currentTotal.toLocaleString('es-CL')} `
+                + `piezas (${diff > 0 ? '+' : ''}${diff.toLocaleString('es-CL')}) tras el brief de fin de turno`
+
+              const perMachineLines = currentMachines.map((m) => {
+                const before = snapshot.perMachine?.find((s) => s.name === m.machineName)?.totalCycles ?? 0
+                const d = (m.totalCycles || 0) - before
+                return d !== 0
+                  ? `  · ${m.machineName}: ${before.toLocaleString('es-CL')} → ${(m.totalCycles || 0).toLocaleString('es-CL')} (${d > 0 ? '+' : ''}${d})`
+                  : null
+              }).filter(Boolean)
+
+              const msg = [
+                `🔄 <b>Corrección Shoplogix · ${plantLabel}</b>`,
+                `${shiftId} · ${dateKey}`,
+                '',
+                `Este turno ya se había reportado (brief de fin de turno) y Shoplogix cambió los datos después:`,
+                `📦 Total: <b>${snapshotTotal.toLocaleString('es-CL')}</b> → <b>${currentTotal.toLocaleString('es-CL')}</b> piezas`,
+                ...perMachineLines,
+                '',
+                `Verificación ${dueCheck.key} post-brief.`,
+              ].join('\n')
+
+              const config = await getShoplogixNotifConfig(plant)
+              const eligibleIds = await getShoplogixEligibleUsers(plant)
+              await dispatchShoplogixNotif(
+                config,
+                eligibleIds,
+                `🔄 Corrección de datos · ${plantLabel}`,
+                `${shiftId}: ${snapshotTotal.toLocaleString('es-CL')} → ${currentTotal.toLocaleString('es-CL')} piezas`,
+                { plant, shiftDoc: docSnap.id },
+                msg,
+              )
+              logger.info('[checkShiftReconciliation] corrección detectada y notificada', {
+                plant, doc: docSnap.id, check: dueCheck.key, diff, pct,
+              })
+            } else {
+              logger.info('[checkShiftReconciliation] sin cambios relevantes', {
+                plant, doc: docSnap.id, check: dueCheck.key, diff, pct,
+              })
+            }
+
+            await docSnap.ref.set(update, { merge: true })
+          } catch (e) {
+            logger.error('[checkShiftReconciliation] error verificando', { plant, doc: docSnap.id, err: e.message })
           }
         }
       }

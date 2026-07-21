@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
@@ -152,6 +153,93 @@ function toDateKey(iso?: string): string {
 type CalendarView = 'piezas' | 'p0' | 'uptime'
 
 /**
+ * Wrapper tap+hover para chips pequeños del calendario que NO navegan (son
+ * puramente informativos — primary/secondary/orphan de `ShiftChip` y el
+ * footer "Total del día"). En desktop se abre con hover; en mobile/tablet
+ * no hay hover así que se abre con tap (toggle) y se cierra tocando fuera —
+ * mismo patrón que `ui/InfoTooltip.tsx`, pero el trigger es el chip entero
+ * en vez de un ícono aparte, para no ocupar espacio extra en la celda.
+ */
+function ChipTooltip({
+  content,
+  children,
+  className,
+}: {
+  content: React.ReactNode
+  children: React.ReactNode
+  className?: string
+}): JSX.Element {
+  const [visible, setVisible] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+
+  const position = useCallback(() => {
+    const t = triggerRef.current
+    const tip = tooltipRef.current
+    if (!t || !tip) return
+    const r = t.getBoundingClientRect()
+    const tr = tip.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const gap = 6
+    let top = r.bottom + gap
+    if (top + tr.height > vh - 8) top = r.top - tr.height - gap
+    const left = Math.min(vw - tr.width - 8, Math.max(8, r.left + r.width / 2 - tr.width / 2))
+    setCoords({ top, left })
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
+    const raf = requestAnimationFrame(position)
+    window.addEventListener('resize', position)
+    window.addEventListener('scroll', position, true)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', position)
+      window.removeEventListener('scroll', position, true)
+    }
+  }, [visible, position])
+
+  useEffect(() => {
+    if (!visible) return
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (!target) return
+      if (triggerRef.current?.contains(target)) return
+      if (tooltipRef.current?.contains(target)) return
+      setVisible(false)
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [visible])
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        className={className}
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        onClick={(e) => { e.stopPropagation(); setVisible((v) => !v) }}
+      >
+        {children}
+      </div>
+      {visible && createPortal(
+        <div
+          ref={tooltipRef}
+          className="fixed z-[9999] w-64 rounded-lg bg-slate-800 text-slate-100 text-[10px] leading-snug p-2.5 shadow-2xl border border-slate-600/50"
+          style={{ top: coords.top, left: coords.left }}
+        >
+          {content}
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+}
+
+/**
  * Renderiza un chip de turno en una celda del calendario según su rol.
  *
  * - `primary`: chip prominente con P0% y label direccional (`D`, `N`, `→N`, `N→`).
@@ -161,16 +249,20 @@ type CalendarView = 'piezas' | 'p0' | 'uptime'
  * - `orphan-source`: chip tachado/muy atenuado en el día programado donde el turno
  *   no tuvo actividad real (ej. los 4 domingos de Feb 2026 en Chile).
  */
-function renderShiftChip(
-  chip: ShiftChipDescriptor,
-  untaggedCount: number | null,
-  view: CalendarView,
-  slxByShift: Map<string, SlxShiftCache>,
-): JSX.Element {
+function ShiftChip({
+  chip,
+  untaggedCount,
+  view,
+  slxByShift,
+}: {
+  chip: ShiftChipDescriptor
+  untaggedCount: number | null
+  view: CalendarView
+  slxByShift: Map<string, SlxShiftCache>
+}): JSX.Element {
   // Label canónico del turno (D, N, T1, T2, T3, etc.) vía helper centralizado.
   const meta = getShiftMeta(chip.shiftId)
   const label = meta.shortLabel
-  const key = `${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`
   const p0 = chip.pointZeroPct
   const colorByP0 = p0 >= DEFAULT_P0_CRITICAL_PCT
     ? 'bg-red-500/18 text-red-600'
@@ -202,14 +294,12 @@ function renderShiftChip(
     // Se muestra como indicador mínimo sin caja, para no ocupar espacio ni confundir.
     const targetDay = chip.primaryDateKey?.slice(8) ?? '--'
     return (
-      <div
-        key={key}
-        title={`${chip.shiftId} sin actividad este día — el turno continuó en día ${targetDay}`}
-        className="flex items-center justify-end leading-none opacity-30"
-        style={{ height: '11px' }}
+      <ChipTooltip
+        content={`${chip.shiftId} sin actividad este día — el turno continuó en día ${targetDay}`}
+        className="flex items-center justify-end leading-none opacity-30 cursor-help"
       >
-        <span className="text-[7px] text-muted-foreground tabular-nums">↷ {targetDay}</span>
-      </div>
+        <span style={{ height: '11px' }} className="flex items-center text-[7px] text-muted-foreground tabular-nums">↷ {targetDay}</span>
+      </ChipTooltip>
     )
   }
 
@@ -219,18 +309,18 @@ function renderShiftChip(
     // para no confundirse con P0% o piezas. Oculto en mobile.
     const pct = chip.pctOfShift != null ? Math.round(chip.pctOfShift) : 0
     return (
-      <div
-        key={key}
-        title={`${chip.shiftId} ${chip.shiftDateKey} — solo ${pct}% de la carga fue hoy; el resto continúa mañana como Madrugada (P0% del turno completo: ${p0.toFixed(1)}%)`}
+      <ChipTooltip
+        content={`${chip.shiftId} ${chip.shiftDateKey} — solo ${pct}% de la carga fue hoy; el resto continúa mañana como Madrugada (P0% del turno completo: ${p0.toFixed(1)}%)`}
         className={cn(
-          'hidden sm:flex items-center justify-between rounded-sm px-1 leading-none opacity-40 hover:opacity-70 transition-opacity border border-dashed',
+          'hidden sm:flex items-center justify-between rounded-sm px-1 leading-none opacity-40 hover:opacity-70 transition-opacity border border-dashed cursor-help',
           activeColor,
         )}
-        style={{ paddingTop: 0, paddingBottom: 0, height: '13px', borderColor: 'currentColor' }}
       >
-        <span className="text-[8px] font-medium">{label}</span>
-        <span className="text-[8px]">→</span>
-      </div>
+        <span style={{ paddingTop: 0, paddingBottom: 0, height: '13px', borderColor: 'currentColor' }} className="flex items-center justify-between w-full">
+          <span className="text-[8px] font-medium">{label}</span>
+          <span className="text-[8px]">→</span>
+        </span>
+      </ChipTooltip>
     )
   }
 
@@ -259,17 +349,19 @@ function renderShiftChip(
     : chip.direction === 'exits'
       ? ` (${Math.round(chip.pctOfShift ?? 100)}% de la carga aquí, resto mañana)`
       : ''
-  const tooltipPrimary =
-    `${chip.shiftId}${directionSuffix}\n`
-    + `• ${piecesText} piezas clasificadas (Marelec/Excel)\n`
-    + `• P0: ${p0Text}`
-    + (slxUptimePct != null ? `\n• Uptime Baader: ${uptimeText} (Shoplogix)` : '')
+  const tooltipContent = (
+    <div className="space-y-1">
+      <div className="font-semibold text-[11px] text-white">{`${chip.shiftId}${directionSuffix}`}</div>
+      <div>{`• ${piecesText} piezas clasificadas (Marelec/Excel)`}</div>
+      <div>{`• P0: ${p0Text}`}</div>
+      {slxUptimePct != null && <div>{`• Uptime Baader: ${uptimeText} (Shoplogix)`}</div>}
+    </div>
+  )
 
   return (
-    <div
-      key={key}
-      title={tooltipPrimary}
-      className={cn('flex items-center justify-between rounded px-1 py-px leading-none', activeColor)}
+    <ChipTooltip
+      content={tooltipContent}
+      className={cn('flex items-center justify-between rounded px-1 py-px leading-none cursor-help', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
       <span className="text-[9px] font-bold tabular-nums">{chipValue}</span>
@@ -278,7 +370,7 @@ function renderShiftChip(
           🏷{untaggedCount}
         </span>
       )}
-    </div>
+    </ChipTooltip>
   )
 }
 
@@ -992,6 +1084,14 @@ interface SlxShiftCache {
     plannedDowntimeSec: number
     totalTrackedSec: number
   } | null
+  /**
+   * true si `checkShiftReconciliation` (Cloud Function) detectó que Shoplogix
+   * cambió los datos de este turno DESPUÉS del brief de fin de turno ya
+   * enviado a Telegram — ej. re-etiquetado retroactivo. `reconciliationNote`
+   * trae el detalle (antes/después) para el tooltip.
+   */
+  correctionDetected: boolean
+  reconciliationNote: string | null
 }
 
 /**
@@ -1036,6 +1136,8 @@ function buildCacheFromParent(parent: ShoplogixShiftParent): SlxShiftCache {
       stateAggregates: deserializeStateAggregates(m.stateAggregates),
     })),
     breakdown: m0?.breakdown ?? null,
+    correctionDetected: parent.correctionDetected,
+    reconciliationNote: parent.reconciliationNote,
   }
 }
 
@@ -1763,6 +1865,10 @@ export function GraderHistoricalCalendar({
               plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
               totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
             } : null,
+            // Preservar lo que ya sabíamos por el doc padre (esta carga solo
+            // refina `states`, no vuelve a traer el flag de reconciliación).
+            correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
+            reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
           }
           setSlxByShift((prev) => new Map(prev).set(key, cache))
           setSlxTotalsByShift((prev) => new Map(prev).set(key, totalCycles))
@@ -1776,6 +1882,8 @@ export function GraderHistoricalCalendar({
               totalUptimeSecAllMachines: 0,
               perMachine: [],
               breakdown: null,
+              correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
+              reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
             }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
@@ -1812,6 +1920,8 @@ export function GraderHistoricalCalendar({
       totalUptimeSecAllMachines: 0,
       perMachine: [],
       breakdown: null,
+      correctionDetected: false,
+      reconciliationNote: null,
     }
 
     const loadOne = async (dk: string, shiftId: string, forceServer: boolean): Promise<number> => {
@@ -1887,6 +1997,8 @@ export function GraderHistoricalCalendar({
           plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
           totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
         } : null,
+        correctionDetected: false,
+        reconciliationNote: null,
       }
       setSlxByShift((prev)       => new Map(prev).set(key, cache))
       setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
@@ -2129,6 +2241,8 @@ export function GraderHistoricalCalendar({
             plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
             totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
           } : null,
+          correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
+          reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
         }
         setSlxByShift(prev       => new Map(prev).set(key, cache))
         setSlxTotalsByShift(prev => new Map(prev).set(key, cycles))
@@ -3629,7 +3743,15 @@ export function GraderHistoricalCalendar({
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
                   {chipsForDay
                     .filter((chip) => chip.role === 'primary')
-                    .map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null, calendarView, slxByShift))}
+                    .map((chip) => (
+                      <ShiftChip
+                        key={`${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`}
+                        chip={chip}
+                        untaggedCount={filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null}
+                        view={calendarView}
+                        slxByShift={slxByShift}
+                      />
+                    ))}
 
                   {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage.
                       En Yal (plantas no clasificadoras) también mostrar SLX
@@ -3681,6 +3803,16 @@ export function GraderHistoricalCalendar({
                     }
                     const slxDayLabel   = labelFor(slxDayNav?.shiftId, 'D')
                     const slxNightLabel = labelFor(slxNightNav?.shiftId, 'N')
+                    // Corrección post-brief detectada por checkShiftReconciliation (Cloud
+                    // Function): Shoplogix cambió estos datos DESPUÉS de haberse reportado
+                    // por Telegram. Se marca con 🔄 siempre visible (no solo al hover) para
+                    // que también se note en mobile sin necesidad de tap.
+                    const dayCorrection = slxDayNav
+                      ? slxByShift.get(`${slxDayNav.cfDateKey}__${slxDayNav.shiftId}`)
+                      : null
+                    const nightCorrection = slxNightNav
+                      ? slxByShift.get(`${slxNightNav.cfDateKey}__${slxNightNav.shiftId}`)
+                      : null
                     return (
                       <>
                         {hasSlxDay && slxDayNav && (
@@ -3689,6 +3821,9 @@ export function GraderHistoricalCalendar({
                             title={
                               (isDayLowActivity
                                 ? `⚠ Actividad baja (<${SLX_LOW_ACTIVITY_THRESHOLD} ciclos) — revisar si fue producción real, mantenimiento o ruido del sensor\n`
+                                : '')
+                              + (dayCorrection?.correctionDetected
+                                ? `🔄 Corrección post-brief: ${dayCorrection.reconciliationNote ?? 'los datos cambiaron después de reportados'}\n`
                                 : '')
                               + `Turno día (Shoplogix)\n`
                               + `• ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader\n`
@@ -3704,6 +3839,7 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">{slxDayLabel}</span>
                             <span className="text-[9px] font-bold tabular-nums">{slxDayValue}</span>
+                            {dayCorrection?.correctionDetected && <span className="text-[8px]">🔄</span>}
                           </button>
                         )}
                         {hasSlxNight && slxNightNav && (
@@ -3712,6 +3848,9 @@ export function GraderHistoricalCalendar({
                             title={
                               (isNightLowActivity
                                 ? `⚠ Actividad baja (<${SLX_LOW_ACTIVITY_THRESHOLD} ciclos) — revisar si fue producción real, mantenimiento o ruido del sensor\n`
+                                : '')
+                              + (nightCorrection?.correctionDetected
+                                ? `🔄 Corrección post-brief: ${nightCorrection.reconciliationNote ?? 'los datos cambiaron después de reportados'}\n`
                                 : '')
                               + `Turno noche (Shoplogix)`
                               + (slxNightNav.shiftId === 'Turno 3' ? ' — arranca 23:00, cubre madrugada' : '')
@@ -3728,6 +3867,7 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">{slxNightLabel}</span>
                             <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
+                            {nightCorrection?.correctionDetected && <span className="text-[8px]">🔄</span>}
                           </button>
                         )}
                       </>
@@ -3767,6 +3907,39 @@ export function GraderHistoricalCalendar({
                           <span className="text-[9px] opacity-30">—</span>
                         </button>
                       </>
+                    )
+                  })()}
+
+                  {/* Total del día: suma 00:00→24:00 de todos los turnos que aportaron
+                      a este día calendario (Excel primary + SLX día/noche mostrados —
+                      son mutuamente excluyentes vía hasExcelDay/hasExcelNight, sin doble
+                      conteo). Hoy son 2 turnos en Yal, mañana 3 sin tocar este cálculo:
+                      simplemente se suman los chips que la celda ya está mostrando. */}
+                  {(() => {
+                    const excelPieces = chipsForDay
+                      .filter((c) => c.role === 'primary')
+                      .reduce((sum, c) => sum + (c.pieces ?? 0), 0)
+                    const slxOnlyPieces = (hasSlxDay ? slxDayCycles : 0) + (hasSlxNight ? slxNightCycles : 0)
+                    const dayTotal = excelPieces + slxOnlyPieces
+                    if (dayTotal <= 0) return null
+                    return (
+                      <ChipTooltip
+                        className="mt-auto flex items-center justify-between rounded px-1 py-px leading-none bg-slate-500/10 text-muted-foreground hover:bg-slate-500/20 cursor-help"
+                        content={
+                          <div className="space-y-1">
+                            <div className="font-semibold text-[11px] text-white">{`Total del día · ${dayKey}`}</div>
+                            {chipsForDay.filter((c) => c.role === 'primary').map((c) => (
+                              <div key={c.summaryId}>{`• ${getShiftMeta(c.shiftId).shortLabel}: ${(c.pieces ?? 0).toLocaleString('es-CL')} piezas (Excel)`}</div>
+                            ))}
+                            {hasSlxDay && <div>{`• D (Shoplogix): ${slxDayCycles.toLocaleString('es-CL')} ciclos`}</div>}
+                            {hasSlxNight && <div>{`• N (Shoplogix): ${slxNightCycles.toLocaleString('es-CL')} ciclos`}</div>}
+                            <div className="text-slate-400 text-[10px]">Suma 24h calendario (00:00→00:00), no el turno de trabajo</div>
+                          </div>
+                        }
+                      >
+                        <span className="text-[7px] font-medium opacity-70">Σ 24h</span>
+                        <span className="text-[9px] font-bold tabular-nums">{dayTotal.toLocaleString('es-CL')}</span>
+                      </ChipTooltip>
                     )
                   })()}
 

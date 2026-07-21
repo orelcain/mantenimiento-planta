@@ -98,13 +98,20 @@ function componerBriefInicioTurno({ plantLabel, shiftId, officialSchedule, curre
  * @param {Record<string, number>|null} p.officialTargets — machineid → ciclos (se usa la SUMA)
  * @param {{name: string}|null} p.currentJob
  * @param {{pointZeroPct: number, totalPieces: number}|null} p.grader — calidad si hay Excel
+ * @param {{start: Date, end: Date}|null} [p.realSchedule] — ventana REAL derivada de
+ *   intervals (scheduledStart/End del doc padre), NO la plantilla oficial de Shoplogix.
+ *   El brief de inicio muestra "Horario oficial" (plantilla fija); acá mostramos el
+ *   horario REAL en que el turno efectivamente corrió, para no confundir ambos.
  * @returns {string} HTML para Telegram
  */
-function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader }) {
+function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader, realSchedule }) {
   const ms = machines || []
   const total = ms.reduce((a, m) => a + (m.totalCycles || 0), 0)
 
   const lineas = [`🏁 <b>Fin de turno · ${plantLabel}</b>`, `${shiftId} · ${dateKey}`]
+  if (realSchedule?.start && realSchedule?.end) {
+    lineas.push(`🕐 Horario real: ${fmtHora(realSchedule.start)} → ${fmtHora(realSchedule.end)}`)
+  }
 
   // Producción por máquina + total
   lineas.push('')
