@@ -51,6 +51,7 @@ import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
 import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
+import { LossCascadeCard } from './LossCascadeCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
@@ -1337,6 +1338,12 @@ export function UpstreamMachinesPanel({
                   windowEnd={chartWindowEnd}
                 />
               </div>
+            )}
+
+            {/* Cascada de pérdidas del turno — quién limitó la producción y
+                cuántas piezas costó cada causal. Ver LossCascadeCard. */}
+            {snapshot && snapshot.machines.length > 0 && (
+              <LossCascadeCard machines={snapshot.machines} />
             )}
 
             {snapshot && snapshot.machines.length > 0 && (

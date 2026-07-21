@@ -498,6 +498,35 @@ const KIND_META: Record<CardKind, { icon: string; title: string }> = {
   salida:    { icon: '🌙',  title: 'Turno noche' },
 }
 
+/**
+ * Línea "horario real + uso de máquinas" para tooltips del calendario.
+ *
+ * Usa la ventana EFECTIVA (primer→último uptime, "primer pescado") del doc
+ * padre cuando existe; si no, degrada al horario programado marcándolo "~prog".
+ * El "uso" es la suma de uptime de las máquinas vs la ventana efectiva × N máq.
+ */
+function slxRealScheduleLines(cache: SlxShiftCache | undefined): string {
+  if (!cache) return ''
+  const fmtHHMM = (d: Date) =>
+    `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  const lines: string[] = []
+  const eff = cache.effectiveStart && cache.effectiveEnd
+  const start = cache.effectiveStart ?? cache.scheduledStart
+  const end   = cache.effectiveEnd   ?? cache.scheduledEnd
+  if (start && end) {
+    lines.push(`• ${eff ? 'Real' : '~Programado'}: ${fmtHHMM(start)} → ${fmtHHMM(end)}`)
+  }
+  if (cache.totalUptimeSecAllMachines > 0 && cache.perMachine.length > 0) {
+    const spanSec = start && end ? Math.max(0, (end.getTime() - start.getTime()) / 1000) : 0
+    const avgUseSec = cache.totalUptimeSecAllMachines / cache.perMachine.length
+    const useTxt = fmtSecPanoramic(avgUseSec)
+    lines.push(spanSec > 0
+      ? `• Uso máquinas: ${useTxt} de ${fmtSecPanoramic(spanSec)} (${Math.round((avgUseSec / spanSec) * 100)}%)`
+      : `• Uso máquinas: ${useTxt}`)
+  }
+  return lines.length > 0 ? lines.join('\n') + '\n' : ''
+}
+
 function getUploadTimestamp(upload: GraderUpload): number {
   const ts = upload.updatedAt || upload.createdAt || upload.fileMeta.parsedAt
   return ts ? new Date(ts).getTime() : 0
@@ -1092,6 +1121,12 @@ interface SlxShiftCache {
    */
   correctionDetected: boolean
   reconciliationNote: string | null
+  /**
+   * Ventana efectiva de producción ("primer pescado" → último uptime), del doc
+   * padre. Null en docs pre 2026-07-21 o sin producción — degradar a scheduled*.
+   */
+  effectiveStart: Date | null
+  effectiveEnd: Date | null
 }
 
 /**
@@ -1138,6 +1173,8 @@ function buildCacheFromParent(parent: ShoplogixShiftParent): SlxShiftCache {
     breakdown: m0?.breakdown ?? null,
     correctionDetected: parent.correctionDetected,
     reconciliationNote: parent.reconciliationNote,
+    effectiveStart: parent.effectiveStart,
+    effectiveEnd:   parent.effectiveEnd,
   }
 }
 
@@ -1866,9 +1903,11 @@ export function GraderHistoricalCalendar({
               totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
             } : null,
             // Preservar lo que ya sabíamos por el doc padre (esta carga solo
-            // refina `states`, no vuelve a traer el flag de reconciliación).
+            // refina `states`, no vuelve a traer flags ni ventana efectiva).
             correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
             reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
+            effectiveStart: slxByShift.get(key)?.effectiveStart ?? null,
+            effectiveEnd:   slxByShift.get(key)?.effectiveEnd   ?? null,
           }
           setSlxByShift((prev) => new Map(prev).set(key, cache))
           setSlxTotalsByShift((prev) => new Map(prev).set(key, totalCycles))
@@ -1884,6 +1923,8 @@ export function GraderHistoricalCalendar({
               breakdown: null,
               correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
               reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
+              effectiveStart: slxByShift.get(key)?.effectiveStart ?? null,
+              effectiveEnd:   slxByShift.get(key)?.effectiveEnd   ?? null,
             }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
@@ -1922,6 +1963,8 @@ export function GraderHistoricalCalendar({
       breakdown: null,
       correctionDetected: false,
       reconciliationNote: null,
+      effectiveStart: null,
+      effectiveEnd: null,
     }
 
     const loadOne = async (dk: string, shiftId: string, forceServer: boolean): Promise<number> => {
@@ -1999,6 +2042,8 @@ export function GraderHistoricalCalendar({
         } : null,
         correctionDetected: false,
         reconciliationNote: null,
+        effectiveStart: slxByShift.get(key)?.effectiveStart ?? null,
+        effectiveEnd:   slxByShift.get(key)?.effectiveEnd   ?? null,
       }
       setSlxByShift((prev)       => new Map(prev).set(key, cache))
       setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
@@ -2243,6 +2288,8 @@ export function GraderHistoricalCalendar({
           } : null,
           correctionDetected: slxByShift.get(key)?.correctionDetected ?? false,
           reconciliationNote: slxByShift.get(key)?.reconciliationNote ?? null,
+          effectiveStart: slxByShift.get(key)?.effectiveStart ?? null,
+          effectiveEnd:   slxByShift.get(key)?.effectiveEnd   ?? null,
         }
         setSlxByShift(prev       => new Map(prev).set(key, cache))
         setSlxTotalsByShift(prev => new Map(prev).set(key, cycles))
@@ -3825,8 +3872,9 @@ export function GraderHistoricalCalendar({
                               + (dayCorrection?.correctionDetected
                                 ? `🔄 Corrección post-brief: ${dayCorrection.reconciliationNote ?? 'los datos cambiaron después de reportados'}\n`
                                 : '')
-                              + `Turno día (Shoplogix)\n`
+                              + `${slxDayNav.shiftId} (Shoplogix)\n`
                               + `• ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader\n`
+                              + slxRealScheduleLines(dayCorrection ?? undefined)
                               + (slxDayUptimePct > 0 ? `• Uptime: ${slxDayUptimePct.toFixed(0)}%\n` : '')
                               + (hasExcelDay
                                 ? '• Sin Excel del Marelec — solo conteo upstream'
@@ -3852,9 +3900,10 @@ export function GraderHistoricalCalendar({
                               + (nightCorrection?.correctionDetected
                                 ? `🔄 Corrección post-brief: ${nightCorrection.reconciliationNote ?? 'los datos cambiaron después de reportados'}\n`
                                 : '')
-                              + `Turno noche (Shoplogix)`
-                              + (slxNightNav.shiftId === 'Turno 3' ? ' — arranca 23:00, cubre madrugada' : '')
+                              + `${slxNightNav.shiftId} (Shoplogix)`
+                              + (slxNightNav.shiftId === 'Turno 3' ? ' — turno noche, cubre madrugada' : '')
                               + `\n• ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader\n`
+                              + slxRealScheduleLines(nightCorrection ?? undefined)
                               + (slxNightUptimePct > 0 ? `• Uptime: ${slxNightUptimePct.toFixed(0)}%\n` : '')
                               + (hasExcelNight
                                 ? '• Sin Excel del Marelec — solo conteo upstream'
@@ -3922,6 +3971,22 @@ export function GraderHistoricalCalendar({
                     const slxOnlyPieces = (hasSlxDay ? slxDayCycles : 0) + (hasSlxNight ? slxNightCycles : 0)
                     const dayTotal = excelPieces + slxOnlyPieces
                     if (dayTotal <= 0) return null
+                    // Detalle por turno SLX con nombre real (T1/T2/T3) + horario
+                    // real (ventana efectiva del doc padre) + uso de máquinas.
+                    const slxDetail = (nav: { cfDateKey: string; shiftId: string } | null, cycles: number) => {
+                      if (!nav || cycles <= 0) return null
+                      const cache = slxByShift.get(`${nav.cfDateKey}__${nav.shiftId}`)
+                      const label = getShiftMeta(nav.shiftId).shortLabel
+                      const extra = slxRealScheduleLines(cache)
+                      return (
+                        <div key={nav.shiftId}>
+                          <div>{`• ${label}: ${cycles.toLocaleString('es-CL')} ciclos (Shoplogix)`}</div>
+                          {extra && (
+                            <div className="text-slate-400 whitespace-pre-line pl-2">{extra.trimEnd()}</div>
+                          )}
+                        </div>
+                      )
+                    }
                     return (
                       <ChipTooltip
                         className="mt-auto flex items-center justify-between rounded px-1 py-px leading-none bg-slate-500/10 text-muted-foreground hover:bg-slate-500/20 cursor-help"
@@ -3931,9 +3996,9 @@ export function GraderHistoricalCalendar({
                             {chipsForDay.filter((c) => c.role === 'primary').map((c) => (
                               <div key={c.summaryId}>{`• ${getShiftMeta(c.shiftId).shortLabel}: ${(c.pieces ?? 0).toLocaleString('es-CL')} piezas (Excel)`}</div>
                             ))}
-                            {hasSlxDay && <div>{`• D (Shoplogix): ${slxDayCycles.toLocaleString('es-CL')} ciclos`}</div>}
-                            {hasSlxNight && <div>{`• N (Shoplogix): ${slxNightCycles.toLocaleString('es-CL')} ciclos`}</div>}
-                            <div className="text-slate-400 text-[10px]">Suma 24h calendario (00:00→00:00), no el turno de trabajo</div>
+                            {hasSlxDay && slxDetail(slxDayNav, slxDayCycles)}
+                            {hasSlxNight && slxDetail(slxNightNav, slxNightCycles)}
+                            <div className="text-slate-400 text-[10px]">Suma 24h calendario (00:00→00:00), no el turno de trabajo. "Real" = primer→último pescado procesado.</div>
                           </div>
                         }
                       >

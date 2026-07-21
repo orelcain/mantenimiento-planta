@@ -534,6 +534,13 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     }
 
     const shiftMachineResults = []
+    // Ventana EFECTIVA del turno: primer→último estado `uptime` entre TODAS las
+    // máquinas ("primer pescado que pasó" → último). Distinta del horario
+    // programado (scheduledStart/End): si el turno arranca 14:45 pero la línea
+    // procesó recién a las 15:20, effectiveStart = 15:20. Viaja en el doc padre
+    // para que la vista mensual la muestre sin bajar la subcolección `machines`.
+    let effectiveStartMs = null
+    let effectiveEndMs = null
 
     for (let i = 0; i < machines.length; i++) {
       const rawProd = productionResponses[i]
@@ -679,6 +686,15 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         // (1 query de rango), sin bajar las subcolecciones `machines` de cada
         // turno. Los `states[]` completos siguen en la subcolección y se cargan
         // solo al abrir un día concreto (timeline).
+        for (const st of doc.states) {
+          if (st.type !== 'uptime') continue
+          const sMs = st.startAt instanceof Date ? st.startAt.getTime() : new Date(st.startAt).getTime()
+          const eMs = st.endAt   instanceof Date ? st.endAt.getTime()   : new Date(st.endAt).getTime()
+          if (!isFinite(sMs) || !isFinite(eMs)) continue
+          if (effectiveStartMs === null || sMs < effectiveStartMs) effectiveStartMs = sMs
+          if (effectiveEndMs   === null || eMs > effectiveEndMs)   effectiveEndMs   = eMs
+        }
+
         shiftMachineResults.push({
           machineid:   machines[i].machineid,
           name:        machines[i].name,
@@ -713,6 +729,10 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       scheduleSource: 'intervals',
       lastSyncAt:     syncedAt,
       machines:       shiftMachineResults,
+      // Ventana efectiva de producción (primer/último uptime real). Null si el
+      // turno no procesó nada (solo idle) — la UI degrada al horario programado.
+      effectiveStart: effectiveStartMs !== null ? new Date(effectiveStartMs) : null,
+      effectiveEnd:   effectiveEndMs   !== null ? new Date(effectiveEndMs)   : null,
     }
 
     // Enriquecimiento con el rollup oficial: solo si su etiqueta de turno

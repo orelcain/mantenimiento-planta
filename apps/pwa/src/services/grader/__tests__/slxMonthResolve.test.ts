@@ -35,6 +35,8 @@ const parent = (
   hasAggregates: opts.hasAggregates ?? true,
   correctionDetected: false,
   reconciliationNote: null,
+  effectiveStart: null,
+  effectiveEnd: null,
   machines: [
     { machineid: 'm1', name: 'Ev 1', totalCycles: cycles, uptimeSec: 1000, shiftRuntime: 0.8,
       overallRatio: 0.9, expectedTotalCycles: cycles, breakdown: null, stateAggregates: [] },

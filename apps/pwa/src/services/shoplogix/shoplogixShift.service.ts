@@ -956,6 +956,13 @@ export interface ShoplogixShiftParent {
    */
   correctionDetected: boolean
   reconciliationNote: string | null
+  /**
+   * Ventana EFECTIVA de producción del turno: primer→último estado `uptime`
+   * entre todas las máquinas ("primer pescado" → último). Null en docs viejos
+   * (pre 2026-07-21) o turnos sin producción — la UI degrada a scheduled*.
+   */
+  effectiveStart: Date | null
+  effectiveEnd: Date | null
 }
 
 function parseParentMachine(raw: unknown): ParentMachineSummary | null {
@@ -1013,6 +1020,8 @@ function parseShiftParent(docId: string, data: FirestoreData): ShoplogixShiftPar
     hasAggregates,
     correctionDetected: data.correctionDetected === true,
     reconciliationNote: typeof data.reconciliationNote === 'string' ? data.reconciliationNote : null,
+    effectiveStart: data.effectiveStart != null ? toDateSafe(data.effectiveStart) : null,
+    effectiveEnd:   data.effectiveEnd   != null ? toDateSafe(data.effectiveEnd)   : null,
   }
 }
 
