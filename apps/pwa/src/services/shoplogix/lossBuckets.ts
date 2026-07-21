@@ -137,6 +137,28 @@ export function cascadeFromAggregates(aggs: StateAggregate[]): LossCascade {
   }
 }
 
+/**
+ * Cascada directamente desde `states[]` crudos (página del turno).
+ *
+ * OJO: `aggregatesFromStates` EXCLUYE los states uptime (el pareto no los
+ * necesita; su total viaja en breakdown) — pasarle esos agregados a
+ * `cascadeFromAggregates` da produccionSec=0 y usoReal=0%. Esta variante
+ * agrega TODO, incluido uptime.
+ */
+export function cascadeFromStates(
+  states: ReadonlyArray<{ type: string; name?: string; reason?: string; durationSec?: number }> | null | undefined,
+): LossCascade {
+  const pseudo = (states ?? []).map((s) => ({
+    type: s.type as StateAggregate['type'],
+    name: s.name ?? '',
+    reason: s.reason ?? '',
+    color: '',
+    durationSec: s.durationSec ?? 0,
+    count: 1,
+  }))
+  return cascadeFromAggregates(pseudo)
+}
+
 export const LOSS_BUCKET_META: Record<Exclude<LossBucket, 'produccion' | 'fuera-turno'>, { label: string; owner: string }> = {
   'planificado':    { label: 'Planificado',    owner: 'Personas (acordado)' },
   'externo':        { label: 'Externo',        owner: 'Proceso / abastecimiento' },

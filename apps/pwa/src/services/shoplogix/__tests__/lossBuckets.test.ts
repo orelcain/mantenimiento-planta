@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { classifyLossState, cascadeFromAggregates } from '../lossBuckets'
+import { classifyLossState, cascadeFromAggregates, cascadeFromStates } from '../lossBuckets'
 
 const agg = (type: string, name: string, reason: string, durationSec: number, count = 1) =>
   ({ type: type as 'uptime' | 'break' | 'downtime' | 'setup', name, reason, color: '#000', durationSec, count })
@@ -62,5 +62,20 @@ describe('cascadeFromAggregates', () => {
     const c = cascadeFromAggregates([])
     expect(c.techoSec).toBe(0)
     expect(c.usoReal).toBe(0)
+  })
+})
+
+describe('cascadeFromStates', () => {
+  it('INCLUYE uptime (a diferencia de aggregatesFromStates, que lo excluye para el pareto)', () => {
+    // Regresión del bug real 2026-07-21: la card usaba aggregatesFromStates →
+    // produccionSec=0 → "Uso real 0%" en prod aunque la máquina produjo 5h.
+    const c = cascadeFromStates([
+      { type: 'uptime', durationSec: 5 * 3600 },
+      { type: 'break', name: 'Detencion', reason: 'COLACION', durationSec: 3600 },
+      { type: 'downtime', name: 'Detencion', reason: 'FALTA MMPP', durationSec: 1800 },
+    ])
+    expect(c.produccionSec).toBe(5 * 3600)
+    expect(c.techoSec).toBe(5 * 3600 + 1800)
+    expect(c.usoReal).toBeGreaterThan(0.9)
   })
 })

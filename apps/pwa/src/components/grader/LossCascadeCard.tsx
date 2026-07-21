@@ -24,8 +24,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { aggregatesFromStates } from '@/services/grader/shoplogixStateAggregates'
-import { cascadeFromAggregates, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
+import { cascadeFromStates, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 
 function fmtHm(sec: number): string {
@@ -51,7 +50,7 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
     // Cascada de tiempo: suma de las máquinas (horas-máquina, igual que el
     // resto del panel). Piezas: cadencia real por máquina × su propio techo.
     const perMachine = machines.map((m) => {
-      const cascade = cascadeFromAggregates(aggregatesFromStates(m.states))
+      const cascade = cascadeFromStates(m.states)
       const cadencePzSec = cascade.produccionSec > 0 ? m.totalCycles / cascade.produccionSec : 0
       return { m, cascade, cadencePzSec }
     })
