@@ -2661,18 +2661,37 @@ export function GraderHistoricalCalendar({
    * Principal muestra Día/Noche. `resolve` = cadena de candidatos en Firestore.
    */
   const availabilityCols = useMemo(() => {
-    if (plantLine.isClassificationPlant === false) {
-      return [
-        { id: 'Turno 1', label: 'T1 · mañana', resolve: ['Turno 1'] },
-        { id: 'Turno 2', label: 'T2 · tarde',  resolve: ['Turno 2'] },
-        { id: 'Turno 3', label: 'T3 · noche',  resolve: ['Turno 3'] },
-      ]
-    }
-    return [
-      { id: 'Turno día',   label: 'Día',   resolve: ['Turno 2', 'Turno día'] },
-      { id: 'Turno noche', label: 'Noche', resolve: ['Turno 3', 'Turno 1', 'Turno noche'] },
-    ]
-  }, [plantLine.isClassificationPlant])
+    const base = plantLine.isClassificationPlant === false
+      ? [
+          { id: 'Turno 1', label: 'T1 · mañana', resolve: ['Turno 1'] },
+          { id: 'Turno 2', label: 'T2 · tarde',  resolve: ['Turno 2'] },
+          { id: 'Turno 3', label: 'T3 · noche',  resolve: ['Turno 3'] },
+        ]
+      : [
+          { id: 'Turno día',   label: 'Día',   resolve: ['Turno 2', 'Turno día'] },
+          { id: 'Turno noche', label: 'Noche', resolve: ['Turno 3', 'Turno 1', 'Turno noche'] },
+        ]
+    // Horario programado de cada turno, sacado de los DATOS del mes visible
+    // (plantilla oficial si existe, si no la ventana derivada) — no hardcodeado,
+    // porque Shoplogix cambia horarios de un día para otro.
+    const monthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-`
+    return base.map((col) => {
+      let schedule = ''
+      for (const [key, cache] of slxByShift) {
+        if (!key.startsWith(monthPrefix)) continue
+        const sid = key.slice(12)
+        if (!col.resolve.includes(sid)) continue
+        const s = cache.officialStart ?? cache.scheduledStart
+        const e = cache.officialEnd   ?? cache.scheduledEnd
+        if (s && e && (cache.totalCycles ?? 0) > 0) {
+          schedule = `${fmtWallHHMM(s)}–${fmtWallHHMM(e)}`
+          // Preferir un horario de plantilla oficial si aparece más adelante
+          if (cache.officialStart) break
+        }
+      }
+      return { ...col, schedule }
+    })
+  }, [plantLine.isClassificationPlant, slxByShift, currentMonth])
 
   const availabilityTrend = useMemo((): Array<{
     dk: string
@@ -5004,13 +5023,16 @@ export function GraderHistoricalCalendar({
                           (Yal: T1/T2/T3 aunque T1 esté vacío; Principal: Día/Noche).
                           Al partir el 3er turno la vista no cambia — solo se llena. */}
                       <div
-                        className="grid gap-x-3 gap-y-[3px] items-center"
-                        style={{ gridTemplateColumns: `3.2rem repeat(${availabilityCols.length}, minmax(0, 1fr))` }}
+                        className="grid gap-x-6 gap-y-[3px] items-center"
+                        style={{ gridTemplateColumns: `4rem repeat(${availabilityCols.length}, minmax(0, 1fr))` }}
                       >
-                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 text-right">Día</span>
+                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 text-right self-end pb-0.5">Día</span>
                         {availabilityCols.map((col) => (
-                          <span key={col.id} className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                            {col.label}
+                          <span key={col.id} className="leading-tight">
+                            <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/80 font-semibold">{col.label}</span>
+                            <span className="block text-[9px] text-muted-foreground/50 tabular-nums normal-case tracking-normal">
+                              {col.schedule ? `prog. ${col.schedule}` : 'sin datos aún'}
+                            </span>
                           </span>
                         ))}
                       {/* Filas por día, con separador al inicio de cada semana */}
@@ -5068,10 +5090,15 @@ export function GraderHistoricalCalendar({
                             {cells.map(({ cache }, colIdx) => (
                               <div key={availabilityCols[colIdx]!.id} className="flex items-center gap-1.5 min-w-0">
                                 {buildAvailBar(cache)}
-                                <span className={cn(
-                                  'tabular-nums shrink-0 w-9 text-right text-[11px]',
-                                  cache ? 'text-foreground/75' : 'text-muted-foreground/30',
-                                )}>
+                                <span
+                                  className={cn(
+                                    'tabular-nums shrink-0 w-9 text-right text-[11px] cursor-help',
+                                    cache ? 'text-foreground/75' : 'text-muted-foreground/30',
+                                  )}
+                                  title={cache
+                                    ? `Uptime del turno: la máquina estuvo procesando el ${(cache.shiftRuntime * 100).toFixed(0)}% del tiempo del turno (el resto se reparte en pausas, paros y setup — ver colores de la barra)`
+                                    : 'Sin producción registrada en este turno'}
+                                >
                                   {cache ? `${(cache.shiftRuntime * 100).toFixed(0)}%` : '—'}
                                 </span>
                               </div>
@@ -5083,8 +5110,9 @@ export function GraderHistoricalCalendar({
                     </div>
                   )}
                   <p className="text-[10px] text-muted-foreground/60 pt-1">
-                    Cada fila = un día, una columna por turno de la planta (las columnas vacías se llenarán cuando ese turno opere).
-                    Cada barra reparte el tiempo del turno: verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup. Upt% = porcentaje procesando. Click en la fecha abre el día.
+                    Cada fila = un día, una columna por turno de la planta (las vacías se llenarán cuando ese turno opere). "prog." = horario programado del turno.
+                    La barra reparte el tiempo del turno: verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup.
+                    El % es el UPTIME: qué fracción del turno la máquina estuvo procesando (ej. 82% = procesó 82 de cada 100 minutos del turno). Click en la fecha abre el día.
                   </p>
                 </div>
                 )}
@@ -5159,9 +5187,22 @@ export function GraderHistoricalCalendar({
                       {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
                     </button>
                   </div>
-                  <BaaderTrendMultiChart series={combinedSeries} height={230} />
+                  <BaaderTrendMultiChart
+                    series={combinedSeries}
+                    height={230}
+                    dateKeys={(() => {
+                      // TODOS los días del mes en el eje X — los días sin proceso
+                      // quedan como hueco en la línea (no se saltan fechas).
+                      const y = currentMonth.getFullYear()
+                      const m = currentMonth.getMonth()
+                      const n = new Date(y, m + 1, 0).getDate()
+                      return Array.from({ length: n }, (_, i) =>
+                        `${y}-${String(m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`)
+                    })()}
+                  />
                   <p className="text-[10px] text-muted-foreground/60">
-                    Cada punto = un turno. Línea sólida = {dayShiftLabel} (tarde) · discontinua = {nightShiftLabel} (noche). Pasa el cursor por una fecha para comparar ambos turnos ese día.
+                    Cada punto = un turno; el eje muestra el mes completo y los huecos son días sin proceso.
+                    Línea sólida = {dayShiftLabel} (tarde) · discontinua = {nightShiftLabel} (noche). Pasa el cursor por una fecha para comparar ambos turnos ese día.
                   </p>
                 </div>
                 )

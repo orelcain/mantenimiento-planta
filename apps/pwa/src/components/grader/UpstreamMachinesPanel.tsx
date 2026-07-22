@@ -445,13 +445,20 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
 export function BaaderTrendMultiChart({
   series,
   height = 96,
+  dateKeys,
 }: {
   /** `dashed` distingue familias de series en un chart combinado (ej. T3 vs T2). */
   series: Array<{ name: string; color: string; points: MachineTrendPoint[]; dashed?: boolean }>
   height?: number
+  /**
+   * Eje X explícito (ej. TODOS los días del mes, incluidos los sin proceso —
+   * pedido Orel: no saltar días; el hueco en la línea ES la información).
+   * Sin esto, el eje se arma solo con los días que tienen datos.
+   */
+  dateKeys?: string[]
 }) {
-  // Unión ordenada de dateKeys
-  const allDateKeys = [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
+  // Eje explícito o unión ordenada de los dateKeys con datos
+  const allDateKeys = dateKeys ?? [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
   if (allDateKeys.length < 2) {
     return (
       <p className="text-[10px] text-muted-foreground italic py-1">
