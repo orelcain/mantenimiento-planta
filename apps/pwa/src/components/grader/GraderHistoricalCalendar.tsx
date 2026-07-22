@@ -234,7 +234,7 @@ function ChipTooltip({
       {visible && createPortal(
         <div
           ref={tooltipRef}
-          className="fixed z-[9999] w-64 rounded-lg bg-slate-800 text-slate-100 text-[10px] leading-snug p-2.5 shadow-2xl border border-slate-600/50"
+          className="fixed z-[9999] max-w-[260px] rounded bg-slate-900/95 text-slate-200 text-[10px] leading-[1.5] px-2 py-1.5 shadow-lg border border-slate-600/60 whitespace-pre-line"
           style={{ top: coords.top, left: coords.left }}
         >
           {content}
@@ -582,49 +582,25 @@ function SlxTurnoTooltipBody({
     ? machines.reduce((a, m) => a + m.uptimeSec, 0) / machines.length
     : 0
 
-  return (
-    <div className="space-y-1">
-      <div className="font-semibold text-[11px] text-white">
-        {title ?? `${label} · ${cycles.toLocaleString('es-CL')} ciclos (Shoplogix)`}
-      </div>
-      {progStart && progEnd && (
-        <div>
-          <span className="text-slate-400">Programado: </span>
-          <span className="font-mono tabular-nums">{fmtWallHHMM(progStart)} → {fmtWallHHMM(progEnd)}</span>
-        </div>
-      )}
-      {effStart && (
-        <div>
-          <span className="text-slate-400">Real: </span>
-          <span className="font-mono tabular-nums">{fmtWallHHMM(effStart)} → {effEnd && endConfirmed ? fmtWallHHMM(effEnd) : ''}</span>
-          {(!effEnd || !endConfirmed) && (
-            <span className="text-amber-400/90 italic">{effEnd ? `${fmtWallHHMM(effEnd)} comprobando…` : 'comprobando…'}</span>
-          )}
-        </div>
-      )}
-      {avgUseSec > 0 && (
-        <div>
-          <span className="text-slate-400">Uso máquinas: </span>
-          <span className="font-mono tabular-nums">
-            {fmtSecPanoramic(avgUseSec)}{spanSec > 0 ? ` (${Math.round((avgUseSec / spanSec) * 100)}%)` : ''}
-          </span>
-          <span className="text-slate-400 text-[9px]"> — tiempo de producción real</span>
-        </div>
-      )}
-      {machines.length > 1 && (
-        <div className="pl-2 space-y-0.5">
-          {machines.map((m) => (
-            <div key={m.machineid} className="text-slate-300">
-              <span className="text-slate-400">· {m.name || m.machineid}: </span>
-              <span className="font-mono tabular-nums">
-                {fmtSecPanoramic(m.uptimeSec)}{spanSec > 0 ? ` (${Math.round((m.uptimeSec / spanSec) * 100)}%)` : ''}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  // Texto plano compacto — mismo look sobrio del tooltip nativo original
+  // (pedido de Orel: nada de recuadros con viñetas y títulos en negrita).
+  const lines: string[] = [title ?? `${label} · ${cycles.toLocaleString('es-CL')} ciclos (Shoplogix)`]
+  if (progStart && progEnd) lines.push(`Programado: ${fmtWallHHMM(progStart)} → ${fmtWallHHMM(progEnd)}`)
+  if (effStart) {
+    const endTxt = !effEnd
+      ? 'comprobando…'
+      : endConfirmed ? fmtWallHHMM(effEnd) : `${fmtWallHHMM(effEnd)} (comprobando…)`
+    lines.push(`Real: ${fmtWallHHMM(effStart)} → ${endTxt}`)
+  }
+  if (avgUseSec > 0) {
+    lines.push(`Uso máquinas: ${fmtSecPanoramic(avgUseSec)}${spanSec > 0 ? ` (${Math.round((avgUseSec / spanSec) * 100)}% del turno real)` : ''}`)
+  }
+  if (machines.length > 1) {
+    for (const m of machines) {
+      lines.push(`  · ${m.name || m.machineid}: ${fmtSecPanoramic(m.uptimeSec)}${spanSec > 0 ? ` (${Math.round((m.uptimeSec / spanSec) * 100)}%)` : ''}`)
+    }
+  }
+  return <>{lines.join('\n')}</>
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -4102,13 +4078,13 @@ export function GraderHistoricalCalendar({
                     const slxOnlyPieces = (hasSlxDay ? slxDayCycles : 0) + (hasSlxNight ? slxNightCycles : 0)
                     const dayTotal = excelPieces + slxOnlyPieces
                     if (dayTotal <= 0) return null
-                    // Detalle por turno SLX — MISMO formato/estilo que el tooltip
-                    // de cada chip (SlxTurnoTooltipBody), separado por un divisor.
+                    // Detalle por turno SLX — mismo texto plano que el tooltip
+                    // de cada chip, separado por una línea en blanco.
                     const slxDetail = (nav: { cfDateKey: string; shiftId: string } | null, cycles: number) => {
                       if (!nav || cycles <= 0) return null
                       const cache = slxByShift.get(`${nav.cfDateKey}__${nav.shiftId}`)
                       return (
-                        <div key={nav.shiftId} className="pt-1 border-t border-slate-600/50">
+                        <div key={nav.shiftId} className="mt-1.5">
                           <SlxTurnoTooltipBody cache={cache} shiftId={nav.shiftId} cycles={cycles} />
                         </div>
                       )
@@ -4117,21 +4093,16 @@ export function GraderHistoricalCalendar({
                       <ChipTooltip
                         className="mt-auto flex items-center justify-between rounded px-1 py-px leading-none bg-slate-500/10 text-muted-foreground hover:bg-slate-500/20 cursor-help"
                         content={
-                          <div className="space-y-1.5">
-                            <div className="font-semibold text-[11px] text-white">
-                              {`Total del día · ${dayKey}`}
-                              <span className="float-right font-mono tabular-nums">{dayTotal.toLocaleString('es-CL')}</span>
-                            </div>
+                          <div>
+                            {`Total del día · ${dayKey} · ${dayTotal.toLocaleString('es-CL')}`}
                             {chipsForDay.filter((c) => c.role === 'primary').map((c) => (
-                              <div key={c.summaryId} className="pt-1 border-t border-slate-600/50">
-                                <div className="font-semibold text-[11px] text-white">
-                                  {`${getShiftMeta(c.shiftId).shortLabel} · ${(c.pieces ?? 0).toLocaleString('es-CL')} piezas (Excel)`}
-                                </div>
+                              <div key={c.summaryId} className="mt-1.5">
+                                {`${getShiftMeta(c.shiftId).shortLabel} · ${(c.pieces ?? 0).toLocaleString('es-CL')} piezas (Excel)`}
                               </div>
                             ))}
                             {hasSlxDay && slxDetail(slxDayNav, slxDayCycles)}
                             {hasSlxNight && slxDetail(slxNightNav, slxNightCycles)}
-                            <div className="text-slate-400 text-[9px] pt-1 border-t border-slate-600/50">Suma 24h calendario (00:00→00:00). "Real" = primer→último pescado procesado.</div>
+                            <div className="mt-1.5 text-slate-400 text-[9px]">Suma 24h calendario (00:00→00:00). "Real" = primer→último pescado.</div>
                           </div>
                         }
                       >
