@@ -444,8 +444,11 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
  */
 export function BaaderTrendMultiChart({
   series,
+  height = 96,
 }: {
-  series: Array<{ name: string; color: string; points: MachineTrendPoint[] }>
+  /** `dashed` distingue familias de series en un chart combinado (ej. T3 vs T2). */
+  series: Array<{ name: string; color: string; points: MachineTrendPoint[]; dashed?: boolean }>
+  height?: number
 }) {
   // Unión ordenada de dateKeys
   const allDateKeys = [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
@@ -474,7 +477,7 @@ export function BaaderTrendMultiChart({
       symbol: 'circle',
       symbolSize: 4,
       connectNulls: false,
-      lineStyle: { color: s.color, width: 1.5 },
+      lineStyle: { color: s.color, width: 1.5, type: (s.dashed ? 'dashed' : 'solid') as 'dashed' | 'solid' },
       itemStyle: { color: s.color },
     }
   })
@@ -523,7 +526,7 @@ export function BaaderTrendMultiChart({
   return (
     <ReactECharts
       option={option}
-      style={{ height: 96, width: '100%' }}
+      style={{ height, width: '100%' }}
       opts={{ renderer: 'canvas' }}
     />
   )

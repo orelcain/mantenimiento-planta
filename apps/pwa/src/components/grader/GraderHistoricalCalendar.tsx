@@ -77,7 +77,6 @@ import {
   isUnscheduledShift,
   SLX_LOW_ACTIVITY_THRESHOLD,
 } from '@/services/grader/graderShiftDisplay'
-import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { softenAccentHex } from '@/lib/softenColor'
 
@@ -5000,9 +4999,23 @@ export function GraderHistoricalCalendar({
                           <div className="w-2 h-1.5 rounded-sm bg-rose-500/65" />
                           Paro
                         </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-1.5 rounded-sm bg-violet-500/55" />
+                          Setup
+                        </div>
                       </div>
-                      {/* Filas por día */}
-                      {availabilityTrend.map(({ dk, day, night, dayShiftId, nightShiftId }) => {
+                      {/* Encabezado de columnas — cada barra con su propio % al lado */}
+                      <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-muted-foreground/70 pb-0.5">
+                        <span className="shrink-0 w-8 text-right">Día</span>
+                        <span className="shrink-0 w-5" />
+                        <span className="flex-1">Turno tarde</span>
+                        <span className="shrink-0 w-9 text-right">Upt%</span>
+                        <span className="shrink-0 w-5" />
+                        <span className="flex-1">Turno noche</span>
+                        <span className="shrink-0 w-9 text-right">Upt%</span>
+                      </div>
+                      {/* Filas por día, con separador al inicio de cada semana */}
+                      {availabilityTrend.map(({ dk, day, night, dayShiftId, nightShiftId }, rowIdx) => {
                         const buildAvailBar = (cache: SlxShiftCache | null) => {
                           if (!cache || !cache.breakdown) {
                             return <div className="flex-1 h-4 rounded-sm bg-muted/20 opacity-40" />
@@ -5028,36 +5041,53 @@ export function GraderHistoricalCalendar({
                         }
                         const dayUptimeStr   = day   ? `${(day.shiftRuntime   * 100).toFixed(0)}%` : '—'
                         const nightUptimeStr = night ? `${(night.shiftRuntime * 100).toFixed(0)}%` : '—'
+                        // Separador semanal: los domingos abren semana (misma
+                        // convención Dom-primero del calendario de arriba).
+                        const dow = new Date(`${dk}T12:00:00`).getDay()
+                        const weekBreak = dow === 0 && rowIdx > 0
                         return (
-                          <div key={dk} className="flex items-center gap-1.5 text-[10px]">
-                            {/* Fecha clicable → navega al día */}
-                            <span
-                              className="text-muted-foreground/70 tabular-nums shrink-0 w-8 text-right cursor-pointer hover:text-foreground transition-colors"
-                              onClick={() => {
-                                const d = new Date(`${dk}T00:00:00`)
-                                setSelectedDate(d)
-                                setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
-                              }}
-                            >
-                              {dk.slice(5)}
-                            </span>
-                            <span className="text-[8px] text-amber-500/60 shrink-0 w-5 text-center">
-                              {dayShiftId === 'Turno 2' ? 'T2'
-                                : dayShiftId === 'Turno 1' ? 'T1'
-                                : dayShiftId === 'Turno día' ? 'D'
-                                : dayShiftId === null ? '—' : 'D'}
-                            </span>
-                            {buildAvailBar(day)}
-                            <span className="text-[8px] text-indigo-400/60 shrink-0 w-5 text-center">
-                              {nightShiftId === 'Turno 3' ? 'T3'
-                                : nightShiftId === 'Turno 1' ? 'T1'
-                                : nightShiftId === 'Turno noche' ? 'N'
-                                : nightShiftId === null ? '—' : 'N'}
-                            </span>
-                            {buildAvailBar(night)}
-                            <span className="text-muted-foreground/50 tabular-nums shrink-0 w-14 text-right text-[9px]">
-                              {dayUptimeStr}/{nightUptimeStr}
-                            </span>
+                          <div key={dk}>
+                            {weekBreak && (
+                              <div className="flex items-center gap-2 pt-1.5 pb-0.5">
+                                <span className="text-[8px] uppercase tracking-wider text-muted-foreground/50 shrink-0">
+                                  Sem del {dk.slice(8)}-{dk.slice(5, 7)}
+                                </span>
+                                <div className="flex-1 h-px bg-border/50" />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 text-[10px]">
+                              {/* Fecha clicable → navega al día */}
+                              <span
+                                className="text-muted-foreground/70 tabular-nums shrink-0 w-8 text-right cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => {
+                                  const d = new Date(`${dk}T00:00:00`)
+                                  setSelectedDate(d)
+                                  setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+                                }}
+                              >
+                                {dk.slice(5)}
+                              </span>
+                              <span className="text-[8px] text-amber-500/60 shrink-0 w-5 text-center">
+                                {dayShiftId === 'Turno 2' ? 'T2'
+                                  : dayShiftId === 'Turno 1' ? 'T1'
+                                  : dayShiftId === 'Turno día' ? 'D'
+                                  : dayShiftId === null ? '—' : 'D'}
+                              </span>
+                              {buildAvailBar(day)}
+                              <span className="text-muted-foreground/70 tabular-nums shrink-0 w-9 text-right">
+                                {dayUptimeStr}
+                              </span>
+                              <span className="text-[8px] text-indigo-400/60 shrink-0 w-5 text-center">
+                                {nightShiftId === 'Turno 3' ? 'T3'
+                                  : nightShiftId === 'Turno 1' ? 'T1'
+                                  : nightShiftId === 'Turno noche' ? 'N'
+                                  : nightShiftId === null ? '—' : 'N'}
+                              </span>
+                              {buildAvailBar(night)}
+                              <span className="text-muted-foreground/70 tabular-nums shrink-0 w-9 text-right">
+                                {nightUptimeStr}
+                              </span>
+                            </div>
                           </div>
                         )
                       })}
@@ -5076,84 +5106,73 @@ export function GraderHistoricalCalendar({
                   y per-machine (3 líneas, uptime% de cada Baader). */}
               {panoramaTab === 'tendencia' && (monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
                 const isYal = plantLine.isClassificationPlant === false
-                const dayLabel   = isYal ? '🌇 Tendencia Baader · Turno 2' : '☀ Tendencia Baader · Turno Día'
-                const nightLabel = isYal ? '🌙 Tendencia Baader · Turno 3' : '🌙 Tendencia Baader · Turno Noche'
+                const dayShiftLabel   = isYal ? 'T2' : 'Día'
+                const nightShiftLabel = isYal ? 'T3' : 'Noche'
                 // Paleta consistente por Baader (M0 sky, M1 violet, M2 amber).
                 const machineColors = ['rgba(56,189,248,0.95)', 'rgba(167,139,250,0.95)', 'rgba(251,191,36,0.95)']
-                const toMultiSeries = (
+                // UN solo gráfico combinado (opción T1 elegida por Orel): T2 y T3
+                // como líneas comparables en el mismo eje de fechas. T3 va en
+                // línea DISCONTINUA para distinguir la familia noche de un vistazo.
+                //  - Agregado:   2 series (uptime% de la línea por turno)
+                //  - Por máquina: 6 series (Ev 1/2/3 × T2 sólida / T3 discontinua)
+                const toMachineSeries = (
                   byMachine: Map<string, { name: string; points: MachineTrendPoint[] }>,
+                  shiftLbl: string,
+                  dashed: boolean,
                 ) => [...byMachine.entries()]
                   .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
                   .map(([, v], idx) => ({
-                    name:   v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+                    name:   `${v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')} · ${shiftLbl}`,
                     color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
                     points: v.points,
+                    dashed,
                   }))
-                const daySeries   = toMultiSeries(monthTrendByMachine.day)
-                const nightSeries = toMultiSeries(monthTrendByMachine.night)
+                const combinedSeries = trendByMachine
+                  ? [
+                      ...toMachineSeries(monthTrendByMachine.day, dayShiftLabel, false),
+                      ...toMachineSeries(monthTrendByMachine.night, nightShiftLabel, true),
+                    ]
+                  : [
+                      ...(monthTrendPoints.day.length >= 2
+                        ? [{ name: `${dayShiftLabel} (línea)`, color: 'rgba(52,211,153,0.95)', points: monthTrendPoints.day, dashed: false }]
+                        : []),
+                      ...(monthTrendPoints.night.length >= 2
+                        ? [{ name: `${nightShiftLabel} (línea)`, color: 'rgba(167,139,250,0.95)', points: monthTrendPoints.night, dashed: true }]
+                        : []),
+                    ]
                 return (
                 <div className="space-y-2">
-                  {/* Toggle Por máquina */}
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                      Tendencia de uptime Baader · {dayShiftLabel} vs {nightShiftLabel} · {monthNames[currentMonth.getMonth()]}
+                      <InfoTooltip
+                        title="Tendencia de uptime por turno"
+                        text={trendByMachine
+                          ? '% uptime de cada Baader (Ev 1/2/3) por turno a lo largo del mes. Línea sólida = turno de tarde; discontinua = turno noche. Útil para detectar qué máquina cayó y en qué turno.'
+                          : '% del tiempo del turno que la línea estuvo procesando, día a día. Línea sólida = turno de tarde; discontinua = turno noche. Comparar ambas revela si un turno rinde sistemáticamente menos.'}
+                        formula="uptime = tiempo_procesando / duración_turno × 100"
+                        example={`${dayShiftLabel} estable en 80% y ${nightShiftLabel} cayendo a 50% → el problema es del turno noche, no de las máquinas.`}
+                        iconSize={10}
+                      />
+                    </p>
                     <button
                       type="button"
                       onClick={() => setTrendByMachine((v) => !v)}
                       className={cn(
-                        'text-[9px] px-2 py-0.5 rounded border transition-colors',
+                        'text-[10px] px-2 py-1 rounded border transition-colors',
                         trendByMachine
                           ? 'bg-primary/15 text-primary border-primary/30'
                           : 'bg-muted text-muted-foreground border-border hover:bg-accent',
                       )}
-                      title="Alternar entre tendencia agregada (1 línea: ritmo+uptime de la línea) y por máquina (3 líneas: uptime% de cada Baader)"
+                      title="Alternar entre la línea completa (2 series) y el detalle por Baader (6 series)"
                     >
-                      {trendByMachine ? '⚙ Por máquina' : '⚙ Agregado'}
+                      {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {monthTrendPoints.day.length >= 2 && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                          {dayLabel}
-                          <InfoTooltip
-                            title={isYal ? 'Tendencia · Ritmo del Turno 2' : 'Tendencia · Ritmo del turno día'}
-                            text={trendByMachine
-                              ? '% uptime de cada Baader (Ev 1/2/3) a lo largo del mes. Útil para detectar qué máquina cayó en un día específico.'
-                              : '% productividad real vs objetivo a lo largo del mes. Un valor de 100% significa que las Baader procesaron exactamente las piezas que Shoplogix esperaba; >100% es sobre-objetivo, <100% es bajo-objetivo.'}
-                            formula={trendByMachine
-                              ? 'uptime_máquina = tiempo_procesando / duración_turno'
-                              : 'Ritmo = ciclos_reales / ciclos_esperados × 100'}
-                            example={trendByMachine
-                              ? 'Ev 1 al 70% y Ev 3 al 30% el mismo día → Ev 3 tuvo más paros.'
-                              : '80% = procesó 4.000 piezas cuando se esperaban 5.000.'}
-                            iconSize={10}
-                          />
-                        </p>
-                        {trendByMachine && daySeries.length > 0
-                          ? <BaaderTrendMultiChart series={daySeries} />
-                          : <MachineTrendMiniChart points={monthTrendPoints.day} />}
-                      </div>
-                    )}
-                    {monthTrendPoints.night.length >= 2 && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                          {nightLabel}
-                          <InfoTooltip
-                            title={isYal ? 'Tendencia · Ritmo del Turno 3' : 'Tendencia · Ritmo del turno noche'}
-                            text={trendByMachine
-                              ? '% uptime de cada Baader (Ev 1/2/3) a lo largo del mes en el turno noche.'
-                              : '% productividad real vs objetivo a lo largo del mes. Mismo cálculo que el de día — compara qué tan cerca del target operaron las Baader.'}
-                            formula={trendByMachine
-                              ? 'uptime_máquina = tiempo_procesando / duración_turno'
-                              : 'Ritmo = ciclos_reales / ciclos_esperados × 100'}
-                            iconSize={10}
-                          />
-                        </p>
-                        {trendByMachine && nightSeries.length > 0
-                          ? <BaaderTrendMultiChart series={nightSeries} />
-                          : <MachineTrendMiniChart points={monthTrendPoints.night} />}
-                      </div>
-                    )}
-                  </div>
+                  <BaaderTrendMultiChart series={combinedSeries} height={230} />
+                  <p className="text-[10px] text-muted-foreground/60">
+                    Cada punto = un turno. Línea sólida = {dayShiftLabel} (tarde) · discontinua = {nightShiftLabel} (noche). Pasa el cursor por una fecha para comparar ambos turnos ese día.
+                  </p>
                 </div>
                 )
               })()}
