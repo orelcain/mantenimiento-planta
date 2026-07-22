@@ -4911,6 +4911,10 @@ export function GraderHistoricalCalendar({
                       {cascadaCalcOpen && (
                         <div className="rounded border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-[11px] space-y-1 font-mono tabular-nums">
                           <div>
+                            <span className="text-muted-foreground">Turnos (Σ máq) = tiempo RASTREADO por Shoplogix en cada turno × 3 Baader (procesando + pausas + paros + setup; no es el horario programado — si el turno partió tarde, cuenta menos) = </span>
+                            <b>{fmtSecPanoramic(mesSec)}</b>
+                          </div>
+                          <div>
                             <span className="text-muted-foreground">Techo de máquina = turnos − pausas planificadas = </span>
                             {fmtSecPanoramic(mesSec)} − {fmtSecPanoramic(totals.planificadoSec)} = <b className="text-sky-400">{fmtSecPanoramic(totals.techoSec)}</b>
                           </div>
@@ -4987,7 +4991,14 @@ export function GraderHistoricalCalendar({
                         ]).sort((a, b) => b.sec - a.sec)
                         return (
                           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[11px]">
-                            <div className="rounded bg-muted/40 px-2 py-1.5" title="Suma del tiempo de todos los turnos del mes, de las 3 máquinas.">
+                            <div
+                              className="rounded bg-muted/40 px-2 py-1.5"
+                              title={
+                                'Cómo se calcula: para cada turno del mes y cada una de las 3 Baader se suma TODO el tiempo que Shoplogix rastreó dentro del turno — procesando + pausas (colación, ejercicio…) + paros + setup. Aquí NO se descuenta nada: la colación se descuenta recién en "− Planificado".\n\n'
+                                + 'NO es el horario programado (ej. 00:00–07:45): es el tiempo con estados registrados, que puede ser menor si el turno partió tarde o terminó antes. Se excluye solo el relleno "Planned Downtime" (tiempo fuera de turno que la consulta captura de más).\n\n'
+                                + 'Son horas-MÁQUINA: las 3 Baader en paralelo suman 3h por cada hora de reloj. Ej.: un T3 de ~7h45m aporta ≈23h15m.'
+                              }
+                            >
                               <div className="text-muted-foreground text-[9px] uppercase">Turnos (Σ máq)</div>
                               <div className="font-mono tabular-nums">{fmtSecPanoramic(mesSec)}</div>
                               <div className="text-[9px] text-muted-foreground/60">100%</div>
