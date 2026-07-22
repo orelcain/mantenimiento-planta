@@ -4940,79 +4940,89 @@ export function GraderHistoricalCalendar({
                         {totals.mantencionSec    > 0 && <div className="bg-rose-500/70"    style={{ width: `${pctTecho(totals.mantencionSec)}%` }} title={`Mantención (equipos): ${fmtSecPanoramic(totals.mantencionSec)}`} />}
                         {totals.sinClasificarSec > 0 && <div className="bg-violet-500/60"  style={{ width: `${pctTecho(totals.sinClasificarSec)}%` }} title={`Sin clasificar: ${fmtSecPanoramic(totals.sinClasificarSec)}`} />}
                       </div>
-                      {/* Cascada numérica — los grupos de pérdida son BOTONES:
-                          click = filtrar la lista de causales a ese grupo. Cada
-                          uno muestra su % (planificado sobre el turno completo;
-                          los demás sobre el techo, que es contra lo que restan). */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[11px]">
-                        <div className="rounded bg-muted/40 px-2 py-1.5">
-                          <div className="text-muted-foreground text-[9px] uppercase">Turnos (Σ máq)</div>
-                          <div className="font-mono tabular-nums">{fmtSecPanoramic(mesSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60">100%</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setCascadaFilter((f) => (f === 'planificado' ? 'all' : 'planificado'))}
-                          className={cn(
-                            'rounded bg-slate-500/10 px-2 py-1.5 text-left transition-shadow hover:ring-1 hover:ring-slate-400/40',
-                            cascadaFilter === 'planificado' && 'ring-1 ring-slate-400/70',
-                          )}
-                          title="Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina. Click para ver sus eventos."
-                        >
-                          <div className="text-muted-foreground text-[9px] uppercase">− Planificado</div>
-                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.planificadoSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.planificadoSec).toFixed(1)}% del turno</div>
-                        </button>
-                        <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = tiempo de turnos − planificado. Todo este tiempo las máquinas PODÍAN producir.">
-                          <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
-                          <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.techoSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.techoSec).toFixed(1)}% del turno</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setCascadaFilter((f) => (f === 'externo' ? 'all' : 'externo'))}
-                          className={cn(
-                            'rounded bg-amber-500/10 px-2 py-1.5 text-left transition-shadow hover:ring-1 hover:ring-amber-400/40',
-                            cascadaFilter === 'externo' && 'ring-1 ring-amber-400/70',
-                          )}
-                          title="Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos."
-                        >
-                          <div className="text-amber-500 text-[9px] uppercase">− Externo</div>
-                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.externoSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctTecho(totals.externoSec).toFixed(1)}% del techo</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCascadaFilter((f) => (f === 'mantencion' ? 'all' : 'mantencion'))}
-                          className={cn(
-                            'rounded bg-rose-500/10 px-2 py-1.5 text-left transition-shadow hover:ring-1 hover:ring-rose-400/40',
-                            cascadaFilter === 'mantencion' && 'ring-1 ring-rose-400/70',
-                          )}
-                          title="Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos."
-                        >
-                          <div className="text-rose-400 text-[9px] uppercase">− Mantención</div>
-                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.mantencionSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctTecho(totals.mantencionSec).toFixed(1)}% del techo</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCascadaFilter((f) => (f === 'sin-clasificar' ? 'all' : 'sin-clasificar'))}
-                          className={cn(
-                            'rounded bg-violet-500/10 px-2 py-1.5 text-left transition-shadow hover:ring-1 hover:ring-violet-400/40',
-                            cascadaFilter === 'sin-clasificar' && 'ring-1 ring-violet-400/70',
-                          )}
-                          title="Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos."
-                        >
-                          <div className="text-violet-400 text-[9px] uppercase">− Sin clasif.</div>
-                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.sinClasificarSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctTecho(totals.sinClasificarSec).toFixed(1)}% del techo</div>
-                        </button>
-                        <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
-                          <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
-                          <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.produccionSec)}</div>
-                          <div className="text-[9px] text-muted-foreground/60 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
-                        </div>
-                      </div>
+                      {/* Cascada numérica ORDENADA de mayor a menor (pedido Orel):
+                          primero los 3 niveles (Turnos → Techo → Uso real) y luego
+                          las pérdidas de MAYOR a menor según los datos del mes —
+                          la vista queda ordenada visualmente sin leer los números.
+                          Los grupos de pérdida son BOTONES: click = filtrar la
+                          lista de causales a ese grupo. */}
+                      {(() => {
+                        const lossCells = ([
+                          {
+                            id: 'externo' as const,
+                            label: '− Externo',
+                            sec: totals.externoSec,
+                            pct: `${pctTecho(totals.externoSec).toFixed(1)}% del techo`,
+                            bg: 'bg-amber-500/10', text: 'text-amber-500',
+                            ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
+                            tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
+                          },
+                          {
+                            id: 'planificado' as const,
+                            label: '− Planificado',
+                            sec: totals.planificadoSec,
+                            pct: `${pctMes(totals.planificadoSec).toFixed(1)}% del turno`,
+                            bg: 'bg-slate-500/10', text: 'text-muted-foreground',
+                            ringHover: 'hover:ring-slate-400/40', ringActive: 'ring-1 ring-slate-400/70',
+                            tip: 'Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina (fuera del techo). Click para ver sus eventos.',
+                          },
+                          {
+                            id: 'mantencion' as const,
+                            label: '− Mantención',
+                            sec: totals.mantencionSec,
+                            pct: `${pctTecho(totals.mantencionSec).toFixed(1)}% del techo`,
+                            bg: 'bg-rose-500/10', text: 'text-rose-400',
+                            ringHover: 'hover:ring-rose-400/40', ringActive: 'ring-1 ring-rose-400/70',
+                            tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
+                          },
+                          {
+                            id: 'sin-clasificar' as const,
+                            label: '− Sin clasif.',
+                            sec: totals.sinClasificarSec,
+                            pct: `${pctTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
+                            bg: 'bg-violet-500/10', text: 'text-violet-400',
+                            ringHover: 'hover:ring-violet-400/40', ringActive: 'ring-1 ring-violet-400/70',
+                            tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
+                          },
+                        ]).sort((a, b) => b.sec - a.sec)
+                        return (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-[11px]">
+                            <div className="rounded bg-muted/40 px-2 py-1.5" title="Suma del tiempo de todos los turnos del mes, de las 3 máquinas.">
+                              <div className="text-muted-foreground text-[9px] uppercase">Turnos (Σ máq)</div>
+                              <div className="font-mono tabular-nums">{fmtSecPanoramic(mesSec)}</div>
+                              <div className="text-[9px] text-muted-foreground/60">100%</div>
+                            </div>
+                            <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = tiempo de turnos − planificado. Todo este tiempo las máquinas PODÍAN producir.">
+                              <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
+                              <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.techoSec)}</div>
+                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.techoSec).toFixed(1)}% del turno</div>
+                            </div>
+                            <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
+                              <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
+                              <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.produccionSec)}</div>
+                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
+                            </div>
+                            {lossCells.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setCascadaFilter((f) => (f === c.id ? 'all' : c.id))}
+                                className={cn(
+                                  'rounded px-2 py-1.5 text-left transition-shadow hover:ring-1',
+                                  c.bg,
+                                  c.ringHover,
+                                  cascadaFilter === c.id && c.ringActive,
+                                )}
+                                title={c.tip}
+                              >
+                                <div className={cn('text-[9px] uppercase', c.text)}>{c.label}</div>
+                                <div className="font-mono tabular-nums">{fmtSecPanoramic(c.sec)}</div>
+                                <div className="text-[9px] text-muted-foreground/60 tabular-nums">{c.pct}</div>
+                              </button>
+                            ))}
+                          </div>
+                        )
+                      })()}
                       {/* Uso real por máquina */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                         {machines.map((m) => (
