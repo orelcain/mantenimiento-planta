@@ -433,106 +433,119 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
   )
 }
 
+/** Promedio móvil centrado de `windowSize` puntos, ignorando huecos (null). */
+function movingAverage(values: Array<number | null>, windowSize: number): Array<number | null> {
+  const half = Math.floor(windowSize / 2)
+  return values.map((_, i) => {
+    const lo = Math.max(0, i - half)
+    const hi = Math.min(values.length - 1, i + half)
+    const slice = values.slice(lo, hi + 1).filter((v): v is number => v != null)
+    if (slice.length === 0) return null
+    return slice.reduce((a, b) => a + b, 0) / slice.length
+  })
+}
+
 /**
- * Gráfico mensual con una línea de uptime% por Baader (multi-serie).
- * Usado en la vista panorámica cuando el toggle "Por máquina" está activo —
- * permite ver qué Baader cayó en uptime en qué día.
+ * Tendencia de uptime por turno — barras diarias (dato honesto: un turno sin
+ * proceso es simplemente un hueco, no una línea que sugiere continuidad
+ * inexistente) + línea de promedio móvil de 5 días para leer la tendencia real
+ * sin que el ruido día-a-día la esconda. Opción "M" elegida por Orel 2026-07-22
+ * sobre línea pura (L) y barras agrupadas sin promedio (B).
  *
- * Series: { name (ej. "Ev 1"), color, points: MachineTrendPoint[] (uno por día) }.
- * El X axis es la unión ordenada de dateKeys; las máquinas que no tienen
- * dato en un día determinado dejan un hueco (gaps en la línea).
+ * Un solo turno a la vez (selector fuera de este componente) — comparar T2 vs
+ * T3 en la misma barra confundía más de lo que aclaraba; el selector resuelve
+ * lo mismo sin amontonar.
  */
-export function BaaderTrendMultiChart({
-  series,
-  height = 96,
+export function TrendBarsWithMovingAverage({
   dateKeys,
+  series,
+  height = 230,
 }: {
-  /** `dashed` distingue familias de series en un chart combinado (ej. T3 vs T2). */
-  series: Array<{ name: string; color: string; points: MachineTrendPoint[]; dashed?: boolean }>
+  dateKeys: string[]
+  /** Una barra por serie y por día; cada serie trae su propia línea de promedio. */
+  series: Array<{ name: string; color: string; points: MachineTrendPoint[] }>
   height?: number
-  /**
-   * Eje X explícito (ej. TODOS los días del mes, incluidos los sin proceso —
-   * pedido Orel: no saltar días; el hueco en la línea ES la información).
-   * Sin esto, el eje se arma solo con los días que tienen datos.
-   */
-  dateKeys?: string[]
 }) {
-  // Eje explícito o unión ordenada de los dateKeys con datos
-  const allDateKeys = dateKeys ?? [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
-  if (allDateKeys.length < 2) {
-    return (
-      <p className="text-[10px] text-muted-foreground italic py-1">
-        Sin suficientes turnos históricos aún (mín. 2)
-      </p>
-    )
-  }
-  const labels = allDateKeys.map((dk) => {
+  const labels = dateKeys.map((dk) => {
     const d = new Date(`${dk}T12:00:00`)
     return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })
   })
-  // Para cada serie: alinear con allDateKeys, null donde no haya dato
-  const dataSeries = series.map((s) => {
-    const byDate = new Map(s.points.map((p) => [p.dateKey, p.shiftRuntime * 100]))
-    return {
-      name: s.name,
-      type: 'line' as const,
-      data: allDateKeys.map((dk) => {
-        const v = byDate.get(dk)
-        return v == null ? null : +v.toFixed(1)
-      }),
-      smooth: 0.3,
-      symbol: 'circle',
-      symbolSize: 4,
-      connectNulls: false,
-      lineStyle: { color: s.color, width: 1.5, type: (s.dashed ? 'dashed' : 'solid') as 'dashed' | 'solid' },
-      itemStyle: { color: s.color },
-    }
+  const built = series.map((s) => {
+    const byDate = new Map(s.points.map((p) => [p.dateKey, +(p.shiftRuntime * 100).toFixed(1)]))
+    const values = dateKeys.map((dk) => byDate.get(dk) ?? null)
+    return { ...s, values, avg: movingAverage(values, 5) }
   })
-  // Fuentes/colores escalan con la altura: el chart combinado grande (~230px)
-  // necesita ejes LEGIBLES (pedido Orel: "no se ven bien los números del X/Y");
-  // los mini-charts de 96px mantienen la densidad original.
-  const big = height >= 160
+  const hasAnyData = built.some((s) => s.values.some((v) => v != null))
+  if (!hasAnyData) {
+    return (
+      <p className="text-[10px] text-muted-foreground italic py-1">
+        Sin datos de este turno en el mes aún
+      </p>
+    )
+  }
+  const barSeries = built.map((s) => ({
+    name: s.name,
+    type: 'bar' as const,
+    data: s.values,
+    barMaxWidth: 14,
+    itemStyle: { color: s.color, opacity: 0.55, borderRadius: [2, 2, 0, 0] as [number, number, number, number] },
+  }))
+  const avgSeries = built.map((s) => ({
+    name: `${s.name} · promedio 5d`,
+    type: 'line' as const,
+    data: s.avg.map((v) => (v == null ? null : +v.toFixed(1))),
+    smooth: 0.4,
+    symbol: 'none' as const,
+    connectNulls: true,
+    lineStyle: { color: s.color, width: 2.5 },
+  }))
   const option = {
     backgroundColor: 'transparent',
-    grid: { left: big ? 40 : 28, right: 8, top: big ? 26 : 18, bottom: big ? 26 : 20, containLabel: false },
+    grid: { left: 40, right: 8, top: 30, bottom: 26, containLabel: false },
     legend: {
       top: 0,
       right: 4,
-      itemWidth: big ? 14 : 8,
-      itemHeight: big ? 3 : 8,
-      textStyle: { color: '#cbd5e1', fontSize: big ? 11 : 9 },
+      itemWidth: 12,
+      itemHeight: 8,
+      textStyle: { color: '#cbd5e1', fontSize: 11 },
+      // Solo la leyenda de barras (el promedio comparte color, sería ruido duplicado)
+      data: built.map((s) => s.name),
     },
     xAxis: {
       type: 'category' as const,
       data: labels,
-      axisLabel: { color: big ? '#94a3b8' : '#475569', fontSize: big ? 11 : 8 },
-      axisLine: { lineStyle: { color: big ? '#334155' : '#1e293b' } },
+      axisLabel: { color: '#94a3b8', fontSize: 10, interval: dateKeys.length > 20 ? 1 : 0 },
+      axisLine: { lineStyle: { color: '#334155' } },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value' as const,
       min: 0,
       max: 100,
-      axisLabel: { color: big ? '#94a3b8' : '#475569', fontSize: big ? 11 : 8, formatter: (v: number) => (big ? `${v}%` : `${v}`) },
-      splitLine: { lineStyle: { color: big ? '#26364a' : '#1e293b', type: 'dashed' as const } },
+      axisLabel: { color: '#94a3b8', fontSize: 11, formatter: (v: number) => `${v}%` },
+      splitLine: { lineStyle: { color: '#26364a', type: 'dashed' as const } },
       axisLine: { show: false },
     },
     tooltip: {
       trigger: 'axis' as const,
+      axisPointer: { type: 'shadow' as const },
       backgroundColor: '#1f2937',
       borderColor: '#374151',
-      textStyle: { color: '#f1f5f9', fontSize: big ? 12 : 10 },
-      formatter: (params: Array<{ color: string; seriesName: string; value: number | null; dataIndex: number }>) => {
+      textStyle: { color: '#f1f5f9', fontSize: 12 },
+      formatter: (params: Array<{ seriesName: string; value: number | null; dataIndex: number; seriesType: string; color: string }>) => {
         if (!params.length) return ''
-        const dk = allDateKeys[params[0]!.dataIndex] ?? ''
-        const rows = params
-          .filter((p) => p.value != null)
-          .map((p) => `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${(p.value as number).toFixed(0)}% uptime</b>`)
-          .join('<br/>')
-        return `<div style="font-size:9px;color:#94a3b8">${dk}</div>${rows}`
+        const dk = dateKeys[params[0]!.dataIndex] ?? ''
+        const bars = params.filter((p) => p.seriesType === 'bar' && p.value != null)
+        const avgs = params.filter((p) => p.seriesType === 'line' && p.value != null)
+        const rows = bars.map((p) => {
+          const avg = avgs.find((a) => a.seriesName.startsWith(p.seriesName))
+          return `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${(p.value as number).toFixed(0)}%</b>`
+            + (avg ? ` <span style="color:#94a3b8">(prom 5d: ${(avg.value as number).toFixed(0)}%)</span>` : '')
+        }).join('<br/>')
+        return `<div style="font-size:10px;color:#94a3b8;margin-bottom:2px">${dk}</div>${rows || '<span style="color:#64748b">sin proceso</span>'}`
       },
     },
-    series: dataSeries,
+    series: [...barSeries, ...avgSeries],
   }
   return (
     <ReactECharts

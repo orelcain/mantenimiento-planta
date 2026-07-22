@@ -47,7 +47,7 @@ import {
   type StateAggregate,
 } from '@/services/grader/shoplogixStateAggregates'
 import { resolveMonthShiftKeys } from '@/services/grader/slxMonthResolve'
-import { BaaderTrendMultiChart } from '@/components/grader/UpstreamMachinesPanel'
+import { TrendBarsWithMovingAverage } from '@/components/grader/UpstreamMachinesPanel'
 import {
   DEFAULT_SHIFT_SCHEDULE,
   inferShiftIdFromSchedule,
@@ -1398,6 +1398,8 @@ export function GraderHistoricalCalendar({
   // Toggle: tendencia agregada (1 línea por turno) vs. por máquina (3 líneas
   // de uptime% — una por Baader). Útil para detectar qué Baader cayó qué día.
   const [trendByMachine, setTrendByMachine] = useState<boolean>(false)
+  /** Turno seleccionado en la pestaña Tendencias (barras + promedio móvil). */
+  const [trendShiftTab, setTrendShiftTab] = useState<'day' | 'night'>('day')
   /** Pestaña activa de la Vista panorámica — cada bloque a página completa
    *  en vez de 3 columnas amontonadas (pedido Orel 2026-07-21). */
   const [panoramaTab, setPanoramaTab] = useState<'baader' | 'paros' | 'disponibilidad' | 'tendencia'>('baader')
@@ -5124,85 +5126,83 @@ export function GraderHistoricalCalendar({
                   y per-machine (3 líneas, uptime% de cada Baader). */}
               {panoramaTab === 'tendencia' && (monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
                 const isYal = plantLine.isClassificationPlant === false
-                const dayShiftLabel   = isYal ? 'T2' : 'Día'
-                const nightShiftLabel = isYal ? 'T3' : 'Noche'
+                const dayShiftLabel   = isYal ? 'T2 · tarde'  : 'Día'
+                const nightShiftLabel = isYal ? 'T3 · noche'  : 'Noche'
                 // Paleta consistente por Baader (M0 sky, M1 violet, M2 amber).
                 const machineColors = ['rgba(56,189,248,0.95)', 'rgba(167,139,250,0.95)', 'rgba(251,191,36,0.95)']
-                // UN solo gráfico combinado (opción T1 elegida por Orel): T2 y T3
-                // como líneas comparables en el mismo eje de fechas. T3 va en
-                // línea DISCONTINUA para distinguir la familia noche de un vistazo.
-                //  - Agregado:   2 series (uptime% de la línea por turno)
-                //  - Por máquina: 6 series (Ev 1/2/3 × T2 sólida / T3 discontinua)
-                const toMachineSeries = (
-                  byMachine: Map<string, { name: string; points: MachineTrendPoint[] }>,
-                  shiftLbl: string,
-                  dashed: boolean,
-                ) => [...byMachine.entries()]
+                const selectedIsDay = trendShiftTab === 'day'
+                const selectedPoints = selectedIsDay ? monthTrendPoints.day : monthTrendPoints.night
+                const selectedByMachine = selectedIsDay ? monthTrendByMachine.day : monthTrendByMachine.night
+                // Barras + promedio móvil (opción "M" elegida por Orel): un solo
+                // turno a la vez (selector abajo) — mezclar T2 y T3 en la misma
+                // barra confundía más que aclaraba. "Por máquina" da 3 series
+                // (Ev 1/2/3) en vez de 1 (línea completa).
+                const machineSeries = [...selectedByMachine.entries()]
                   .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
                   .map(([, v], idx) => ({
-                    name:   `${v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')} · ${shiftLbl}`,
+                    name:   v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
                     color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
                     points: v.points,
-                    dashed,
                   }))
-                const combinedSeries = trendByMachine
-                  ? [
-                      ...toMachineSeries(monthTrendByMachine.day, dayShiftLabel, false),
-                      ...toMachineSeries(monthTrendByMachine.night, nightShiftLabel, true),
-                    ]
-                  : [
-                      ...(monthTrendPoints.day.length >= 2
-                        ? [{ name: `${dayShiftLabel} (línea)`, color: 'rgba(52,211,153,0.95)', points: monthTrendPoints.day, dashed: false }]
-                        : []),
-                      ...(monthTrendPoints.night.length >= 2
-                        ? [{ name: `${nightShiftLabel} (línea)`, color: 'rgba(167,139,250,0.95)', points: monthTrendPoints.night, dashed: true }]
-                        : []),
-                    ]
+                const chartSeries = trendByMachine
+                  ? machineSeries
+                  : [{ name: 'Línea completa', color: 'rgba(52,211,153,0.95)', points: selectedPoints }]
+                const monthDateKeys = (() => {
+                  const y = currentMonth.getFullYear()
+                  const m = currentMonth.getMonth()
+                  const n = new Date(y, m + 1, 0).getDate()
+                  return Array.from({ length: n }, (_, i) =>
+                    `${y}-${String(m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`)
+                })()
                 return (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                      Tendencia de uptime Baader · {dayShiftLabel} vs {nightShiftLabel} · {monthNames[currentMonth.getMonth()]}
+                      Tendencia de uptime Baader · {monthNames[currentMonth.getMonth()]}
                       <InfoTooltip
                         title="Tendencia de uptime por turno"
-                        text={trendByMachine
-                          ? '% uptime de cada Baader (Ev 1/2/3) por turno a lo largo del mes. Línea sólida = turno de tarde; discontinua = turno noche. Útil para detectar qué máquina cayó y en qué turno.'
-                          : '% del tiempo del turno que la línea estuvo procesando, día a día. Línea sólida = turno de tarde; discontinua = turno noche. Comparar ambas revela si un turno rinde sistemáticamente menos.'}
+                        text="Barras = uptime real de cada día (un día sin proceso es simplemente un hueco). Línea gruesa = promedio móvil de 5 días, para ver la tendencia real sin que el ruido día-a-día la esconda."
                         formula="uptime = tiempo_procesando / duración_turno × 100"
-                        example={`${dayShiftLabel} estable en 80% y ${nightShiftLabel} cayendo a 50% → el problema es del turno noche, no de las máquinas.`}
+                        example="Si el promedio móvil sube semana a semana, el turno está mejorando de verdad — no es un día bueno aislado."
                         iconSize={10}
                       />
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setTrendByMachine((v) => !v)}
-                      className={cn(
-                        'text-[10px] px-2 py-1 rounded border transition-colors',
-                        trendByMachine
-                          ? 'bg-primary/15 text-primary border-primary/30'
-                          : 'bg-muted text-muted-foreground border-border hover:bg-accent',
-                      )}
-                      title="Alternar entre la línea completa (2 series) y el detalle por Baader (6 series)"
-                    >
-                      {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Selector de turno — un turno a la vez, evita amontonar T2+T3 */}
+                      <div className="flex rounded border border-border overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setTrendShiftTab('day')}
+                          className={cn('text-[10px] px-2 py-1 transition-colors', trendShiftTab === 'day' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-accent')}
+                        >
+                          {dayShiftLabel}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrendShiftTab('night')}
+                          className={cn('text-[10px] px-2 py-1 transition-colors border-l border-border', trendShiftTab === 'night' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-accent')}
+                        >
+                          {nightShiftLabel}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTrendByMachine((v) => !v)}
+                        className={cn(
+                          'text-[10px] px-2 py-1 rounded border transition-colors',
+                          trendByMachine
+                            ? 'bg-primary/15 text-primary border-primary/30'
+                            : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                        )}
+                        title="Alternar entre la línea completa (1 serie) y el detalle por Baader (3 series)"
+                      >
+                        {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
+                      </button>
+                    </div>
                   </div>
-                  <BaaderTrendMultiChart
-                    series={combinedSeries}
-                    height={230}
-                    dateKeys={(() => {
-                      // TODOS los días del mes en el eje X — los días sin proceso
-                      // quedan como hueco en la línea (no se saltan fechas).
-                      const y = currentMonth.getFullYear()
-                      const m = currentMonth.getMonth()
-                      const n = new Date(y, m + 1, 0).getDate()
-                      return Array.from({ length: n }, (_, i) =>
-                        `${y}-${String(m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`)
-                    })()}
-                  />
+                  <TrendBarsWithMovingAverage series={chartSeries} dateKeys={monthDateKeys} height={230} />
                   <p className="text-[10px] text-muted-foreground/60">
-                    Cada punto = un turno; el eje muestra el mes completo y los huecos son días sin proceso.
-                    Línea sólida = {dayShiftLabel} (tarde) · discontinua = {nightShiftLabel} (noche). Pasa el cursor por una fecha para comparar ambos turnos ese día.
+                    Cada barra = un día del turno {selectedIsDay ? dayShiftLabel : nightShiftLabel}; sin barra = sin proceso ese día. La línea gruesa es el promedio móvil de 5 días.
                   </p>
                 </div>
                 )
