@@ -481,36 +481,40 @@ export function BaaderTrendMultiChart({
       itemStyle: { color: s.color },
     }
   })
+  // Fuentes/colores escalan con la altura: el chart combinado grande (~230px)
+  // necesita ejes LEGIBLES (pedido Orel: "no se ven bien los números del X/Y");
+  // los mini-charts de 96px mantienen la densidad original.
+  const big = height >= 160
   const option = {
     backgroundColor: 'transparent',
-    grid: { left: 28, right: 6, top: 18, bottom: 20, containLabel: false },
+    grid: { left: big ? 40 : 28, right: 8, top: big ? 26 : 18, bottom: big ? 26 : 20, containLabel: false },
     legend: {
       top: 0,
       right: 4,
-      itemWidth: 8,
-      itemHeight: 8,
-      textStyle: { color: '#94a3b8', fontSize: 9 },
+      itemWidth: big ? 14 : 8,
+      itemHeight: big ? 3 : 8,
+      textStyle: { color: '#cbd5e1', fontSize: big ? 11 : 9 },
     },
     xAxis: {
       type: 'category' as const,
       data: labels,
-      axisLabel: { color: '#475569', fontSize: 8 },
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLabel: { color: big ? '#94a3b8' : '#475569', fontSize: big ? 11 : 8 },
+      axisLine: { lineStyle: { color: big ? '#334155' : '#1e293b' } },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value' as const,
       min: 0,
       max: 100,
-      axisLabel: { color: '#475569', fontSize: 8, formatter: (v: number) => `${v}` },
-      splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' as const } },
+      axisLabel: { color: big ? '#94a3b8' : '#475569', fontSize: big ? 11 : 8, formatter: (v: number) => (big ? `${v}%` : `${v}`) },
+      splitLine: { lineStyle: { color: big ? '#26364a' : '#1e293b', type: 'dashed' as const } },
       axisLine: { show: false },
     },
     tooltip: {
       trigger: 'axis' as const,
       backgroundColor: '#1f2937',
       borderColor: '#374151',
-      textStyle: { color: '#f1f5f9', fontSize: 10 },
+      textStyle: { color: '#f1f5f9', fontSize: big ? 12 : 10 },
       formatter: (params: Array<{ color: string; seriesName: string; value: number | null; dataIndex: number }>) => {
         if (!params.length) return ''
         const dk = allDateKeys[params[0]!.dataIndex] ?? ''

@@ -16,7 +16,7 @@
  *    ya estamos en el Wizard y queremos actualizar el state en lugar de navegar).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
@@ -2654,54 +2654,50 @@ export function GraderHistoricalCalendar({
   }, [slxByShift, currentMonth, paretoMachineFilter, paretoMaintOnly])
 
   // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
+  /**
+   * Columnas FIJAS de la matriz de disponibilidad, según los turnos reales de
+   * la planta (pedido Orel 2026-07-22): Yal muestra T1/T2/T3 desde ya (aunque
+   * T1 esté vacío — cuando parta el 3er turno la vista no cambia); Planta
+   * Principal muestra Día/Noche. `resolve` = cadena de candidatos en Firestore.
+   */
+  const availabilityCols = useMemo(() => {
+    if (plantLine.isClassificationPlant === false) {
+      return [
+        { id: 'Turno 1', label: 'T1 · mañana', resolve: ['Turno 1'] },
+        { id: 'Turno 2', label: 'T2 · tarde',  resolve: ['Turno 2'] },
+        { id: 'Turno 3', label: 'T3 · noche',  resolve: ['Turno 3'] },
+      ]
+    }
+    return [
+      { id: 'Turno día',   label: 'Día',   resolve: ['Turno 2', 'Turno día'] },
+      { id: 'Turno noche', label: 'Noche', resolve: ['Turno 3', 'Turno 1', 'Turno noche'] },
+    ]
+  }, [plantLine.isClassificationPlant])
+
   const availabilityTrend = useMemo((): Array<{
     dk: string
-    day: SlxShiftCache | null
-    night: SlxShiftCache | null
-    /** shiftId real del slot "día" para mostrar como label (T1/T2/Día según convención). */
-    dayShiftId: string | null
-    /** shiftId real del slot "noche" (T3/Noche). */
-    nightShiftId: string | null
+    /** Un cache (o null) por columna de `availabilityCols`, en el mismo orden. */
+    cells: Array<{ cache: SlxShiftCache | null; shiftId: string | null }>
   }> => {
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix     = `${year}-${String(month + 1).padStart(2, '0')}-`
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null; dayShiftId: string | null; nightShiftId: string | null }> = []
+    const result: Array<{ dk: string; cells: Array<{ cache: SlxShiftCache | null; shiftId: string | null }> }> = []
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = `${prefix}${String(d).padStart(2, '0')}`
-      // Slot "día": preferir T2 (tarde Yal), luego Turno día (Chonchi).
-      const t2 = slxByShift.get(`${dk}__Turno 2`)
-      const legacyDay = slxByShift.get(`${dk}__Turno día`)
-      const dayCache = (t2 && (t2.totalCycles ?? 0) > 0) ? t2 : legacyDay ?? null
-      const dayShiftId = (t2 && (t2.totalCycles ?? 0) > 0)
-        ? 'Turno 2'
-        : ((legacyDay?.totalCycles ?? 0) > 0 ? 'Turno día' : null)
-      // Slot "noche": mejor entre T1/T3 con datos (más ciclos), fallback Turno noche.
-      const candidates: Array<[string, SlxShiftCache | undefined]> = [
-        ['Turno 1', slxByShift.get(`${dk}__Turno 1`)],
-        ['Turno 3', slxByShift.get(`${dk}__Turno 3`)],
-      ]
-      const nightChosen = candidates
-        .filter((entry): entry is [string, SlxShiftCache] => entry[1] != null && (entry[1].totalCycles ?? 0) > 0)
-        .sort((a, b) => (b[1].totalCycles ?? 0) - (a[1].totalCycles ?? 0))[0]
-      const legacyNight = slxByShift.get(`${dk}__Turno noche`)
-      const nightCache = nightChosen?.[1] ?? legacyNight ?? null
-      const nightShiftId = nightChosen?.[0]
-        ?? ((legacyNight?.totalCycles ?? 0) > 0 ? 'Turno noche' : null)
-      const dayHasData   = (dayCache?.totalCycles   ?? 0) > 0
-      const nightHasData = (nightCache?.totalCycles ?? 0) > 0
-      if (!dayHasData && !nightHasData) continue
-      result.push({
-        dk,
-        day:   dayHasData   ? dayCache   : null,
-        night: nightHasData ? nightCache : null,
-        dayShiftId:   dayHasData   ? dayShiftId   : null,
-        nightShiftId: nightHasData ? nightShiftId : null,
+      const cells = availabilityCols.map((col) => {
+        for (const cand of col.resolve) {
+          const cache = slxByShift.get(`${dk}__${cand}`)
+          if (cache && (cache.totalCycles ?? 0) > 0) return { cache, shiftId: cand }
+        }
+        return { cache: null, shiftId: null }
       })
+      if (cells.every((c) => c.cache === null)) continue
+      result.push({ dk, cells })
     }
     return result
-  }, [slxByShift, currentMonth])
+  }, [slxByShift, currentMonth, availabilityCols])
 
   // Emite stats mensuales al padre para el panel lateral
   useEffect(() => {
@@ -4984,38 +4980,41 @@ export function GraderHistoricalCalendar({
                   {availabilityTrend.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground italic">Cargando datos del mes...</p>
                   ) : (
-                    <div className="space-y-[3px]">
+                    <div className="space-y-1">
                       {/* Leyenda compacta */}
-                      <div className="flex items-center gap-3 pb-1 text-[9px] text-muted-foreground/70">
+                      <div className="flex items-center gap-3 pb-1 text-[10px] text-muted-foreground/80">
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-1.5 rounded-sm bg-emerald-500/70" />
+                          <div className="w-2.5 h-2 rounded-sm bg-emerald-500/70" />
                           Uptime
                         </div>
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-1.5 rounded-sm bg-amber-500/60" />
+                          <div className="w-2.5 h-2 rounded-sm bg-amber-500/60" />
                           Breaks
                         </div>
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-1.5 rounded-sm bg-rose-500/65" />
+                          <div className="w-2.5 h-2 rounded-sm bg-rose-500/65" />
                           Paro
                         </div>
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-1.5 rounded-sm bg-violet-500/55" />
+                          <div className="w-2.5 h-2 rounded-sm bg-violet-500/55" />
                           Setup
                         </div>
                       </div>
-                      {/* Encabezado de columnas — cada barra con su propio % al lado */}
-                      <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-muted-foreground/70 pb-0.5">
-                        <span className="shrink-0 w-8 text-right">Día</span>
-                        <span className="shrink-0 w-5" />
-                        <span className="flex-1">Turno tarde</span>
-                        <span className="shrink-0 w-9 text-right">Upt%</span>
-                        <span className="shrink-0 w-5" />
-                        <span className="flex-1">Turno noche</span>
-                        <span className="shrink-0 w-9 text-right">Upt%</span>
-                      </div>
+                      {/* Matriz día × turno: una COLUMNA fija por turno de la planta
+                          (Yal: T1/T2/T3 aunque T1 esté vacío; Principal: Día/Noche).
+                          Al partir el 3er turno la vista no cambia — solo se llena. */}
+                      <div
+                        className="grid gap-x-3 gap-y-[3px] items-center"
+                        style={{ gridTemplateColumns: `3.2rem repeat(${availabilityCols.length}, minmax(0, 1fr))` }}
+                      >
+                        <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 text-right">Día</span>
+                        {availabilityCols.map((col) => (
+                          <span key={col.id} className="text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                            {col.label}
+                          </span>
+                        ))}
                       {/* Filas por día, con separador al inicio de cada semana */}
-                      {availabilityTrend.map(({ dk, day, night, dayShiftId, nightShiftId }, rowIdx) => {
+                      {availabilityTrend.map(({ dk, cells }, rowIdx) => {
                         const buildAvailBar = (cache: SlxShiftCache | null) => {
                           if (!cache || !cache.breakdown) {
                             return <div className="flex-1 h-4 rounded-sm bg-muted/20 opacity-40" />
@@ -5039,62 +5038,53 @@ export function GraderHistoricalCalendar({
                             </div>
                           )
                         }
-                        const dayUptimeStr   = day   ? `${(day.shiftRuntime   * 100).toFixed(0)}%` : '—'
-                        const nightUptimeStr = night ? `${(night.shiftRuntime * 100).toFixed(0)}%` : '—'
                         // Separador semanal: los domingos abren semana (misma
                         // convención Dom-primero del calendario de arriba).
                         const dow = new Date(`${dk}T12:00:00`).getDay()
                         const weekBreak = dow === 0 && rowIdx > 0
+                        const dowLabel = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'][dow]
                         return (
-                          <div key={dk}>
+                          <React.Fragment key={dk}>
                             {weekBreak && (
-                              <div className="flex items-center gap-2 pt-1.5 pb-0.5">
-                                <span className="text-[8px] uppercase tracking-wider text-muted-foreground/50 shrink-0">
-                                  Sem del {dk.slice(8)}-{dk.slice(5, 7)}
+                              <div className="col-span-full flex items-center gap-2 pt-2 pb-0.5">
+                                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 shrink-0">
+                                  Semana del {dk.slice(8)}
                                 </span>
                                 <div className="flex-1 h-px bg-border/50" />
                               </div>
                             )}
-                            <div className="flex items-center gap-1.5 text-[10px]">
-                              {/* Fecha clicable → navega al día */}
-                              <span
-                                className="text-muted-foreground/70 tabular-nums shrink-0 w-8 text-right cursor-pointer hover:text-foreground transition-colors"
-                                onClick={() => {
-                                  const d = new Date(`${dk}T00:00:00`)
-                                  setSelectedDate(d)
-                                  setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
-                                }}
-                              >
-                                {dk.slice(5)}
-                              </span>
-                              <span className="text-[8px] text-amber-500/60 shrink-0 w-5 text-center">
-                                {dayShiftId === 'Turno 2' ? 'T2'
-                                  : dayShiftId === 'Turno 1' ? 'T1'
-                                  : dayShiftId === 'Turno día' ? 'D'
-                                  : dayShiftId === null ? '—' : 'D'}
-                              </span>
-                              {buildAvailBar(day)}
-                              <span className="text-muted-foreground/70 tabular-nums shrink-0 w-9 text-right">
-                                {dayUptimeStr}
-                              </span>
-                              <span className="text-[8px] text-indigo-400/60 shrink-0 w-5 text-center">
-                                {nightShiftId === 'Turno 3' ? 'T3'
-                                  : nightShiftId === 'Turno 1' ? 'T1'
-                                  : nightShiftId === 'Turno noche' ? 'N'
-                                  : nightShiftId === null ? '—' : 'N'}
-                              </span>
-                              {buildAvailBar(night)}
-                              <span className="text-muted-foreground/70 tabular-nums shrink-0 w-9 text-right">
-                                {nightUptimeStr}
-                              </span>
-                            </div>
-                          </div>
+                            {/* Fecha clicable → navega al día. "Ma 14" en una línea. */}
+                            <span
+                              className="text-[11px] text-muted-foreground tabular-nums text-right cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                              onClick={() => {
+                                const d = new Date(`${dk}T00:00:00`)
+                                setSelectedDate(d)
+                                setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+                              }}
+                            >
+                              <span className="text-muted-foreground/50 text-[9px] mr-1">{dowLabel}</span>
+                              <span className="font-medium text-foreground/80">{dk.slice(8)}</span>
+                            </span>
+                            {cells.map(({ cache }, colIdx) => (
+                              <div key={availabilityCols[colIdx]!.id} className="flex items-center gap-1.5 min-w-0">
+                                {buildAvailBar(cache)}
+                                <span className={cn(
+                                  'tabular-nums shrink-0 w-9 text-right text-[11px]',
+                                  cache ? 'text-foreground/75' : 'text-muted-foreground/30',
+                                )}>
+                                  {cache ? `${(cache.shiftRuntime * 100).toFixed(0)}%` : '—'}
+                                </span>
+                              </div>
+                            ))}
+                          </React.Fragment>
                         )
                       })}
+                      </div>
                     </div>
                   )}
                   <p className="text-[10px] text-muted-foreground/60 pt-1">
-                    Cada fila = un día; barra izquierda turno de tarde, derecha turno noche. Verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup. Click en la fecha abre el día.
+                    Cada fila = un día, una columna por turno de la planta (las columnas vacías se llenarán cuando ese turno opere).
+                    Cada barra reparte el tiempo del turno: verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup. Upt% = porcentaje procesando. Click en la fecha abre el día.
                   </p>
                 </div>
                 )}

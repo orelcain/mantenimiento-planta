@@ -54,6 +54,8 @@ const REASON_RULES: BucketRule[] = [
   { bucket: 'externo',      match: ['falta mmpp', 'mmpp', 'materia prima'] },
   { bucket: 'externo',      match: ['cumplimiento cuota', 'cuota'] },
   { bucket: 'externo',      match: ['falta personal'] },
+  // ENERGIA = corte de suministro eléctrico (confirmado por Orel 2026-07-22)
+  // → pérdida externa, no es frente de Mantención.
   { bucket: 'externo',      match: ['energia', 'energía'] },
   { bucket: 'mantencion',   match: ['ajuste mantenimiento', 'mantencion', 'mantención'] },
   { bucket: 'mantencion',   match: ['cintas', 'cinta'] },
