@@ -2663,35 +2663,46 @@ export function GraderHistoricalCalendar({
    * Principal muestra Día/Noche. `resolve` = cadena de candidatos en Firestore.
    */
   const availabilityCols = useMemo(() => {
+    // Etiquetas SIN adjetivos de jornada ("mañana"/"tarde"): Shoplogix renombra
+    // turnos de un día para otro (T3→T1 el 8-jul-2026) y un rótulo fijo puede
+    // mentir. El horario real de abajo, derivado de los datos, es quien manda.
     const base = plantLine.isClassificationPlant === false
       ? [
-          { id: 'Turno 1', label: 'T1 · mañana', resolve: ['Turno 1'] },
-          { id: 'Turno 2', label: 'T2 · tarde',  resolve: ['Turno 2'] },
-          { id: 'Turno 3', label: 'T3 · noche',  resolve: ['Turno 3'] },
+          { id: 'Turno 1', label: 'T1', resolve: ['Turno 1'] },
+          { id: 'Turno 2', label: 'T2', resolve: ['Turno 2'] },
+          { id: 'Turno 3', label: 'T3', resolve: ['Turno 3'] },
         ]
       : [
           { id: 'Turno día',   label: 'Día',   resolve: ['Turno 2', 'Turno día'] },
           { id: 'Turno noche', label: 'Noche', resolve: ['Turno 3', 'Turno 1', 'Turno noche'] },
         ]
-    // Horario programado de cada turno, sacado de los DATOS del mes visible
-    // (plantilla oficial si existe, si no la ventana derivada) — no hardcodeado,
-    // porque Shoplogix cambia horarios de un día para otro.
+    // Horario de cada turno = el MÁS FRECUENTE observado en el mes (moda), no
+    // el primero que aparezca: un solo día anómalo no debe definir el rótulo de
+    // toda la columna. Se prefiere la plantilla oficial cuando existe.
     const monthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-`
     return base.map((col) => {
-      let schedule = ''
+      const freq = new Map<string, number>()
+      let daysWithData = 0
       for (const [key, cache] of slxByShift) {
         if (!key.startsWith(monthPrefix)) continue
         const sid = key.slice(12)
         if (!col.resolve.includes(sid)) continue
+        if (!isSignificantCycleCount(cache.totalCycles)) continue
         const s = cache.officialStart ?? cache.scheduledStart
         const e = cache.officialEnd   ?? cache.scheduledEnd
-        if (s && e && (cache.totalCycles ?? 0) > 0) {
-          schedule = `${fmtWallHHMM(s)}–${fmtWallHHMM(e)}`
-          // Preferir un horario de plantilla oficial si aparece más adelante
-          if (cache.officialStart) break
-        }
+        if (!s || !e) continue
+        daysWithData += 1
+        const label = `${fmtWallHHMM(s)}–${fmtWallHHMM(e)}`
+        freq.set(label, (freq.get(label) ?? 0) + 1)
       }
-      return { ...col, schedule }
+      const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]
+      return {
+        ...col,
+        schedule: top?.[0] ?? '',
+        /** true si el horario sale de 1-2 días: puede no ser representativo. */
+        scheduleWeak: daysWithData > 0 && daysWithData <= 2,
+        daysWithData,
+      }
     })
   }, [plantLine.isClassificationPlant, slxByShift, currentMonth])
 
@@ -5030,10 +5041,22 @@ export function GraderHistoricalCalendar({
                       >
                         <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 text-right self-end pb-0.5">Día</span>
                         {availabilityCols.map((col) => (
-                          <span key={col.id} className="leading-tight">
+                          <span
+                            key={col.id}
+                            className="leading-tight"
+                            title={col.schedule
+                              ? `Horario más frecuente de ${col.label} en el mes (${col.daysWithData} ${col.daysWithData === 1 ? 'día' : 'días'} con datos).`
+                                + (col.scheduleWeak ? ' Con tan pocos días puede no ser el horario habitual.' : '')
+                              : `${col.label} sin producción registrada este mes`}
+                          >
                             <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/80 font-semibold">{col.label}</span>
-                            <span className="block text-[9px] text-muted-foreground/50 tabular-nums normal-case tracking-normal">
-                              {col.schedule ? `prog. ${col.schedule}` : 'sin datos aún'}
+                            <span className={cn(
+                              'block text-[9px] tabular-nums normal-case tracking-normal',
+                              col.scheduleWeak ? 'text-amber-500/60' : 'text-muted-foreground/50',
+                            )}>
+                              {col.schedule
+                                ? `${col.scheduleWeak ? '~' : ''}${col.schedule}`
+                                : 'sin datos aún'}
                             </span>
                           </span>
                         ))}
@@ -5112,7 +5135,8 @@ export function GraderHistoricalCalendar({
                     </div>
                   )}
                   <p className="text-[10px] text-muted-foreground/60 pt-1">
-                    Cada fila = un día, una columna por turno de la planta (las vacías se llenarán cuando ese turno opere). "prog." = horario programado del turno.
+                    Cada fila = un día, una columna por turno de la planta (las vacías se llenarán cuando ese turno opere).
+                    Bajo cada turno va su horario más frecuente del mes (~ = pocos días de datos, puede no ser el habitual).
                     La barra reparte el tiempo del turno: verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup.
                     El % es el UPTIME: qué fracción del turno la máquina estuvo procesando (ej. 82% = procesó 82 de cada 100 minutos del turno). Click en la fecha abre el día.
                   </p>
@@ -5126,8 +5150,10 @@ export function GraderHistoricalCalendar({
                   y per-machine (3 líneas, uptime% de cada Baader). */}
               {panoramaTab === 'tendencia' && (monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
                 const isYal = plantLine.isClassificationPlant === false
-                const dayShiftLabel   = isYal ? 'T2 · tarde'  : 'Día'
-                const nightShiftLabel = isYal ? 'T3 · noche'  : 'Noche'
+                // Sin adjetivos de jornada: Shoplogix renombra turnos (T3→T1 el
+                // 8-jul-2026) y un rótulo fijo puede contradecir los datos.
+                const dayShiftLabel   = isYal ? 'T2' : 'Día'
+                const nightShiftLabel = isYal ? 'T3' : 'Noche'
                 // Paleta consistente por Baader (M0 sky, M1 violet, M2 amber).
                 const machineColors = ['rgba(56,189,248,0.95)', 'rgba(167,139,250,0.95)', 'rgba(251,191,36,0.95)']
                 const selectedIsDay = trendShiftTab === 'day'
