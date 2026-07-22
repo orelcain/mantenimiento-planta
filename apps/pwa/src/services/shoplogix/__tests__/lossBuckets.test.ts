@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { classifyLossState, cascadeFromAggregates, cascadeFromStates } from '../lossBuckets'
+import { classifyLossState, cascadeFromAggregates, cascadeFromStates, cascadeFromMonthAggregates } from '../lossBuckets'
 
 const agg = (type: string, name: string, reason: string, durationSec: number, count = 1) =>
   ({ type: type as 'uptime' | 'break' | 'downtime' | 'setup', name, reason, color: '#000', durationSec, count })
@@ -62,6 +62,19 @@ describe('cascadeFromAggregates', () => {
     const c = cascadeFromAggregates([])
     expect(c.techoSec).toBe(0)
     expect(c.usoReal).toBe(0)
+  })
+})
+
+describe('cascadeFromMonthAggregates', () => {
+  it('inyecta el uptime del doc padre (los aggregates lo excluyen) y recalcula techo/usoReal', () => {
+    const c = cascadeFromMonthAggregates(6 * 3600, [
+      agg('break', 'Detencion', 'COLACION', 3600),
+      agg('downtime', 'Detencion', 'FALTA MMPP', 2 * 3600),
+    ])
+    expect(c.produccionSec).toBe(6 * 3600)
+    expect(c.planificadoSec).toBe(3600)
+    expect(c.techoSec).toBe(8 * 3600)                 // uptime + externo (colación queda fuera del techo)
+    expect(c.usoReal).toBeCloseTo(6 / 8)
   })
 })
 

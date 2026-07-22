@@ -79,6 +79,7 @@ import {
 } from '@/services/grader/graderShiftDisplay'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { softenAccentHex } from '@/lib/softenColor'
+import { cascadeFromMonthAggregates, LOSS_BUCKET_META, type LossBucket, type LossCascade } from '@/services/shoplogix/lossBuckets'
 
 interface TurnoSummary {
   totalPieces: number
@@ -1398,11 +1399,14 @@ export function GraderHistoricalCalendar({
   // Toggle: tendencia agregada (1 línea por turno) vs. por máquina (3 líneas
   // de uptime% — una por Baader). Útil para detectar qué Baader cayó qué día.
   const [trendByMachine, setTrendByMachine] = useState<boolean>(false)
-  /** Turno seleccionado en la pestaña Tendencias (barras + promedio móvil). */
-  const [trendShiftTab, setTrendShiftTab] = useState<'day' | 'night'>('day')
+  /** Turno seleccionado en la pestaña Tendencias (barras + promedio móvil).
+   *  'both' = modo Comparar: barras T2|T3 agrupadas + ambos promedios. */
+  const [trendShiftTab, setTrendShiftTab] = useState<'day' | 'night' | 'both'>('both')
   /** Pestaña activa de la Vista panorámica — cada bloque a página completa
-   *  en vez de 3 columnas amontonadas (pedido Orel 2026-07-21). */
-  const [panoramaTab, setPanoramaTab] = useState<'baader' | 'paros' | 'disponibilidad' | 'tendencia'>('baader')
+   *  en vez de 3 columnas amontonadas (pedido Orel 2026-07-21). 'cascada'
+   *  (fase 2) es el default: es LA vista de la meta grande — quién limitó
+   *  producir el máximo este mes y cuánto costó en piezas. */
+  const [panoramaTab, setPanoramaTab] = useState<'cascada' | 'baader' | 'paros' | 'disponibilidad' | 'tendencia'>('cascada')
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -2601,6 +2605,81 @@ export function GraderHistoricalCalendar({
       },
     }
   }, [currentMonth, slxByShift])
+
+  // ── Fase 2: cascada de pérdidas AGREGADA DEL MES ───────────────────────────
+  // Misma taxonomía que la cascada del turno (LossCascadeCard) pero sumada
+  // sobre todos los turnos del mes, desde los agregados del doc padre → 0 reads.
+  // Excluye Unscheduled (producción fuera de turno no compite en la cascada de
+  // turnos; ya tiene su chip propio en el Resumen del mes).
+  const monthlyCascade = useMemo(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    const perMachine = new Map<string, {
+      name: string
+      uptimeSec: number
+      totalCycles: number
+      aggs: StateAggregate[]
+    }>()
+    for (const [key, cache] of slxByShift) {
+      if (!key.startsWith(prefix)) continue
+      if (!isSignificantCycleCount(cache.totalCycles)) continue
+      const dk      = key.slice(0, 10)
+      const shiftId = key.slice(12)
+      if (isUnscheduledShift(shiftId)) continue
+      // Dedup legacy vs nuevo — mismo criterio que slxMonthlyStats
+      if (shiftId === 'Turno día'   && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles))) continue
+      if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
+      for (const pm of cache.perMachine ?? []) {
+        const acc = perMachine.get(pm.machineid) ?? { name: pm.name, uptimeSec: 0, totalCycles: 0, aggs: [] }
+        acc.uptimeSec   += pm.uptimeSec
+        acc.totalCycles += pm.totalCycles
+        acc.aggs.push(...(pm.stateAggregates ?? []))
+        perMachine.set(pm.machineid, acc)
+      }
+    }
+    if (perMachine.size === 0) return null
+
+    const machines = [...perMachine.entries()].map(([machineid, m]) => {
+      const cascade = cascadeFromMonthAggregates(m.uptimeSec, m.aggs)
+      const cadencePzSec = cascade.produccionSec > 0 ? m.totalCycles / cascade.produccionSec : 0
+      return { machineid, name: m.name, cascade, cadencePzSec, totalCycles: m.totalCycles }
+    }).sort((a, b) => a.name.localeCompare(b.name, 'es'))
+
+    const sum = (f: (x: typeof machines[number]) => number) => machines.reduce((a, x) => a + f(x), 0)
+    const totals: Pick<LossCascade, 'produccionSec' | 'planificadoSec' | 'externoSec' | 'mantencionSec' | 'sinClasificarSec' | 'techoSec'> = {
+      produccionSec:    sum(x => x.cascade.produccionSec),
+      planificadoSec:   sum(x => x.cascade.planificadoSec),
+      externoSec:       sum(x => x.cascade.externoSec),
+      mantencionSec:    sum(x => x.cascade.mantencionSec),
+      sinClasificarSec: sum(x => x.cascade.sinClasificarSec),
+      techoSec:         sum(x => x.cascade.techoSec),
+    }
+    const usoReal = totals.techoSec > 0 ? totals.produccionSec / totals.techoSec : 0
+    const piezasReales = sum(x => x.totalCycles)
+    const piezasMax = Math.round(sum(x => x.cascade.techoSec * x.cadencePzSec))
+
+    // Piezas perdidas por causal — duración × cadencia de cada máquina
+    const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number }>()
+    for (const x of machines) {
+      for (const item of x.cascade.items) {
+        const label = item.reason || (item.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
+        const key = `${item.bucket}__${label}`
+        const cur = lossByCause.get(key) ?? { bucket: item.bucket, label, sec: 0, piezas: 0, count: 0 }
+        cur.sec += item.durationSec
+        cur.piezas += item.durationSec * x.cadencePzSec
+        cur.count += item.count
+        lossByCause.set(key, cur)
+      }
+    }
+    const causes = [...lossByCause.values()]
+      .map(c => ({ ...c, piezas: Math.round(c.piezas) }))
+      .sort((a, b) => b.piezas - a.piezas)
+
+    return { machines, totals, usoReal, piezasReales, piezasMax, causes }
+  }, [slxByShift, currentMonth])
 
   // ── Panel panorámico: pareto de causas de paro cross-turno del mes ─────────
   // Agrega todos los estados de tipo 'downtime' de los turnos ya cargados
@@ -4731,6 +4810,7 @@ export function GraderHistoricalCalendar({
                   espacio para graficarse más grande y explicarse mejor. */}
               <div className="flex flex-wrap gap-1 pt-2">
                 {([
+                  ['cascada', 'Cascada del mes'],
                   ['baader', 'Por Baader'],
                   ['paros', 'Top paros'],
                   ['disponibilidad', 'Disponibilidad diaria'],
@@ -4754,6 +4834,142 @@ export function GraderHistoricalCalendar({
             </CardHeader>
             <CardContent className="px-6 pb-5">
               <div>
+
+                {/* ── Pestaña: CASCADA DEL MES (fase 2 — la meta grande) ──────
+                    Cascada de pérdidas agregada: quién limitó producir el máximo
+                    este mes y cuánto costó en piezas, con dueño por causal. */}
+                {panoramaTab === 'cascada' && monthlyCascade && (() => {
+                  const { machines, totals, usoReal, piezasReales, piezasMax, causes } = monthlyCascade
+                  const mesSec = totals.techoSec + totals.planificadoSec
+                  const pctTecho = (sec: number) => (totals.techoSec > 0 ? (sec / totals.techoSec) * 100 : 0)
+                  const bucketColor: Record<string, string> = {
+                    'planificado':    'bg-slate-500/60',
+                    'externo':        'bg-amber-500/70',
+                    'mantencion':     'bg-rose-500/70',
+                    'sin-clasificar': 'bg-violet-500/60',
+                  }
+                  const piezasPerdidas = Math.max(0, piezasMax - piezasReales)
+                  const uptimeClasico = slxMonthlyStats?.avgUptimePct ?? null
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                        Cascada de pérdidas · {monthNames[currentMonth.getMonth()]} · ¿qué limitó producir el máximo?
+                        <InfoTooltip
+                          title="Cascada del mes"
+                          text="Del tiempo total de los turnos del mes se descuenta lo planificado (colación, ejercicio) para obtener el TECHO real de máquina. Cada minuto bajo ese techo tiene dueño: externo (proceso/abastecimiento), mantención (equipos) o sin clasificar. Uso real = tiempo procesando / techo — el uptime honesto, que no castiga a la máquina por la colación."
+                          formula="techo = tiempo turnos − planificado · uso real = procesando / techo"
+                          iconSize={11}
+                        />
+                      </p>
+                      {/* KPIs cabecera: uso real vs uptime clásico + piezas */}
+                      <div className="flex items-baseline gap-4 flex-wrap">
+                        <div>
+                          <span className="text-3xl font-bold tabular-nums text-emerald-400">{(usoReal * 100).toFixed(0)}%</span>
+                          <span className="text-xs text-muted-foreground ml-1.5">uso real del techo de máquina</span>
+                        </div>
+                        {uptimeClasico != null && (
+                          <span
+                            className="text-[11px] text-muted-foreground cursor-help"
+                            title="El uptime clásico divide por TODO el tiempo del turno, colación incluida — castiga a la máquina por pausas de personas. El uso real descuenta lo planificado antes de medir."
+                          >
+                            uptime clásico: {uptimeClasico.toFixed(0)}%
+                          </span>
+                        )}
+                        <span className="text-[11px] tabular-nums ml-auto">
+                          <b>{piezasReales.toLocaleString('es-CL')}</b>
+                          <span className="text-muted-foreground"> de {piezasMax.toLocaleString('es-CL')} pz máx teóricas</span>
+                          {piezasPerdidas > 0 && (
+                            <span className="text-rose-400/90"> · −{piezasPerdidas.toLocaleString('es-CL')}</span>
+                          )}
+                        </span>
+                      </div>
+                      {/* Barra apilada sobre el TECHO */}
+                      <div className="flex h-3 rounded-full overflow-hidden bg-muted/60">
+                        {totals.produccionSec    > 0 && <div className="bg-emerald-500/75" style={{ width: `${pctTecho(totals.produccionSec)}%` }} title={`Produciendo: ${fmtSecPanoramic(totals.produccionSec)}`} />}
+                        {totals.externoSec       > 0 && <div className="bg-amber-500/70"   style={{ width: `${pctTecho(totals.externoSec)}%` }} title={`Externo (proceso): ${fmtSecPanoramic(totals.externoSec)}`} />}
+                        {totals.mantencionSec    > 0 && <div className="bg-rose-500/70"    style={{ width: `${pctTecho(totals.mantencionSec)}%` }} title={`Mantención (equipos): ${fmtSecPanoramic(totals.mantencionSec)}`} />}
+                        {totals.sinClasificarSec > 0 && <div className="bg-violet-500/60"  style={{ width: `${pctTecho(totals.sinClasificarSec)}%` }} title={`Sin clasificar: ${fmtSecPanoramic(totals.sinClasificarSec)}`} />}
+                      </div>
+                      {/* Cascada numérica */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-[11px]">
+                        <div className="rounded bg-muted/40 px-2 py-1.5">
+                          <div className="text-muted-foreground text-[9px] uppercase">Turnos (Σ máq)</div>
+                          <div className="font-mono tabular-nums">{fmtSecPanoramic(mesSec)}</div>
+                        </div>
+                        <div className="rounded bg-slate-500/10 px-2 py-1.5" title="Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina.">
+                          <div className="text-muted-foreground text-[9px] uppercase">− Planificado</div>
+                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.planificadoSec)}</div>
+                        </div>
+                        <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = tiempo de turnos − planificado. Todo este tiempo las máquinas PODÍAN producir.">
+                          <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
+                          <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.techoSec)}</div>
+                        </div>
+                        <div className="rounded bg-amber-500/10 px-2 py-1.5" title="Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención.">
+                          <div className="text-amber-500 text-[9px] uppercase">− Externo</div>
+                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.externoSec)}</div>
+                        </div>
+                        <div className="rounded bg-rose-500/10 px-2 py-1.5" title="Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir.">
+                          <div className="text-rose-400 text-[9px] uppercase">− Mantención</div>
+                          <div className="font-mono tabular-nums">{fmtSecPanoramic(totals.mantencionSec)}</div>
+                        </div>
+                        <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
+                          <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
+                          <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.produccionSec)}</div>
+                        </div>
+                      </div>
+                      {/* Uso real por máquina */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                        {machines.map((m) => (
+                          <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-foreground/85">{m.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')}</span>
+                              <span className="font-mono tabular-nums text-emerald-400">{(m.cascade.usoReal * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
+                              <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${Math.min(100, m.cascade.usoReal * 100)}%` }} />
+                            </div>
+                            <div className="mt-1 text-[9px] text-muted-foreground tabular-nums">
+                              {fmtSecPanoramic(m.cascade.produccionSec)} de {fmtSecPanoramic(m.cascade.techoSec)} de techo
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Piezas perdidas por causal */}
+                      {causes.length > 0 && (
+                        <div>
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
+                            Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico del mes
+                          </p>
+                          <div className="space-y-0.5">
+                            {causes.slice(0, 10).map((c) => {
+                              const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
+                              return (
+                                <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                                  <span className={cn('w-2 h-2 rounded-sm shrink-0', bucketColor[c.bucket] ?? 'bg-slate-500/60')} />
+                                  <span className="truncate">{c.label}</span>
+                                  <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
+                                  <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
+                                  <span className="ml-auto font-mono tabular-nums shrink-0">{fmtSecPanoramic(c.sec)}</span>
+                                  <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
+                                    ≈ {c.piezas.toLocaleString('es-CL')} pz
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {totals.sinClasificarSec > 0 && (
+                        <p className="text-[10px] text-violet-400/80">
+                          ⚠ {fmtSecPanoramic(totals.sinClasificarSec)} sin clasificar (ej. LOGICA) — anotar la causal en Shoplogix le asigna dueño.
+                        </p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground/60">
+                        Piezas máx = techo de cada máquina × su cadencia real demostrada este mes. No incluye la producción fuera de turno (ver chip en Resumen del mes).
+                      </p>
+                    </div>
+                  )
+                })()}
 
                 {/* ── Pestaña: rendimiento POR BAADER (desglose por máquina) ──
                     Muestra SOLO lo que el Resumen del mes no tiene: el reparto
@@ -5156,13 +5372,15 @@ export function GraderHistoricalCalendar({
                 const nightShiftLabel = isYal ? 'T3' : 'Noche'
                 // Paleta consistente por Baader (M0 sky, M1 violet, M2 amber).
                 const machineColors = ['rgba(56,189,248,0.95)', 'rgba(167,139,250,0.95)', 'rgba(251,191,36,0.95)']
+                const isCompare = trendShiftTab === 'both'
                 const selectedIsDay = trendShiftTab === 'day'
                 const selectedPoints = selectedIsDay ? monthTrendPoints.day : monthTrendPoints.night
                 const selectedByMachine = selectedIsDay ? monthTrendByMachine.day : monthTrendByMachine.night
-                // Barras + promedio móvil (opción "M" elegida por Orel): un solo
-                // turno a la vez (selector abajo) — mezclar T2 y T3 en la misma
-                // barra confundía más que aclaraba. "Por máquina" da 3 series
-                // (Ev 1/2/3) en vez de 1 (línea completa).
+                // Tres modos (iteración sobre la opción "M" con Orel):
+                //  - Comparar (default): barras T2|T3 agrupadas por día + ambos
+                //    promedios móviles — la comparación entre turnos que faltaba.
+                //  - T2 / T3 solo: foco en un turno; ahí aplica el toggle
+                //    "Por máquina" (3 series Ev 1/2/3).
                 const machineSeries = [...selectedByMachine.entries()]
                   .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
                   .map(([, v], idx) => ({
@@ -5170,9 +5388,14 @@ export function GraderHistoricalCalendar({
                     color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
                     points: v.points,
                   }))
-                const chartSeries = trendByMachine
-                  ? machineSeries
-                  : [{ name: 'Línea completa', color: 'rgba(52,211,153,0.95)', points: selectedPoints }]
+                const chartSeries = isCompare
+                  ? [
+                      { name: dayShiftLabel,   color: 'rgba(52,211,153,0.95)',  points: monthTrendPoints.day },
+                      { name: nightShiftLabel, color: 'rgba(167,139,250,0.95)', points: monthTrendPoints.night },
+                    ]
+                  : trendByMachine
+                    ? machineSeries
+                    : [{ name: 'Línea completa', color: 'rgba(52,211,153,0.95)', points: selectedPoints }]
                 const monthDateKeys = (() => {
                   const y = currentMonth.getFullYear()
                   const m = currentMonth.getMonth()
@@ -5194,41 +5417,51 @@ export function GraderHistoricalCalendar({
                       />
                     </p>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {/* Selector de turno — un turno a la vez, evita amontonar T2+T3 */}
+                      {/* Selector: Comparar (T2 vs T3) o foco en un turno */}
                       <div className="flex rounded border border-border overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => setTrendShiftTab('day')}
-                          className={cn('text-[10px] px-2 py-1 transition-colors', trendShiftTab === 'day' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-accent')}
-                        >
-                          {dayShiftLabel}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTrendShiftTab('night')}
-                          className={cn('text-[10px] px-2 py-1 transition-colors border-l border-border', trendShiftTab === 'night' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-accent')}
-                        >
-                          {nightShiftLabel}
-                        </button>
+                        {([
+                          ['both', 'Comparar'],
+                          ['day', dayShiftLabel],
+                          ['night', nightShiftLabel],
+                        ] as const).map(([mode, label], i) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setTrendShiftTab(mode)}
+                            className={cn(
+                              'text-[10px] px-2 py-1 transition-colors',
+                              i > 0 && 'border-l border-border',
+                              trendShiftTab === mode ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-accent',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setTrendByMachine((v) => !v)}
-                        className={cn(
-                          'text-[10px] px-2 py-1 rounded border transition-colors',
-                          trendByMachine
-                            ? 'bg-primary/15 text-primary border-primary/30'
-                            : 'bg-muted text-muted-foreground border-border hover:bg-accent',
-                        )}
-                        title="Alternar entre la línea completa (1 serie) y el detalle por Baader (3 series)"
-                      >
-                        {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
-                      </button>
+                      {/* "Por máquina" solo aplica con un turno enfocado (en
+                          Comparar serían 6 series — el enredo que salimos a matar) */}
+                      {!isCompare && (
+                        <button
+                          type="button"
+                          onClick={() => setTrendByMachine((v) => !v)}
+                          className={cn(
+                            'text-[10px] px-2 py-1 rounded border transition-colors',
+                            trendByMachine
+                              ? 'bg-primary/15 text-primary border-primary/30'
+                              : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                          )}
+                          title="Alternar entre la línea completa (1 serie) y el detalle por Baader (3 series)"
+                        >
+                          {trendByMachine ? '⚙ Por máquina' : '⚙ Línea completa'}
+                        </button>
+                      )}
                     </div>
                   </div>
                   <TrendBarsWithMovingAverage series={chartSeries} dateKeys={monthDateKeys} height={230} />
                   <p className="text-[10px] text-muted-foreground/60">
-                    Cada barra = un día del turno {selectedIsDay ? dayShiftLabel : nightShiftLabel}; sin barra = sin proceso ese día. La línea gruesa es el promedio móvil de 5 días.
+                    {isCompare
+                      ? `Cada día muestra el par de barras ${dayShiftLabel} (verde) | ${nightShiftLabel} (violeta); el guión gris al pie = día sin proceso. Las líneas gruesas son el promedio móvil de 5 días de cada turno — si se separan, un turno está rindiendo sistemáticamente menos.`
+                      : `Cada barra = un día del turno ${selectedIsDay ? dayShiftLabel : nightShiftLabel}; el guión gris al pie = sin proceso ese día. La línea gruesa es el promedio móvil de 5 días.`}
                   </p>
                 </div>
                 )

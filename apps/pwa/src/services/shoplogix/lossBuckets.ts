@@ -161,6 +161,26 @@ export function cascadeFromStates(
   return cascadeFromAggregates(pseudo)
 }
 
+/**
+ * Cascada desde AGREGADOS del doc padre + uptime conocido (vista MENSUAL).
+ *
+ * Los `stateAggregates` del padre EXCLUYEN uptime a propósito (el pareto no lo
+ * necesita; su total viaja en `uptimeSec` de la máquina). Esta variante arma
+ * la cascada con las pérdidas de los agregados e inyecta el uptime aparte —
+ * así el mes se resuelve con 0 reads extra (sin bajar subcolecciones).
+ */
+export function cascadeFromMonthAggregates(uptimeSec: number, aggs: StateAggregate[]): LossCascade {
+  const c = cascadeFromAggregates(aggs)
+  const produccionSec = c.produccionSec + uptimeSec
+  const techoSec = produccionSec + c.externoSec + c.mantencionSec + c.sinClasificarSec
+  return {
+    ...c,
+    produccionSec,
+    techoSec,
+    usoReal: techoSec > 0 ? produccionSec / techoSec : 0,
+  }
+}
+
 export const LOSS_BUCKET_META: Record<Exclude<LossBucket, 'produccion' | 'fuera-turno'>, { label: string; owner: string }> = {
   'planificado':    { label: 'Planificado',    owner: 'Personas (acordado)' },
   'externo':        { label: 'Externo',        owner: 'Proceso / abastecimiento' },

@@ -466,10 +466,9 @@ export function TrendBarsWithMovingAverage({
   series: Array<{ name: string; color: string; points: MachineTrendPoint[] }>
   height?: number
 }) {
-  const labels = dateKeys.map((dk) => {
-    const d = new Date(`${dk}T12:00:00`)
-    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })
-  })
+  // Etiqueta = solo el NÚMERO de día ("02", "03"...): caben los 31 sin saltarse
+  // ninguno (el pedido de Orel: "el 4 no sale" era el eje mostrando día por medio).
+  const labels = dateKeys.map((dk) => dk.slice(8))
   const built = series.map((s) => {
     const byDate = new Map(s.points.map((p) => [p.dateKey, +(p.shiftRuntime * 100).toFixed(1)]))
     const values = dateKeys.map((dk) => byDate.get(dk) ?? null)
@@ -483,6 +482,11 @@ export function TrendBarsWithMovingAverage({
       </p>
     )
   }
+  // Días donde NINGUNA serie tiene dato → marcador explícito "sin proceso"
+  // (un guión gris al pie), para distinguir "no se procesó" de "uptime 0%".
+  const emptyMarkers = dateKeys
+    .map((_, i) => (built.every((s) => s.values[i] == null) ? [i, 2.5] as [number, number] : null))
+    .filter((v): v is [number, number] => v !== null)
   const barSeries = built.map((s) => ({
     name: s.name,
     type: 'bar' as const,
@@ -499,6 +503,19 @@ export function TrendBarsWithMovingAverage({
     connectNulls: true,
     lineStyle: { color: s.color, width: 2.5 },
   }))
+  // Marcadores "sin proceso": guiones grises al pie del chart en los días vacíos
+  const emptySeries = emptyMarkers.length > 0
+    ? [{
+        name: 'Sin proceso',
+        type: 'scatter' as const,
+        data: emptyMarkers,
+        symbol: 'rect',
+        symbolSize: [10, 3] as [number, number],
+        itemStyle: { color: '#475569', opacity: 0.8 },
+        tooltip: { show: false },
+        silent: true,
+      }]
+    : []
   const option = {
     backgroundColor: 'transparent',
     grid: { left: 40, right: 8, top: 30, bottom: 26, containLabel: false },
@@ -514,7 +531,8 @@ export function TrendBarsWithMovingAverage({
     xAxis: {
       type: 'category' as const,
       data: labels,
-      axisLabel: { color: '#94a3b8', fontSize: 10, interval: dateKeys.length > 20 ? 1 : 0 },
+      // interval 0: TODOS los días del mes llevan etiqueta — sin días fantasma
+      axisLabel: { color: '#94a3b8', fontSize: 10, interval: 0 },
       axisLine: { lineStyle: { color: '#334155' } },
       axisTick: { show: false },
     },
@@ -542,10 +560,10 @@ export function TrendBarsWithMovingAverage({
           return `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${(p.value as number).toFixed(0)}%</b>`
             + (avg ? ` <span style="color:#94a3b8">(prom 5d: ${(avg.value as number).toFixed(0)}%)</span>` : '')
         }).join('<br/>')
-        return `<div style="font-size:10px;color:#94a3b8;margin-bottom:2px">${dk}</div>${rows || '<span style="color:#64748b">sin proceso</span>'}`
+        return `<div style="font-size:10px;color:#94a3b8;margin-bottom:2px">${dk}</div>${rows || '<span style="color:#64748b">sin proceso este día</span>'}`
       },
     },
-    series: [...barSeries, ...avgSeries],
+    series: [...barSeries, ...avgSeries, ...emptySeries],
   }
   return (
     <ReactECharts
