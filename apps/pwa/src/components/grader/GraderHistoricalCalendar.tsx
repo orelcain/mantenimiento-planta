@@ -582,25 +582,59 @@ function SlxTurnoTooltipBody({
     ? machines.reduce((a, m) => a + m.uptimeSec, 0) / machines.length
     : 0
 
-  // Texto plano compacto — mismo look sobrio del tooltip nativo original
-  // (pedido de Orel: nada de recuadros con viñetas y títulos en negrita).
-  const lines: string[] = [title ?? `${label} · ${cycles.toLocaleString('es-CL')} ciclos (Shoplogix)`]
-  if (progStart && progEnd) lines.push(`Programado: ${fmtWallHHMM(progStart)} → ${fmtWallHHMM(progEnd)}`)
-  if (effStart) {
-    const endTxt = !effEnd
-      ? 'comprobando…'
-      : endConfirmed ? fmtWallHHMM(effEnd) : `${fmtWallHHMM(effEnd)} (comprobando…)`
-    lines.push(`Real: ${fmtWallHHMM(effStart)} → ${endTxt}`)
+  // Texto plano compacto con RESALTADOS tipo destacador de apuntes (pedido
+  // Orel): banda translúcida detrás de los datos clave para dirigir la vista.
+  // Tonos −50% croma del design system (/antarfood-design-system), nunca los
+  // brillantes: success #6c9a8a · warning #ac966e · destructive #b2807f.
+  const HL = { ok: '#6c9a8a', mid: '#ac966e', bad: '#b2807f' } as const
+  const mark = (hex: string): React.CSSProperties => ({
+    backgroundColor: `${hex}38`,
+    color: hex,
+    borderRadius: '3px',
+    padding: '0 3px',
+  })
+  // Ranking de Baaders por tiempo de uso: mejor→verde, medio→ámbar, peor→rojo.
+  const ranked = [...machines].sort((a, b) => b.uptimeSec - a.uptimeSec)
+  const rankColor = (machineid: string): string | null => {
+    if (ranked.length < 2) return null
+    const idx = ranked.findIndex((m) => m.machineid === machineid)
+    if (idx === 0) return HL.ok
+    if (idx === ranked.length - 1) return HL.bad
+    return HL.mid
   }
-  if (avgUseSec > 0) {
-    lines.push(`Uso máquinas: ${fmtSecPanoramic(avgUseSec)}${spanSec > 0 ? ` (${Math.round((avgUseSec / spanSec) * 100)}% del turno real)` : ''}`)
-  }
-  if (machines.length > 1) {
-    for (const m of machines) {
-      lines.push(`  · ${m.name || m.machineid}: ${fmtSecPanoramic(m.uptimeSec)}${spanSec > 0 ? ` (${Math.round((m.uptimeSec / spanSec) * 100)}%)` : ''}`)
-    }
-  }
-  return <>{lines.join('\n')}</>
+
+  const endTxt = !effEnd
+    ? 'comprobando…'
+    : endConfirmed ? fmtWallHHMM(effEnd) : `${fmtWallHHMM(effEnd)} (comprobando…)`
+
+  return (
+    <>
+      <div>
+        {title ?? (
+          <>
+            {label} · <span className="font-mono tabular-nums font-semibold" style={mark(HL.ok)}>{cycles.toLocaleString('es-CL')} ciclos</span> (Shoplogix)
+          </>
+        )}
+      </div>
+      {progStart && progEnd && (
+        <div>{`Programado: ${fmtWallHHMM(progStart)} → ${fmtWallHHMM(progEnd)}`}</div>
+      )}
+      {effStart && <div>{`Real: ${fmtWallHHMM(effStart)} → ${endTxt}`}</div>}
+      {avgUseSec > 0 && (
+        <div>{`Uso máquinas: ${fmtSecPanoramic(avgUseSec)}${spanSec > 0 ? ` (${Math.round((avgUseSec / spanSec) * 100)}% del turno real)` : ''}`}</div>
+      )}
+      {machines.length > 1 && ranked.map((m) => {
+        const hex = rankColor(m.machineid)
+        const valTxt = `${fmtSecPanoramic(m.uptimeSec)}${spanSec > 0 ? ` (${Math.round((m.uptimeSec / spanSec) * 100)}%)` : ''}`
+        return (
+          <div key={m.machineid}>
+            {`  · ${m.name || m.machineid}: `}
+            <span className="font-mono tabular-nums" style={hex ? mark(hex) : undefined}>{valTxt}</span>
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -1360,6 +1394,9 @@ export function GraderHistoricalCalendar({
   // Toggle: tendencia agregada (1 línea por turno) vs. por máquina (3 líneas
   // de uptime% — una por Baader). Útil para detectar qué Baader cayó qué día.
   const [trendByMachine, setTrendByMachine] = useState<boolean>(false)
+  /** Pestaña activa de la Vista panorámica — cada bloque a página completa
+   *  en vez de 3 columnas amontonadas (pedido Orel 2026-07-21). */
+  const [panoramaTab, setPanoramaTab] = useState<'baader' | 'paros' | 'disponibilidad' | 'tendencia'>('baader')
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -4007,9 +4044,11 @@ export function GraderHistoricalCalendar({
                                   cache={nightCorrection ?? undefined}
                                   shiftId={slxNightNav.shiftId}
                                   cycles={slxNightCycles}
-                                  title={`${getShiftMeta(slxNightNav.shiftId).shortLabel} · ${slxNightCycles.toLocaleString('es-CL')} ciclos (Shoplogix)${slxNightNav.shiftId === 'Turno 3' ? ' — noche, cubre madrugada' : ''}`}
                                 />
-                                <div className="text-slate-400 text-[9px]">{hasExcelNight ? 'Sin Excel del Marelec — solo conteo upstream' : 'Click para ver detalle Shoplogix'}</div>
+                                <div className="text-slate-400 text-[9px]">
+                                  {slxNightNav.shiftId === 'Turno 3' ? 'Turno noche — cubre la madrugada. ' : ''}
+                                  {hasExcelNight ? 'Sin Excel del Marelec — solo conteo upstream' : 'Click para ver detalle Shoplogix'}
+                                </div>
                               </div>
                             }
                           >
@@ -4094,7 +4133,13 @@ export function GraderHistoricalCalendar({
                         className="mt-auto flex items-center justify-between rounded px-1 py-px leading-none bg-slate-500/10 text-muted-foreground hover:bg-slate-500/20 cursor-help"
                         content={
                           <div>
-                            {`Total del día · ${dayKey} · ${dayTotal.toLocaleString('es-CL')}`}
+                            {`Total del día · ${dayKey} · `}
+                            <span
+                              className="font-mono tabular-nums font-semibold"
+                              style={{ backgroundColor: '#6c9a8a38', color: '#6c9a8a', borderRadius: '3px', padding: '0 3px' }}
+                            >
+                              {dayTotal.toLocaleString('es-CL')}
+                            </span>
                             {chipsForDay.filter((c) => c.role === 'primary').map((c) => (
                               <div key={c.summaryId} className="mt-1.5">
                                 {`${getShiftMeta(c.shiftId).shortLabel} · ${(c.pieces ?? 0).toLocaleString('es-CL')} piezas (Excel)`}
@@ -4627,7 +4672,7 @@ export function GraderHistoricalCalendar({
         <div className="lg:col-span-3">
           <Card>
             <CardHeader className="pb-2 pt-4 px-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
                   <Activity className="h-4 w-4 text-sky-400" />
                   Vista panorámica · {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
@@ -4636,15 +4681,38 @@ export function GraderHistoricalCalendar({
                   {slxMonthlyStats.turnosWithData} turnos · {slxMonthlyStats.daysWithData} días con data
                 </span>
               </div>
+              {/* Pestañas: un bloque a la vez, a página completa — cada uno con
+                  espacio para graficarse más grande y explicarse mejor. */}
+              <div className="flex flex-wrap gap-1 pt-2">
+                {([
+                  ['baader', 'Por Baader'],
+                  ['paros', 'Top paros'],
+                  ['disponibilidad', 'Disponibilidad diaria'],
+                  ['tendencia', 'Tendencias'],
+                ] as const).map(([id, tabLabel]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPanoramaTab(id)}
+                    className={cn(
+                      'text-[11px] px-2.5 py-1 rounded-md border transition-colors',
+                      panoramaTab === id
+                        ? 'bg-primary/15 text-primary border-primary/30 font-medium'
+                        : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                    )}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="px-6 pb-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
 
-                {/* ── Col 1: Rendimiento POR BAADER (desglose por máquina) ──
-                    Antes era "Métricas del mes" y repetía uptime/ciclos/turnos/
-                    mejor-peor que ya viven en el "Resumen del mes" (panel superior).
-                    Ahora muestra SOLO lo que ese panel no tiene: el reparto por
-                    cada Evisceradora (horas-máquina, %uptime y MTTR). */}
+                {/* ── Pestaña: rendimiento POR BAADER (desglose por máquina) ──
+                    Muestra SOLO lo que el Resumen del mes no tiene: el reparto
+                    por cada Evisceradora (horas-máquina, %uptime y MTTR). */}
+                {panoramaTab === 'baader' && (
                 <div className="space-y-3">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Por Baader · {monthNames[currentMonth.getMonth()]}
@@ -4673,22 +4741,33 @@ export function GraderHistoricalCalendar({
                       </span>
                     </div>
                   )}
-                  {/* Desglose por Baader individual: horas + % uptime + MTTR.
-                      Permite ver si una máquina trabajó significativamente más
-                      o menos que las demás. */}
+                  {/* Desglose por Baader como TABLA a ancho completo — antes eran
+                      chips microscópicos ilegibles ("la data por Baader no se
+                      entiende", Orel 2026-07-21). Cada fila: horas procesando,
+                      % uptime con barra, ciclos, turnos y MTTR macro/micro. */}
                   {slxMonthlyStats.perMachineMonth.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-[minmax(4rem,1.2fr)_1fr_2fr_1fr_0.7fr_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider text-muted-foreground/70 px-1">
+                        <span>Máquina</span>
+                        <span className="text-right">Procesando</span>
+                        <span>Uptime</span>
+                        <span className="text-right">Ciclos</span>
+                        <span className="text-right">Turnos</span>
+                        <span className="text-right" title="Tiempo promedio de reparación de averías macro (≥5 min) · N° eventos">MTTR mac</span>
+                        <span className="text-right" title="Tiempo promedio de las micro-detenciones (<5 min) · N° eventos">MTTR mic</span>
+                      </div>
                       {slxMonthlyStats.perMachineMonth.map((pm) => {
                         const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
                         const uptimeColor =
                           pm.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-300'
                           : pm.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-300'
                           : 'text-rose-700 dark:text-rose-300'
-                        // MTTR = total seg / N° eventos. 0 si no hubo eventos.
-                        const mttrMacroSec = pm.maintMacroCount > 0
-                          ? pm.maintMacroSec / pm.maintMacroCount : 0
-                        const mttrMicroSec = pm.maintMicroCount > 0
-                          ? pm.maintMicroSec / pm.maintMicroCount : 0
+                        const uptimeBarColor =
+                          pm.avgUptimePct >= 70 ? 'bg-emerald-500/60'
+                          : pm.avgUptimePct >= 40 ? 'bg-amber-500/55'
+                          : 'bg-rose-500/55'
+                        const mttrMacroSec = pm.maintMacroCount > 0 ? pm.maintMacroSec / pm.maintMacroCount : 0
+                        const mttrMicroSec = pm.maintMicroCount > 0 ? pm.maintMicroSec / pm.maintMicroCount : 0
                         const fmtMttr = (sec: number) => {
                           if (sec <= 0) return '—'
                           if (sec < 60) return `${Math.round(sec)}s`
@@ -4699,30 +4778,33 @@ export function GraderHistoricalCalendar({
                         return (
                           <div
                             key={pm.machineid}
-                            className="rounded bg-muted border border-border px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
-                            title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}\n\nMTTR macro: ${fmtMttr(mttrMacroSec)} (${pm.maintMacroCount} ev · ${fmtSecPanoramic(pm.maintMacroSec)} total)\nMTTR micro: ${fmtMttr(mttrMicroSec)} (${pm.maintMicroCount} ev · ${fmtSecPanoramic(pm.maintMicroSec)} total)`}
+                            className="grid grid-cols-[minmax(4rem,1.2fr)_1fr_2fr_1fr_0.7fr_1fr_1fr] gap-2 items-center rounded bg-muted/50 border border-border px-1 py-1.5 text-[11px] tabular-nums"
                           >
-                            <div className="flex items-center gap-1">
-                              <span className="text-muted-foreground/70 font-medium">{shortName}</span>
-                              <span className="text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
-                              <span className={cn(uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
-                            </div>
-                            {(pm.maintMacroCount > 0 || pm.maintMicroCount > 0) && (
-                              <div className="flex items-center gap-1 text-[8px] text-muted-foreground/80">
-                                <span className="text-amber-400/80">🔧</span>
-                                <span>mac {fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50">·{pm.maintMacroCount}</span></span>
-                                <span className="text-muted-foreground/40">|</span>
-                                <span>mic {fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50">·{pm.maintMicroCount}</span></span>
-                              </div>
-                            )}
+                            <span className="font-medium text-foreground/85">{shortName}</span>
+                            <span className="text-right text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span className="flex-1 h-2 rounded-full bg-muted/70 overflow-hidden min-w-0">
+                                <span className={cn('block h-full rounded-full', uptimeBarColor)} style={{ width: `${Math.min(100, pm.avgUptimePct)}%` }} />
+                              </span>
+                              <span className={cn('shrink-0 w-8 text-right', uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
+                            </span>
+                            <span className="text-right text-foreground/70">{pm.totalCycles.toLocaleString('es-CL')}</span>
+                            <span className="text-right text-muted-foreground">{pm.shiftCount}</span>
+                            <span className="text-right text-muted-foreground">{fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50 text-[9px]"> ·{pm.maintMacroCount}</span></span>
+                            <span className="text-right text-muted-foreground">{fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50 text-[9px]"> ·{pm.maintMicroCount}</span></span>
                           </div>
                         )
                       })}
+                      <p className="text-[10px] text-muted-foreground/60 pt-1">
+                        Uptime = % del tiempo de turno procesando. MTTR mac = promedio de reparación de averías ≥5 min; mic = micro-detenciones (no inflan el MTTR macro).
+                      </p>
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* ── Col 2: Pareto de paros del mes (upstream Baader) ── */}
+                {/* ── Pestaña: Pareto de paros del mes (upstream Baader) ── */}
+                {panoramaTab === 'paros' && (
                 <div className="space-y-2">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Top paros upstream · {monthNames[currentMonth.getMonth()]}
@@ -4791,25 +4873,27 @@ export function GraderHistoricalCalendar({
                   {monthParetoData.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground italic">Sin datos de paros para este mes</p>
                   ) : (
-                    <div ref={monthParetoRef} className="space-y-[5px] pt-0.5">
+                    <div ref={monthParetoRef} className="space-y-1.5 pt-1">
                       {(() => {
                         const totalSec = monthParetoData.reduce((a, r) => a + r.durationSec, 0)
-                        return monthParetoData.slice(0, 7).map((item) => {
+                        // A página completa: top 12 (antes 7) con etiqueta ancha,
+                        // barra más gruesa y N° de eventos visible en la fila.
+                        return monthParetoData.slice(0, 12).map((item) => {
                           const pct = totalSec > 0 ? (item.durationSec / totalSec) * 100 : 0
                           return (
                             <div
                               key={item.name}
-                              className="flex items-center gap-1.5 text-[10px]"
+                              className="flex items-center gap-2 text-[11px]"
                               title={`${item.count} evento${item.count !== 1 ? 's' : ''} · ${fmtSecPanoramic(item.durationSec)} total`}
                             >
                               <span
-                                className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-black/30"
+                                className="w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-black/30"
                                 style={{ backgroundColor: softenAccentHex(item.color || '#64748b') }}
                               />
-                              <span className="text-foreground/70 truncate shrink-0 w-[7.5rem]">
+                              <span className="text-foreground/75 truncate shrink-0 w-32 sm:w-44">
                                 {item.name || 'Sin categoría'}
                               </span>
-                              <div className="flex-1 h-1.5 bg-muted/60 rounded-full overflow-hidden min-w-0">
+                              <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden min-w-0">
                                 <div
                                   data-month-pareto-bar=""
                                   className="h-full rounded-full opacity-80"
@@ -4820,10 +4904,13 @@ export function GraderHistoricalCalendar({
                                   }}
                                 />
                               </div>
-                              <span className="text-muted-foreground tabular-nums shrink-0 w-10 text-right">
+                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-9 text-right text-[10px]">
+                                ×{item.count}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums shrink-0 w-12 text-right">
                                 {fmtSecPanoramic(item.durationSec)}
                               </span>
-                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-7 text-right">
+                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-8 text-right">
                                 {pct.toFixed(0)}%
                               </span>
                             </div>
@@ -4833,13 +4920,15 @@ export function GraderHistoricalCalendar({
                     </div>
                   )}
                   {monthParetoData.length > 0 && (
-                    <p className="text-[9px] text-muted-foreground/40 pt-1">
-                      * Estados de paro de la primera Baader 142 por turno
+                    <p className="text-[10px] text-muted-foreground/60 pt-1">
+                      Cada barra = % del tiempo total detenido del mes que se llevó esa causal. ×N = veces que ocurrió. Estados de paro de la primera Baader por turno.
                     </p>
                   )}
                 </div>
+                )}
 
-                {/* ── Col 3: Disponibilidad diaria D/N (stacked bars por día) ── */}
+                {/* ── Pestaña: Disponibilidad diaria D/N (stacked bars por día) ── */}
+                {panoramaTab === 'disponibilidad' && (
                 <div className="space-y-2">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Disponibilidad diaria · {monthNames[currentMonth.getMonth()]}
@@ -4873,18 +4962,18 @@ export function GraderHistoricalCalendar({
                       {availabilityTrend.map(({ dk, day, night, dayShiftId, nightShiftId }) => {
                         const buildAvailBar = (cache: SlxShiftCache | null) => {
                           if (!cache || !cache.breakdown) {
-                            return <div className="flex-1 h-3 rounded-sm bg-muted/20 opacity-40" />
+                            return <div className="flex-1 h-4 rounded-sm bg-muted/20 opacity-40" />
                           }
                           const bd   = cache.breakdown
                           const prod = bd.uptimeSec + bd.breakSec + bd.downtimeSec + bd.setupSec
-                          if (prod === 0) return <div className="flex-1 h-3 rounded-sm bg-muted/20 opacity-40" />
+                          if (prod === 0) return <div className="flex-1 h-4 rounded-sm bg-muted/20 opacity-40" />
                           const up    = (bd.uptimeSec   / prod) * 100
                           const brk   = (bd.breakSec    / prod) * 100
                           const down  = (bd.downtimeSec / prod) * 100
                           const setup = (bd.setupSec    / prod) * 100
                           return (
                             <div
-                              className="flex flex-1 h-3 rounded-sm overflow-hidden bg-muted/60"
+                              className="flex flex-1 h-4 rounded-sm overflow-hidden bg-muted/60"
                               title={`${fmtSecPanoramic(bd.uptimeSec)} uptime (${up.toFixed(0)}%) · ${cache.totalCycles.toLocaleString('es-CL')} ciclos`}
                             >
                               {up    > 0 && <div className="h-full bg-emerald-500/70" style={{ width: `${up}%`    }} />}
@@ -4931,14 +5020,18 @@ export function GraderHistoricalCalendar({
                       })}
                     </div>
                   )}
+                  <p className="text-[10px] text-muted-foreground/60 pt-1">
+                    Cada fila = un día; barra izquierda turno de tarde, derecha turno noche. Verde = procesando · ámbar = pausas de personas · rojo = paro · violeta = setup. Click en la fecha abre el día.
+                  </p>
                 </div>
+                )}
 
               </div>
 
-              {/* ── Fila tendencia Baader: por turno (Yal: T2/T3 · Chonchi: Día/Noche) ──
+              {/* ── Pestaña: tendencia Baader por turno (Yal: T2/T3 · Chonchi: Día/Noche) ──
                   Toggle "Por máquina" cambia entre agregado (ritmo+uptime de la línea)
                   y per-machine (3 líneas, uptime% de cada Baader). */}
-              {(monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
+              {panoramaTab === 'tendencia' && (monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
                 const isYal = plantLine.isClassificationPlant === false
                 const dayLabel   = isYal ? '🌇 Tendencia Baader · Turno 2' : '☀ Tendencia Baader · Turno Día'
                 const nightLabel = isYal ? '🌙 Tendencia Baader · Turno 3' : '🌙 Tendencia Baader · Turno Noche'
@@ -4956,7 +5049,7 @@ export function GraderHistoricalCalendar({
                 const daySeries   = toMultiSeries(monthTrendByMachine.day)
                 const nightSeries = toMultiSeries(monthTrendByMachine.night)
                 return (
-                <div className="col-span-full pt-2 border-t border-border/40 space-y-2">
+                <div className="space-y-2">
                   {/* Toggle Por máquina */}
                   <div className="flex items-center justify-end">
                     <button
