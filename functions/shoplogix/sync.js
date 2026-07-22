@@ -67,17 +67,39 @@ const PARENT_SCHEMA_VERSION = 2
  * Un turno de ~8h colapsa cientos de states (los micro-paros son 1400+ al mes)
  * en unas 10-25 entradas por máquina.
  */
+/**
+ * Gap máximo (seg) entre dos states CONSECUTIVOS de la misma causal para
+ * considerarlos UN solo evento real. Shoplogix trocea una misma detención en
+ * varios states contiguos (caso real 14-07 T2: COLACION 19:04→19:49 + COLACION
+ * 19:49→20:01 = una colación de 57 min contada como 2 eventos) — sin fusión, el
+ * conteo de eventos queda inflado y el MTTR (sec/count) subestimado.
+ */
+const EVENT_MERGE_GAP_SEC = 60
+
 function aggregateStatesByReason(states) {
+  // Orden cronológico primero: la fusión de consecutivos depende de mirar el
+  // state anterior DE LA MISMA causal en el tiempo.
+  const toMs = (v) => (v instanceof Date ? v.getTime() : new Date(v).getTime())
+  const sorted = [...(states || [])]
+    .filter((s) => s.type !== 'uptime')
+    .sort((a, b) => toMs(a.startAt) - toMs(b.startAt))
+
   const byKey = new Map()
-  for (const s of states || []) {
-    if (s.type === 'uptime') continue
+  for (const s of sorted) {
     const name   = s.name   || ''
     const reason = s.reason || ''
     const key = `${s.type}|${name}|${reason}`
     const prev = byKey.get(key)
     if (prev) {
       prev.durationSec += s.durationSec || 0
-      prev.count       += 1
+      // Evento nuevo SOLO si hay un gap real desde el fin del último fragmento
+      // de esta causal; contiguo (≤ EVENT_MERGE_GAP_SEC) = mismo evento.
+      // NaN-safe: sin timestamps válidos no se puede probar contigüidad →
+      // cuenta como evento aparte (comportamiento pre-fusión).
+      const gapSec = (toMs(s.startAt) - prev.lastEndMs) / 1000
+      if (!(gapSec <= EVENT_MERGE_GAP_SEC)) prev.count += 1
+      const endMs = toMs(s.endAt)
+      if (isFinite(endMs)) prev.lastEndMs = Math.max(prev.lastEndMs, endMs)
     } else {
       byKey.set(key, {
         type: s.type,
@@ -86,10 +108,13 @@ function aggregateStatesByReason(states) {
         color: s.color || '#64748b',
         durationSec: s.durationSec || 0,
         count: 1,
+        lastEndMs: toMs(s.endAt),
       })
     }
   }
-  return [...byKey.values()].sort((a, b) => b.durationSec - a.durationSec)
+  return [...byKey.values()]
+    .map(({ lastEndMs: _drop, ...rest }) => rest)
+    .sort((a, b) => b.durationSec - a.durationSec)
 }
 
 /**

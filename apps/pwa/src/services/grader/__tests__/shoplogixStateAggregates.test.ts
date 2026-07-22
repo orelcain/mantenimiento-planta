@@ -46,11 +46,23 @@ function paretoFromStates(states: UpstreamMachineState[], maintOnly: boolean): P
 
 // ── Fixture: mezcla realista basada en la distribución observada en Yal ──────
 
-const st = (over: Partial<UpstreamMachineState>): UpstreamMachineState => ({
-  startAt: new Date(0), endAt: new Date(0), durationSec: 60,
-  type: 'downtime', name: '', reason: '', color: '#ff0000', isCurrent: false,
-  ...over,
-})
+// Reloj incremental: cada state ocupa su lugar en el tiempo con un gap de
+// 5 min respecto del anterior. Sin esto (antes: todos en Date(0)) TODOS los
+// states de una misma causal serían "contiguos" y la fusión de fragmentos
+// (EVENT_MERGE_GAP_SEC) los colapsaría en 1 evento, rompiendo la paridad
+// con el oráculo que cuenta states separados.
+let clockMs = 0
+const st = (over: Partial<UpstreamMachineState>): UpstreamMachineState => {
+  const durationSec = over.durationSec ?? 60
+  const startAt = over.startAt ?? new Date(clockMs)
+  const endAt = over.endAt ?? new Date(startAt.getTime() + durationSec * 1000)
+  clockMs = endAt.getTime() + 5 * 60_000
+  return {
+    type: 'downtime', name: '', reason: '', color: '#ff0000', isCurrent: false,
+    ...over,
+    startAt, endAt, durationSec,
+  }
+}
 
 /** 1400+ microparos, averías macro, paros operacionales y breaks — como en planta. */
 function realisticStates(): UpstreamMachineState[] {
@@ -145,3 +157,40 @@ describe('paridad agregados vs states', () => {
 function aggresultOf(s: UpstreamMachineState[]) {
   return aggregatesFromStates(s)
 }
+
+describe('fusión de fragmentos contiguos (caso real COLACION 14-07 T2)', () => {
+  const frag = (startMin: number, durMin: number, reason: string, type: UpstreamMachineState['type'] = 'break'): UpstreamMachineState => ({
+    startAt: new Date(startMin * 60_000),
+    endAt: new Date((startMin + durMin) * 60_000),
+    durationSec: durMin * 60,
+    type, name: 'Detencion', reason, color: '#0000ff', isCurrent: false,
+  })
+
+  it('dos COLACION contiguas (45m + 12m, gap 0) = 1 evento de 57m', () => {
+    const aggs = aggregatesFromStates([frag(0, 45, 'COLACION'), frag(45, 12, 'COLACION')])
+    expect(aggs).toHaveLength(1)
+    expect(aggs[0]!.count).toBe(1)
+    expect(aggs[0]!.durationSec).toBe(57 * 60)
+  })
+
+  it('dos COLACION separadas por un gap real (> 60s) = 2 eventos', () => {
+    const aggs = aggregatesFromStates([frag(0, 45, 'COLACION'), frag(50, 12, 'COLACION')])
+    expect(aggs[0]!.count).toBe(2)
+  })
+
+  it('computeMaintenanceTotals fusiona igual: 3 fragmentos de avería contiguos = 1 evento macro', () => {
+    const t = computeMaintenanceTotals([
+      frag(0, 10, '', 'downtime'),
+      frag(10, 5, '', 'downtime'),
+      frag(15, 3, '', 'downtime'),
+    ])
+    expect(t.macroCount).toBe(1)
+    expect(t.macroSec).toBe(18 * 60)
+  })
+
+  it('causales distintas nunca se fusionan aunque sean contiguas', () => {
+    const aggs = aggregatesFromStates([frag(0, 10, 'COLACION'), frag(10, 10, 'CAMBIO TURNO')])
+    expect(aggs).toHaveLength(2)
+    expect(aggs.every((a) => a.count === 1)).toBe(true)
+  })
+})

@@ -94,19 +94,34 @@ export interface MaintenanceTotals {
   microCount: number
 }
 
+/**
+ * Gap máximo (seg) para fusionar dos states consecutivos de la misma causal en
+ * UN evento. Espejo de EVENT_MERGE_GAP_SEC en functions/shoplogix/sync.js y en
+ * aggregatesFromStates — Shoplogix trocea una misma detención en fragmentos
+ * contiguos; contarlos por separado infla los eventos y subestima el MTTR.
+ */
+const EVENT_MERGE_GAP_SEC = 60
+
 export function computeMaintenanceTotals(states: readonly UpstreamMachineState[]): MaintenanceTotals {
   let macroSec = 0
   let macroCount = 0
   let microSec = 0
   let microCount = 0
-  for (const s of states) {
+  // Fusión de fragmentos contiguos: mismo (type|name|reason) sin gap real = 1 evento.
+  const sorted = [...states].sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+  const lastEndByKey = new Map<string, number>()
+  for (const s of sorted) {
     if (!isMaintenanceState(s)) continue
+    const key = `${s.type}|${(s.name || '').trim()}|${(s.reason || '').trim()}`
+    const lastEnd = lastEndByKey.get(key)
+    const isNewEvent = lastEnd === undefined || (s.startAt.getTime() - lastEnd) / 1000 > EVENT_MERGE_GAP_SEC
+    lastEndByKey.set(key, Math.max(lastEnd ?? 0, s.endAt.getTime()))
     if ((s.name || '').trim() === 'Micro Detencion') {
       microSec += s.durationSec || 0
-      microCount += 1
+      if (isNewEvent) microCount += 1
     } else {
       macroSec += s.durationSec || 0
-      macroCount += 1
+      if (isNewEvent) macroCount += 1
     }
   }
   return { macroSec, macroCount, microSec, microCount }

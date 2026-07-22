@@ -55,17 +55,32 @@ const DEFAULT_STATE_COLOR = '#64748b'
  * Excluye `uptime`: no aparece en el pareto (que muestra paradas) y su total ya
  * viaja en `breakdown.uptimeSec`.
  */
+/**
+ * Gap máximo (seg) entre dos states consecutivos de la misma causal para
+ * fusionarlos en UN evento. Espejo exacto de EVENT_MERGE_GAP_SEC en
+ * functions/shoplogix/sync.js — Shoplogix trocea una misma detención en
+ * fragmentos contiguos (COLACION 45min + COLACION 12min sin gap = 1 colación
+ * de 57min, no 2 eventos); sin fusión el conteo queda inflado y el MTTR
+ * (sec/count) subestimado.
+ */
+const EVENT_MERGE_GAP_SEC = 60
+
 export function aggregatesFromStates(states: readonly UpstreamMachineState[] | null | undefined): StateAggregate[] {
-  const byKey = new Map<string, StateAggregate>()
-  for (const s of states ?? []) {
-    if (s.type === 'uptime') continue
+  const sorted = [...(states ?? [])]
+    .filter((s) => s.type !== 'uptime')
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+
+  const byKey = new Map<string, StateAggregate & { lastEndMs: number }>()
+  for (const s of sorted) {
     const name   = s.name   || ''
     const reason = s.reason || ''
     const key = `${s.type}|${name}|${reason}`
     const prev = byKey.get(key)
     if (prev) {
       prev.durationSec += s.durationSec || 0
-      prev.count       += 1
+      const gapSec = (s.startAt.getTime() - prev.lastEndMs) / 1000
+      if (gapSec > EVENT_MERGE_GAP_SEC) prev.count += 1
+      prev.lastEndMs = Math.max(prev.lastEndMs, s.endAt.getTime())
     } else {
       byKey.set(key, {
         type: s.type,
@@ -74,10 +89,13 @@ export function aggregatesFromStates(states: readonly UpstreamMachineState[] | n
         color: s.color || DEFAULT_STATE_COLOR,
         durationSec: s.durationSec || 0,
         count: 1,
+        lastEndMs: s.endAt.getTime(),
       })
     }
   }
-  return [...byKey.values()].sort((a, b) => b.durationSec - a.durationSec)
+  return [...byKey.values()]
+    .map(({ lastEndMs: _drop, ...rest }) => rest)
+    .sort((a, b) => b.durationSec - a.durationSec)
 }
 
 /** Deserializa `machines[].stateAggregates` de un doc padre de Firestore. */

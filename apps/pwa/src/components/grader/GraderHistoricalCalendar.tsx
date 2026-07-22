@@ -1199,6 +1199,8 @@ interface SlxShiftCache {
     uptimeSec: number
     /** Total de ciclos (piezas) procesados por esta máquina en el turno. */
     totalCycles: number
+    /** Ciclos que Shoplogix esperaba de esta máquina en el turno (target). */
+    expectedTotalCycles: number
     /** Fracción de uptime (0..1) sobre la duración total del turno. */
     shiftRuntime: number
     /** Lista de states (uptime/break/downtime/setup) para esta máquina — usado
@@ -1283,6 +1285,7 @@ function buildCacheFromParent(parent: ShoplogixShiftParent): SlxShiftCache {
       name:            m.name,
       uptimeSec:       m.uptimeSec,
       totalCycles:     m.totalCycles,
+      expectedTotalCycles: m.expectedTotalCycles,
       shiftRuntime:    m.shiftRuntime,
       states:          [],
       stateAggregates: deserializeStateAggregates(m.stateAggregates),
@@ -1312,6 +1315,8 @@ export interface SlxMonthlyStats {
     name: string
     uptimeSec: number
     totalCycles: number
+    /** Ciclos esperados (target Shoplogix) sumados del mes. */
+    expectedTotalCycles: number
     shiftCount: number
     avgUptimePct: number
     /** Avería macro (paros relevantes, sin Micro Detencion): seg acumulados. */
@@ -2000,6 +2005,7 @@ export function GraderHistoricalCalendar({
             name:         m.machineName,
             uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
             totalCycles:  m.totalCycles ?? 0,
+            expectedTotalCycles: m.expectedTotalCycles ?? 0,
             shiftRuntime: m.shiftRuntime ?? 0,
             states:       m.states ?? [],
             stateAggregates: aggregatesFromStates(m.states),
@@ -2148,6 +2154,7 @@ export function GraderHistoricalCalendar({
         name:         m.machineName,
         uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
         totalCycles:  m.totalCycles ?? 0,
+        expectedTotalCycles: m.expectedTotalCycles ?? 0,
         shiftRuntime: m.shiftRuntime ?? 0,
         states:       m.states ?? [],
       }))
@@ -2397,6 +2404,7 @@ export function GraderHistoricalCalendar({
           name:         m.machineName,
           uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
           totalCycles:  m.totalCycles ?? 0,
+          expectedTotalCycles: m.expectedTotalCycles ?? 0,
           shiftRuntime: m.shiftRuntime ?? 0,
           states:       m.states ?? [],
         }))
@@ -2458,6 +2466,7 @@ export function GraderHistoricalCalendar({
       name: string
       uptimeSec: number
       totalCycles: number
+      expectedTotalCycles: number
       shiftCount: number
       sumUptimePct: number
       maintMacroSec: number
@@ -2507,17 +2516,25 @@ export function GraderHistoricalCalendar({
       // Suma de las 3 Baaders (no solo M0), coherente con totalCycles que también
       // suma las 3. Representa horas-máquina totales procesando del mes.
       totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
-      // Agregación por Baader individual del mes (uptime + MTTR macro/micro)
+      // Agregación por Baader individual del mes (uptime + MTTR macro/micro).
+      // `shiftCount` solo cuenta TURNOS reales (excluye Unscheduled) para que
+      // la suma por máquina cuadre con el `turnosWithData` del header — antes
+      // los Unscheduled inflaban el contador por máquina (27 arriba vs 29 abajo).
+      // La producción del Unscheduled (piezas/horas) SÍ se sigue sumando.
       for (const pm of cache.perMachine ?? []) {
         // Desde los agregados, no desde `states`: mismos números (paridad
         // verificada) y así el mes no depende de la subcolección `machines`.
         const maint = maintenanceTotalsFromAggregates(pm.stateAggregates ?? [])
+        const countsAsShift = !isUnscheduledShift(shiftId)
         const acc = perMachineAcc.get(pm.machineid)
         if (acc) {
           acc.uptimeSec       += pm.uptimeSec
           acc.totalCycles     += pm.totalCycles
-          acc.shiftCount      += 1
-          acc.sumUptimePct    += pm.shiftRuntime * 100
+          acc.expectedTotalCycles += pm.expectedTotalCycles
+          if (countsAsShift) {
+            acc.shiftCount   += 1
+            acc.sumUptimePct += pm.shiftRuntime * 100
+          }
           acc.maintMacroSec   += maint.macroSec
           acc.maintMacroCount += maint.macroCount
           acc.maintMicroSec   += maint.microSec
@@ -2527,8 +2544,9 @@ export function GraderHistoricalCalendar({
             name:            pm.name,
             uptimeSec:       pm.uptimeSec,
             totalCycles:     pm.totalCycles,
-            shiftCount:      1,
-            sumUptimePct:    pm.shiftRuntime * 100,
+            expectedTotalCycles: pm.expectedTotalCycles,
+            shiftCount:      countsAsShift ? 1 : 0,
+            sumUptimePct:    countsAsShift ? pm.shiftRuntime * 100 : 0,
             maintMacroSec:   maint.macroSec,
             maintMacroCount: maint.macroCount,
             maintMicroSec:   maint.microSec,
@@ -2551,6 +2569,7 @@ export function GraderHistoricalCalendar({
         name:            v.name,
         uptimeSec:       v.uptimeSec,
         totalCycles:     v.totalCycles,
+        expectedTotalCycles: v.expectedTotalCycles,
         shiftCount:      v.shiftCount,
         avgUptimePct:    v.shiftCount > 0 ? v.sumUptimePct / v.shiftCount : 0,
         maintMacroSec:   v.maintMacroSec,
@@ -4722,41 +4741,42 @@ export function GraderHistoricalCalendar({
                       iconSize={11}
                     />
                   </p>
-                  {/* Horas-máquina totales — ancla de la columna (número único,
-                      no está en el panel superior). */}
-                  {slxMonthlyStats.totalUptimeSec > 0 && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold tabular-nums text-foreground/90">
-                        {fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)}
-                      </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        horas-máquina · procesando
-                        <InfoTooltip
-                          title="Horas-máquina del mes"
-                          text="Suma de tiempo procesando de las 3 Baader 142 a lo largo del mes (M0+M1+M2). Si las 3 trabajan 1 hora en paralelo, esto cuenta 3 horas-máquina."
-                          formula="∑(uptimeSec de cada Baader) en todos los turnos del mes"
-                          example={`${fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)} = capacidad total de procesamiento usada · coherente con ${slxMonthlyStats.totalCycles.toLocaleString('es-CL')} ciclos del mes (suma de las 3 máquinas).`}
-                          iconSize={10}
-                        />
-                      </span>
-                    </div>
-                  )}
-                  {/* Desglose por Baader como TABLA a ancho completo — antes eran
-                      chips microscópicos ilegibles ("la data por Baader no se
-                      entiende", Orel 2026-07-21). Cada fila: horas procesando,
-                      % uptime con barra, ciclos, turnos y MTTR macro/micro. */}
-                  {slxMonthlyStats.perMachineMonth.length > 0 && (
+                  {/* Desglose por Baader como TABLA a ancho completo con fila de
+                      TOTALES abajo (pedido Orel: los totales al pie, no un número
+                      suelto arriba) + piezas esperadas (target Shoplogix). */}
+                  {slxMonthlyStats.perMachineMonth.length > 0 && (() => {
+                    const fmtMttr = (sec: number) => {
+                      if (sec <= 0) return '—'
+                      if (sec < 60) return `${Math.round(sec)}s`
+                      const m = Math.floor(sec / 60)
+                      const s = Math.round(sec % 60)
+                      return s === 0 ? `${m}m` : `${m}m${s}s`
+                    }
+                    const pms = slxMonthlyStats.perMachineMonth
+                    const tot = {
+                      uptimeSec: pms.reduce((a, p) => a + p.uptimeSec, 0),
+                      cycles:    pms.reduce((a, p) => a + p.totalCycles, 0),
+                      expected:  pms.reduce((a, p) => a + p.expectedTotalCycles, 0),
+                      macroSec:  pms.reduce((a, p) => a + p.maintMacroSec, 0),
+                      macroN:    pms.reduce((a, p) => a + p.maintMacroCount, 0),
+                      microSec:  pms.reduce((a, p) => a + p.maintMicroSec, 0),
+                      microN:    pms.reduce((a, p) => a + p.maintMicroCount, 0),
+                      avgUptime: pms.length > 0 ? pms.reduce((a, p) => a + p.avgUptimePct, 0) / pms.length : 0,
+                    }
+                    const gridCols = 'grid-cols-[minmax(3.5rem,1fr)_1fr_1.8fr_1.1fr_1.1fr_0.7fr_1fr_1fr]'
+                    return (
                     <div className="space-y-1">
-                      <div className="grid grid-cols-[minmax(4rem,1.2fr)_1fr_2fr_1fr_0.7fr_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider text-muted-foreground/70 px-1">
+                      <div className={cn('grid gap-2 text-[9px] uppercase tracking-wider text-muted-foreground/70 px-1', gridCols)}>
                         <span>Máquina</span>
-                        <span className="text-right">Procesando</span>
-                        <span>Uptime</span>
-                        <span className="text-right">Ciclos</span>
-                        <span className="text-right">Turnos</span>
-                        <span className="text-right" title="Tiempo promedio de reparación de averías macro (≥5 min) · N° eventos">MTTR mac</span>
-                        <span className="text-right" title="Tiempo promedio de las micro-detenciones (<5 min) · N° eventos">MTTR mic</span>
+                        <span className="text-right" title="Horas que la máquina estuvo efectivamente procesando pescado en el mes">Procesando</span>
+                        <span title="% del tiempo de turno que la máquina estuvo procesando (promedio de sus turnos)">Uptime</span>
+                        <span className="text-right" title="Piezas que pasaron por la máquina en el mes (ciclos Baader)">Piezas proc.</span>
+                        <span className="text-right" title="Piezas que Shoplogix esperaba según el target configurado de cada turno">Esperadas</span>
+                        <span className="text-right" title="N° de turnos del mes en que esta máquina registró datos (no cuenta producción fuera de turno)">Turnos</span>
+                        <span className="text-right" title="MTTR de averías MACRO: paros de equipo ≥5 min. Promedio de duración por evento · N° de eventos del mes">MTTR avería</span>
+                        <span className="text-right" title="MTTR de MICRO-detenciones: interferencias breves <5 min (atascos, sensores). Se reportan aparte para no distorsionar el MTTR de averías">MTTR micro</span>
                       </div>
-                      {slxMonthlyStats.perMachineMonth.map((pm) => {
+                      {pms.map((pm) => {
                         const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
                         const uptimeColor =
                           pm.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-300'
@@ -4768,17 +4788,10 @@ export function GraderHistoricalCalendar({
                           : 'bg-rose-500/55'
                         const mttrMacroSec = pm.maintMacroCount > 0 ? pm.maintMacroSec / pm.maintMacroCount : 0
                         const mttrMicroSec = pm.maintMicroCount > 0 ? pm.maintMicroSec / pm.maintMicroCount : 0
-                        const fmtMttr = (sec: number) => {
-                          if (sec <= 0) return '—'
-                          if (sec < 60) return `${Math.round(sec)}s`
-                          const m = Math.floor(sec / 60)
-                          const s = Math.round(sec % 60)
-                          return s === 0 ? `${m}m` : `${m}m${s}s`
-                        }
                         return (
                           <div
                             key={pm.machineid}
-                            className="grid grid-cols-[minmax(4rem,1.2fr)_1fr_2fr_1fr_0.7fr_1fr_1fr] gap-2 items-center rounded bg-muted/50 border border-border px-1 py-1.5 text-[11px] tabular-nums"
+                            className={cn('grid gap-2 items-center rounded bg-muted/50 border border-border px-1 py-1.5 text-[11px] tabular-nums', gridCols)}
                           >
                             <span className="font-medium text-foreground/85">{shortName}</span>
                             <span className="text-right text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
@@ -4789,17 +4802,32 @@ export function GraderHistoricalCalendar({
                               <span className={cn('shrink-0 w-8 text-right', uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
                             </span>
                             <span className="text-right text-foreground/70">{pm.totalCycles.toLocaleString('es-CL')}</span>
+                            <span className="text-right text-muted-foreground">{pm.expectedTotalCycles > 0 ? pm.expectedTotalCycles.toLocaleString('es-CL') : '—'}</span>
                             <span className="text-right text-muted-foreground">{pm.shiftCount}</span>
                             <span className="text-right text-muted-foreground">{fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50 text-[9px]"> ·{pm.maintMacroCount}</span></span>
                             <span className="text-right text-muted-foreground">{fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50 text-[9px]"> ·{pm.maintMicroCount}</span></span>
                           </div>
                         )
                       })}
+                      {/* Fila de TOTALES — reemplaza al "475h 50m" suelto de arriba */}
+                      <div className={cn('grid gap-2 items-center rounded bg-primary/8 border border-primary/25 px-1 py-1.5 text-[11px] tabular-nums font-semibold', gridCols)}>
+                        <span className="text-foreground/90">Total 3 máq</span>
+                        <span className="text-right">{fmtSecPanoramic(tot.uptimeSec)}</span>
+                        <span className="text-muted-foreground font-normal text-[10px]">prom {tot.avgUptime.toFixed(0)}%</span>
+                        <span className="text-right">{tot.cycles.toLocaleString('es-CL')}</span>
+                        <span className="text-right">{tot.expected > 0 ? tot.expected.toLocaleString('es-CL') : '—'}</span>
+                        <span className="text-right font-normal text-muted-foreground">{slxMonthlyStats.turnosWithData}</span>
+                        <span className="text-right font-normal text-muted-foreground">{fmtMttr(tot.macroN > 0 ? tot.macroSec / tot.macroN : 0)}<span className="text-muted-foreground/50 text-[9px]"> ·{tot.macroN}</span></span>
+                        <span className="text-right font-normal text-muted-foreground">{fmtMttr(tot.microN > 0 ? tot.microSec / tot.microN : 0)}<span className="text-muted-foreground/50 text-[9px]"> ·{tot.microN}</span></span>
+                      </div>
                       <p className="text-[10px] text-muted-foreground/60 pt-1">
-                        Uptime = % del tiempo de turno procesando. MTTR mac = promedio de reparación de averías ≥5 min; mic = micro-detenciones (no inflan el MTTR macro).
+                        Procesando = horas de producción real. Piezas proc. = ciclos que pasaron por la Baader; Esperadas = target Shoplogix del mes.
+                        Turnos = turnos del mes con datos de esa máquina (sin producción fuera de turno).
+                        MTTR avería = duración promedio de paros de equipo ≥5 min (mac); MTTR micro = interferencias &lt;5 min, aparte para no distorsionar. ·N = eventos del mes.
                       </p>
                     </div>
-                  )}
+                    )
+                  })()}
                 </div>
                 )}
 
@@ -4874,44 +4902,57 @@ export function GraderHistoricalCalendar({
                     <p className="text-[11px] text-muted-foreground italic">Sin datos de paros para este mes</p>
                   ) : (
                     <div ref={monthParetoRef} className="space-y-1.5 pt-1">
+                      {/* Encabezados de columna — nada se asume: cada número tiene título */}
+                      <div className="flex items-center gap-2 text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                        <span className="w-2.5 shrink-0" />
+                        <span className="shrink-0 w-32 sm:w-44">Causal</span>
+                        <span className="flex-1 min-w-0">% del tiempo detenido</span>
+                        <span className="shrink-0 w-12 text-right" title="Cuántas veces ocurrió esta causal en el mes (fragmentos contiguos fusionados en un solo evento)">Eventos</span>
+                        <span className="shrink-0 w-14 text-right" title="Tiempo total del mes detenido por esta causal">Tiempo</span>
+                      </div>
                       {(() => {
                         const totalSec = monthParetoData.reduce((a, r) => a + r.durationSec, 0)
-                        // A página completa: top 12 (antes 7) con etiqueta ancha,
-                        // barra más gruesa y N° de eventos visible en la fila.
                         return monthParetoData.slice(0, 12).map((item) => {
                           const pct = totalSec > 0 ? (item.durationSec / totalSec) * 100 : 0
                           return (
                             <div
                               key={item.name}
-                              className="flex items-center gap-2 text-[11px]"
-                              title={`${item.count} evento${item.count !== 1 ? 's' : ''} · ${fmtSecPanoramic(item.durationSec)} total`}
+                              className="flex items-center gap-2 text-[12px]"
+                              title={`${item.name || 'Sin categoría'}: ${item.count} evento${item.count !== 1 ? 's' : ''} · ${fmtSecPanoramic(item.durationSec)} en total · ${pct.toFixed(1)}% de todo el tiempo detenido del mes`}
                             >
                               <span
                                 className="w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-black/30"
                                 style={{ backgroundColor: softenAccentHex(item.color || '#64748b') }}
                               />
-                              <span className="text-foreground/75 truncate shrink-0 w-32 sm:w-44">
+                              <span className="text-foreground/80 truncate shrink-0 w-32 sm:w-44">
                                 {item.name || 'Sin categoría'}
                               </span>
-                              <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden min-w-0">
+                              {/* Barra con marco definido: el track completo = 100% del
+                                  tiempo detenido; el % vive DENTRO de la barra. */}
+                              <div className="flex-1 h-4 bg-muted/40 border border-border/60 rounded overflow-hidden min-w-0 relative">
                                 <div
                                   data-month-pareto-bar=""
-                                  className="h-full rounded-full opacity-80"
+                                  className="h-full rounded-r"
                                   style={{
                                     width:           `${Math.max(pct, 1)}%`,
                                     backgroundColor: softenAccentHex(item.color || '#64748b'),
                                     transformOrigin: 'left center',
                                   }}
                                 />
+                                <span className={cn(
+                                  'absolute inset-y-0 flex items-center text-[10px] font-semibold tabular-nums',
+                                  pct >= 18 ? 'left-1.5 text-black/70' : 'text-muted-foreground',
+                                )}
+                                  style={pct < 18 ? { left: `calc(${Math.max(pct, 1)}% + 6px)` } : undefined}
+                                >
+                                  {pct.toFixed(0)}%
+                                </span>
                               </div>
-                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-9 text-right text-[10px]">
-                                ×{item.count}
+                              <span className="text-foreground/70 tabular-nums shrink-0 w-12 text-right">
+                                {item.count}
                               </span>
-                              <span className="text-muted-foreground tabular-nums shrink-0 w-12 text-right">
+                              <span className="text-foreground/70 tabular-nums shrink-0 w-14 text-right">
                                 {fmtSecPanoramic(item.durationSec)}
-                              </span>
-                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-8 text-right">
-                                {pct.toFixed(0)}%
                               </span>
                             </div>
                           )
@@ -4921,7 +4962,9 @@ export function GraderHistoricalCalendar({
                   )}
                   {monthParetoData.length > 0 && (
                     <p className="text-[10px] text-muted-foreground/60 pt-1">
-                      Cada barra = % del tiempo total detenido del mes que se llevó esa causal. ×N = veces que ocurrió. Estados de paro de la primera Baader por turno.
+                      La barra completa representa TODO el tiempo detenido del mes; el relleno es la porción de esa causal.
+                      Eventos consecutivos de la misma causal (ej. colación partida en 2 fragmentos) se cuentan como UNO.
+                      Fuente: estados de paro de la primera Baader por turno.
                     </p>
                   )}
                 </div>

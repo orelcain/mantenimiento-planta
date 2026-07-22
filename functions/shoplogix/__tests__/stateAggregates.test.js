@@ -15,9 +15,20 @@ const { test } = require('node:test')
 const assert = require('node:assert')
 const { aggregateStatesByReason } = require('../sync')
 
-const state = (over = {}) => ({
-  type: 'downtime', name: '', reason: '', color: '#ff0000', durationSec: 60, ...over,
-})
+// Reloj incremental con gap de 5 min entre states: así cada state es un evento
+// separado y la fusión de fragmentos contiguos (EVENT_MERGE_GAP_SEC) no altera
+// los conteos de estos tests. La fusión se prueba aparte, al final.
+let clockMs = 0
+const state = (over = {}) => {
+  const durationSec = over.durationSec ?? 60
+  const startAt = over.startAt ?? new Date(clockMs)
+  const endAt = over.endAt ?? new Date(startAt.getTime() + durationSec * 1000)
+  clockMs = endAt.getTime() + 5 * 60_000
+  return {
+    type: 'downtime', name: '', reason: '', color: '#ff0000', ...over,
+    durationSec, startAt, endAt,
+  }
+}
 
 test('suma duración y conteo de states con la misma (type, name, reason)', () => {
   const out = aggregateStatesByReason([
@@ -105,4 +116,25 @@ test('comprime cientos de micro-paros en una sola entrada', () => {
   assert.strictEqual(out.length, 1)
   assert.strictEqual(out[0].count, 500)
   assert.strictEqual(out[0].durationSec, 1500)
+})
+
+test('fusiona fragmentos CONTIGUOS de la misma causal en un solo evento (caso real COLACION 14-07)', () => {
+  // COLACION 45m seguida sin gap de COLACION 12m = UNA colación de 57m, no 2.
+  const frag = (startMin, durMin, reason) => ({
+    type: 'break', name: 'Detencion', reason, color: '#00f', durationSec: durMin * 60,
+    startAt: new Date(startMin * 60_000), endAt: new Date((startMin + durMin) * 60_000),
+  })
+  const out = aggregateStatesByReason([frag(0, 45, 'COLACION'), frag(45, 12, 'COLACION')])
+  assert.strictEqual(out.length, 1)
+  assert.strictEqual(out[0].count, 1)
+  assert.strictEqual(out[0].durationSec, 57 * 60)
+  // Con gap real (> 60s) sí son 2 eventos:
+  const out2 = aggregateStatesByReason([frag(0, 45, 'COLACION'), frag(50, 12, 'COLACION')])
+  assert.strictEqual(out2[0].count, 2)
+})
+
+test('states sin timestamps cuentan como eventos separados (NaN-safe, comportamiento legacy)', () => {
+  const bare = { type: 'downtime', reason: 'X', durationSec: 10 }
+  const out = aggregateStatesByReason([{ ...bare }, { ...bare }])
+  assert.strictEqual(out[0].count, 2)
 })
