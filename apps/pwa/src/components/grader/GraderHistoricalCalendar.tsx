@@ -4932,8 +4932,13 @@ export function GraderHistoricalCalendar({
                             <span className="text-muted-foreground">Piezas máx = techo de cada Baader × su cadencia real del mes (piezas÷hora demostradas) = </span>
                             <b>{piezasMax.toLocaleString('es-CL')} pz</b>
                           </div>
+                          <div>
+                            <span className="text-muted-foreground">Verificación (todo sobre el turno completo): </span>
+                            {pctMes(totals.produccionSec).toFixed(1)}% uso real + {pctMes(totals.externoSec).toFixed(1)}% externo + {pctMes(totals.planificadoSec).toFixed(1)}% planificado + {pctMes(totals.mantencionSec).toFixed(1)}% mantención + {pctMes(totals.sinClasificarSec).toFixed(1)}% sin clasif. = <b>{(pctMes(totals.produccionSec) + pctMes(totals.externoSec) + pctMes(totals.planificadoSec) + pctMes(totals.mantencionSec) + pctMes(totals.sinClasificarSec)).toFixed(1)}%</b>
+                          </div>
                           <div className="text-muted-foreground/70 font-sans">
                             Horas en "máquina-horas": las 3 Baader en paralelo suman 3h por cada hora de reloj.
+                            El techo (88%) es un subtotal — no se suma con las demás celdas; sus componentes son uso real + externo + mantención + sin clasif.
                           </div>
                         </div>
                       )}
@@ -4956,7 +4961,8 @@ export function GraderHistoricalCalendar({
                             id: 'externo' as const,
                             label: '− Externo',
                             sec: totals.externoSec,
-                            pct: `${pctTecho(totals.externoSec).toFixed(1)}% del techo`,
+                            pct: `${pctMes(totals.externoSec).toFixed(1)}% del turno`,
+                            pct2: `${pctTecho(totals.externoSec).toFixed(1)}% del techo`,
                             bg: 'bg-amber-500/10', text: 'text-amber-500',
                             ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
                             tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
@@ -4966,6 +4972,7 @@ export function GraderHistoricalCalendar({
                             label: '− Planificado',
                             sec: totals.planificadoSec,
                             pct: `${pctMes(totals.planificadoSec).toFixed(1)}% del turno`,
+                            pct2: null,
                             bg: 'bg-slate-500/10', text: 'text-muted-foreground',
                             ringHover: 'hover:ring-slate-400/40', ringActive: 'ring-1 ring-slate-400/70',
                             tip: 'Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina (fuera del techo). Click para ver sus eventos.',
@@ -4974,7 +4981,8 @@ export function GraderHistoricalCalendar({
                             id: 'mantencion' as const,
                             label: '− Mantención',
                             sec: totals.mantencionSec,
-                            pct: `${pctTecho(totals.mantencionSec).toFixed(1)}% del techo`,
+                            pct: `${pctMes(totals.mantencionSec).toFixed(1)}% del turno`,
+                            pct2: `${pctTecho(totals.mantencionSec).toFixed(1)}% del techo`,
                             bg: 'bg-rose-500/10', text: 'text-rose-400',
                             ringHover: 'hover:ring-rose-400/40', ringActive: 'ring-1 ring-rose-400/70',
                             tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
@@ -4983,7 +4991,8 @@ export function GraderHistoricalCalendar({
                             id: 'sin-clasificar' as const,
                             label: '− Sin clasif.',
                             sec: totals.sinClasificarSec,
-                            pct: `${pctTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
+                            pct: `${pctMes(totals.sinClasificarSec).toFixed(1)}% del turno`,
+                            pct2: `${pctTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
                             bg: 'bg-violet-500/10', text: 'text-violet-400',
                             ringHover: 'hover:ring-violet-400/40', ringActive: 'ring-1 ring-violet-400/70',
                             tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
@@ -5003,15 +5012,16 @@ export function GraderHistoricalCalendar({
                               <div className="font-mono tabular-nums">{fmtSecPanoramic(mesSec)}</div>
                               <div className="text-[9px] text-muted-foreground/60">100%</div>
                             </div>
-                            <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = tiempo de turnos − planificado. Todo este tiempo las máquinas PODÍAN producir.">
+                            <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = tiempo de turnos − planificado. Todo este tiempo las máquinas PODÍAN producir. Es un SUBTOTAL (no suma con las demás celdas): techo = uso real + externo + mantención + sin clasif.">
                               <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
                               <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.techoSec)}</div>
-                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.techoSec).toFixed(1)}% del turno</div>
+                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.techoSec).toFixed(1)}% del turno · subtotal</div>
                             </div>
-                            <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
+                            <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime). Ambos %: sobre el turno completo (la base común que suma 100%) y sobre el techo (el 'uso real' del titular).">
                               <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
                               <div className="font-mono tabular-nums font-semibold">{fmtSecPanoramic(totals.produccionSec)}</div>
-                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
+                              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctMes(totals.produccionSec).toFixed(1)}% del turno</div>
+                              <div className="text-[9px] text-emerald-400/70 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
                             </div>
                             {lossCells.map((c) => (
                               <button
@@ -5029,6 +5039,7 @@ export function GraderHistoricalCalendar({
                                 <div className={cn('text-[9px] uppercase', c.text)}>{c.label}</div>
                                 <div className="font-mono tabular-nums">{fmtSecPanoramic(c.sec)}</div>
                                 <div className="text-[9px] text-muted-foreground/60 tabular-nums">{c.pct}</div>
+                                {c.pct2 && <div className="text-[9px] text-muted-foreground/40 tabular-nums">{c.pct2}</div>}
                               </button>
                             ))}
                           </div>
