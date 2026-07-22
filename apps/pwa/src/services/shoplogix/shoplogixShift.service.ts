@@ -963,6 +963,14 @@ export interface ShoplogixShiftParent {
    */
   effectiveStart: Date | null
   effectiveEnd: Date | null
+  /**
+   * Horario OFICIAL del turno según la plantilla de Shoplogix (rollup del
+   * whiteboard). A diferencia de scheduledEnd — que crece sync a sync mientras
+   * el turno está vivo — este es el horario completo programado (ej. 14:45→00:00).
+   * Solo existe para turnos que estuvieron vigentes durante algún sync.
+   */
+  officialStart: Date | null
+  officialEnd: Date | null
 }
 
 function parseParentMachine(raw: unknown): ParentMachineSummary | null {
@@ -1022,6 +1030,12 @@ function parseShiftParent(docId: string, data: FirestoreData): ShoplogixShiftPar
     reconciliationNote: typeof data.reconciliationNote === 'string' ? data.reconciliationNote : null,
     effectiveStart: data.effectiveStart != null ? toDateSafe(data.effectiveStart) : null,
     effectiveEnd:   data.effectiveEnd   != null ? toDateSafe(data.effectiveEnd)   : null,
+    officialStart: (data.officialSchedule as FirestoreData | undefined)?.start != null
+      ? toDateSafe((data.officialSchedule as FirestoreData).start)
+      : null,
+    officialEnd: (data.officialSchedule as FirestoreData | undefined)?.end != null
+      ? toDateSafe((data.officialSchedule as FirestoreData).end)
+      : null,
   }
 }
 
