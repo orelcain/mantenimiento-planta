@@ -157,30 +157,60 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
             </div>
           </div>
 
-          {/* Piezas perdidas por causal — "la culpa, con número" */}
-          {causes.length > 0 && (
-            <div>
-              <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
-                Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico
-              </p>
-              <div className="space-y-0.5">
-                {causes.map((c) => {
-                  const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
-                  return (
-                    <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                      <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-slate-500/60')} />
-                      <span className="truncate">{c.label}</span>
-                      <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
-                      <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
-                      <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
-                        ≈ {c.piezas.toLocaleString('es-CL')} pz
-                      </span>
+          {/* Piezas perdidas por causal — "la culpa, con número". SOLO buckets
+              que restan del techo: lo planificado (colación, ejercicio) se
+              descuenta ANTES del techo, así que sus piezas NO están "bajo el
+              máximo" — mezclarlo hacía que las causales sumaran más que la
+              pérdida total. Se listan aparte, sin ≈pz. */}
+          {(() => {
+            const techoCauses = causes.filter((c) => c.bucket !== 'planificado')
+            const plannedCauses = causes.filter((c) => c.bucket === 'planificado')
+            return (
+              <>
+                {techoCauses.length > 0 && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
+                      Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico
+                    </p>
+                    <div className="space-y-0.5">
+                      {techoCauses.map((c) => {
+                        const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
+                        return (
+                          <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                            <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-slate-500/60')} />
+                            <span className="truncate">{c.label}</span>
+                            <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
+                            <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
+                            <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
+                              ≈ {c.piezas.toLocaleString('es-CL')} pz
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+                  </div>
+                )}
+                {plannedCauses.length > 0 && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider mb-1">
+                      Pausas planificadas · fuera del techo (no cuentan como pérdida)
+                    </p>
+                    <div className="space-y-0.5 opacity-70">
+                      {plannedCauses.map((c) => (
+                        <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                          <span className="w-2 h-2 rounded-sm shrink-0 bg-slate-500/60" />
+                          <span className="truncate">{c.label}</span>
+                          <span className="text-[9px] text-muted-foreground shrink-0">Personas (acordado)</span>
+                          <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
+                          <span className="w-20 shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
           {totals.sinClasificarSec > 0 && (
             <p className="text-[10px] text-violet-400/80">

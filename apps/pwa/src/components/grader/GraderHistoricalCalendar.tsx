@@ -4934,31 +4934,62 @@ export function GraderHistoricalCalendar({
                           </div>
                         ))}
                       </div>
-                      {/* Piezas perdidas por causal */}
-                      {causes.length > 0 && (
-                        <div>
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
-                            Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico del mes
-                          </p>
-                          <div className="space-y-0.5">
-                            {causes.slice(0, 10).map((c) => {
-                              const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
-                              return (
-                                <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                                  <span className={cn('w-2 h-2 rounded-sm shrink-0', bucketColor[c.bucket] ?? 'bg-slate-500/60')} />
-                                  <span className="truncate">{c.label}</span>
-                                  <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
-                                  <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
-                                  <span className="ml-auto font-mono tabular-nums shrink-0">{fmtSecPanoramic(c.sec)}</span>
-                                  <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
-                                    ≈ {c.piezas.toLocaleString('es-CL')} pz
-                                  </span>
+                      {/* Piezas perdidas por causal — SOLO buckets que restan del
+                          techo (externo/mantención/sin clasificar). Lo planificado
+                          (colación, ejercicio) se descuenta ANTES del techo: sus
+                          piezas NO están "bajo el máximo" — mezclarlo aquí hacía
+                          que las causales sumaran más que la pérdida total. */}
+                      {(() => {
+                        const techoCauses = causes.filter((c) => c.bucket !== 'planificado')
+                        const plannedCauses = causes.filter((c) => c.bucket === 'planificado')
+                        return (
+                          <>
+                            {techoCauses.length > 0 && (
+                              <div>
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
+                                  Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico del mes
+                                </p>
+                                <div className="space-y-0.5">
+                                  {techoCauses.slice(0, 10).map((c) => {
+                                    const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
+                                    return (
+                                      <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                                        <span className={cn('w-2 h-2 rounded-sm shrink-0', bucketColor[c.bucket] ?? 'bg-slate-500/60')} />
+                                        <span className="truncate">{c.label}</span>
+                                        <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
+                                        <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
+                                        <span className="ml-auto font-mono tabular-nums shrink-0">{fmtSecPanoramic(c.sec)}</span>
+                                        <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
+                                          ≈ {c.piezas.toLocaleString('es-CL')} pz
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
                                 </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
+                              </div>
+                            )}
+                            {plannedCauses.length > 0 && (
+                              <div>
+                                <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider mb-1">
+                                  Pausas planificadas · fuera del techo (no cuentan como pérdida)
+                                </p>
+                                <div className="space-y-0.5 opacity-70">
+                                  {plannedCauses.map((c) => (
+                                    <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                                      <span className="w-2 h-2 rounded-sm shrink-0 bg-slate-500/60" />
+                                      <span className="truncate">{c.label}</span>
+                                      <span className="text-[9px] text-muted-foreground shrink-0">Personas (acordado)</span>
+                                      <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
+                                      <span className="ml-auto font-mono tabular-nums shrink-0">{fmtSecPanoramic(c.sec)}</span>
+                                      <span className="w-20 shrink-0" />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                       {totals.sinClasificarSec > 0 && (
                         <p className="text-[10px] text-violet-400/80">
                           ⚠ {fmtSecPanoramic(totals.sinClasificarSec)} sin clasificar (ej. LOGICA) — anotar la causal en Shoplogix le asigna dueño.
