@@ -172,12 +172,18 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
       .map(c => ({ ...c, piezas: Math.round(c.piezas), machines: [...c.machines].sort() }))
       .sort((a, b) => b.piezas - a.piezas)
 
-    return { totals, usoReal, piezasReales, piezasMax, causes }
+    const perMachineOut = perMachine.map((x) => ({
+      machineid: x.m.machineid,
+      name: x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+      cascade: x.cascade,
+    }))
+
+    return { totals, usoReal, piezasReales, piezasMax, causes, perMachine: perMachineOut }
   }, [machines])
 
   if (!data || data.totals.techoSec <= 0) return null
 
-  const { totals, usoReal, piezasReales, piezasMax, causes } = data
+  const { totals, usoReal, piezasReales, piezasMax, causes, perMachine } = data
   const turnoSec = totals.techoSec + totals.planificadoSec
   const pctOfTecho = (sec: number) => (totals.techoSec > 0 ? (sec / totals.techoSec) * 100 : 0)
   const pctOfTurno = (sec: number) => (turnoSec > 0 ? (sec / turnoSec) * 100 : 0)
@@ -356,6 +362,66 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
               </button>
             ))}
           </div>
+
+          {/* Desglose por máquina — REACTIVO al grupo seleccionado arriba
+              (mismo patrón que la Cascada del mes, Orel 2026-07-23): sin
+              filtro muestra uso real de siempre; con un grupo de pérdida
+              activo muestra cuánto aportó cada Baader a ESE grupo (% =
+              participación dentro del grupo, las 3 suman ~100%) + tiempo
+              absoluto + qué fracción es de SU PROPIO techo/turno. */}
+          {(() => {
+            const activeBucket = filter === 'all' ? null : filter
+            const bucketSecOf = (c: typeof perMachine[number]['cascade']) => {
+              switch (activeBucket) {
+                case 'externo':        return c.externoSec
+                case 'mantencion':      return c.mantencionSec
+                case 'sin-clasificar':  return c.sinClasificarSec
+                case 'planificado':     return c.planificadoSec
+                default:                return c.produccionSec
+              }
+            }
+            const groupTotalSec = perMachine.reduce((a, m) => a + bucketSecOf(m.cascade), 0)
+            const theme = activeBucket == null
+              ? { bar: 'bg-emerald-500/60', text: 'text-emerald-400' }
+              : activeBucket === 'externo'
+              ? { bar: 'bg-amber-500/60', text: 'text-amber-400' }
+              : activeBucket === 'mantencion'
+              ? { bar: 'bg-rose-500/60', text: 'text-rose-400' }
+              : activeBucket === 'sin-clasificar'
+              ? { bar: 'bg-violet-500/60', text: 'text-violet-400' }
+              : { bar: 'bg-slate-500/60', text: 'text-muted-foreground' }
+            const groupLabel = activeBucket == null ? 'Uso real por máquina' : `${LOSS_BUCKET_META[activeBucket as keyof typeof LOSS_BUCKET_META]?.label ?? activeBucket} por máquina`
+            return (
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{groupLabel}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                  {perMachine.map((m) => {
+                    const sec = bucketSecOf(m.cascade)
+                    const shareOfGroup = groupTotalSec > 0 ? (sec / groupTotalSec) * 100 : 0
+                    const ownDenomSec = activeBucket === 'planificado' ? m.cascade.techoSec + m.cascade.planificadoSec : m.cascade.techoSec
+                    const pctOfOwnDenom = ownDenomSec > 0 ? (sec / ownDenomSec) * 100 : 0
+                    const bigPct = activeBucket == null ? m.cascade.usoReal * 100 : shareOfGroup
+                    return (
+                      <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-foreground/85">{m.name}</span>
+                          <span className={cn('font-mono tabular-nums', theme.text)}>{bigPct.toFixed(0)}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
+                          <div className={cn('h-full rounded-full', theme.bar)} style={{ width: `${Math.min(100, bigPct)}%` }} />
+                        </div>
+                        <div className="mt-1 text-[9px] text-muted-foreground tabular-nums">
+                          {activeBucket == null
+                            ? `${fmtHm(m.cascade.produccionSec)} de ${fmtHm(m.cascade.techoSec)} de techo`
+                            : `${fmtHm(sec)} · ${pctOfOwnDenom.toFixed(0)}% de ${activeBucket === 'planificado' ? 'su turno' : 'su techo'}`}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           {causeMachine ? (
             <div className="flex items-center gap-2 text-[11px] rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1.5">
