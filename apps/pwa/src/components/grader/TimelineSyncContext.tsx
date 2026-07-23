@@ -65,6 +65,17 @@ export interface TimelineSyncValue {
   /** ID de grupo para `echarts.connect()` — todos los charts del grupo
    *  sincronizan zoom y axisPointer nativamente. */
   connectGroupId: string
+  /**
+   * Tramos de tiempo a resaltar (markArea) en TODOS los charts del turno —
+   * el Gantt de cada Baader Y el chart de velocidad upstream. Dos orígenes:
+   *   1. Click en un segmento del Gantt (un evento puntual).
+   *   2. Filtro por grupo en la Cascada del turno (todos los eventos de esa
+   *      causal, para "demostrar" cómo se comportaron las Baader ahí).
+   * Vacío = sin resaltado. Pedido Orel 2026-07-22: "que arriba se muestre el
+   * mismo tiempo marcado" al clickear un evento en el Gantt.
+   */
+  highlightRanges: TimelineRange[]
+  setHighlightRanges: (next: TimelineRange[]) => void
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -81,6 +92,7 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
   const [range, setRangeState] = useState<TimelineRange | null>(null)
   const [hover, setHoverState] = useState<HoverState | null>(null)
   const [lotChanges, setLotChangesState] = useState<LotChange[]>([])
+  const [highlightRanges, setHighlightRangesState] = useState<TimelineRange[]>([])
 
   // setRange es estable (useCallback) para evitar re-renders cascada en
   // consumidores que sólo dependen del setter.
@@ -121,9 +133,25 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
     })
   }, [])
 
+  // Idempotente por igualdad estructural (mismo criterio que setLotChanges):
+  // evita re-renders cascada cuando el caller recalcula el mismo array.
+  const setHighlightRanges = useCallback((next: TimelineRange[]) => {
+    setHighlightRangesState((prev) => {
+      if (prev === next) return prev
+      if (prev.length !== next.length) return next
+      for (let i = 0; i < prev.length; i++) {
+        if (prev[i]!.startMs !== next[i]!.startMs || prev[i]!.endMs !== next[i]!.endMs) return next
+      }
+      return prev
+    })
+  }, [])
+
   const value = useMemo<TimelineSyncValue>(
-    () => ({ range, setRange, hover, setHover, lotChanges, setLotChanges, connectGroupId: groupId }),
-    [range, setRange, hover, setHover, lotChanges, setLotChanges, groupId],
+    () => ({
+      range, setRange, hover, setHover, lotChanges, setLotChanges,
+      highlightRanges, setHighlightRanges, connectGroupId: groupId,
+    }),
+    [range, setRange, hover, setHover, lotChanges, setLotChanges, highlightRanges, setHighlightRanges, groupId],
   )
 
   return <TimelineSyncContext.Provider value={value}>{children}</TimelineSyncContext.Provider>

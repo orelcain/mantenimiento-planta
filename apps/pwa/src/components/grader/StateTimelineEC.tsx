@@ -58,6 +58,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     return [shift.shiftStart, shift.shiftEnd]
   }, [timelineSync?.range, windowStart, windowEnd, shift.shiftStart, shift.shiftEnd])
 
+  const highlightRanges = timelineSync?.highlightRanges ?? []
+
   // ── Datos de la serie ───────────────────────────────────────────────────────
   const seriesData = useMemo(() => shift.states.map((st) => {
     const color = slxStateColor(st.type, st.reason, st.color)
@@ -229,6 +231,11 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           const st = shift.states[params.dataIndex as number]
           const MIN_LABEL_WIDTH = 30
           if (st && st.type !== 'uptime' && widthPx >= MIN_LABEL_WIDTH && height >= 14) {
+            // Fondo propio (no solo textBorder) para contraste real sobre
+            // cualquier color de estado — pedido Orel 2026-07-22: "el 32 min
+            // no se ve bien". backgroundColor/padding/borderRadius son props
+            // nativas de zrender 'text', se auto-ajustan al contenido sin
+            // medir el texto a mano.
             const label = {
               type: 'text' as const,
               style: {
@@ -236,13 +243,15 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
                 x: start[0] + widthPx / 2,
                 y: yCenter,
                 fill: '#fff',
-                textBorderColor: 'rgba(0,0,0,0.6)',
-                textBorderWidth: 2,
-                fontSize: Math.min(10, height - 4),
-                fontWeight: 600 as const,
+                backgroundColor: 'rgba(15,23,42,0.78)',
+                padding: [2, 5] as [number, number],
+                borderRadius: 3,
+                fontSize: Math.min(12, height - 8),
+                fontWeight: 700 as const,
                 align: 'center' as const,
                 verticalAlign: 'middle' as const,
               },
+              z: 10,
               silent: true,
             }
             return { type: 'group' as const, children: [rect, label] }
@@ -259,7 +268,11 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         } : undefined,
       },
       // Serie auxiliar invisible solo para axisPointer cross-chart (crosshair).
-      // No se usa para tooltip (trigger:'item' lo maneja directamente).
+      // No se usa para tooltip (trigger:'item' lo maneja directamente). También
+      // carga el markArea de resaltado (highlightRanges): click en un evento del
+      // Gantt o filtro de causal en la Cascada del turno — se ve en LAS TRES
+      // Baader y en el chart de velocidad upstream, para "demostrar" cómo se
+      // comportó cada máquina en ese tramo (pedido Orel 2026-07-22).
       {
         type: 'line' as const,
         data: [
@@ -272,11 +285,16 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         silent:      true,
         z:           -1,
         tooltip:     { show: false },
+        markArea: highlightRanges.length > 0 ? {
+          silent: true,
+          itemStyle: { color: 'rgba(250,204,21,0.16)', borderWidth: 1, borderColor: 'rgba(250,204,21,0.5)', borderType: 'dashed' as const },
+          data: highlightRanges.map((r) => ([{ xAxis: r.startMs }, { xAxis: r.endMs }])),
+        } : undefined,
       },
     ],
   // shift.states: renderItem lo lee directo (para la etiqueta de duración) además
   // de vía seriesData; se agrega explícito aunque cambie junto con seriesData.
-  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states])
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states, highlightRanges])
 
   // onEvents mínimo y estable: solo datazoom + click, sin mouse* que causarían re-bind
   const onEvents = useMemo(() => ({

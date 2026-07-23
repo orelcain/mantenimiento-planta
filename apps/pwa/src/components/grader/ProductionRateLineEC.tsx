@@ -152,6 +152,12 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     [machines],
   )
 
+  // Resaltado compartido (click en un evento del Gantt Baader, o filtro de
+  // causal en la Cascada del turno) — mismos tramos que se pintan en los 3
+  // Gantts, acá encima de la velocidad upstream para poder "demostrar" el
+  // comportamiento real de las máquinas en ese tramo (Orel 2026-07-22).
+  const highlightRanges = timelineSync?.highlightRanges ?? []
+
   // Rango temporal efectivo
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
     if (timelineSync?.range) {
@@ -250,6 +256,13 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         itemStyle:   { color: col.line },
         areaStyle:   { color: col.area },
         emphasis:    { lineStyle: { width: 2.5 } },
+        // Solo en la primera serie (una vez por chart) — mismo tramo resaltado
+        // que en los Gantts Baader (StateTimelineEC), vía TimelineSyncContext.
+        markArea: i === 0 && highlightRanges.length > 0 ? {
+          silent: true,
+          itemStyle: { color: 'rgba(250,204,21,0.14)', borderWidth: 1, borderColor: 'rgba(250,204,21,0.5)', borderType: 'dashed' as const },
+          data: highlightRanges.map((r) => ([{ xAxis: r.startMs }, { xAxis: r.endMs }])),
+        } : undefined,
       }
     })
 
@@ -357,7 +370,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       }] : [],
       series: avgS ? [...machineSeries, avgS] : machineSeries,
     }
-  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg])
+  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges])
 
   if (timeAxis.length < 2) return null
 

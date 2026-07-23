@@ -30,8 +30,9 @@
 import { useMemo, useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { cascadeFromStates, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
+import { cascadeFromStates, classifyLossState, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
+import { useTimelineSyncOptional } from './useTimelineSync'
 
 function fmtHm(sec: number): string {
   if (sec <= 0) return '0m'
@@ -65,6 +66,28 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
 
   const [filter, setFilter] = useState<'all' | LossBucket>('all')
   const [calcOpen, setCalcOpen] = useState(false)
+  const timelineSync = useTimelineSyncOptional()
+
+  // Filtrar por grupo también RESALTA en los 3 Gantts + el chart de velocidad
+  // upstream todos los eventos de esa causal — "demostrar" cómo se comportaron
+  // las Baader ahí (Orel 2026-07-22), no solo listarlos como texto.
+  useEffect(() => {
+    if (!timelineSync) return
+    if (filter === 'all') {
+      timelineSync.setHighlightRanges([])
+      return
+    }
+    const ranges = machines.flatMap((m) =>
+      m.states
+        .filter((s) => classifyLossState(s) === filter)
+        .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })),
+    )
+    timelineSync.setHighlightRanges(ranges)
+    // Al desmontar (cambiar de turno) limpiar — evita que el resaltado de un
+    // turno anterior "sangre" al siguiente si el usuario navega con el filtro activo.
+    return () => timelineSync.setHighlightRanges([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, machines])
 
   const data = useMemo(() => {
     if (machines.length === 0) return null
@@ -89,21 +112,25 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
     const piezasMax = Math.round(sum(x => x.cascade.techoSec * x.cadencePzSec))
 
     // Piezas perdidas POR CAUSAL: duración de la causal en cada máquina × la
-    // cadencia de esa máquina. Agrupadas por (bucket, reason) entre máquinas.
-    const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number }>()
+    // cadencia de esa máquina. Agrupadas por (bucket, reason) entre máquinas,
+    // pero conservando QUÉ Baader(s) aportó cada causal (pedido Orel: "AJUSTE
+    // MANTENIMIENTO ¿en qué Baader fue?" — antes se perdía al sumar entre las 3).
+    const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number; machines: Set<string> }>()
     for (const x of perMachine) {
+      const shortName = x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
       for (const item of x.cascade.items) {
         const label = item.reason || (item.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
         const key = `${item.bucket}__${label}`
-        const cur = lossByCause.get(key) ?? { bucket: item.bucket, label, sec: 0, piezas: 0, count: 0 }
+        const cur = lossByCause.get(key) ?? { bucket: item.bucket, label, sec: 0, piezas: 0, count: 0, machines: new Set<string>() }
         cur.sec += item.durationSec
         cur.piezas += item.durationSec * x.cadencePzSec
         cur.count += item.count
+        cur.machines.add(shortName)
         lossByCause.set(key, cur)
       }
     }
     const causes = [...lossByCause.values()]
-      .map(c => ({ ...c, piezas: Math.round(c.piezas) }))
+      .map(c => ({ ...c, piezas: Math.round(c.piezas), machines: [...c.machines].sort() }))
       .sort((a, b) => b.piezas - a.piezas)
 
     return { totals, usoReal, piezasReales, piezasMax, causes }
@@ -328,6 +355,13 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
                       <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-slate-500/60')} />
                       <span className="truncate">{c.label}</span>
                       <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
+                      {/* Qué Baader(s) aportó esta causal — antes se perdía al
+                          sumar las 3 máquinas (Orel: "¿en qué Baader fue?"). */}
+                      <span className="flex gap-0.5 shrink-0">
+                        {c.machines.map((mn) => (
+                          <span key={mn} className="text-[8px] px-1 rounded bg-muted border border-border/60 text-muted-foreground/80">{mn}</span>
+                        ))}
+                      </span>
                       <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                       <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
                       <span className="font-mono tabular-nums text-muted-foreground/60 w-14 text-right shrink-0 text-[10px]">

@@ -19,8 +19,8 @@
  */
 
 import { Badge } from '@/components/ui'
-import { X, Clock, Activity, AlertCircle, Pause, Wrench } from 'lucide-react'
-import type { UpstreamMachineShift, UpstreamMachineState } from '@/services/shoplogix/types'
+import { X, Clock, Activity, AlertCircle, Pause, Wrench, MessageSquare } from 'lucide-react'
+import type { UpstreamMachineShift, UpstreamMachineState, UpstreamShiftComment } from '@/services/shoplogix/types'
 import { fmtTimeWithSec, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { softenAccentHex } from '@/lib/softenColor'
 
@@ -52,11 +52,16 @@ interface Props {
   state: UpstreamMachineState
   /** Shift completo — necesario para % del turno y comparación con estados similares. */
   shift: UpstreamMachineShift
+  /** Comentario(s) de operador emparejados a este estado (matchCommentsToStates,
+   *  por razón + solape temporal) — ya se mostraban en la tabla "Análisis del
+   *  turno" de más abajo; ahora también aquí, en el detalle del click directo
+   *  sobre el Gantt (pedido Orel 2026-07-22: no obligar a bajar a la tabla). */
+  comments?: UpstreamShiftComment[]
   /** Cierra el panel. */
   onClose: () => void
 }
 
-export function StateDetailPanel({ state, shift, onClose }: Props) {
+export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
   const shiftDurationMs = shift.shiftEnd.getTime() - shift.shiftStart.getTime()
   const shiftDurationSec = shiftDurationMs / 1000
 
@@ -154,6 +159,20 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
           />
         )}
       </div>
+
+      {/* Comentario(s) de operador emparejados a este evento — mismo match que
+          la tabla "Análisis del turno" (matchCommentsToStates), visible acá
+          para no obligar a bajar a buscarlo. */}
+      {comments && comments.length > 0 && (
+        <div className="pt-1.5 border-t border-border/60 space-y-1">
+          {comments.map((c) => (
+            <div key={c.key} className="flex items-start gap-1.5 text-xs">
+              <MessageSquare className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+              <span className="text-foreground italic">{c.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

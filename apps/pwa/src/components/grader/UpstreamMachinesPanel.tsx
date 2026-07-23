@@ -774,19 +774,24 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
   const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
-
-  const handleStateClick = (s: UpstreamMachineState) => {
-    setSelectedState((prev) =>
-      prev && prev.startAt.getTime() === s.startAt.getTime() && prev.name === s.name
-        ? null
-        : s,
-    )
-  }
   // F5a — Mini-KPIs zoom-aware. Source of truth: context.range (idéntico al
   // panel-global). Sin esto, el badge aparecería siempre que el rango de
   // alineación con el Grader difiera del shift Baader (false positive).
   const timelineSyncRow = useTimelineSyncOptional()
   const isZoomActive = timelineSyncRow?.range != null
+
+  const handleStateClick = (s: UpstreamMachineState) => {
+    setSelectedState((prev) => {
+      const closing = prev && prev.startAt.getTime() === s.startAt.getTime() && prev.name === s.name
+      // Resaltar el mismo tramo en las OTRAS 2 Baader y en el chart de
+      // velocidad upstream — "demostrar" cómo se comportaron ahí (Orel
+      // 2026-07-22). Al cerrar (mismo segmento clickeado de nuevo), limpiar.
+      timelineSyncRow?.setHighlightRanges(
+        closing ? [] : [{ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() }],
+      )
+      return closing ? null : s
+    })
+  }
 
   const kpis = useMemo(() => {
     if (!isZoomActive || !windowStart || !windowEnd) {
@@ -907,7 +912,8 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           <StateDetailPanel
             state={selectedState}
             shift={shift}
-            onClose={() => setSelectedState(null)}
+            comments={analisis.byState.get(selectedState)}
+            onClose={() => { setSelectedState(null); timelineSyncRow?.setHighlightRanges([]) }}
           />
         )}
 
