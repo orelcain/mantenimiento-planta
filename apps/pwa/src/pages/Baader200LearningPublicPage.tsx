@@ -106,6 +106,10 @@ export function Baader200LearningPublicPage() {
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
+      // Mismo patrón que PlanosAguasPage.tsx: solo aceptar mensajes del propio
+      // iframe same-origin (defensa contra postMessage de un opener ajeno).
+      if (e.origin !== window.location.origin) return
+      if (e.source !== iframeRef.current?.contentWindow) return
       if (!e.data || e.data.type !== 'b200:ready') return
       iframeReadyRef.current = true
       if (selected) sendInitData(selected)

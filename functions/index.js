@@ -37,8 +37,15 @@ function requireAdminKey(req, res) {
     res.status(503).json({ error: 'ADMIN_KEY_NOT_CONFIGURED', message: 'Configurar ADMIN_SETUP_KEY en FUNCTIONS_ENV' })
     return false
   }
-  const got = req.get('x-admin-key') || req.query.key
-  if (got !== expected) {
+  const got = String(req.get('x-admin-key') || req.query.key || '')
+  // Comparación en tiempo constante (mismo criterio que mintTelegramAuthToken):
+  // timingSafeEqual exige buffers del mismo largo, así que igualamos con un pad
+  // que garantiza el rechazo (nunca compara igual) cuando el largo no calza.
+  const gotBuf = Buffer.from(got)
+  const expectedBuf = Buffer.from(expected)
+  const lengthOk = gotBuf.length === expectedBuf.length
+  const safeGot = lengthOk ? gotBuf : Buffer.alloc(expectedBuf.length)
+  if (!lengthOk || !timingSafeEqual(safeGot, expectedBuf)) {
     res.status(403).json({ error: 'FORBIDDEN' })
     return false
   }
@@ -1431,12 +1438,29 @@ exports.purgeSensorReadingsManual = onCall(
  * El embed llama esta función HTTP con los datos DM para cachearlos
  * en Firestore, y así checkClimaPortoAlert los puede leer.
  */
+// Sin auth A PROPÓSITO: lo llama el navegador de CUALQUIER visitante del embed
+// público (ver comentario arriba) — un secreto embebido en ese HTML estático
+// sería extraíble con "ver código fuente" y no protegería nada real. La
+// mitigación aplicable es validar estrictamente la FORMA del payload (tipos +
+// topes de tamaño) para que un curl malicioso no pueda inyectar objetos
+// arbitrarios/gigantes al doc cacheado — no evita spoofear el estado (impacto
+// bajo: solo cambia lo que se MUESTRA en el widget de clima, no autoriza nada).
+function isPlainBoolOrUndef(v) { return v === undefined || typeof v === 'boolean' }
+function isShortStringOrNull(v) { return v === null || v === undefined || (typeof v === 'string' && v.length <= 500) }
+
 exports.cacheDmStatus = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
     const d = req.body
-    if (!d || typeof d.found !== 'boolean') return res.status(400).json({ error: 'invalid payload' })
+    const valid = d && typeof d.found === 'boolean'
+      && isPlainBoolOrUndef(d.restriccionBahia)
+      && isPlainBoolOrUndef(d.navesMenores)
+      && isPlainBoolOrUndef(d.navesMayores)
+      && (d.numRestricciones === undefined || (typeof d.numRestricciones === 'number' && Number.isFinite(d.numRestricciones)))
+      && isShortStringOrNull(d.estado)
+      && (d.meteo === undefined || d.meteo === null || (typeof d.meteo === 'object' && JSON.stringify(d.meteo).length <= 2000))
+    if (!valid) return res.status(400).json({ error: 'invalid payload' })
     try {
       await db.collection('cache').doc('dmStatus').set({
         found:            d.found,
@@ -1861,10 +1885,12 @@ exports.checkClimaPortoAlert = onSchedule(
   async () => { await _runClimaCheck('scheduler') }
 )
 
-// Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler)
+// Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler).
+// Herramienta manual de admin — ningún cliente la llama automáticamente.
 exports.runClimaPortoCheck = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, timeoutSeconds: 30, memory: '256MiB' },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const result = await _runClimaCheck('http')
     res.json({ ok: !result?.error, ...result })
   }
@@ -5401,11 +5427,18 @@ exports.telegramWebhook = onRequest(
     return
   }
 
-  // Anti-spoofing: si TELEGRAM_WEBHOOK_SECRET está configurado, exigir que el
-  // header coincida (Telegram lo envía cuando se registró setWebhook con
-  // secret_token). Condicional para no romper el bot si aún no se re-registró.
+  // Anti-spoofing: exige que el header secret_token coincida (Telegram lo
+  // envía cuando se registró setWebhook con secret_token — ya registrado en
+  // prod, verificado 2026-07-05). FAIL-CLOSED: si el env TELEGRAM_WEBHOOK_SECRET
+  // se perdiera en un deploy (ej. FUNCTIONS_ENV mal escrito), el webhook debe
+  // rechazar TODO en vez de quedar abierto en silencio.
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  if (webhookSecret && req.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
+  if (!webhookSecret) {
+    logger.error('telegramWebhook: TELEGRAM_WEBHOOK_SECRET no configurado — rechazando por seguridad (fail-closed)')
+    res.status(503).send('webhook not configured')
+    return
+  }
+  if (req.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
     logger.warn('telegramWebhook: secret_token inválido o ausente — rechazado')
     res.status(401).send('unauthorized')
     return
@@ -7593,10 +7626,12 @@ exports.animeEstrenosDiarios = onSchedule(
   }
 );
 
+// Disparo manual del chequeo de estrenos — herramienta de admin, ningún cliente la llama.
 exports.animeEstrenosManual = onRequest(
   { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+    if (!requireAdminKey(req, res)) return;
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
     await _runAnimeEstrenos(token);

@@ -313,6 +313,10 @@ export function HmiBombeoS2PublicPage() {
   /* Escuchar mensajes del iframe (overrides changed, snapshots) */
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
+      // Mismo patrón que PlanosAguasPage.tsx: solo aceptar mensajes del propio
+      // iframe same-origin (defensa contra postMessage de un opener ajeno).
+      if (e.origin !== window.location.origin) return
+      if (e.source !== iframeRef.current?.contentWindow) return
       if (!e.data || e.data.source !== 'hmi-yal') return
       if (e.data.type === 'hmi:pipe-override-changed') {
         setOverridesCount(c => c + 1)
