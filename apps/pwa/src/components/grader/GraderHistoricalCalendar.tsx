@@ -5045,23 +5045,73 @@ export function GraderHistoricalCalendar({
                           </div>
                         )
                       })()}
-                      {/* Uso real por máquina */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                        {machines.map((m) => (
-                          <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium text-foreground/85">{m.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')}</span>
-                              <span className="font-mono tabular-nums text-emerald-400">{(m.cascade.usoReal * 100).toFixed(0)}%</span>
-                            </div>
-                            <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
-                              <div className="h-full rounded-full bg-emerald-500/60" style={{ width: `${Math.min(100, m.cascade.usoReal * 100)}%` }} />
-                            </div>
-                            <div className="mt-1 text-[9px] text-muted-foreground tabular-nums">
-                              {fmtSecPanoramic(m.cascade.produccionSec)} de {fmtSecPanoramic(m.cascade.techoSec)} de techo
+                      {/* Desglose por máquina — REACTIVO al grupo seleccionado
+                          arriba (Orel 2026-07-23: "que las 3 Ev se muestren
+                          según lo que se seleccione"). Sin filtro (o filtro
+                          "Planificado", que no tiene costo en piezas) muestra
+                          el uso real de siempre; con un grupo de pérdida
+                          (Externo/Mantención/Sin clasif.) muestra CUÁNTO aportó
+                          cada Baader a ESE grupo — % = participación dentro del
+                          grupo (las 3 suman ~100%, responde "qué Baader tira
+                          más para abajo"), y abajo el tiempo absoluto + qué
+                          fracción es de SU PROPIO techo (o turno, si es
+                          planificado). El dato ya existía por máquina
+                          (m.cascade.<bucket>Sec); solo faltaba mostrarlo. */}
+                      {(() => {
+                        const activeBucket = cascadaFilter === 'all' ? null : cascadaFilter
+                        const bucketSecOf = (c: typeof machines[number]['cascade']) => {
+                          switch (activeBucket) {
+                            case 'externo':        return c.externoSec
+                            case 'mantencion':      return c.mantencionSec
+                            case 'sin-clasificar':  return c.sinClasificarSec
+                            case 'planificado':     return c.planificadoSec
+                            default:                return c.produccionSec
+                          }
+                        }
+                        const groupTotalSec = machines.reduce((a, m) => a + bucketSecOf(m.cascade), 0)
+                        const theme = activeBucket == null
+                          ? { bar: 'bg-emerald-500/60', text: 'text-emerald-400' }
+                          : activeBucket === 'externo'
+                          ? { bar: 'bg-amber-500/60', text: 'text-amber-400' }
+                          : activeBucket === 'mantencion'
+                          ? { bar: 'bg-rose-500/60', text: 'text-rose-400' }
+                          : activeBucket === 'sin-clasificar'
+                          ? { bar: 'bg-violet-500/60', text: 'text-violet-400' }
+                          : { bar: 'bg-slate-500/60', text: 'text-muted-foreground' }
+                        const groupLabel = activeBucket == null ? 'Uso real por máquina' : `${LOSS_BUCKET_META[activeBucket].label} por máquina`
+                        return (
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{groupLabel}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                              {machines.map((m) => {
+                                const sec = bucketSecOf(m.cascade)
+                                const shareOfGroup = groupTotalSec > 0 ? (sec / groupTotalSec) * 100 : 0
+                                // Denominador propio: techo de la máquina, salvo
+                                // Planificado (que vive FUERA del techo) → su turno.
+                                const ownDenomSec = activeBucket === 'planificado' ? m.cascade.techoSec + m.cascade.planificadoSec : m.cascade.techoSec
+                                const pctOfOwnDenom = ownDenomSec > 0 ? (sec / ownDenomSec) * 100 : 0
+                                const bigPct = activeBucket == null ? m.cascade.usoReal * 100 : shareOfGroup
+                                return (
+                                  <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium text-foreground/85">{m.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')}</span>
+                                      <span className={cn('font-mono tabular-nums', theme.text)}>{bigPct.toFixed(0)}%</span>
+                                    </div>
+                                    <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
+                                      <div className={cn('h-full rounded-full', theme.bar)} style={{ width: `${Math.min(100, bigPct)}%` }} />
+                                    </div>
+                                    <div className="mt-1 text-[9px] text-muted-foreground tabular-nums">
+                                      {activeBucket == null
+                                        ? `${fmtSecPanoramic(m.cascade.produccionSec)} de ${fmtSecPanoramic(m.cascade.techoSec)} de techo`
+                                        : `${fmtSecPanoramic(sec)} · ${pctOfOwnDenom.toFixed(0)}% de ${activeBucket === 'planificado' ? 'su turno' : 'su techo'}`}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        )
+                      })()}
                       {/* Piezas perdidas por causal — SOLO buckets que restan del
                           techo (externo/mantención/sin clasificar). Lo planificado
                           (colación, ejercicio) se descuenta ANTES del techo: sus
