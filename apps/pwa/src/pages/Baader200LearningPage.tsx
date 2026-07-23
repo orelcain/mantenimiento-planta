@@ -73,6 +73,12 @@ export function Baader200LearningPage() {
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
+      // Mismo patrón que PlanosAguasPage.tsx: solo aceptar mensajes del propio
+      // iframe same-origin — antes cualquier ventana con referencia a esta
+      // pestaña (ej. si se abrió vía window.open desde otro sitio) podía
+      // disparar b200:save-section/delete-section con la sesión del usuario.
+      if (event.origin !== window.location.origin) return
+      if (event.source !== iframeRef.current?.contentWindow) return
       if (!event.data || typeof event.data.type !== 'string') return
       if (!event.data.type.startsWith('b200:')) return
       const { type } = event.data

@@ -78,6 +78,10 @@ export function HmiGraderPage() {
   // ── Puente postMessage ──────────────────────────────────────────────────
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
+      // Mismo patrón que PlanosAguasPage.tsx: solo aceptar mensajes del propio
+      // iframe same-origin (defensa contra postMessage de un opener ajeno).
+      if (event.origin !== window.location.origin) return
+      if (event.source !== iframeRef.current?.contentWindow) return
       if (!event.data || typeof event.data.type !== 'string') return
       if (!event.data.type.startsWith('hmi:')) return
       const { type } = event.data
