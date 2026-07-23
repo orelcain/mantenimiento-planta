@@ -1200,6 +1200,93 @@ exports.geminiProxy = onCall(
   }
 )
 
+// ==================== GEMINI VISION PROXY ====================
+// Análisis de fotos (ChatBot.tsx → ai.ts:callGeminiVision) — el cliente
+// descarga las imágenes de Storage y las manda en base64 (no requiere la
+// key), este proxy es quien tiene la GEMINI_API_KEY real. Antes la key vivía
+// en el bundle del cliente (VITE_GEMINI_API_KEY); quedó en blanco en un
+// hardening previo y la feature de análisis de fotos quedó rota en silencio
+// — este proxy la repara completando la migración a Cloud Functions.
+exports.geminiVisionProxy = onCall(
+  {
+    secrets: ['GEMINI_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 10,
+    timeoutSeconds: 60,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la IA')
+    }
+
+    const { imageParts, prompt, model, temperature, max_tokens, thinkingBudget } = request.data
+
+    if (!Array.isArray(imageParts) || imageParts.length === 0) {
+      throw new Error('Se requiere al menos una imagen')
+    }
+    if (imageParts.length > 3) {
+      throw new Error('Máximo 3 imágenes por análisis')
+    }
+    for (const p of imageParts) {
+      if (!p || typeof p.mimeType !== 'string' || typeof p.data !== 'string' || p.data.length > 8_000_000) {
+        throw new Error('Imagen inválida o demasiado grande')
+      }
+    }
+    if (typeof prompt !== 'string' || prompt.length === 0 || prompt.length > 4000) {
+      throw new Error('Prompt inválido')
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      logger.error('GEMINI_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio Gemini no configurado')
+    }
+
+    const geminiModel = model || 'gemini-2.5-flash'
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
+
+    const generationConfig = {
+      temperature: temperature ?? 0.3,
+      maxOutputTokens: max_tokens || 1024,
+    }
+    if (thinkingBudget && thinkingBudget > 0) {
+      generationConfig.thinkingConfig = { thinkingBudget }
+    }
+
+    const body = {
+      contents: [{
+        parts: [
+          ...imageParts.map(p => ({ inlineData: { mimeType: p.mimeType, data: p.data } })),
+          { text: prompt },
+        ],
+      }],
+      generationConfig,
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Referer: GEMINI_KEY_REFERER },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Gemini Vision API error', { status: response.status, body: errorText })
+        throw upstreamHttpsError('Gemini', response.status)
+      }
+
+      const data = await response.json()
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      return { content: text, usage: data.usageMetadata }
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      logger.error('Gemini Vision proxy error:', error)
+      throw new HttpsError('internal', 'Gemini Vision: error interno del proxy')
+    }
+  }
+)
+
 // ==================== DEEPSEEK PROXY ====================
 
 exports.deepseekProxy = onCall(
@@ -3014,6 +3101,74 @@ async function ariaTts(text) {
   const d = await r.json()
   return Buffer.from(d.audioContent, 'base64')
 }
+
+// ==================== GOOGLE TTS PROXY (voz de ARIA en la PWA) ====================
+// El navegador llamaba a texttospeech.googleapis.com directo con
+// VITE_GOOGLE_TTS_API_KEY en la query string (?key=...) — visible en
+// DevTools/Network y en el historial. Reusa el MISMO mecanismo que ya
+// funciona en prod para las notas de voz de Telegram (ariaGetGcpToken(): el
+// token OAuth de la propia service account de la Cloud Function, SIN
+// ninguna API key) en vez de crear un secreto nuevo.
+// Espejo server-side de ARIA_VOICE_OPTIONS en apps/pwa/src/lib/ariaVoice.ts
+// (sin el prefijo "gcloud:", que el cliente ya recorta antes de llamar).
+// Actualizar ambas listas juntas si Orel cura una voz nueva.
+const TTS_ALLOWED_VOICES = new Set(['es-US-Chirp-HD-F', 'es-US-Neural2-A'])
+
+exports.googleTtsProxy = onCall(
+  { enforceAppCheck: false, maxInstances: 10, timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la voz de ARIA')
+    }
+    const { action } = request.data || {}
+    const token = await ariaGetGcpToken()
+
+    if (action === 'voices') {
+      const r = await fetch('https://texttospeech.googleapis.com/v1/voices', {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(4000),
+      })
+      if (!r.ok) throw new HttpsError('internal', `TTS voices ${r.status}`)
+      const d = await r.json()
+      return { voices: d.voices || [] }
+    }
+
+    if (action === 'synthesize') {
+      const { text, voiceName, rate } = request.data
+      if (typeof text !== 'string' || text.length === 0 || text.length > 2000) {
+        throw new Error('Texto inválido')
+      }
+      // Allowlist: solo las voces curadas de ARIA_VOICE_OPTIONS (no cualquier
+      // voz del catálogo Google) — evita abusar el proxy como TTS genérico gratis.
+      if (typeof voiceName !== 'string' || !TTS_ALLOWED_VOICES.has(voiceName)) {
+        throw new Error('Voz no permitida')
+      }
+      const languageMatch = voiceName.match(/^([a-z]{2}-[A-Z]{2})/)
+      const languageCode = (languageMatch && languageMatch[1]) || 'es-US'
+      const speakingRate = Math.max(0.5, Math.min(2, Number(rate) || 1))
+
+      const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text },
+          voice: { languageCode, name: voiceName },
+          audioConfig: { audioEncoding: 'MP3', speakingRate },
+        }),
+      })
+      if (!r.ok) {
+        const errText = await r.text().catch(() => '')
+        logger.error('googleTtsProxy synthesize error', { status: r.status, body: errText })
+        throw upstreamHttpsError('GoogleTTS', r.status)
+      }
+      const d = await r.json()
+      if (!d.audioContent) throw new HttpsError('internal', 'TTS: respuesta vacía')
+      return { audioContent: d.audioContent }
+    }
+
+    throw new Error(`action inválida: ${action}`)
+  }
+)
 
 /** Envía una nota de voz a Telegram (multipart) */
 async function sendTelegramVoice(chatId, buffer, opts = {}) {
@@ -6311,6 +6466,19 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
   await db.doc('system/shoplogixCredentials').delete()
   return { ok: true }
 })
+
+// Password de OTA (ArduinoOTA) de los ESP32 de sensores — antes vivía en
+// VITE_OTA_PASSWORD, horneada en el bundle público de la PWA y visible en
+// la ruta /sensors SIN ni siquiera exigir rol admin. Ahora solo se entrega
+// bajo demanda a un caller admin verificado server-side (mismo patrón que
+// las credenciales de Shoplogix).
+exports.getOtaPasswordProxy = onCall(
+  { region: 'us-central1', secrets: ['OTA_PASSWORD'] },
+  async (request) => {
+    await _assertAdminCaller(request)
+    return { password: process.env.OTA_PASSWORD || '' }
+  }
+)
 
 /**
  * Trigger manual de sync Shoplogix — llamado desde el botón "Actualizar ahora"

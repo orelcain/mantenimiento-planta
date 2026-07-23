@@ -30,7 +30,6 @@ import {
   XCircle,
   ArrowRightLeft,
   Radio,
-  Key,
   Brain,
   TrendingUp,
   MessageSquare,
@@ -150,7 +149,6 @@ export function MissionControlPanel() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({})
   const [learningStats, setLearningStats] = useState<LearningStats | null>(null)
 
   const loadData = useCallback(async () => {
@@ -163,10 +161,6 @@ export function MissionControlPanel() {
       setConfig(cfg)
       setAgents(getAllAgents())
       setLearningStats(lStats)
-      // Init key inputs from config
-      if (cfg.providerKeys) {
-        setKeyInputs(prev => ({ ...cfg.providerKeys, ...prev }))
-      }
       // Merge memory logs + firestore logs, dedup by id
       const memoryLogs = getMissionLogs(100)
       const allLogs = [...memoryLogs, ...todayLogs]
@@ -220,26 +214,6 @@ export function MissionControlPanel() {
       toast({ title: enabled ? 'Agente habilitado' : 'Agente deshabilitado' })
     } catch {
       toast({ title: 'Error', variant: 'destructive' })
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleSaveApiKey = async (provider: string) => {
-    const key = keyInputs[provider]?.trim()
-    if (!key) return
-    const newConfig: AgentsConfig = {
-      ...config,
-      providerKeys: { ...config.providerKeys, [provider]: key },
-    }
-    setConfig(newConfig)
-    setIsSaving(true)
-    try {
-      await saveAgentsConfig(newConfig, user?.id || '')
-      setAgents(getAllAgents())
-      toast({ title: `API key de ${provider} guardada`, description: 'El agente debería activarse automáticamente' })
-    } catch {
-      toast({ title: 'Error al guardar key', variant: 'destructive' })
     } finally {
       setIsSaving(false)
     }
@@ -634,54 +608,6 @@ export function MissionControlPanel() {
               <Spinner className="h-4 w-4" />
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* ─── API Keys (admin) — original ─── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Key className="h-4 w-4" />
-            API Keys de Proveedores
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-[11px] text-muted-foreground">
-            Si las env vars del build no incluyen una API key, puedes agregarla aquí. Las keys se guardan cifradas en Firestore.
-          </p>
-          {(['deepseek', 'groq', 'gemini'] as const).map(provider => {
-            const providerLabel: Record<string, string> = { deepseek: 'DeepSeek', groq: 'Groq (Qwen/Llama)', gemini: 'Gemini (Google)' }
-            const envVar: Record<string, string> = { deepseek: 'VITE_DEEPSEEK_API_KEY', groq: 'VITE_GROQ_API_KEY', gemini: 'VITE_GEMINI_API_KEY' }
-            const hasSavedKey = !!config.providerKeys?.[provider]
-            return (
-              <div key={provider} className="flex items-center gap-2">
-                <div className="w-32 shrink-0">
-                  <div className="text-xs font-medium">{providerLabel[provider]}</div>
-                  <div className="text-[9px] text-muted-foreground">{envVar[provider]}</div>
-                </div>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  placeholder={hasSavedKey ? '••••••••••• (guardada)' : 'Pegar API key...'}
-                  value={keyInputs[provider] || ''}
-                  onChange={e => setKeyInputs(prev => ({ ...prev, [provider]: e.target.value }))}
-                  className="flex-1 text-xs px-2 py-1.5 rounded-md border border-border bg-background focus:ring-1 focus:ring-primary/50 focus:outline-none"
-                />
-                <Button
-                  size="sm"
-                  variant={hasSavedKey ? 'outline' : 'default'}
-                  onClick={() => handleSaveApiKey(provider)}
-                  disabled={isSaving || !keyInputs[provider]?.trim()}
-                  className="text-xs h-7 px-3"
-                >
-                  {hasSavedKey ? 'Actualizar' : 'Guardar'}
-                </Button>
-                {hasSavedKey && (
-                  <span className="text-green-500 text-[10px]">✓</span>
-                )}
-              </div>
-            )
-          })}
         </CardContent>
       </Card>
 
