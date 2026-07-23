@@ -125,7 +125,11 @@ export function PredictivePage() {
   const [testTempSlope, setTestTempSlope] = useState(0.2)
   const [testHumSlope, setTestHumSlope] = useState(0.3)
 
-  const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
+  // La IA ya no depende de una key embebida en el cliente — siempre pasa por
+  // el proxy de Cloud Functions (groqProxy). Antes esta constante leía
+  // import.meta.env.VITE_GROQ_API_KEY, lo que horneaba la key real en el
+  // bundle público solo para calcular este booleano.
+  const hasGroqKey = true
 
   const equipmentWithSensorIds = useMemo(() => {
     const ids = new Set<string>()

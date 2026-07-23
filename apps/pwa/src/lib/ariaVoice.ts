@@ -18,11 +18,20 @@ export interface VoicePref {
 export const PIPER_SERVER = 'http://localhost:8008'
 const PIPER_PREFIX = 'piper:'
 const GCLOUD_PREFIX = 'gcloud:'
-// Clave para Google Cloud TTS (reusa la de Gemini si no hay una dedicada).
-const GOOGLE_TTS_KEY =
-  (import.meta.env.VITE_GOOGLE_TTS_API_KEY as string | undefined) ||
-  (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) ||
-  ''
+
+// Google Cloud TTS ya NO usa API key en el cliente (antes iba en ?key= de la
+// URL, visible en DevTools/Network e historial) — pasa por googleTtsProxy
+// (Cloud Function), que reusa el token OAuth de su propia service account
+// (mismo mecanismo que ya funciona en prod para las notas de voz de Telegram).
+let ttsProxyFn: ((data: unknown) => Promise<{ data: unknown }>) | null = null
+async function getTtsProxy() {
+  if (ttsProxyFn) return ttsProxyFn
+  const { httpsCallable, getFunctions } = await import('firebase/functions')
+  const { default: app } = await import('@/services/firebase')
+  const functions = getFunctions(app)
+  ttsProxyFn = httpsCallable(functions, 'googleTtsProxy') as unknown as (data: unknown) => Promise<{ data: unknown }>
+  return ttsProxyFn
+}
 
 let pref: VoicePref = { rate: 1.0 }
 let currentAudio: HTMLAudioElement | null = null
@@ -95,12 +104,12 @@ export async function loadVoicePref(): Promise<VoicePref> {
   }
   // Preferencia automática de motor cuando el admin no eligió uno cloud/local:
   //   1) Chatterbox local (la voz elegida de ARIA) si su server está arriba
-  //   2) Google Cloud neuronal por defecto (Chirp-HD-F @ 0.96) si hay key
-  //   3) (si no) voz del navegador
+  //   2) Google Cloud neuronal por defecto (Chirp-HD-F @ 0.96) — vía Cloud
+  //      Function (googleTtsProxy), ya no depende de una key en el cliente
   if (!isGcloudVoice(pref.voiceURI) && !isPiperVoice(pref.voiceURI) && !isChatterboxVoice(pref.voiceURI)) {
     if (await isChatterboxUp()) {
       pref.voiceURI = CHATTERBOX_PREFIX + 'local'
-    } else if (GOOGLE_TTS_KEY) {
+    } else {
       pref.voiceURI = DEFAULT_GCLOUD_VOICE
       // Aplicar la velocidad por defecto de la voz elegida, salvo que el admin haya fijado una.
       if (!rateFromConfig) pref.rate = DEFAULT_GCLOUD_RATE
@@ -194,26 +203,17 @@ export function isPiperVoice(uri?: string): boolean {
 interface GVoice { name: string; languageCodes: string[]; ssmlGender: string }
 let gcloudCache: { uri: string; label: string }[] | null = null
 
-function gLang(name: string): string {
-  const m = name.match(/^([a-z]{2}-[A-Z]{2})/)
-  return (m && m[1]) || 'es-US'
-}
-
 /**
  * Voces Google ofrecidas en el selector: solo las CURADAS (ARIA_VOICE_OPTIONS),
- * confirmando contra la API que existen (si la key no sirve → []). El resto del
+ * confirmando contra la API que existen (si el proxy falla → []). El resto del
  * catálogo Google se dejó fuera a propósito para no saturar el selector.
  */
 export async function getGoogleVoices(): Promise<{ uri: string; label: string }[]> {
   if (gcloudCache) return gcloudCache
-  if (!GOOGLE_TTS_KEY) return []
   try {
-    const r = await fetch(
-      `https://texttospeech.googleapis.com/v1/voices?key=${GOOGLE_TTS_KEY}`,
-      { signal: AbortSignal.timeout(4000) },
-    )
-    if (!r.ok) return []
-    const d = (await r.json()) as { voices?: GVoice[] }
+    const proxy = await getTtsProxy()
+    const result = await proxy({ action: 'voices' })
+    const d = result.data as { voices?: GVoice[] }
     const available = new Set((d.voices || []).map((v) => GCLOUD_PREFIX + v.name))
     gcloudCache = ARIA_VOICE_OPTIONS
       .filter((o) => available.has(o.uri))
@@ -248,17 +248,14 @@ function b64ToBlobUrl(b64: string, mime: string): string {
 /** Fetcher de Google Cloud TTS: sintetiza UNA frase y devuelve su Blob URL. */
 function googleFetcher(voiceName: string, rate: number): AudioFetcher {
   return async (sentence: string) => {
-    const body = {
-      input: { text: sentence },
-      voice: { languageCode: gLang(voiceName), name: voiceName },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: Math.max(0.5, Math.min(2, rate)) },
-    }
-    const r = await fetch(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-    )
-    if (!r.ok) throw new Error(`google tts ${r.status}`)
-    const d = (await r.json()) as { audioContent?: string }
+    const proxy = await getTtsProxy()
+    const result = await proxy({
+      action: 'synthesize',
+      text: sentence,
+      voiceName,
+      rate: Math.max(0.5, Math.min(2, rate)),
+    })
+    const d = result.data as { audioContent?: string }
     if (!d.audioContent) throw new Error('google tts vacío')
     return b64ToBlobUrl(d.audioContent, 'audio/mp3')
   }
@@ -390,8 +387,7 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
     const chatterbox = httpGetFetcher((s) => `${CHATTERBOX_SERVER}/tts?text=${encodeURIComponent(s)}`)
     // Si el server local cayó (1ª frase falla), no quedarse mudo: caer a la voz de Google.
     void playChunks(sentences, chatterbox, wrapped, () => {
-      if (GOOGLE_TTS_KEY) void playChunks(sentences, googleFetcher(DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r), wrapped)
-      else wrapped.onerror?.()
+      void playChunks(sentences, googleFetcher(DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r), wrapped)
     })
     return
   }

@@ -241,7 +241,26 @@ export function SensorsPage() {
 
   const otaHostname = selectedDevice?.deviceId ? `esp32-${selectedDevice.deviceId.slice(-6)}` : ''
   const otaHostLabel = otaHostname ? `${otaHostname}.local` : ''
-  const otaPassword = import.meta.env.VITE_OTA_PASSWORD || ''
+  // La password OTA de los ESP32 ya NO se embebe en el bundle (VITE_OTA_PASSWORD
+  // horneaba la password real en el JS público, visible a cualquier usuario
+  // autenticado en /sensors, sin ni siquiera exigir rol admin). Ahora se pide
+  // bajo demanda a getOtaPasswordProxy, que verifica rol admin server-side.
+  const [otaPassword, setOtaPassword] = useState('')
+  const [otaPasswordState, setOtaPasswordState] = useState<'idle' | 'loading' | 'error' | 'ok'>('idle')
+  const fetchOtaPassword = async () => {
+    setOtaPasswordState('loading')
+    try {
+      const { httpsCallable, getFunctions } = await import('firebase/functions')
+      const { default: app } = await import('@/services/firebase')
+      const proxy = httpsCallable(getFunctions(app), 'getOtaPasswordProxy')
+      const result = await proxy({})
+      const data = result.data as { password?: string }
+      setOtaPassword(data.password || '')
+      setOtaPasswordState('ok')
+    } catch {
+      setOtaPasswordState('error')
+    }
+  }
 
   const getRssiQuality = (rssi: number | undefined, online: boolean | undefined) => {
     if (!online) return 'Sin señal'
@@ -2265,20 +2284,36 @@ export function SensorsPage() {
                       </div>
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs text-muted-foreground">Contraseña OTA:</div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-sm font-medium">{otaPassword}</span>
+                        {otaPasswordState === 'idle' && (
                           <button
-                            onClick={() => copyToClipboard(otaPassword, 'otaPassword')}
-                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
-                            title="Copiar contraseña OTA"
+                            onClick={fetchOtaPassword}
+                            className="text-xs px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                           >
-                            {copiedField === 'otaPassword' ? (
-                              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
-                            ) : (
-                              <Copy className="h-3 w-3 text-muted-foreground" />
-                            )}
+                            Mostrar (solo admin)
                           </button>
-                        </div>
+                        )}
+                        {otaPasswordState === 'loading' && (
+                          <span className="text-xs text-muted-foreground">Cargando…</span>
+                        )}
+                        {otaPasswordState === 'error' && (
+                          <span className="text-xs text-red-600 dark:text-red-400">Solo administradores</span>
+                        )}
+                        {otaPasswordState === 'ok' && (
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm font-medium">{otaPassword}</span>
+                            <button
+                              onClick={() => copyToClipboard(otaPassword, 'otaPassword')}
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              title="Copiar contraseña OTA"
+                            >
+                              {copiedField === 'otaPassword' ? (
+                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              ) : (
+                                <Copy className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Usa mDNS: {otaHostLabel || 'esp32-XXXXXX.local'}

@@ -13,25 +13,10 @@ export class RateLimitError extends Error {
   }
 }
 
-/** Parsea Retry-After header (segundos o fecha) y devuelve ms a esperar */
-function parseRetryAfter(response: Response): number {
-  const header = response.headers.get('Retry-After') || response.headers.get('retry-after')
-  if (!header) return 60_000 // default 60s
-  const secs = Number(header)
-  if (!isNaN(secs)) return Math.max(secs * 1000, 5_000)
-  const date = Date.parse(header)
-  if (!isNaN(date)) return Math.max(date - Date.now(), 5_000)
-  return 60_000
-}
-
 // Modelo por defecto (usado como parámetro a Cloud Functions, no para llamadas directas)
 const MODEL = 'llama-3.3-70b-versatile'
 
-// Las API keys ya NO se usan en el cliente — todo pasa por Cloud Functions
-// Estas constantes se mantienen SOLO para referencia interna (convertToGeminiFormat, etc.)
-const GEMINI_API_KEY = '' // BLOQUEADO: usar Cloud Function geminiProxy
-const GEMINI_MODEL = 'gemini-2.5-flash'
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`
+// Las API keys ya NO se usan en el cliente — todo pasa por Cloud Functions.
 
 // Cloud Functions siempre disponibles si están deployadas
 export const isAIConfigured = () => true
@@ -189,10 +174,11 @@ export async function callGeminiVision(
   prompt: string,
   opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
-
-  // Descargar imágenes y convertir a base64
-  const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = []
+  // Descargar imágenes en el CLIENTE (son URLs de Storage, no requieren la
+  // API key) y convertir a base64 — solo el análisis en sí pasa por el
+  // proxy (geminiVisionProxy), que es quien tiene la key real (secret de
+  // Cloud Functions, nunca llega al browser).
+  const imageParts: Array<{ mimeType: string; data: string }> = []
   for (const url of imageUrls.slice(0, 3)) {
     try {
       const resp = await fetch(url)
@@ -202,7 +188,7 @@ export async function callGeminiVision(
       const base64 = btoa(
         new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       )
-      imageParts.push({ inlineData: { mimeType, data: base64 } })
+      imageParts.push({ mimeType, data: base64 })
     } catch {
       // Skip failed image downloads
     }
@@ -212,45 +198,28 @@ export async function callGeminiVision(
     return { content: 'No se pudieron cargar las imágenes para análisis.', tokens: 0 }
   }
 
-  const generationConfigVision: Record<string, unknown> = {
-    temperature: opts?.temperature ?? 0.3,
-    maxOutputTokens: opts?.max_tokens || 1024,
-  }
-  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
-    generationConfigVision.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
-  }
+  try {
+    const { getFunctions } = await import('firebase/functions')
+    const { default: app } = await import('@/services/firebase')
+    const functions = getFunctions(app)
+    const geminiVisionProxyFn = httpsCallable(functions, 'geminiVisionProxy')
 
-  const body = {
-    contents: [{
-      parts: [
-        ...imageParts,
-        { text: prompt },
-      ],
-    }],
-    generationConfig: generationConfigVision,
-  }
-
-  const response = await fetch(
-    `${GEMINI_API_URL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  )
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
+    const result = await geminiVisionProxyFn({
+      imageParts,
+      prompt,
+      temperature: opts?.temperature ?? 0.3,
+      max_tokens: opts?.max_tokens || 1024,
+      thinkingBudget: opts?.thinkingBudget,
+    })
+    const data = result.data as { content: string; usage?: { totalTokenCount?: number } }
+    return { content: data.content, tokens: data.usage?.totalTokenCount || 0 }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('not-found') || msg.includes('NOT_FOUND')) {
+      throw new Error('Gemini Vision no disponible: Cloud Function geminiVisionProxy no desplegada.')
     }
-    const errText = await response.text().catch(() => '')
-    throw new Error(`Gemini Vision error: ${response.status} ${errText.slice(0, 200)}`)
+    throw err
   }
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const tokens = data.usageMetadata?.totalTokenCount || 0
-  return { content: text, tokens }
 }
 
 /**
