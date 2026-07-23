@@ -6471,9 +6471,11 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
 // VITE_OTA_PASSWORD, horneada en el bundle público de la PWA y visible en
 // la ruta /sensors SIN ni siquiera exigir rol admin. Ahora solo se entrega
 // bajo demanda a un caller admin verificado server-side (mismo patrón que
-// las credenciales de Shoplogix).
+// las credenciales de Shoplogix). NO usa Secret Manager (`secrets:`) — como
+// ADMIN_SETUP_KEY/TELEGRAM_WEBHOOK_SECRET, viene de FUNCTIONS_ENV (GitHub
+// secret) → functions/.env en cada deploy; agregar OTA_PASSWORD=... ahí.
 exports.getOtaPasswordProxy = onCall(
-  { region: 'us-central1', secrets: ['OTA_PASSWORD'] },
+  { region: 'us-central1' },
   async (request) => {
     await _assertAdminCaller(request)
     return { password: process.env.OTA_PASSWORD || '' }
