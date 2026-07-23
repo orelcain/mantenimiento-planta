@@ -86,6 +86,18 @@ export interface TimelineSyncValue {
   highlightRanges: TimelineRange[]
   setHighlightRanges: (next: TimelineRange[]) => void
   /**
+   * Filtro de GRUPO activo en la Cascada del turno (Externo/Mantención/etc.).
+   * A diferencia de `highlightRanges` (ventana de tiempo, cruza máquinas a
+   * propósito para comparar comportamiento), esto resalta por CAUSAL REAL de
+   * cada barra en cada Gantt — evita marcar de más una barra de otra máquina
+   * que solo coincide en horario pero es un estado distinto (ej. producción)
+   * (bug real reportado por Orel 2026-07-23: filtrar "Externo" y ver tramos
+   * de Ev2/Ev3 marcados que no eran FALTA MMPP). `string` en vez de importar
+   * el tipo LossBucket acá — este archivo es infraestructura genérica.
+   */
+  highlightBucket: string | null
+  setHighlightBucket: (next: string | null) => void
+  /**
    * Si viene definido, SOLO esa máquina se muestra en el panel upstream — las
    * otras 2 Baader se ocultan (no solo se dejan de resaltar). Se activa junto
    * con el filtro fino "Ev1/Ev2/Ev3 dentro de una causal" de la Cascada del
@@ -112,6 +124,7 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
   const [lotChanges, setLotChangesState] = useState<LotChange[]>([])
   const [highlightRanges, setHighlightRangesState] = useState<TimelineRange[]>([])
   const [isolatedMachineId, setIsolatedMachineIdState] = useState<string | null>(null)
+  const [highlightBucket, setHighlightBucketState] = useState<string | null>(null)
 
   // setRange es estable (useCallback) para evitar re-renders cascada en
   // consumidores que sólo dependen del setter.
@@ -169,13 +182,18 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
     setIsolatedMachineIdState((prev) => (prev === next ? prev : next))
   }, [])
 
+  const setHighlightBucket = useCallback((next: string | null) => {
+    setHighlightBucketState((prev) => (prev === next ? prev : next))
+  }, [])
+
   const value = useMemo<TimelineSyncValue>(
     () => ({
       range, setRange, hover, setHover, lotChanges, setLotChanges,
-      highlightRanges, setHighlightRanges, isolatedMachineId, setIsolatedMachineId,
+      highlightRanges, setHighlightRanges, highlightBucket, setHighlightBucket,
+      isolatedMachineId, setIsolatedMachineId,
       connectGroupId: groupId,
     }),
-    [range, setRange, hover, setHover, lotChanges, setLotChanges, highlightRanges, setHighlightRanges, isolatedMachineId, setIsolatedMachineId, groupId],
+    [range, setRange, hover, setHover, lotChanges, setLotChanges, highlightRanges, setHighlightRanges, highlightBucket, setHighlightBucket, isolatedMachineId, setIsolatedMachineId, groupId],
   )
 
   return <TimelineSyncContext.Provider value={value}>{children}</TimelineSyncContext.Provider>

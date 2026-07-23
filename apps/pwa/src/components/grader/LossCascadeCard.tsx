@@ -95,25 +95,34 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
           .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime(), machineId: targetMachine.machineid }))
         : []
       timelineSync.setHighlightRanges(ranges)
+      timelineSync.setHighlightBucket(null)
       // Aísla la Baader filtrada en el panel: las otras 2 se ocultan (no solo
       // se dejan de resaltar) para verla sin bajar con scroll (Orel 2026-07-23).
       timelineSync.setIsolatedMachineId(targetMachine?.machineid ?? null)
     } else if (filter === 'all') {
       timelineSync.setHighlightRanges([])
+      timelineSync.setHighlightBucket(null)
       timelineSync.setIsolatedMachineId(null)
     } else {
+      // Filtro de GRUPO (Externo/Mantención/etc.): el chart upstream usa la
+      // ventana de tiempo (ranges, cruza máquinas a propósito). Los Gantts
+      // usan `highlightBucket` — cada barra se resalta según SU PROPIA causal
+      // real, no por coincidir de horario con el evento de otra máquina (bug
+      // reportado por Orel: Ev2/Ev3 marcaban tramos que no eran FALTA MMPP).
       const ranges = machines.flatMap((m) =>
         m.states
           .filter((s) => classifyLossState(s) === filter)
           .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })),
       )
       timelineSync.setHighlightRanges(ranges)
+      timelineSync.setHighlightBucket(filter)
       timelineSync.setIsolatedMachineId(null)
     }
     // Al desmontar (cambiar de turno) limpiar — evita que el resaltado de un
     // turno anterior "sangre" al siguiente si el usuario navega con el filtro activo.
     return () => {
       timelineSync.setHighlightRanges([])
+      timelineSync.setHighlightBucket(null)
       timelineSync.setIsolatedMachineId(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

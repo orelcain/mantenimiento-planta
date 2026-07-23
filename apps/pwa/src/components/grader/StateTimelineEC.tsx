@@ -22,6 +22,7 @@ import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
+import { classifyLossState } from '@/services/shoplogix/lossBuckets'
 
 interface Props {
   shift: UpstreamMachineShift
@@ -59,6 +60,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   }, [timelineSync?.range, windowStart, windowEnd, shift.shiftStart, shift.shiftEnd])
 
   const highlightRanges = timelineSync?.highlightRanges ?? []
+  const highlightBucket = timelineSync?.highlightBucket ?? null
 
   // ── Datos de la serie ───────────────────────────────────────────────────────
   const seriesData = useMemo(() => shift.states.map((st) => {
@@ -217,13 +219,22 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           // cae dentro de un highlightRange se dibuja con borde brillante grueso
           // — imposible de no ver, sea cual sea su color de estado.
           const stForHl = shift.states[params.dataIndex as number]
-          const isHighlighted = !!stForHl && highlightRanges.some(
-            (r) =>
-              stForHl.startAt.getTime() < r.endMs && stForHl.endAt.getTime() > r.startMs &&
-              // machineId presente → EXCLUSIVO de esa Baader (filtro fino de la
-              // Cascada del turno). undefined → aplica a todas (click individual
-              // o filtro por grupo completo, donde SÍ interesa comparar las 3).
-              (r.machineId === undefined || r.machineId === shift.machineid),
+          // Filtro de GRUPO activo (highlightBucket): resalta por CAUSAL REAL
+          // de ESTA barra — no por horario. Corrige el bug real reportado por
+          // Orel 2026-07-23: filtrar "Externo" marcaba en Ev2/Ev3 tramos que
+          // coincidían de horario con la FALTA MMPP de Ev1 pero eran otro
+          // estado (ej. producción) — el time-overlap no distinguía causal.
+          const isHighlighted = !!stForHl && (
+            highlightBucket !== null
+              ? classifyLossState(stForHl) === highlightBucket
+              : highlightRanges.some(
+                (r) =>
+                  stForHl.startAt.getTime() < r.endMs && stForHl.endAt.getTime() > r.startMs &&
+                  // machineId presente → EXCLUSIVO de esa Baader (filtro fino
+                  // Ev1/Ev2/Ev3 de la Cascada). undefined → aplica a todas
+                  // (click individual en un evento, para comparar las 3).
+                  (r.machineId === undefined || r.machineId === shift.machineid),
+              )
           )
           const rect = {
             type: 'rect' as const,
@@ -302,7 +313,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     ],
   // shift.states: renderItem lo lee directo (para la etiqueta de duración) además
   // de vía seriesData; se agrega explícito aunque cambie junto con seriesData.
-  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states, highlightRanges])
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states, highlightRanges, highlightBucket])
 
   // onEvents mínimo y estable: solo datazoom + click, sin mouse* que causarían re-bind
   const onEvents = useMemo(() => ({
