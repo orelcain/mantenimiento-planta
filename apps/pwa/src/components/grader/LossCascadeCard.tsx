@@ -19,9 +19,15 @@
  * NOTA vs `shiftRuntime` (uptime % actual): ese indicador incluye colación y
  * ejercicio en el denominador → castiga a la máquina por pausas de personas.
  * `usoReal` de esta cascada usa el techo (sin planificado): es el % honesto.
+ *
+ * Misma dinámica que la Cascada del mes (GraderHistoricalCalendar, pestaña
+ * panorámica): celdas ordenadas de mayor a menor, filtro por grupo (click),
+ * % sobre base común (turno completo) + % sobre techo en las pérdidas, y caja
+ * "¿cómo se calcula?" — pedido explícito de Orel 2026-07-22 de portar "las
+ * demás cualidades que tiene el de afuera del mes" a la cascada del turno.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cascadeFromStates, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
@@ -42,8 +48,23 @@ const BUCKET_COLOR: Record<string, string> = {
   'produccion':     'bg-emerald-500/75',
 }
 
+/** Persistido entre turnos: si el usuario colapsa la cascada, se queda así
+ *  hasta que la vuelva a abrir (pedido Orel: "que guarde el estado en que se
+ *  deja" en vez de recordarse cerrada/abierta solo dentro de este turno). */
+const EXPANDED_KEY = 'graderLossCascadeExpanded'
+
 export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[] }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem(EXPANDED_KEY)
+    return stored === null ? true : stored === '1'
+  })
+  useEffect(() => {
+    window.localStorage.setItem(EXPANDED_KEY, expanded ? '1' : '0')
+  }, [expanded])
+
+  const [filter, setFilter] = useState<'all' | LossBucket>('all')
+  const [calcOpen, setCalcOpen] = useState(false)
 
   const data = useMemo(() => {
     if (machines.length === 0) return null
@@ -69,14 +90,15 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
 
     // Piezas perdidas POR CAUSAL: duración de la causal en cada máquina × la
     // cadencia de esa máquina. Agrupadas por (bucket, reason) entre máquinas.
-    const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number }>()
+    const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number }>()
     for (const x of perMachine) {
       for (const item of x.cascade.items) {
         const label = item.reason || (item.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
         const key = `${item.bucket}__${label}`
-        const cur = lossByCause.get(key) ?? { bucket: item.bucket, label, sec: 0, piezas: 0 }
+        const cur = lossByCause.get(key) ?? { bucket: item.bucket, label, sec: 0, piezas: 0, count: 0 }
         cur.sec += item.durationSec
         cur.piezas += item.durationSec * x.cadencePzSec
+        cur.count += item.count
         lossByCause.set(key, cur)
       }
     }
@@ -92,25 +114,86 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
   const { totals, usoReal, piezasReales, piezasMax, causes } = data
   const turnoSec = totals.techoSec + totals.planificadoSec
   const pctOfTecho = (sec: number) => (totals.techoSec > 0 ? (sec / totals.techoSec) * 100 : 0)
+  const pctOfTurno = (sec: number) => (turnoSec > 0 ? (sec / turnoSec) * 100 : 0)
   const piezasPerdidas = Math.max(0, piezasMax - piezasReales)
+  // Uptime clásico derivado de las MISMAS horas de la cascada (no de un
+  // shiftRuntime promedio aparte) para que toda la aritmética del panel
+  // se pueda verificar a mano, sumando 100% sobre el turno.
+  const uptimeClasico = turnoSec > 0 ? (totals.produccionSec / turnoSec) * 100 : null
+
+  const lossCells: Array<{
+    id: LossBucket
+    label: string
+    sec: number
+    pct: string
+    pct2: string | null
+    bg: string; text: string; ringHover: string; ringActive: string
+    tip: string
+  }> = [
+    {
+      id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
+      pct: `${pctOfTurno(totals.externoSec).toFixed(1)}% del turno`,
+      pct2: `${pctOfTecho(totals.externoSec).toFixed(1)}% del techo`,
+      bg: 'bg-amber-500/10', text: 'text-amber-500',
+      ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
+      tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
+    },
+    {
+      id: 'planificado' as LossBucket, label: '− Planificado', sec: totals.planificadoSec,
+      pct: `${pctOfTurno(totals.planificadoSec).toFixed(1)}% del turno`,
+      pct2: null,
+      bg: 'bg-slate-500/10', text: 'text-muted-foreground',
+      ringHover: 'hover:ring-slate-400/40', ringActive: 'ring-1 ring-slate-400/70',
+      tip: 'Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina (fuera del techo). Click para ver sus eventos.',
+    },
+    {
+      id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
+      pct: `${pctOfTurno(totals.mantencionSec).toFixed(1)}% del turno`,
+      pct2: `${pctOfTecho(totals.mantencionSec).toFixed(1)}% del techo`,
+      bg: 'bg-rose-500/10', text: 'text-rose-400',
+      ringHover: 'hover:ring-rose-400/40', ringActive: 'ring-1 ring-rose-400/70',
+      tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
+    },
+    {
+      id: 'sin-clasificar' as LossBucket, label: '− Sin clasif.', sec: totals.sinClasificarSec,
+      pct: `${pctOfTurno(totals.sinClasificarSec).toFixed(1)}% del turno`,
+      pct2: `${pctOfTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
+      bg: 'bg-violet-500/10', text: 'text-violet-400',
+      ringHover: 'hover:ring-violet-400/40', ringActive: 'ring-1 ring-violet-400/70',
+      tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
+    },
+  ].sort((a, b) => b.sec - a.sec)
+
+  const filtered = filter === 'all' ? causes : causes.filter((c) => c.bucket === filter)
+  const techoCauses = filtered.filter((c) => c.bucket !== 'planificado')
+  const plannedCauses = filtered.filter((c) => c.bucket === 'planificado')
+  const filterMeta = filter === 'externo' || filter === 'mantencion' || filter === 'sin-clasificar'
+    ? LOSS_BUCKET_META[filter]
+    : null
+  const filterSec = filtered.reduce((a, c) => a + c.sec, 0)
+  const filterPz  = techoCauses.reduce((a, c) => a + c.piezas, 0)
 
   return (
-    <div className="mb-3 pb-3 border-b border-border/60">
+    <div className="mb-4 pb-4 border-b border-border/60">
+      {/* Header MÁS VISIBLE: antes se perdía como una línea gris más — ahora
+          card propia con borde e ícono a color, para que "se note que se puede
+          desplegar" (Orel 2026-07-22). */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 group"
+        className="w-full flex items-center gap-2 group rounded-md border border-sky-500/25 bg-sky-500/5 px-3 py-2 hover:bg-sky-500/10 transition-colors"
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-        <Scale className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-          Cascada del turno · ¿qué limitó la producción?
+          ? <ChevronDown className="w-4 h-4 text-sky-400 shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-sky-400 shrink-0" />}
+        <Scale className="w-4 h-4 text-sky-400 shrink-0" />
+        <span className="text-[13px] font-semibold text-foreground/90">
+          Cascada del turno
         </span>
+        <span className="text-[11px] text-muted-foreground hidden sm:inline">¿qué limitó la producción?</span>
         <span className="ml-auto flex items-center gap-3 text-[11px] tabular-nums">
           <span title="Uso real = tiempo produciendo / techo de máquina (descontada colación y pausas planificadas de personas). Es el uptime honesto — el % de uptime clásico castiga a la máquina por la colación.">
-            Uso real <b className="text-emerald-400">{(usoReal * 100).toFixed(0)}%</b>
+            Uso real <b className="text-emerald-400 text-sm">{(usoReal * 100).toFixed(0)}%</b>
           </span>
           <span title={`Piezas máximas teóricas del turno = techo de máquina × cadencia real demostrada por cada Baader en este turno.\nReales: ${piezasReales.toLocaleString('es-CL')} · Máx: ${piezasMax.toLocaleString('es-CL')}`}>
             <b>{piezasReales.toLocaleString('es-CL')}</b>
@@ -129,90 +212,160 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
 
       {expanded && (
         <div className="mt-2 space-y-2">
-          {/* Cascada numérica */}
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setCalcOpen((v) => !v)}
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded border transition-colors',
+                calcOpen ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+              )}
+            >
+              ¿cómo se calcula?
+            </button>
+          </div>
+          {calcOpen && (
+            <div className="rounded border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-[11px] space-y-1 font-mono tabular-nums">
+              <div>
+                <span className="text-muted-foreground">Turno (Σ máq) = tiempo rastreado por Shoplogix en el turno × 3 Baader (procesando + pausas + paros + setup; colación incluida hasta el paso siguiente) = </span>
+                <b>{fmtHm(turnoSec)}</b>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Techo de máquina = turno − planificado = </span>
+                {fmtHm(turnoSec)} − {fmtHm(totals.planificadoSec)} = <b className="text-sky-400">{fmtHm(totals.techoSec)}</b>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Uso real = procesando ÷ techo = </span>
+                {fmtHm(totals.produccionSec)} ÷ {fmtHm(totals.techoSec)} = <b className="text-emerald-400">{(usoReal * 100).toFixed(1)}%</b>
+              </div>
+              {uptimeClasico != null && (
+                <div>
+                  <span className="text-muted-foreground">Uptime clásico = procesando ÷ turno completo = </span>
+                  {fmtHm(totals.produccionSec)} ÷ {fmtHm(turnoSec)} = <b>{uptimeClasico.toFixed(1)}%</b>
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Piezas máx = techo de cada Baader × su cadencia real de este turno (piezas÷hora demostradas) = </span>
+                <b>{piezasMax.toLocaleString('es-CL')} pz</b>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Verificación (todo sobre el turno completo): </span>
+                {pctOfTurno(totals.produccionSec).toFixed(1)}% uso real + {pctOfTurno(totals.externoSec).toFixed(1)}% externo + {pctOfTurno(totals.planificadoSec).toFixed(1)}% planificado + {pctOfTurno(totals.mantencionSec).toFixed(1)}% mantención + {pctOfTurno(totals.sinClasificarSec).toFixed(1)}% sin clasif. = <b>{(pctOfTurno(totals.produccionSec) + pctOfTurno(totals.externoSec) + pctOfTurno(totals.planificadoSec) + pctOfTurno(totals.mantencionSec) + pctOfTurno(totals.sinClasificarSec)).toFixed(1)}%</b>
+              </div>
+            </div>
+          )}
+
+          {/* Cascada numérica ORDENADA de mayor a menor (niveles primero, luego
+              pérdidas por magnitud) — mismo criterio que la Cascada del mes.
+              Los grupos de pérdida son BOTONES: click filtra la lista abajo. */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-[11px]">
-            <div className="rounded bg-muted/40 px-2 py-1">
+            <div className="rounded bg-muted/40 px-2 py-1.5" title="Suma del tiempo rastreado por Shoplogix en el turno, de las 3 máquinas (procesando + pausas + paros + setup).">
               <div className="text-muted-foreground text-[9px] uppercase">Turno (Σ máq)</div>
               <div className="font-mono tabular-nums">{fmtHm(turnoSec)}</div>
+              <div className="text-[9px] text-muted-foreground/60">100%</div>
             </div>
-            <div className="rounded bg-slate-500/10 px-2 py-1" title="Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina.">
-              <div className="text-muted-foreground text-[9px] uppercase">− Planificado</div>
-              <div className="font-mono tabular-nums">{fmtHm(totals.planificadoSec)}</div>
-            </div>
-            <div className="rounded bg-sky-500/10 px-2 py-1" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir.">
+            <div className="rounded bg-sky-500/10 px-2 py-1.5" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir. Es un subtotal (no se suma con las demás celdas).">
               <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.techoSec)}</div>
+              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.techoSec).toFixed(1)}% del turno · subtotal</div>
             </div>
-            <div className="rounded bg-amber-500/10 px-2 py-1" title="Falta MMPP, cumplimiento de cuota, energía — la máquina estaba disponible pero el proceso no la alimentó. NO es pérdida de Mantención.">
-              <div className="text-amber-500 text-[9px] uppercase">− Externo</div>
-              <div className="font-mono tabular-nums">{fmtHm(totals.externoSec)}</div>
-            </div>
-            <div className="rounded bg-rose-500/10 px-2 py-1" title="Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir.">
-              <div className="text-rose-400 text-[9px] uppercase">− Mantención</div>
-              <div className="font-mono tabular-nums">{fmtHm(totals.mantencionSec)}</div>
-            </div>
-            <div className="rounded bg-emerald-500/10 px-2 py-1" title="Tiempo efectivamente produciendo (uptime).">
+            <div className="rounded bg-emerald-500/10 px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
               <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
+              <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.produccionSec).toFixed(1)}% del turno</div>
+              <div className="text-[9px] text-emerald-400/70 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
             </div>
+            {lossCells.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setFilter((f) => (f === c.id ? 'all' : c.id))}
+                className={cn('rounded px-2 py-1.5 text-left transition-shadow hover:ring-1', c.bg, c.ringHover, filter === c.id && c.ringActive)}
+                title={c.tip}
+              >
+                <div className={cn('text-[9px] uppercase', c.text)}>{c.label}</div>
+                <div className="font-mono tabular-nums">{fmtHm(c.sec)}</div>
+                <div className="text-[9px] text-muted-foreground/60 tabular-nums">{c.pct}</div>
+                {c.pct2 && <div className="text-[9px] text-muted-foreground/40 tabular-nums">{c.pct2}</div>}
+              </button>
+            ))}
           </div>
+
+          {filter !== 'all' && (
+            <div className="flex items-center gap-2 text-[11px] rounded border border-border bg-muted/40 px-2 py-1.5">
+              <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[filter] ?? 'bg-slate-500/60')} />
+              <span>
+                Filtrando: <b>{filter === 'planificado' ? 'Planificado' : filterMeta?.label ?? filter}</b>
+                <span className="text-muted-foreground tabular-nums"> · {filtered.length} causal{filtered.length === 1 ? '' : 'es'} · {fmtHm(filterSec)}{filter !== 'planificado' ? ` · ≈ ${filterPz.toLocaleString('es-CL')} pz` : ' (fuera del techo, sin costo en piezas)'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
+              >
+                ✕ quitar filtro
+              </button>
+            </div>
+          )}
 
           {/* Piezas perdidas por causal — "la culpa, con número". SOLO buckets
               que restan del techo: lo planificado (colación, ejercicio) se
               descuenta ANTES del techo, así que sus piezas NO están "bajo el
               máximo" — mezclarlo hacía que las causales sumaran más que la
               pérdida total. Se listan aparte, sin ≈pz. */}
-          {(() => {
-            const techoCauses = causes.filter((c) => c.bucket !== 'planificado')
-            const plannedCauses = causes.filter((c) => c.bucket === 'planificado')
-            return (
-              <>
-                {techoCauses.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
-                      Piezas perdidas por causal · {piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico
-                    </p>
-                    <div className="space-y-0.5">
-                      {techoCauses.map((c) => {
-                        const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
-                        return (
-                          <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                            <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-slate-500/60')} />
-                            <span className="truncate">{c.label}</span>
-                            <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
-                            <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
-                            <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
-                              ≈ {c.piezas.toLocaleString('es-CL')} pz
-                            </span>
-                          </div>
-                        )
-                      })}
+          {techoCauses.length > 0 && (
+            <div>
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">
+                {filter === 'all'
+                  ? `Piezas perdidas por causal · ${piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico`
+                  : 'Eventos del grupo · con su costo en piezas'}
+              </p>
+              <div className="space-y-0.5">
+                {techoCauses.map((c) => {
+                  const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
+                  return (
+                    <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                      <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-slate-500/60')} />
+                      <span className="truncate">{c.label}</span>
+                      <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
+                      <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
+                      <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
+                      <span className="font-mono tabular-nums text-muted-foreground/60 w-14 text-right shrink-0 text-[10px]">
+                        {pctOfTecho(c.sec).toFixed(1)}%
+                      </span>
+                      <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
+                        ≈ {c.piezas.toLocaleString('es-CL')} pz
+                      </span>
                     </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {plannedCauses.length > 0 && (
+            <div>
+              <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider mb-1">
+                Pausas planificadas · fuera del techo (no cuentan como pérdida)
+              </p>
+              <div className="space-y-0.5 opacity-70">
+                {plannedCauses.map((c) => (
+                  <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-2 h-2 rounded-sm shrink-0 bg-slate-500/60" />
+                    <span className="truncate">{c.label}</span>
+                    <span className="text-[9px] text-muted-foreground shrink-0">Personas (acordado)</span>
+                    <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
+                    <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
+                    <span className="font-mono tabular-nums text-muted-foreground/60 w-14 text-right shrink-0 text-[10px]">
+                      {pctOfTurno(c.sec).toFixed(1)}%
+                    </span>
+                    <span className="w-20 shrink-0" />
                   </div>
-                )}
-                {plannedCauses.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground/70 uppercase tracking-wider mb-1">
-                      Pausas planificadas · fuera del techo (no cuentan como pérdida)
-                    </p>
-                    <div className="space-y-0.5 opacity-70">
-                      {plannedCauses.map((c) => (
-                        <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                          <span className="w-2 h-2 rounded-sm shrink-0 bg-slate-500/60" />
-                          <span className="truncate">{c.label}</span>
-                          <span className="text-[9px] text-muted-foreground shrink-0">Personas (acordado)</span>
-                          <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
-                          <span className="w-20 shrink-0" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )
-          })()}
+                ))}
+              </div>
+            </div>
+          )}
 
-          {totals.sinClasificarSec > 0 && (
+          {totals.sinClasificarSec > 0 && filter === 'all' && (
             <p className="text-[10px] text-violet-400/80">
               ⚠ {fmtHm(totals.sinClasificarSec)} sin clasificar — causal desconocida o sin anotar en Shoplogix.
               Anotarla permite asignarle dueño (y sacarla de la duda).

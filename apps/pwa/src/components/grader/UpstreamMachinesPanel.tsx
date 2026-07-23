@@ -15,6 +15,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
@@ -613,7 +614,7 @@ function StateTimeline({
           shift={shift}
           windowStart={windowStart}
           windowEnd={windowEnd}
-          height={20}
+          height={30}
           onStateClick={onStateClick}
         />
       </div>
@@ -745,8 +746,22 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // MachineRow — 1 máquina
 // ============================================================================
 
-function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert }: {
+// Mismo color por índice de máquina en TODO el panel (Gantt, dot, borde
+// izquierdo) — consistente con machineColors de BaaderTrendMultiChart/
+// TrendBarsWithMovingAverage (M0 sky, M1 violet, M2 amber). Antes las 3
+// máquinas se separaban solo por un `divide-y` tenue — "no se ve bien dónde
+// empieza una y termina la otra" (Orel 2026-07-22) — el borde de color
+// resuelve eso sin depender de leer el nombre.
+const MACHINE_ACCENT = [
+  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400' },
+  { border: 'border-l-violet-500/70', dot: 'bg-violet-400' },
+  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400' },
+] as const
+
+function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, windowEnd, microAlert }: {
   shift: UpstreamMachineShift
+  /** Índice de la máquina en la línea (0,1,2) — define su color de acento. */
+  machineIndex?: number
   expanded: boolean
   onToggle: () => void
   windowStart?: Date
@@ -822,8 +837,10 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
   const RatioIcon = shift.runtimeVariance >= 0 ? TrendingUp : TrendingDown
 
+  const accent = MACHINE_ACCENT[machineIndex % MACHINE_ACCENT.length]!
+
   return (
-    <div className="py-3 space-y-2">
+    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-md bg-muted/20 border-l-4', accent.border)}>
       {/* Row header — clickeable para expandir */}
       <button
         onClick={onToggle}
@@ -834,6 +851,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
           {expanded
             ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
             : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
+          <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
           <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="font-medium text-sm truncate">{shift.machineName}</span>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
@@ -1392,11 +1410,12 @@ export function UpstreamMachinesPanel({
             )}
 
             {snapshot && snapshot.machines.length > 0 && (
-              <div className="divide-y divide-border/60">
-                {snapshot.machines.map(m => (
+              <div className="space-y-2">
+                {snapshot.machines.map((m, idx) => (
                   <MachineRow
                     key={m.machineid}
                     shift={m}
+                    machineIndex={idx}
                     expanded={expandedMachines.has(m.machineid)}
                     onToggle={() => toggleMachine(m.machineid)}
                     windowStart={chartWindowStart}
