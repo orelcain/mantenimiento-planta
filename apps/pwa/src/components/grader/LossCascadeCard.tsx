@@ -65,29 +65,46 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
   }, [expanded])
 
   const [filter, setFilter] = useState<'all' | LossBucket>('all')
+  // Selección fina DENTRO de una causal: click en el badge "Ev 1/2/3" de una
+  // fila (ej. AJUSTE MANTENIMIENTO → Ev 2) — resalta y cuenta SOLO los eventos
+  // de esa máquina para esa causal, no las 3 (Orel 2026-07-22).
+  const [causeMachine, setCauseMachine] = useState<{ bucket: LossBucket; label: string; machine: string } | null>(null)
   const [calcOpen, setCalcOpen] = useState(false)
   const timelineSync = useTimelineSyncOptional()
 
-  // Filtrar por grupo también RESALTA en los 3 Gantts + el chart de velocidad
-  // upstream todos los eventos de esa causal — "demostrar" cómo se comportaron
-  // las Baader ahí (Orel 2026-07-22), no solo listarlos como texto.
+  /** Mismo criterio de etiqueta que usa la agregación de causas más abajo —
+   *  necesario acá para poder volver a filtrar states CRUDOS por causal. */
+  const stateCauseLabel = (s: { name: string; reason: string }) =>
+    s.reason || (s.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
+  const shortMachineName = (name: string) => name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+
+  // Filtrar por grupo (o por causal+máquina específica) RESALTA en los 3
+  // Gantts + el chart de velocidad upstream — "demostrar" cómo se comportaron
+  // las Baader ahí (Orel 2026-07-22), no solo listarlo como texto.
   useEffect(() => {
     if (!timelineSync) return
-    if (filter === 'all') {
+    if (causeMachine) {
+      const ranges = machines
+        .filter((m) => shortMachineName(m.machineName) === causeMachine.machine)
+        .flatMap((m) => m.states
+          .filter((s) => classifyLossState(s) === causeMachine.bucket && stateCauseLabel(s) === causeMachine.label)
+          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })))
+      timelineSync.setHighlightRanges(ranges)
+    } else if (filter === 'all') {
       timelineSync.setHighlightRanges([])
-      return
+    } else {
+      const ranges = machines.flatMap((m) =>
+        m.states
+          .filter((s) => classifyLossState(s) === filter)
+          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })),
+      )
+      timelineSync.setHighlightRanges(ranges)
     }
-    const ranges = machines.flatMap((m) =>
-      m.states
-        .filter((s) => classifyLossState(s) === filter)
-        .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })),
-    )
-    timelineSync.setHighlightRanges(ranges)
     // Al desmontar (cambiar de turno) limpiar — evita que el resaltado de un
     // turno anterior "sangre" al siguiente si el usuario navega con el filtro activo.
     return () => timelineSync.setHighlightRanges([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, machines])
+  }, [filter, causeMachine, machines])
 
   const data = useMemo(() => {
     if (machines.length === 0) return null
@@ -306,7 +323,7 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setFilter((f) => (f === c.id ? 'all' : c.id))}
+                onClick={() => { setFilter((f) => (f === c.id ? 'all' : c.id)); setCauseMachine(null) }}
                 className={cn('rounded px-2 py-1.5 text-left transition-shadow hover:ring-1', c.bg, c.ringHover, filter === c.id && c.ringActive)}
                 title={c.tip}
               >
@@ -318,7 +335,22 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
             ))}
           </div>
 
-          {filter !== 'all' && (
+          {causeMachine ? (
+            <div className="flex items-center gap-2 text-[11px] rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1.5">
+              <span className="w-2 h-2 rounded-sm shrink-0 bg-amber-400" />
+              <span>
+                Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
+                <span className="text-muted-foreground"> · mira las bandas amarillas en el Gantt de esa máquina y en la velocidad upstream</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCauseMachine(null)}
+                className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
+              >
+                ✕ quitar
+              </button>
+            </div>
+          ) : filter !== 'all' && (
             <div className="flex items-center gap-2 text-[11px] rounded border border-border bg-muted/40 px-2 py-1.5">
               <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[filter] ?? 'bg-slate-500/60')} />
               <span>
@@ -327,7 +359,7 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
               </span>
               <button
                 type="button"
-                onClick={() => setFilter('all')}
+                onClick={() => { setFilter('all'); setCauseMachine(null) }}
                 className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
               >
                 ✕ quitar filtro
@@ -356,11 +388,31 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
                       <span className="truncate">{c.label}</span>
                       <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
                       {/* Qué Baader(s) aportó esta causal — antes se perdía al
-                          sumar las 3 máquinas (Orel: "¿en qué Baader fue?"). */}
+                          sumar las 3 máquinas (Orel: "¿en qué Baader fue?").
+                          Cada badge es clickeable: filtra y resalta SOLO los
+                          eventos de esa máquina para esta causal específica. */}
                       <span className="flex gap-0.5 shrink-0">
-                        {c.machines.map((mn) => (
-                          <span key={mn} className="text-[8px] px-1 rounded bg-muted border border-border/60 text-muted-foreground/80">{mn}</span>
-                        ))}
+                        {c.machines.map((mn) => {
+                          const active = causeMachine?.bucket === c.bucket && causeMachine?.label === c.label && causeMachine?.machine === mn
+                          return (
+                            <button
+                              key={mn}
+                              type="button"
+                              onClick={() => setCauseMachine((prev) =>
+                                prev && prev.bucket === c.bucket && prev.label === c.label && prev.machine === mn
+                                  ? null
+                                  : { bucket: c.bucket, label: c.label, machine: mn },
+                              )}
+                              className={cn(
+                                'text-[8px] px-1 rounded bg-muted border transition-colors hover:border-amber-400/60 hover:text-foreground',
+                                active ? 'border-amber-400/80 text-amber-400 bg-amber-500/10' : 'border-border/60 text-muted-foreground/80',
+                              )}
+                              title={`Ver solo los eventos de "${c.label}" en ${mn}`}
+                            >
+                              {mn}
+                            </button>
+                          )
+                        })}
                       </span>
                       <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                       <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>

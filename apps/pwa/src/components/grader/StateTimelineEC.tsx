@@ -211,16 +211,28 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           const end     = api.coord([api.value(1), 0])
           const widthPx = Math.max(0, end[0] - start[0])
           const yCenter = api.size([0, 1])[1] / 2
+          // Resaltado: un markArea de fondo quedaba INVISIBLE (las barras llenan
+          // todo el alto del Gantt, no dejan hueco para verlo — "apenas se ve un
+          // punto amarillo", Orel 2026-07-22). En su lugar, la barra MISMA que
+          // cae dentro de un highlightRange se dibuja con borde brillante grueso
+          // — imposible de no ver, sea cual sea su color de estado.
+          const stForHl = shift.states[params.dataIndex as number]
+          const isHighlighted = !!stForHl && highlightRanges.some(
+            (r) => stForHl.startAt.getTime() < r.endMs && stForHl.endAt.getTime() > r.startMs,
+          )
           const rect = {
             type: 'rect' as const,
             shape: { x: start[0], y: yCenter - height / 2, width: widthPx, height },
             style: {
               fill: api.value(2),
-              stroke: 'rgba(15,23,42,0.4)',
-              lineWidth: 0.5,
+              stroke: isHighlighted ? 'rgba(250,204,21,0.95)' : 'rgba(15,23,42,0.4)',
+              lineWidth: isHighlighted ? 3 : 0.5,
+              shadowBlur: isHighlighted ? 6 : 0,
+              shadowColor: isHighlighted ? 'rgba(250,204,21,0.7)' : undefined,
             },
             emphasis: { style: { opacity: 0.85 } },
             cursor: interactive ? 'pointer' : 'default',
+            z2: isHighlighted ? 10 : 1,
           }
           // Etiqueta inline de duración — solo para PAROS (downtime/break/setup,
           // no uptime) y solo si el segmento es lo bastante ancho para leerla.
@@ -268,11 +280,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         } : undefined,
       },
       // Serie auxiliar invisible solo para axisPointer cross-chart (crosshair).
-      // No se usa para tooltip (trigger:'item' lo maneja directamente). También
-      // carga el markArea de resaltado (highlightRanges): click en un evento del
-      // Gantt o filtro de causal en la Cascada del turno — se ve en LAS TRES
-      // Baader y en el chart de velocidad upstream, para "demostrar" cómo se
-      // comportó cada máquina en ese tramo (pedido Orel 2026-07-22).
+      // No se usa para tooltip (trigger:'item' lo maneja directamente).
       {
         type: 'line' as const,
         data: [
@@ -285,11 +293,6 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         silent:      true,
         z:           -1,
         tooltip:     { show: false },
-        markArea: highlightRanges.length > 0 ? {
-          silent: true,
-          itemStyle: { color: 'rgba(250,204,21,0.16)', borderWidth: 1, borderColor: 'rgba(250,204,21,0.5)', borderType: 'dashed' as const },
-          data: highlightRanges.map((r) => ([{ xAxis: r.startMs }, { xAxis: r.endMs }])),
-        } : undefined,
       },
     ],
   // shift.states: renderItem lo lee directo (para la etiqueta de duración) además
