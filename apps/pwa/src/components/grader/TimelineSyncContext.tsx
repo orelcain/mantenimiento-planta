@@ -30,6 +30,15 @@ import type { ReactNode } from 'react'
 export interface TimelineRange {
   startMs: number
   endMs: number
+  /**
+   * Si viene definido, el resaltado (highlightRanges) es EXCLUSIVO de esa
+   * máquina — solo su Gantt lo pinta, las otras 2 Baader quedan intactas aunque
+   * tengan su propia barra en el mismo tramo horario (pedido Orel 2026-07-23:
+   * el filtro por Baader dentro de una causal debe ser estrictamente exclusivo).
+   * `undefined` = aplica a todas (comportamiento del click individual y del
+   * filtro por grupo completo, donde SÍ interesa comparar las 3 máquinas).
+   */
+  machineId?: string
 }
 
 export interface HoverState {
@@ -140,7 +149,7 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
       if (prev === next) return prev
       if (prev.length !== next.length) return next
       for (let i = 0; i < prev.length; i++) {
-        if (prev[i]!.startMs !== next[i]!.startMs || prev[i]!.endMs !== next[i]!.endMs) return next
+        if (prev[i]!.startMs !== next[i]!.startMs || prev[i]!.endMs !== next[i]!.endMs || prev[i]!.machineId !== next[i]!.machineId) return next
       }
       return prev
     })

@@ -84,11 +84,15 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
   useEffect(() => {
     if (!timelineSync) return
     if (causeMachine) {
+      // machineId presente → EXCLUSIVO de esa Baader (Orel 2026-07-23): las
+      // otras 2 Gantt no se pintan aunque tengan su propia barra en el mismo
+      // tramo horario. El chart de velocidad upstream sigue mostrando las 3
+      // líneas (eso no cambia) — solo el Gantt filtra por dueño del rango.
       const ranges = machines
         .filter((m) => shortMachineName(m.machineName) === causeMachine.machine)
         .flatMap((m) => m.states
           .filter((s) => classifyLossState(s) === causeMachine.bucket && stateCauseLabel(s) === causeMachine.label)
-          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })))
+          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime(), machineId: m.machineid })))
       timelineSync.setHighlightRanges(ranges)
     } else if (filter === 'all') {
       timelineSync.setHighlightRanges([])

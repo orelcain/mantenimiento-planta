@@ -218,7 +218,12 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           // — imposible de no ver, sea cual sea su color de estado.
           const stForHl = shift.states[params.dataIndex as number]
           const isHighlighted = !!stForHl && highlightRanges.some(
-            (r) => stForHl.startAt.getTime() < r.endMs && stForHl.endAt.getTime() > r.startMs,
+            (r) =>
+              stForHl.startAt.getTime() < r.endMs && stForHl.endAt.getTime() > r.startMs &&
+              // machineId presente → EXCLUSIVO de esa Baader (filtro fino de la
+              // Cascada del turno). undefined → aplica a todas (click individual
+              // o filtro por grupo completo, donde SÍ interesa comparar las 3).
+              (r.machineId === undefined || r.machineId === shift.machineid),
           )
           const rect = {
             type: 'rect' as const,
