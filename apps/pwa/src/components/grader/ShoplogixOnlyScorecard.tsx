@@ -33,6 +33,26 @@ const VERDICT_STYLE = {
   },
 }
 
+/** Veredicto POR MÁQUINA — combina disponibilidad (uptime) Y ritmo (ciclos
+ *  reales vs objetivo Shoplogix): "qué tan óptimo va cada Baader", no solo si
+ *  estuvo prendida. Pedido de Orel 2026-07-23: un vistazo rápido por Baader,
+ *  no dos números sueltos que hay que leer e interpretar. Manda el peor de
+ *  los dos ejes (si el ritmo es bueno pero el uptime es crítico, es crítico).
+ *  Umbrales calcados de los ya usados en el resto del módulo: uptime 70/40
+ *  (`uptimeTextColor` acá mismo), ritmo 85/50 (`UpstreamMachinesPanel.tsx`). */
+const MACHINE_VERDICT_STYLE = {
+  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', label: 'Óptimo' },
+  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/40',   bg: 'bg-amber-500/10',   label: 'Regular' },
+  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/40',      bg: 'bg-red-500/10',     label: 'Crítico' },
+} as const
+
+function machineVerdict(uptimePct: number, ratio: number): keyof typeof MACHINE_VERDICT_STYLE {
+  const uptimeTier = uptimePct >= 70 ? 2 : uptimePct >= 40 ? 1 : 0
+  const ratioTier  = ratio >= 0.85 ? 2 : ratio >= 0.5 ? 1 : 0
+  const worst = Math.min(uptimeTier, ratioTier)
+  return worst >= 2 ? 'ok' : worst === 1 ? 'warn' : 'critical'
+}
+
 
 interface Props {
   snapshot: UpstreamLineSnapshot
@@ -221,13 +241,27 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
               {snapshot.machines.map((m, idx) => {
                 const sharePct = totalCycles > 0 ? (m.totalCycles / totalCycles) * 100 : 0
                 const uptimePct = (m.shiftRuntime ?? 0) * 100
+                const ratioPct = (m.overallRatio ?? 0) * 100
+                const vStyle = MACHINE_VERDICT_STYLE[machineVerdict(uptimePct, m.overallRatio ?? 0)]
                 // Label corto en mobile: "Ev 1/2/3". Desktop: nombre completo.
                 const shortLabel = `Ev ${idx + 1}`
                 return (
-                  <div key={m.machineid} className="rounded-md bg-muted border border-border px-2 sm:px-3 py-1.5 sm:py-2">
-                    <div className="text-[11px] text-muted-foreground truncate mb-1" title={m.machineName}>
-                      <span className="hidden sm:inline">{m.machineName}</span>
-                      <span className="sm:hidden">{shortLabel}</span>
+                  <div key={m.machineid} className={cn('rounded-md border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="text-[11px] text-muted-foreground truncate" title={m.machineName}>
+                        <span className="hidden sm:inline">{m.machineName}</span>
+                        <span className="sm:hidden">{shortLabel}</span>
+                      </div>
+                      {/* Veredicto de un vistazo: combina uptime + ritmo vs objetivo
+                          (no solo si estuvo prendida — también si rindió al ritmo
+                          esperado). Pedido Orel 2026-07-23. */}
+                      <span
+                        className={cn('flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide shrink-0', vStyle.text)}
+                        title="Combina disponibilidad (uptime) y ritmo vs objetivo — manda el peor de los dos."
+                      >
+                        <span className={cn('w-1.5 h-1.5 rounded-full', vStyle.dot)} />
+                        {vStyle.label}
+                      </span>
                     </div>
                     <div className="text-base font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}
@@ -235,16 +269,30 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                         ({sharePct.toFixed(0)}%)
                       </span>
                     </div>
-                    <div className="mt-1.5 space-y-0.5">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-muted-foreground">uptime</span>
-                        <span className={cn('font-semibold tabular-nums', uptimeTextColor(uptimePct))}>
-                          {uptimePct.toFixed(0)}%
-                        </span>
+                    <div className="mt-1.5 space-y-1">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">uptime</span>
+                          <span className={cn('font-semibold tabular-nums', uptimeTextColor(uptimePct))}>
+                            {uptimePct.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="h-1 bg-muted/60 rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full', uptimeBarColor(uptimePct))}
+                               style={{ width: `${uptimePct.toFixed(1)}%` }} />
+                        </div>
                       </div>
-                      <div className="h-1 bg-muted/60 rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', uptimeBarColor(uptimePct))}
-                             style={{ width: `${uptimePct.toFixed(1)}%` }} />
+                      <div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground" title="Ciclos reales vs objetivo Shoplogix para este turno">ritmo vs objetivo</span>
+                          <span className={cn('font-semibold tabular-nums', ratioPct >= 85 ? 'text-emerald-400' : ratioPct >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                            {ratioPct.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="h-1 bg-muted/60 rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full', ratioPct >= 85 ? 'bg-emerald-500' : ratioPct >= 50 ? 'bg-amber-500' : 'bg-red-500')}
+                               style={{ width: `${Math.min(100, ratioPct).toFixed(1)}%` }} />
+                        </div>
                       </div>
                     </div>
                   </div>
