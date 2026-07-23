@@ -752,10 +752,12 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // máquinas se separaban solo por un `divide-y` tenue — "no se ve bien dónde
 // empieza una y termina la otra" (Orel 2026-07-22) — el borde de color
 // resuelve eso sin depender de leer el nombre.
+// `bg` = tinte tenue del color de acento (10%) mezclado sobre la superficie
+// normal — "que se vea rápido" sin tener que leer el borde (Orel 2026-07-23).
 const MACHINE_ACCENT = [
-  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400' },
-  { border: 'border-l-violet-500/70', dot: 'bg-violet-400' },
-  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400' },
+  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-sky-500/10' },
+  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-violet-500/10' },
+  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/10' },
 ] as const
 
 function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, windowEnd, microAlert }: {
@@ -845,7 +847,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
   const accent = MACHINE_ACCENT[machineIndex % MACHINE_ACCENT.length]!
 
   return (
-    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-md bg-muted/20 border-l-4', accent.border)}>
+    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-md border-l-4', accent.bg, accent.border)}>
       {/* Row header — clickeable para expandir */}
       <button
         onClick={onToggle}
@@ -1417,19 +1419,28 @@ export function UpstreamMachinesPanel({
 
             {snapshot && snapshot.machines.length > 0 && (
               <div className="space-y-2">
-                {snapshot.machines.map((m, idx) => (
-                  <MachineRow
-                    key={m.machineid}
-                    shift={m}
-                    machineIndex={idx}
-                    expanded={expandedMachines.has(m.machineid)}
-                    onToggle={() => toggleMachine(m.machineid)}
-                    windowStart={chartWindowStart}
-                    windowEnd={chartWindowEnd}
-                    microAlert={microAlertSet.has(m.machineid)}
-                    plantSlug={plantSlug}
-                  />
-                ))}
+                {/* Filtro fino de la Cascada del turno (Ev1/Ev2/Ev3 dentro de
+                    una causal) aísla esa Baader: las otras 2 se OCULTAN (no
+                    solo dejan de resaltarse) para verla sin bajar con scroll
+                    a buscarla entre las 3 (Orel 2026-07-23). machineIndex se
+                    calcula sobre la lista COMPLETA (no la filtrada) para que
+                    el color de cada máquina no cambie al aislar/desaislar. */}
+                {snapshot.machines
+                  .map((m, idx) => ({ m, idx }))
+                  .filter(({ m }) => !timelineSync?.isolatedMachineId || m.machineid === timelineSync.isolatedMachineId)
+                  .map(({ m, idx }) => (
+                    <MachineRow
+                      key={m.machineid}
+                      shift={m}
+                      machineIndex={idx}
+                      expanded={expandedMachines.has(m.machineid)}
+                      onToggle={() => toggleMachine(m.machineid)}
+                      windowStart={chartWindowStart}
+                      windowEnd={chartWindowEnd}
+                      microAlert={microAlertSet.has(m.machineid)}
+                      plantSlug={plantSlug}
+                    />
+                  ))}
               </div>
             )}
 

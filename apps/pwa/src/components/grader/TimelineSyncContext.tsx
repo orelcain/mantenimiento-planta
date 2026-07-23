@@ -85,6 +85,15 @@ export interface TimelineSyncValue {
    */
   highlightRanges: TimelineRange[]
   setHighlightRanges: (next: TimelineRange[]) => void
+  /**
+   * Si viene definido, SOLO esa máquina se muestra en el panel upstream — las
+   * otras 2 Baader se ocultan (no solo se dejan de resaltar). Se activa junto
+   * con el filtro fino "Ev1/Ev2/Ev3 dentro de una causal" de la Cascada del
+   * turno (pedido Orel 2026-07-23: ver la Baader filtrada sin bajar con scroll
+   * a buscarla entre las otras 2).
+   */
+  isolatedMachineId: string | null
+  setIsolatedMachineId: (next: string | null) => void
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -102,6 +111,7 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
   const [hover, setHoverState] = useState<HoverState | null>(null)
   const [lotChanges, setLotChangesState] = useState<LotChange[]>([])
   const [highlightRanges, setHighlightRangesState] = useState<TimelineRange[]>([])
+  const [isolatedMachineId, setIsolatedMachineIdState] = useState<string | null>(null)
 
   // setRange es estable (useCallback) para evitar re-renders cascada en
   // consumidores que sólo dependen del setter.
@@ -155,12 +165,17 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
     })
   }, [])
 
+  const setIsolatedMachineId = useCallback((next: string | null) => {
+    setIsolatedMachineIdState((prev) => (prev === next ? prev : next))
+  }, [])
+
   const value = useMemo<TimelineSyncValue>(
     () => ({
       range, setRange, hover, setHover, lotChanges, setLotChanges,
-      highlightRanges, setHighlightRanges, connectGroupId: groupId,
+      highlightRanges, setHighlightRanges, isolatedMachineId, setIsolatedMachineId,
+      connectGroupId: groupId,
     }),
-    [range, setRange, hover, setHover, lotChanges, setLotChanges, highlightRanges, setHighlightRanges, groupId],
+    [range, setRange, hover, setHover, lotChanges, setLotChanges, highlightRanges, setHighlightRanges, isolatedMachineId, setIsolatedMachineId, groupId],
   )
 
   return <TimelineSyncContext.Provider value={value}>{children}</TimelineSyncContext.Provider>

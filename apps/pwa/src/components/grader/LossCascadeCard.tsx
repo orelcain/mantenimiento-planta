@@ -88,14 +88,19 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
       // otras 2 Gantt no se pintan aunque tengan su propia barra en el mismo
       // tramo horario. El chart de velocidad upstream sigue mostrando las 3
       // líneas (eso no cambia) — solo el Gantt filtra por dueño del rango.
-      const ranges = machines
-        .filter((m) => shortMachineName(m.machineName) === causeMachine.machine)
-        .flatMap((m) => m.states
+      const targetMachine = machines.find((m) => shortMachineName(m.machineName) === causeMachine.machine)
+      const ranges = targetMachine
+        ? targetMachine.states
           .filter((s) => classifyLossState(s) === causeMachine.bucket && stateCauseLabel(s) === causeMachine.label)
-          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime(), machineId: m.machineid })))
+          .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime(), machineId: targetMachine.machineid }))
+        : []
       timelineSync.setHighlightRanges(ranges)
+      // Aísla la Baader filtrada en el panel: las otras 2 se ocultan (no solo
+      // se dejan de resaltar) para verla sin bajar con scroll (Orel 2026-07-23).
+      timelineSync.setIsolatedMachineId(targetMachine?.machineid ?? null)
     } else if (filter === 'all') {
       timelineSync.setHighlightRanges([])
+      timelineSync.setIsolatedMachineId(null)
     } else {
       const ranges = machines.flatMap((m) =>
         m.states
@@ -103,10 +108,14 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
           .map((s) => ({ startMs: s.startAt.getTime(), endMs: s.endAt.getTime() })),
       )
       timelineSync.setHighlightRanges(ranges)
+      timelineSync.setIsolatedMachineId(null)
     }
     // Al desmontar (cambiar de turno) limpiar — evita que el resaltado de un
     // turno anterior "sangre" al siguiente si el usuario navega con el filtro activo.
-    return () => timelineSync.setHighlightRanges([])
+    return () => {
+      timelineSync.setHighlightRanges([])
+      timelineSync.setIsolatedMachineId(null)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, causeMachine, machines])
 
