@@ -334,4 +334,46 @@
 .dossier .dp-quiz-review .dp-ra { font-size: 12.5px; color: var(--dp-ink-soft); margin-top: 4px; }
 .dossier .dp-quiz-review .dp-ra b { color: var(--dp-ok); font-weight: 600; }
 
+/* Resultado en anillo — acompaña al puntaje grande, no lo reemplaza. */
+.dossier .dp-quiz-ring { display: flex; align-items: center; gap: 22px; margin: 10px 0 4px; }
+.dossier .dp-quiz-ring svg { flex-shrink: 0; }
+.dossier .dp-quiz-ring-num { font-family: var(--dp-mono); font-size: 20px; font-weight: 600; }
+.dossier .dp-quiz-ring-thr { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-top: 4px; }
+
+/* Diagrama con puntos de referencia (hotspots) — despiece de equipo con notas al tocar. */
+.dossier .dp-hotspot { max-width: 66ch; margin: 22px 0; }
+.dossier .dp-hotspot-stage { position: relative; border: 1px solid var(--dp-rule-hard); background: var(--dp-paper); min-height: 220px; }
+.dossier .dp-hotspot-point {
+  position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+  border-radius: 50%; border: 1px solid var(--dp-accent); background: var(--dp-paper);
+  color: var(--dp-accent); font-family: var(--dp-mono); font-weight: 600; font-size: 11px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.dossier .dp-hotspot-point:hover { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-point[aria-pressed="true"] { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-tip {
+  position: absolute; z-index: 2; width: 200px; background: var(--dp-paper);
+  border: 1px solid var(--dp-rule-hard); padding: 10px 12px; font-size: 12.5px;
+  color: var(--dp-ink-soft); line-height: 1.5;
+}
+.dossier .dp-hotspot-tip .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 4px; }
+.dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
+.dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
+
+/* Ejercicio de relacionar término ↔ definición, en dos columnas hairline. */
+.dossier .dp-match { max-width: 66ch; margin: 26px 0; }
+.dossier .dp-match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-match-item {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  border-bottom: 1px solid var(--dp-rule); padding: 12px 2px; cursor: pointer;
+  font-size: 13.5px; color: var(--dp-ink-soft); font-family: var(--dp-body);
+}
+.dossier .dp-match-item:disabled { cursor: default; }
+.dossier .dp-match-item:hover:not(:disabled) { color: var(--dp-ink); }
+.dossier .dp-match-item[data-state="selected"] { color: var(--dp-accent); }
+.dossier .dp-match-item[data-state="matched"] { color: var(--dp-ok); }
+.dossier .dp-match-item[data-state="wrong"] { color: var(--dp-warn); }
+.dossier .dp-match-status { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-faint); margin-top: 12px; }
+.dossier .dp-match-status.is-done { color: var(--dp-ok); }
+
 .dossier a:focus-visible, .dossier button:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 3px; }

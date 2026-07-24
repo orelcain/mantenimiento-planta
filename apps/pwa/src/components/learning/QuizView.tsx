@@ -37,11 +37,31 @@ export function QuizView({ questions }: { questions: QuizQuestion[] }) {
       : pct >= 50
         ? 'Vas bien, repasá los puntos que fallaste.'
         : 'Conviene repasar las lecciones antes de la prueba.'
+    const ringColor = passed ? 'var(--dp-ok)' : 'var(--dp-warn)'
+    const circumference = 2 * Math.PI * 34
+    const offset = circumference * (1 - pct / 100)
     return (
       <div className="dp-quiz">
         <span className="dp-lbl">Resultado</span>
-        <p className="dp-quiz-score">{score} / {total}</p>
-        <p className="dp-quiz-pct" style={{ color: passed ? 'var(--dp-ok)' : 'var(--dp-warn)' }}>{pct}% de aciertos</p>
+        <div className="dp-quiz-ring">
+          <svg width="84" height="84" viewBox="0 0 84 84">
+            <circle cx="42" cy="42" r="34" fill="none" stroke="var(--dp-rule-hard)" strokeWidth="6" />
+            <circle
+              cx="42" cy="42" r="34" fill="none" stroke={ringColor} strokeWidth="6"
+              strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+              transform="rotate(-90 42 42)"
+            />
+            <line
+              x1="42" y1="8" x2="42" y2="14" stroke="var(--dp-ink-faint)" strokeWidth="2"
+              transform={`rotate(${70 * 3.6 - 90} 42 42)`}
+            />
+          </svg>
+          <div>
+            <p className="dp-quiz-score">{score} / {total}</p>
+            <p className="dp-quiz-ring-thr">Umbral de aprobación 70%</p>
+          </div>
+        </div>
+        <p className="dp-quiz-pct" style={{ color: ringColor }}>{pct}% de aciertos</p>
         <p className="dp-quiz-msg">{message}</p>
         <button type="button" className="dp-quiz-next" onClick={restart}>↺ Repetir examen</button>
 

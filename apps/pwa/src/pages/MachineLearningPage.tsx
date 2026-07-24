@@ -41,6 +41,7 @@ import {
 import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 import { QuizView } from '@/components/learning/QuizView'
+import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = 'Capacitacion / Normativa'
@@ -303,7 +304,10 @@ export function MachineLearningPage() {
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
           <ProceduresList procedures={procedures} machineSlug={machine.slug} />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <ManualList sections={manualSections} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
+          <>
+            <ManualList sections={manualSections} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
+            {machine.slug === 'grader' && <GraderVisualPilot />}
+          </>
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
