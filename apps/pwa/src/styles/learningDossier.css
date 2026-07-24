@@ -14,15 +14,19 @@
   --dp-ink-faint: #979d9a;
   --dp-rule:      #e0e2df;
   --dp-rule-hard: #c4c8c3;
-  --dp-accent:    #275874;
+  /* Acento = azul de marca AquaChile (rampa primary-600 #2a6aa6 para texto
+     sobre papel claro; azulClaro #9DC3E6 en oscuro). Antes petróleo #275874. */
+  --dp-accent:    #2a6aa6;
   --dp-warn:      #9c4a22;
   --dp-ok:        #38614c;
-  --dp-accent-soft: rgba(39, 88, 116, 0.10);
+  --dp-accent-soft: rgba(46, 117, 182, 0.10);
   --dp-warn-soft:   rgba(156, 74, 34, 0.10);
   --dp-ok-soft:     rgba(56, 97, 76, 0.10);
-  --dp-cond: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --dp-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-  --dp-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+  /* Tipografía unificada con la app (design system): IBM Plex Sans / Mono,
+     ya cargadas vía @fontsource en main.tsx. */
+  --dp-cond: "IBM Plex Sans", system-ui, sans-serif;
+  --dp-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --dp-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   background: var(--dp-paper);
   color: var(--dp-ink);
@@ -37,10 +41,10 @@
   --dp-ink-faint: #626c72;
   --dp-rule:      #232a2f;
   --dp-rule-hard: #363f45;
-  --dp-accent:    #7aacc7;
+  --dp-accent:    #9DC3E6;
   --dp-warn:      #d5885a;
   --dp-ok:        #63b58e;
-  --dp-accent-soft: rgba(122, 172, 199, 0.13);
+  --dp-accent-soft: rgba(157, 195, 230, 0.13);
   --dp-warn-soft:   rgba(213, 136, 90, 0.13);
   --dp-ok-soft:     rgba(99, 181, 142, 0.13);
 }
@@ -63,7 +67,7 @@
 .dossier .dp-eyebrow { font-family: var(--dp-mono); font-size: 11px; letter-spacing: .14em; color: var(--dp-ink-soft); }
 .dossier .dp-eyebrow b { color: var(--dp-accent); font-weight: 600; }
 .dossier .dp-eyebrow .sep { color: var(--dp-ink-faint); margin: 0 8px; }
-.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; text-transform: uppercase; font-size: clamp(33px, 6.5vw, 56px); line-height: 1.0; letter-spacing: .005em; margin: 20px 0 16px; text-wrap: balance; color: var(--dp-ink); }
+.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; font-size: clamp(26px, 4.5vw, 40px); line-height: 1.1; letter-spacing: -0.01em; margin: 18px 0 14px; text-wrap: balance; color: var(--dp-ink); }
 .dossier .dp-sub { font-size: 15px; color: var(--dp-ink-soft); max-width: 54ch; margin: 0; }
 
 .dossier .dp-meta { display: flex; flex-wrap: wrap; gap: 22px 44px; padding: 20px 0; margin-top: 30px; border-top: 1px solid var(--dp-rule); border-bottom: 1px solid var(--dp-rule); }
@@ -218,7 +222,7 @@
 /* Cabecera de sub-sección (sección de manual / bloque de casos) */
 .dossier .dp-subhead { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 4px; }
 .dossier .dp-subhead .dp-subno { font-family: var(--dp-mono); font-size: 12px; font-weight: 600; color: var(--dp-ink-faint); }
-.dossier .dp-subhead h3 { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(17px, 3vw, 22px); letter-spacing: .01em; margin: 0; line-height: 1.1; color: var(--dp-ink); }
+.dossier .dp-subhead h3 { font-family: var(--dp-cond); font-weight: 600; font-size: clamp(16px, 2.8vw, 20px); letter-spacing: 0; margin: 0; line-height: 1.25; color: var(--dp-ink); }
 .dossier .dp-subhead + .dp-sec-code { margin-top: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--dp-rule); }
 
 /* Documentos descargables */
