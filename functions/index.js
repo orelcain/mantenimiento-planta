@@ -6467,6 +6467,50 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
   return { ok: true }
 })
 
+/**
+ * Valida un código de invitación ANTES de crear la cuenta (signUpWithInviteCode
+ * en auth.ts llama esto primero, luego createUserWithEmailAndPassword). A
+ * propósito SIN _assertAdminCaller/auth: el caller todavía no tiene sesión de
+ * Firebase (es justo el momento pre-signup). Usa Admin SDK → bypasa
+ * firestore.rules, así que la regla de `inviteCodes` puede cerrarse a
+ * admin-only sin romper este flujo (antes exigía isNotAnonymous(), lo cual
+ * es imposible de cumplir pre-signup → 403 real confirmado por curl sin
+ * auth — el signup con código de invitación estaba roto en silencio desde
+ * que se deshabilitó el login anónimo el 2026-07-05).
+ */
+exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (request) => {
+  const code = String(request.data?.code ?? '').trim().toUpperCase()
+  if (!code || code.length > 40) return { valid: false }
+
+  const snap = await db.collection('inviteCodes')
+    .where('code', '==', code)
+    .where('activo', '==', true)
+    .limit(1)
+    .get()
+  if (snap.empty) return { valid: false }
+
+  const doc = snap.docs[0]
+  const d = doc.data()
+  const expiresAt = d.expiresAt && typeof d.expiresAt.toDate === 'function' ? d.expiresAt.toDate() : null
+  if (expiresAt && expiresAt < new Date()) return { valid: false }
+  if (typeof d.usosActuales === 'number' && typeof d.usosMaximos === 'number' && d.usosActuales >= d.usosMaximos) {
+    return { valid: false }
+  }
+
+  return {
+    valid: true,
+    id: doc.id,
+    code: d.code,
+    rol: d.rol,
+    usosMaximos: d.usosMaximos,
+    usosActuales: d.usosActuales,
+    activo: d.activo,
+    createdBy: d.createdBy ?? null,
+    createdAt: d.createdAt && typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toISOString() : null,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+  }
+})
+
 // Password de OTA (ArduinoOTA) de los ESP32 de sensores — antes vivía en
 // VITE_OTA_PASSWORD, horneada en el bundle público de la PWA y visible en
 // la ruta /sensors SIN ni siquiera exigir rol admin. Ahora solo se entrega
