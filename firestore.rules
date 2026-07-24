@@ -1374,7 +1374,11 @@ service cloud.firestore {
     // CÓDIGOS DE INVITACIÓN
     // ============================================
     match /inviteCodes/{codeId} {
-      allow read: if isNotAnonymous();
+      // Antes isNotAnonymous() = cualquier usuario real podía LISTAR todos los
+      // códigos (incl. rol=admin). La validación pre-signup ya no depende de
+      // este read (pasa por validateInviteCodeProxy, Admin SDK) → puede
+      // cerrarse a admin-only sin romper nada.
+      allow read: if isAdmin();
       allow create: if isAdmin() && isValidInviteCode();
       // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
       allow update: if isAdmin()
