@@ -305,28 +305,59 @@ export function MachineLearningPage() {
           </div>
         </header>
 
-        {/* Índice / pestañas */}
-        <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
-          {tabs.map((tab, i) => {
-            const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                aria-current={activeTab === tab.id ? 'true' : undefined}
-              >
-                {done
-                  ? <span className="dp-toc-done" aria-label="Sección visitada">✓</span>
-                  : <b>{String(i + 1).padStart(2, '0')}</b>}
-                {tab.label}
-              </button>
-            )
-          })}
-        </nav>
+        <div className="dp-course">
+          {/* Sidebar de módulos (desktop): título + progreso + checklist */}
+          <aside className="dp-side" aria-label="Módulos del curso">
+            <div className="dp-side-title">{machine.name}</div>
+            <div className="dp-side-progress">
+              <div className={`dp-progress-track ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
+                <span style={{ width: `${progress.pct}%` }} />
+              </div>
+              <span className={`dp-progress-label ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
+                {progress.state === 'aprobado' ? 'Aprobado' : `${progress.pct}%`}
+              </span>
+            </div>
+            <ul className="dp-side-list">
+              {tabs.map(tab => {
+                const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
+                return (
+                  <li key={tab.id} className={done ? 'is-done' : ''}>
+                    <button
+                      onClick={() => setActiveTab(tab.id)}
+                      aria-current={activeTab === tab.id ? 'true' : undefined}
+                    >
+                      <span className="dp-side-ico">{done ? '✓' : ''}</span>
+                      {tab.label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </aside>
+
+          <div className="dp-main-col">
+            {/* Índice / pestañas (móvil) */}
+            <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
+              {tabs.map((tab, i) => {
+                const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={activeTab === tab.id ? 'true' : undefined}
+                  >
+                    {done
+                      ? <span className="dp-toc-done" aria-label="Sección visitada">✓</span>
+                      : <b>{String(i + 1).padStart(2, '0')}</b>}
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </nav>
 
         {/* Cabecera de sección activa */}
-        <div className="dp-sec-head" style={{ marginTop: 46 }}>
-          <span className="dp-sec-no">{String(activeIndex + 1).padStart(2, '0')}</span>
+        <div className="dp-sec-head" style={{ marginTop: 34 }}>
+          <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
           <h2 className="dp-sec-title">{activeTabData.label}</h2>
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
@@ -387,7 +418,9 @@ export function MachineLearningPage() {
           />
         )}
 
-        <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
+            <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
+          </div>
+        </div>
       </div>
     </div>
   )

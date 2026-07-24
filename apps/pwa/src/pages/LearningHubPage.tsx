@@ -558,18 +558,16 @@ function MachineCard({
         className="group w-full text-left rounded-lg overflow-hidden flex flex-col transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
         style={{ background: C.surface, border: `1px solid ${C.border}`, opacity: ready ? 1 : 0.72 }}
       >
-        {/* Strip superior — identidad de la máquina + fill = progreso de secciones */}
-        <div className="h-1 w-full" style={{ background: `${accent}26` }}>
-          <div className="h-full transition-[width] duration-500 ease-out"
-            style={{ width: `${(enabledCount / 4) * 100}%`, background: accent }} />
+        {/* Thumbnail de identidad — banda de color con el ícono grande (estilo plataforma de cursos) */}
+        <div
+          className="h-[72px] w-full flex items-center justify-center flex-shrink-0"
+          style={{ background: progress.state === 'aprobado' ? C.okSoft : `${accent}1f`, borderBottom: `1px solid ${C.border}` }}
+        >
+          <Icon style={{ color: progress.state === 'aprobado' ? C.ok : accent, width: 30, height: 30 }} />
         </div>
 
         <div className="p-4 flex flex-col flex-1">
           <div className="flex items-start gap-3 pr-8">
-            <div className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0"
-              style={{ background: `${accent}1a`, border: `1px solid ${accent}33` }}>
-              <Icon style={{ color: accent, width: 22, height: 22 }} />
-            </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{machine.name}</h3>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
