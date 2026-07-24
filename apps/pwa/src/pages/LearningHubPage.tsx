@@ -36,6 +36,7 @@ import {
   type SymptomHit,
 } from '@/services/learningContent'
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
+import { getMachineProgress } from '@/utils/learningProgress'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText, StatusTag } from '@/components/learning/primitives'
 
@@ -535,6 +536,9 @@ function MachineCard({
       }))
   const enabledCount = badges.filter(b => b.enabled).length
   const isNew = ready && meta?.lastUpdatedAt != null && (Date.now() - meta.lastUpdatedAt) < NEW_WINDOW_MS
+  // Progreso local del usuario (secciones visitadas + mejor examen). El total de
+  // pestañas es aproximado (curso=6, máquina=4): el % es orientativo, no nota.
+  const progress = getMachineProgress(machine.slug, course ? 6 : 4)
 
   // Color de identidad de la máquina (vive en el strip + icono, no tiñe la card)
   const accent = machine.color
@@ -586,6 +590,33 @@ function MachineCard({
           {ready && countLine && (
             <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
               <MetaText>{countLine}</MetaText>
+            </div>
+          )}
+
+          {/* Progreso del usuario (local): barra + estado, como plataforma de cursos */}
+          {ready && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-mono tabular-nums" style={{ color: progress.state === 'aprobado' ? C.ok : C.inkMid }}>
+                  {progress.state === 'aprobado'
+                    ? `✓ Aprobado${progress.quizBest != null ? ` · ${progress.quizBest}%` : ''}`
+                    : progress.state === 'en-curso'
+                      ? `${progress.pct}%`
+                      : 'Sin iniciar'}
+                </span>
+                {progress.state === 'en-curso' && (
+                  <span className="text-[11px]" style={{ color: C.inkLo }}>En curso</span>
+                )}
+              </div>
+              <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: `${accent}22` }}>
+                <div
+                  className="h-full rounded-full transition-[width] duration-500 ease-out"
+                  style={{
+                    width: `${progress.pct}%`,
+                    background: progress.state === 'aprobado' ? C.ok : accent,
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>

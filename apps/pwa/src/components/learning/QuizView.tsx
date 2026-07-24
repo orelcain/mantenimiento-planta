@@ -4,13 +4,21 @@
  * responder se revela ✓/✕ + la explicación en barra lateral. Pantalla final con
  * puntaje condensado y repaso. No persiste nada (evaluación local, sin login).
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { QuizQuestion } from '@/services/learningContent'
+import { saveQuizBest } from '@/utils/learningProgress'
 
-export function QuizView({ questions }: { questions: QuizQuestion[] }) {
+export function QuizView({ questions, machineSlug }: { questions: QuizQuestion[]; machineSlug?: string }) {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [finished, setFinished] = useState(false)
+
+  // Al terminar, guardar el mejor % como progreso local del módulo.
+  useEffect(() => {
+    if (!finished || !machineSlug || questions.length === 0) return
+    const finalScore = questions.reduce((acc, q) => acc + (answers[q.id] === q.correctIndex ? 1 : 0), 0)
+    saveQuizBest(machineSlug, Math.round((finalScore / questions.length) * 100))
+  }, [finished, machineSlug, questions, answers])
 
   const total = questions.length
   const current = questions[index]

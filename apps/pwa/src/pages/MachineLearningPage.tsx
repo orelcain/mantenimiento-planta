@@ -42,6 +42,7 @@ import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningMo
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 import { QuizView } from '@/components/learning/QuizView'
 import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
+import { markSectionVisited, getVisitedSections, getMachineProgress } from '@/utils/learningProgress'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = 'Capacitacion / Normativa'
@@ -213,6 +214,16 @@ export function MachineLearningPage() {
     }
   }, [machine, activeTab])
 
+  // Progreso local: marcar la sección visitada al abrirla (localStorage, sin login).
+  const [visitedTabs, setVisitedTabs] = useState<string[]>(() =>
+    machine ? getVisitedSections(machine.slug) : [],
+  )
+  useEffect(() => {
+    if (!machine || machine.customRoute) return
+    markSectionVisited(machine.slug, activeTab)
+    setVisitedTabs(getVisitedSections(machine.slug))
+  }, [machine, activeTab])
+
   if (!machine) {
     return <Navigate to="/aprendizaje" replace />
   }
@@ -246,6 +257,7 @@ export function MachineLearningPage() {
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
   const docCode = machine.slug.toUpperCase()
   const activeIndex = tabs.findIndex(t => t.id === activeTab)
+  const progress = getMachineProgress(machine.slug, tabs.length)
   const contenido = isCourse
     ? 'Curso / Normativa'
     : `${Object.values(machine.sections).filter(Boolean).length} secciones`
@@ -277,19 +289,39 @@ export function MachineLearningPage() {
               <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
             </button>
           )}
+
+          {/* Progreso local del módulo (secciones visitadas + examen) */}
+          <div className="dp-progress">
+            <div className={`dp-progress-track ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
+              <span style={{ width: `${progress.pct}%` }} />
+            </div>
+            <span className={`dp-progress-label ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
+              {progress.state === 'aprobado'
+                ? `Aprobado${progress.quizBest != null ? ` · ${progress.quizBest}%` : ''}`
+                : progress.state === 'en-curso'
+                  ? `${progress.pct}% visto`
+                  : 'Sin iniciar'}
+            </span>
+          </div>
         </header>
 
         {/* Índice / pestañas */}
         <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
-          {tabs.map((tab, i) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              aria-current={activeTab === tab.id ? 'true' : undefined}
-            >
-              <b>{String(i + 1).padStart(2, '0')}</b>{tab.label}
-            </button>
-          ))}
+          {tabs.map((tab, i) => {
+            const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? 'true' : undefined}
+              >
+                {done
+                  ? <span className="dp-toc-done" aria-label="Sección visitada">✓</span>
+                  : <b>{String(i + 1).padStart(2, '0')}</b>}
+                {tab.label}
+              </button>
+            )
+          })}
         </nav>
 
         {/* Cabecera de sección activa */}
@@ -336,7 +368,7 @@ export function MachineLearningPage() {
             )}
           </div>
         ) : activeTab === 'quiz' && quiz.length > 0 ? (
-          <QuizView questions={quiz} />
+          <QuizView questions={quiz} machineSlug={machine.slug} />
         ) : activeTab === 'glossary' && glossary.length > 0 ? (
           <GlossaryView
             entries={glossary}
