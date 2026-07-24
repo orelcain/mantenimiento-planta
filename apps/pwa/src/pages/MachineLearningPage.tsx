@@ -11,7 +11,7 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay,
+  MonitorPlay, Zap,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -42,13 +42,15 @@ import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningMo
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 import { QuizView } from '@/components/learning/QuizView'
 import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
-import { markSectionVisited, getVisitedSections, getMachineProgress } from '@/utils/learningProgress'
+import { QuickRefView } from '@/components/learning/QuickRefView'
+import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
+import { getQuizBest } from '@/utils/learningProgress'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos'
+type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos'
 
 interface TabDef {
   id: TabId
@@ -96,6 +98,26 @@ const REPUESTOS_TAB: TabDef = {
   shortLabel: 'Repuestos',
   icon: Wrench,
   description: 'Los repuestos más usados de la máquina, con foto y stock en vivo.',
+}
+
+/** Pestaña "Consulta rápida" — lámina de datos duros para terreno. Solo si la
+ *  máquina tiene ficha en learningQuickRef (piloto: Grader). Va PRIMERA. */
+const QUICKREF_TAB: TabDef = {
+  id: 'quickref',
+  label: 'Consulta rápida',
+  shortLabel: 'Rápida',
+  icon: Zap,
+  description: 'Datos clave del equipo: parámetros, rutas del controlador y tolerancias.',
+}
+
+/** Pestaña "Evaluación" para máquinas — antes el quiz vivía solo en cursos y
+ *  la autoevaluación quedaba enterrada al pie del manual. */
+const QUIZ_TAB_MACHINE: TabDef = {
+  id: 'quiz',
+  label: 'Evaluación',
+  shortLabel: 'Evaluación',
+  icon: GraduationCap,
+  description: 'Autoevaluación del equipo, con explicación por pregunta.',
 }
 
 /** Set de pestanas para temas de curso (area "Capacitacion / Normativa"). */
@@ -148,7 +170,10 @@ export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<TabId>('manual')
+  // Arranca en "Consulta rápida" si la máquina tiene ficha express (uso terreno).
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    slug && hasQuickRef(slug) ? 'quickref' : 'manual',
+  )
   const [procedures, setProcedures] = useState<Procedure[]>([])
   const [manualSections, setManualSections] = useState<ManualSection[]>([])
   const [flows, setFlows] = useState<Flow[]>([])
@@ -214,16 +239,6 @@ export function MachineLearningPage() {
     }
   }, [machine, activeTab])
 
-  // Progreso local: marcar la sección visitada al abrirla (localStorage, sin login).
-  const [visitedTabs, setVisitedTabs] = useState<string[]>(() =>
-    machine ? getVisitedSections(machine.slug) : [],
-  )
-  useEffect(() => {
-    if (!machine || machine.customRoute) return
-    markSectionVisited(machine.slug, activeTab)
-    setVisitedTabs(getVisitedSections(machine.slug))
-  }, [machine, activeTab])
-
   if (!machine) {
     return <Navigate to="/aprendizaje" replace />
   }
@@ -233,9 +248,15 @@ export function MachineLearningPage() {
     return <Navigate to={machine.customRoute} replace />
   }
 
+  const quickRefGroups = !isCourse ? getQuickRef(machine.slug) : null
   const tabs = isCourse
     ? COURSE_TABS
-    : (commonParts.length > 0 ? [...TABS, REPUESTOS_TAB] : TABS)
+    : [
+        ...(quickRefGroups ? [QUICKREF_TAB] : []),
+        ...TABS,
+        ...(commonParts.length > 0 ? [REPUESTOS_TAB] : []),
+        QUIZ_TAB_MACHINE,
+      ]
   const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
   // Conteo de items reales por pestana (casos = flujos + diagnostico)
   const countFor = (id: TabId): number =>
@@ -248,6 +269,7 @@ export function MachineLearningPage() {
     : id === 'glossary' ? glossary.length
     : id === 'bibliografia' ? bibliografia.length
     : id === 'repuestos' ? commonParts.length
+    : id === 'quickref' ? (quickRefGroups?.length ?? 0)
     : 0
   const activeCount = countFor(activeTab)
   const sectionEnabled = activeCount > 0 || (!isCourse && machine.sections[activeTab as LearningSection])
@@ -257,7 +279,10 @@ export function MachineLearningPage() {
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
   const docCode = machine.slug.toUpperCase()
   const activeIndex = tabs.findIndex(t => t.id === activeTab)
-  const progress = getMachineProgress(machine.slug, tabs.length)
+  // Progreso = SOLO evaluación (el material es de consulta periódica; el "% visto"
+  // no aporta). Aprobado si el mejor examen local llegó al umbral.
+  const quizBest = getQuizBest(machine.slug)
+  const quizPassed = quizBest != null && quizBest >= 70
   const contenido = isCourse
     ? 'Curso / Normativa'
     : `${Object.values(machine.sections).filter(Boolean).length} secciones`
@@ -290,43 +315,39 @@ export function MachineLearningPage() {
             </button>
           )}
 
-          {/* Progreso local del módulo (secciones visitadas + examen) */}
-          <div className="dp-progress">
-            <div className={`dp-progress-track ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
-              <span style={{ width: `${progress.pct}%` }} />
+          {/* Estado de evaluación (único progreso que importa: esto es material
+              de consulta periódica, no un curso lineal) */}
+          {quizBest != null && (
+            <div className="dp-progress">
+              <span className={`dp-progress-label ${quizPassed ? 'is-ok' : ''}`}>
+                {quizPassed ? `✓ Evaluación aprobada · ${quizBest}%` : `Evaluación: mejor intento ${quizBest}% — umbral 70%`}
+              </span>
             </div>
-            <span className={`dp-progress-label ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
-              {progress.state === 'aprobado'
-                ? `Aprobado${progress.quizBest != null ? ` · ${progress.quizBest}%` : ''}`
-                : progress.state === 'en-curso'
-                  ? `${progress.pct}% visto`
-                  : 'Sin iniciar'}
-            </span>
-          </div>
+          )}
         </header>
 
         <div className="dp-course">
           {/* Sidebar de módulos (desktop): título + progreso + checklist */}
-          <aside className="dp-side" aria-label="Módulos del curso">
+          <aside className="dp-side" aria-label="Secciones del módulo">
             <div className="dp-side-title">{machine.name}</div>
-            <div className="dp-side-progress">
-              <div className={`dp-progress-track ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
-                <span style={{ width: `${progress.pct}%` }} />
+            {quizPassed && (
+              <div className="dp-side-progress">
+                <span className="dp-progress-label is-ok">✓ Evaluación aprobada · {quizBest}%</span>
               </div>
-              <span className={`dp-progress-label ${progress.state === 'aprobado' ? 'is-ok' : ''}`}>
-                {progress.state === 'aprobado' ? 'Aprobado' : `${progress.pct}%`}
-              </span>
-            </div>
-            <ul className="dp-side-list">
+            )}
+            <ul className="dp-side-list" style={quizPassed ? undefined : { marginTop: 12 }}>
               {tabs.map(tab => {
-                const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
+                const TabIcon = tab.icon
+                const evalDone = tab.id === 'quiz' && quizPassed
                 return (
-                  <li key={tab.id} className={done ? 'is-done' : ''}>
+                  <li key={tab.id} className={evalDone ? 'is-done' : ''}>
                     <button
                       onClick={() => setActiveTab(tab.id)}
                       aria-current={activeTab === tab.id ? 'true' : undefined}
                     >
-                      <span className="dp-side-ico">{done ? '✓' : ''}</span>
+                      <span className="dp-side-ico">
+                        {evalDone ? '✓' : <TabIcon style={{ width: 11, height: 11 }} />}
+                      </span>
                       {tab.label}
                     </button>
                   </li>
@@ -339,15 +360,15 @@ export function MachineLearningPage() {
             {/* Índice / pestañas (móvil) */}
             <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
               {tabs.map((tab, i) => {
-                const done = visitedTabs.includes(tab.id) && tab.id !== activeTab
+                const evalDone = tab.id === 'quiz' && quizPassed
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     aria-current={activeTab === tab.id ? 'true' : undefined}
                   >
-                    {done
-                      ? <span className="dp-toc-done" aria-label="Sección visitada">✓</span>
+                    {evalDone
+                      ? <span className="dp-toc-done" aria-label="Evaluación aprobada">✓</span>
                       : <b>{String(i + 1).padStart(2, '0')}</b>}
                     {tab.label}
                   </button>
@@ -362,7 +383,9 @@ export function MachineLearningPage() {
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
-        {loadingTab ? (
+        {activeTab === 'quickref' && quickRefGroups ? (
+          <QuickRefView groups={quickRefGroups} />
+        ) : loadingTab ? (
           <p className="dp-loading">Cargando…</p>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
           <ProceduresList procedures={procedures} machineSlug={machine.slug} />

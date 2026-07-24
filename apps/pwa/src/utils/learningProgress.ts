@@ -1,81 +1,47 @@
 /**
- * learningProgress — progreso local del Centro de Aprendizaje (localStorage,
- * mismo patrón que learningHubPrefs). Sin login: el progreso es del dispositivo.
+ * learningProgress — estado local de EVALUACIÓN del Centro de Aprendizaje
+ * (localStorage, mismo patrón que learningHubPrefs). Sin login: es del
+ * dispositivo.
  *
- * Modelo simple y honesto:
- *  · "visitado": el usuario abrió esa pestaña/sección de la máquina.
- *  · "examen": mejor % logrado en el examen (QuizView) de la máquina.
- *  · % de avance = pestañas visitadas / pestañas con contenido.
- *  · estado: aprobado (examen ≥70) · en curso (algo visitado) · sin iniciar.
+ * Decisión 2026-07 (Orel): el material del Centro es de consulta periódica,
+ * no un curso lineal — trackear "% visto" no aporta. Lo único que progresa
+ * es la evaluación: acá se guarda el mejor % de examen por máquina/curso.
  */
 
-const VISITED_KEY = 'learning:visited'
 const QUIZ_KEY = 'learning:quizBest'
 
-type VisitedMap = Record<string, string[]>
 type QuizMap = Record<string, number>
 
-function read<T>(key: string, fallback: T): T {
+function read(): QuizMap {
   try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
+    const raw = localStorage.getItem(QUIZ_KEY)
+    return raw ? (JSON.parse(raw) as QuizMap) : {}
   } catch {
-    return fallback
+    return {}
   }
-}
-
-function write(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    /* storage lleno o bloqueado: el progreso es cosmético, no bloquea nada */
-  }
-}
-
-export function markSectionVisited(machineSlug: string, tabId: string) {
-  const map = read<VisitedMap>(VISITED_KEY, {})
-  const list = map[machineSlug] ?? []
-  if (list.includes(tabId)) return
-  map[machineSlug] = [...list, tabId]
-  write(VISITED_KEY, map)
-}
-
-export function getVisitedSections(machineSlug: string): string[] {
-  return read<VisitedMap>(VISITED_KEY, {})[machineSlug] ?? []
 }
 
 /** Guarda el % del examen solo si mejora el anterior. */
 export function saveQuizBest(machineSlug: string, pct: number) {
-  const map = read<QuizMap>(QUIZ_KEY, {})
+  const map = read()
   if ((map[machineSlug] ?? -1) >= pct) return
   map[machineSlug] = pct
-  write(QUIZ_KEY, map)
+  try {
+    localStorage.setItem(QUIZ_KEY, JSON.stringify(map))
+  } catch {
+    /* storage lleno o bloqueado: el estado es cosmético, no bloquea nada */
+  }
 }
 
 export function getQuizBest(machineSlug: string): number | null {
-  const v = read<QuizMap>(QUIZ_KEY, {})[machineSlug]
+  const v = read()[machineSlug]
   return typeof v === 'number' ? v : null
 }
 
-export type MachineProgressState = 'aprobado' | 'en-curso' | 'sin-iniciar'
+/** Umbral de aprobación compartido (mismo que usa QuizView). */
+export const QUIZ_PASS_PCT = 70
 
-export interface MachineProgress {
-  /** 0–100, avance por secciones visitadas. */
-  pct: number
-  state: MachineProgressState
-  /** Mejor % de examen si existe. */
-  quizBest: number | null
-}
-
-export function getMachineProgress(machineSlug: string, totalSections: number): MachineProgress {
-  const visited = getVisitedSections(machineSlug)
-  const quizBest = getQuizBest(machineSlug)
-  const pct = totalSections > 0
-    ? Math.min(100, Math.round((visited.length / totalSections) * 100))
-    : 0
-  const state: MachineProgressState =
-    quizBest != null && quizBest >= 70 ? 'aprobado'
-    : visited.length > 0 ? 'en-curso'
-    : 'sin-iniciar'
-  return { pct: state === 'aprobado' ? 100 : pct, state, quizBest }
+export function isQuizPassed(machineSlug: string): boolean {
+  const best = getQuizBest(machineSlug)
+  return best != null && best >= QUIZ_PASS_PCT
 }

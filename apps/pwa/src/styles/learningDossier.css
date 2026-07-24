@@ -404,6 +404,17 @@
 .dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
 .dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
 
+/* Consulta rápida — lámina de datos duros en tarjetas escaneables */
+.dossier .dp-qr { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; max-width: 900px; }
+.dossier .dp-qr-card { border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-paper); padding: 16px 18px; }
+.dossier .dp-qr-title { font-size: 13px; font-weight: 700; color: var(--dp-accent); margin: 0 0 10px; }
+.dossier .dp-qr-rows { margin: 0; }
+.dossier .dp-qr-row { display: grid; grid-template-columns: minmax(96px, 38%) 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--dp-rule); align-items: baseline; }
+.dossier .dp-qr-row:last-child { border-bottom: 0; }
+.dossier .dp-qr-row dt { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-qr-row dd { margin: 0; font-family: var(--dp-mono); font-size: 12.5px; color: var(--dp-ink); line-height: 1.5; overflow-wrap: anywhere; }
+.dossier .dp-qr-note { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--dp-warn); font-size: 12px; color: var(--dp-ink-soft); }
+
 /* Ejercicio de relacionar término ↔ definición — filas rellenas redondeadas. */
 .dossier .dp-match { max-width: 66ch; margin: 26px 0; }
 .dossier .dp-match-grid { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr; gap: 8px 20px; }

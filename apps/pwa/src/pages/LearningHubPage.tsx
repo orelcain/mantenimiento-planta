@@ -36,7 +36,7 @@ import {
   type SymptomHit,
 } from '@/services/learningContent'
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
-import { getMachineProgress } from '@/utils/learningProgress'
+import { getQuizBest, QUIZ_PASS_PCT } from '@/utils/learningProgress'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText, StatusTag } from '@/components/learning/primitives'
 
@@ -536,9 +536,10 @@ function MachineCard({
       }))
   const enabledCount = badges.filter(b => b.enabled).length
   const isNew = ready && meta?.lastUpdatedAt != null && (Date.now() - meta.lastUpdatedAt) < NEW_WINDOW_MS
-  // Progreso local del usuario (secciones visitadas + mejor examen). El total de
-  // pestañas es aproximado (curso=6, máquina=4): el % es orientativo, no nota.
-  const progress = getMachineProgress(machine.slug, course ? 6 : 4)
+  // Estado de evaluación local (lo único que "progresa": el material es de
+  // consulta periódica, no un curso lineal con % de avance).
+  const quizBest = getQuizBest(machine.slug)
+  const quizPassed = quizBest != null && quizBest >= QUIZ_PASS_PCT
 
   // Color de identidad de la máquina (vive en el strip + icono, no tiñe la card)
   const accent = machine.color
@@ -561,9 +562,9 @@ function MachineCard({
         {/* Thumbnail de identidad — banda de color con el ícono grande (estilo plataforma de cursos) */}
         <div
           className="h-[72px] w-full flex items-center justify-center flex-shrink-0"
-          style={{ background: progress.state === 'aprobado' ? C.okSoft : `${accent}1f`, borderBottom: `1px solid ${C.border}` }}
+          style={{ background: quizPassed ? C.okSoft : `${accent}1f`, borderBottom: `1px solid ${C.border}` }}
         >
-          <Icon style={{ color: progress.state === 'aprobado' ? C.ok : accent, width: 30, height: 30 }} />
+          <Icon style={{ color: quizPassed ? C.ok : accent, width: 30, height: 30 }} />
         </div>
 
         <div className="p-4 flex flex-col flex-1">
@@ -591,30 +592,17 @@ function MachineCard({
             </div>
           )}
 
-          {/* Progreso del usuario (local): barra + estado, como plataforma de cursos */}
-          {ready && (
+          {/* Estado de evaluación local — lo único que "progresa" en material de consulta */}
+          {ready && quizBest != null && (
             <div className="mt-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-mono tabular-nums" style={{ color: progress.state === 'aprobado' ? C.ok : C.inkMid }}>
-                  {progress.state === 'aprobado'
-                    ? `✓ Aprobado${progress.quizBest != null ? ` · ${progress.quizBest}%` : ''}`
-                    : progress.state === 'en-curso'
-                      ? `${progress.pct}%`
-                      : 'Sin iniciar'}
-                </span>
-                {progress.state === 'en-curso' && (
-                  <span className="text-[11px]" style={{ color: C.inkLo }}>En curso</span>
-                )}
-              </div>
-              <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: `${accent}22` }}>
-                <div
-                  className="h-full rounded-full transition-[width] duration-500 ease-out"
-                  style={{
-                    width: `${progress.pct}%`,
-                    background: progress.state === 'aprobado' ? C.ok : accent,
-                  }}
-                />
-              </div>
+              <span
+                className="text-[11px] font-mono tabular-nums"
+                style={{ color: quizPassed ? C.ok : C.inkMid }}
+              >
+                {quizPassed
+                  ? `✓ Evaluación aprobada · ${quizBest}%`
+                  : `Evaluación: mejor intento ${quizBest}%`}
+              </span>
             </div>
           )}
         </div>
