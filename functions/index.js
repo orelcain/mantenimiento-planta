@@ -7004,10 +7004,18 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
     if (config.shiftStart.enabled) {
       const scheduledStart = data.scheduledStart?.toDate?.() || new Date()
       const gracePeriodMs  = (config.shiftStart.gracePeriodMinutes || 20) * 60 * 1000
-      const checkAt        = new Date(scheduledStart.getTime() + gracePeriodMs)
+      // `scheduledStart` está en wall-clock-as-UTC pero el cron compara checkAt
+      // contra UTC real → convertir acá, al crear el check, para que venza a la
+      // hora Chile correcta (sin esto vencía ~4h antes; misma clase de bug que
+      // el brief de fin de turno, ver checkShiftEndBriefs).
+      const scheduledStartReal = new Date(
+        scheduledStart.getTime() + shoplogixPolling.chileUtcOffsetHours(new Date()) * 3600_000,
+      )
+      const checkAt        = new Date(scheduledStartReal.getTime() + gracePeriodMs)
       await db.collection('shoplogixShiftDelayChecks').doc(`${plant}_${shiftDoc}`).set({
         plant, shiftDoc, shiftId, plantLabel,
-        scheduledStart, // F3: base para "demoró N min" del mensaje de recuperación
+        scheduledStart, // F3: base para "demoró N min" (wall-clock-as-UTC, legado)
+        scheduledStartReal, // misma hora en UTC real — comparable con `now` del cron
         checkAt,
         done: false,
         alerted: false,
@@ -7306,7 +7314,15 @@ exports.checkShiftStartDelays = onSchedule(
       // recalcular restando el margen de gracia, pero si tampoco hay config
       // disponible el fallback es checkAt (subestima el delay, nunca lo inventa
       // de más). Nunca bloquea el flujo: es solo el número que se muestra.
-      const scheduledStart = data.scheduledStart?.toDate?.() || checkAt
+      // Para "demoró N min" se necesita la partida en UTC REAL (comparable con
+      // `now`). `scheduledStartReal` existe en checks nuevos; en docs legado
+      // `scheduledStart` está en wall-clock-as-UTC y restarlo de `now` inflaba
+      // el delay ~+4h (offset Chile) → convertir al vuelo.
+      const legacyStart = data.scheduledStart?.toDate?.()
+      const scheduledStart = data.scheduledStartReal?.toDate?.()
+        || (legacyStart
+          ? new Date(legacyStart.getTime() + shoplogixPolling.chileUtcOffsetHours(now) * 3600_000)
+          : checkAt)
       try {
         const config = await getShoplogixNotifConfig(plant)
         if (!config.shiftStart.enabled) {
@@ -7444,7 +7460,18 @@ exports.checkShiftEndBriefs = onSchedule(
 
           config = config ?? await getShoplogixNotifConfig(plant)
           if (!config.shiftEnd.enabled) continue
-          const fireAt = new Date(end.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
+          // OJO escalas de tiempo: `end` viene en wall-clock-as-UTC (hora Chile
+          // "disfrazada" de UTC, como todo lo derivado de intervals), pero `now`
+          // es UTC REAL. Sin la conversión, `now` alcanza el valor del cierre
+          // ~4h ANTES de que en Chile sea esa hora → el brief salía a mitad de
+          // turno (p.ej. 13:25 para un turno que cierra 17:15) con cifras
+          // parciales, y checkShiftReconciliation mandaba la "corrección"
+          // después. Mismo bug de escalas que el freeze del 19-07 (sync.js,
+          // scheduledEndReal).
+          const endReal = new Date(
+            end.getTime() + shoplogixPolling.chileUtcOffsetHours(now) * 3600_000,
+          )
+          const fireAt = new Date(endReal.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
           if (now < fireAt) continue
 
           // Idempotencia: solo la corrida que logra estampar endBriefSentAt envía.

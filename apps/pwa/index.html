@@ -5,6 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0d1722" />
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
+    <!-- CSP conservador: el sitio canónico es GitHub Pages, que NO soporta headers HTTP
+         custom (los de firebase.json solo aplican al hosting secundario, casi sin uso —
+         confirmado con curl: GitHub Pages hoy no manda NINGÚN header de seguridad). Un
+         <meta> CSP es la única vía disponible aquí, pero el spec IGNORA frame-ancestors/
+         sandbox/report-uri en <meta> — la protección contra clickjacking (embeber esta
+         app en un iframe ajeno) NO es alcanzable así; requeriría mover el hosting.
+         Deliberadamente permisivo en connect-src/img-src/frame-src (https: genérico) para
+         no romper embeds/mapas/APIs externas que no se pudieron probar todas en esta
+         sesión — bloquea lo más peligroso: script-src fuera de https:, object-src,
+         base-uri y form-action a dominios ajenos. -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+      style-src 'self' 'unsafe-inline' https:;
+      img-src 'self' data: blob: https:;
+      font-src 'self' data: https:;
+      media-src 'self' data: blob: https:;
+      connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*;
+      frame-src 'self' https:;
+      worker-src 'self' blob:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+    " />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="icon" type="image/svg+xml" href="/mantenimiento-planta/icons/icon.svg" />

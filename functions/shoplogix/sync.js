@@ -338,6 +338,28 @@ async function fetchOfficialRollup({ query, plantSlug, at, logger = console }) {
   }
 }
 
+/**
+ * ¿El horario oficial del rollup es coherente con la ventana real del turno?
+ *
+ * El rollup a veces entrega una plantilla con fechas de OTRO día (visto en
+ * prod: officialEnd 2026-08-01 para un turno del 22-07, o corrido +1 día).
+ * Guardar eso corrompe `officialSchedule` y cualquier cosa que lo consuma
+ * (brief de fin de turno, chips de la UI). Regla: start y end oficiales deben
+ * caer a ≤12h de sus pares derivados de intervals — margen de sobra para
+ * horas extra o turnos cortados, pero mata los saltos de día/semana.
+ *
+ * Ambas fechas vienen en la misma escala (wall-clock-as-UTC), comparables
+ * entre sí sin conversión.
+ */
+function isOfficialScheduleSane({ officialStart, officialEnd, scheduledStart, scheduledEnd }) {
+  const MAX_DRIFT_MS = 12 * 3600_000
+  if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return false
+  if (!(officialEnd   instanceof Date) || isNaN(officialEnd.getTime()))   return false
+  if (officialEnd.getTime() <= officialStart.getTime()) return false
+  return Math.abs(officialStart.getTime() - scheduledStart.getTime()) <= MAX_DRIFT_MS
+      && Math.abs(officialEnd.getTime()   - scheduledEnd.getTime())   <= MAX_DRIFT_MS
+}
+
 function deriveShiftGroups(machineProductionResponses, plantSlug) {
   // Usar la primera máquina que tenga intervalos (todas deberían tener los mismos shifts)
   const firstWithIntervals = machineProductionResponses.find(r => r?.machineProduction?.length > 0)
@@ -765,9 +787,26 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // consulta; ver fetchOfficialRollup). additivo — nunca reemplaza
     // scheduledStart/End derivados de intervals reales.
     if (officialRollup && officialRollup.shiftLabel === group.shiftId) {
-      parentDoc.officialSchedule = {
-        start: officialRollup.officialStart,
-        end:   officialRollup.officialEnd,
+      // Horario oficial solo si pasa el sanity-check (ver isOfficialScheduleSane):
+      // el rollup a veces trae plantillas con fechas de otro día y guardarlas
+      // corrompe el doc. Targets/especie no muestran esa corrupción → siguen
+      // guardándose siempre.
+      if (isOfficialScheduleSane({
+        officialStart:  officialRollup.officialStart,
+        officialEnd:    officialRollup.officialEnd,
+        scheduledStart: group.scheduledStart,
+        scheduledEnd:   group.scheduledEnd,
+      })) {
+        parentDoc.officialSchedule = {
+          start: officialRollup.officialStart,
+          end:   officialRollup.officialEnd,
+        }
+      } else {
+        logger.warn(
+          `[syncDay][${plantSlug}] officialSchedule del rollup descartado por incoherente ` +
+          `(${toShoplogixTime(officialRollup.officialStart)}→${toShoplogixTime(officialRollup.officialEnd)} ` +
+          `vs turno ${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`,
+        )
       }
       parentDoc.officialTargetsByMachineId = Object.fromEntries(officialRollup.targetsByMachineId)
       parentDoc.currentJob = officialRollup.currentJob
@@ -907,6 +946,7 @@ module.exports = {
   fullDayWindow,
   deriveShiftGroups,
   fetchOfficialRollup,
+  isOfficialScheduleSane,
   shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
