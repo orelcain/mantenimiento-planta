@@ -661,6 +661,17 @@ function ManualList({
         </div>
       )}
 
+      {!isGraderGlossary && blocks.steps.length > 0 && (
+        <ol className="dp-proc-ol" style={{ marginTop: 24 }}>
+          {blocks.steps.map((step, index) => (
+            <li key={`${step}-${index}`}>
+              <span className="dp-n" />
+              <div className="dp-c"><span style={{ whiteSpace: 'pre-wrap' }}>{step}</span></div>
+            </li>
+          ))}
+        </ol>
+      )}
+
       {!isGraderGlossary && activeSection.porque && (
         <p className="dp-porque"><span className="dp-lbl">Por qué importa — </span>{activeSection.porque}</p>
       )}
@@ -768,9 +779,20 @@ interface ManualContentBlocks {
   measurements: string[]
   keyPoints: string[]
   notes: string[]
+  /** Secuencia de acciones marcada explícitamente en el contenido (ver STEP_MARKERS) — se renderiza como lista numerada, no como párrafo. */
+  steps: string[]
   images: { label: string; url: string }[]
   /** Documentos descargables (PDF, planos): "- Etiqueta: /ruta.pdf" */
   documents: { label: string; url: string }[]
+}
+
+/** Líneas-marcador que indican que lo que sigue es una secuencia de pasos, no prosa libre. */
+const STEP_MARKERS = ['Secuencia técnica verificada:', 'Secuencia de ajuste:', 'Rutina verificada:']
+/** Sin tildes, en minúscula — el contenido curado a veces las pierde (ver gotcha de acentos de Codex). */
+const STEP_MARKERS_NORMALIZED = STEP_MARKERS.map(normalizeForMatch)
+
+function normalizeForMatch(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
 /** "Etiqueta: /ruta" → {label, url}. Devuelve url vacia si la linea no trae ruta. */
@@ -785,10 +807,11 @@ function parseManualContent(content: string): ManualContentBlocks {
     measurements: [],
     keyPoints: [],
     notes: [],
+    steps: [],
     images: [],
     documents: [],
   }
-  type ListKey = 'measurements' | 'keyPoints' | 'notes'
+  type ListKey = 'measurements' | 'keyPoints' | 'notes' | 'steps'
   let current: ListKey | 'images' | 'documents' | 'description' = 'description'
   const description: string[] = []
 
@@ -800,6 +823,7 @@ function parseManualContent(content: string): ManualContentBlocks {
     if (line === 'Notas operativas:') { current = 'notes'; continue }
     if (line === 'Referencias visuales:') { current = 'images'; continue }
     if (line === 'Documentos:') { current = 'documents'; continue }
+    if (STEP_MARKERS_NORMALIZED.includes(normalizeForMatch(line))) { current = 'steps'; continue }
 
     const value = line.startsWith('- ') ? line.slice(2) : line
     if (current === 'description') {
@@ -837,11 +861,36 @@ function ManualBlock({
       </div>
     )
   }
-  // Medidas → lista mono con hairlines; puntos clave → lista con guiones
+  // Medidas → fila etiqueta/valor cuando el texto trae "Etiqueta: valor" (más fácil de escanear que la oración completa)
+  if (variant === 'measure') {
+    return (
+      <div className="dp-block">
+        <div className="dp-block-head"><span className="dp-lbl">{title}</span></div>
+        <dl className="dp-specs-rows">
+          {items.map((item, index) => {
+            const match = item.match(/^([^:]{2,50}):\s*(.+)$/)
+            return (
+              <div key={`${item}-${index}`} className="dp-specs-row">
+                {match ? (
+                  <>
+                    <dt>{match[1]}</dt>
+                    <dd>{match[2]}</dd>
+                  </>
+                ) : (
+                  <dd style={{ gridColumn: '1 / -1' }}>{item}</dd>
+                )}
+              </div>
+            )
+          })}
+        </dl>
+      </div>
+    )
+  }
+  // Puntos clave → lista con guiones
   return (
     <div className="dp-block">
       <div className="dp-block-head"><span className="dp-lbl">{title}</span></div>
-      <ul className={variant === 'measure' ? 'dp-list dp-specs' : 'dp-list'}>
+      <ul className="dp-list">
         {items.map((item, index) => (
           <li key={`${item}-${index}`}><span style={{ whiteSpace: 'pre-wrap' }}>{item}</span></li>
         ))}
