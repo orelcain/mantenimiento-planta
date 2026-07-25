@@ -1,37 +1,30 @@
 /**
  * GraderVisualPilot — piloto de los dos patrones nuevos (hotspots + relacionar),
  * en su propia pestaña "Componentes del equipo" del Grader, con contenido de
- * referencia escrito a mano (no viene de Firestore todavía) y una ilustración
- * plana en vez de una foto real — pendiente encontrar/tomar una foto general
- * del equipo apta como fondo del diagrama (las fotos de OneDrive son de
- * repuestos en bodega o detalles muy cerrados, no sirven para esto). Si el
- * piloto se valida, el siguiente paso es mover este contenido a
+ * referencia escrito a mano (no viene de Firestore todavía). El fondo es una
+ * foto real de la banda de clasificación (Orel la ubicó en OneDrive, ya
+ * sincronizada desde Telegram) en
+ * `public/learning-assets/grader/grader-cinta-capachos-clasificacion.jpg`.
+ * Si el piloto se valida, el siguiente paso es mover este contenido a
  * `learningContent.ts` (tipos `HotspotDiagram` / `MatchingExercise`) para que
  * sea editable desde LearningAdminMachinePage, igual que el resto del manual.
  */
 import { HotspotDiagram, type HotspotPoint } from './HotspotDiagram'
 import { MatchingExercise, type MatchingPair } from './MatchingExercise'
 
+const STAGE_IMG = `${import.meta.env.BASE_URL}learning-assets/grader/grader-cinta-capachos-clasificacion.jpg`
+
 const POINTS: HotspotPoint[] = [
-  { id: 'cadena', x: 15, y: 62, label: 'Cadena de arrastre', description: 'Riesgo de atrapamiento. Bloquear y etiquetar (LOTO) antes de despejar un atasco.' },
-  { id: 'hmi', x: 50, y: 20, label: 'Panel HMI', description: 'Control digital del ciclo. Solo personal autorizado modifica parámetros de calibración.' },
-  { id: 'sensor', x: 85, y: 62, label: 'Sensor de peso', description: 'Celda de carga bajo la banda. Calibración periódica; evitar golpes o sobrecarga.' },
+  { id: 'fotocelula', x: 22, y: 14, label: 'Fotocélula de lectura', description: 'Detecta el producto antes de la zona de clasificación. Mantener el lente limpio; un lente sucio o desalineado hace que el flipper no dispare a tiempo.' },
+  { id: 'cinta', x: 20, y: 68, label: 'Cinta transportadora', description: 'Traslada el producto ya pesado/medido hacia los capachos. Revisar guías laterales y tensión de banda en cada limpieza.' },
+  { id: 'capacho', x: 72, y: 45, label: 'Capacho de clasificación', description: 'Accionado por cilindro neumático; vuelca el producto al canal según su categoría. Riesgo de atrapamiento entre el cilindro y el brazo — no acercar manos con el equipo en marcha.' },
 ]
 
 const PAIRS: MatchingPair[] = [
-  { id: 'atrapamiento', term: 'Atrapamiento', definition: 'Manos cerca de la cadena de arrastre sin bloqueo del equipo' },
-  { id: 'golpe', term: 'Golpe por impacto', definition: 'Producto en movimiento sobre las celdas de carga durante la calibración' },
-  { id: 'caida', term: 'Caída de objetos', definition: 'Cajas clasificadas acumuladas en la zona de descarga' },
+  { id: 'atrapamiento', term: 'Atrapamiento', definition: 'Manos cerca del capacho mientras el cilindro neumático lo acciona' },
+  { id: 'lectura', term: 'Falla de clasificación', definition: 'Fotocélula sucia o desalineada que no detecta el producto a tiempo' },
+  { id: 'golpe', term: 'Golpe por impacto', definition: 'Brazo del capacho volcando producto mientras alguien limpia esa zona' },
 ]
-
-function StageIllustration() {
-  return (
-    <svg width="100%" height="100%" viewBox="0 0 300 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-      <rect x="20" y="55" width="260" height="8" fill="var(--dp-rule-hard)" />
-      <rect x="120" y="14" width="60" height="26" fill="none" stroke="var(--dp-rule-hard)" strokeWidth="1.5" />
-    </svg>
-  )
-}
 
 export function GraderVisualPilot() {
   return (
@@ -40,9 +33,9 @@ export function GraderVisualPilot() {
 
       <div className="dp-objetivo">
         <span className="dp-lbl">Referencia</span>
-        <p>Puntos de riesgo y control sobre la banda transportadora. Toca cada número para ver la nota.</p>
+        <p>Puntos de riesgo y control sobre la banda de clasificación. Toca cada número para ver la nota.</p>
       </div>
-      <HotspotDiagram points={POINTS} stageSvg={<StageIllustration />} height={340} />
+      <HotspotDiagram points={POINTS} stageSvg={<img src={STAGE_IMG} alt="Banda de clasificación del Grader con capachos neumáticos" />} height={340} />
 
       <div className="dp-objetivo" style={{ marginTop: 34 }}>
         <span className="dp-lbl">Autoevaluación</span>
