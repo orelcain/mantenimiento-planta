@@ -447,6 +447,11 @@
 .dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
 .dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
 
+.dossier .dp-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; max-width: 1000px; margin: 22px 0; }
+.dossier .dp-gallery figure { margin: 0; border: 1px solid var(--dp-rule-hard); background: var(--dp-paper); overflow: hidden; }
+.dossier .dp-gallery img { width: 100%; height: 160px; object-fit: cover; display: block; }
+.dossier .dp-gallery figcaption { padding: 8px 10px; font-size: 0.8rem; line-height: 1.35; color: var(--dp-ink-soft, inherit); }
+
 /* Consulta rápida — pestañas horizontales por grupo + 1 tarjeta activa */
 .dossier .dp-qr { max-width: 900px; }
 .dossier .dp-qr-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
