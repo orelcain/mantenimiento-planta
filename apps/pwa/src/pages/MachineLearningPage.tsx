@@ -726,7 +726,6 @@ function ManualList({
     if (nextSection) setActiveId(nextSection.id)
   }
   const resumeSection = resumeId ? sections.find(s => s.id === resumeId) : null
-  const relatedLinks = findMatchedLinks([blocks.description, ...blocks.steps], textLinks)
 
   return (
     <div className="dp-doc">
@@ -873,24 +872,6 @@ function ManualList({
       </>
       )}
       </div>
-
-      {!criticalMode && relatedLinks.length > 0 && (
-        <aside className="dp-related" aria-label="Relacionado con esta sección">
-          <span className="dp-related-head">Relacionado con esta sección</span>
-          {relatedLinks.map(link => (
-            <button
-              key={`${link.kind}-${link.id}`}
-              type="button"
-              className={`dp-related-card ${link.kind === 'glossary' ? 'is-gloss' : ''}`}
-              onClick={() => link.kind === 'procedure' && onJumpToProcedure?.(link.id)}
-              disabled={link.kind === 'glossary'}
-            >
-              <b>{link.phrase}</b>
-              <span>{link.kind === 'procedure' ? 'Procedimientos' : 'Glosario'}</span>
-            </button>
-          ))}
-        </aside>
-      )}
     </div>
   )
 }
@@ -1110,18 +1091,6 @@ function renderBodyText(text: string, links: TextLink[], query: string, onJumpTo
       </span>
     )
   })
-}
-
-/** Enlaces (procedimiento/glosario) que efectivamente aparecen en alguno de `texts` — para el panel "Relacionado". */
-function findMatchedLinks(texts: string[], links: TextLink[]): TextLink[] {
-  const found = new Map<string, TextLink>()
-  const haystack = texts.join('\n').toLowerCase()
-  for (const link of links) {
-    if (!found.has(`${link.kind}-${link.id}`) && haystack.includes(link.phrase.toLowerCase())) {
-      found.set(`${link.kind}-${link.id}`, link)
-    }
-  }
-  return Array.from(found.values())
 }
 
 function ManualBlock({

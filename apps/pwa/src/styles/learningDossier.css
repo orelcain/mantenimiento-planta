@@ -252,18 +252,6 @@
 .dossier .dp-resume-actions button:first-child { font-family: var(--dp-mono); font-size: 12px; color: var(--dp-paper); background: var(--dp-accent); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
 .dossier .dp-resume-dismiss { background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; font-size: 15px; padding: 0 4px; }
 
-/* Panel lateral "Relacionado con esta sección" (solo pantallas anchas; ver dp-doc abajo) */
-.dossier .dp-related { border-left: 1px solid var(--dp-rule); padding-left: 20px; margin-top: 30px; }
-.dossier .dp-related-head { font-family: var(--dp-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--dp-ink-faint); display: block; margin-bottom: 12px; }
-.dossier .dp-related-card { display: block; width: 100%; text-align: left; border: 1px solid var(--dp-rule-hard); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: none; cursor: pointer; }
-.dossier .dp-related-card:disabled { cursor: default; }
-.dossier .dp-related-card b { display: block; font-size: 12px; color: var(--dp-ink); margin-bottom: 3px; }
-.dossier .dp-related-card span { font-size: 11px; color: var(--dp-ink-faint); font-family: var(--dp-mono); }
-.dossier .dp-related-card.is-gloss { border-left: 3px solid var(--dp-ok); }
-@media (min-width: 1300px) {
-  .dossier .dp-doc { grid-template-columns: 256px minmax(0, 1fr) 220px; }
-  .dossier .dp-related { margin-top: 6px; }
-}
 
 /* Vista "Todo lo crítico" */
 .dossier .dp-critical .dp-crit-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); max-width: 66ch; }
