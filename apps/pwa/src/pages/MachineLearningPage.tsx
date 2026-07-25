@@ -166,6 +166,57 @@ const COURSE_TABS: TabDef[] = [
   },
 ]
 
+/**
+ * ScrollTabs — selector de secciones de la máquina/curso: una sola fila subrayada
+ * con scroll horizontal, igual en desktop y en móvil (nunca se envuelve a 2 filas).
+ * Estilo "documentation portal" (subrayado) en vez de píldoras: son varias secciones
+ * de consulta técnica, no un panel de ajustes con opciones excluyentes.
+ */
+function ScrollTabs({
+  tabs,
+  activeTab,
+  onSelect,
+  quizPassed,
+}: {
+  tabs: TabDef[]
+  activeTab: TabId
+  onSelect: (id: TabId) => void
+  quizPassed: boolean
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const scrollBy = (dx: number) => trackRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
+
+  return (
+    <nav className="dp-scroll-tabs" aria-label="Secciones">
+      <button type="button" className="dp-scroll-arrow left" onClick={() => scrollBy(-160)} aria-label="Desplazar a la izquierda">
+        <ChevronLeft style={{ width: 15, height: 15 }} />
+      </button>
+      <div className="dp-scroll-track" ref={trackRef}>
+        {tabs.map(tab => {
+          const TabIcon = tab.icon
+          const evalDone = tab.id === 'quiz' && quizPassed
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className="dp-scroll-tab"
+              onClick={() => onSelect(tab.id)}
+              aria-current={activeTab === tab.id ? 'true' : undefined}
+            >
+              {evalDone ? <span className="dp-scroll-tab-done">✓</span> : <TabIcon style={{ width: 13, height: 13 }} />}
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div className="dp-scroll-fade" aria-hidden />
+      <button type="button" className="dp-scroll-arrow right" onClick={() => scrollBy(160)} aria-label="Desplazar a la derecha">
+        <ChevronRight style={{ width: 15, height: 15 }} />
+      </button>
+    </nav>
+  )
+}
+
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -334,54 +385,13 @@ export function MachineLearningPage() {
         </header>
 
         <div className="dp-course">
-          {/* Sidebar de módulos (desktop): título + progreso + checklist */}
-          <aside className="dp-side" aria-label="Secciones del módulo">
-            <div className="dp-side-title">{machine.name}</div>
-            {quizPassed && (
-              <div className="dp-side-progress">
-                <span className="dp-progress-label is-ok">✓ Evaluación aprobada · {quizBest}%</span>
-              </div>
-            )}
-            <ul className="dp-side-list" style={quizPassed ? undefined : { marginTop: 12 }}>
-              {tabs.map(tab => {
-                const TabIcon = tab.icon
-                const evalDone = tab.id === 'quiz' && quizPassed
-                return (
-                  <li key={tab.id} className={evalDone ? 'is-done' : ''}>
-                    <button
-                      onClick={() => setActiveTab(tab.id)}
-                      aria-current={activeTab === tab.id ? 'true' : undefined}
-                    >
-                      <span className="dp-side-ico">
-                        {evalDone ? '✓' : <TabIcon style={{ width: 11, height: 11 }} />}
-                      </span>
-                      {tab.label}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </aside>
-
           <div className="dp-main-col">
-            {/* Índice / pestañas (móvil) */}
-            <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
-              {tabs.map((tab, i) => {
-                const evalDone = tab.id === 'quiz' && quizPassed
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    aria-current={activeTab === tab.id ? 'true' : undefined}
-                  >
-                    {evalDone
-                      ? <span className="dp-toc-done" aria-label="Evaluación aprobada">✓</span>
-                      : <b>{String(i + 1).padStart(2, '0')}</b>}
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </nav>
+            <ScrollTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onSelect={setActiveTab}
+              quizPassed={quizPassed}
+            />
 
         {/* Cabecera de sección activa */}
         <div className="dp-sec-head" style={{ marginTop: 34 }}>
