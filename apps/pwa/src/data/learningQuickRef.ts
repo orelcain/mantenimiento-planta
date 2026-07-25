@@ -433,6 +433,64 @@ const FISHKEN: QuickRefGroup[] = [
   },
 ]
 
+const DETECTOR_METALES: QuickRefGroup[] = [
+  {
+    title: 'Identificación',
+    rows: [
+      { label: 'Familia', value: 'Sartorius Vistus (variantes C/H/T/E/S/R/EI según abertura y electrónica)' },
+      { label: 'Detecta', value: 'Metales ferrosos, no ferrosos (aluminio, latón, bronce) y aceros inoxidables (magnéticos y no magnéticos)' },
+      { label: 'Más difícil de detectar', value: 'Acero inoxidable no magnético (AISI 304 / V2A)' },
+    ],
+  },
+  {
+    title: 'Zona libre de metales',
+    rows: [
+      { label: 'Aguas arriba/abajo — transporte inox', value: '3 veces la altura de la abertura' },
+      { label: 'Aguas arriba/abajo — transporte acero', value: '4 veces la altura de la abertura' },
+      { label: 'Izquierda/derecha/arriba/abajo', value: 'Al menos el equivalente a la altura de la abertura' },
+    ],
+    note: 'Si no se puede mantener la zona libre, la sensibilidad se reduce.',
+  },
+  {
+    title: 'Perfiles de producto',
+    rows: [
+      { label: 'Antes de inspeccionar', value: 'Crear perfil + aprender el efecto de producto (mínimo 3 piezas libres de metal)' },
+      { label: 'Nombre/N° artículo', value: 'Máximo 15 caracteres para verse completos' },
+      { label: 'Editar ajustes de detección', value: 'Solo ingeniero o responsable de mantenimiento' },
+    ],
+  },
+  {
+    title: 'Semáforo y mensajes',
+    rows: [
+      { label: 'Rojo — Error (E)', value: 'Detección se detiene, dispara relé Error. Confirma: ingeniero' },
+      { label: 'Amarillo — Advertencia (W)', value: 'Detección sigue funcionando. Confirma: operador o ingeniero' },
+      { label: 'Informativo — Evento (M)', value: 'Detección funciona normal (ej. USB conectado)' },
+      { label: 'Detección (X)', value: 'Se disparó la detección de metal' },
+    ],
+    note: 'Solventar la causa SIEMPRE antes de confirmar — un error confirmado sin resolver reaparece.',
+  },
+  {
+    title: 'Diagnóstico rápido (código → acción)',
+    rows: [
+      { label: 'W0008 — recipiente lleno', value: 'Vaciar el recipiente colector' },
+      { label: 'W0017/W0018 — cinta vs impulsos', value: 'Revisar transmisor de impulsos y sensor inicio/parada de cinta' },
+      { label: 'W0019 — transporte sucio', value: 'Limpiar; si no mejora, sustituir cinta o cadena' },
+      { label: 'W0020 — acumulación de metal', value: 'Revisar origen de detecciones y aprendizaje del producto' },
+      { label: 'EFF07 — separación muy corta', value: 'Aumentar distancia entre separador y detector' },
+      { label: 'EFF08 — campo transmisor bajo', value: 'Aumentar tensión del transmisor en "Cambiar datos producto"' },
+      { label: 'Falsos rechazos recurrentes', value: 'Reaprender efecto de producto; revisar zona libre de metales' },
+      { label: 'E01xx / FFFF / software', value: 'No accionable en planta — notificar a Sartorius Mechatronics' },
+    ],
+  },
+  {
+    title: 'Mantenimiento del terminal',
+    rows: [
+      { label: 'Batería reloj interno', value: 'Litio 3V tipo CR2032 — dura ~3 años' },
+      { label: 'Al agotarse', value: 'Se pierden fecha y hora; reajustar tras cambiarla' },
+    ],
+  },
+]
+
 const GEA: QuickRefGroup[] = [
   {
     title: 'Claves de acceso',
@@ -451,6 +509,7 @@ const QUICK_REF: Record<string, QuickRefGroup[]> = {
   'baader-142': BAADER_142,
   'baader-200': BAADER_200,
   fishken: FISHKEN,
+  'detector-metales': DETECTOR_METALES,
 }
 
 export function getQuickRef(machineSlug: string): QuickRefGroup[] | null {

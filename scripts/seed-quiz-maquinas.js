@@ -946,23 +946,171 @@ const QUIZ = {
 
   'detector-metales': [
     {
-      question: '¿Qué modelo es el detector de metales principal de la línea?',
-      options: ['IQ3', 'IQ4', 'Vistus V1', 'Safeline X'],
-      correctIndex: 1,
-      explanation: 'El detector principal es el IQ4 (también hay material del Vistus en el expediente).',
-    },
-    {
-      question: '¿Qué parámetro documentado determina CUÁNDO se acciona el rechazo tras detectar metal?',
+      question: "¿Qué modelo es el detector de metales principal de la línea?",
       options: [
-        'La sensibilidad de esfera',
-        'El retardo de rechazo',
-        'La frecuencia de trabajo',
-        'El umbral de producto',
+        "IQ3",
+        "IQ4",
+        "Vistus V1",
+        "Safeline X"
       ],
       correctIndex: 1,
-      explanation: 'El retardo de rechazo (documentado en el PDF del expediente) sincroniza la detección con el momento en que el producto llega al mecanismo de rechazo.',
+      explanation: "El detector principal es el IQ4 (también hay material del Vistus en el expediente).",
     },
-  ],
+    {
+      question: "¿Qué parámetro documentado determina CUÁNDO se acciona el rechazo tras detectar metal?",
+      options: [
+        "La sensibilidad de esfera",
+        "El retardo de rechazo",
+        "La frecuencia de trabajo",
+        "El umbral de producto"
+      ],
+      correctIndex: 1,
+      explanation: "El retardo de rechazo (documentado en el PDF del expediente) sincroniza la detección con el momento en que el producto llega al mecanismo de rechazo.",
+    },
+    {
+      question: "¿Qué debe APRENDER primero el detector Vistus para poder distinguir metal del propio producto?",
+      options: [
+        "El efecto de producto",
+        "El peso del producto",
+        "El código del operador",
+        "La velocidad de la cinta"
+      ],
+      correctIndex: 0,
+      explanation: "Muchos productos generan señal propia (efecto de producto); el detector debe aprenderlo primero para no confundirlo con una contaminación metálica.",
+    },
+    {
+      question: "¿Cuántos productos libres de metal se necesitan como mínimo para el ajuste automático de un perfil?",
+      options: [
+        "5",
+        "1",
+        "10",
+        "3"
+      ],
+      correctIndex: 3,
+      explanation: "El ajuste automático de producto requiere dejar pasar un mínimo de 3 productos libres de metal por la abertura.",
+    },
+    {
+      question: "Con transporte de acero inoxidable, ¿cuánto debe ser la zona libre de metales aguas arriba y abajo del detector?",
+      options: [
+        "5 veces la altura de la abertura",
+        "2 veces la altura de la abertura",
+        "4 veces la altura de la abertura",
+        "3 veces la altura de la abertura"
+      ],
+      correctIndex: 3,
+      explanation: "Con transporte de acero inoxidable la zona libre es 3 veces la altura de la abertura; con acero (no inox) es 4 veces.",
+    },
+    {
+      question: "Entre AISI 420 (magnético) y AISI 304 (no magnético), ¿cuál acero inoxidable es MÁS DIFÍCIL de detectar?",
+      options: [
+        "Ambos igual de fáciles",
+        "AISI 304",
+        "Ninguno se puede detectar",
+        "AISI 420"
+      ],
+      correctIndex: 1,
+      explanation: "El acero inoxidable no magnético (AISI 304 / V2A) es el más difícil de detectar de los dos.",
+    },
+    {
+      question: "Cuando el semáforo se pone ROJO (mensaje de error, E), ¿qué pasa con la detección?",
+      options: [
+        "Se detiene y se dispara el relé Error",
+        "Baja la sensibilidad a la mitad",
+        "Se reinicia automáticamente",
+        "Sigue funcionando normal"
+      ],
+      correctIndex: 0,
+      explanation: "Un mensaje de error (E) pone el semáforo en rojo, detiene la detección y dispara el relé Error.",
+    },
+    {
+      question: "¿Qué privilegio se necesita para confirmar un mensaje de ERROR?",
+      options: [
+        "Jefe de calidad únicamente",
+        "No se puede confirmar, hay que reiniciar",
+        "Ingeniero",
+        "Cualquier operador"
+      ],
+      correctIndex: 2,
+      explanation: "Confirmar un error requiere privilegio de ingeniero; advertencias y detecciones las puede confirmar operador o ingeniero.",
+    },
+    {
+      question: "Ante la advertencia W0008 (demasiados productos en el recipiente colector), ¿qué se hace?",
+      options: [
+        "Aumentar la sensibilidad",
+        "Vaciar el recipiente colector",
+        "Reiniciar el detector",
+        "Cambiar el perfil de producto"
+      ],
+      correctIndex: 1,
+      explanation: "W0008 indica que hay demasiados productos en el recipiente colector — hay que vaciarlo; si el número de rechazos es anormalmente alto, además revisar el perfil.",
+    },
+    {
+      question: "Ante W0019 (sistema de transporte sucio), ¿qué riesgo hay si no se corrige?",
+      options: [
+        "Ninguno, es solo informativo",
+        "Falsas activaciones y pérdida de sensibilidad",
+        "Se bloquea el separador permanentemente",
+        "Se borra la memoria del equipo"
+      ],
+      correctIndex: 1,
+      explanation: "Un sistema de transporte sucio (cinta o cadena) genera riesgo de falsas activaciones y pérdida de sensibilidad — hay que limpiar o sustituir la cinta/cadena.",
+    },
+    {
+      question: "Ante el error EFF07 (\"distancia de separación demasiado corta\"), ¿cuál es la solución?",
+      options: [
+        "Acercar el separador al detector",
+        "Cambiar la batería del terminal",
+        "Aumentar la distancia entre el separador y el detector",
+        "Aumentar la tensión del transmisor"
+      ],
+      correctIndex: 2,
+      explanation: "EFF07 indica que el tiempo de desplazamiento para separar el producto es muy corto — se soluciona aumentando la distancia entre separador y detector.",
+    },
+    {
+      question: "¿Qué batería usa el terminal del detector y cada cuánto se agota aproximadamente?",
+      options: [
+        "AA alcalina, 1 año",
+        "No tiene batería, es de red",
+        "Litio 3V tipo CR2032, unos 3 años",
+        "Recargable 9V, 6 meses"
+      ],
+      correctIndex: 2,
+      explanation: "La batería del reloj interno es de litio 3V tipo CR2032 y dura aproximadamente 3 años; al agotarse se pierden fecha y hora.",
+    },
+    {
+      question: "¿Cuál es el máximo de caracteres para el nombre de producto y el número de artículo en un perfil?",
+      options: [
+        "8 caracteres",
+        "Sin límite",
+        "15 caracteres",
+        "25 caracteres"
+      ],
+      correctIndex: 2,
+      explanation: "El nombre de producto y el número de artículo no deben superar 15 caracteres para verse completos en el área línea/producto.",
+    },
+    {
+      question: "¿Qué se debe hacer ANTES de confirmar un mensaje de error?",
+      options: [
+        "Solventar la causa del error",
+        "Nada, solo tocar Confirmar",
+        "Esperar 24 horas",
+        "Reiniciar el terminal"
+      ],
+      correctIndex: 0,
+      explanation: "Hay que solventar la causa antes de confirmar — un error confirmado sin resolver la causa reaparece.",
+    },
+    {
+      question: "Si el detector rechaza producto sano (falso rechazo) de forma reiterada, ¿qué se revisa primero?",
+      options: [
+        "El idioma de la pantalla",
+        "El número de artículo del perfil",
+        "La batería del terminal",
+        "El aprendizaje del efecto de producto y la zona libre de metales"
+      ],
+      correctIndex: 3,
+      explanation: "Los falsos rechazos suelen venir de un efecto de producto mal aprendido (cambió humedad/sal/temperatura) o de que la zona libre de metales esté invadida.",
+    },
+    ],
 
   'termoformadora-gea': [
     {
