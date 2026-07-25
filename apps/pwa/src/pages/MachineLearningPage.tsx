@@ -50,7 +50,7 @@ import { getQuizBest } from '@/utils/learningProgress'
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos'
+type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components'
 
 interface TabDef {
   id: TabId
@@ -108,6 +108,17 @@ const QUICKREF_TAB: TabDef = {
   shortLabel: 'Rápida',
   icon: Zap,
   description: 'Datos clave del equipo: parámetros, rutas del controlador y tolerancias.',
+}
+
+/** Pestaña "Componentes del equipo" — piloto de diagrama de puntos de riesgo/control
+ *  sobre foto real de la máquina. Solo se muestra en las máquinas que tienen contenido
+ *  cargado (hoy: Grader, ver GraderVisualPilot). */
+const COMPONENTS_TAB: TabDef = {
+  id: 'components',
+  label: 'Componentes del equipo',
+  shortLabel: 'Componentes',
+  icon: ImageIcon,
+  description: 'Puntos de riesgo y control señalados sobre fotos reales del equipo.',
 }
 
 /** Pestaña "Evaluación" para máquinas — antes el quiz vivía solo en cursos y
@@ -310,6 +321,7 @@ export function MachineLearningPage() {
     : [
         ...(quickRefGroups ? [QUICKREF_TAB] : []),
         ...TABS,
+        ...(machine.slug === 'grader' ? [COMPONENTS_TAB] : []),
         ...(commonParts.length > 0 ? [REPUESTOS_TAB] : []),
         QUIZ_TAB_MACHINE,
       ]
@@ -412,20 +424,19 @@ export function MachineLearningPage() {
             onJumpConsumed={() => setPendingProcedureId(null)}
           />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <>
-            <ManualList
-              sections={manualSections}
-              machineSlug={machine.slug}
-              canEdit={isAdmin}
-              isCourse={isCourse}
-              jumpToOrder={pendingLessonOrder}
-              onJumpConsumed={() => setPendingLessonOrder(null)}
-              procedures={procedures}
-              glossary={glossary}
-              onJumpToProcedure={id => { setPendingProcedureId(id); setActiveTab('procedures') }}
-            />
-            {machine.slug === 'grader' && <GraderVisualPilot />}
-          </>
+          <ManualList
+            sections={manualSections}
+            machineSlug={machine.slug}
+            canEdit={isAdmin}
+            isCourse={isCourse}
+            jumpToOrder={pendingLessonOrder}
+            onJumpConsumed={() => setPendingLessonOrder(null)}
+            procedures={procedures}
+            glossary={glossary}
+            onJumpToProcedure={id => { setPendingProcedureId(id); setActiveTab('procedures') }}
+          />
+        ) : activeTab === 'components' ? (
+          <GraderVisualPilot />
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
@@ -679,7 +690,10 @@ function ManualList({
   const linkify = (text: string) => renderBodyText(text, textLinks, query, onJumpToProcedure ?? (() => {}))
   const normalizedQuery = normalizeForMatch(query.trim())
   const filteredSections = normalizedQuery
-    ? sections.filter(sec => normalizeForMatch(sec.title).includes(normalizedQuery))
+    ? sections.filter(sec => {
+        const haystack = [sec.title, sec.content, sec.objetivo, sec.porque].filter(Boolean).join(' \n ')
+        return normalizeForMatch(haystack).includes(normalizedQuery)
+      })
     : sections
 
   // Metadata por sección (parseada una vez): iconos del índice + "Todo lo crítico".
