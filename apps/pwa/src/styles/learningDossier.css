@@ -404,8 +404,12 @@
 .dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
 .dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
 
-/* Consulta rápida — lámina de datos duros en tarjetas escaneables */
-.dossier .dp-qr { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; max-width: 900px; }
+/* Consulta rápida — pestañas horizontales por grupo + 1 tarjeta activa */
+.dossier .dp-qr { max-width: 900px; }
+.dossier .dp-qr-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.dossier .dp-qr-tabs button { font-family: var(--dp-mono); font-size: 11.5px; letter-spacing: .02em; color: var(--dp-ink-soft); background: var(--dp-accent-soft); border: 1px solid transparent; border-radius: 999px; padding: 6px 13px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.dossier .dp-qr-tabs button:hover { color: var(--dp-ink); border-color: var(--dp-accent); }
+.dossier .dp-qr-tabs button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); }
 .dossier .dp-qr-card { border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-paper); padding: 16px 18px; }
 .dossier .dp-qr-title { font-size: 13px; font-weight: 700; color: var(--dp-accent); margin: 0 0 10px; }
 .dossier .dp-qr-rows { margin: 0; }
