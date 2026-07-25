@@ -308,6 +308,70 @@ const BAADER_142: QuickRefGroup[] = [
   },
 ]
 
+const BAADER_200: QuickRefGroup[] = [
+  {
+    title: 'Identificación',
+    rows: [
+      { label: 'Modelo', value: 'BAADER 200' },
+      { label: 'Función', value: 'Fileteadora — corte de filetes, cuchillos ventrales/dorsales/punzones/rascadores/cola' },
+      { label: 'Manual vigente', value: 'Nuevo manual de ajuste Baader 200 V4' },
+    ],
+  },
+  {
+    title: 'Regla general de roscas',
+    rows: [
+      { label: 'Con muesca', value: 'Se saca en sentido horario · se pone en sentido antihorario' },
+      { label: 'Sin muesca', value: 'Se saca en sentido antihorario · se pone en sentido horario' },
+    ],
+    note: 'Regla espejo — verificar siempre si la pieza tiene muesca antes de girar.',
+  },
+  {
+    title: 'Ajustes clave (tolerancias)',
+    rows: [
+      { label: '1ra Alimentación — chapaletas', value: 'referencia catálogo 32-28mm; en la práctica generalmente menos' },
+      { label: '2da Alimentación — chapaletas vs dorsales', value: '±0.5mm (casi chocando)' },
+      { label: '2do levantador — vs contradiente', value: '5mm' },
+      { label: 'Cuchillos ventrales — avance "a"', value: '5mm' },
+      { label: 'Guías flotantes — abertura máxima', value: '4.8mm (ajustar SIEMPRE después de ventrales)' },
+      { label: 'Ventrales vs dorsales', value: '12mm — verificar siempre al cambiar cuchillos' },
+      { label: 'Levante cuchillos dorsales', value: '20mm al paso de la silleta' },
+      { label: 'Cuchillos punzones — separación', value: '8mm' },
+      { label: 'Cuchillos rascadores — abertura', value: '17-18mm' },
+      { label: 'Cuchillos ventrales — diámetro objetivo', value: '~200mm (el mayor disponible)' },
+    ],
+  },
+  {
+    title: 'Sistema de seguridad (9 puntos)',
+    rows: [
+      { label: '1', value: 'Límite de carrera de entrada' },
+      { label: '2', value: 'Parada de emergencia' },
+      { label: '3', value: 'Límite de carrera corte de cola' },
+      { label: '4', value: 'Sensor de seguridad guía dorsal' },
+      { label: '5-8', value: 'Sensores de seguridad pasillo (zonas 5 a 8)' },
+      { label: '9', value: 'Interruptor principal' },
+    ],
+  },
+  {
+    title: 'Precauciones — cambio de cuchillos nuevos',
+    rows: [
+      { label: 'Medida patrón', value: 'Ajustar a 12mm entre cuchillos ventrales y dorsales' },
+      { label: 'Guías flotantes', value: 'Reajustar SIEMPRE con cuchillos nuevos' },
+      { label: 'Guías frontales/superior', value: 'Reajustar si es necesario' },
+    ],
+  },
+  {
+    title: 'Diagnóstico rápido (síntoma → revisar)',
+    rows: [
+      { label: 'Gay ping a lo largo del esquelón', value: 'Filo y altura de trabajo del cuchillo de punta; altura y abertura de rascadores' },
+      { label: 'Gay ping zona cola/aleta anal', value: 'Diámetro (~200mm) y filo de ventrales; separación ventrales-dorsales (máx 12mm); resortes de guías flotantes' },
+      { label: 'Espina belly', value: 'Altura de cuchillos rascadores; calidad del eviscerado (sin esófago ni riñón)' },
+      { label: 'Colgajo en línea del esquelón', value: 'Filo y abertura de cuchillos de punta; abertura de desviadores y cuchillos de cola' },
+      { label: 'Exceso de aleta anal', value: 'Alineamiento de guías flotantes; filo de ventrales; resortes de guías flotantes' },
+      { label: 'Embrague bloqueado', value: 'Verificar objeto interpuesto ANTES de reajustar (perno M8 parker + palanca 30×30×130mm)' },
+    ],
+  },
+]
+
 const GEA: QuickRefGroup[] = [
   {
     title: 'Claves de acceso',
@@ -324,6 +388,7 @@ const QUICK_REF: Record<string, QuickRefGroup[]> = {
   'marel-filete': MAREL_FILETE,
   'termoformadora-gea': GEA,
   'baader-142': BAADER_142,
+  'baader-200': BAADER_200,
 }
 
 export function getQuickRef(machineSlug: string): QuickRefGroup[] | null {

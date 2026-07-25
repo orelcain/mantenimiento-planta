@@ -621,39 +621,182 @@ const QUIZ = {
 
   'baader-200': [
     {
-      question: 'Según la regla de la máquina, un tornillo/tuerca CON muesca…',
+      question: "Según la regla de la máquina, un tornillo/tuerca CON muesca…",
       options: [
-        'Se saca en sentido horario y se pone antihorario',
-        'Se saca antihorario y se pone horario',
-        'Se saca y se pone en sentido horario',
-        'No se debe tocar en terreno',
+        "Se saca en sentido horario y se pone antihorario",
+        "Se saca antihorario y se pone horario",
+        "Se saca y se pone en sentido horario",
+        "No se debe tocar en terreno"
       ],
       correctIndex: 0,
-      explanation: 'Con muesca: se saca horario / se pone antihorario. Sin muesca es al revés (saca antihorario, pone horario).',
+      explanation: "Con muesca: se saca horario / se pone antihorario. Sin muesca es al revés (saca antihorario, pone horario).",
     },
     {
-      question: 'Y un tornillo/tuerca SIN muesca…',
+      question: "Y un tornillo/tuerca SIN muesca…",
       options: [
-        'Se saca horario y se pone antihorario',
-        'Se saca antihorario y se pone horario',
-        'Se saca y se pone antihorario',
-        'Da lo mismo el sentido',
+        "Se saca horario y se pone antihorario",
+        "Se saca antihorario y se pone horario",
+        "Se saca y se pone antihorario",
+        "Da lo mismo el sentido"
       ],
       correctIndex: 1,
-      explanation: 'Sin muesca: se saca antihorario / se pone horario — la regla espejo de las piezas con muesca.',
+      explanation: "Sin muesca: se saca antihorario / se pone horario — la regla espejo de las piezas con muesca.",
     },
     {
-      question: '¿Cuál es el manual de ajustes vigente del equipo?',
+      question: "¿Cuál es el manual de ajustes vigente del equipo?",
       options: [
-        'Manual de ajuste Baader 200 V4',
-        'Manual Boanerges Service rev. 2',
-        'Manual de fábrica 1998',
-        'No existe manual de ajustes',
+        "Manual de ajuste Baader 200 V4",
+        "Manual Boanerges Service rev. 2",
+        "Manual de fábrica 1998",
+        "No existe manual de ajustes"
       ],
       correctIndex: 0,
-      explanation: 'El vigente es el "Nuevo manual de ajuste Baader 200 V4"; la revisión 2 de Boanerges Service quedó como referencia anterior.',
+      explanation: "El vigente es el \"Nuevo manual de ajuste Baader 200 V4\"; la revisión 2 de Boanerges Service quedó como referencia anterior.",
     },
-  ],
+    {
+      question: "¿Qué hay que hacer si la materia prima se trabaja a temperatura menor a 0°C, en la 1ra Alimentación?",
+      options: [
+        "Aflojar el resorte de la silleta",
+        "Bajar la velocidad de la cinta",
+        "Dar más presión al resorte (tuerca Fig 6)",
+        "Aumentar la distancia de las chapaletas a 32mm"
+      ],
+      correctIndex: 2,
+      explanation: "Con materia prima bajo 0°C hay que dar más presión al resorte, ajustable con la tuerca Fig 6.",
+    },
+    {
+      question: "En la 2da Alimentación, ¿qué tolerancia deben tener las chapaletas respecto al filo de los cuchillos dorsales?",
+      options: [
+        "±0.5mm (casi chocando entre sí)",
+        "12mm de holgura",
+        "No hay tolerancia, deben tocarse siempre",
+        "5mm de holgura"
+      ],
+      correctIndex: 0,
+      explanation: "Las chapaletas Fig 3-4 deben quedar por dentro del filo de los cuchillos dorsales a ±0.5mm, casi chocando entre sí.",
+    },
+    {
+      question: "¿Por qué el 2do levantador de aletas se baja más de lo normal?",
+      options: [
+        "Por no contar con chapas guías de aleta",
+        "Por temperatura de la materia prima",
+        "Por error de fábrica",
+        "Por desgaste del motor"
+      ],
+      correctIndex: 0,
+      explanation: "El 2do levantador no tiene chapas guías de aleta, por lo tanto se baja más de lo normal que el 1ro.",
+    },
+    {
+      question: "¿Cuál es la medida de avance \"a\" de los cuchillos ventrales?",
+      options: [
+        "177.5mm",
+        "12mm",
+        "5mm",
+        "20mm"
+      ],
+      correctIndex: 2,
+      explanation: "La medida \"a\" de avance de los cuchillos ventrales es de 5mm.",
+    },
+    {
+      question: "¿En qué orden hay que hacer el ajuste de guías flotantes respecto a los cuchillos ventrales?",
+      options: [
+        "Solo en mantención anual",
+        "Siempre DESPUÉS del ajuste de cuchillos ventrales",
+        "Siempre ANTES del ajuste de cuchillos ventrales",
+        "Da lo mismo el orden"
+      ],
+      correctIndex: 1,
+      explanation: "El ajuste de guías flotantes debe realizarse SIEMPRE después del ajuste de cuchillos ventrales.",
+    },
+    {
+      question: "¿Cuál es la distancia de referencia entre cuchillos ventrales y dorsales que hay que verificar SIEMPRE al cambiar cuchillos nuevos?",
+      options: [
+        "12mm",
+        "8mm",
+        "20mm",
+        "17-18mm"
+      ],
+      correctIndex: 0,
+      explanation: "La distancia de 12mm entre cuchillos ventrales y dorsales debe verificarse siempre al cambiar cuchillos nuevos, para que no rocen con las chapaletas de la 2da alimentación.",
+    },
+    {
+      question: "¿Cuánto deben levantar los cuchillos dorsales al paso de la silleta?",
+      options: [
+        "30mm",
+        "12mm",
+        "20mm",
+        "5mm"
+      ],
+      correctIndex: 2,
+      explanation: "Los cuchillos dorsales deben levantar 20mm al paso de la silleta, altura dada por la palanca del trinquete.",
+    },
+    {
+      question: "Según los cuchillos punzones, ¿qué pasa si quedan más ALTOS de lo normal?",
+      options: [
+        "Cortan la espina del flanco",
+        "No afecta el corte",
+        "Gay ping en el filete a lo largo del esquelón",
+        "Los rascadores no cumplen su función"
+      ],
+      correctIndex: 2,
+      explanation: "Cuchillos punzones más altos de lo normal producen gay ping en el filete a lo largo del esquelón; más bajos cortan la espina del flanco y los rascadores no funcionan.",
+    },
+    {
+      question: "¿Cuál es la abertura correcta de los cuchillos rascadores?",
+      options: [
+        "8mm",
+        "17-18mm",
+        "3mm",
+        "0.5mm"
+      ],
+      correctIndex: 1,
+      explanation: "La abertura de los cuchillos rascadores debe ser entre 17-18mm, ajustada en posición de trabajo.",
+    },
+    {
+      question: "En el sistema de seguridad de la Baader 200, ¿cuántos puntos de seguridad tiene el circuito?",
+      options: [
+        "12",
+        "7",
+        "5",
+        "9"
+      ],
+      correctIndex: 3,
+      explanation: "El sistema de seguridad tiene 9 puntos: límite de carrera de entrada, parada de emergencia, límite de carrera corte de cola, sensor guía dorsal, 4 sensores de pasillo (zonas 5-8) e interruptor principal.",
+    },
+    {
+      question: "Al hacer precauciones por cambio de cuchillos nuevos, además de ajustar la medida patrón de 12mm, ¿qué más hay que reajustar SIEMPRE?",
+      options: [
+        "El sistema de seguridad",
+        "Las guías flotantes",
+        "La velocidad de la silleta",
+        "El embrague"
+      ],
+      correctIndex: 1,
+      explanation: "Con cuchillos nuevos siempre hay que reajustar las guías flotantes, para asegurar la calidad del filo de los cuchillos nuevos.",
+    },
+    {
+      question: "Ante gay ping en la zona de cola o aleta anal, ¿qué característica deben tener los cuchillos ventrales instalados?",
+      options: [
+        "El diámetro más cercano a 200mm (el mayor)",
+        "No influye el diámetro",
+        "El diámetro más chico disponible",
+        "Cuchillos nuevos sin usar"
+      ],
+      correctIndex: 0,
+      explanation: "Para evitar gay ping en cola/aleta anal, los cuchillos ventrales deben ser los de mayor diámetro, lo más cercano a 200mm, y en excelente estado de filo.",
+    },
+    {
+      question: "¿Cuándo se debe reajustar el embrague de la Baader 200?",
+      options: [
+        "Nunca, es de fábrica",
+        "Solo cuando no hay causal justificada de bloqueo (sin objeto interpuesto)",
+        "Cada vez que se cambian cuchillos",
+        "Todos los días al arrancar"
+      ],
+      correctIndex: 1,
+      explanation: "El reajuste del embrague se hace solo cuando no hay causal justificada de bloqueo, es decir, cuando se verificó que no hay ningún objeto interpuesto al accionamiento normal.",
+    },
+    ],
 
   fishken: [
     {
