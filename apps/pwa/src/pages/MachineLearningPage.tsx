@@ -5,13 +5,13 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap,
+  MonitorPlay, Zap, Search,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -184,6 +184,8 @@ export function MachineLearningPage() {
   const [loadingTab, setLoadingTab] = useState(false)
   // Leccion a la que saltar cuando el usuario toca "Leccion N" en el Glosario.
   const [pendingLessonOrder, setPendingLessonOrder] = useState<number | null>(null)
+  // Procedimiento a abrir cuando el usuario toca un link dentro del texto del Manual.
+  const [pendingProcedureId, setPendingProcedureId] = useState<string | null>(null)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
@@ -210,6 +212,9 @@ export function MachineLearningPage() {
       loaders.push(listProcedures(machine.slug).then(list => { if (!cancelled) setProcedures(list) }))
     } else if (activeTab === 'manual') {
       loaders.push(listManualSections(machine.slug).then(list => { if (!cancelled) setManualSections(list) }))
+      // Tambien procedimientos + glosario: el Manual enlaza menciones de ambos en su texto.
+      loaders.push(listProcedures(machine.slug).then(list => { if (!cancelled) setProcedures(list) }))
+      loaders.push(listGlossary(machine.slug).then(list => { if (!cancelled) setGlossary(list) }))
     } else if (activeTab === 'flows') {
       loaders.push(listFlows(machine.slug).then(list => { if (!cancelled) setFlows(list) }))
     } else if (activeTab === 'diagnosis') {
@@ -390,10 +395,25 @@ export function MachineLearningPage() {
         ) : loadingTab ? (
           <p className="dp-loading">Cargando…</p>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
-          <ProceduresList procedures={procedures} machineSlug={machine.slug} />
+          <ProceduresList
+            procedures={procedures}
+            machineSlug={machine.slug}
+            jumpToId={pendingProcedureId}
+            onJumpConsumed={() => setPendingProcedureId(null)}
+          />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
           <>
-            <ManualList sections={manualSections} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
+            <ManualList
+              sections={manualSections}
+              machineSlug={machine.slug}
+              canEdit={isAdmin}
+              isCourse={isCourse}
+              jumpToOrder={pendingLessonOrder}
+              onJumpConsumed={() => setPendingLessonOrder(null)}
+              procedures={procedures}
+              glossary={glossary}
+              onJumpToProcedure={id => { setPendingProcedureId(id); setActiveTab('procedures') }}
+            />
             {machine.slug === 'grader' && <GraderVisualPilot />}
           </>
         ) : activeTab === 'flows' && flows.length > 0 ? (
@@ -480,8 +500,29 @@ function HmiPracticeButton({ contentId, machineSlug }: { contentId: string; mach
  * cuerpo despliega descripción, ruta de menú, fórmula, los pasos numerados y
  * los criterios de éxito.
  */
-function ProceduresList({ procedures, machineSlug }: { procedures: Procedure[]; machineSlug?: string }) {
+function ProceduresList({
+  procedures,
+  machineSlug,
+  jumpToId = null,
+  onJumpConsumed,
+}: {
+  procedures: Procedure[]
+  machineSlug?: string
+  /** Id de procedimiento a abrir (viene de un link dentro del Manual). */
+  jumpToId?: string | null
+  onJumpConsumed?: () => void
+}) {
   const [openId, setOpenId] = useState<string | null>(procedures[0]?.id ?? null)
+
+  // Salto a un procedimiento concreto desde un link dentro del Manual.
+  useEffect(() => {
+    if (jumpToId == null) return
+    if (procedures.some(p => p.id === jumpToId)) {
+      setOpenId(jumpToId)
+      document.getElementById(`proc-${jumpToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    onJumpConsumed?.()
+  }, [jumpToId, procedures, onJumpConsumed])
 
   return (
     <div className="dp-acc">
@@ -494,7 +535,7 @@ function ProceduresList({ procedures, machineSlug }: { procedures: Procedure[]; 
           machineSlug === 'grader' && hmiPracticeUrl(proc.id) ? 'práctica' : null,
         ].filter(Boolean) as string[]
         return (
-          <div key={proc.id} className="dp-acc-item" data-open={open}>
+          <div key={proc.id} id={`proc-${proc.id}`} className="dp-acc-item" data-open={open}>
             <button type="button" className="dp-acc-head" aria-expanded={open} onClick={() => setOpenId(open ? null : proc.id)}>
               <span className="dp-acc-no">{String(idx + 1).padStart(2, '0')}</span>
               <span>
@@ -587,6 +628,9 @@ function ManualList({
   isCourse = false,
   jumpToOrder = null,
   onJumpConsumed,
+  procedures = [],
+  glossary = [],
+  onJumpToProcedure,
 }: {
   sections: ManualSection[]
   machineSlug: string
@@ -595,10 +639,36 @@ function ManualList({
   /** Orden de leccion a abrir (viene del Glosario). */
   jumpToOrder?: number | null
   onJumpConsumed?: () => void
+  /** Para enlazar menciones de un procedimiento dentro del texto del Manual. */
+  procedures?: Procedure[]
+  /** Para resaltar términos del Glosario dentro del texto del Manual. */
+  glossary?: GlossaryEntry[]
+  onJumpToProcedure?: (id: string) => void
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
+  const [query, setQuery] = useState('')
   const activeSection = sections.find(section => section.id === activeId) ?? sections[0]
   const activeIndex = Math.max(0, sections.findIndex(section => section.id === activeSection?.id))
+  // El Grader tiene su glosario aparte (GRADER_GLOSSARY, componente propio) en vez de la
+  // colección Firestore genérica — sumarlo acá para poder resaltar sus términos en el Manual.
+  const effectiveGlossary = useMemo<GlossaryEntry[]>(() => {
+    if (machineSlug !== 'grader') return glossary
+    const now = Date.now()
+    return Object.entries(GRADER_GLOSSARY).map(([id, entry], index) => ({
+      id,
+      term: entry.label,
+      definition: entry.description,
+      order: index,
+      createdAt: now,
+      updatedAt: now,
+    }))
+  }, [machineSlug, glossary])
+  const textLinks = useMemo(() => buildTextLinks(procedures, effectiveGlossary), [procedures, effectiveGlossary])
+  const linkify = (text: string) => renderLinkedText(text, textLinks, onJumpToProcedure ?? (() => {}))
+  const normalizedQuery = normalizeForMatch(query.trim())
+  const filteredSections = normalizedQuery
+    ? sections.filter(sec => normalizeForMatch(sec.title).includes(normalizedQuery))
+    : sections
 
   useEffect(() => {
     if (!sections.some(section => section.id === activeId)) {
@@ -628,7 +698,23 @@ function ManualList({
     <div className="dp-doc">
       {/* Índice de secciones / lecciones (riel lateral en desktop) */}
       <nav className="dp-index" aria-label={isCourse ? 'Lecciones del curso' : 'Secciones del manual'}>
-        {sections.map(sec => (
+        {sections.length > 6 && (
+          <div className="dp-idx-search">
+            <Search className="h-3.5 w-3.5" aria-hidden />
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={`Buscar ${isCourse ? 'lección' : 'sección'}...`}
+              aria-label={`Buscar ${isCourse ? 'lección' : 'sección'}`}
+            />
+            {query && <span className="dp-idx-count">{filteredSections.length} de {sections.length}</span>}
+          </div>
+        )}
+        {filteredSections.length === 0 && (
+          <p className="dp-idx-empty">Sin resultados para "{query}".</p>
+        )}
+        {filteredSections.map(sec => (
           <button
             key={sec.id}
             type="button"
@@ -657,7 +743,7 @@ function ManualList({
 
       {!isGraderGlossary && blocks.description && (
         <div className="dp-body" style={{ marginTop: 24 }}>
-          <p style={{ whiteSpace: 'pre-wrap' }}>{blocks.description}</p>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{linkify(blocks.description)}</p>
         </div>
       )}
 
@@ -666,7 +752,7 @@ function ManualList({
           {blocks.steps.map((step, index) => (
             <li key={`${step}-${index}`}>
               <span className="dp-n" />
-              <div className="dp-c"><span style={{ whiteSpace: 'pre-wrap' }}>{step}</span></div>
+              <div className="dp-c"><span style={{ whiteSpace: 'pre-wrap' }}>{linkify(step)}</span></div>
             </li>
           ))}
         </ol>
@@ -839,6 +925,62 @@ function parseManualContent(content: string): ManualContentBlocks {
 
   blocks.description = description.join('\n')
   return blocks
+}
+
+/** Frase enlazable dentro del texto del Manual: un procedimiento (salta de pestaña) o un término del glosario (tooltip). */
+interface TextLink {
+  phrase: string
+  kind: 'procedure' | 'glossary'
+  id: string
+  definition?: string
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Enlaces detectables en el texto del Manual: título completo de un procedimiento existente, o un término del glosario. Frases más largas primero para no partir una más corta que esté contenida en una más larga. */
+function buildTextLinks(procedures: Procedure[], glossary: GlossaryEntry[]): TextLink[] {
+  const links: TextLink[] = []
+  for (const proc of procedures) {
+    if (proc.title.length >= 10) links.push({ phrase: proc.title, kind: 'procedure', id: proc.id })
+  }
+  for (const entry of glossary) {
+    if (entry.term.length >= 2) links.push({ phrase: entry.term, kind: 'glossary', id: entry.id, definition: entry.definition })
+  }
+  return links.sort((a, b) => b.phrase.length - a.phrase.length)
+}
+
+/** Envuelve las ocurrencias de `links` dentro de `text` en el span/botón correspondiente; el resto queda como texto plano. */
+function renderLinkedText(text: string, links: TextLink[], onJumpToProcedure: (id: string) => void): ReactNode {
+  if (links.length === 0 || !text) return text
+  const byLower = new Map(links.map(l => [l.phrase.toLowerCase(), l]))
+  const pattern = links.map(l => escapeRegExp(l.phrase)).join('|')
+  if (!pattern) return text
+  const parts = text.split(new RegExp(`(${pattern})`, 'gi'))
+  if (parts.length === 1) return text
+  return parts.map((part, index) => {
+    const link = byLower.get(part.toLowerCase())
+    if (!link) return <span key={index}>{part}</span>
+    if (link.kind === 'procedure') {
+      return (
+        <button key={index} type="button" className="dp-xlink" onClick={() => onJumpToProcedure(link.id)}>
+          {part}
+        </button>
+      )
+    }
+    return (
+      <span key={index} className="dp-gterm" tabIndex={0}>
+        {part}
+        {link.definition && (
+          <span className="dp-gpop">
+            <b>{link.phrase}</b>
+            <span>{link.definition}</span>
+          </span>
+        )}
+      </span>
+    )
+  })
 }
 
 function ManualBlock({

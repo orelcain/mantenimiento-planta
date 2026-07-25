@@ -214,6 +214,24 @@
   .dossier .dp-doc .dp-index button[aria-current="true"] { border-left-color: var(--dp-accent); }
 }
 
+/* Buscador dentro del índice (manuales largos, 7+ secciones) */
+.dossier .dp-idx-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--dp-rule-hard); border-radius: 8px; padding: 7px 10px; margin: 0 0 12px; color: var(--dp-ink-faint); width: 100%; }
+.dossier .dp-idx-search input { border: 0; background: none; outline: none; font-family: var(--dp-mono); font-size: 12px; color: var(--dp-ink); width: 100%; }
+.dossier .dp-idx-search input::placeholder { color: var(--dp-ink-faint); }
+.dossier .dp-idx-count { font-family: var(--dp-mono); font-size: 10px; color: var(--dp-ink-faint); white-space: nowrap; }
+.dossier .dp-idx-empty { font-size: 12.5px; color: var(--dp-ink-faint); padding: 8px 0; }
+
+/* Link a un procedimiento mencionado dentro del texto del Manual */
+.dossier .dp-xlink { display: inline; font: inherit; color: var(--dp-accent); background: none; border: 0; padding: 0; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
+.dossier .dp-xlink:hover { color: var(--dp-ink); }
+
+/* Término del Glosario resaltado dentro del texto del Manual, con definición al pasar el mouse/foco */
+.dossier .dp-gterm { position: relative; color: var(--dp-ink); text-decoration: underline; text-decoration-style: dotted; text-decoration-color: var(--dp-ok); text-underline-offset: 3px; font-weight: 600; cursor: help; }
+.dossier .dp-gpop { display: none; position: absolute; bottom: 130%; left: 0; width: 240px; background: var(--dp-paper); border: 1px solid var(--dp-rule-hard); border-radius: 10px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 5; white-space: normal; }
+.dossier .dp-gterm:hover .dp-gpop, .dossier .dp-gterm:focus .dp-gpop { display: block; }
+.dossier .dp-gpop b { display: block; font-family: var(--dp-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--dp-ok); margin-bottom: 5px; }
+.dossier .dp-gpop span { font-size: 12px; color: var(--dp-ink-soft); line-height: 1.5; }
+
 /* Navegación anterior / siguiente */
 .dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-nav button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .03em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 4px 0; }
