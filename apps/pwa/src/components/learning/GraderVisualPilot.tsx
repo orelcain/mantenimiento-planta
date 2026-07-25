@@ -1,10 +1,13 @@
 /**
- * GraderVisualPilot — piloto de los dos patrones nuevos (hotspots + relacionar)
- * aplicados al final de la pestaña "Manual" del Grader, con contenido de
- * referencia escrito a mano (no viene de Firestore todavía). Si el piloto se
- * valida, el siguiente paso es mover este contenido a `learningContent.ts`
- * (tipos `HotspotDiagram` / `MatchingExercise`) para que sea editable desde
- * LearningAdminMachinePage, igual que el resto del manual.
+ * GraderVisualPilot — piloto de los dos patrones nuevos (hotspots + relacionar),
+ * en su propia pestaña "Componentes del equipo" del Grader, con contenido de
+ * referencia escrito a mano (no viene de Firestore todavía) y una ilustración
+ * plana en vez de una foto real — pendiente encontrar/tomar una foto general
+ * del equipo apta como fondo del diagrama (las fotos de OneDrive son de
+ * repuestos en bodega o detalles muy cerrados, no sirven para esto). Si el
+ * piloto se valida, el siguiente paso es mover este contenido a
+ * `learningContent.ts` (tipos `HotspotDiagram` / `MatchingExercise`) para que
+ * sea editable desde LearningAdminMachinePage, igual que el resto del manual.
  */
 import { HotspotDiagram, type HotspotPoint } from './HotspotDiagram'
 import { MatchingExercise, type MatchingPair } from './MatchingExercise'
@@ -39,7 +42,7 @@ export function GraderVisualPilot() {
         <span className="dp-lbl">Referencia</span>
         <p>Puntos de riesgo y control sobre la banda transportadora. Toca cada número para ver la nota.</p>
       </div>
-      <HotspotDiagram points={POINTS} stageSvg={<StageIllustration />} />
+      <HotspotDiagram points={POINTS} stageSvg={<StageIllustration />} height={340} />
 
       <div className="dp-objetivo" style={{ marginTop: 34 }}>
         <span className="dp-lbl">Autoevaluación</span>
