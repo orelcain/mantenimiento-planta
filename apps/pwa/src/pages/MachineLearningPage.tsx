@@ -302,12 +302,14 @@ export function MachineLearningPage() {
           <h1 className="dp-title">{machine.name}</h1>
           <p className="dp-sub">{machine.description}</p>
 
-          <div className="dp-meta">
-            <div><span className="dp-lbl">Área</span><span className="dp-val">{isCourse ? (machine.programa ?? machine.area) : machine.area}</span></div>
-            <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
-            <div><span className="dp-lbl">Uso</span><span className="dp-val">{isCourse ? 'Estudio' : 'Consulta en terreno'}</span></div>
-            <div><span className="dp-lbl">Nivel</span><span className="dp-val">{isCourse ? `M${machine.modulo ?? '—'}` : 'Operador → Mant.'}</span></div>
-          </div>
+          {isCourse && (
+            <div className="dp-meta">
+              <div><span className="dp-lbl">Área</span><span className="dp-val">{machine.programa ?? machine.area}</span></div>
+              <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
+              <div><span className="dp-lbl">Uso</span><span className="dp-val">Estudio</span></div>
+              <div><span className="dp-lbl">Nivel</span><span className="dp-val">{`M${machine.modulo ?? '—'}`}</span></div>
+            </div>
+          )}
 
           {!isCourse && machine.hmiRoute && (
             <button className="dp-hmi" onClick={() => navigate(machine.hmiRoute!)}>
