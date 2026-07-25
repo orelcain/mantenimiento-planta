@@ -372,6 +372,67 @@ const BAADER_200: QuickRefGroup[] = [
   },
 ]
 
+const FISHKEN: QuickRefGroup[] = [
+  {
+    title: 'Identificación',
+    rows: [
+      { label: 'Modelo', value: 'Fishken E-Pack S28' },
+      { label: 'Función', value: 'Envasadora/pesadora combinatoria — arma cajas dentro de un peso objetivo combinando 28 compuertas' },
+      { label: 'Software', value: 'E-Pack S28 (control) + FishKen Web (reportes)' },
+    ],
+  },
+  {
+    title: 'Eléctrico',
+    rows: [
+      { label: 'General moto vibradores', value: 'Automático de 80 A' },
+      { label: 'Moto vibradores de empaque', value: 'Tienen automáticos propios en el tablero, además del general' },
+    ],
+  },
+  {
+    title: 'Menú principal E-Pack',
+    rows: [
+      { label: 'Iniciar Proceso', value: 'Controla el proceso productivo y muestra los datos en vivo' },
+      { label: 'Servicio FishKen', value: 'Calibración, ajuste de puertas y pruebas de conexión' },
+    ],
+  },
+  {
+    title: 'Servicio FishKen (3 tareas)',
+    rows: [
+      { label: 'Calibración', value: 'Calibración del sistema de pesaje' },
+      { label: 'Ajuste de puertas', value: 'Habilitar/deshabilitar compuertas (casilla Activo + Guardar Cambios)' },
+      { label: 'Pruebas de conexión', value: 'Base de Datos · Tarjetas de Relé (NUMATO) · Tarjetas de Pesaje' },
+    ],
+  },
+  {
+    title: 'Estadísticas del proceso',
+    rows: [
+      { label: 'Compuerta habilitada', value: 'Se ve con transparencia' },
+      { label: 'Compuerta deshabilitada', value: 'Se ve en color ROJO' },
+      { label: '% de sobrepeso', value: 'Cuánto se pasa la caja del peso objetivo — cuanto menor, mejor' },
+      { label: 'Productividad', value: 'kg/h y cajas/h' },
+    ],
+    note: 'Las estadísticas se cuentan desde el último reinicio o carga de configuración.',
+  },
+  {
+    title: 'Diagnóstico rápido (síntoma → revisar)',
+    rows: [
+      { label: 'Compuerta en rojo', value: 'Deshabilitada a propósito o por problema de pesaje — Ajuste de puertas para reactivar' },
+      { label: 'Sobrepeso/rechazo alto', value: 'Compuerta con pesaje impreciso, rango de celda mal configurado o celda sucia/descalibrada' },
+      { label: 'No guarda/lee datos, sin reportes', value: 'Falla Base de Datos — Pruebas de conexión' },
+      { label: 'Compuertas no accionan', value: 'Falla Tarjetas de Relé (NUMATO) — revisar cableado/tarjeta' },
+      { label: 'Pesaje ausente o errático', value: 'Falla Tarjetas de Pesaje o celda de carga desconectada/dañada' },
+    ],
+  },
+  {
+    title: 'Reportes FishKen Web',
+    rows: [
+      { label: 'Por Especie', value: 'General y Detallado' },
+      { label: 'Por Calidad', value: 'General y Detallado' },
+      { label: 'Por Calibre', value: 'General y Detallado' },
+    ],
+  },
+]
+
 const GEA: QuickRefGroup[] = [
   {
     title: 'Claves de acceso',
@@ -389,6 +450,7 @@ const QUICK_REF: Record<string, QuickRefGroup[]> = {
   'termoformadora-gea': GEA,
   'baader-142': BAADER_142,
   'baader-200': BAADER_200,
+  fishken: FISHKEN,
 }
 
 export function getQuickRef(machineSlug: string): QuickRefGroup[] | null {
