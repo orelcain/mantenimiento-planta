@@ -800,23 +800,149 @@ const QUIZ = {
 
   fishken: [
     {
-      question: '¿Desde qué automático está tomado el general de los moto vibradores?',
-      options: ['32 A', '50 A', '80 A', '125 A'],
+      question: "¿Desde qué automático está tomado el general de los moto vibradores?",
+      options: [
+        "32 A",
+        "50 A",
+        "80 A",
+        "125 A"
+      ],
       correctIndex: 2,
-      explanation: 'El general de los moto vibradores está tomado desde un automático de 80 A.',
+      explanation: "El general de los moto vibradores está tomado desde un automático de 80 A.",
     },
     {
-      question: '¿Los moto vibradores de empaque tienen protección propia?',
+      question: "¿Los moto vibradores de empaque tienen protección propia?",
       options: [
-        'No, cuelgan directo del general',
-        'Sí, tienen automáticos propios en el tablero',
-        'Solo protección térmica en el motor',
-        'Se protegen por variador',
+        "No, cuelgan directo del general",
+        "Sí, tienen automáticos propios en el tablero",
+        "Solo protección térmica en el motor",
+        "Se protegen por variador"
       ],
       correctIndex: 1,
-      explanation: 'Además del general de 80 A, los moto vibradores de empaque tienen sus automáticos propios (ubicación del tablero en video del expediente).',
+      explanation: "Además del general de 80 A, los moto vibradores de empaque tienen sus automáticos propios (ubicación del tablero en video del expediente).",
     },
-  ],
+    {
+      question: "¿Cuántas compuertas tiene la Fishken E-Pack S28?",
+      options: [
+        "12",
+        "28",
+        "18",
+        "24"
+      ],
+      correctIndex: 1,
+      explanation: "La E-Pack S28 tiene 28 compuertas, cada una con su propia celda de carga.",
+    },
+    {
+      question: "¿Cómo se ve en pantalla una compuerta deshabilitada?",
+      options: [
+        "En color rojo",
+        "Transparente",
+        "Con un candado",
+        "Parpadeando en amarillo"
+      ],
+      correctIndex: 0,
+      explanation: "Las compuertas habilitadas se ven con transparencia; las deshabilitadas, en color rojo.",
+    },
+    {
+      question: "¿Cuáles son las 2 opciones del menú principal del software E-Pack?",
+      options: [
+        "Iniciar Proceso y Servicio FishKen",
+        "Producción y Mantención",
+        "Especie y Calibre",
+        "Calibración y Reportes"
+      ],
+      correctIndex: 0,
+      explanation: "El menú principal del E-Pack tiene Iniciar Proceso (control del proceso productivo) y Servicio FishKen (calibración, puertas, conexiones).",
+    },
+    {
+      question: "¿Qué 3 grupos verifican las Pruebas de conexión de Servicio FishKen?",
+      options: [
+        "Especie, Calidad y Calibre",
+        "Red, Software y Firmware",
+        "Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje",
+        "Compuertas, Celdas y Motores"
+      ],
+      correctIndex: 2,
+      explanation: "Las Pruebas de conexión verifican Base de Datos, Tarjetas de Relé (NUMATO) y Tarjetas de Pesaje.",
+    },
+    {
+      question: "¿Qué tarjetas accionan físicamente las compuertas?",
+      options: [
+        "Tarjetas de Red",
+        "Tarjetas de Pesaje",
+        "Tarjetas de Base de Datos",
+        "Tarjetas de Relé (NUMATO)"
+      ],
+      correctIndex: 3,
+      explanation: "Las Tarjetas de Relé (NUMATO) son las que accionan (abren/cierran) las compuertas según la combinatoria.",
+    },
+    {
+      question: "Para deshabilitar una compuerta con problemas de pesaje, ¿qué se hace?",
+      options: [
+        "Se llama directo a soporte técnico",
+        "Servicio FishKen › Ajuste de puertas: desmarcar Activo y Guardar Cambios",
+        "Se reinicia todo el software",
+        "Se corta el automático del tablero"
+      ],
+      correctIndex: 1,
+      explanation: "En Servicio FishKen › Ajuste de puertas se desmarca la casilla Activo de la compuerta y se guarda — queda en rojo hasta resolver el problema.",
+    },
+    {
+      question: "¿Qué mide el \"% de sobrepeso\" de una caja?",
+      options: [
+        "El peso total de todas las cajas del turno",
+        "Cuánto se pasa la caja del peso objetivo (menor es mejor)",
+        "La cantidad de compuertas deshabilitadas",
+        "El tiempo que demora en armarse la caja"
+      ],
+      correctIndex: 1,
+      explanation: "El sobrepeso (y su %) mide cuánto se pasa la caja del peso objetivo: cuanto menor, mejor rendimiento de la combinatoria.",
+    },
+    {
+      question: "¿Qué tipos de reporte ofrece FishKen Web?",
+      options: [
+        "Solo por operador",
+        "Por consumo eléctrico",
+        "Solo por turno",
+        "Por Especie, Calidad y Calibre (General o Detallado)"
+      ],
+      correctIndex: 3,
+      explanation: "FishKen Web entrega reportes por Especie, Calidad y Calibre, cada uno en versión General o Detallado.",
+    },
+    {
+      question: "Ante sobrepeso alto o muchas cajas rechazadas, ¿qué se revisa primero?",
+      options: [
+        "Compuertas con pesaje impreciso, rango de celda mal configurado o celda sucia/descalibrada",
+        "La versión del software",
+        "El automático general de 80 A",
+        "El cableado de red"
+      ],
+      correctIndex: 0,
+      explanation: "Sobrepeso/rechazo alto suele venir de compuertas con pesaje malo, rango de celda incorrecto o celdas sucias/descalibradas.",
+    },
+    {
+      question: "¿Dónde se calibra el sistema de pesaje de la Fishken?",
+      options: [
+        "FishKen Web › Reportes",
+        "Iniciar Proceso › Estadísticas",
+        "Servicio FishKen › Calibración",
+        "No se calibra, es automático"
+      ],
+      correctIndex: 2,
+      explanation: "La calibración del sistema de pesaje se hace desde Servicio FishKen › Calibración.",
+    },
+    {
+      question: "Antes de presionar Iniciar en el proceso, ¿qué hay que confirmar?",
+      options: [
+        "La fecha del último reporte",
+        "Solo que el software esté abierto",
+        "El nivel de aceite de los motores",
+        "El producto configurado y que las compuertas necesarias estén habilitadas (sin rojo)"
+      ],
+      correctIndex: 3,
+      explanation: "Antes de iniciar hay que confirmar el producto configurado (especie, calibre, orden, caja master) y que las compuertas necesarias estén habilitadas.",
+    },
+    ],
 
   'detector-metales': [
     {
