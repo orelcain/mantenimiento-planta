@@ -499,6 +499,40 @@ const GEA: QuickRefGroup[] = [
     ],
     note: 'Da acceso a mantención nivel 4 del panel GEA.',
   },
+  {
+    title: 'Ajuste producto congelado',
+    rows: [
+      { label: 'Valor teórico sensor de vacío', value: '2 hPa → 1 hPa' },
+      { label: 'Retraso de vacío (moldeo)', value: '0.50 → 0.60' },
+      { label: 'Duración de moldeo', value: '2.00 → 2.20' },
+      { label: 'Vacío de moldeo', value: '1.00 → 1.20' },
+    ],
+    note: 'Valores de referencia del ajuste para producto congelado — verificar contra receta activa antes de aplicar.',
+  },
+  {
+    title: 'Pasos de regulación (film y velocidad)',
+    rows: [
+      { label: 'Tensión de film', value: 'De 500 en 500 (valor de referencia 14500, antes 12000)' },
+      { label: 'Velocidad de caída', value: 'De 50 en 50 (valor de referencia 200)' },
+      { label: 'Leva film superior', value: 'Ajuste normal por parámetros (hoja 3630) — mecánico muy rara vez' },
+      { label: 'Film inferior (tras modificación técnico GEA)', value: 'Ya NO requiere tensar en cada reanudación del proceso' },
+    ],
+  },
+  {
+    title: 'Estaciones de formado y sellado',
+    rows: [
+      { label: 'Formado — placas delgadas', value: '2 por lado' },
+      { label: 'Sellado — placas retiradas', value: '1 por lado' },
+      { label: 'Sellado — abertura de elevación', value: '25 → 55' },
+      { label: 'Ajuste de aceleración/velocidad', value: 'Aceleración 60% → 10% · Velocidad 85% → 20% · Elevación 35 → 25' },
+    ],
+  },
+  {
+    title: 'Recetas',
+    rows: [
+      { label: 'Flujo', value: 'Cargar receta → Agregar nueva → Guardar parámetros modificados' },
+    ],
+  },
 ]
 
 const QUICK_REF: Record<string, QuickRefGroup[]> = {
