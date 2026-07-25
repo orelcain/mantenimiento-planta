@@ -22,18 +22,23 @@ export function HotspotDiagram({
   points,
   stageSvg,
   height = 220,
+  aspectRatio,
 }: {
   points: HotspotPoint[]
   /** Ilustración de fondo del stage (SVG plano, sin colores de marca). */
   stageSvg?: React.ReactNode
   height?: number
+  /** Si se pasa (ancho/alto de la imagen real), el stage escala su alto para calzar exacto
+   * con la imagen — sin recorte ni letterbox — así los puntos en % caen en el lugar correcto
+   * sin importar el ancho del contenedor. Tiene prioridad sobre `height`. */
+  aspectRatio?: number
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const active = points.find(p => p.id === openId)
 
   return (
     <div className="dp-hotspot">
-      <div className="dp-hotspot-stage" style={{ height }}>
+      <div className="dp-hotspot-stage" style={aspectRatio ? { height: 'auto', minHeight: 0, aspectRatio } : { height }}>
         {stageSvg}
         {points.map((p, i) => (
           <button
