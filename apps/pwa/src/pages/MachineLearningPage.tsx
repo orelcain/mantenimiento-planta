@@ -647,6 +647,8 @@ function ManualList({
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
   const [query, setQuery] = useState('')
+  const [criticalMode, setCriticalMode] = useState(false)
+  const [resumeId, setResumeId] = useState<string | null>(null)
   const activeSection = sections.find(section => section.id === activeId) ?? sections[0]
   const activeIndex = Math.max(0, sections.findIndex(section => section.id === activeSection?.id))
   // El Grader tiene su glosario aparte (GRADER_GLOSSARY, componente propio) en vez de la
@@ -664,11 +666,24 @@ function ManualList({
     }))
   }, [machineSlug, glossary])
   const textLinks = useMemo(() => buildTextLinks(procedures, effectiveGlossary), [procedures, effectiveGlossary])
-  const linkify = (text: string) => renderLinkedText(text, textLinks, onJumpToProcedure ?? (() => {}))
+  const linkify = (text: string) => renderBodyText(text, textLinks, query, onJumpToProcedure ?? (() => {}))
   const normalizedQuery = normalizeForMatch(query.trim())
   const filteredSections = normalizedQuery
     ? sections.filter(sec => normalizeForMatch(sec.title).includes(normalizedQuery))
     : sections
+
+  // Metadata por sección (parseada una vez): iconos del índice + "Todo lo crítico".
+  const sectionMeta = useMemo(
+    () => sections.map(sec => {
+      const b = parseManualContent(sec.content)
+      return { id: sec.id, order: sec.order, title: sec.title, hasSteps: b.steps.length > 0, hasQuiz: !!(sec.quiz && sec.quiz.length > 0), notes: b.notes }
+    }),
+    [sections],
+  )
+  const allNotes = useMemo(
+    () => sectionMeta.flatMap(m => m.notes.map(note => ({ note, sectionId: m.id, sectionOrder: m.order, sectionTitle: m.title }))),
+    [sectionMeta],
+  )
 
   useEffect(() => {
     if (!sections.some(section => section.id === activeId)) {
@@ -684,6 +699,23 @@ function ManualList({
     onJumpConsumed?.()
   }, [jumpToOrder, sections, onJumpConsumed])
 
+  // "Continuar donde quedaste": leer la última sección vista en este dispositivo (no es progreso/métrica, solo conveniencia local).
+  const resumeKey = `dp-manual-last:${machineSlug}`
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(resumeKey) : null
+    if (saved && saved !== sections[0]?.id && sections.some(s => s.id === saved)) {
+      setResumeId(saved)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  useEffect(() => {
+    if (activeSection && typeof window !== 'undefined') {
+      window.localStorage.setItem(resumeKey, activeSection.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection?.id])
+
   if (!activeSection) return null
 
   const blocks = parseManualContent(activeSection.content)
@@ -693,6 +725,8 @@ function ManualList({
     const nextSection = sections[index]
     if (nextSection) setActiveId(nextSection.id)
   }
+  const resumeSection = resumeId ? sections.find(s => s.id === resumeId) : null
+  const relatedLinks = findMatchedLinks([blocks.description, ...blocks.steps], textLinks)
 
   return (
     <div className="dp-doc">
@@ -714,19 +748,52 @@ function ManualList({
         {filteredSections.length === 0 && (
           <p className="dp-idx-empty">Sin resultados para "{query}".</p>
         )}
-        {filteredSections.map(sec => (
+        {filteredSections.map(sec => {
+          const meta = sectionMeta.find(m => m.id === sec.id)
+          return (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => { setActiveId(sec.id); setCriticalMode(false) }}
+              aria-current={!criticalMode && sec.id === activeSection.id ? 'true' : undefined}
+            >
+              <b>{String(sec.order).padStart(2, '0')}</b>
+              {meta?.hasSteps && <span className="dp-idx-kind" title="Tiene pasos">☑</span>}
+              {meta?.hasQuiz && <span className="dp-idx-kind is-quiz" title="Tiene autoevaluación">✓?</span>}
+              {sec.title}
+            </button>
+          )
+        })}
+        {!isCourse && allNotes.length > 0 && (
           <button
-            key={sec.id}
             type="button"
-            onClick={() => setActiveId(sec.id)}
-            aria-current={sec.id === activeSection.id ? 'true' : undefined}
+            className="dp-idx-critical"
+            onClick={() => setCriticalMode(true)}
+            aria-current={criticalMode ? 'true' : undefined}
           >
-            <b>{String(sec.order).padStart(2, '0')}</b>{sec.title}
+            <b>⚠</b>Todo lo crítico ({allNotes.length})
           </button>
-        ))}
+        )}
       </nav>
 
       <div className="dp-doc-body">
+      {resumeSection && !criticalMode && resumeSection.id !== activeSection.id && (
+        <div className="dp-resume">
+          <div className="dp-resume-txt">
+            <span className="dp-lbl">Continuar leyendo</span>
+            <span>Ibas por "{String(resumeSection.order).padStart(2, '0')} · {resumeSection.title}"</span>
+          </div>
+          <div className="dp-resume-actions">
+            <button type="button" onClick={() => setActiveId(resumeSection.id)}>Ir ahí →</button>
+            <button type="button" className="dp-resume-dismiss" onClick={() => setResumeId(null)} aria-label="Descartar">✕</button>
+          </div>
+        </div>
+      )}
+
+      {criticalMode ? (
+        <CriticalNotesView notes={allNotes} onGoToSection={id => { setActiveId(id); setCriticalMode(false) }} />
+      ) : (
+      <>
       {/* Sub-cabecera de la sección activa */}
       <div className="dp-subhead">
         <span className="dp-subno">{String(activeSection.order).padStart(2, '0')}</span>
@@ -803,7 +870,57 @@ function ManualList({
           </button>
         </div>
       )}
+      </>
+      )}
       </div>
+
+      {!criticalMode && relatedLinks.length > 0 && (
+        <aside className="dp-related" aria-label="Relacionado con esta sección">
+          <span className="dp-related-head">Relacionado con esta sección</span>
+          {relatedLinks.map(link => (
+            <button
+              key={`${link.kind}-${link.id}`}
+              type="button"
+              className={`dp-related-card ${link.kind === 'glossary' ? 'is-gloss' : ''}`}
+              onClick={() => link.kind === 'procedure' && onJumpToProcedure?.(link.id)}
+              disabled={link.kind === 'glossary'}
+            >
+              <b>{link.phrase}</b>
+              <span>{link.kind === 'procedure' ? 'Procedimientos' : 'Glosario'}</span>
+            </button>
+          ))}
+        </aside>
+      )}
+    </div>
+  )
+}
+
+/** Vista "Todo lo crítico": todas las Notas operativas (⚠) de todas las secciones del Manual, juntas, con link de vuelta a su sección de origen. */
+function CriticalNotesView({
+  notes,
+  onGoToSection,
+}: {
+  notes: { note: string; sectionId: string; sectionOrder: number; sectionTitle: string }[]
+  onGoToSection: (sectionId: string) => void
+}) {
+  return (
+    <div className="dp-critical">
+      <div className="dp-subhead">
+        <h3>Todo lo crítico</h3>
+      </div>
+      <div className="dp-sec-code">Todas las notas operativas del manual, en un solo lugar.</div>
+      {notes.map((item, index) => (
+        <div className="dp-crit-item" key={index}>
+          <span className="dp-crit-ico" aria-hidden>⚠</span>
+          <div className="dp-crit-txt">
+            <span className="dp-lbl">{item.sectionTitle}</span>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{item.note}</p>
+            <button type="button" onClick={() => onGoToSection(item.sectionId)}>
+              Ver sección {String(item.sectionOrder).padStart(2, '0')} →
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -951,17 +1068,29 @@ function buildTextLinks(procedures: Procedure[], glossary: GlossaryEntry[]): Tex
   return links.sort((a, b) => b.phrase.length - a.phrase.length)
 }
 
-/** Envuelve las ocurrencias de `links` dentro de `text` en el span/botón correspondiente; el resto queda como texto plano. */
-function renderLinkedText(text: string, links: TextLink[], onJumpToProcedure: (id: string) => void): ReactNode {
-  if (links.length === 0 || !text) return text
+/** Envuelve las ocurrencias de `links` dentro de `text` en el span/botón correspondiente y, si `query`
+ * no está vacío, resalta además esas coincidencias dentro del texto plano restante (búsqueda tipo Ctrl+F). */
+function renderBodyText(text: string, links: TextLink[], query: string, onJumpToProcedure: (id: string) => void): ReactNode {
+  if (!text) return text
   const byLower = new Map(links.map(l => [l.phrase.toLowerCase(), l]))
-  const pattern = links.map(l => escapeRegExp(l.phrase)).join('|')
-  if (!pattern) return text
-  const parts = text.split(new RegExp(`(${pattern})`, 'gi'))
-  if (parts.length === 1) return text
-  return parts.map((part, index) => {
+  const linkPattern = links.map(l => escapeRegExp(l.phrase)).join('|')
+  const rawParts = linkPattern ? text.split(new RegExp(`(${linkPattern})`, 'gi')) : [text]
+  const q = query.trim()
+
+  const highlightPlain = (segment: string, keyPrefix: string): ReactNode => {
+    if (!q) return segment
+    const pieces = segment.split(new RegExp(`(${escapeRegExp(q)})`, 'gi'))
+    if (pieces.length === 1) return segment
+    return pieces.map((piece, i) =>
+      piece.toLowerCase() === q.toLowerCase()
+        ? <mark key={`${keyPrefix}-${i}`} className="dp-hit">{piece}</mark>
+        : piece,
+    )
+  }
+
+  return rawParts.map((part, index) => {
     const link = byLower.get(part.toLowerCase())
-    if (!link) return <span key={index}>{part}</span>
+    if (!link) return <span key={index}>{highlightPlain(part, `p${index}`)}</span>
     if (link.kind === 'procedure') {
       return (
         <button key={index} type="button" className="dp-xlink" onClick={() => onJumpToProcedure(link.id)}>
@@ -981,6 +1110,18 @@ function renderLinkedText(text: string, links: TextLink[], onJumpToProcedure: (i
       </span>
     )
   })
+}
+
+/** Enlaces (procedimiento/glosario) que efectivamente aparecen en alguno de `texts` — para el panel "Relacionado". */
+function findMatchedLinks(texts: string[], links: TextLink[]): TextLink[] {
+  const found = new Map<string, TextLink>()
+  const haystack = texts.join('\n').toLowerCase()
+  for (const link of links) {
+    if (!found.has(`${link.kind}-${link.id}`) && haystack.includes(link.phrase.toLowerCase())) {
+      found.set(`${link.kind}-${link.id}`, link)
+    }
+  }
+  return Array.from(found.values())
 }
 
 function ManualBlock({

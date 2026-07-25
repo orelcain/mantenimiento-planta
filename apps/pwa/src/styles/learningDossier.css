@@ -232,6 +232,49 @@
 .dossier .dp-gpop b { display: block; font-family: var(--dp-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--dp-ok); margin-bottom: 5px; }
 .dossier .dp-gpop span { font-size: 12px; color: var(--dp-ink-soft); line-height: 1.5; }
 
+/* Resaltado de la búsqueda del índice dentro del cuerpo de la sección activa */
+.dossier .dp-hit { background: color-mix(in srgb, var(--dp-accent) 30%, transparent); color: var(--dp-ink); border-radius: 3px; padding: 0 1px; }
+
+/* Iconos de tipo de contenido en el índice (pasos / autoevaluación) */
+.dossier .dp-idx-kind { font-family: var(--dp-mono); font-size: 10px; color: var(--dp-accent); flex-shrink: 0; }
+.dossier .dp-idx-kind.is-quiz { color: var(--dp-ok); }
+
+/* Botón "Todo lo crítico" al pie del índice */
+.dossier .dp-idx-critical { display: flex !important; align-items: baseline; gap: 8px; margin-top: 10px; padding-top: 14px !important; border-top: 1px solid var(--dp-rule); color: var(--dp-warn) !important; }
+.dossier .dp-idx-critical b { color: var(--dp-warn) !important; }
+.dossier .dp-idx-critical[aria-current="true"] { color: var(--dp-ink) !important; }
+
+/* Banner "Continuar donde quedaste" */
+.dossier .dp-resume { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--dp-accent); background: var(--dp-accent-soft); border-radius: 12px; padding: 12px 16px; margin-bottom: 26px; }
+.dossier .dp-resume-txt { display: flex; flex-direction: column; gap: 3px; }
+.dossier .dp-resume-txt span:last-child { font-size: 13px; color: var(--dp-ink); }
+.dossier .dp-resume-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.dossier .dp-resume-actions button:first-child { font-family: var(--dp-mono); font-size: 12px; color: var(--dp-paper); background: var(--dp-accent); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.dossier .dp-resume-dismiss { background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; font-size: 15px; padding: 0 4px; }
+
+/* Panel lateral "Relacionado con esta sección" (solo pantallas anchas; ver dp-doc abajo) */
+.dossier .dp-related { border-left: 1px solid var(--dp-rule); padding-left: 20px; margin-top: 30px; }
+.dossier .dp-related-head { font-family: var(--dp-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--dp-ink-faint); display: block; margin-bottom: 12px; }
+.dossier .dp-related-card { display: block; width: 100%; text-align: left; border: 1px solid var(--dp-rule-hard); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: none; cursor: pointer; }
+.dossier .dp-related-card:disabled { cursor: default; }
+.dossier .dp-related-card b { display: block; font-size: 12px; color: var(--dp-ink); margin-bottom: 3px; }
+.dossier .dp-related-card span { font-size: 11px; color: var(--dp-ink-faint); font-family: var(--dp-mono); }
+.dossier .dp-related-card.is-gloss { border-left: 3px solid var(--dp-ok); }
+@media (min-width: 1300px) {
+  .dossier .dp-doc { grid-template-columns: 256px minmax(0, 1fr) 220px; }
+  .dossier .dp-related { margin-top: 6px; }
+}
+
+/* Vista "Todo lo crítico" */
+.dossier .dp-critical .dp-crit-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); max-width: 66ch; }
+.dossier .dp-critical .dp-crit-item:first-of-type { padding-top: 26px; }
+.dossier .dp-critical .dp-crit-item:last-child { border-bottom: 0; }
+.dossier .dp-crit-ico { color: var(--dp-warn); flex-shrink: 0; font-size: 15px; margin-top: 1px; }
+.dossier .dp-crit-txt .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 5px; }
+.dossier .dp-crit-txt p { font-size: 13.5px; color: var(--dp-ink); margin: 0 0 8px; line-height: 1.55; }
+.dossier .dp-crit-txt button { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-accent); background: none; border: 0; padding: 0; cursor: pointer; }
+.dossier .dp-crit-txt button:hover { color: var(--dp-ink); }
+
 /* Navegación anterior / siguiente */
 .dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-nav button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .03em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 4px 0; }
