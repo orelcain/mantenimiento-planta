@@ -49,9 +49,21 @@
       "title": "Preparar antes de iniciar producción",
       "description": "Verificación breve para evitar alarmas al arrancar. Fuente: manual A600 (Marel), pág 8.",
       "steps": [
-        { "order": 1, "title": "Estado del M3210", "description": "Verificar que la etiqueta de estado del menú de encabezado del controlador M3210 esté en RUNNING." },
-        { "order": 2, "title": "Despejar las vías", "description": "Comprobar que no haya herramientas ni objetos en las vías que reciben el producto." },
-        { "order": 3, "title": "Balanza lista", "description": "Confirmar que la balanza (Weigher) esté inicializada y lista antes de producir." }
+        {
+          "order": 1,
+          "title": "Estado del M3210",
+          "description": "Verificar que la etiqueta de estado del menú de encabezado del controlador M3210 esté en RUNNING."
+        },
+        {
+          "order": 2,
+          "title": "Despejar las vías",
+          "description": "Comprobar que no haya herramientas ni objetos en las vías que reciben el producto."
+        },
+        {
+          "order": 3,
+          "title": "Balanza lista",
+          "description": "Confirmar que la balanza (Weigher) esté inicializada y lista antes de producir."
+        }
       ]
     },
     {
@@ -59,10 +71,26 @@
       "title": "Agregar un nuevo programa",
       "description": "Crear un programa de clasificación desde la pantalla Programs. Fuente: manual A600 (Marel), pág 33.",
       "steps": [
-        { "order": 1, "title": "Abrir Programs", "description": "Ir a la pantalla Programs (Programas)." },
-        { "order": 2, "title": "Agregar", "description": "Elegir agregar un nuevo programa." },
-        { "order": 3, "title": "Método y parámetros", "description": "Configurar el método de clasificación (lotes óptimos, tasa, simple) y sus parámetros." },
-        { "order": 4, "title": "Guardar y activar", "description": "Guardar el programa y activarlo cuando corresponda para que controle la clasificación." }
+        {
+          "order": 1,
+          "title": "Abrir Programs",
+          "description": "Ir a la pantalla Programs (Programas)."
+        },
+        {
+          "order": 2,
+          "title": "Agregar",
+          "description": "Elegir agregar un nuevo programa."
+        },
+        {
+          "order": 3,
+          "title": "Método y parámetros",
+          "description": "Configurar el método de clasificación (lotes óptimos, tasa, simple) y sus parámetros."
+        },
+        {
+          "order": 4,
+          "title": "Guardar y activar",
+          "description": "Guardar el programa y activarlo cuando corresponda para que controle la clasificación."
+        }
       ]
     },
     {
@@ -70,10 +98,26 @@
       "title": "Copiar y editar un programa",
       "description": "Reutilizar un programa existente como base. Fuente: manual A600 (Marel), pág 35-39.",
       "steps": [
-        { "order": 1, "title": "Seleccionar el programa", "description": "En la pantalla Programs, elegir el programa a copiar." },
-        { "order": 2, "title": "Copiar", "description": "Crear una copia del programa." },
-        { "order": 3, "title": "Editar la configuración", "description": "Ajustar el método, rangos y destinos en la configuración del programa copiado." },
-        { "order": 4, "title": "Activar", "description": "Activar el programa editado para usarlo en producción." }
+        {
+          "order": 1,
+          "title": "Seleccionar el programa",
+          "description": "En la pantalla Programs, elegir el programa a copiar."
+        },
+        {
+          "order": 2,
+          "title": "Copiar",
+          "description": "Crear una copia del programa."
+        },
+        {
+          "order": 3,
+          "title": "Editar la configuración",
+          "description": "Ajustar el método, rangos y destinos en la configuración del programa copiado."
+        },
+        {
+          "order": 4,
+          "title": "Activar",
+          "description": "Activar el programa editado para usarlo en producción."
+        }
       ]
     },
     {
@@ -81,9 +125,21 @@
       "title": "Activar un programa",
       "description": "Solo el programa activo controla la clasificación. Fuente: manual A600 (Marel), pág 37.",
       "steps": [
-        { "order": 1, "title": "Abrir Programs", "description": "Ir a la pantalla Programs (Programas)." },
-        { "order": 2, "title": "Elegir el programa", "description": "Seleccionar el programa que se quiere poner en producción." },
-        { "order": 3, "title": "Activar", "description": "Activarlo; el A600 pasa a clasificar según ese programa." }
+        {
+          "order": 1,
+          "title": "Abrir Programs",
+          "description": "Ir a la pantalla Programs (Programas)."
+        },
+        {
+          "order": 2,
+          "title": "Elegir el programa",
+          "description": "Seleccionar el programa que se quiere poner en producción."
+        },
+        {
+          "order": 3,
+          "title": "Activar",
+          "description": "Activarlo; el A600 pasa a clasificar según ese programa."
+        }
       ]
     },
     {
@@ -91,9 +147,21 @@
       "title": "Agregar y asignar un producto",
       "description": "Definir un producto y dirigirlo a su salida. Fuente: manual A600 (Marel), pág 40-45.",
       "steps": [
-        { "order": 1, "title": "Abrir Products", "description": "Ir a la pantalla Products (Productos)." },
-        { "order": 2, "title": "Agregar producto", "description": "Agregar un nuevo producto (o copiar uno existente y editarlo)." },
-        { "order": 3, "title": "Asignar a ubicación", "description": "Asignar el producto a la ubicación (vía/salida) que le corresponde." }
+        {
+          "order": 1,
+          "title": "Abrir Products",
+          "description": "Ir a la pantalla Products (Productos)."
+        },
+        {
+          "order": 2,
+          "title": "Agregar producto",
+          "description": "Agregar un nuevo producto (o copiar uno existente y editarlo)."
+        },
+        {
+          "order": 3,
+          "title": "Asignar a ubicación",
+          "description": "Asignar el producto a la ubicación (vía/salida) que le corresponde."
+        }
       ]
     },
     {
@@ -101,9 +169,21 @@
       "title": "Terminar lotes",
       "description": "Cerrar los lotes en curso. Fuente: manual A600 (Marel), pág 18.",
       "steps": [
-        { "order": 1, "title": "Abrir Last Batches", "description": "Ir a la pantalla Last Batches (Últimos lotes)." },
-        { "order": 2, "title": "Terminar", "description": "Terminar el/los lote(s) según el flujo de la pantalla." },
-        { "order": 3, "title": "Verificar informe", "description": "Comprobar que el lote quedó registrado en los informes." }
+        {
+          "order": 1,
+          "title": "Abrir Last Batches",
+          "description": "Ir a la pantalla Last Batches (Últimos lotes)."
+        },
+        {
+          "order": 2,
+          "title": "Terminar",
+          "description": "Terminar el/los lote(s) según el flujo de la pantalla."
+        },
+        {
+          "order": 3,
+          "title": "Verificar informe",
+          "description": "Comprobar que el lote quedó registrado en los informes."
+        }
       ]
     },
     {
@@ -111,9 +191,21 @@
       "title": "Presentar un informe",
       "description": "Consultar la producción registrada. Fuente: manual A600 (Marel), pág 46.",
       "steps": [
-        { "order": 1, "title": "Abrir Reports", "description": "Ir a la pantalla Reports (Informes)." },
-        { "order": 2, "title": "Presentar", "description": "Presentar el informe deseado." },
-        { "order": 3, "title": "Eliminar si corresponde", "description": "Eliminar informes que ya no se necesiten desde la misma pantalla." }
+        {
+          "order": 1,
+          "title": "Abrir Reports",
+          "description": "Ir a la pantalla Reports (Informes)."
+        },
+        {
+          "order": 2,
+          "title": "Presentar",
+          "description": "Presentar el informe deseado."
+        },
+        {
+          "order": 3,
+          "title": "Eliminar si corresponde",
+          "description": "Eliminar informes que ya no se necesiten desde la misma pantalla."
+        }
       ]
     },
     {
@@ -121,9 +213,21 @@
       "title": "Consultar el registro de alarmas",
       "description": "Investigar el origen de una alarma. Fuente: manual A600 (Marel), pág 7.",
       "steps": [
-        { "order": 1, "title": "Tocar Alarm Log", "description": "Cuando el botón Alarm parpadea, tocar Alarm Log (Registro de alarmas)." },
-        { "order": 2, "title": "Leer el error", "description": "Ver el tipo de error con su descripción, prioridad (color) y solución sugerida." },
-        { "order": 3, "title": "Aplicar la solución", "description": "Ejecutar la solución indicada; si dice contactar servicio, anotar el error y avisar a Marel." }
+        {
+          "order": 1,
+          "title": "Tocar Alarm Log",
+          "description": "Cuando el botón Alarm parpadea, tocar Alarm Log (Registro de alarmas)."
+        },
+        {
+          "order": 2,
+          "title": "Leer el error",
+          "description": "Ver el tipo de error con su descripción, prioridad (color) y solución sugerida."
+        },
+        {
+          "order": 3,
+          "title": "Aplicar la solución",
+          "description": "Ejecutar la solución indicada; si dice contactar servicio, anotar el error y avisar a Marel."
+        }
       ]
     },
     {
@@ -131,9 +235,77 @@
       "title": "Limpieza de la cinta de la balanza",
       "description": "Mantener limpia la cinta transportadora de la balanza para pesajes estables. Fuente: manual A600 (Marel), pág 14, 23.",
       "steps": [
-        { "order": 1, "title": "Detener producción", "description": "Detener la producción y asegurar la máquina antes de limpiar." },
-        { "order": 2, "title": "Limpiar la cinta", "description": "Limpiar la cinta transportadora de la balanza (Weigher), donde la suciedad desestabiliza el peso." },
-        { "order": 3, "title": "Verificar estabilidad", "description": "Reiniciar y comprobar que el peso de la cinta ya no marque inestable." }
+        {
+          "order": 1,
+          "title": "Detener producción",
+          "description": "Detener la producción y asegurar la máquina antes de limpiar."
+        },
+        {
+          "order": 2,
+          "title": "Limpiar la cinta",
+          "description": "Limpiar la cinta transportadora de la balanza (Weigher), donde la suciedad desestabiliza el peso."
+        },
+        {
+          "order": 3,
+          "title": "Verificar estabilidad",
+          "description": "Reiniciar y comprobar que el peso de la cinta ya no marque inestable."
+        }
+      ]
+    },
+    {
+      "id": "mhg-proc-modificar-distancia-flipper",
+      "title": "Modificar distancia de flipper (Servicio → Distancias puerta)",
+      "description": "Ajustar a qué distancia se abre cada compuerta (puerta) desde el menú Servicio del A600.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Ingresar la clave de Servicio",
+          "description": "En la pantalla de inicio del A600 aparece \"Introduzca la contraseña\" con un teclado numérico. Escribe la clave de Servicio (ver pestaña Consulta rápida) y confirma con ✔.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-modificar-distancia-flipper%2Fstep-1.jpg?alt=media&token=098a4c77-424f-43ed-94fd-7a8377687f4f"
+        },
+        {
+          "order": 2,
+          "title": "Abrir \"Distancias puerta\"",
+          "description": "Se abre la tabla con las 5 puertas (flippers). Cada fila tiene: Distancia, Distancia abierta, Desplz. cierre, Umbral sujec., Ubicación y Tiempo caída. Los botones \"Guardar\" y \"Atrás\" están abajo.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-modificar-distancia-flipper%2Fstep-2.jpg?alt=media&token=175f8875-dfd4-4f18-8267-e74c062ca6f1"
+        },
+        {
+          "order": 3,
+          "title": "Seleccionar y ajustar la puerta",
+          "description": "Toca la fila de la puerta a modificar (queda marcada \">N<\") y luego la celda \"Distancia abierta\" (se resalta en azul). Usa los botones \"−\" / \"+\" para bajar o subir el valor: bajar la distancia hace que el flipper abra antes; subir la distancia hace que abra después.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-modificar-distancia-flipper%2Fstep-3.jpg?alt=media&token=e4636073-7339-4338-a9c0-a1d32db98fb7"
+        },
+        {
+          "order": 4,
+          "title": "Guardar el cambio",
+          "description": "Presiona \"Guardar\" (esquina inferior derecha de la tabla) para aplicar el nuevo valor. Sin este paso el ajuste no queda grabado.",
+          "imageUrl": null
+        }
+      ]
+    },
+    {
+      "id": "mhg-proc-activar-flippers-entrada-baader",
+      "title": "Activación manual de flippers de entrada al Baader",
+      "description": "Abrir manualmente una compuerta específica desde el menú Servicio, sin esperar producto — útil para pruebas y despeje de atascos.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Ingresar la clave de Servicio",
+          "description": "Misma pantalla \"Introduzca la contraseña\": ingresa la clave de Servicio con el teclado numérico y confirma con ✔.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-1.jpg?alt=media&token=d5320998-44bf-41df-a3fd-5d7742724915"
+        },
+        {
+          "order": 2,
+          "title": "Confirmar la clave",
+          "description": "El campo muestra la clave enmascarada con asteriscos mientras se escribe. Verifica los dígitos antes de confirmar.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-2.jpg?alt=media&token=7b9fdb73-e096-4242-a572-41cbb483364d"
+        },
+        {
+          "order": 3,
+          "title": "Elegir la puerta y activarla",
+          "description": "En la pantalla de activación manual: arriba a la derecha selecciona el número de \"Puerta por ajustar\" con los botones \"−\"/\"+\"; abajo a la izquierda se ve el \"Tiempo apertura/cierre puerta\" (ej. 0.75 s). Presiona \"Iniciar/detener\" (abajo a la derecha) para abrir y cerrar esa puerta manualmente.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-3.jpg?alt=media&token=26425f8f-2845-4387-b721-e97a64b66888"
+        }
       ]
     }
   ],

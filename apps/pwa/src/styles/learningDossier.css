@@ -14,12 +14,19 @@
   --dp-ink-faint: #979d9a;
   --dp-rule:      #e0e2df;
   --dp-rule-hard: #c4c8c3;
-  --dp-accent:    #275874;
+  /* Acento = azul de marca AquaChile (rampa primary-600 #2a6aa6 para texto
+     sobre papel claro; azulClaro #9DC3E6 en oscuro). Antes petróleo #275874. */
+  --dp-accent:    #2a6aa6;
   --dp-warn:      #9c4a22;
   --dp-ok:        #38614c;
-  --dp-cond: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --dp-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-  --dp-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+  --dp-accent-soft: rgba(46, 117, 182, 0.10);
+  --dp-warn-soft:   rgba(156, 74, 34, 0.10);
+  --dp-ok-soft:     rgba(56, 97, 76, 0.10);
+  /* Tipografía unificada con la app (design system): IBM Plex Sans / Mono,
+     ya cargadas vía @fontsource en main.tsx. */
+  --dp-cond: "IBM Plex Sans", system-ui, sans-serif;
+  --dp-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --dp-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   background: var(--dp-paper);
   color: var(--dp-ink);
@@ -34,9 +41,12 @@
   --dp-ink-faint: #626c72;
   --dp-rule:      #232a2f;
   --dp-rule-hard: #363f45;
-  --dp-accent:    #7aacc7;
+  --dp-accent:    #9DC3E6;
   --dp-warn:      #d5885a;
   --dp-ok:        #63b58e;
+  --dp-accent-soft: rgba(157, 195, 230, 0.13);
+  --dp-warn-soft:   rgba(213, 136, 90, 0.13);
+  --dp-ok-soft:     rgba(99, 181, 142, 0.13);
 }
 
 /* Utilidades */
@@ -57,7 +67,7 @@
 .dossier .dp-eyebrow { font-family: var(--dp-mono); font-size: 11px; letter-spacing: .14em; color: var(--dp-ink-soft); }
 .dossier .dp-eyebrow b { color: var(--dp-accent); font-weight: 600; }
 .dossier .dp-eyebrow .sep { color: var(--dp-ink-faint); margin: 0 8px; }
-.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; text-transform: uppercase; font-size: clamp(33px, 6.5vw, 56px); line-height: 1.0; letter-spacing: .005em; margin: 20px 0 16px; text-wrap: balance; color: var(--dp-ink); }
+.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; font-size: clamp(26px, 4.5vw, 40px); line-height: 1.1; letter-spacing: -0.01em; margin: 18px 0 14px; text-wrap: balance; color: var(--dp-ink); }
 .dossier .dp-sub { font-size: 15px; color: var(--dp-ink-soft); max-width: 54ch; margin: 0; }
 
 .dossier .dp-meta { display: flex; flex-wrap: wrap; gap: 22px 44px; padding: 20px 0; margin-top: 30px; border-top: 1px solid var(--dp-rule); border-bottom: 1px solid var(--dp-rule); }
@@ -67,19 +77,51 @@
 .dossier .dp-hmi { margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; }
 .dossier .dp-hmi:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
-/* Tabs / índice */
-.dossier .dp-toc { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
-.dossier .dp-toc button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .02em; color: var(--dp-ink-soft); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 7px; }
+/* Tabs / índice — píldoras con activo sólido (lenguaje curso, no manual) */
+.dossier .dp-toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; padding-bottom: 14px; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-toc button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .02em; color: var(--dp-ink-soft); background: var(--dp-accent-soft); border: 1px solid transparent; border-radius: 999px; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 7px; transition: background .15s ease, color .15s ease; }
 .dossier .dp-toc button b { color: var(--dp-ink-faint); }
-.dossier .dp-toc button:hover { color: var(--dp-ink); }
-.dossier .dp-toc button[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); }
-.dossier .dp-toc button[aria-current="true"] b { color: var(--dp-accent); }
+.dossier .dp-toc button:hover { color: var(--dp-ink); border-color: var(--dp-accent); }
+.dossier .dp-toc button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-toc button[aria-current="true"] b { color: var(--dp-paper); opacity: .75; }
+.dossier .dp-toc .dp-toc-done { font-weight: 700; color: var(--dp-ok); }
+.dossier .dp-toc button[aria-current="true"] .dp-toc-done { color: var(--dp-paper); }
 
-/* Cabecera de sección de contenido */
-.dossier .dp-sec-head { display: flex; align-items: baseline; gap: 14px; }
-.dossier .dp-sec-no { font-family: var(--dp-mono); font-size: 13px; font-weight: 600; color: var(--dp-accent); letter-spacing: .05em; }
-.dossier .dp-sec-no::before { content: "§ "; color: var(--dp-ink-faint); }
-.dossier .dp-sec-title { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(20px, 4vw, 27px); letter-spacing: .01em; margin: 0; line-height: 1.05; color: var(--dp-ink); }
+/* Progreso del curso en la portada */
+.dossier .dp-progress { display: flex; align-items: center; gap: 12px; margin-top: 18px; max-width: 420px; }
+.dossier .dp-progress-track { position: relative; flex: 1; height: 6px; border-radius: 999px; background: var(--dp-accent-soft); overflow: hidden; }
+.dossier .dp-progress-track > span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--dp-accent); transition: width .5s ease; }
+.dossier .dp-progress-track.is-ok > span { background: var(--dp-ok); }
+.dossier .dp-progress-label { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-soft); white-space: nowrap; }
+.dossier .dp-progress-label.is-ok { color: var(--dp-ok); font-weight: 600; }
+
+/* Layout curso: sidebar de módulos (desktop) + columna de contenido */
+.dossier .dp-course { display: grid; }
+.dossier .dp-side { display: none; }
+@media (min-width: 1000px) {
+  .dossier .dp-course { grid-template-columns: 236px minmax(0, 1fr); gap: 34px; align-items: start; margin-top: 26px; }
+  .dossier .dp-course .dp-toc { display: none; }
+  .dossier .dp-side { display: block; position: sticky; top: 16px; border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-accent-soft); padding: 16px 14px; }
+}
+.dossier .dp-side-title { font-size: 13.5px; font-weight: 700; color: var(--dp-ink); line-height: 1.35; }
+.dossier .dp-side-progress { display: flex; align-items: center; gap: 10px; margin: 12px 0 14px; }
+.dossier .dp-side-progress .dp-progress-track { flex: 1; height: 5px; border-radius: 999px; background: var(--dp-rule-hard); position: relative; overflow: hidden; }
+.dossier .dp-side-progress .dp-progress-track > span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--dp-accent); }
+.dossier .dp-side-progress .dp-progress-track.is-ok > span { background: var(--dp-ok); }
+.dossier .dp-side-progress .dp-progress-label { font-family: var(--dp-mono); font-size: 11px; color: var(--dp-ink-soft); }
+.dossier .dp-side-progress .dp-progress-label.is-ok { color: var(--dp-ok); font-weight: 600; }
+.dossier .dp-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.dossier .dp-side-list button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 8px 9px; font-size: 12.5px; color: var(--dp-ink-soft); cursor: pointer; }
+.dossier .dp-side-list button:hover { color: var(--dp-ink); }
+.dossier .dp-side-list button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); font-weight: 600; }
+.dossier .dp-side-ico { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--dp-ink-faint); display: inline-flex; align-items: center; justify-content: center; flex: none; font-size: 9px; font-weight: 700; }
+.dossier .dp-side-list button[aria-current="true"] .dp-side-ico { border-color: var(--dp-paper); }
+.dossier .dp-side-list .is-done .dp-side-ico { background: var(--dp-ok); border-color: var(--dp-ok); color: var(--dp-paper); }
+
+/* Cabecera de sección de contenido — eyebrow + título con barra de acento */
+.dossier .dp-sec-head { display: block; border-left: 3px solid var(--dp-accent); padding-left: 14px; }
+.dossier .dp-sec-no { display: block; font-family: var(--dp-mono); font-size: 11px; font-weight: 600; color: var(--dp-accent); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px; }
+.dossier .dp-sec-title { font-weight: 700; font-size: clamp(19px, 3.4vw, 24px); letter-spacing: 0; margin: 0; line-height: 1.15; color: var(--dp-ink); }
 .dossier .dp-sec-code { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .1em; color: var(--dp-ink-faint); text-transform: uppercase; margin-top: 12px; }
 
 /* Bloques de manual: objetivo, cuerpo, porqué, aviso, medidas, notas */
@@ -180,7 +222,7 @@
 /* Cabecera de sub-sección (sección de manual / bloque de casos) */
 .dossier .dp-subhead { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 4px; }
 .dossier .dp-subhead .dp-subno { font-family: var(--dp-mono); font-size: 12px; font-weight: 600; color: var(--dp-ink-faint); }
-.dossier .dp-subhead h3 { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(17px, 3vw, 22px); letter-spacing: .01em; margin: 0; line-height: 1.1; color: var(--dp-ink); }
+.dossier .dp-subhead h3 { font-family: var(--dp-cond); font-weight: 600; font-size: clamp(16px, 2.8vw, 20px); letter-spacing: 0; margin: 0; line-height: 1.25; color: var(--dp-ink); }
 .dossier .dp-subhead + .dp-sec-code { margin-top: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--dp-rule); }
 
 /* Documentos descargables */
@@ -314,10 +356,12 @@
 .dossier .dp-quiz-opt .dp-k { font-family: var(--dp-mono); font-weight: 600; font-size: 12px; color: var(--dp-ink-faint); flex-shrink: 0; }
 .dossier .dp-quiz-opt .dp-otext { font-size: 14px; color: var(--dp-ink-soft); }
 .dossier .dp-quiz-opt:hover:not(:disabled) .dp-otext { color: var(--dp-ink); }
+.dossier .dp-quiz-opt[data-state="correct"] { background: var(--dp-ok-soft); }
 .dossier .dp-quiz-opt[data-state="correct"] .dp-k, .dossier .dp-quiz-opt[data-state="correct"] .dp-otext { color: var(--dp-ok); }
+.dossier .dp-quiz-opt[data-state="wrong"] { background: var(--dp-warn-soft); }
 .dossier .dp-quiz-opt[data-state="wrong"] .dp-k, .dossier .dp-quiz-opt[data-state="wrong"] .dp-otext { color: var(--dp-warn); }
-.dossier .dp-quiz-fb { max-width: 66ch; margin-top: 18px; padding-left: 16px; border-left: 2px solid var(--dp-ok); font-size: 13.5px; color: var(--dp-ink-soft); }
-.dossier .dp-quiz-fb.is-wrong { border-left-color: var(--dp-warn); }
+.dossier .dp-quiz-fb { max-width: 66ch; margin-top: 18px; padding: 12px 16px; border-left: 2px solid var(--dp-ok); background: var(--dp-ok-soft); font-size: 13.5px; color: var(--dp-ink-soft); }
+.dossier .dp-quiz-fb.is-wrong { border-left-color: var(--dp-warn); background: var(--dp-warn-soft); }
 .dossier .dp-quiz-fb .dp-lbl { display: block; margin-bottom: 5px; color: var(--dp-ok); }
 .dossier .dp-quiz-fb.is-wrong .dp-lbl { color: var(--dp-warn); }
 .dossier .dp-quiz-next { font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; margin-top: 22px; }
@@ -333,5 +377,62 @@
 .dossier .dp-quiz-review .dp-rq { font-size: 13.5px; font-weight: 600; color: var(--dp-ink); }
 .dossier .dp-quiz-review .dp-ra { font-size: 12.5px; color: var(--dp-ink-soft); margin-top: 4px; }
 .dossier .dp-quiz-review .dp-ra b { color: var(--dp-ok); font-weight: 600; }
+
+/* Resultado en anillo — acompaña al puntaje grande, no lo reemplaza. */
+.dossier .dp-quiz-ring { display: flex; align-items: center; gap: 22px; margin: 10px 0 4px; }
+.dossier .dp-quiz-ring svg { flex-shrink: 0; }
+.dossier .dp-quiz-ring-num { font-family: var(--dp-mono); font-size: 20px; font-weight: 600; }
+.dossier .dp-quiz-ring-thr { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-top: 4px; }
+
+/* Diagrama con puntos de referencia (hotspots) — despiece de equipo con notas al tocar. */
+.dossier .dp-hotspot { max-width: 66ch; margin: 22px 0; }
+.dossier .dp-hotspot-stage { position: relative; border: 1px solid var(--dp-rule-hard); background: var(--dp-paper); min-height: 220px; }
+.dossier .dp-hotspot-point {
+  position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+  border-radius: 50%; border: 1px solid var(--dp-accent); background: var(--dp-paper);
+  color: var(--dp-accent); font-family: var(--dp-mono); font-weight: 600; font-size: 11px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.dossier .dp-hotspot-point:hover { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-point[aria-pressed="true"] { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-tip {
+  position: absolute; z-index: 2; width: 200px; background: var(--dp-paper);
+  border: 1px solid var(--dp-rule-hard); padding: 10px 12px; font-size: 12.5px;
+  color: var(--dp-ink-soft); line-height: 1.5;
+}
+.dossier .dp-hotspot-tip .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 4px; }
+.dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
+.dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
+
+/* Consulta rápida — lámina de datos duros en tarjetas escaneables */
+.dossier .dp-qr { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; max-width: 900px; }
+.dossier .dp-qr-card { border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-paper); padding: 16px 18px; }
+.dossier .dp-qr-title { font-size: 13px; font-weight: 700; color: var(--dp-accent); margin: 0 0 10px; }
+.dossier .dp-qr-rows { margin: 0; }
+.dossier .dp-qr-row { display: grid; grid-template-columns: minmax(96px, 38%) 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--dp-rule); align-items: baseline; }
+.dossier .dp-qr-row:last-child { border-bottom: 0; }
+.dossier .dp-qr-row dt { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-qr-row dd { margin: 0; font-family: var(--dp-mono); font-size: 12.5px; color: var(--dp-ink); line-height: 1.5; overflow-wrap: anywhere; }
+.dossier .dp-qr-note { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--dp-warn); font-size: 12px; color: var(--dp-ink-soft); }
+.dossier .dp-qr-masked { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-body); font-size: 12px; color: var(--dp-ink-faint); font-style: italic; }
+
+/* Ejercicio de relacionar término ↔ definición — filas rellenas redondeadas. */
+.dossier .dp-match { max-width: 66ch; margin: 26px 0; }
+.dossier .dp-match-grid { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr; gap: 8px 20px; }
+.dossier .dp-match-item {
+  display: block; width: 100%; text-align: left;
+  background: var(--dp-paper); border: 1px solid var(--dp-rule-hard); border-radius: 9px;
+  padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  font-size: 13px; color: var(--dp-ink-soft); font-family: var(--dp-body);
+  transition: background .15s ease, border-color .15s ease;
+}
+.dossier .dp-match-grid > div:first-child .dp-match-item { background: var(--dp-accent-soft); font-weight: 600; color: var(--dp-ink); }
+.dossier .dp-match-item:disabled { cursor: default; }
+.dossier .dp-match-item:hover:not(:disabled) { border-color: var(--dp-accent); }
+.dossier .dp-match-item[data-state="selected"] { color: var(--dp-accent); border-color: var(--dp-accent); background: var(--dp-accent-soft); }
+.dossier .dp-match-grid .dp-match-item[data-state="matched"] { color: var(--dp-ok); background: var(--dp-ok-soft); border-color: var(--dp-ok); }
+.dossier .dp-match-item[data-state="wrong"] { color: var(--dp-warn); background: var(--dp-warn-soft); border-color: var(--dp-warn); }
+.dossier .dp-match-status { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-faint); margin-top: 12px; }
+.dossier .dp-match-status.is-done { color: var(--dp-ok); }
 
 .dossier a:focus-visible, .dossier button:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 3px; }
