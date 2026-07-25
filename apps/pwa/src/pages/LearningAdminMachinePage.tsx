@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Edit3, Save, X, ChevronUp, ChevronDown, Loader2,
-  ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus, Eye,
+  ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus, Eye, Image as ImageIcon,
 } from 'lucide-react'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { LC } from '@/data/learningTheme'
@@ -29,6 +29,9 @@ import {
   listDiagnosis,
   saveDiagnosis,
   deleteDiagnosis,
+  listComponentPhotos,
+  saveComponentPhoto,
+  deleteComponentPhoto,
   generateContentId,
   uploadLearningImage,
   deleteLearningImage,
@@ -38,20 +41,23 @@ import {
   type SectionQuizItem,
   type Flow,
   type DiagnosisEntry,
+  type ComponentPhoto,
+  type ComponentHotspotPoint,
 } from '@/services/learningContent'
 import { logger } from '@/lib/logger'
 
-type AdminTab = 'procedures' | 'manual' | 'flows' | 'diagnosis'
+type AdminTab = 'procedures' | 'manual' | 'flows' | 'diagnosis' | 'components'
 
 const TAB_DEFS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'procedures', label: 'Procedimientos', icon: ListChecks },
   { id: 'manual', label: 'Manual', icon: BookOpen },
   { id: 'flows', label: 'Flujos', icon: GitBranch },
   { id: 'diagnosis', label: 'Diagnóstico', icon: AlertTriangle },
+  { id: 'components', label: 'Componentes', icon: ImageIcon },
 ]
 
 function isAdminTab(value: string | null): value is AdminTab {
-  return value === 'procedures' || value === 'manual' || value === 'flows' || value === 'diagnosis'
+  return value === 'procedures' || value === 'manual' || value === 'flows' || value === 'diagnosis' || value === 'components'
 }
 
 export function LearningAdminMachinePage() {
@@ -137,6 +143,7 @@ export function LearningAdminMachinePage() {
       {activeTab === 'manual' && <ManualEditor machineSlug={machine.slug} />}
       {activeTab === 'flows' && <FlowsEditor machineSlug={machine.slug} />}
       {activeTab === 'diagnosis' && <DiagnosisEditor machineSlug={machine.slug} />}
+      {activeTab === 'components' && <ComponentsEditor machineSlug={machine.slug} />}
     </div>
   )
 }
@@ -1557,6 +1564,343 @@ function DiagnosisForm({
       </FormField>
 
       <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// COMPONENTES DEL EQUIPO (fotos reales + hotspots)
+// ═════════════════════════════════════════════════════════════
+
+function ComponentsEditor({ machineSlug }: { machineSlug: string }) {
+  const [photos, setPhotos] = useState<ComponentPhoto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<ComponentPhoto | null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      setPhotos(await listComponentPhotos(machineSlug))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  function handleNew() {
+    setEditing({
+      id: generateContentId('comp_'),
+      file: '',
+      title: '',
+      aspectRatio: 4 / 3,
+      order: photos.length + 1,
+      points: [],
+      createdAt: 0,
+      updatedAt: 0,
+    })
+  }
+
+  async function handleSave(photo: ComponentPhoto) {
+    await saveComponentPhoto(machineSlug, photo)
+    setEditing(null)
+    await load()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Eliminar esta foto y sus puntos?')) return
+    await deleteComponentPhoto(machineSlug, id)
+    await load()
+  }
+
+  if (editing) {
+    return (
+      <ComponentPhotoForm
+        machineSlug={machineSlug}
+        initial={editing}
+        onSave={handleSave}
+        onCancel={() => setEditing(null)}
+      />
+    )
+  }
+
+  const sorted = [...photos].sort((a, b) => a.order - b.order)
+
+  return (
+    <CollectionListView
+      emptyIcon={ImageIcon}
+      emptyTitle="Sin fotos aún"
+      emptyHint="Agrega la primera foto real de la máquina con sus puntos numerados."
+      newLabel="Nueva foto"
+      loading={loading}
+      count={photos.length}
+      onNew={handleNew}
+      singular="foto"
+      plural="fotos"
+    >
+      {sorted.map(photo => (
+        <ItemCard
+          key={photo.id}
+          title={`${photo.order}. ${photo.title}`}
+          subtitle={`${photo.file || '(sin archivo)'} · ${photo.points.length} punto${photo.points.length !== 1 ? 's' : ''}`}
+          meta={`Actualizado ${formatDate(photo.updatedAt)}`}
+          onEdit={() => setEditing(photo)}
+          onDelete={() => handleDelete(photo.id)}
+        />
+      ))}
+    </CollectionListView>
+  )
+}
+
+function ComponentPhotoForm({
+  machineSlug,
+  initial,
+  onSave,
+  onCancel,
+}: {
+  machineSlug: string
+  initial: ComponentPhoto
+  onSave: (p: ComponentPhoto) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [photo, setPhoto] = useState<ComponentPhoto>(initial)
+  const [saving, setSaving] = useState(false)
+  const [imgError, setImgError] = useState(false)
+
+  function updatePoint(id: string, patch: Partial<ComponentHotspotPoint>) {
+    setPhoto(p => ({ ...p, points: p.points.map(pt => (pt.id === id ? { ...pt, ...patch } : pt)) }))
+  }
+
+  function removePoint(id: string) {
+    setPhoto(p => ({ ...p, points: p.points.filter(pt => pt.id !== id) }))
+  }
+
+  function addPoint(x: number, y: number) {
+    const id = generateContentId('pt_')
+    setPhoto(p => ({
+      ...p,
+      points: [...p.points, { id, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, label: 'Nuevo punto', description: '' }],
+    }))
+  }
+
+  const previewUrl = photo.file.trim()
+    ? `${import.meta.env.BASE_URL}learning-assets/${machineSlug}/${photo.file.trim()}`
+    : ''
+
+  const canSave = photo.title.trim().length > 0 && photo.file.trim().length > 0
+
+  async function handleSubmit() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      await onSave(photo)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <FormField label="Orden" className="w-24 flex-shrink-0">
+          <input
+            type="number"
+            min={1}
+            value={photo.order}
+            onChange={e => setPhoto({ ...photo, order: Number(e.target.value) || 1 })}
+            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+          />
+        </FormField>
+        <FormField label="Título" required className="flex-1">
+          <input
+            type="text"
+            value={photo.title}
+            onChange={e => setPhoto({ ...photo, title: e.target.value })}
+            placeholder="Ej: Fotocélula — receptor"
+            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+          />
+        </FormField>
+      </div>
+
+      <FormField label={`Archivo (en public/learning-assets/${machineSlug}/)`} required>
+        <input
+          type="text"
+          value={photo.file}
+          onChange={e => { setPhoto({ ...photo, file: e.target.value }); setImgError(false) }}
+          placeholder="grader-foto-ejemplo.jpg"
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/60"
+        />
+        <p className="mt-1 text-xs text-muted-foreground/80">
+          El archivo debe subirse manualmente a esa carpeta del repo (esta pantalla aún no sube fotos).
+        </p>
+      </FormField>
+
+      {previewUrl && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Puntos — clic en la foto para agregar uno, arrastra para moverlo
+            </label>
+            <span className="text-xs text-muted-foreground/80 font-mono">
+              {photo.points.length} punto{photo.points.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {imgError ? (
+            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground/80">
+              No se encontró la foto en esa ruta. Verifica el nombre del archivo.
+            </p>
+          ) : (
+            <PointEditorImage
+              src={previewUrl}
+              points={photo.points}
+              onAddPoint={addPoint}
+              onMovePoint={(id, x, y) => updatePoint(id, { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 })}
+              onImageLoad={(w, h) => setPhoto(p => ({ ...p, aspectRatio: w / h }))}
+              onImageError={() => setImgError(true)}
+            />
+          )}
+
+          {photo.points.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {photo.points.map((pt, i) => (
+                <div key={pt.id} className="p-3 rounded-lg border border-border bg-card/50">
+                  <div className="flex items-start gap-2">
+                    <span className="flex items-center justify-center w-6 h-6 mt-1 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-[11px] flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 space-y-2 min-w-0">
+                      <input
+                        type="text"
+                        value={pt.label}
+                        onChange={e => updatePoint(pt.id, { label: e.target.value })}
+                        placeholder="Nombre del punto"
+                        className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-ring/60"
+                      />
+                      <textarea
+                        value={pt.description}
+                        onChange={e => updatePoint(pt.id, { description: e.target.value })}
+                        placeholder="Nota que se muestra al tocar el punto"
+                        rows={2}
+                        className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring/60"
+                      />
+                    </div>
+                    <button
+                      onClick={() => removePoint(pt.id)}
+                      className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded flex-shrink-0"
+                      title="Eliminar punto"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+/**
+ * PointEditorImage — clic sobre la foto agrega un punto en esa posicion (%);
+ * arrastrar un punto existente lo reposiciona. Coordenadas 0-100 relativas al
+ * elemento (no a la foto original), por eso `onImageLoad` reporta el
+ * ancho/alto real para guardar `aspectRatio` — igual que ve el técnico.
+ */
+function PointEditorImage({
+  src,
+  points,
+  onAddPoint,
+  onMovePoint,
+  onImageLoad,
+  onImageError,
+}: {
+  src: string
+  points: ComponentHotspotPoint[]
+  onAddPoint: (x: number, y: number) => void
+  onMovePoint: (id: string, x: number, y: number) => void
+  onImageLoad: (naturalWidth: number, naturalHeight: number) => void
+  onImageError: () => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const draggingId = useRef<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  function toPercent(clientX: number, clientY: number) {
+    const rect = containerRef.current!.getBoundingClientRect()
+    return {
+      x: Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100)),
+      y: Math.min(100, Math.max(0, ((clientY - rect.top) / rect.height) * 100)),
+    }
+  }
+
+  function handleContainerClick(e: React.MouseEvent) {
+    if (draggingId.current) return
+    const { x, y } = toPercent(e.clientX, e.clientY)
+    onAddPoint(x, y)
+  }
+
+  function handlePointMouseDown(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    draggingId.current = id
+    setSelectedId(id)
+
+    function handleMove(ev: MouseEvent) {
+      const { x, y } = toPercent(ev.clientX, ev.clientY)
+      onMovePoint(id, x, y)
+    }
+    function handleUp() {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+      setTimeout(() => { draggingId.current = null }, 0)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      onClick={handleContainerClick}
+      className="relative rounded-lg border border-border overflow-hidden bg-background"
+      style={{ cursor: 'crosshair', userSelect: 'none', maxWidth: 480 }}
+    >
+      <img
+        src={src}
+        alt="Foto a editar"
+        draggable={false}
+        className="w-full block pointer-events-none"
+        onLoad={e => onImageLoad(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+        onError={onImageError}
+      />
+      {points.map((p, i) => (
+        <div
+          key={p.id}
+          onMouseDown={e => handlePointMouseDown(p.id, e)}
+          title={p.label}
+          className="absolute flex items-center justify-center rounded-full text-[11px] font-bold text-white"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: 24,
+            height: 24,
+            marginLeft: -12,
+            marginTop: -12,
+            background: p.id === selectedId ? LC.aqua : 'rgba(0,0,0,0.65)',
+            border: '2px solid #fff',
+            cursor: 'grab',
+          }}
+        >
+          {i + 1}
+        </div>
+      ))}
     </div>
   )
 }

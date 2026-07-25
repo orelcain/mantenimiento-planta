@@ -430,6 +430,13 @@
 @media (min-width: 700px) {
   .dossier .dp-hotspot-stage { min-height: 360px; }
 }
+/* En desktop la foto real con `aspectRatio` puede crecer demasiado (una foto en
+   retrato a 1000px de ancho pasa de 1300px de alto) — capar el ancho del stage
+   cuando trae una foto real (no la ilustración plana original, que sí usa el
+   ancho completo). Móvil no se toca: ya cabe dentro del viewport angosto. */
+@media (min-width: 700px) {
+  .dossier .dp-hotspot[data-photo] { max-width: 480px; }
+}
 .dossier .dp-hotspot-point {
   position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px;
   border-radius: 50%; border: 1px solid var(--dp-accent); background: var(--dp-paper);
