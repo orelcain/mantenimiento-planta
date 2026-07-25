@@ -123,6 +123,31 @@ export interface ManualSection {
   quiz?: SectionQuizItem[]
 }
 
+/** Punto numerado sobre una foto real de "Componentes del equipo" — toca para ver la nota. */
+export interface ComponentHotspotPoint {
+  id: string
+  /** Posición horizontal, 0-100 (%) sobre la foto completa (sin recorte). */
+  x: number
+  /** Posición vertical, 0-100 (%) sobre la foto completa (sin recorte). */
+  y: number
+  label: string
+  description: string
+}
+
+/** Una foto real con sus puntos, dentro de la pestaña "Componentes del equipo". */
+export interface ComponentPhoto {
+  id: string
+  /** Nombre de archivo dentro de `public/learning-assets/{machineSlug}/`. */
+  file: string
+  title: string
+  /** Ancho/alto real de la foto (evita recorte/letterbox al posicionar los puntos). */
+  aspectRatio: number
+  order: number
+  points: ComponentHotspotPoint[]
+  createdAt: number
+  updatedAt: number
+}
+
 export interface Flow {
   id: string
   title: string
@@ -184,7 +209,7 @@ export interface BibliographyEntry {
   updatedAt: number
 }
 
-export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz' | 'glossary' | 'bibliografia'
+export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz' | 'glossary' | 'bibliografia' | 'components'
 
 // ─────────────────────────────────────────────────────────────
 // PATHS HELPERS
@@ -686,6 +711,32 @@ export async function deleteManualSection(machineSlug: string, id: string): Prom
     return
   }
   await deleteDoc(sectionDoc(machineSlug, 'manual', id))
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMPONENTES DEL EQUIPO (fotos reales + hotspots)
+// ─────────────────────────────────────────────────────────────
+
+export async function listComponentPhotos(machineSlug: string): Promise<ComponentPhoto[]> {
+  const q = query(sectionCollection(machineSlug, 'components'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as ComponentPhoto), id: d.id }))
+}
+
+export async function saveComponentPhoto(
+  machineSlug: string,
+  photo: Omit<ComponentPhoto, 'createdAt' | 'updatedAt'> & { createdAt?: number }
+): Promise<void> {
+  const now = Date.now()
+  await setDoc(sectionDoc(machineSlug, 'components', photo.id), {
+    ...photo,
+    createdAt: photo.createdAt || now,
+    updatedAt: now,
+  })
+}
+
+export async function deleteComponentPhoto(machineSlug: string, id: string): Promise<void> {
+  await deleteDoc(sectionDoc(machineSlug, 'components', id))
 }
 
 // ─────────────────────────────────────────────────────────────
