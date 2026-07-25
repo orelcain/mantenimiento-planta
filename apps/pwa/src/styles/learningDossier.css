@@ -77,15 +77,24 @@
 .dossier .dp-hmi { margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; }
 .dossier .dp-hmi:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
-/* Tabs / índice — píldoras con activo sólido (lenguaje curso, no manual) */
-.dossier .dp-toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; padding-bottom: 14px; border-bottom: 1px solid var(--dp-rule); }
-.dossier .dp-toc button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .02em; color: var(--dp-ink-soft); background: var(--dp-accent-soft); border: 1px solid transparent; border-radius: 999px; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 7px; transition: background .15s ease, color .15s ease; }
-.dossier .dp-toc button b { color: var(--dp-ink-faint); }
-.dossier .dp-toc button:hover { color: var(--dp-ink); border-color: var(--dp-accent); }
-.dossier .dp-toc button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); }
-.dossier .dp-toc button[aria-current="true"] b { color: var(--dp-paper); opacity: .75; }
-.dossier .dp-toc .dp-toc-done { font-weight: 700; color: var(--dp-ok); }
-.dossier .dp-toc button[aria-current="true"] .dp-toc-done { color: var(--dp-paper); }
+/* Selector de secciones de la máquina/curso — una sola fila subrayada con scroll
+   horizontal, igual en desktop y móvil (nunca se envuelve a 2 filas). Estilo
+   "documentation portal": subrayado, no píldoras — ver memoria de diseño del
+   Centro de Aprendizaje para el porqué (setproduct.com/blog/tabs-ui-design). */
+.dossier .dp-scroll-tabs { position: relative; display: flex; align-items: center; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-scroll-track { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.dossier .dp-scroll-track::-webkit-scrollbar { display: none; }
+.dossier .dp-scroll-tab { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-mono); font-size: 12px; letter-spacing: .01em; color: var(--dp-ink-faint); background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: color .15s ease, border-color .15s ease; }
+.dossier .dp-scroll-tab:hover { color: var(--dp-ink); }
+.dossier .dp-scroll-tab[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); font-weight: 600; }
+.dossier .dp-scroll-tab-done { color: var(--dp-ok); font-weight: 700; }
+.dossier .dp-scroll-fade { position: absolute; top: 0; right: 26px; bottom: 1px; width: 30px; background: linear-gradient(to right, transparent, var(--dp-paper)); pointer-events: none; }
+.dossier .dp-scroll-arrow { flex-shrink: 0; display: none; align-items: center; justify-content: center; width: 26px; height: 34px; background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; }
+.dossier .dp-scroll-arrow:hover { color: var(--dp-ink); }
+@media (min-width: 700px) {
+  /* Las flechas ayudan a quien usa mouse sin gesto horizontal; en touch el deslizar alcanza. */
+  .dossier .dp-scroll-arrow { display: flex; }
+}
 
 /* Progreso del curso en la portada */
 .dossier .dp-progress { display: flex; align-items: center; gap: 12px; margin-top: 18px; max-width: 420px; }
@@ -95,28 +104,7 @@
 .dossier .dp-progress-label { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-soft); white-space: nowrap; }
 .dossier .dp-progress-label.is-ok { color: var(--dp-ok); font-weight: 600; }
 
-/* Layout curso: sidebar de módulos (desktop) + columna de contenido */
-.dossier .dp-course { display: grid; }
-.dossier .dp-side { display: none; }
-@media (min-width: 1000px) {
-  .dossier .dp-course { grid-template-columns: 236px minmax(0, 1fr); gap: 34px; align-items: start; margin-top: 26px; }
-  .dossier .dp-course .dp-toc { display: none; }
-  .dossier .dp-side { display: block; position: sticky; top: 16px; border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-accent-soft); padding: 16px 14px; }
-}
-.dossier .dp-side-title { font-size: 13.5px; font-weight: 700; color: var(--dp-ink); line-height: 1.35; }
-.dossier .dp-side-progress { display: flex; align-items: center; gap: 10px; margin: 12px 0 14px; }
-.dossier .dp-side-progress .dp-progress-track { flex: 1; height: 5px; border-radius: 999px; background: var(--dp-rule-hard); position: relative; overflow: hidden; }
-.dossier .dp-side-progress .dp-progress-track > span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--dp-accent); }
-.dossier .dp-side-progress .dp-progress-track.is-ok > span { background: var(--dp-ok); }
-.dossier .dp-side-progress .dp-progress-label { font-family: var(--dp-mono); font-size: 11px; color: var(--dp-ink-soft); }
-.dossier .dp-side-progress .dp-progress-label.is-ok { color: var(--dp-ok); font-weight: 600; }
-.dossier .dp-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.dossier .dp-side-list button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 8px 9px; font-size: 12.5px; color: var(--dp-ink-soft); cursor: pointer; }
-.dossier .dp-side-list button:hover { color: var(--dp-ink); }
-.dossier .dp-side-list button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); font-weight: 600; }
-.dossier .dp-side-ico { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--dp-ink-faint); display: inline-flex; align-items: center; justify-content: center; flex: none; font-size: 9px; font-weight: 700; }
-.dossier .dp-side-list button[aria-current="true"] .dp-side-ico { border-color: var(--dp-paper); }
-.dossier .dp-side-list .is-done .dp-side-ico { background: var(--dp-ok); border-color: var(--dp-ok); color: var(--dp-paper); }
+.dossier .dp-course { display: block; }
 
 /* Cabecera de sección de contenido — eyebrow + título con barra de acento */
 .dossier .dp-sec-head { display: block; border-left: 3px solid var(--dp-accent); padding-left: 14px; }
