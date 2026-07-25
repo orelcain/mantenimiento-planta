@@ -125,24 +125,24 @@
 .dossier .dp-sec-code { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .1em; color: var(--dp-ink-faint); text-transform: uppercase; margin-top: 12px; }
 
 /* Bloques de manual: objetivo, cuerpo, porqué, aviso, medidas, notas */
-.dossier .dp-objetivo { max-width: 66ch; margin: 22px 0; padding-left: 18px; border-left: 2px solid var(--dp-accent); }
+.dossier .dp-objetivo { max-width: 74ch; margin: 22px 0; padding-left: 18px; border-left: 2px solid var(--dp-accent); }
 .dossier .dp-objetivo .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 6px; }
 .dossier .dp-objetivo p { margin: 0; font-size: 15px; }
 
 /* "El porqué" — por qué importa la sección */
-.dossier .dp-porque { max-width: 66ch; font-size: 14px; color: var(--dp-ink-soft); margin: 20px 0; }
+.dossier .dp-porque { max-width: 74ch; font-size: 14px; color: var(--dp-ink-soft); margin: 20px 0; }
 .dossier .dp-porque .dp-lbl { color: var(--dp-ink-soft); }
 
 /* Autoevaluación al pie de una sección de manual (reusa dp-quiz-opt/fb) */
-.dossier .dp-selfquiz { max-width: 66ch; margin: 44px 0 0; padding-top: 26px; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-selfquiz { max-width: 74ch; margin: 44px 0 0; padding-top: 26px; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-selfquiz > .dp-lbl { color: var(--dp-ink-faint); display: block; margin-bottom: 18px; }
 .dossier .dp-selfquiz .dp-sq-item + .dp-sq-item { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-selfquiz .dp-q { font-size: 15px; font-weight: 600; color: var(--dp-ink); margin: 0 0 14px; line-height: 1.4; }
 
-.dossier .dp-body { max-width: 66ch; }
+.dossier .dp-body { max-width: 74ch; }
 .dossier .dp-body p { margin: 0 0 15px; }
 
-.dossier .dp-block { max-width: 66ch; margin: 26px 0; }
+.dossier .dp-block { max-width: 74ch; margin: 26px 0; }
 .dossier .dp-block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dossier .dp-block-head .dp-lbl { color: var(--dp-ink-soft); }
 .dossier .dp-list { list-style: none; margin: 0; padding: 0; }
@@ -152,7 +152,7 @@
 .dossier .dp-block b { color: var(--dp-ink); font-weight: 600; }
 
 /* Aviso / nota operativa */
-.dossier .dp-aviso { max-width: 66ch; margin: 24px 0; padding-left: 18px; border-left: 2px solid var(--dp-warn); }
+.dossier .dp-aviso { max-width: 74ch; margin: 24px 0; padding-left: 18px; border-left: 2px solid var(--dp-warn); }
 .dossier .dp-aviso .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 6px; }
 .dossier .dp-aviso p, .dossier .dp-aviso li { font-size: 14px; color: var(--dp-ink-soft); }
 
@@ -164,7 +164,7 @@
 .dossier .dp-specs-row dd { margin: 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); font-weight: 600; overflow-wrap: anywhere; }
 
 /* Procedimientos — pasos con hairline, mono */
-.dossier .dp-proc { max-width: 66ch; margin: 6px 0 30px; }
+.dossier .dp-proc { max-width: 74ch; margin: 6px 0 30px; }
 .dossier .dp-proc-ol { list-style: none; counter-reset: st; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-proc-ol li { counter-increment: st; display: grid; grid-template-columns: 38px 1fr; padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-proc-ol li .dp-n { font-family: var(--dp-mono); font-weight: 600; color: var(--dp-ink-faint); font-size: 13px; }
@@ -181,10 +181,10 @@
 .dossier .dp-diag .dp-sol { font-size: 13.5px; color: var(--dp-ink-soft); margin-top: 5px; }
 .dossier .dp-diag .dp-sol .dp-lbl { color: var(--dp-ok); margin-right: 7px; }
 
-.dossier .dp-marg { max-width: 66ch; padding-left: 16px; border-left: 2px solid var(--dp-rule-hard); margin: 22px 0; font-size: 13px; color: var(--dp-ink-soft); }
+.dossier .dp-marg { max-width: 74ch; padding-left: 16px; border-left: 2px solid var(--dp-rule-hard); margin: 22px 0; font-size: 13px; color: var(--dp-ink-soft); }
 .dossier .dp-marg .dp-lbl { display: block; margin-bottom: 4px; }
 
-.dossier .dp-empty { max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 20px 0; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-empty { max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 20px 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-empty b { color: var(--dp-ink); font-weight: 600; }
 
 .dossier .dp-loading { font-family: var(--dp-mono); font-size: 13px; letter-spacing: .04em; color: var(--dp-ink-faint); padding: 40px 0; }
@@ -254,7 +254,7 @@
 
 
 /* Vista "Todo lo crítico" */
-.dossier .dp-critical .dp-crit-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); max-width: 66ch; }
+.dossier .dp-critical .dp-crit-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); max-width: 74ch; }
 .dossier .dp-critical .dp-crit-item:first-of-type { padding-top: 26px; }
 .dossier .dp-critical .dp-crit-item:last-child { border-bottom: 0; }
 .dossier .dp-crit-ico { color: var(--dp-warn); flex-shrink: 0; font-size: 15px; margin-top: 1px; }
@@ -264,7 +264,7 @@
 .dossier .dp-crit-txt button:hover { color: var(--dp-ink); }
 
 /* Navegación anterior / siguiente */
-.dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 74ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-nav button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .03em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 4px 0; }
 .dossier .dp-nav button:hover:not(:disabled) { color: var(--dp-accent); }
 .dossier .dp-nav button:disabled { color: var(--dp-ink-faint); opacity: .5; cursor: default; }
@@ -277,20 +277,20 @@
 .dossier .dp-subhead + .dp-sec-code { margin-top: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--dp-rule); }
 
 /* Documentos descargables */
-.dossier .dp-docs { max-width: 66ch; margin: 22px 0; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-docs { max-width: 74ch; margin: 22px 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-docs a { display: flex; align-items: baseline; gap: 10px; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); text-decoration: none; padding: 11px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-docs a::before { content: "↳"; color: var(--dp-accent); }
 .dossier .dp-docs a:hover { color: var(--dp-accent); }
 
 /* Figuras / referencias visuales */
-.dossier .dp-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; max-width: 66ch; margin: 22px 0; }
+.dossier .dp-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; max-width: 74ch; margin: 22px 0; }
 .dossier .dp-fig { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .dossier .dp-fig img { width: 100%; height: 200px; object-fit: contain; background: #fff; border: 1px solid var(--dp-rule); padding: 6px; filter: grayscale(18%); transition: filter .2s; }
 .dossier .dp-fig:hover img { filter: grayscale(0); }
 .dossier .dp-fig-empty { width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--dp-paper); border: 1px solid var(--dp-rule); color: var(--dp-ink-faint); }
 .dossier .dp-fig figcaption { display: flex; justify-content: space-between; gap: 8px; font-family: var(--dp-mono); font-size: 11px; color: var(--dp-ink-soft); margin-top: 7px; letter-spacing: .02em; }
 .dossier .dp-fig figcaption .dp-fig-zoom { color: var(--dp-accent); }
-.dossier .dp-fig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 8px 0 0; }
+.dossier .dp-fig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 74ch; margin: 8px 0 0; }
 .dossier .dp-edit { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 1px 0; white-space: nowrap; }
 .dossier .dp-edit:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
@@ -313,7 +313,7 @@
 .dossier .dp-path .dp-caret { color: var(--dp-ink-faint); }
 
 /* Fórmula */
-.dossier .dp-formula { max-width: 66ch; margin: 18px 0; padding-left: 16px; border-left: 2px solid var(--dp-accent); }
+.dossier .dp-formula { max-width: 74ch; margin: 18px 0; padding-left: 16px; border-left: 2px solid var(--dp-accent); }
 .dossier .dp-formula .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 8px; }
 .dossier .dp-formula .dp-expr { font-family: var(--dp-mono); font-size: 14px; color: var(--dp-ink); margin: 0 0 12px; word-break: break-word; }
 .dossier .dp-formula dl { margin: 0; display: grid; gap: 5px; }
@@ -325,7 +325,7 @@
 .dossier .dp-proc-ol li .dp-c img { display: block; max-height: 220px; margin-top: 10px; border: 1px solid var(--dp-rule); background: #fff; padding: 4px; }
 
 /* Criterios de éxito */
-.dossier .dp-crit { max-width: 66ch; margin: 20px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
+.dossier .dp-crit { max-width: 74ch; margin: 20px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
 .dossier .dp-crit .dp-lbl { color: var(--dp-ok); display: block; margin-bottom: 8px; }
 .dossier .dp-crit ul { list-style: none; margin: 0; padding: 0; }
 .dossier .dp-crit li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; font-size: 13.5px; color: var(--dp-ink-soft); padding: 3px 0; }
@@ -342,9 +342,9 @@
 .dossier .dp-diag .dp-sol { margin-top: 12px; }
 
 /* Flujo de reacción (casos): disparador y cierre */
-.dossier .dp-flow-trigger { max-width: 66ch; margin: 2px 0 16px; padding-left: 16px; border-left: 2px solid var(--dp-warn); }
+.dossier .dp-flow-trigger { max-width: 74ch; margin: 2px 0 16px; padding-left: 16px; border-left: 2px solid var(--dp-warn); }
 .dossier .dp-flow-trigger .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 5px; }
-.dossier .dp-flow-end { max-width: 66ch; margin: 16px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
+.dossier .dp-flow-end { max-width: 74ch; margin: 16px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
 .dossier .dp-flow-end .dp-lbl { color: var(--dp-ok); display: block; margin-bottom: 5px; }
 .dossier .dp-flow-trigger p, .dossier .dp-flow-end p { margin: 0; font-size: 14px; color: var(--dp-ink-soft); }
 
@@ -371,13 +371,13 @@
 .dossier .dp-part-link:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
 /* Buscador (glosario) */
-.dossier .dp-search { display: block; width: 100%; max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); background: none; border: 0; border-bottom: 1px solid var(--dp-rule-hard); padding: 10px 2px; outline: none; margin-bottom: 6px; }
+.dossier .dp-search { display: block; width: 100%; max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); background: none; border: 0; border-bottom: 1px solid var(--dp-rule-hard); padding: 10px 2px; outline: none; margin-bottom: 6px; }
 .dossier .dp-search::placeholder { color: var(--dp-ink-faint); }
 .dossier .dp-search:focus { border-bottom-color: var(--dp-accent); }
-.dossier .dp-noresult { max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 24px 0; }
+.dossier .dp-noresult { max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 24px 0; }
 
 /* Glosario */
-.dossier .dp-gloss { max-width: 66ch; list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-gloss { max-width: 74ch; list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-gloss > li { padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-gloss .dp-term { font-weight: 600; color: var(--dp-ink); font-size: 14.5px; }
 .dossier .dp-gloss .dp-alt { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-left: 8px; text-transform: uppercase; letter-spacing: .04em; }
@@ -386,7 +386,7 @@
 .dossier .dp-gloss .dp-lesson:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
 /* Bibliografía */
-.dossier .dp-biblio { max-width: 66ch; list-style: none; margin: 6px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); counter-reset: bib; }
+.dossier .dp-biblio { max-width: 74ch; list-style: none; margin: 6px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); counter-reset: bib; }
 .dossier .dp-biblio li { counter-increment: bib; display: grid; grid-template-columns: 34px 1fr; padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-biblio li .dp-bibno { font-family: var(--dp-mono); color: var(--dp-ink-faint); font-size: 13px; }
 .dossier .dp-biblio li .dp-bibno::before { content: counter(bib, decimal-leading-zero); }
@@ -395,7 +395,7 @@
 .dossier .dp-biblio a:hover { text-decoration: underline; }
 
 /* Autoevaluación / examen */
-.dossier .dp-quiz { max-width: 66ch; }
+.dossier .dp-quiz { max-width: 74ch; }
 .dossier .dp-quiz-progress { display: flex; align-items: center; gap: 12px; font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-faint); margin-bottom: 26px; }
 .dossier .dp-quiz-bar { position: relative; flex: 1; height: 2px; background: var(--dp-rule); }
 .dossier .dp-quiz-bar > span { position: absolute; inset: 0 auto 0 0; background: var(--dp-accent); transition: width .4s ease; }
@@ -411,7 +411,7 @@
 .dossier .dp-quiz-opt[data-state="correct"] .dp-k, .dossier .dp-quiz-opt[data-state="correct"] .dp-otext { color: var(--dp-ok); }
 .dossier .dp-quiz-opt[data-state="wrong"] { background: var(--dp-warn-soft); }
 .dossier .dp-quiz-opt[data-state="wrong"] .dp-k, .dossier .dp-quiz-opt[data-state="wrong"] .dp-otext { color: var(--dp-warn); }
-.dossier .dp-quiz-fb { max-width: 66ch; margin-top: 18px; padding: 12px 16px; border-left: 2px solid var(--dp-ok); background: var(--dp-ok-soft); font-size: 13.5px; color: var(--dp-ink-soft); }
+.dossier .dp-quiz-fb { max-width: 74ch; margin-top: 18px; padding: 12px 16px; border-left: 2px solid var(--dp-ok); background: var(--dp-ok-soft); font-size: 13.5px; color: var(--dp-ink-soft); }
 .dossier .dp-quiz-fb.is-wrong { border-left-color: var(--dp-warn); background: var(--dp-warn-soft); }
 .dossier .dp-quiz-fb .dp-lbl { display: block; margin-bottom: 5px; color: var(--dp-ok); }
 .dossier .dp-quiz-fb.is-wrong .dp-lbl { color: var(--dp-warn); }
@@ -420,7 +420,7 @@
 .dossier .dp-quiz-score { font-family: var(--dp-cond); font-weight: 700; font-size: clamp(40px, 9vw, 60px); line-height: 1; color: var(--dp-ink); margin: 0; letter-spacing: .01em; }
 .dossier .dp-quiz-pct { font-family: var(--dp-mono); font-size: 13px; margin-top: 8px; }
 .dossier .dp-quiz-msg { font-size: 14px; color: var(--dp-ink-soft); margin-top: 6px; max-width: 48ch; }
-.dossier .dp-quiz-review { max-width: 66ch; list-style: none; margin: 34px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-quiz-review { max-width: 74ch; list-style: none; margin: 34px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-quiz-review li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-quiz-review .dp-mark { font-family: var(--dp-mono); font-weight: 700; font-size: 13px; }
 .dossier .dp-quiz-review .dp-mark.ok { color: var(--dp-ok); }
@@ -436,7 +436,7 @@
 .dossier .dp-quiz-ring-thr { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-top: 4px; }
 
 /* Diagrama con puntos de referencia (hotspots) — despiece de equipo con notas al tocar. */
-.dossier .dp-hotspot { max-width: 66ch; margin: 22px 0; }
+.dossier .dp-hotspot { max-width: 74ch; margin: 22px 0; }
 .dossier .dp-hotspot-stage { position: relative; border: 1px solid var(--dp-rule-hard); background: var(--dp-paper); min-height: 220px; }
 .dossier .dp-hotspot-point {
   position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px;
@@ -472,7 +472,7 @@
 .dossier .dp-qr-masked { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-body); font-size: 12px; color: var(--dp-ink-faint); font-style: italic; }
 
 /* Ejercicio de relacionar término ↔ definición — filas rellenas redondeadas. */
-.dossier .dp-match { max-width: 66ch; margin: 26px 0; }
+.dossier .dp-match { max-width: 74ch; margin: 26px 0; }
 .dossier .dp-match-grid { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr; gap: 8px 20px; }
 .dossier .dp-match-item {
   display: block; width: 100%; text-align: left;
