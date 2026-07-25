@@ -156,10 +156,12 @@
 .dossier .dp-aviso .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 6px; }
 .dossier .dp-aviso p, .dossier .dp-aviso li { font-size: 14px; color: var(--dp-ink-soft); }
 
-/* Medidas / especificaciones — tabla o lista mono */
-.dossier .dp-specs li { grid-template-columns: 1fr; }
-.dossier .dp-specs li::before { content: ""; }
-.dossier .dp-specs li { border-bottom: 1px solid var(--dp-rule); padding: 9px 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); }
+/* Medidas / especificaciones — fila etiqueta → valor (escaneable, mismo lenguaje que Consulta rápida) */
+.dossier .dp-specs-rows { margin: 0; }
+.dossier .dp-specs-row { display: grid; grid-template-columns: minmax(96px, 42%) 1fr; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--dp-rule); align-items: baseline; }
+.dossier .dp-specs-row:last-child { border-bottom: 0; }
+.dossier .dp-specs-row dt { margin: 0; font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-specs-row dd { margin: 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); font-weight: 600; overflow-wrap: anywhere; }
 
 /* Procedimientos — pasos con hairline, mono */
 .dossier .dp-proc { max-width: 66ch; margin: 6px 0 30px; }
