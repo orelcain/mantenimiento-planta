@@ -384,7 +384,7 @@ export function MachineLearningPage() {
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
         {activeTab === 'quickref' && quickRefGroups ? (
-          <QuickRefView groups={quickRefGroups} />
+          <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />
         ) : loadingTab ? (
           <p className="dp-loading">Cargando…</p>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
