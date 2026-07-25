@@ -99,6 +99,29 @@ const QUIZ = {
       correctIndex: 1,
       explanation: 'Producto fuera de especificación degrada el pesaje y aumenta el rechazo al punto cero — antes de calibrar, revisa si el problema es el producto.',
     },
+    {
+      question: '¿Cuál es la velocidad máxima de la cinta clasificadora?',
+      options: ['0,5 m/s', '1,4 m/s', '2,0 m/s', '3,0 m/s'],
+      correctIndex: 1,
+      explanation: 'La cinta llega hasta 1,4 m/s. Combinado con el rango de pesaje (0–15 kg) define la ventana de operación normal.',
+    },
+    {
+      question: '¿Quién es el distribuidor/fabricante del clasificador MS4/12 instalado en planta?',
+      options: ['Marel Chile', 'Marelec Chile · Puerto Montt', 'GEA Chile', 'Baader Chile'],
+      correctIndex: 1,
+      explanation: 'El Grader es Marelec (controlador Z2), distribuido en Chile por Marelec Chile desde Puerto Montt — no confundir con Marel (otro fabricante, otras máquinas de la línea).',
+    },
+    {
+      question: '¿De qué material está construido el clasificador?',
+      options: [
+        'Acero inoxidable AISI 304 + plásticos aptos para alimentos',
+        'Acero al carbono pintado',
+        'Aluminio anodizado',
+        'Acero galvanizado',
+      ],
+      correctIndex: 0,
+      explanation: 'Acero inox AISI 304 + plásticos food-grade, estándar para equipos en contacto con alimento.',
+    },
   ],
 
   'marel-hg': [
@@ -158,6 +181,39 @@ const QUIZ = {
       ],
       correctIndex: 1,
       explanation: 'Desde Servicio del Marel se activan manualmente los flippers de entrada al Baader — útil para pruebas sin producto.',
+    },
+    {
+      question: 'Al tarar una báscula manual, ¿con qué botón se ingresa la coma del valor 0,00?',
+      options: [
+        'Con la tecla clear',
+        'Con el 4º botón azul circular (de izquierda a derecha) bajo la pantalla',
+        'No se ingresa coma, es automática',
+        'Con la tecla del ticket',
+      ],
+      correctIndex: 1,
+      explanation: 'La coma se ingresa con el 4º botón azul circular bajo la pantalla, contando de izquierda a derecha.',
+    },
+    {
+      question: 'Después de entrar a la opción 5 del menú "libro" en la báscula manual, ¿qué sigue en la secuencia?',
+      options: [
+        'Ok (tecla del ticket) → clear → ingresar 0,00 → validar con ✔',
+        'Apagar y prender la báscula',
+        'Ingresar 0,00 directo sin confirmar nada más',
+        'Salir inmediatamente sin guardar',
+      ],
+      correctIndex: 0,
+      explanation: 'Opción 5 → ok (tecla del ticket ✔) → clear → 0,00 → validar con ✔ → salir con el "librito". Saltarse un paso deja la tara mal cargada.',
+    },
+    {
+      question: '¿Qué manuales de respaldo existen para el Marel HG A600?',
+      options: [
+        'A600 User Manual (ES) y M-Weigher User Manual (SPA)',
+        'Solo un PDF genérico de Marel',
+        'No hay manuales digitalizados',
+        'Manual Marelec Z2',
+      ],
+      correctIndex: 0,
+      explanation: 'El expediente del equipo tiene el A600 User Manual en español y el M-Weigher User Manual en español como respaldo.',
     },
   ],
 
@@ -253,6 +309,23 @@ const QUIZ = {
       ],
       correctIndex: 0,
       explanation: 'El motorreductor de la bomba helicoidal es i = 21,81:1 con 0,75 kW.',
+    },
+    {
+      question: '¿Cuál es el último ajuste de la rutina de punto cero, después de la cuchilla ventral?',
+      options: [
+        'El centrador',
+        'El expulsador de pescados',
+        'El palpador de altura',
+        'El carro a la chapaleta de entrada',
+      ],
+      correctIndex: 1,
+      explanation: 'El orden completo: carro-chapaleta → medidor de longitud → palpador de altura → centrador → punzón y dedos palpadores → cuchilla ventral → expulsador de pescados (último).',
+    },
+    {
+      question: '¿A qué código SAP corresponde el resorte del excavador A en la caja de accionamiento?',
+      options: ['3300012041', '3300106055', '3300012257', '3300084243'],
+      correctIndex: 0,
+      explanation: 'El resorte del excavador A (biela de mando, caja de accionamiento) es SAP 3300012041. No confundir con el resorte de tracción del carro (3300106055).',
     },
   ],
 
@@ -384,6 +457,29 @@ const QUIZ = {
       options: ['1', '2', '3', '4'],
       correctIndex: 1,
       explanation: 'Quedaron 2 placas delgadas por lado en formado (y se retiró una placa por lado en la estación de sellado, abertura de elevación 25 → 55).',
+    },
+    {
+      question: '¿Cómo cambió la aceleración en el ajuste realizado?',
+      options: ['De 60% a 10%', 'De 10% a 60%', 'De 60% a 30%', 'No se modificó'],
+      correctIndex: 0,
+      explanation: 'Aceleración bajó de 60% a 10%; en el mismo ajuste la velocidad pasó de 85% a 20% y la elevación de 35 a 25.',
+    },
+    {
+      question: 'En la estación de sellado, ¿a qué valor subió la abertura de elevación?',
+      options: ['De 25 a 55', 'De 55 a 25', 'De 25 a 35', 'No se ajustó'],
+      correctIndex: 0,
+      explanation: 'La abertura de elevación en sellado subió de 25 a 55, y se retiró una placa por lado en esa estación.',
+    },
+    {
+      question: '¿Dónde se guardan los parámetros modificados en el flujo de "recetas" de la termoformadora?',
+      options: [
+        'Se guardan automáticamente al apagar el equipo',
+        'Cargar receta → agregar nueva → guardar parámetros modificados',
+        'No es posible guardar cambios de receta',
+        'Solo el técnico GEA puede guardar recetas',
+      ],
+      correctIndex: 1,
+      explanation: 'El flujo del video de recetas es: cargar (00:18) → agregar nueva (03:03) → guardar parámetros modificados (04:16).',
     },
   ],
 };

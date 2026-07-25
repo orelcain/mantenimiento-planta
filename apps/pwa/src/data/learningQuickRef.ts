@@ -81,7 +81,7 @@ const MAREL_HG: QuickRefGroup[] = [
     rows: [
       { label: 'Menú Servicio', value: '5638000', sensitive: true },
     ],
-    note: 'Verificada en el grupo Telegram del equipo (2025-08). Da acceso al menú Servicio del controlador.',
+    note: 'Da acceso al menú Servicio del controlador.',
   },
   {
     title: 'Identificación',
@@ -96,7 +96,7 @@ const MAREL_HG: QuickRefGroup[] = [
       { label: 'Flippers entrada Baader', value: 'activación manual desde el Marel (Servicio › flippers)' },
       { label: 'Distancia de flipper', value: 'modificable en Servicio — criterio: bajar dist → abre antes · subir → abre después' },
     ],
-    note: 'Paso a paso en video del expediente Telegram del equipo ("Modificar distancia de flipper", 2025-07).',
+    note: 'Paso a paso con imágenes en la pestaña Procedimientos → "Modificar distancia de flipper".',
   },
 ]
 
@@ -107,7 +107,7 @@ const MAREL_FILETE: QuickRefGroup[] = [
       { label: 'Modo Servicio', value: '1300', sensitive: true },
       { label: 'Modo Avanzado', value: '11', sensitive: true },
     ],
-    note: 'Verificadas en el grupo Telegram del equipo (2025-07).',
+    note: 'Da acceso a modo Servicio y modo Avanzado del controlador.',
   },
   {
     title: 'Identificación',
@@ -123,7 +123,7 @@ const GEA: QuickRefGroup[] = [
     rows: [
       { label: 'Mantención (nivel 4)', value: '1310', sensitive: true },
     ],
-    note: 'Del registro Telegram del equipo (2026-07). Usuarios de servicio GEA adicionales en el expediente.',
+    note: 'Da acceso a mantención nivel 4 del panel GEA.',
   },
 ]
 
