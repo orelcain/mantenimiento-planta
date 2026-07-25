@@ -386,6 +386,160 @@ const QUIZ = {
 
   'baader-142': [
     {
+      question: "¿Qué debe hacerse con el interruptor principal antes de limpiar, mantener o lubricar la BAADER 142?",
+      options: [
+        "Cambiarlo a Test 12",
+        "Ponerlo en posición 0 y asegurarlo",
+        "Desconectar solo la bomba de vacío",
+        "Dejarlo en I para mantener el A3C activo"
+      ],
+      correctIndex: 1,
+      explanation: "El manual indica desconectar la máquina, poner el interruptor principal en posición 0 y asegurarlo antes de limpieza, mantenimiento y lubricación.",
+    },
+    {
+      question: "¿Qué pescado admite la BAADER 142 según los datos técnicos?",
+      options: [
+        "Salmón y trucha marina frescos, enteros con cabeza, 2 - 7 kgs",
+        "Solo trucha eviscerada y sin aleta anal",
+        "Salmón congelado de 1 - 3 kgs sin cabeza",
+        "Cualquier pescado blanco de 7 - 12 kgs"
+      ],
+      correctIndex: 0,
+      explanation: "El manual especifica salmón y trucha marina frescos, no eviscerados, con cabeza, con aleta anal, de 2 - 7 kgs; no admite congelados ni rigor mortis.",
+    },
+    {
+      question: "¿Qué restricción de instalación protege la refrigeración del controlador de pescado?",
+      options: [
+        "Usar agua solo por encima de 60°C",
+        "Cerrar la toma de agua al arrancar la bomba de vacío",
+        "No instalar grifos de cierre delante de la máquina",
+        "Trabajar sin aire comprimido para evitar condensación"
+      ],
+      correctIndex: 2,
+      explanation: "El manual advierte que no deben instalarse grifos de cierre delante de la máquina ni interrumpirse la refrigeración del controlador de pescado.",
+    },
+    {
+      question: "¿Qué condición hace que la BAADER 142 deba detenerse por sus dispositivos de seguridad?",
+      options: [
+        "Rociar agua en las aberturas de aspiración durante limpieza",
+        "Seleccionar la clase de pescado con el selector 5",
+        "Levantar cubiertas, girar puertas protectoras hacia arriba o accionar emergencia",
+        "Arrancar la bomba de vacío antes de producción"
+      ],
+      correctIndex: 2,
+      explanation: "Los dispositivos de seguridad detienen la máquina al levantarse cubiertas, al girarse puertas protectoras hacia arriba y al accionarse emergencias de la BAADER 142 o del ciclón.",
+    },
+    {
+      question: "¿Qué calcula el A3C durante el funcionamiento?",
+      options: [
+        "La presión exacta de grasa en cada punto",
+        "Recorridos a partir del largo, contorno y posición del ano",
+        "La temperatura del agua de enjuague químico",
+        "El código SAP de cada repuesto instalado"
+      ],
+      correctIndex: 1,
+      explanation: "En funcionamiento, el A3C calcula los recorridos de trabajo a partir del largo, el contorno y la posición del ano del pescado.",
+    },
+    {
+      question: "¿Para qué sirve la posición cero de las herramientas?",
+      options: [
+        "Para aumentar el rendimiento sobre 16 pescados/min",
+        "Para que pescados no medidos correctamente pasen sin dañarse",
+        "Para resetear automáticamente todos los errores E7xx",
+        "Para cerrar los tubos de aspiración"
+      ],
+      correctIndex: 1,
+      explanation: "El manual define la posición cero como la posición más alta de las herramientas, permitiendo que pescados no medidos correctamente pasen sin dañarse.",
+    },
+    {
+      question: "¿Cuál es la diferencia funcional entre el excavador A y el excavador B?",
+      options: [
+        "El A separa el recto; el B suelta sangre del riñón y saca el corazón",
+        "El A centra el pescado; el B acciona la chapaleta de ciclo",
+        "El A corta el esófago; el B mide el largo",
+        "El A abre la válvula de vacío; el B resetea el contador"
+      ],
+      correctIndex: 0,
+      explanation: "El manual indica que el excavador A separa el recto, mientras que el excavador B suelta sangre del riñón y saca el corazón.",
+    },
+    {
+      question: "En el selector 5, ¿qué diferencia hay entre Test 12 y Test 13?",
+      options: [
+        "Test 12 prueba la máquina completa; Test 13 prueba solo herramientas",
+        "Test 12 lubrica cadenas; Test 13 abre grifos esféricos",
+        "Test 12 resetea el contador; Test 13 selecciona salmón",
+        "Test 12 detiene el ciclón; Test 13 apaga el A3C"
+      ],
+      correctIndex: 0,
+      explanation: "El esquema de programas describe Test 12 como marcha de prueba de máquina completa y Test 13 como marcha de prueba solo de herramientas.",
+    },
+    {
+      question: "Durante la limpieza diaria, ¿qué indica explícitamente el procedimiento sobre el interruptor principal?",
+      options: [
+        "Debe ponerse siempre en 0 desde el primer paso",
+        "Debe alternarse entre I y 0 cada carro",
+        "No debe desconectarse el interruptor principal",
+        "Debe usarse solo para apagar la bomba BNM"
+      ],
+      correctIndex: 2,
+      explanation: "En el procedimiento de limpieza diaria, el último paso remarca que no debe desconectarse el interruptor principal.",
+    },
+    {
+      question: "En limpieza química, ¿cuándo se usa P3-topax 56 en lugar de P3-topax 17?",
+      options: [
+        "Diariamente, para desinfección final",
+        "Solo para limpiar tableros eléctricos",
+        "Una vez por semana, para capas de cal",
+        "Cada 40 horas, como lubricante de cadena"
+      ],
+      correctIndex: 2,
+      explanation: "El procedimiento de limpieza principal indica espumar con 2 - 5% P3-topax 17 y usar 2 - 5% P3-topax 56 una vez por semana para capas de cal.",
+    },
+    {
+      question: "¿Cuál es la presión máxima indicada para la boquilla de la pistola de grasa?",
+      options: [
+        "30 bar",
+        "190 bar",
+        "4 bar",
+        "2 bar"
+      ],
+      correctIndex: 1,
+      explanation: "El mantenimiento especifica lubricar con GLS 380/N3 y que la presión máxima en la boquilla de la pistola no debería sobrepasar 190 bar.",
+    },
+    {
+      question: "¿Qué indica el error E 777?",
+      options: [
+        "Pescado en la entrada por fallo de introducción, abrazadera o muelle roto si se repite",
+        "Transmisor B25 defectuoso del excavador B",
+        "Motor paso a paso sin posición cero después de producción",
+        "Fallo en placa de unidad de control"
+      ],
+      correctIndex: 0,
+      explanation: "El diagnóstico E 777 corresponde a pescado en la entrada; puede deberse a fallo de introducción por operador, fallo de abrazadera o, si se repite, muelle de tracción roto en el carro.",
+    },
+    {
+      question: "¿Qué solución entrega el manual para los errores E 900 - E 999?",
+      options: [
+        "Desconectar el interruptor principal por 5 segundos, por lo menos",
+        "Rociar la bomba BNM con 10 l de agua",
+        "Cambiar el selector 5 a Cleaning Position",
+        "Aumentar la presión de aire a 6 bar de servicio"
+      ],
+      correctIndex: 0,
+      explanation: "Para E 900 - E 999, asociados a fallos de unidad de control o fenómenos inexplicables, el manual indica desconectar el interruptor principal por al menos 5 segundos.",
+    },
+    {
+      question: "Según la tabla eléctrica, ¿qué alimentación aparece con frecuencia 60 Hz y corriente nominal 8 A?",
+      options: [
+        "380V, 400V y 415V",
+        "110V y 24V",
+        "220V y 230V",
+        "440V y 480V"
+      ],
+      correctIndex: 3,
+      explanation: "Los diagramas eléctricos listan 440V 60 Hz con Nennstrom 8 A y 480V 60 Hz con Nennstrom 8 A.",
+    },
+    {
       question: '¿En qué programa de la máquina se chequean los ajustes de punto cero de las herramientas?',
       options: ['Programa de producción', 'Programa de limpieza', 'Modo manual', 'Programa de mantención'],
       correctIndex: 1,

@@ -214,6 +214,100 @@ const MAREL_FILETE: QuickRefGroup[] = [
   },
 ]
 
+const BAADER_142: QuickRefGroup[] = [
+  {
+    title: 'Identificación',
+    rows: [
+      { label: 'Modelo', value: 'BAADER 142' },
+      { label: 'Función', value: 'Evisceradora de salmones y truchas marinas frescos y enteros con cabeza; corte princesa; extracción de vísceras por vacío' },
+      { label: 'Controlador', value: 'A3C' },
+    ],
+  },
+  {
+    title: 'Rango de trabajo',
+    rows: [
+      { label: 'Pescado', value: 'Salmón y trucha marina; fresco, no en rigor mortis; con aleta anal' },
+      { label: 'Tamaño', value: '2 - 7 kgs, no eviscerado, con cabeza' },
+      { label: 'Rendimiento', value: '1-16 pescados/min' },
+      { label: 'No admitido', value: 'Peces/pescados en rigidez cadavérica (rigor mortis) o congelados' },
+      { label: 'Ruido', value: '80 dB(A)' },
+    ],
+    note: 'Usar protección auditiva.',
+  },
+  {
+    title: 'Servicios (utilities)',
+    rows: [
+      { label: 'Agua', value: '10 litros/min, 2 bar mínimo, toma 3/4 pulg.; manguera 3/4 pulg., diámetro interior 19 mm' },
+      { label: 'Aire comprimido', value: '125 litros/min, 6 bar mínimo, 4 bar servicio, toma 3/8 pulg.; manguera 3/8 pulg., diámetro interior 10 mm; DIN ISO 8573-1 clase 7.4.3' },
+      { label: 'Vacío', value: '15 m3/min, 0,4 bar presión negativa, DN 80/DN 100' },
+      { label: 'Energía', value: '4 kW' },
+      { label: 'Corte por agua/controlador', value: 'No instalar grifos de cierre delante de la máquina; sobre 50°C el controlador desconecta la máquina' },
+    ],
+  },
+  {
+    title: 'Datos eléctricos',
+    rows: [
+      { label: 'Red 220V/230V 50 Hz', value: 'Nennstrom 16 A; F0 <=25 A; Steuerspannung AC 110 V; Steuerspannung DC 24 V' },
+      { label: 'Red 220V 60 Hz', value: 'Nennstrom 16 A; F0 <=25 A; Steuerspannung AC 110 V; Steuerspannung DC 24 V' },
+      { label: 'Red 380V/400V/415V 50 Hz', value: 'Nennstrom 9 A; F0 <=25 A; Steuerspannung AC 110 V; Steuerspannung DC 24 V' },
+      { label: 'Red 440V 60 Hz', value: 'Nennstrom 8 A; F0 <=25 A; Steuerspannung AC 110 V; Steuerspannung DC 24 V' },
+      { label: 'Red 480V 60 Hz', value: 'Nennstrom 8 A; F0 <=25 A; Steuerspannung AC 110 V; Steuerspannung DC 24 V' },
+      { label: 'M1', value: '0,37 kW Messerantrieb' },
+      { label: 'M2', value: '0,75 kW Kontrollband' },
+      { label: 'M3', value: '0,75 kW Exzenterschneckenpresse' },
+      { label: 'F1/F2/F3-F4/F5', value: 'Según tabla: F1 2,7 A/1,3 A/1,2 A/1,1 A por tensión; F2 1,4 A/0,8 A/0,7 A; F3,F4 10 A; F5 2,4- 4 A o 1- 1,6 A / 0,6- 1 A' },
+    ],
+    note: 'Valores tomados de los Stromlauf- u. Klemmenplan 142.70.00.860 / 142.70.00.851.',
+  },
+  {
+    title: 'Selector 5 (programas)',
+    rows: [
+      { label: 'Cleaning Position', value: 'Grifos esféricos para tubos de aspiración abiertos' },
+      { label: 'Test 12', value: 'Marcha de prueba de máquina completa' },
+      { label: 'Test 13', value: 'Marcha de prueba solo herramientas' },
+      { label: 'Height [mm]', value: 'Valor actual de altura del palpador' },
+      { label: 'Service for Stepmotors', value: 'Ajuste de motores paso a paso' },
+      { label: 'Stop for justage 1 F/min', value: 'Parada en posición cero de abrazadera de colas' },
+      { label: 'Reset Fishcounter', value: 'Contador de pescados vuelve a cero' },
+      { label: 'Después de seleccionar tamaño/corte', value: 'Volver selector 5 a la posición de clase de pescado' },
+    ],
+  },
+  {
+    title: 'Limpieza',
+    rows: [
+      { label: 'P3-topax 17', value: '2 - 5%; espumar desde abajo hacia arriba; tiempo de acción 15 minutos' },
+      { label: 'P3-topax 56', value: '2 - 5%; usar 1 vez por semana para capas de cal en lugar de P3-topax 17' },
+      { label: 'Enjuague principal', value: 'Agua potable 60°C máximo, baja presión 30 bar máximo, desde arriba hacia abajo' },
+      { label: 'P3-topax 91', value: '1%; desinfección a 30 bar máximo; tiempo de acción unos 10-15 minutos' },
+      { label: 'Aclarado final', value: 'Agua potable, 20°C aprox., baja presión 30 bar máximo' },
+      { label: 'Limpieza diaria', value: 'Selector 5 en limpieza; arrancar bomba de vacío; introducir bastante agua en aberturas de aspiración; no desconectar interruptor principal' },
+    ],
+    note: 'No rociar con spray cajas de distribución ni aparatos eléctricos.',
+  },
+  {
+    title: 'Mantenimiento periódico',
+    rows: [
+      { label: 'Diario', value: 'Verificar palpador por marcha suave; cambiar hoja de membrana; verificar cuchillas y hojas' },
+      { label: 'Diario BNM (BUSCH)', value: 'Rociar bomba con 10 l de agua; girar interruptores 360°; resetear contador' },
+      { label: 'Semanal', value: 'Lubrificar máquina, palpador y bielas; desmontar cuchilla hendedora y reafilarla o sustituirla' },
+      { label: 'Semanal controles', value: 'Hermeticidad de mangueras, tensión de correas dentadas y sujeciones' },
+      { label: 'Presiones semanales', value: 'Aire 4 bar, agua 2 bar, vacío -0,4 bar' },
+      { label: 'Lubricante', value: 'GLS 380/N3' },
+      { label: 'Pistola de grasa', value: 'Presión máxima en boquilla no debería sobrepasar 190 bar' },
+      { label: 'Spray FLC 65', value: 'Palpador, cabezas articuladas y cadena: intervalo 40 horas' },
+    ],
+  },
+  {
+    title: 'Chequeo antes de operar',
+    rows: [
+      { label: 'Cubiertas y placas', value: 'Montadas antes de poner la máquina en marcha' },
+      { label: 'Dispositivos de seguridad', value: 'Inspeccionar funcionamiento correcto; la máquina debe pararse al levantar cubiertas, girar puertas protectoras o accionar emergencias' },
+      { label: 'Arranque', value: 'Cerrar cubiertas y puertas; selector 5 en limpieza; arrancar bomba de vacío; selector 5 a clase de pescado; selector 4 a velocidad; pulsar I' },
+      { label: 'Primeros pescados', value: 'Hacer pasar 2-3 pescados y corregir con interruptores 1-3 si es necesario' },
+    ],
+  },
+]
+
 const GEA: QuickRefGroup[] = [
   {
     title: 'Claves de acceso',
@@ -229,6 +323,7 @@ const QUICK_REF: Record<string, QuickRefGroup[]> = {
   'marel-hg': MAREL_HG,
   'marel-filete': MAREL_FILETE,
   'termoformadora-gea': GEA,
+  'baader-142': BAADER_142,
 }
 
 export function getQuickRef(machineSlug: string): QuickRefGroup[] | null {
