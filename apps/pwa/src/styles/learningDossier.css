@@ -53,7 +53,7 @@
 .dossier .dp-lbl { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--dp-ink-faint); }
 .dossier .dp-mono { font-family: var(--dp-mono); }
 .dossier .dp-num { font-variant-numeric: tabular-nums; }
-.dossier .dp-wrap { max-width: 720px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 40px); }
+.dossier .dp-wrap { max-width: 720px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 40px); container-type: inline-size; }
 /* En desktop el documento se ensancha para dar lugar al riel de índice + contenido */
 @media (min-width: 1000px) {
   .dossier .dp-wrap { max-width: 1200px; }
@@ -260,7 +260,9 @@
 .dossier .dp-related-card b { display: block; font-size: 12px; color: var(--dp-ink); margin-bottom: 3px; }
 .dossier .dp-related-card span { font-size: 11px; color: var(--dp-ink-faint); font-family: var(--dp-mono); }
 .dossier .dp-related-card.is-gloss { border-left: 3px solid var(--dp-ok); }
-@media (min-width: 1300px) {
+/* Contenedor real disponible (no el viewport: el sidebar propio de la app puede angostar
+   el espacio sin cambiar el ancho de ventana) — el panel solo aparece si de verdad hay sitio. */
+@container (min-width: 1080px) {
   .dossier .dp-doc { grid-template-columns: 256px minmax(0, 1fr) 220px; }
   .dossier .dp-related { margin-top: 6px; }
 }
