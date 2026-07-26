@@ -13,6 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-26 - claude - Sistema agéntico + optimización de contexto
+
+- Hecho: capa de ejecución por costo con 3 subagentes globales en `~/.claude/agents/` (`verificador-web`, `implementador-patron`, `cerrador-pr`, todos model=sonnet) para que verificación en navegador, aplicación de patrones y cierre de PR no corran al precio del modelo del bucle principal. Nueva skill global `mockup-antes-de-construir` que vuelve mecánica la regla de mostrar mockup antes de construir UI. Optimización de contexto: `CLAUDE.md` con regla de costo obligatoria (nunca leer completo `_novedades.json` ~840 KB/210k tokens ni los `_MANIFIESTO.json`, solo grep/jq), lectura obligatoria partida en "siempre" (~20 KB) vs "según la tarea" (~42 KB). Memoria del Centro de Aprendizaje compactada de 68 KB a 15 KB (−78%).
+- Archivos: `~/.claude/agents/*.md` (3 nuevos), `~/.claude/skills/mockup-antes-de-construir/SKILL.md`, `OneDrive\ANTARFOOD\CLAUDE.md`, memoria de Claude. Respaldo en `OneDrive\ANTARFOOD\_BACKUP_MEMORIA_CLAUDE\2026-07-26\`.
+- Verificación: skill activa de inmediato; los 3 agentes requirieron reinicio de sesión para registrarse (confirmado). Ningún cambio en código de la app.
+- Estado: HECHO
+- Sigue: cerrar 2 huecos del checklist agéntico — recuperación (snapshot antes de escrituras masivas a Firestore) y evaluación (verificar contenido de las 9 fichas contra manuales fuente).
+
+## 2026-07-25 - claude - Componentes del equipo: fotos reales con hotspots editables (PRs #278-#283)
+
+- Hecho: "Componentes del equipo" del Grader pasó de ilustración SVG abstracta a 10 fotos reales con puntos numerados clicables y zoom/paneo. #278 primera foto real; #279 galería de 9 fotos más; #280 cada foto con hotspots + zoom/paneo (`ImageLightbox`); #281 migración a Firestore (`learningContent/{slug}/components/{id}`) + editor admin clic-para-agregar/arrastrar-para-mover; #282 botón "Administrar" en cada sección editable; #283 nota del punto activo fija bajo la foto + grid 2 columnas en desktop. Causa raíz del mal posicionamiento inicial: `object-fit:cover` con altura fija recortaba la foto; se resolvió con `aspectRatio` real de cada imagen.
+- Archivos: `apps/pwa/src/components/learning/{GraderVisualPilot.tsx,HotspotDiagram.tsx}`, `apps/pwa/src/pages/{MachineLearningPage.tsx,LearningAdminMachinePage.tsx}`, `apps/pwa/src/services/learningContent.ts`, `apps/pwa/src/styles/learningDossier.css`, `scripts/seed-grader-components.js`, 10 fotos en `apps/pwa/public/learning-assets/grader/`.
+- Verificación: tsc 0 en cada PR; check "build" verde en los 6; verificado en preview y en producción con las 10 fotos y hotspots bien posicionados.
+- Estado: HECHO — 6 PRs mergeados y desplegados.
+- Sigue: Orel debe probar el editor admin en vivo y decidir si marca los 4 candidatos SAP como repuestos comunes del Grader (`3300110019`, `3300103437`, `3300103438`, `3300103452`). Falta extender "Componentes del equipo" a las otras 8 máquinas.
+
 ## 2026-07-22 - claude - Fase 2: Cascada del mes (pestaña default) + Tendencia v3 con modo Comparar
 
 - Hecho: (1) Pestaña "Cascada del mes" en la Vista panorámica (nueva DEFAULT — es la vista de la meta grande): cascada de pérdidas agregada de todos los turnos del mes desde `stateAggregates` del doc padre (0 reads; `cascadeFromMonthAggregates` en lossBuckets inyecta el uptime que los agregados excluyen). Muestra uso real vs uptime clásico lado a lado, techo de máquina, uso real por Baader, piezas máx teóricas del mes y top-10 piezas perdidas por causal con dueño y ×N eventos. Excluye Unscheduled (tiene su chip propio). (2) Tendencia v3: etiquetas de TODOS los días (solo número de día, interval 0 — el "4/7 no sale" era el eje saltando día por medio), marcador gris "sin proceso" al pie en días vacíos, y modo "Comparar" (default) con barras T2|T3 agrupadas + ambos promedios móviles; "Por máquina" solo en foco de un turno (en Comparar serían 6 series). (3) Fix previo verificando en prod: horario de columna de disponibilidad por MODA del mes (no primer turno hallado) y etiquetas sin adjetivos de jornada (T1 "mañana" mentía: su único día de julio es la madrugada renombrada del 8-jul); "~" ámbar cuando el horario sale de ≤2 días.
