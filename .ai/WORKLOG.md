@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-26 - claude - Snapshot/restore de Firestore + workflow de eval de contenido (PR #284)
+
+- Hecho: cierre de los 2 huecos pendientes del sistema agéntico. `scripts/firestore-snapshot.js` (list/dump/restore con dry-run por defecto) como red de seguridad antes de escrituras masivas a producción. `.claude/workflows/verificar-contenido-fichas.js` escrito para auditar contenido técnico de las 7 fichas contra manuales PDF, aún no ejecutado a propósito.
+- Archivos: `scripts/firestore-snapshot.js`, `.claude/workflows/verificar-contenido-fichas.js`, `.gitignore` (`_snapshots/`).
+- Verificación: 5 pruebas reales contra producción del script de snapshot (list, dump, rechazo de ruta de documento, restore en dry-run, ayuda sin argumentos). El workflow de eval no se corrió (a propósito).
+- Estado: HECHO — PR #284 mergeado y desplegado.
+- Sigue: correr `verificar-contenido-fichas.js` cuando Orel lo pida.
+
 ## 2026-07-26 - claude - Sistema agéntico + optimización de contexto
 
 - Hecho: capa de ejecución por costo con 3 subagentes globales en `~/.claude/agents/` (`verificador-web`, `implementador-patron`, `cerrador-pr`, todos model=sonnet) para que verificación en navegador, aplicación de patrones y cierre de PR no corran al precio del modelo del bucle principal. Nueva skill global `mockup-antes-de-construir` que vuelve mecánica la regla de mostrar mockup antes de construir UI. Optimización de contexto: `CLAUDE.md` con regla de costo obligatoria (nunca leer completo `_novedades.json` ~840 KB/210k tokens ni los `_MANIFIESTO.json`, solo grep/jq), lectura obligatoria partida en "siempre" (~20 KB) vs "según la tarea" (~42 KB). Memoria del Centro de Aprendizaje compactada de 68 KB a 15 KB (−78%).
