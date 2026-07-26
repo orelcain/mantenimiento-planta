@@ -11,7 +11,7 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap, Search,
+  MonitorPlay, Zap, Search, Lock,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -51,6 +51,11 @@ const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
 type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components'
+
+/** Pestañas que tienen su editor correspondiente en LearningAdminMachinePage
+ * (?tab=...) — el resto (Consulta rápida, Evaluación, Glosario, etc.) no se
+ * edita desde ahí, así que no muestran el botón "Administrar" acá. */
+const ADMIN_EDITABLE_TABS = new Set<TabId>(['manual', 'procedures', 'flows', 'diagnosis', 'components'])
 
 interface TabDef {
   id: TabId
@@ -406,9 +411,23 @@ export function MachineLearningPage() {
             />
 
         {/* Cabecera de sección activa */}
-        <div className="dp-sec-head" style={{ marginTop: 34 }}>
-          <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
-          <h2 className="dp-sec-title">{activeTabData.label}</h2>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>
+          <div className="dp-sec-head">
+            <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
+            <h2 className="dp-sec-title">{activeTabData.label}</h2>
+          </div>
+          {isAdmin && ADMIN_EDITABLE_TABS.has(activeTab) && (
+            <button
+              type="button"
+              className="dp-edit"
+              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}
+              title="Administrar esta sección — pedirá confirmar identidad"
+              onClick={() => window.open(`/mantenimiento-planta/aprendizaje/admin/${machine.slug}?tab=${activeTab}`, '_blank', 'noopener,noreferrer')}
+            >
+              <Lock className="h-3 w-3" />
+              Administrar
+            </button>
+          )}
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
