@@ -445,14 +445,31 @@
 }
 .dossier .dp-hotspot-point:hover { background: var(--dp-accent); color: var(--dp-paper); }
 .dossier .dp-hotspot-point[aria-pressed="true"] { background: var(--dp-accent); color: var(--dp-paper); }
-.dossier .dp-hotspot-tip {
-  position: absolute; z-index: 2; width: 200px; background: var(--dp-paper);
-  border: 1px solid var(--dp-rule-hard); padding: 10px 12px; font-size: 12.5px;
-  color: var(--dp-ink-soft); line-height: 1.5;
+.dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 14px; }
+.dossier .dp-hotspot-legend-item {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dp-ink-soft);
+  background: none; border: 1px solid var(--dp-rule); border-radius: 999px; padding: 4px 11px 4px 8px; cursor: pointer;
 }
-.dossier .dp-hotspot-tip .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 4px; }
-.dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 14px; font-size: 12.5px; color: var(--dp-ink-soft); }
-.dossier .dp-hotspot-legend b { font-family: var(--dp-mono); color: var(--dp-accent); margin-right: 6px; }
+.dossier .dp-hotspot-legend-item b { font-family: var(--dp-mono); color: var(--dp-accent); }
+.dossier .dp-hotspot-legend-item:hover { border-color: var(--dp-accent); color: var(--dp-ink); }
+.dossier .dp-hotspot-legend-item[aria-pressed="true"] { background: var(--dp-accent-soft); border-color: var(--dp-accent); color: var(--dp-ink); }
+/* Nota del punto activo — SIEMPRE debajo del stage, nunca superpuesta ni recortada
+   (antes flotaba sobre la foto con `position:absolute` y tapaba otros puntos o se
+   cortaba contra `overflow:hidden` del stage). */
+.dossier .dp-hotspot-note {
+  margin-top: 12px; background: var(--dp-accent-soft); border: 1px solid var(--dp-accent);
+  border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: var(--dp-ink); line-height: 1.5;
+}
+.dossier .dp-hotspot-note .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 4px; }
+.dossier .dp-hotspot-note p { margin: 0; }
+
+/* Galería de "Componentes del equipo" — 2 columnas en desktop (antes 1 columna
+   angosta dejaba media pantalla vacía a la derecha); móvil sigue 1 columna. */
+.dossier .dp-components-grid { display: grid; grid-template-columns: 1fr; gap: 8px 32px; }
+@media (min-width: 1000px) {
+  .dossier .dp-components-grid { grid-template-columns: 1fr 1fr; }
+  .dossier .dp-components-grid .dp-hotspot[data-photo] { max-width: none; }
+}
 
 /* Consulta rápida — pestañas horizontales por grupo + 1 tarjeta activa */
 .dossier .dp-qr { max-width: 900px; }

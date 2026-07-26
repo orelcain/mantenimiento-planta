@@ -53,24 +53,27 @@ export function HotspotDiagram({
             {i + 1}
           </button>
         ))}
-        {active && (
-          <div
-            className="dp-hotspot-tip"
-            style={{
-              left: `${Math.min(active.x + 4, 62)}%`,
-              top: `${Math.min(active.y + 6, 68)}%`,
-            }}
-          >
-            <span className="dp-lbl">{active.label}</span>
-            {active.description}
-          </div>
-        )}
       </div>
       <div className="dp-hotspot-legend">
         {points.map((p, i) => (
-          <span key={p.id}><b>{i + 1}</b>{p.label}</span>
+          <button
+            key={p.id}
+            type="button"
+            className="dp-hotspot-legend-item"
+            aria-pressed={openId === p.id}
+            onClick={() => setOpenId(openId === p.id ? null : p.id)}
+          >
+            <b>{i + 1}</b>{p.label}
+          </button>
         ))}
       </div>
+      {/* Nota fuera del stage (nunca tapa un punto ni se recorta con overflow/zoom) */}
+      {active && (
+        <div className="dp-hotspot-note">
+          <span className="dp-lbl">{active.label}</span>
+          <p>{active.description}</p>
+        </div>
+      )}
     </div>
   )
 }
