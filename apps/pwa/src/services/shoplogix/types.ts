@@ -108,7 +108,7 @@ export interface ShoplogixSummaryResponse {
 export interface UpstreamMachineInfo {
   machineid: string;           // UUID Shoplogix
   name: string;                // "Evisceradora 1"
-  type: 'baader_142' | 'marel_hg' | 'knuro' | 'other';
+  type: 'baader_142' | 'baader_200' | 'marel_hg' | 'knuro' | 'other';
   role: 'upstream' | 'inline';
   order: number;               // orden en pipeline: Marel(0) → B1,2,3(1) → Grader(2)
 }

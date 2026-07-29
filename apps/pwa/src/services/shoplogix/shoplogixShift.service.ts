@@ -670,6 +670,18 @@ const SHIFT_CANDIDATES_BY_PLANT: Record<PlantSlug, Record<string, string[]>> = {
     'Turno 2':     ['Turno 2', 'Turno 2*'],
     'Turno 3':     ['Turno 3', 'Turno 3*'],
   },
+  filete: {
+    // Filete (área 8181, una sola máquina: la Baader 200 de Línea 1). Todavía
+    // no sabemos qué nombres de turno emite Shoplogix acá — no hay Grader Excel
+    // que etiquete día/noche, así que se aceptan ambas familias y el listener
+    // se queda con el primer candidato que tenga producción real.
+    'Turno día':   ['Turno día', 'Turno 1', 'Turno 1*', 'Turno 2', 'Turno 2*'],
+    'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*'],
+    'Turno 1':       ['Turno 1', 'Turno 1*'],
+    'Turno 1 Lunes': ['Turno 1 Lunes'],
+    'Turno 2':     ['Turno 2', 'Turno 2*'],
+    'Turno 3':     ['Turno 3', 'Turno 3*'],
+  },
 }
 
 export function getSlxShiftCandidates(shiftId: string, plantSlug: PlantSlug = 'chonchi'): string[] {

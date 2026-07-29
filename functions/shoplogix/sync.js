@@ -27,7 +27,7 @@ const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours } =
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
-const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
+const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal', 'filete'])
 
 /**
  * Gracia tras el cierre de un turno antes de considerarlo "congelado".

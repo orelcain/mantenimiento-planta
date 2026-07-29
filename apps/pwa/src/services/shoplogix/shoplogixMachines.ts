@@ -9,7 +9,12 @@
 
 import type { UpstreamMachineInfo } from './types';
 
-export type PlantSlug = 'chonchi' | 'yal';
+/**
+ * Clave del doc Firestore `shoplogix/{plantSlug}`. No es "planta física":
+ * `filete` es un ÁREA de Chonchi que Shoplogix expone como su propio árbol
+ * (areaid 8181) y por eso tiene su propio stream de turnos.
+ */
+export type PlantSlug = 'chonchi' | 'yal' | 'filete';
 
 /**
  * Las 3 Baader 142 de Planta Chonchi (Eviscerados, areaid 3650).
@@ -66,16 +71,33 @@ export const YAL_EVISCERADORAS: readonly UpstreamMachineInfo[] = [
   },
 ] as const;
 
+/**
+ * Filetes (Planta Chonchi, areaid 8181). UNA sola máquina instrumentada:
+ * la Baader 200 de Línea 1 (Shoplogix la nombra "Linea 1"). La GEA de filete
+ * todavía no está integrada y no hay Grader aguas abajo.
+ */
+export const CHONCHI_FILETE: readonly UpstreamMachineInfo[] = [
+  {
+    machineid: '3c0581da-9f19-49f0-aa15-b1596ae94dbd',
+    name: 'Baader 200 · Línea 1',
+    type: 'baader_200',
+    role: 'upstream',
+    order: 1,
+  },
+] as const;
+
 /** Mapa plantSlug → lista de máquinas */
 export const PLANT_MACHINES: Readonly<Record<PlantSlug, readonly UpstreamMachineInfo[]>> = {
   chonchi: CHONCHI_EVISCERADORAS,
   yal:     YAL_EVISCERADORAS,
+  filete:  CHONCHI_FILETE,
 };
 
 /** Todas las máquinas de todas las plantas (para búsqueda global). */
 const ALL_MACHINES: readonly UpstreamMachineInfo[] = [
   ...CHONCHI_EVISCERADORAS,
   ...YAL_EVISCERADORAS,
+  ...CHONCHI_FILETE,
 ];
 
 /** Busca info de una máquina por machineid (cualquier planta). */

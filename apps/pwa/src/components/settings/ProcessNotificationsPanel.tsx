@@ -11,8 +11,10 @@ import { db } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
 
+type PlantKey = 'chonchi' | 'yal' | 'filete'
+
 interface Plant {
-  key: 'chonchi' | 'yal'
+  key: PlantKey
   label: string
   description: string
 }
@@ -20,11 +22,12 @@ interface Plant {
 const PLANTS: Plant[] = [
   { key: 'chonchi', label: 'Planta Chonchi', description: 'Avisa cuando arranca el turno día o noche' },
   { key: 'yal',     label: 'Planta Yal',     description: 'Avisa cuando arranca cualquiera de los 3 turnos' },
+  { key: 'filete',  label: 'Filete · Línea 1', description: 'Avisa cuando arranca un turno de la línea de filete' },
 ]
 
-type PlantPrefs = Record<'chonchi' | 'yal', boolean>
+type PlantPrefs = Record<PlantKey, boolean>
 
-const DEFAULT_PREFS: PlantPrefs = { chonchi: true, yal: true }
+const DEFAULT_PREFS: PlantPrefs = { chonchi: true, yal: true, filete: true }
 
 interface Props {
   /** Si se omite, usa el usuario autenticado */
@@ -37,7 +40,7 @@ export function ProcessNotificationsPanel({ userId }: Props) {
 
   const [prefs, setPrefs]     = useState<PlantPrefs>(DEFAULT_PREFS)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState<'chonchi' | 'yal' | null>(null)
+  const [saving, setSaving]   = useState<PlantKey | null>(null)
 
   useEffect(() => {
     if (!targetId) return
@@ -50,6 +53,7 @@ export function ProcessNotificationsPanel({ userId }: Props) {
           setPrefs({
             chonchi: raw.chonchi !== false,
             yal:     raw.yal     !== false,
+            filete:  raw.filete  !== false,
           })
         }
       })
@@ -57,7 +61,7 @@ export function ProcessNotificationsPanel({ userId }: Props) {
       .finally(() => setLoading(false))
   }, [targetId])
 
-  const handleToggle = async (plant: 'chonchi' | 'yal', value: boolean) => {
+  const handleToggle = async (plant: PlantKey, value: boolean) => {
     if (!targetId) return
     const next: PlantPrefs = { ...prefs, [plant]: value }
     setPrefs(next)

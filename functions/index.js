@@ -4323,8 +4323,11 @@ function slxUptimeFromStates(states) {
 }
 
 async function ariaDataProduccionVivo(consulta) {
-  const plantSlug = /\byal\b/i.test(consulta || '') ? 'yal' : 'chonchi'
-  const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+  const q = consulta || ''
+  const plantSlug = /\byal\b/i.test(q) ? 'yal' : /\bfilete/i.test(q) ? 'filete' : 'chonchi'
+  const plantLbl = plantSlug === 'yal' ? 'Planta Yal'
+    : plantSlug === 'filete' ? 'Filete · Línea 1 (Chonchi)'
+    : 'Planta Principal (Chonchi)'
   const dk = slxTodayKeyChile()
   const loaded = (await Promise.all(SLX_CANDS.map(async (sid) => {
     try {
@@ -7037,6 +7040,17 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
 
 const SHOPLOGIX_PLANT_LABEL = { chonchi: 'Chonchi', yal: 'Yal', filete: 'Filete' }
 
+/**
+ * plantSlug (doc de `shoplogix/{plant}`) → `PlantLineId` de la PWA
+ * (`apps/pwa/src/config/plantLines.ts`). Se usa para armar el deep-link de las
+ * notificaciones: sin esto, un evento de Filete abría la pestaña de Eviscerado.
+ */
+const SHOPLOGIX_PLANT_LINE_ID = {
+  chonchi: 'chonchi-eviscerado',
+  yal:     'yal-eviscerado',
+  filete:  'chonchi-filete',
+}
+
 const SHOPLOGIX_NOTIF_DEFAULTS = {
   // telegramDest: 'bot' = solo DM del admin con @antarfood_mant_bot (rodaje),
   // 'grupo' = grupo Telegram (topic General), 'ambos' = los dos.
@@ -7107,7 +7121,7 @@ async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data
   const shiftDoc   = String(data.shiftDoc || '')
   const dateKey    = shiftDoc.slice(0, 10)
   const shiftLabel = shiftDoc.slice(11)
-  const lineaId    = data.plant === 'yal' ? 'yal-eviscerado' : 'chonchi-eviscerado'
+  const lineaId    = SHOPLOGIX_PLANT_LINE_ID[data.plant] || 'chonchi-eviscerado'
   const url = dateKey && shiftLabel
     ? `analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftLabel)}?linea=${lineaId}`
     : 'analisis-grader'

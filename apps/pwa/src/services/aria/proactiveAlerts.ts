@@ -176,7 +176,10 @@ export async function getKpiTurnoAlerts(plantSlug: PlantSlug = 'chonchi'): Promi
     kpis = await getLatestTurnoKPIs(plantSlug, summaries, true)
   }
   if (!kpis) return []
-  return kpiTurnoAlerts(kpis, plantSlug, plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal')
+  const label = plantSlug === 'yal' ? 'Planta Yal'
+    : plantSlug === 'filete' ? 'Filete · Línea 1'
+    : 'Planta Principal'
+  return kpiTurnoAlerts(kpis, plantSlug, label)
 }
 
 /**
