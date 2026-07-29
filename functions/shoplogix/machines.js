@@ -18,10 +18,21 @@ const YAL_EVISCERADORAS = Object.freeze([
   { machineid: '54eea655-3c62-4d3d-8e3b-11b3962e988b', name: 'YAL Evisceradora 3', type: 'baader_142' },
 ])
 
+/**
+ * Filetes (Planta Chonchi, areaid 8181). UNA sola máquina instrumentada en
+ * Shoplogix: la Baader 200 de Línea 1 (el árbol la expone como "Linea 1").
+ * La GEA de filete NO tiene integración todavía, y no hay Grader aguas abajo:
+ * en esta área no existe P0% ni clasificación por calibre/calidad.
+ */
+const CHONCHI_FILETE = Object.freeze([
+  { machineid: '3c0581da-9f19-49f0-aa15-b1596ae94dbd', name: 'Baader 200 · Línea 1', type: 'baader_200' },
+])
+
 /** Mapa plantSlug → lista de máquinas a sincronizar */
 const PLANT_MACHINES = Object.freeze({
   chonchi: CHONCHI_EVISCERADORAS,
   yal:     YAL_EVISCERADORAS,
+  filete:  CHONCHI_FILETE,
 })
 
 /**
@@ -32,6 +43,7 @@ const PLANT_MACHINES = Object.freeze({
 const PLANT_AREA_ID = Object.freeze({
   chonchi: 3650,
   yal:     3651,
+  filete:  8181,   // Planta Chonchi (3640) → Filetes
 })
 
-module.exports = { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, PLANT_MACHINES, PLANT_AREA_ID }
+module.exports = { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, CHONCHI_FILETE, PLANT_MACHINES, PLANT_AREA_ID }

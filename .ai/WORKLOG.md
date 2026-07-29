@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-29 - claude - Filete conectado a Shoplogix (deja de ser "próx.")
+
+- Hecho: la pestaña Filete de Análisis de Turno pasa de deshabilitada a línea viva con datos Shoplogix. Nuevo `plantSlug` **`filete`** (doc `shoplogix/filete`) con la ÚNICA máquina instrumentada del área: la **Baader 200 de Línea 1** (`3c0581da-…`, área Filetes areaid 8181). La GEA de filete no tiene integración todavía y no hay Grader aguas abajo → sin Excel, sin P0%, sin Calidad (el OEE queda en A·P, igual que Yal). De paso se parametrizaron los textos que decían "las 3 Baader"/"Evisceradora" en el KPI board: ahora salen de `machineKind`/`kpiScopeNote` de `plantLines.ts`, así que Filete no hereda copy del Eviscerado.
+- Archivos: `functions/shoplogix/{machines.js,sync.js}` (registry + `ACTIVE_PLANTS`), `functions/index.js` (mapa plant→plantLineId para el deep-link de notificaciones, detección "filete" en ARIA), `functions/scripts/validate-plant-integration.js`; PWA: `config/plantLines.ts`, `services/shoplogix/{shoplogixMachines.ts,types.ts,shoplogixShift.service.ts}`, `components/grader/{PlantKPIBoard.tsx,UpstreamMachinesPanel.tsx}`, `components/settings/ProcessNotificationsPanel.tsx`, `services/aria/{tools/grader.ts,proactiveAlerts.ts}`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificación: `tsc --noEmit` limpio; eslint sin errores (solo warnings preexistentes); 741 tests PWA verdes; 78 tests de `functions/shoplogix` verdes; preview en `?linea=chonchi-filete` muestra la pestaña habilitada, el alcance correcto y "Sin datos Shoplogix" (esperado: el sync de `filete` recién corre cuando se despliegan las functions). Eviscerado sin regresión.
+- Estado: EN REVISIÓN — falta el deploy de functions y confirmar con datos reales.
+- Sigue: tras el merge, (1) `shoplogixProbe?plantSlug=filete` para ver qué turnos emite Shoplogix en el área, (2) `shoplogixBackfillRange?plantSlug=filete&from=…&to=…` para poblar histórico, (3) `node functions/scripts/validate-plant-integration.js filete <fecha>`, (4) ajustar `defaultShiftSchedule` de la línea con los horarios reales.
+
 ## 2026-07-26 - claude - Snapshot/restore de Firestore + workflow de eval de contenido (PR #284)
 
 - Hecho: cierre de los 2 huecos pendientes del sistema agéntico. `scripts/firestore-snapshot.js` (list/dump/restore con dry-run por defecto) como red de seguridad antes de escrituras masivas a producción. `.claude/workflows/verificar-contenido-fichas.js` escrito para auditar contenido técnico de las 7 fichas contra manuales PDF, aún no ejecutado a propósito.

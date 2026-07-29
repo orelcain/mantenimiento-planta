@@ -86,6 +86,24 @@ export interface PlantLineConfig {
    * Y muestra un banner explicando el flujo simplificado.
    */
   isClassificationPlant?: boolean
+  /**
+   * Cómo se llaman en la UI las máquinas Shoplogix de esta línea.
+   * `short` se usa en mobile y `long` en tooltips. Sin esto, los textos quedaban
+   * hardcodeados a "Evisceradora Baader 142" / "Ev", que es falso en Filete.
+   */
+  machineKind?: { short: string; long: string }
+  /**
+   * Nota de alcance del panel de KPIs (qué mide realmente el OEE de esta línea).
+   * Honestidad de alcance: el OEE es de las máquinas instrumentadas, no del área.
+   */
+  kpiScopeNote?: string
+}
+
+/** Nombre de máquina por defecto (líneas de eviscerado). */
+const DEFAULT_MACHINE_KIND = { short: 'Ev', long: 'Evisceradora Baader 142' } as const
+
+export function getMachineKind(id?: PlantLineId | string | null): { short: string; long: string } {
+  return getPlantLineConfig(id).machineKind ?? DEFAULT_MACHINE_KIND
 }
 
 export const PLANT_LINES: readonly PlantLineConfig[] = [
@@ -139,15 +157,32 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     ],
   },
   {
+    // Filetes (areaid 8181 en Shoplogix) — una sola máquina instrumentada
+    // ("Linea 1"). No hay Grader acá: no existe Excel ni P0%, así que la
+    // Calidad del OEE no aplica y el KPI board queda en A·P.
     id: 'chonchi-filete',
     plant: 'principal',
     areaLabel: 'Filete',
     label: 'Filete',
     description: 'P. Principal · Línea 1',
-    plantSlug: 'chonchi',
+    plantSlug: 'filete',           // doc Firestore `shoplogix/filete`
     hasGraderData: false,
-    shoplogixEnabled: false,
-    comingSoon: true,
+    shoplogixEnabled: true,
+    isClassificationPlant: false,  // sin clasificación por calibre/calidad
+    machineKind: { short: 'B200', long: 'Baader 200 · Línea 1 de Filete' },
+    kpiScopeNote:
+      'Alcance: la Baader 200 de Línea 1 (única máquina instrumentada en Shoplogix). La GEA todavía no tiene integración y el Filete no pasa por Grader: la Calidad no aplica.',
+    // FALLBACK de horarios — la VERDAD son los scheduledStart/End que emite
+    // Shoplogix (scheduleSource='shoplogix'). Se copian los de Chonchi porque
+    // Filete corre dentro de la misma jornada de la planta principal; en cuanto
+    // haya turnos reales sincronizados, esto deja de usarse.
+    defaultShiftSchedule: [
+      { shiftId: 'Turno día',     startHour: 7,  startMinute: 0,  endHour: 19, endMinute: 0  },
+      { shiftId: 'Turno noche',   startHour: 19, startMinute: 0,  endHour: 7,  endMinute: 0  },
+      { shiftId: 'Turno 1',       startHour: 21, startMinute: 30, endHour: 5,  endMinute: 45 },
+      { shiftId: 'Turno 1 Lunes', startHour: 0,  startMinute: 0,  endHour: 7,  endMinute: 0  },
+      { shiftId: 'Turno 2',       startHour: 9,  startMinute: 0,  endHour: 17, endMinute: 15 },
+    ],
   },
   {
     id: 'chonchi-empaque',

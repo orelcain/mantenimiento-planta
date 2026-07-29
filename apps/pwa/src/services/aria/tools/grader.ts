@@ -39,6 +39,21 @@ function getPlantLabel(plantLineId: string): string {
   return PLANT_LINES.find(p => p.id === plantLineId)?.label || plantLineId
 }
 
+/** Slugs Shoplogix válidos para las tools que consultan `shoplogix/{slug}`. */
+const PLANT_SLUGS: readonly PlantSlug[] = ['chonchi', 'yal', 'filete']
+
+/** Normaliza el parámetro `plantSlug` de una tool (default: chonchi). */
+function resolvePlantSlug(value: unknown): PlantSlug {
+  return PLANT_SLUGS.includes(value as PlantSlug) ? (value as PlantSlug) : 'chonchi'
+}
+
+/** Etiqueta legible de un slug Shoplogix, para el texto de la respuesta. */
+function plantSlugLabel(slug: PlantSlug): string {
+  if (slug === 'yal') return 'Planta Yal'
+  if (slug === 'filete') return 'Filete · Línea 1 (Chonchi)'
+  return 'Planta Principal (Chonchi)'
+}
+
 // ─── Utilidades fecha ──────────────────────────────────────────────────
 
 function toDateKey(d: Date): string {
@@ -309,7 +324,7 @@ registerTool({
         if (buckets.length > 0) {
           const plantLbl = plantLineId
             ? getPlantLabel(plantLineId)
-            : (slug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)')
+            : plantSlugLabel(slug)
           const sorted = [...buckets].sort((a, b) => {
             const sa = a.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
             const sb = b.snapshot.machines[0]?.shiftStart?.getTime() ?? 0
@@ -809,7 +824,7 @@ registerTool({
     {
       name: 'plantSlug',
       type: 'string',
-      enum: ['chonchi', 'yal'],
+      enum: ['chonchi', 'yal', 'filete'],
       required: false,
       default: 'chonchi',
       description: 'Planta Shoplogix (chonchi = principal, yal)',
@@ -820,8 +835,8 @@ registerTool({
     /\bc[oó]mo\s+(va|est[aá]|anda)\s+(el\s+)?(oee|la\s+disponibilidad|la\s+confiabilidad|la\s+planta|la\s+l[ií]nea)\b/i,
   ],
   execute: async (params) => {
-    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
-    const plantLabel = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const plantSlug: PlantSlug = resolvePlantSlug(params.plantSlug)
+    const plantLabel = plantSlugLabel(plantSlug)
     // Calidad (1−P0%) del Grader. Primero ventana reciente (operación viva, barato);
     // si no hay turno reciente, ampliamos para ubicar el último turno DISPONIBLE.
     let graderSummaries = await listDailySummariesByRange(daysAgo(8), todayKey()).catch(() => [] as GraderDailySummary[])
@@ -873,7 +888,7 @@ registerTool({
     {
       name: 'plantSlug',
       type: 'string',
-      enum: ['chonchi', 'yal'],
+      enum: ['chonchi', 'yal', 'filete'],
       required: false,
       default: 'chonchi',
       description: 'Planta Shoplogix (chonchi = principal, yal)',
@@ -886,8 +901,8 @@ registerTool({
     /\bc[oó]mo\s+(va|est[aá]|anda)\s+(la\s+)?(producci[oó]n|l[ií]nea|planta)\b/i,
   ],
   execute: async (params) => {
-    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
-    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const plantSlug: PlantSlug = resolvePlantSlug(params.plantSlug)
+    const plantLbl = plantSlugLabel(plantSlug)
     const live = await loadLiveShift(plantSlug)
     if (!live) {
       return {
@@ -929,7 +944,7 @@ registerTool({
   description:
     'Producción registrada en Shoplogix para una planta en un día (default hoy; entiende "ayer"/"anoche"/"madrugada"), sumando TODOS los turnos INCLUIDO lo "sin turno asignado" (Unscheduled). Fiel al registro directo de Shoplogix — NO impone horarios. Úsalo para "cuánto se registró hoy/anoche en total", "producción de la madrugada", "qué se pasó sin turno", "producción del día completo". Detecta planta (yal/chonchi).',
   params: [
-    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal'], required: false, default: 'chonchi', description: 'Planta' },
+    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal', 'filete'], required: false, default: 'chonchi', description: 'Planta' },
     { name: 'date', type: 'date', required: false, description: 'Fecha YYYY-MM-DD (default hoy)' },
   ],
   triggers: [
@@ -938,8 +953,8 @@ registerTool({
     /\bcu[aá]nt[ao]s?\s+(piezas|ciclos)?\s*(se\s+)?(registr|proces|pas|pescamos|pesc[oó])/i,
   ],
   execute: async (params) => {
-    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
-    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const plantSlug: PlantSlug = resolvePlantSlug(params.plantSlug)
+    const plantLbl = plantSlugLabel(plantSlug)
     const dk = (typeof params.date === 'string' && params.date) || todayKey()
     const buckets = await loadAllShiftBuckets(plantSlug, dk)
     if (buckets.length === 0) {
@@ -1036,7 +1051,7 @@ registerTool({
   description:
     'Detenciones y confiabilidad desde Shoplogix, cuadra con el board Análisis de Turno: estado ACTUAL de cada Baader (produciendo o detenida y POR QUÉ), averías macro, MTTR, micro-detenciones, el LISTADO de cada detención individual (hora + duración + causa), y el Pareto de causas de parada (energía, atascamiento, ajuste mantención, colación, o "falta de MMPP" si Shoplogix la etiqueta). Por defecto el turno EN CURSO; con fecha (ayer/anoche/una fecha) consulta un turno PASADO. Detecta planta (yal/chonchi). Úsalo para "por qué está detenida/parada la línea", "qué fallas/averías han tenido", "cuánto duró cada detención", "MTTR/confiabilidad", "motivo de las paradas", "cuánto tiempo detenida", "detenciones de ayer/del turno del día".',
   params: [
-    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal'], required: false, default: 'chonchi', description: 'Planta' },
+    { name: 'plantSlug', type: 'string', enum: ['chonchi', 'yal', 'filete'], required: false, default: 'chonchi', description: 'Planta' },
     { name: 'date', type: 'date', required: false, description: 'Fecha YYYY-MM-DD del turno a consultar (default: turno en curso/hoy)' },
   ],
   triggers: [
@@ -1050,8 +1065,8 @@ registerTool({
     /\bcada\s+(detenci|parad|falla|aver)/i,
   ],
   execute: async (params) => {
-    const plantSlug: PlantSlug = params.plantSlug === 'yal' ? 'yal' : 'chonchi'
-    const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+    const plantSlug: PlantSlug = resolvePlantSlug(params.plantSlug)
+    const plantLbl = plantSlugLabel(plantSlug)
     const wantsPast = typeof params.date === 'string' && params.date && params.date !== todayKey()
 
     // Turno EN VIVO (hoy) vs turno PASADO (fecha explícita): distintas fuentes.
@@ -1232,6 +1247,7 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
   // Texto explícito > planta activa del board.
   if (toolName === 'shift.kpis' || toolName === 'shift.live' || toolName === 'shift.dayProduction' || toolName === 'shift.stops') {
     if (/\b(yal|planta\s+yal)\b/i.test(userMessage)) params.plantSlug = 'yal'
+    else if (/\bfilete/i.test(userMessage)) params.plantSlug = 'filete'
     else if (/\b(chonchi|p\.?\s*principal|planta\s+principal)\b/i.test(userMessage)) params.plantSlug = 'chonchi'
     else {
       const activeSlug = getActivePlantSlug()

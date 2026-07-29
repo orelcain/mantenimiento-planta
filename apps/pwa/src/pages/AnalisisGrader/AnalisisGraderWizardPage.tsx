@@ -783,6 +783,7 @@ export function AnalisisGraderWizardPage() {
           )}
           <PlantKPIBoard
             plantSlug={lineConfig.plantSlug}
+            plantLineId={lineId}
             graderSummaries={calendarSummaries}
             enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
             selectedDateKey={selectedDateKey}
