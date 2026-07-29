@@ -13,12 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-29 - claude - Filete visible en calendario y resumen del mes ("Turno Dia")
+
+- Hecho: con los datos ya sincronizados aparecieron 4 puntos donde el nombre del turno se comparaba contra listas/strings fijos y Filete quedaba invisible: (1) el calendario buscaba solo `Turno 1/2/3` → ahora descubre los turnos REALES del dia desde los docs; (2) `dayScanned` miraba solo claves de Chonchi; (3) el bucket dia/noche usaba una heuristica horaria de Yal que mandaba "Turno Dia" (07:30 local) a la noche → ahora el nombre explicito manda; (4) `SHIFT_META_TABLE` no tenia "Turno Dia" → la UI mostraba "?". Ademas, la grilla T1/T2/T3 del resumen mensual cae a Dia/Noche cuando la linea no usa esa nomenclatura (antes mostraba 0/0/0 con turnos productivos).
+- Archivos: `apps/pwa/src/components/grader/{GraderHistoricalCalendar.tsx,GraderMonthlyStatsPanel.tsx}`, `apps/pwa/src/services/grader/graderShiftDisplay.ts`.
+- Verificacion: `tsc` limpio, 741 tests verdes, eslint sin errores. En preview con datos reales: el 28-jul pasa de "sin proceso" a **D · 59**, y el resumen del mes de "07-28 · ?" + "T1 0 · T2 0 · T3 0" a "07-28 · Dia" + "1 Dia · 0 Noche". Yal (mayo) sin regresion: mantiene sus chips Excel Dia/Noche + SLX T2/T3.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado arranca el proceso normal de Filete; mirar el primer turno real y ajustar `defaultShiftSchedule` con los horarios que emita Shoplogix.
+
 ## 2026-07-29 - claude - Filete conectado a Shoplogix (deja de ser "próx.")
 
 - Hecho: la pestaña Filete de Análisis de Turno pasa de deshabilitada a línea viva con datos Shoplogix. Nuevo `plantSlug` **`filete`** (doc `shoplogix/filete`) con la ÚNICA máquina instrumentada del área: la **Baader 200 de Línea 1** (`3c0581da-…`, área Filetes areaid 8181). La GEA de filete no tiene integración todavía y no hay Grader aguas abajo → sin Excel, sin P0%, sin Calidad (el OEE queda en A·P, igual que Yal). De paso se parametrizaron los textos que decían "las 3 Baader"/"Evisceradora" en el KPI board: ahora salen de `machineKind`/`kpiScopeNote` de `plantLines.ts`, así que Filete no hereda copy del Eviscerado.
 - Archivos: `functions/shoplogix/{machines.js,sync.js}` (registry + `ACTIVE_PLANTS`), `functions/index.js` (mapa plant→plantLineId para el deep-link de notificaciones, detección "filete" en ARIA), `functions/scripts/validate-plant-integration.js`; PWA: `config/plantLines.ts`, `services/shoplogix/{shoplogixMachines.ts,types.ts,shoplogixShift.service.ts}`, `components/grader/{PlantKPIBoard.tsx,UpstreamMachinesPanel.tsx}`, `components/settings/ProcessNotificationsPanel.tsx`, `services/aria/{tools/grader.ts,proactiveAlerts.ts}`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
 - Verificación: `tsc --noEmit` limpio; eslint sin errores (solo warnings preexistentes); 741 tests PWA verdes; 78 tests de `functions/shoplogix` verdes; preview en `?linea=chonchi-filete` muestra la pestaña habilitada, el alcance correcto y "Sin datos Shoplogix" (esperado: el sync de `filete` recién corre cuando se despliegan las functions). Eviscerado sin regresión.
-- Estado: EN REVISIÓN — falta el deploy de functions y confirmar con datos reales.
+- Estado: HECHO — PR #286 mergeado y desplegado (functions + hosting en verde).
+- Datos reales confirmados el mismo dia: el sync escribio `shoplogix/filete/shifts/*` solo, y el backfill 20→28 jul trajo el dia de pruebas de la Baader 200: **2026-07-28 "Turno Dia" = 59 ciclos** (el probe daba 42 en la ventana consultada + 17 Unscheduled). A 17.6% · P 21.1% · Calidad N/A.
+- Aprendizaje clave: **Filete nombra su turno "Turno Dia"** (sin tilde, D mayuscula), distinto de Chonchi (T1/T2) y Yal (T1/T2/T3).
 - Sigue: tras el merge, (1) `shoplogixProbe?plantSlug=filete` para ver qué turnos emite Shoplogix en el área, (2) `shoplogixBackfillRange?plantSlug=filete&from=…&to=…` para poblar histórico, (3) `node functions/scripts/validate-plant-integration.js filete <fecha>`, (4) ajustar `defaultShiftSchedule` de la línea con los horarios reales.
 
 ## 2026-07-26 - claude - Snapshot/restore de Firestore + workflow de eval de contenido (PR #284)

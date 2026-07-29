@@ -2571,8 +2571,11 @@ export function GraderHistoricalCalendar({
     // Convención Yal: T1 (07:45-14:45 mañana) y T2 (14:45-00:00 tarde) son DÍA;
     // T3 (23:00-07:45 noche+madrugada) es NOCHE. Legacy "Turno día"/"Turno noche"
     // mantienen su mapeo. Antes T1 caía erróneamente en noche por descarte.
+    // Comparación sin tildes: Filete emite "Turno Dia" y con la comparación
+    // exacta caía en el balde de NOCHE.
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
     const isDayShift = (id: string) =>
-      id === 'Turno día' || id === 'Turno 1' || id === 'Turno 2'
+      norm(id) === 'turno dia' || id === 'Turno 1' || id === 'Turno 2'
     const perMachineMonth = [...perMachineAcc.entries()]
       .map(([machineid, v]) => ({
         machineid,
@@ -3911,14 +3914,30 @@ export function GraderHistoricalCalendar({
                 const dayBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
                 const nightBucket: Array<{ shiftId: string; cycles: number; uptimePct: number }> = []
                 if (showSlx) {
-                  for (const sid of ['Turno 1', 'Turno 2', 'Turno 3']) {
+                  // Los turnos se descubren de los docs REALES del día, no de una
+                  // lista fija de nombres: Filete emite "Turno Dia" (sin tilde) y
+                  // con la lista hardcodeada T1/T2/T3 su producción no aparecía
+                  // nunca en el calendario. Yal se comporta igual que antes: sus
+                  // ids presentes son justamente T1/T2/T3.
+                  const dayPrefix = `${dayKey}__`
+                  const shiftIdsPresent = [...slxByShift.keys()]
+                    .filter(k => k.startsWith(dayPrefix))
+                    .map(k => k.slice(dayPrefix.length))
+                    .filter(sid => !isUnscheduledShift(sid))
+                  for (const sid of shiftIdsPresent) {
                     if (hasExcelForShift(sid)) continue  // ya se ve vía chip de Excel
                     const cyc = slxTotalsByShift.get(`${dayKey}__${sid}`) ?? 0
                     if (!(cyc > 0)) continue
                     const cache = slxByShift.get(`${dayKey}__${sid}`)
                     const startHour = cache?.scheduledStart?.getUTCHours() ?? 0
                     const uptimePct = (cache?.avgShiftRuntime ?? 0) * 100
-                    const isNightStart = startHour < 12 || startHour >= 20
+                    // El NOMBRE manda cuando es explícito ("Turno Dia" de Filete
+                    // arranca 07:30 local y la heurística horaria — pensada para
+                    // separar el T1/T2/T3 de Yal — lo mandaba al slot noche).
+                    const sidNorm = sid.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+                    const isNightStart = /\bnoche\b/.test(sidNorm) ? true
+                      : /\bdia\b/.test(sidNorm) ? false
+                      : (startHour < 12 || startHour >= 20)
                     ;(isNightStart ? nightBucket : dayBucket).push({ shiftId: sid, cycles: cyc, uptimePct })
                   }
                 }
@@ -3974,7 +3993,10 @@ export function GraderHistoricalCalendar({
               // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
               const dayScanned = !hasData && !hasAnySlx && (
                 slxByShift.has(`${dayKey}__Turno 2`) ||
-                slxByShift.has(`${dayKey}__Turno día`)
+                slxByShift.has(`${dayKey}__Turno día`) ||
+                // Líneas que no usan la nomenclatura de Chonchi (Filete emite
+                // "Turno Dia"): basta con que exista CUALQUIER doc del día.
+                (isNonClassifCal && [...slxByShift.keys()].some(k => k.startsWith(`${dayKey}__`)))
               )
 
               // M9 — un día tiene untagged si algún chip primary/orphan-source del día

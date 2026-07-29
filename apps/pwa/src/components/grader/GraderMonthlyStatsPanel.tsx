@@ -143,6 +143,10 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
   const t1Shifts = slxStats?.t1ShiftsWithData ?? stats?.t1Shifts ?? 0
   const t2Shifts = slxStats?.t2ShiftsWithData ?? stats?.t2Shifts ?? 0
   const t3Shifts = slxStats?.t3ShiftsWithData ?? stats?.t3Shifts ?? 0
+  // La grilla T1/T2/T3 solo tiene sentido si la línea usa esa nomenclatura.
+  // Filete emite un único "Turno Dia": con la grilla numerada mostraba 0/0/0
+  // aunque el mes tuviera turnos con producción. Ahí cae a Día/Noche.
+  const useNumberedShiftGrid = t1Shifts + t2Shifts + t3Shifts > 0
 
   return (
     // top-[4.5rem]: el header global es sticky h-14 (56px) con z-30; si el panel
@@ -240,7 +244,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       <Card>
         <CardContent className="py-1.5 px-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
-          {isClassificationPlant ? (
+          {isClassificationPlant || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>

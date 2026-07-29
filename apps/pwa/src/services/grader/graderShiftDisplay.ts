@@ -246,6 +246,21 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     isDayLike: true,
     scheduleHint: '07:45–00:00',
   },
+  // Filete emite "Turno Dia" (sin tilde y con D mayúscula). Es el mismo
+  // concepto que "Turno día" pero con OTRO string: sin esta entrada la tabla
+  // caía al FALLBACK y la UI mostraba "?" como nombre del turno.
+  'Turno Dia': {
+    label: 'Turno Día',
+    shortLabel: 'Día',
+    period: 'dia',
+    textColorClass: 'text-amber-600 dark:text-amber-400',
+    bgColorClass: 'bg-amber-500/10',
+    borderColorClass: 'border-amber-500/30',
+    iconName: 'Sun',
+    emoji: '☀',
+    isDayLike: true,
+    scheduleHint: '07:30–15:45',
+  },
   'Turno noche': {
     label: 'Turno noche',
     shortLabel: 'Noche',
