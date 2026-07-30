@@ -19,6 +19,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Detector de Metales: 3 medios + 2 menores corregidos (PR #314, MERGED, 6a tanda de MEDIOS)
+
+- Contexto: Orel confirmo en planta que el equipo instalado es un Vistus (no un IQ4), lo que desbloquea la auditoria `verificar-contenido-fichas` del 2026-07-30 sobre el manual correcto (`845_BA_Vistus-es_0_20110413.pdf`, 223 pags, citando pagina impresa).
+- Hecho: (1) privilegios reales de Operador (§4.7 pag 23) incluyen aprendizaje rapido, remedio explicito ante rechazo masivo por cambio de producto (§13.3.3 pag 152) — la ficha lo dejaba esperando a un ingeniero; (2) regla de deteccion de alambres corregida (§4.9.4 pag 27): en alambres el Fe se detecta peor que el VA en 2 de 3 orientaciones, al reves de lo que decia la ficha; el dato sobre AISI 304 quedo acotado a bolas de test (pag 131); (3) codigos E010C, W0207 y E010B recategorizados como accionables (remiten a red o muestran detalle en pantalla), no todo el rango E0100-E01xx es Sartorius; menores: la sal como causa de efecto de producto se etiqueto como criterio de planta (no esta en el manual) + citas de pagina unificadas a numeracion impresa.
+- Archivos: `apps/pwa/src/services/detectorMetales/detectorMetalesContent.json`, `apps/pwa/src/services/detectorMetalesLearning.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 8 puntos incluyendo 2 preguntas de quiz respondidas, ambos temas, consola limpia.
+- Estado: HECHO. Sigue: 28 de 43 medios corregidos acumulados.
+
 ## 2026-07-30 - claude - Baader 142: 3 medios + 1 menor corregidos (PR #312, MERGED, 5a tanda de MEDIOS)
 
 - Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 3 hallazgos MEDIOS de la Baader 142 mas 1 menor, cruzados contra `498_142-Manual de Instrucciones-2005-12-E.pdf` citando pagina.
