@@ -177,7 +177,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                   <span className="sm:hidden">Uptime</span>
                 </div>
                 <InfoTooltip
-                  text={`% promedio del turno en que las máquinas estuvieron activas.\n\n≥ 70% normal · 40–70% bajo · < 40% crítico\n\nPromedio de las ${snapshot.machines.length} evisceradoras.`}
+                  text={`% promedio del turno en que las máquinas estuvieron activas.\n\n≥ 70% normal · 40–70% bajo · < 40% crítico\n\nPromedio de ${snapshot.machines.length} ${snapshot.machines.length === 1 ? 'máquina' : 'máquinas'}${lineMachinesLabel(snapshot.machines) ? ` ${lineMachinesLabel(snapshot.machines)}` : ''}.`}
                   iconSize={10} position="top"
                 />
               </div>
