@@ -10,7 +10,7 @@
  *     objetivo corriendo, que es lo que el sombreado tiene que marcar
  */
 import { describe, it, expect } from 'vitest'
-import { buildRateSeries, regroupRates } from '../ProductionRateLineEC'
+import { buildRateSeries, regroupRates, rateChartMode } from '../ProductionRateLineEC'
 import type { UpstreamMachineShift, UpstreamProductionInterval } from '@/services/shoplogix/types'
 
 const BUCKET_MS = 5 * 60_000
@@ -177,5 +177,24 @@ describe('regroupRates', () => {
     expect(regroupRates([], [], 15 * 60_000).values).toEqual([])
     const same = regroupRates([T('15:00')], [5], 0)
     expect(same.values).toEqual([5])
+  })
+})
+
+// ── Encoding según la línea ──────────────────────────────────────────────────
+// Verificado con datos reales: barras con 1 máquina (Filete, tramos sueltos) y
+// líneas con 3 (Yal, donde 3 series × ~100 tramos daban barras de 1-2 px).
+
+describe('rateChartMode', () => {
+  it('una máquina → barras (proceso intermitente, tramos sueltos)', () => {
+    expect(rateChartMode(1)).toBe('bar')
+  })
+
+  it('varias máquinas → líneas (la pregunta es cuál bajó primero)', () => {
+    expect(rateChartMode(2)).toBe('line')
+    expect(rateChartMode(3)).toBe('line')
+  })
+
+  it('sin máquinas no revienta', () => {
+    expect(rateChartMode(0)).toBe('bar')
   })
 })

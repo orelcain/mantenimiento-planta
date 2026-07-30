@@ -1439,6 +1439,9 @@ export function UpstreamMachinesPanel({
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                     Tasa de producción por máquina · pz/min
                   </p>
+                  {/* Solo con UNA máquina: la brecha se apila sobre la barra, y
+                      con varias el gráfico usa líneas (no hay dónde apilar). */}
+                  {snapshot.machines.length === 1 && (
                   <button
                     type="button"
                     onClick={() => setShowRateGap((v) => !v)}
@@ -1452,6 +1455,7 @@ export function UpstreamMachinesPanel({
                   >
                     {showRateGap ? 'ocultar brecha' : 'ver brecha al objetivo'}
                   </button>
+                  )}
                 </div>
                 {slxWindowMismatch && (
                   <p className="text-[10px] text-rose-400/70 mb-1">

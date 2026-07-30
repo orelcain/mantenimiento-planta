@@ -7,11 +7,17 @@
  *
  * Sincroniza con TimelineSyncContext: zoom + axisPointer cross-chart.
  *
- * ENCODING: BARRAS por tramo, no una línea.
- * Un proceso intermitente no tiene flujo continuo entre tramos: el turno del
- * 2026-07-28 de la Baader 200 tuvo 14 tramos con dato sobre 288 posibles, en dos
- * racimos separados por 4,5 h. Una línea dibujaba continuidad donde no hubo ni un
- * tramo con producción; las barras dejan los huecos como huecos.
+ * ENCODING SEGÚN LA LÍNEA (`rateChartMode`):
+ *
+ *   1 máquina  → BARRAS por tramo. Un proceso intermitente no tiene flujo
+ *     continuo: el turno del 2026-07-28 de la Baader 200 tuvo 14 tramos con dato
+ *     sobre 288 posibles, en dos racimos separados por 4,5 h. Una línea dibujaba
+ *     continuidad donde no hubo ni un tramo con producción.
+ *
+ *   2+ máquinas → LÍNEAS. Acá la pregunta es otra: cuál de las Baader bajó
+ *     primero y cuánto se separan entre sí. Con 3 series × ~100 tramos las barras
+ *     quedan de 1-2 px pegadas (una reja ilegible, verificado en Yal) mientras la
+ *     línea muestra la divergencia de un vistazo.
  *
  * Datos de entrada: `machines[].intervals` (buckets de 5 min con `cycles`).
  * Rate real = cycles / duracion_min del intervalo.
@@ -216,6 +222,17 @@ export function buildRateSeries(machines: UpstreamMachineShift[]): {
 }
 
 /**
+ * Encoding del gráfico según cuántas máquinas tiene la línea.
+ *
+ * No es preferencia estética: responde a preguntas distintas. Con una máquina
+ * interesa "¿en qué tramos produjo y cuánto le faltó al objetivo?" (barras); con
+ * varias, "¿cuál bajó primero y cuánto se separan?" (líneas).
+ */
+export function rateChartMode(machineCount: number): 'bar' | 'line' {
+  return machineCount <= 1 ? 'bar' : 'line'
+}
+
+/**
  * Reagrupa una serie de tasas (pz/min) a tramos más anchos.
  *
  * Las tasas se PROMEDIAN entre los sub-tramos CON dato, no se divide por el
@@ -350,6 +367,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
   const option = useMemo(() => {
     // Ancho de barra en px: el tramo real (5 o 15 min) proyectado al eje, con un
     // mínimo de 2 px para que un tramo aislado siga siendo visible.
+    const mode = rateChartMode(series.length)
     const rangeMin = (rangeEnd.getTime() - rangeStart.getTime()) / 60_000
     const bucketMin = bucketMinutesForRange(rangeMin)
     const barPx = Math.max(2, Math.min(22, Math.round((bucketMin / Math.max(rangeMin, 1)) * 560)))
@@ -370,18 +388,12 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
 
     const machineSeries = series.map((s, i) => {
       const col = MACHINE_COLORS[i % MACHINE_COLORS.length]!
-      return {
-        name:        s.name,
-        type:        'bar' as const,
-        // Los tramos SIN dato quedan como hueco (null), no como una barra en 0:
-        // "no hubo dato" y "produjo cero" son cosas distintas.
-        data:        axis.map((ts, ti) => [ts, regrouped.series[i]?.[ti] ?? null] as [number, number | null]),
-        stack:       showGap ? `pz-${s.name}` : undefined,
-        barWidth:    barPx,
-        barGap:      '10%',
-        barCategoryGap: '0%',
-        itemStyle:   { color: col.line, borderRadius: [1, 1, 0, 0] as [number, number, number, number] },
-        emphasis:    { itemStyle: { color: col.line } },
+      const data = axis.map((ts, ti) => [ts, regrouped.series[i]?.[ti] ?? null] as [number, number | null])
+      // Los tramos SIN dato quedan como hueco (null) en los dos modos: "no hubo
+      // dato" y "produjo cero" son cosas distintas.
+      const comun = {
+        name: s.name,
+        data,
         // Solo en la primera serie (una vez por chart) — mismo tramo resaltado
         // que en los Gantts Baader (StateTimelineEC), vía TimelineSyncContext.
         markArea: i === 0 && highlightRanges.length > 0 ? {
@@ -390,11 +402,38 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
           data: highlightRanges.map((r) => ([{ xAxis: r.startMs }, { xAxis: r.endMs }])),
         } : undefined,
       }
+
+      if (mode === 'line') {
+        return {
+          ...comun,
+          type:        'line' as const,
+          smooth:      0.3,
+          connectNulls: false,
+          symbol:      'circle',
+          symbolSize:  4,
+          lineStyle:   { color: col.line, width: 1.5 },
+          itemStyle:   { color: col.line },
+          areaStyle:   { color: col.area },
+          emphasis:    { lineStyle: { width: 2.5 } },
+        }
+      }
+
+      return {
+        ...comun,
+        type:        'bar' as const,
+        stack:       showGap ? `pz-${s.name}` : undefined,
+        barWidth:    barPx,
+        barGap:      '10%',
+        barCategoryGap: '0%',
+        itemStyle:   { color: col.line, borderRadius: [1, 1, 0, 0] as [number, number, number, number] },
+        emphasis:    { itemStyle: { color: col.line } },
+      }
     })
 
     // Brecha al objetivo, apilada encima de cada barra: lo que faltó en ese tramo.
     // Solo con showGap; se calcula por máquina para que apile con su propia barra.
-    const gapSeries = showGap
+    // La brecha se apila sobre la barra: en modo línea no tiene dónde apilarse.
+    const gapSeries = showGap && mode === 'bar'
       ? series.map((s, i) => ({
           name:     i === 0 ? GAP_LABEL : `${GAP_LABEL} ${s.name}`,
           type:     'bar' as const,

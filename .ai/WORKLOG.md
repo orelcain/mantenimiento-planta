@@ -28,6 +28,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Verificacion: tsc limpio, 761 tests verdes, verificacion en navegador (DOM real) de las 5 fichas afectadas, Baader 200 re-verificado tras el fix de Firestore, movil 375px sin scroll horizontal, consola limpia.
 - Estado: HECHO. Sigue: ~36 hallazgos MEDIOS del informe sin tocar; 2 preguntas de planta abiertas (detector Vistus/IQ4, Marel Filete SmartLine/M-Weigher); capacho 3 del Grader transcrito "130" tal cual (probable errata) marcado para verificar en maquina.
 
+## 2026-07-30 - claude - Grafico de pz/min: el encoding depende de la linea (barras 1 maq / lineas 2+)
+
+- Contexto: Orel reviso el grafico en Yal (turno de anoche, 3 Baader) y lo llamo "muy sucio". Tenia razon: 3 series x ~100 tramos son barras de 1-2 px pegadas — una reja. Las barras resolvian Filete (1 maquina, 14 tramos sueltos) y arruinaban Yal.
+- Hecho: `rateChartMode(machineCount)` decide el encoding — **1 maquina → barras, 2+ → lineas** (vuelve al encoding original de Yal/Chonchi, que respondia la pregunta correcta: cual Baader bajo primero y cuanto se separan). Todo lo demas del trabajo anterior se mantiene en los dos modos: eje acotado a la operacion real, objetivo conectado, bandas de "parada con objetivo" y agrupacion a 15 min. El toggle "ver brecha" queda solo con 1 maquina (se apila sobre la barra; en modo linea no hay donde apilar).
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`.
+- Verificacion: 776 tests verdes (3 nuevos de `rateChartMode`), tsc y eslint limpios. En el navegador: Yal SIN toggle de brecha y en "turno completo"; Filete CON toggle y en "operacion real".
+- ⚠ La verificacion VISUAL sigue dependiendo de Orel (el pane de esta sesion no compone frames; ECharts pinta en canvas).
+- Estado: EN REVISION — PR abierto.
+- Sigue: confirmar con captura que Yal volvio a verse limpio. El sabado, Filete con 5.000 pz reales.
+
 ## 2026-07-30 - claude - Grafico de pz/min: barras por tramo + eje acotado a la operacion real
 
 - Contexto: Orel mando una captura del grafico en produccion. Dos problemas visibles: el eje cubria 24 h (08:00→08:00) para un turno que produjo 6 h, y el objetivo aparecia como rayitas flotantes sueltas.
