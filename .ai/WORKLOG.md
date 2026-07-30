@@ -13,6 +13,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-30 - claude - Alertas y brief de Filete con umbrales propios
+
+- Hecho: (1) la config de notificaciones pasa a 3 capas en `functions/shoplogix/notifConfig.js` (DEFAULTS -> overrides por planta -> Firestore) con `shiftEnd.minPieces` nuevo: Filete exige 200 piezas y el eviscerado sigue en 50. Motivo REAL: el lote de prueba de 59 piezas del 28-jul disparo un brief de fin de turno como si fuera un turno productivo. (2) El brief muestra la OPERACION REAL (`effectiveStart/End`) cuando la ventana del turno es >=25% mas ancha: decia "Horario real: 08:00 -> 08:00" porque el "Turno Dia" de Filete abarca 24 h; ahora dice "Operacion real: 09:56 -> 16:11". (3) Nueva linea "N paros sin causa anotada (Nm) — anotala en Analisis de Turno", que cruza los paros del sensor con las anotaciones de `paros` (via la misma clave determinística `sensorStopKey`) — el brief es el momento en que alguien todavia se acuerda de lo que paso. (4) `minPieces` editable en el Panel Admin. (5) Copy: "piezas por Baader" -> "por maquina" en briefs/tools, y la tool de produccion de ARIA ahora detecta filete.
+- Archivos: `functions/shoplogix/{notifConfig.js (nuevo),turnoBrief.js,__tests__/{notifConfig.test.js (nuevo),turnoBrief.test.js}}`, `functions/index.js`, PWA: `pages/admin/ShoplogixNotificationsConfigPage.tsx`, `services/shoplogix/shoplogixNotifConfig.service.ts`.
+- Verificacion: 90 tests de functions verdes (5 nuevos de notifConfig + 3 del brief), 761 de la PWA, tsc y eslint limpios. Renderice el brief con los DATOS REALES del 28-jul antes y despues: antes "Horario real: 08:00 -> 08:00" y se enviaba con 59 piezas; ahora con 59 piezas NO se envia (umbral 200) y con un turno real sale "Operacion real: 09:56 -> 16:11" + "1 paro sin causa anotada (23m)".
+- ⚠ PENDIENTE de verificacion visual: el Panel Admin de notificaciones exige re-autenticacion con contraseña, asi que el input nuevo de `minPieces` no lo pude ver en pantalla (el resto se verifico). Orel: mirarlo al entrar.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado, primer turno real de Filete — confirmar que el brief sale con la ventana real y que el umbral de 200 es el adecuado; ver si `scrapReasons` viene poblado (habilitaria OEE completo A*P*Q).
+
 ## 2026-07-30 - claude - OEE del AREA: maquina instrumentada + etapas sin sensor (la GEA)
 
 - Hecho: la tarjeta de OEE de linea pasa a ser OEE del AREA y se habilita en toda linea con Shoplogix (antes solo con Grader, asi que Filete no la veia). Calculo extraido a `services/grader/areaOeeCompute.ts` (testeado): `A_area = uptime / (tiempo rastreado por el sensor + paros de etapa)`, R del cuello de botella, y donde no hay Grader el OEE se muestra como **A×R con chip rotulado** en vez de fingir calidad 100%. El pareto ahora reparte el downtime de la maquina POR CAUSA ANOTADA (el pago de la feature anterior) y expone lo que falta anotar en vez de esconderlo.
