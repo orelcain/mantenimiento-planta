@@ -1,15 +1,27 @@
 name: Daily Sync (versions)
 
+# 2026-07-26 — Se quitó el `schedule` y ya NO se commitea a `main`.
+#
+# Por qué: `main` exige el status check "build" con `enforce_admins: true`, así que NINGUNA
+# escritura directa entra (ni con token de admin). El paso de `git push` fallaba todos los días
+# desde el 24-jul con `GH006: Protected branch update failed`. La vía "rama + PR" tampoco sirve
+# acá: los PR creados con el GITHUB_TOKEN por defecto no disparan workflows, así que el check
+# "build" nunca correría y el PR quedaría imposible de mergear.
+#
+# Cómo se resolvió el problema de fondo: la sincronización de `version.ts` ahora corre sola en
+# los dos lugares donde importa — `prebuild` (producción, ya estaba) y `dev` (local, se agregó).
+# El commit diario a `main` era solo para que el archivo versionado coincidiera; dejó de ser
+# necesario. Este workflow queda como auditoría manual: informa si hay desfase, sin escribir nada.
+#
+# Si alguna vez se quiere volver a commitear en automático, hace falta un PAT con permiso de
+# bypass de la protección de rama — algo que contradice el `enforce_admins: true` que se puso
+# a propósito. Conversarlo antes.
+
 on:
-  schedule:
-    # Diario 03:15 hora Chile (America/Santiago).
-    # GitHub Actions usa cron en UTC, por eso programamos 06:15 UTC.
-    # Nota: si cambia el horario de verano, puede correrse 1h.
-    - cron: '15 6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: daily-sync
@@ -47,18 +59,27 @@ jobs:
       - name: Run version sync
         run: pnpm sync:version:pwa
 
-      - name: Commit and push (if changed)
+      - name: Reportar desfase (sin escribir en el repo)
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "$(git status --porcelain)" ]; then
-            echo "No changes to commit"
+            echo "✓ Sin desfase: el version.ts versionado ya coincide con package.json."
+            echo "✓ Sin desfase entre \`version.ts\` y \`package.json\`." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A
-          git commit -m "chore: daily sync $(date +%F)"
-          git push
+          echo "Hay desfase entre el version.ts versionado y package.json:"
+          git --no-pager diff --stat
+          {
+            echo "### Desfase detectado"
+            echo
+            echo "El \`version.ts\` del repo no coincide con \`package.json\`."
+            echo "**No requiere acción**: se corrige solo en el próximo \`pnpm dev\` (local) y en"
+            echo "cada \`pnpm build\` (producción, vía \`prebuild\`). El archivo versionado es"
+            echo "informativo."
+            echo
+            echo '```'
+            git --no-pager diff --stat
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
