@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm run sync:version && vite",
     "sync:version": "node ../../scripts/sync-pwa-version.mjs",
     "prebuild": "pnpm run sync:version",
     "build": "vite build",
