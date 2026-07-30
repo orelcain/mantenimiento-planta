@@ -140,3 +140,18 @@ export function lineMachinesLabel(
   )
   return types.size === 1 ? machineTypeLabel([...types][0]) : ''
 }
+
+/**
+ * Etiqueta CORTA por modelo, para mobile y ejes de gráficos ("B142", "B200").
+ * Sin esto, la vista de turno abreviaba toda máquina como "Ev" (evisceradora),
+ * que en Filete es falso.
+ */
+export function machineShortLabel(type: UpstreamMachineInfo['type'] | undefined): string {
+  switch (type) {
+    case 'baader_142': return 'B142'
+    case 'baader_200': return 'B200'
+    case 'marel_hg':   return 'HG'
+    case 'knuro':      return 'KN'
+    default:           return 'Máq'
+  }
+}

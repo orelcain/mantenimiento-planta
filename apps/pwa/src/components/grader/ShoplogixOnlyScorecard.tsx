@@ -6,7 +6,7 @@
  * Usado en AnalisisGraderTurnoPage cuando !summary && upstreamLine.snapshot.
  */
 import { cn } from '@/lib/utils'
-import { lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
+import { lineMachinesLabel, machineShortLabel } from '@/services/shoplogix/shoplogixMachines'
 import { Badge, Card, CardContent, InfoTooltip } from '@/components/ui'
 import { Activity, Clock, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
@@ -57,12 +57,18 @@ function machineVerdict(uptimePct: number, ratio: number): keyof typeof MACHINE_
 
 interface Props {
   snapshot: UpstreamLineSnapshot
+  /**
+   * Piezas que planta pide por turno (target de PLANIFICACIÓN de la línea, no la
+   * cadencia del sensor). Con esto el turno se lee como cumplimiento y no solo
+   * como un número suelto de ciclos.
+   */
+  plannedTargetPieces?: number
   shiftWindow: ShiftTimeWindow | null
   shiftLabel: string
   dateKey: string
 }
 
-export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey }: Props) {
+export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey, plannedTargetPieces }: Props) {
   const totalCycles = snapshot.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0)
   const isClosed = shiftWindow?.status === 'closed' || shiftWindow?.status == null
 
@@ -164,6 +170,29 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
             <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
               ciclos · línea total
             </div>
+            {/* Cumplimiento vs lo PLANIFICADO por producción. Se rotula como
+                "planificadas" para no confundirlo con el target de cadencia que
+                reporta el sensor: son dos números distintos. */}
+            {plannedTargetPieces != null && plannedTargetPieces > 0 && (() => {
+              const pct = (totalCycles / plannedTargetPieces) * 100
+              const cls = pct >= 95 ? 'text-emerald-600 dark:text-emerald-400'
+                : pct >= 75 ? 'text-amber-600 dark:text-amber-400'
+                : 'text-rose-600 dark:text-rose-400'
+              return (
+                <div className="text-[11px] mt-1 flex items-center gap-1 flex-wrap">
+                  <span className={cn('font-semibold tabular-nums', cls)}>{pct.toFixed(0)}%</span>
+                  <span className="text-muted-foreground">
+                    de {plannedTargetPieces.toLocaleString('es-CL')} planificadas
+                  </span>
+                  <InfoTooltip
+                    text={`Cumplimiento contra las piezas que producción pide por turno en esta línea (${plannedTargetPieces.toLocaleString('es-CL')}).
+
+No es el target de cadencia del sensor: ese mide velocidad instantánea, este mide el compromiso del turno.`}
+                    iconSize={10} position="top"
+                  />
+                </div>
+              )
+            })()}
             <div className="text-xs mt-1 font-medium">{style.label}</div>
           </div>
 
@@ -259,8 +288,13 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 const uptimePct = (m.shiftRuntime ?? 0) * 100
                 const ratioPct = (m.overallRatio ?? 0) * 100
                 const vStyle = MACHINE_VERDICT_STYLE[machineVerdict(uptimePct, m.overallRatio ?? 0)]
-                // Label corto en mobile: "Ev 1/2/3". Desktop: nombre completo.
-                const shortLabel = `Ev ${idx + 1}`
+                // Label corto en mobile. Sale del MODELO de la máquina, no de un
+                // "Ev" fijo: en Filete la máquina es una Baader 200 y aparecía
+                // como "Ev 1" (de evisceradora).
+                // Con una sola máquina el número no aporta ("B200 1" → "B200").
+                const shortLabel = snapshot.machines.length > 1
+                  ? `${machineShortLabel(m.machineType)} ${idx + 1}`
+                  : machineShortLabel(m.machineType)
                 return (
                   <div key={m.machineid} className={cn('rounded-md border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
                     <div className="flex items-center justify-between gap-1 mb-1">

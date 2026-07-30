@@ -93,6 +93,13 @@ export interface PlantLineConfig {
    */
   machineKind?: { short: string; long: string }
   /**
+   * Piezas que planta PIDE por turno en esta línea. Es un target de
+   * PLANIFICACIÓN (lo define producción), distinto del target de cadencia que
+   * reporta el sensor: sirve para medir cumplimiento del turno cuando Shoplogix
+   * no manda target oficial — que es el caso de Filete.
+   */
+  shiftTargetPieces?: number
+  /**
    * Etapas del área que NO están instrumentadas en Shoplogix, para ofrecerlas en
    * la captura manual de paros. Sin esto la lista mostraba siempre las etapas
    * del eviscerado (Bombeo, Chiller, Grader…), que en Filete no existen.
@@ -176,6 +183,9 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     shoplogixEnabled: true,
     isClassificationPlant: false,  // sin clasificación por calibre/calidad
     machineKind: { short: 'B200', long: 'Baader 200 · Línea 1 de Filete' },
+    // Planta pide ~5.000 piezas por turno, en 2 turnos (dato de producción,
+    // 2026-07-30). Los horarios los define Shoplogix, así que no se fijan acá.
+    shiftTargetPieces: 5000,
     // La GEA es la etapa grande sin integración: sus paros solo existen si
     // alguien los registra.
     stagesWithoutSensor: ['GEA', 'Cinta de entrada', 'Cinta de salida', 'Enzunchadora', 'Empaque filete'],

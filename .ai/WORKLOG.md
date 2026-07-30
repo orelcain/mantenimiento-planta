@@ -19,6 +19,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Target de planificacion de Filete (5.000 pz/turno)
+
+- Contexto: produccion definio ~5.000 piezas por turno y 2 turnos en Filete (los horarios no se fijan: los define Shoplogix y la app ya descubre los turnos de los docs).
+- Hecho: `shiftTargetPieces` por linea en `plantLines.ts` (Filete 5.000) con espejo `PLANT_SHIFT_TARGET_PIECES` en `functions/shoplogix/machines.js`. Se usa como REFERENCIA DE CUMPLIMIENTO donde Shoplogix no manda target oficial — el caso de Filete: (a) el brief de fin de turno agrega "🟡 84% de lo planificado (5.000)", rotulado DISTINTO del target del sensor porque son dos numeros diferentes; (b) la vista de turno muestra "1% de 5.000 planificadas" bajo el total de ciclos. Si algun dia llega el target oficial del rollup, ese GANA.
+- Ademas: el label corto de maquina sale del MODELO (`machineShortLabel`: B142/B200/HG/KN) — en Filete la Baader 200 aparecia como "Ev 1" (evisceradora); y con una sola maquina se omite el numero ("B200", no "B200 1").
+- Umbral del brief confirmado contra el dato nuevo: `minPieces` 200 = 4% de 5.000 → un turno real (5.000) manda brief, un turno malo al 10% (500) TAMBIEN (hay que reportarlo), un lote de prueba (59) no.
+- Archivos: `apps/pwa/src/config/plantLines.ts`, `apps/pwa/src/components/grader/ShoplogixOnlyScorecard.tsx`, `apps/pwa/src/services/shoplogix/shoplogixMachines.ts`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`, `functions/shoplogix/{machines.js,turnoBrief.js,__tests__/turnoBrief.test.js}`, `functions/index.js`.
+- Verificacion: 93 tests de functions (3 nuevos: usa lo planificado, el oficial le gana, y sin ninguno NO inventa porcentaje) + 761 de la PWA, tsc y eslint limpios. Chip verificado en el navegador con el turno real ("1% de 5.000 planificadas" y "B200" en vez de "Ev 1"); brief renderizado para un turno simulado de 4.200 pz → "🟡 84% de lo planificado (5.000)".
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado, primer turno real → ajustar 5.000 si el pedido cambia, y confirmar como nombra Shoplogix a los 2 turnos.
+
 ## 2026-07-30 - claude - Pobla la Enzunchadora TP-6000: 9a y ultima maquina del Centro de Aprendizaje (PR #296)
 
 - Hecho: la Enzunchadora N2 (Transpak TP-6000-1) estaba en 0/4 secciones; la memoria decia que no habia material en OneDrive pero SI existe (`TRANSPAK_TP-6000-1_Manual_operacion_y_repuestos.pdf`, 124 pags) — la busqueda vieja fallaba por buscar "N2" en vez de "TP-6000". Se curo del manual (ingles, PARTE I pags. 1-22, con la tabla de Troubleshooting rasterizada y transcrita): 7 secciones de Manual, 5 Procedimientos, 4 Flujos, 5 Diagnosticos, Consulta rapida (8 grupos, sin "Claves de acceso" porque no hay clave documentada) y 18 preguntas de Evaluacion. Con esto el Centro de Aprendizaje queda completo, 9/9 maquinas. Se corrigio ademas el shuffle de opciones del seed (concentraba correctas en B) por uno deterministico, y se agrego `--only=<slug>` a `seed-quiz-maquinas.js` para no pisar preguntas de otras maquinas ya editadas desde el panel admin.

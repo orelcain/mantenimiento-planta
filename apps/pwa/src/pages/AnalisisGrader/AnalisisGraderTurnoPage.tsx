@@ -1406,6 +1406,7 @@ export function AnalisisGraderTurnoPage() {
           {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
           <ShoplogixOnlyScorecard
             snapshot={upstreamLine.snapshot}
+            plannedTargetPieces={plantLineCfg.shiftTargetPieces}
             shiftWindow={shiftWindow}
             shiftLabel={shiftLabel}
             dateKey={dateKey}
