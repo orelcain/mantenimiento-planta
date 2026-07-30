@@ -272,6 +272,52 @@ export function normalizeShift(params: {
 // ============================================================================
 
 /**
+ * Ventana REAL de operación: del primer al último tramo con producción.
+ *
+ * Sirve para encuadrar el eje temporal cuando el turno no está acotado en
+ * Shoplogix. Caso real: el "Turno Dia" de Filete abarca 24 h, así que el Gantt y
+ * el gráfico de tasa dibujaban 24 h para 6 h de operación y todo quedaba
+ * comprimido en el 15% del ancho.
+ *
+ * Devuelve null si no hubo ni un tramo con piezas — sin producción no hay
+ * ventana real que mostrar, y el caller se queda con la del turno.
+ */
+export function effectiveProductionWindow(
+  machines: ReadonlyArray<{ intervals: ReadonlyArray<{ startAt: Date; endAt: Date; cycles: number }> }>,
+): { start: Date; end: Date } | null {
+  let firstMs = Infinity
+  let lastMs = -Infinity
+  for (const m of machines) {
+    for (const iv of m.intervals) {
+      if ((iv.cycles ?? 0) <= 0) continue
+      firstMs = Math.min(firstMs, iv.startAt.getTime())
+      lastMs = Math.max(lastMs, iv.endAt.getTime())
+    }
+  }
+  if (!Number.isFinite(firstMs) || lastMs <= firstMs) return null
+  return { start: new Date(firstMs), end: new Date(lastMs) }
+}
+
+/**
+ * ¿Conviene encuadrar el eje en la operación real en vez del turno?
+ *
+ * Solo cuando la diferencia es GRANDE (la operación ocupa menos del 75% del
+ * turno). En Eviscerado ambas ventanas casi coinciden, así que su eje no se
+ * toca: no queremos recortar el turno de una planta que sí lo tiene acotado.
+ */
+export function shouldFrameOnProduction(
+  shiftWindow: { start: Date; end: Date } | null,
+  effective: { start: Date; end: Date } | null,
+): boolean {
+  if (!effective) return false
+  if (!shiftWindow) return true
+  const shiftMin = (shiftWindow.end.getTime() - shiftWindow.start.getTime()) / 60_000
+  const efeMin = (effective.end.getTime() - effective.start.getTime()) / 60_000
+  if (shiftMin <= 0 || efeMin <= 0) return false
+  return efeMin < shiftMin * 0.75
+}
+
+/**
  * Combina varios shifts de máquinas en un snapshot de línea.
  * Útil para el header "Línea de procesamiento" del dashboard.
  */

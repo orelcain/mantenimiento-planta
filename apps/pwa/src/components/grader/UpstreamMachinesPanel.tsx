@@ -85,6 +85,10 @@ interface Props {
    * máquina al expandirla. Default 'chonchi' si no se provee.
    */
   plantSlug?: PlantSlug
+  /** true = el eje está acotado a la operación real (turno sin acotar en Shoplogix). */
+  framedOnProduction?: boolean
+  /** Alterna entre operación real y turno completo. Ausente = sin datos para acotar. */
+  onToggleFraming?: () => void
   /**
    * Fuente de los datos: 'firestore' (real), 'demo' (sintético DEV), 'none'.
    * Se muestra badge "DEMO" cuando es demo. La detección de desfase SLX
@@ -1104,9 +1108,15 @@ export function UpstreamMachinesPanel({
   pauses = [],
   plantSlug = 'chonchi',
   dataSource = 'none',
+  framedOnProduction = false,
+  onToggleFraming,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
+  // Capa opcional del gráfico de tasa: cuánto faltó para el objetivo en cada
+  // tramo. Apagada por default — en un turno normal casi todo está cerca del
+  // objetivo y el sombreado sería ruido.
+  const [showRateGap, setShowRateGap] = useState(false)
 
   const isStale = useMemo(() => isStaleSync(syncedAt), [syncedAt])
 
@@ -1282,6 +1292,27 @@ export function UpstreamMachinesPanel({
               </Badge>
             )}
           </button>
+
+          {/* Encuadre del eje. Va FUERA del botón colapsable: un <button> dentro
+              de otro <button> es HTML inválido (React lo reporta como
+              validateDOMNesting) y el click quedaba ambiguo. */}
+          {onToggleFraming && (
+            <button
+              type="button"
+              onClick={onToggleFraming}
+              title={framedOnProduction
+                ? 'El eje muestra solo las horas con producción. Click para ver el turno completo.'
+                : 'El eje muestra el turno completo. Click para acotarlo a las horas con producción.'}
+              className={cn(
+                'text-[10px] px-1.5 py-0.5 rounded border shrink-0 transition-colors',
+                framedOnProduction
+                  ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              {framedOnProduction ? 'operación real' : 'turno completo'}
+            </button>
+          )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
@@ -1404,9 +1435,24 @@ export function UpstreamMachinesPanel({
                 qué máquina bajó primero y cuánto difiere del promedio. */}
             {snapshot && snapshot.machines.length > 0 && (
               <div className="mb-3 pb-3 border-b border-border/60">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Tasa de producción por máquina · pz/min
-                </p>
+                <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Tasa de producción por máquina · pz/min
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowRateGap((v) => !v)}
+                    title="Apila sobre cada barra lo que faltó para llegar al objetivo de ese tramo."
+                    className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded border transition-colors',
+                      showRateGap
+                        ? 'border-rose-500/45 bg-rose-500/12 text-rose-700 dark:text-rose-300'
+                        : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    {showRateGap ? 'ocultar brecha' : 'ver brecha al objetivo'}
+                  </button>
+                </div>
                 {slxWindowMismatch && (
                   <p className="text-[10px] text-rose-400/70 mb-1">
                     ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
@@ -1416,6 +1462,7 @@ export function UpstreamMachinesPanel({
                   machines={snapshot.machines}
                   windowStart={chartWindowStart}
                   windowEnd={chartWindowEnd}
+                  showGap={showRateGap}
                 />
               </div>
             )}
