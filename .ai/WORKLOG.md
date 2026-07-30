@@ -19,6 +19,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Baader 142: 3 medios + 1 menor corregidos (PR #312, MERGED, 5a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 3 hallazgos MEDIOS de la Baader 142 mas 1 menor, cruzados contra `498_142-Manual de Instrucciones-2005-12-E.pdf` citando pagina.
+- Hecho: (1) mapeo X de la tabla "E 8 N X" estaba invertido (el manual pag 41/45 dice 1=SM1 Centraje, 2=SM2 Cuchilla abridora, al reves de la tabla original) — afecta E801-E805, E821-E825, E831-E835, E841-E845, E851-E855, E861-E865; se publica el mapeo confirmado y se deja explicita la contradiccion; (2) E770-E775 (6 codigos) marcados CONDICIONAL: solo existen con el Upgrade Kit (nota pag 42, S22.4.4 pag 87), pendiente confirmar en planta si esta 142 lo tiene; (3) procedimiento del palpador (S12.4 pag 28) se saltaba los dos extremos del orden de conexion con la clavija de tope, reordenado de 7 a 9 pasos; (4) menor: chapaleta medidora de largos "400 mm" -> "400 ±2 mm" (dib. 15) con advertencia de su efecto en la medicion de largos.
+- Archivos: `apps/pwa/src/services/baader142/baader142Content.json`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 4 puntos con las 6 entradas E77x verificadas una por una, ambos temas, sin scroll horizontal en 375px.
+- Estado: HECHO. Sigue: 25 de 43 medios corregidos acumulados; nota aparte (fuera de este PR): `learningContent/baader-142/diagnosis` tiene 10 docs de diagnostico por sintoma que `listDiagnosis` nunca despacha (la ficha usa el seed puro) — contenido distinto y mas rico, snapshot en `_snapshots/learningContent__baader-142__diagnosis__2026-07-30T22-37-54-098Z.json`.
+
 ## 2026-07-30 - claude - Grader: 7 medios + 3 menores corregidos (PR #310, MERGED, 4a tanda de MEDIOS)
 
 - Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS del Grader cruzados contra el manual Marelec MS4/12 y el instructivo "Basculas Grader", citando pagina.
