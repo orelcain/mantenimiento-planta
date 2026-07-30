@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-30 - claude - OEE del AREA: maquina instrumentada + etapas sin sensor (la GEA)
+
+- Hecho: la tarjeta de OEE de linea pasa a ser OEE del AREA y se habilita en toda linea con Shoplogix (antes solo con Grader, asi que Filete no la veia). Calculo extraido a `services/grader/areaOeeCompute.ts` (testeado): `A_area = uptime / (tiempo rastreado por el sensor + paros de etapa)`, R del cuello de botella, y donde no hay Grader el OEE se muestra como **A×R con chip rotulado** en vez de fingir calidad 100%. El pareto ahora reparte el downtime de la maquina POR CAUSA ANOTADA (el pago de la feature anterior) y expone lo que falta anotar en vez de esconderlo.
+- ⚠ Doble conteo resuelto con una REGLA explicita: un paro de etapa solo suma tiempo si NO detuvo la maquina. Si la detuvo, ya esta en el downtime del sensor y va como causa de ese paro (`origen:'shoplogix'`, que `computeAreaOee` excluye del tiempo adicional).
+- Fixes que salieron de mirar datos reales: `MachineKPI` expone `uptimeMin/downtimeMin/setupMin` (antes la base de tiempo se DERIVABA de `downtime/(1-A)` y fallaba sin averias macro); `machineType` se propaga a los KPIs y en la agregacion gana el primer tipo CONOCIDO (los turnos sin produccion quedan congelados en 'other' y borraban el modelo del mes); etapas sin sensor por linea en `plantLines.ts` (Filete: GEA, cintas, enzunchadora — antes ofrecia Bombeo/Chiller/Grader del eviscerado); `getAreaDisplayLabel` para que el titulo no diga "Filete · Filete".
+- Bug de UX encontrado probando: registrar un paro no movia el OEE hasta recargar (la card leia los paros solo al montar). Ahora `ParoEtapaCapture` avisa (`onChanged`) y la card relee.
+- Archivos: `services/grader/{areaOeeCompute.ts (nuevo),plantKpiCompute.ts,__tests__/areaOeeCompute.test.ts (nuevo)}`, `components/grader/{LineOeeCard.tsx,ParoEtapaCapture.tsx}`, `services/shoplogix/shoplogixMachines.ts`, `config/plantLines.ts`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificacion: tsc limpio, eslint sin errores, 761 tests (9 nuevos de `computeAreaOee`, incluido el caso de doble conteo). Punta a punta en produccion con Filete: registre un paro de la GEA de 45 min → OEE maquina 7% vs **OEE area 3%** ("disponibilidad 33% → 14%, base 1h 19m") y pareto "1. GEA (etapa) 45 min · 2. Paros sin causa anotada (maquina) 23 min"; al borrarlo desde la UI volvio a 7% SIN recargar. Produccion quedo limpia (0 paros, 0 maintenanceLog).
+- Estado: EN REVISION — PR abierto.
+- Sigue: #6 (alertas y brief de Filete con umbrales propios). El sabado: primer turno real.
 ## 2026-07-30 - claude - Arregla los 2 crones que fallaban por la proteccion de main (PR #292)
 
 - Hecho: causa raiz comun — `main` exige el check "build" con `enforce_admins: true`, ninguna escritura directa entra. `Daily Sync (versions)` fallaba desde el 24-jul (`GH006`): se le quito el `schedule` y `version.ts` ahora se sincroniza solo via `prebuild` y el nuevo `dev` (`sync:version && vite`); el workflow queda de auditoria manual. `Weekly NanoBanana Check` fallaba 3 domingos seguidos (`HTTP 409`): ahora sube a la rama sin proteccion `nanobanana-assets`.
