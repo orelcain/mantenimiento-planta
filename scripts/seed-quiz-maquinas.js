@@ -1189,14 +1189,151 @@ const QUIZ = {
       explanation: 'El flujo del video de recetas es: cargar (00:18) → agregar nueva (03:03) → guardar parámetros modificados (04:16).',
     },
   ],
+
+  // Enzunchadora Transpak TP-6000-1. Fuente: manual de operación
+  // TRANSPAK_TP-6000-1_Manual_operacion_y_repuestos.pdf (págs. 1-22), incluida la
+  // tabla de troubleshooting de la pág. 22. Manual en inglés, traducido al curar.
+  'enzunchadora-n2': [
+    {
+      question: '¿Con qué método sella el fleje la TP-6000?',
+      options: ['Con grapa metálica', 'Con adhesivo', 'Por calor', 'Por presión en frío'],
+      correctIndex: 2,
+      explanation: 'El método de sellado es por calor: el calentador funde el fleje de PP y el cabezal lo sella.',
+    },
+    {
+      question: '¿Qué tipo de fleje se puede usar en esta máquina?',
+      options: ['Solo PET', 'PP o PET indistintamente', 'Cordón de poliéster', 'Solo PP (polipropileno)'],
+      correctIndex: 3,
+      explanation: 'Solo fleje PP. El manual prohíbe expresamente el fleje PET y el cordón de poliéster.',
+    },
+    {
+      question: '¿Cuál es el rango de espesor de fleje admitido?',
+      options: ['0,55 a 0,75 mm', '0,20 a 0,40 mm', '1,0 a 1,5 mm', 'Cualquiera'],
+      correctIndex: 0,
+      explanation: 'De 0,55 mm a 0,75 mm. Fuera de ese rango hay que reajustar el mecanismo de avance y recogida.',
+    },
+    {
+      question: '¿Y el rango de ancho de fleje?',
+      options: ['5 a 7 mm', '8 a 12 mm', '15 a 20 mm', '20 a 25 mm'],
+      correctIndex: 1,
+      explanation: 'De 8 mm a 12 mm (3/8" - 1/2"). Cambiar de ancho requiere el kit de conversión, que es opcional.',
+    },
+    {
+      question: '¿Cuál es el peso máximo del paquete a flejar?',
+      options: ['200 kg', '50 kg', '100 kg', 'Sin límite'],
+      correctIndex: 2,
+      explanation: '100 kg. Además el paquete no debe ser menor a 100 mm de ancho por 20 mm de alto.',
+    },
+    {
+      question: 'El fleje NO alcanza la posición de sellado. ¿Qué temporizador hay que revisar?',
+      options: ['T2, que controla la alimentación', 'T1, que controla la recogida', 'Ninguno: es el calentador', 'Los dos por igual'],
+      correctIndex: 0,
+      explanation: 'T2 determina el tiempo de alimentación del fleje. Si es demasiado corto, el fleje no llega al punto de sellado.',
+    },
+    {
+      question: '¿Qué controla el temporizador T1?',
+      options: ['La temperatura del calentador', 'El tiempo de alimentación del fleje', 'La velocidad de la mesa', 'El tiempo de recogida (take-up), o sea el tensado'],
+      correctIndex: 3,
+      explanation: 'T1 determina el tiempo de recogida del fleje. Referencia: ≈0,4 s en trifásica y ≈0,3 s en monofásica.',
+    },
+    {
+      question: 'Para una caja de cartón, ¿en qué posición se deja normalmente la perilla de tensión?',
+      options: ['9 o 10', '4 o 5', '0 o 1', 'Siempre al máximo'],
+      correctIndex: 1,
+      explanation: 'El rango de la perilla es 0 a 10; para caja de cartón normalmente corresponde la posición 4 o 5.',
+    },
+    {
+      question: '¿En qué posición se fija la temperatura del calentador?',
+      options: ['3 o 4', '1 o 2', '5 o 6', 'Siempre en 6'],
+      correctIndex: 0,
+      explanation: 'El rango es 1 a 6 y el manual indica fijarla en 3 o 4, corrigiendo de a poco hasta obtener el sello óptimo.',
+    },
+    {
+      question: '¿Cuánto tiempo hay que esperar tras encender antes de empezar a flejar?',
+      options: ['No hay que esperar', 'Unos 30 segundos', 'Unos 3 minutos', 'Unos 15 minutos'],
+      correctIndex: 2,
+      explanation: 'Hay que esperar alrededor de 3 minutos hasta que el calentador alcance su temperatura de operación; si no, el sello no pega.',
+    },
+    {
+      question: 'En una pausa corta, ¿cómo se evita perder el precalentamiento del calentador?',
+      options: ['Desenchufando la máquina', 'Apagando el interruptor de poder', 'Bajando la temperatura a 1', 'Dejando el STOP bloqueado'],
+      correctIndex: 3,
+      explanation: 'Con el STOP bloqueado la máquina se detiene pero el calentador mantiene su temperatura, y queda lista sin esperar el precalentamiento.',
+    },
+    {
+      question: '¿Qué hace el switch F/R girado en sentido antihorario?',
+      options: ['Alimenta el fleje alrededor del arco', 'Retrocede el fleje al acumulador', 'Apaga el calentador', 'Cambia de AUTO a HAND'],
+      correctIndex: 0,
+      explanation: 'Antihorario alimenta el fleje alrededor del arco; horario lo retrocede y lo devuelve a la caja acumuladora.',
+    },
+    {
+      question: '¿Cuánto debe ser la holgura del mecanismo de avance y recogida?',
+      options: ['Cero siempre', '1 mm fijo', 'Igual al espesor del fleje en uso', 'El doble del espesor del fleje'],
+      correctIndex: 2,
+      explanation: 'La holgura debe ser igual al espesor del fleje que se está usando. De fábrica viene ajustada para fleje de 0,55 a 0,60 mm.',
+    },
+    {
+      question: 'Falta fleje en la caja acumuladora. ¿Hacia dónde se gira el tornillo de ajuste?',
+      options: ['Horario', 'Antihorario', 'No se ajusta: se cambia el resorte', 'Media vuelta en cualquier sentido'],
+      correctIndex: 1,
+      explanation: 'Si falta fleje se afloja la tuerca y se gira el tornillo en antihorario; si sobra fleje, en horario.',
+    },
+    {
+      question: 'La lámpara piloto NO enciende y la máquina no responde. ¿Qué se revisa primero?',
+      options: [
+        'La temperatura del calentador',
+        'Suministro eléctrico, fusible, cable cortado y si el STOP quedó bloqueado',
+        'El temporizador T2',
+        'La perilla de tensión',
+      ],
+      correctIndex: 1,
+      explanation: 'Con piloto apagado las causas del manual son: sin suministro eléctrico, fusible quemado o desalojado, cable cortado o desconectado, y STOP bloqueado.',
+    },
+    {
+      question: 'El fleje se aplica pero la unión se abre (no queda sellada). ¿Qué NO es causa según el manual?',
+      options: [
+        'Cable del calentador cortado o flojo',
+        'Ajuste de temperatura inadecuado',
+        'Valor de la perilla de tensión demasiado alto',
+        'Cantidad excesiva de fleje en el acumulador',
+      ],
+      correctIndex: 3,
+      explanation: 'El exceso de fleje en el acumulador es causa de AVANCE Y RECOGIDA incorrectos, no de fleje sin sellar. Para fleje sin sellar el manual lista el cableado del calentador, la temperatura, que el fleje no llegue al punto de sellado (LS-3) y la tensión demasiado alta.',
+    },
+    {
+      question: 'El relé de sobrecarga cortó la energía. ¿Qué corresponde para volver a operación normal?',
+      options: ['Accionar el switch magnético', 'Cambiar el fusible', 'Reiniciar el temporizador T2', 'Esperar a que se enfríe solo'],
+      correctIndex: 0,
+      explanation: 'El relé de sobrecarga es una protección de corriente que corta automáticamente; para operación normal hay que accionar el switch magnético.',
+    },
+    {
+      question: 'La máquina no se usará por un período largo. ¿Qué corresponde hacer con el fleje?',
+      options: ['Dejarlo como está', 'Tensarlo al máximo', 'Cortarlo y botarlo', 'Sacarlo del acumulador y rebobinarlo en el portabobina'],
+      correctIndex: 3,
+      explanation: 'Se saca de la caja acumuladora y se rebobina en el portabobina para evitar que el fleje se deforme.',
+    },
+  ],
 };
 
 // ── main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const slugs = Object.keys(QUIZ);
+  // `--only=<slug>` limita la escritura a UNA máquina. Sin el flag escribe las 9, y eso
+  // sobrescribiría cualquier pregunta que se haya editado después desde el panel admin
+  // (el docId es determinístico: q01, q02…). Al agregar una máquina nueva, usar --only.
+  const onlyArg = process.argv.slice(2).find(a => a.startsWith('--only='));
+  const only = onlyArg ? onlyArg.split('=')[1] : null;
+  if (only && !QUIZ[only]) {
+    console.error(`--only=${only} no existe en QUIZ. Disponibles: ${Object.keys(QUIZ).join(', ')}`);
+    process.exit(1);
+  }
+
+  const slugs = only ? [only] : Object.keys(QUIZ);
   let total = 0;
   for (const slug of slugs) total += QUIZ[slug].length;
-  console.log(`Seed quiz de máquinas: ${slugs.length} máquinas, ${total} preguntas${isDryRun ? ' [DRY-RUN]' : ''}`);
+  console.log(`Seed quiz de máquinas: ${slugs.length} máquina(s), ${total} preguntas${only ? ` [SOLO ${only}]` : ''}${isDryRun ? ' [DRY-RUN]' : ''}`);
+  if (!only) {
+    console.log('⚠ Sin --only se reescriben las 9 máquinas: pisa ediciones hechas desde el admin.');
+  }
 
   if (!isDryRun) {
     const keyPath = path.join(__dirname, '..', 'serviceAccountKey.json');

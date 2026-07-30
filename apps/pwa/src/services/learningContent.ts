@@ -69,6 +69,14 @@ import {
   listMarelFileteFlows,
   listMarelFileteDiagnosis,
 } from './marelFileteLearning'
+import {
+  ENZUNCHADORA_CONTENT_UPDATED_AT,
+  getEnzunchadoraContentCounts,
+  listEnzunchadoraManualSections,
+  listEnzunchadoraProcedures,
+  listEnzunchadoraFlows,
+  listEnzunchadoraDiagnosis,
+} from './enzunchadoraLearning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -232,6 +240,7 @@ const DETECTOR_LEARNING_SLUG = 'detector-metales'
 const MAREL_HG_LEARNING_SLUG = 'marel-hg'
 const FISHKEN_LEARNING_SLUG = 'fishken'
 const MAREL_FILETE_LEARNING_SLUG = 'marel-filete'
+const ENZUNCHADORA_LEARNING_SLUG = 'enzunchadora-n2'
 type StoredOverride<T> = T & { _deleted?: boolean }
 
 async function listStoredProcedures(machineSlug: string): Promise<StoredOverride<Procedure>[]> {
@@ -609,6 +618,7 @@ export async function listProcedures(machineSlug: string): Promise<Procedure[]> 
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgProcedures()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenProcedures()
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteProcedures()
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return listEnzunchadoraProcedures()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderProcedures()
 
   return listStoredProcedures(machineSlug)
@@ -673,6 +683,7 @@ export async function listManualSections(machineSlug: string): Promise<ManualSec
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return withManualOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgManualSections())
   if (machineSlug === FISHKEN_LEARNING_SLUG) return withManualOverrides(FISHKEN_LEARNING_SLUG, listFishkenManualSections())
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withManualOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteManualSections())
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return withManualOverrides(ENZUNCHADORA_LEARNING_SLUG, listEnzunchadoraManualSections())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderManualSections()
 
   return listStoredManualSections(machineSlug)
@@ -702,6 +713,7 @@ const SEED_MANUAL_PREFIX: Record<string, string> = {
   [MAREL_HG_LEARNING_SLUG]: 'mhg-manual-',
   [MAREL_FILETE_LEARNING_SLUG]: 'mf-manual-',
   [FISHKEN_LEARNING_SLUG]: 'fk-manual-',
+  [ENZUNCHADORA_LEARNING_SLUG]: 'tp6-manual-',
 }
 
 export async function deleteManualSection(machineSlug: string, id: string): Promise<void> {
@@ -750,6 +762,7 @@ export async function listFlows(machineSlug: string): Promise<Flow[]> {
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgFlows()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenFlows()
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteFlows()
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return listEnzunchadoraFlows()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderFlows()
 
   return listStoredFlows(machineSlug)
@@ -791,6 +804,7 @@ export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgDiagnosis()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenDiagnosis()
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteDiagnosis()
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return listEnzunchadoraDiagnosis()
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderDiagnosis()
 
   return listStoredDiagnosis(machineSlug)
@@ -890,6 +904,7 @@ export async function getMachineContentCounts(
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return getMarelHgContentCounts()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return getFishkenContentCounts()
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return getMarelFileteContentCounts()
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return getEnzunchadoraContentCounts()
   if (machineSlug === GRADER_LEARNING_SLUG) return getGraderContentCounts()
 
   const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
@@ -936,6 +951,9 @@ export async function getMachineContentMeta(
   }
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) {
     return { ...getMarelFileteContentCounts(), lastUpdatedAt: MAREL_FILETE_CONTENT_UPDATED_AT }
+  }
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) {
+    return { ...getEnzunchadoraContentCounts(), lastUpdatedAt: ENZUNCHADORA_CONTENT_UPDATED_AT }
   }
   if (machineSlug === GRADER_LEARNING_SLUG) {
     const counts = await getGraderContentCounts()

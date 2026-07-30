@@ -535,6 +535,105 @@ const GEA: QuickRefGroup[] = [
   },
 ]
 
+/**
+ * Enzunchadora Transpak TP-6000-1. Todo sale del manual de operación
+ * (`TRANSPAK_TP-6000-1_Manual_operacion_y_repuestos.pdf`, págs. 1-22).
+ * SIN grupo "Claves de acceso": esta máquina no tiene clave de servicio
+ * documentada en su manual — no se inventa una.
+ */
+const ENZUNCHADORA: QuickRefGroup[] = [
+  {
+    title: 'Identificación',
+    rows: [
+      { label: 'Modelo', value: 'Transpak TP-6000-1' },
+      { label: 'Tipo', value: 'Flejadora automática de cajas · sellado por CALOR' },
+      { label: 'Peso de la máquina', value: '220 kg' },
+      { label: 'Dimensiones', value: 'Ancho 1430 mm · Profundidad 620 mm' },
+      { label: 'Altura de mesa', value: '810 mm' },
+    ],
+  },
+  {
+    title: 'Fleje admitido',
+    rows: [
+      { label: 'Material', value: 'Solo PP (polipropileno)' },
+      { label: 'NO usar', value: 'Fleje PET ni cordón de poliéster' },
+      { label: 'Ancho', value: '8 a 12 mm (3/8" - 1/2")' },
+      { label: 'Espesor', value: '0,55 a 0,75 mm' },
+      { label: 'Diámetro de bobina', value: '200 mm (8" nominal)' },
+      { label: 'Cambio de ancho', value: 'Requiere kit de conversión (opcional)' },
+    ],
+    note: 'Fleje fuera del rango de espesor obliga a reajustar el mecanismo de avance: si no, el fleje se sale de la pista del arco.',
+  },
+  {
+    title: 'Límites del paquete',
+    rows: [
+      { label: 'Peso máximo', value: '100 kg' },
+      { label: 'Tamaño mínimo', value: '100 mm ancho x 20 mm alto' },
+      { label: 'Posición', value: 'Centrado en el cabezal de sellado' },
+      { label: 'Temp. ambiente admitida', value: '5 °C a 40 °C' },
+      { label: 'Ruido', value: '83 dB(A)' },
+    ],
+  },
+  {
+    title: 'Ajustes clave',
+    rows: [
+      { label: 'Tensión (rango 0-10)', value: 'Caja de cartón: 4 o 5' },
+      { label: 'Temperatura (rango 1-6)', value: 'Fijar en 3 o 4' },
+      { label: 'Holgura avance/recogida', value: 'IGUAL al espesor del fleje en uso' },
+      { label: 'Holgura de fábrica', value: 'Ajustada para fleje de 0,55 a 0,60 mm' },
+      { label: 'Acumulador: falta fleje', value: 'Aflojar tuerca y girar tornillo ANTIHORARIO' },
+      { label: 'Acumulador: sobra fleje', value: 'Aflojar tuerca y girar tornillo HORARIO' },
+    ],
+    note: 'La temperatura se corrige DE A POCO: si está muy alta o muy baja no se logra sello. No saltar de un extremo al otro.',
+  },
+  {
+    title: 'Temporizadores T1 y T2',
+    rows: [
+      { label: 'T1 — qué controla', value: 'Recogida del fleje (take-up) = el tensado' },
+      { label: 'T1 trifásica', value: '≈ 0,4 s' },
+      { label: 'T1 monofásica', value: '≈ 0,3 s' },
+      { label: 'T2 — qué controla', value: 'Alimentación del fleje (feed)' },
+      { label: 'T2 trifásica', value: '≈ 0,8 s (arco estándar 850x600)' },
+      { label: 'T2 monofásica', value: '≈ 0,7 s (arco estándar 850x600)' },
+    ],
+    note: 'Si el fleje NO llega al sellado, el parámetro es T2. Si sale FLOJO, es T1. T1 se fija pensando en el paquete más pequeño a flejar.',
+  },
+  {
+    title: 'Datos eléctricos',
+    rows: [
+      { label: 'Monofásica (1PH)', value: 'AC 110 / 220 / 230 / 240 V · 50/60 Hz' },
+      { label: 'Trifásica (3PH)', value: 'AC 220 / 380 / 400 V · 50/60 Hz' },
+      { label: 'Puesta a tierra', value: 'Obligatoria; cablear según código eléctrico local' },
+      { label: 'Alargadores', value: 'PROHIBIDOS por el manual' },
+      { label: 'Relé de sobrecarga', value: 'Corta solo; para reponer accionar el switch magnético' },
+    ],
+  },
+  {
+    title: 'Chequeo antes de operar',
+    rows: [
+      { label: '1. EPP', value: 'Protección ocular + guantes de seguridad' },
+      { label: '2. Tensión', value: 'Verificar que la alimentación sea la correcta' },
+      { label: '3. Fleje', value: 'Confirmar que sea PP, no PET' },
+      { label: '4. Precalentamiento', value: 'Esperar ≈ 3 minutos antes de flejar' },
+      { label: '5. En marcha', value: 'Manos y cuerpo FUERA del área del arco' },
+      { label: '6. Atender', value: 'Humo o ruido anormal = detener' },
+    ],
+    note: 'En pausas cortas dejar el STOP BLOQUEADO: la máquina para pero el calentador mantiene temperatura y no se pierden los 3 minutos.',
+  },
+  {
+    title: 'Diagnóstico rápido',
+    rows: [
+      { label: 'Piloto NO enciende', value: 'Suministro · fusible · cable cortado · STOP bloqueado' },
+      { label: 'Piloto ON, no opera', value: 'Switch START/STOP · 1 de los 3 cables · correa de motores' },
+      { label: 'Fleje no llega al sellado', value: 'T2 muy corto · fleje torcido al cargar · se sale de la pista' },
+      { label: 'Fleje sin sellar', value: 'Temperatura · cable del calentador · LS-3 · tensión muy alta' },
+      { label: 'Fleje flojo', value: 'T1 muy corto · perilla de tensión · resortes de tensión' },
+      { label: 'Avance irregular', value: 'Cantidad en acumulador · suciedad en unidad de alimentación' },
+    ],
+    note: 'La tabla completa de troubleshooting del manual (26 causas con su remedio) está en la pestaña Diagnóstico.',
+  },
+]
+
 const QUICK_REF: Record<string, QuickRefGroup[]> = {
   grader: GRADER,
   'marel-hg': MAREL_HG,
@@ -544,6 +643,7 @@ const QUICK_REF: Record<string, QuickRefGroup[]> = {
   'baader-200': BAADER_200,
   fishken: FISHKEN,
   'detector-metales': DETECTOR_METALES,
+  'enzunchadora-n2': ENZUNCHADORA,
 }
 
 export function getQuickRef(machineSlug: string): QuickRefGroup[] | null {
