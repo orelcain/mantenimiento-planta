@@ -19,6 +19,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Grader: 7 medios + 3 menores corregidos (PR #310, MERGED, 4a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS del Grader cruzados contra el manual Marelec MS4/12 y el instructivo "Basculas Grader", citando pagina.
+- Hecho: (1) ±20 g corregido de tolerancia a desviacion estandar (manual pag 6) — el quiz repetia el mismo error; (2) juego vertical en flipper: rodamientos 6005 2RSR, no bujes (pag 25/58) — el quiz daba la respuesta incorrecta como correcta; (3-7) 5 umbrales sin respaldo documental retirados o etiquetados como criterio interno de Mantención ANTARFOOD (P0<2%, ruta redistribuir-gates, slow-mo-flipper con bobina 15-30 Ω inventada, ajuste-eye-sync 50-150 ms, tachometro-cinta gap 1-3 mm); mas 3 menores (motor-tambor: termometro laser en vez de tacto a 60°C; limpieza-fotocelula: baja presion no paño con alcohol; peso patron redactado sin ambiguedad). Los 11 runbooks y sus 6 triggers automaticos (`metric`) quedaron intactos.
+- Archivos: `apps/pwa/src/services/graderLearning.ts`, `apps/pwa/src/services/grader/graderRunbooks.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 11 puntos respondiendo las 2 preguntas de quiz corregidas, ambos temas, sin scroll horizontal en 375px.
+- Estado: HECHO. Sigue: 22 de 43 medios corregidos acumulados; quedan medios sin tocar en otros equipos.
+
 ## 2026-07-30 - claude - Fishken: 6 medios + restos de quiz/"por que importa" corregidos (PR #308, MERGED, 3a tanda de MEDIOS)
 
 - Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 6 hallazgos MEDIOS de la Fishken cruzados contra los 4 manuales del equipo (E-Pack S28, Hardware, Diagramas de Conexion, FishKen Web), citando pagina.
