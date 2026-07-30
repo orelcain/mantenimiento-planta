@@ -19,6 +19,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Grafico de pz/min: barras por tramo + eje acotado a la operacion real
+
+- Contexto: Orel mando una captura del grafico en produccion. Dos problemas visibles: el eje cubria 24 h (08:00→08:00) para un turno que produjo 6 h, y el objetivo aparecia como rayitas flotantes sueltas.
+- Diagnostico con datos: el turno del 28-jul tiene **14 tramos con dato sobre 288 posibles**, en dos racimos (09:55 y 14:30-16:10). Una LINEA dibujaba continuidad donde no hubo ni un tramo con produccion.
+- Hecho (mockup aprobado A+B, C como toggle): (1) el eje se acota a la ventana real de produccion cuando el turno no esta acotado en Shoplogix, con chip "operacion real / turno completo" para alternar. El encuadre va a nivel de PANEL porque el Gantt y el grafico comparten eje (van sincronizados) — acotar solo uno los desalinearia. (2) El grafico pasa de linea a BARRAS por tramo: los tramos sin dato quedan huecos, no una linea que baja a cero. (3) El objetivo se conecta entre tramos (`connectNulls`) porque es una consigna, no desaparece. (4) Toggle "ver brecha al objetivo" que apila lo que falto en cada tramo (opcion C, apagada por default: en un turno normal seria ruido). (5) Agrupacion a 15 min cuando el rango visible pasa de 4 h, para que las barras no se apelmacen.
+- Helpers nuevos y testeados: `effectiveProductionWindow` / `shouldFrameOnProduction` (shoplogixNormalizer) y `regroupRates` (ProductionRateLineEC).
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`, `apps/pwa/src/services/shoplogix/{shoplogixNormalizer.ts,__tests__/shoplogixNormalizer.test.ts}`.
+- Verificacion: 773 tests verdes (12 nuevos: encuadre con los datos reales del 28-jul, y agrupacion que NO afirma produccion cero donde solo falta el dato), tsc y eslint limpios. En el navegador: Filete arranca en "operacion real", Yal en "turno completo" (su turno SI esta acotado → su eje no se toca), los 2 toggles alternan, y 0 botones anidados tras corregir un `<button>` dentro de `<button>` que React reportaba.
+- ⚠ PENDIENTE de verificacion VISUAL: el pane del navegador de esta sesion no compone frames (ECharts pinta en canvas), asi que las barras, la brecha apilada y las bandas no las pude VER. La logica esta cubierta por tests; Orel manda captura tras el deploy.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado con 5.000 piezas el grafico se ve muy distinto (barras casi llenas) — ahi se valida el encoding de verdad.
+
 ## 2026-07-30 - claude - Target de planificacion de Filete (5.000 pz/turno)
 
 - Contexto: produccion definio ~5.000 piezas por turno y 2 turnos en Filete (los horarios no se fijan: los define Shoplogix y la app ya descubre los turnos de los docs).

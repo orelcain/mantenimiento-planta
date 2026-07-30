@@ -5,6 +5,8 @@ import {
   normalizeState,
   normalizeShift,
   buildLineSnapshot,
+  effectiveProductionWindow,
+  shouldFrameOnProduction,
 } from '../shoplogixNormalizer';
 import type {
   ShoplogixProductionMachine,
@@ -452,3 +454,56 @@ describe('buildLineSnapshot', () => {
     expect(snap.machinesProducing).toBe(0);
   });
 });
+
+// ── Encuadre del eje temporal ────────────────────────────────────────────────
+
+describe('effectiveProductionWindow / shouldFrameOnProduction', () => {
+  const iv = (startISO: string, cycles: number) => ({
+    startAt: new Date(startISO),
+    endAt: new Date(new Date(startISO).getTime() + 5 * 60_000),
+    cycles,
+  })
+
+  it('toma del primer al último tramo CON producción (ignora los vacíos)', () => {
+    const w = effectiveProductionWindow([{ intervals: [
+      iv('2026-07-28T08:00:00Z', 0),
+      iv('2026-07-28T09:55:00Z', 5),
+      iv('2026-07-28T16:05:00Z', 13),
+      iv('2026-07-28T23:00:00Z', 0),
+    ] }])!
+    expect(w.start.toISOString()).toBe('2026-07-28T09:55:00.000Z')
+    expect(w.end.toISOString()).toBe('2026-07-28T16:10:00.000Z')
+  })
+
+  it('sin producción no hay ventana real', () => {
+    expect(effectiveProductionWindow([{ intervals: [iv('2026-07-28T08:00:00Z', 0)] }])).toBeNull()
+    expect(effectiveProductionWindow([])).toBeNull()
+  })
+
+  it('abarca todas las máquinas de la línea', () => {
+    const w = effectiveProductionWindow([
+      { intervals: [iv('2026-05-08T15:00:00Z', 100)] },
+      { intervals: [iv('2026-05-08T23:30:00Z', 80)] },
+    ])!
+    expect(w.start.toISOString()).toBe('2026-05-08T15:00:00.000Z')
+    expect(w.end.toISOString()).toBe('2026-05-08T23:35:00.000Z')
+  })
+
+  it('encuadra en la producción cuando el turno es mucho más ancho (Filete: 6 h en 24 h)', () => {
+    const shift = { start: new Date('2026-07-28T08:00:00Z'), end: new Date('2026-07-29T08:00:00Z') }
+    const efe   = { start: new Date('2026-07-28T09:55:00Z'), end: new Date('2026-07-28T16:10:00Z') }
+    expect(shouldFrameOnProduction(shift, efe)).toBe(true)
+  })
+
+  it('NO recorta el eje de un turno bien acotado (Yal: 8,6 h en 9,25 h)', () => {
+    const shift = { start: new Date('2026-05-08T14:45:00Z'), end: new Date('2026-05-09T00:00:00Z') }
+    const efe   = { start: new Date('2026-05-08T15:00:00Z'), end: new Date('2026-05-08T23:35:00Z') }
+    expect(shouldFrameOnProduction(shift, efe)).toBe(false)
+  })
+
+  it('sin ventana de turno, la producción manda', () => {
+    const efe = { start: new Date('2026-07-28T09:55:00Z'), end: new Date('2026-07-28T16:10:00Z') }
+    expect(shouldFrameOnProduction(null, efe)).toBe(true)
+    expect(shouldFrameOnProduction(null, null)).toBe(false)
+  })
+})

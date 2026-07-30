@@ -10,7 +10,7 @@
  *     objetivo corriendo, que es lo que el sombreado tiene que marcar
  */
 import { describe, it, expect } from 'vitest'
-import { buildRateSeries } from '../ProductionRateLineEC'
+import { buildRateSeries, regroupRates } from '../ProductionRateLineEC'
 import type { UpstreamMachineShift, UpstreamProductionInterval } from '@/services/shoplogix/types'
 
 const BUCKET_MS = 5 * 60_000
@@ -133,5 +133,49 @@ describe('buildRateSeries · objetivo del sensor', () => {
     expect(expectedRate).toBe(0)
     expect(targetSeries.every((v) => v === null)).toBe(true)
     expect(stoppedWithTarget).toHaveLength(0)
+  })
+})
+
+// ── Agrupación a tramos más anchos ───────────────────────────────────────────
+// Con más de ~4 h a la vista, los tramos de 5 min quedan de 1-2 px. Al agrupar,
+// lo que NO puede pasar es afirmar producción cero donde solo falta el dato.
+
+describe('regroupRates', () => {
+  const T = (hhmm: string) => new Date(`2026-07-28T${hhmm}:00Z`).getTime()
+
+  it('promedia los sub-tramos CON dato dentro del mismo grupo', () => {
+    // Los grupos son [15:00,15:15) y [15:15,15:30): 15:00+15:05+15:10 caen juntos.
+    const r = regroupRates([T('15:00'), T('15:05'), T('15:10')], [3.2, 1.4, 2.2], 15 * 60_000)
+    expect(r.timeAxis).toHaveLength(1)
+    expect(r.values[0]).toBeCloseTo(2.3, 1)
+  })
+
+  it('respeta los límites del grupo (15:10 y 15:15 NO son el mismo tramo)', () => {
+    const r = regroupRates([T('15:10'), T('15:15')], [3.2, 1.4], 15 * 60_000)
+    expect(r.timeAxis).toHaveLength(2)
+    expect(r.values).toEqual([3.2, 1.4])
+  })
+
+  it('un sub-tramo con dato entre dos vacíos NO se diluye a un tercio', () => {
+    const r = regroupRates([T('15:00'), T('15:05'), T('15:10')], [null, 3, null], 15 * 60_000)
+    expect(r.values[0]).toBe(3)
+  })
+
+  it('un tramo sin ningún dato queda hueco (null), no en cero', () => {
+    const r = regroupRates([T('12:00'), T('12:05'), T('12:10')], [null, null, null], 15 * 60_000)
+    expect(r.values[0]).toBeNull()
+  })
+
+  it('separa los tramos en grupos de 15 min y los ordena', () => {
+    const r = regroupRates([T('16:10'), T('15:00'), T('15:20')], [1, 2, 3], 15 * 60_000)
+    expect(r.timeAxis).toHaveLength(3)
+    expect(r.timeAxis[0]).toBeLessThan(r.timeAxis[1]!)
+    expect(r.values).toEqual([2, 3, 1])
+  })
+
+  it('no toca nada con serie vacía o grupo inválido', () => {
+    expect(regroupRates([], [], 15 * 60_000).values).toEqual([])
+    const same = regroupRates([T('15:00')], [5], 0)
+    expect(same.values).toEqual([5])
   })
 })

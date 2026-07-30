@@ -7,6 +7,12 @@
  *
  * Sincroniza con TimelineSyncContext: zoom + axisPointer cross-chart.
  *
+ * ENCODING: BARRAS por tramo, no una línea.
+ * Un proceso intermitente no tiene flujo continuo entre tramos: el turno del
+ * 2026-07-28 de la Baader 200 tuvo 14 tramos con dato sobre 288 posibles, en dos
+ * racimos separados por 4,5 h. Una línea dibujaba continuidad donde no hubo ni un
+ * tramo con producción; las barras dejan los huecos como huecos.
+ *
  * Datos de entrada: `machines[].intervals` (buckets de 5 min con `cycles`).
  * Rate real = cycles / duracion_min del intervalo.
  *
@@ -34,12 +40,29 @@ const AVG_COLOR  = { line: 'rgba(251,191,36,0.95)', area: 'rgba(251,191,36,0.12)
 /** Objetivo del sensor — violeta, el mismo tono que ya usaba la línea de meta. */
 const TARGET_COLOR = 'rgba(139,92,246,0.75)'
 const OBJETIVO_LABEL = 'Objetivo'
+/** Brecha al objetivo — rojo suave (semántico −50% croma del design system). */
+const GAP_COLOR = 'rgba(176,112,109,0.42)'
+const GAP_LABEL = 'Faltó'
+
+/**
+ * Ancho de tramo (min) según el rango visible: con más de 4 h a la vista, los
+ * tramos de 5 min quedan de 1-2 px y se apelmazan, así que se agrupan a 15.
+ */
+function bucketMinutesForRange(rangeMin: number): 5 | 15 {
+  return rangeMin > 4 * 60 ? 15 : 5
+}
 const GRID_COLOR = '#1e293b'
 
 interface Props {
   machines: UpstreamMachineShift[]
   windowStart?: Date
   windowEnd?: Date
+  /**
+   * Muestra apilada la BRECHA al objetivo (lo que faltó en cada tramo).
+   * Apagado por default: en un turno normal casi todo está cerca del objetivo y
+   * el sombreado sería ruido; se prende cuando se quiere cuantificar la pérdida.
+   */
+  showGap?: boolean
 }
 
 // ── Helper: toma nombre de máquina y devuelve etiqueta corta ─────────────────
@@ -192,7 +215,39 @@ export function buildRateSeries(machines: UpstreamMachineShift[]): {
   }
 }
 
-export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props) {
+/**
+ * Reagrupa una serie de tasas (pz/min) a tramos más anchos.
+ *
+ * Las tasas se PROMEDIAN entre los sub-tramos CON dato, no se divide por el
+ * tramo completo: si de 3 sub-tramos de 5 min solo 1 tiene dato, dividir por 15
+ * afirmaría que en los otros 10 min la máquina produjo cero, cuando lo que pasa
+ * es que no hay dato. Un tramo sin ningún sub-tramo con dato queda null (hueco).
+ */
+export function regroupRates(
+  timeAxis: number[],
+  values: (number | null)[],
+  groupMs: number,
+): { timeAxis: number[]; values: (number | null)[] } {
+  if (timeAxis.length === 0 || groupMs <= 0) return { timeAxis, values }
+  const acc = new Map<number, { sum: number; n: number }>()
+  for (let i = 0; i < timeAxis.length; i++) {
+    const key = Math.floor(timeAxis[i]! / groupMs) * groupMs
+    const v = values[i]
+    const cur = acc.get(key) ?? { sum: 0, n: 0 }
+    if (v != null) { cur.sum += v; cur.n += 1 }
+    acc.set(key, cur)
+  }
+  const keys = [...acc.keys()].sort((a, b) => a - b)
+  return {
+    timeAxis: keys,
+    values: keys.map((k) => {
+      const a = acc.get(k)!
+      return a.n > 0 ? Math.round((a.sum / a.n) * 10) / 10 : null
+    }),
+  }
+}
+
+export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap = false }: Props) {
   const echartsRef = useRef<any>(null)
   const myHoverId  = useId()
   const timelineSync = useTimelineSyncOptional()
@@ -293,20 +348,40 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
   }, [series, expectedRate])
 
   const option = useMemo(() => {
+    // Ancho de barra en px: el tramo real (5 o 15 min) proyectado al eje, con un
+    // mínimo de 2 px para que un tramo aislado siga siendo visible.
+    const rangeMin = (rangeEnd.getTime() - rangeStart.getTime()) / 60_000
+    const bucketMin = bucketMinutesForRange(rangeMin)
+    const barPx = Math.max(2, Math.min(22, Math.round((bucketMin / Math.max(rangeMin, 1)) * 560)))
+
+    // Con rangos largos los tramos de 5 min quedan de 1-2 px: se agrupan a 15.
+    const groupMs = bucketMin * 60_000
+    const regrouped = bucketMin === 5
+      ? { timeAxis, series: series.map(s => s.data), target: targetSeries }
+      : (() => {
+          const first = regroupRates(timeAxis, series[0]?.data ?? [], groupMs)
+          return {
+            timeAxis: first.timeAxis,
+            series: series.map(s => regroupRates(timeAxis, s.data, groupMs).values),
+            target: regroupRates(timeAxis, targetSeries, groupMs).values,
+          }
+        })()
+    const axis = regrouped.timeAxis
+
     const machineSeries = series.map((s, i) => {
       const col = MACHINE_COLORS[i % MACHINE_COLORS.length]!
       return {
         name:        s.name,
-        type:        'line' as const,
-        data:        timeAxis.map((ts, ti) => [ts, s.data[ti]] as [number, number | null]),
-        smooth:      0.3,
-        connectNulls: false,
-        symbol:      'circle',
-        symbolSize:  4,
-        lineStyle:   { color: col.line, width: 1.5 },
-        itemStyle:   { color: col.line },
-        areaStyle:   { color: col.area },
-        emphasis:    { lineStyle: { width: 2.5 } },
+        type:        'bar' as const,
+        // Los tramos SIN dato quedan como hueco (null), no como una barra en 0:
+        // "no hubo dato" y "produjo cero" son cosas distintas.
+        data:        axis.map((ts, ti) => [ts, regrouped.series[i]?.[ti] ?? null] as [number, number | null]),
+        stack:       showGap ? `pz-${s.name}` : undefined,
+        barWidth:    barPx,
+        barGap:      '10%',
+        barCategoryGap: '0%',
+        itemStyle:   { color: col.line, borderRadius: [1, 1, 0, 0] as [number, number, number, number] },
+        emphasis:    { itemStyle: { color: col.line } },
         // Solo en la primera serie (una vez por chart) — mismo tramo resaltado
         // que en los Gantts Baader (StateTimelineEC), vía TimelineSyncContext.
         markArea: i === 0 && highlightRanges.length > 0 ? {
@@ -317,16 +392,40 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       }
     })
 
+    // Brecha al objetivo, apilada encima de cada barra: lo que faltó en ese tramo.
+    // Solo con showGap; se calcula por máquina para que apile con su propia barra.
+    const gapSeries = showGap
+      ? series.map((s, i) => ({
+          name:     i === 0 ? GAP_LABEL : `${GAP_LABEL} ${s.name}`,
+          type:     'bar' as const,
+          stack:    `pz-${s.name}`,
+          barWidth: barPx,
+          data: axis.map((ts, ti) => {
+            const real = regrouped.series[i]?.[ti] ?? null
+            const target = regrouped.target[ti]
+            // Sin dato real no hay brecha que mostrar (el tramo no existe), y sin
+            // objetivo tampoco: nadie esperaba producción ahí.
+            if (real == null || target == null || target <= 0) return [ts, null] as [number, null]
+            return [ts, Math.max(0, Math.round((target - real) * 10) / 10)] as [number, number]
+          }),
+          itemStyle: { color: GAP_COLOR },
+          emphasis:  { itemStyle: { color: GAP_COLOR } },
+          tooltip:   { valueFormatter: (v: number) => `${v} pz/min sin producir` },
+        }))
+      : []
+
     // Objetivo del sensor: línea punteada violeta, sin área y detrás de todo.
     // Va como serie propia (no como markLine horizontal) porque el objetivo NO
     // es constante: el sensor lo escala en los buckets parciales.
-    const targetHasData = targetSeries.some((v) => v != null && v > 0)
+    const targetHasData = regrouped.target.some((v) => v != null && v > 0)
     const targetS = targetHasData ? {
       name:        OBJETIVO_LABEL,
       type:        'line' as const,
-      data:        timeAxis.map((ts, ti) => [ts, targetSeries[ti]] as [number, number | null]),
+      data:        axis.map((ts, ti) => [ts, regrouped.target[ti]] as [number, number | null]),
       step:        'end' as const,
-      connectNulls: false,
+      // El objetivo es una CONSIGNA: no desaparece entre tramos. Sin conectar,
+      // los tramos aislados se dibujaban como rayitas flotantes sueltas.
+      connectNulls: true,
       symbol:      'none',
       lineStyle:   { color: TARGET_COLOR, width: 1.4, type: 'dashed' as const },
       itemStyle:   { color: TARGET_COLOR },
@@ -354,7 +453,9 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     const avgS = showAvg ? {
       name:        'Promedio',
       type:        'line' as const,
-      data:        timeAxis.map((ts, ti) => [ts, avgSeries.data[ti]] as [number, number | null]),
+      data:        (bucketMin === 5
+        ? timeAxis.map((ts, ti) => [ts, avgSeries.data[ti]] as [number, number | null])
+        : (() => { const g = regroupRates(timeAxis, avgSeries.data, groupMs); return g.timeAxis.map((ts, ti) => [ts, g.values[ti]] as [number, number | null]) })()),
       smooth:      0.3,
       connectNulls: false,
       symbol:      'diamond',
@@ -395,6 +496,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
           ...series.map(s => s.name),
           ...(showAvg ? ['Promedio'] : []),
           ...(targetHasData ? [OBJETIVO_LABEL] : []),
+          ...(showGap && gapSeries.length > 0 ? [GAP_LABEL] : []),
         ],
       },
       xAxis: {
@@ -458,10 +560,11 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       series: [
         ...(targetS ? [targetS] : []),
         ...machineSeries,
+        ...gapSeries,
         ...(avgS ? [avgS] : []),
       ],
     }
-  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges, showGap])
 
   if (timeAxis.length < 2) return null
 
