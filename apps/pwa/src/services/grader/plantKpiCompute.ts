@@ -30,6 +30,8 @@ import type { GraderDailySummary } from './types'
 export interface MachineKPI {
   machineid: string
   machineName: string
+  /** Modelo de la máquina — para que la UI la nombre sin hardcodear "Baader". */
+  machineType?: UpstreamMachineShift['machineType']
   availability: number
   performance: number
   /** MTTR de averías MACRO (excluye micro-detenciones), en minutos. */
@@ -48,6 +50,15 @@ export interface MachineKPI {
   lostBySpeed: number
   /** Piezas dejadas de producir por tiempo detenido (downtime × target). */
   lostByStops: number
+  /**
+   * Minutos del breakdown del turno. Se exponen para no tener que DERIVAR la
+   * base de tiempo desde `downtime/(1−A)`: esa derivación fallaba justo cuando
+   * hacía falta (sin averías macro no había base) y no cuadraba con el downtime
+   * real cuando MTTR×N° ≠ downtime medido.
+   */
+  uptimeMin: number
+  downtimeMin: number
+  setupMin: number
 }
 
 export interface PlantKPIs {
@@ -229,6 +240,7 @@ export function computeMachineKPI(m: UpstreamMachineShift, lineCpm: number | nul
   return {
     machineid: m.machineid,
     machineName: m.machineName,
+    machineType: m.machineType,
     availability: availabilityISO(m.shiftRuntimeBreakdown),
     performance: performanceISO(m.intervals),
     mttrMin: macroCount > 0 ? macroSec / macroCount / 60 : 0,
@@ -238,6 +250,9 @@ export function computeMachineKPI(m: UpstreamMachineShift, lineCpm: number | nul
     microMin: microSec / 60,
     shoplogixTargetCpm: targetCpm,
     totalCycles: m.totalCycles ?? 0,
+    uptimeMin:   uptimeSec / 60,
+    downtimeMin: m.shiftRuntimeBreakdown.downtimeSec / 60,
+    setupMin:    m.shiftRuntimeBreakdown.setupSec / 60,
     ...lost,
   }
 }
@@ -325,6 +340,12 @@ export function aggregateShifts(
     return {
       machineid: a.ms[0]!.machineid,
       machineName: a.ms[0]!.machineName,
+      // Primer tipo CONOCIDO entre las instancias del período, no el del primer
+      // doc: los turnos sin producción quedan congelados con el schema viejo
+      // ('other'), y si justo son los primeros del mes la máquina perdía su
+      // modelo en toda la vista.
+      machineType: a.ms.find((m) => m.machineType && m.machineType !== 'other')?.machineType
+        ?? a.ms[0]!.machineType,
       availability: availabilityISO(a.breakdown),
       performance: performanceISO(a.intervals),
       mttrMin: macroCount > 0 ? macroSec / macroCount / 60 : 0,
@@ -334,6 +355,9 @@ export function aggregateShifts(
       microMin: microSec / 60,
       shoplogixTargetCpm: targetCpmFromIntervals(a.intervals),
       totalCycles: a.totalCycles,
+      uptimeMin:   a.breakdown.uptimeSec / 60,
+      downtimeMin: a.breakdown.downtimeSec / 60,
+      setupMin:    a.breakdown.setupSec / 60,
       ...lost,
     }
   })

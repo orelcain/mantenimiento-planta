@@ -23,7 +23,7 @@ import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
-import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
+import { getPlantLineConfig, getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
@@ -123,6 +123,9 @@ export function AnalisisGraderWizardPage() {
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
   // Día seleccionado en el calendario (para el KPI board)
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
+  // Se incrementa al registrar/borrar un paro de etapa: el OEE del área los
+  // suma y vive en otra card, así que necesita releerlos.
+  const [parosVersion, setParosVersion] = useState(0)
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -724,7 +727,7 @@ export function AnalisisGraderWizardPage() {
           <QuickInterventionCapture
             plantLineId={lineId}
             areaNodeId={lineConfig.areaNodeId}
-            areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+            areaLabel={getAreaDisplayLabel(lineId)}
           />
         </div>
       )}
@@ -840,15 +843,18 @@ export function AnalisisGraderWizardPage() {
         </div>
       )}
 
-      {/* OEE de Línea estimado (Fase C) — combina Baader (Shoplogix) + paros de
-          etapa (manual) + calidad Grader. Solo en líneas con Baader+Grader. */}
-      {lineConfig.hasGraderData && (
+      {/* OEE del ÁREA estimado (Fase C) — combina la máquina instrumentada
+          (Shoplogix) + los paros de las etapas sin sensor (manual) + calidad del
+          Grader donde existe. Aplica a toda línea con datos Shoplogix: en Filete
+          es justamente donde hace falta, porque la GEA no está integrada. */}
+      {lineConfig.shoplogixEnabled && !lineConfig.comingSoon && (
         <LineOeeCard
           plantLineId={lineId}
           plantSlug={lineConfig.plantSlug}
           graderSummaries={calendarSummaries}
           currentMonth={calendarMonth}
-          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+          areaLabel={getAreaDisplayLabel(lineId)}
+          refreshKey={parosVersion}
         />
       )}
 
@@ -857,7 +863,8 @@ export function AnalisisGraderWizardPage() {
       {!lineConfig.comingSoon && (
         <ParoEtapaCapture
           plantLineId={lineId}
-          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+          onChanged={() => setParosVersion((v) => v + 1)}
+          areaLabel={getAreaDisplayLabel(lineId)}
         />
       )}
     </div>

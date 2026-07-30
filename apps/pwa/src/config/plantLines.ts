@@ -93,6 +93,12 @@ export interface PlantLineConfig {
    */
   machineKind?: { short: string; long: string }
   /**
+   * Etapas del área que NO están instrumentadas en Shoplogix, para ofrecerlas en
+   * la captura manual de paros. Sin esto la lista mostraba siempre las etapas
+   * del eviscerado (Bombeo, Chiller, Grader…), que en Filete no existen.
+   */
+  stagesWithoutSensor?: readonly string[]
+  /**
    * Nota de alcance del panel de KPIs (qué mide realmente el OEE de esta línea).
    * Honestidad de alcance: el OEE es de las máquinas instrumentadas, no del área.
    */
@@ -170,6 +176,9 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     shoplogixEnabled: true,
     isClassificationPlant: false,  // sin clasificación por calibre/calidad
     machineKind: { short: 'B200', long: 'Baader 200 · Línea 1 de Filete' },
+    // La GEA es la etapa grande sin integración: sus paros solo existen si
+    // alguien los registra.
+    stagesWithoutSensor: ['GEA', 'Cinta de entrada', 'Cinta de salida', 'Enzunchadora', 'Empaque filete'],
     kpiScopeNote:
       'Alcance: la Baader 200 de Línea 1 (única máquina instrumentada en Shoplogix). La GEA todavía no tiene integración y el Filete no pasa por Grader: la Calidad no aplica.',
     // FALLBACK de horarios — la VERDAD son los scheduledStart/End que emite
@@ -245,6 +254,15 @@ export function getPlantLineConfig(id?: PlantLineId | string | null): PlantLineC
 /** Planta (nivel 1) a la que pertenece una línea/área. */
 export function getPlantOf(id?: PlantLineId | string | null): PlantId {
   return getPlantLineConfig(id).plant
+}
+
+/**
+ * Etiqueta legible del área para títulos: "P. Principal · Eviscerado". Cuando
+ * `label` y `areaLabel` coinciden (Filete) no se duplica el nombre.
+ */
+export function getAreaDisplayLabel(id?: PlantLineId | string | null): string {
+  const cfg = getPlantLineConfig(id)
+  return cfg.label === cfg.areaLabel ? cfg.areaLabel : `${cfg.label} · ${cfg.areaLabel}`
 }
 
 /** Áreas (líneas) de una planta, en el orden declarado en PLANT_LINES. */

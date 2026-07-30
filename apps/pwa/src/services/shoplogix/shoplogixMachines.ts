@@ -129,6 +129,14 @@ export function machineTypeLabel(type: UpstreamMachineInfo['type'] | undefined):
 export function lineMachinesLabel(
   machines: ReadonlyArray<{ machineType?: UpstreamMachineInfo['type'] }>,
 ): string {
-  const types = new Set(machines.map(m => m.machineType).filter(Boolean))
+  // 'other'/undefined = modelo DESCONOCIDO, no un modelo distinto: ignorarlos.
+  // Importa con datos reales — los docs sincronizados antes de registrar una
+  // máquina quedan en 'other', y mezclarlos hacía que la etiqueta desapareciera
+  // (el mes de Filete tenía un doc 'other' y otro 'baader_200').
+  const types = new Set(
+    machines
+      .map(m => m.machineType)
+      .filter((t): t is UpstreamMachineInfo['type'] => !!t && t !== 'other'),
+  )
   return types.size === 1 ? machineTypeLabel([...types][0]) : ''
 }
