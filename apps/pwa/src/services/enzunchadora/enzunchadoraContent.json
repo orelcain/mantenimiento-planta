@@ -462,8 +462,9 @@
       "trigger": "Se acciona el interruptor de poder o el START y la máquina no responde.",
       "actions": [
         "Mirar la lámpara piloto: eso separa el problema en dos caminos distintos.",
-        "Si la lámpara NO enciende: revisar que haya suministro eléctrico, que el fusible no esté quemado ni desalojado, y que no haya un cable cortado o desconectado. Verificar también que el STOP no haya quedado bloqueado.",
-        "Si la lámpara SÍ enciende pero no opera: revisar contacto o falla del switch START o del STOP (puede requerir cambio de switch).",
+        "Si la lámpara NO enciende: revisar que haya suministro eléctrico, que el fusible no esté quemado ni desalojado, y que no haya un cable cortado o desconectado (manual pág. 22, causas 1 a 3).",
+        "Si la lámpara SÍ enciende pero no opera: partir por lo más simple — verificar que el switch de STOP no haya quedado bloqueado. Con el STOP bloqueado la máquina se detiene pero SIGUE energizada y el calentador mantiene su temperatura (manual pág. 5), por eso la lámpara queda encendida.",
+        "Después, en esa misma rama: revisar contacto o falla del switch START o del STOP (puede requerir cambio de switch).",
         "Revisar que ninguno de los 3 cables esté cortado o desconectado (conector incluido).",
         "Revisar la correa de los motores: floja o cortada da este síntoma; ajustar o cambiar.",
         "Si el relé de sobrecarga actuó, accionar el switch magnético para volver a operación normal."
@@ -478,28 +479,28 @@
       "possibleCauses": [
         "No hay suministro eléctrico",
         "Fusible quemado o desalojado",
-        "Cable cortado o desconectado",
-        "El switch de STOP quedó bloqueado"
+        "Cable cortado o desconectado"
       ],
-      "solution": "Revisar la fuente de alimentación eléctrica. Revisar la unidad eléctrica (fusible). Revisar el cableado. Verificar que el STOP no haya quedado bloqueado (el bloqueo del STOP es una función normal para pausas cortas, y detiene la máquina manteniendo la temperatura del calentador). Fuente: tabla de troubleshooting del manual, pág. 22, causas 1 a 4."
+      "solution": "Revisar la fuente de alimentación eléctrica. Revisar la unidad eléctrica (fusible). Revisar el cableado. Ojo: si el STOP quedó bloqueado el síntoma NO es este — la máquina se detiene pero sigue energizada y la lámpara queda ENCENDIDA (manual pág. 5); ese caso está en el diagnóstico de lámpara encendida. Fuente: tabla de troubleshooting del manual, pág. 22, causas 1 a 3."
     },
     {
       "id": "tp6-diag-piloto-enciende-no-opera",
       "title": "La lámpara piloto enciende pero la máquina no opera",
       "symptom": "Hay energía (lámpara piloto encendida) pero la máquina no ejecuta el ciclo de flejado.",
       "possibleCauses": [
+        "El switch de STOP quedó bloqueado",
         "Mal contacto o falla del switch START o del switch STOP",
         "Uno de los 3 cables cortado o desconectado",
-        "Correa de los motores floja o cortada",
-        "Dirección de enhebrado del fleje incorrecta en el portabobina"
+        "Correa de los motores floja o cortada"
       ],
-      "solution": "Cambiar el switch si tiene mal contacto o está fallado. Revisar cable o conector. Revisar y ajustar o cambiar la correa. Recargar el fleje correctamente respetando el sentido de la flecha de la brida exterior (ver el procedimiento de carga de bobina). Fuente: tabla de troubleshooting del manual, pág. 22, causas 5 a 8."
+      "solution": "Empezar por el STOP: el bloqueo del STOP es una función normal para pausas cortas y detiene la máquina manteniendo la temperatura del calentador (manual pág. 5), así que la lámpara sigue encendida — desbloquearlo. Si no es eso, cambiar el switch si tiene mal contacto o está fallado. Revisar cable o conector. Revisar y ajustar o cambiar la correa de los motores. Fuente: tabla de troubleshooting del manual, pág. 22, causas 4 a 7."
     },
     {
       "id": "tp6-diag-avance-recogida-incorrectos",
       "title": "Avance y recogida del fleje incorrectos",
       "symptom": "La máquina funciona pero el fleje avanza o se recoge de forma irregular: no llega, se salta, se sale de la pista o queda mal posicionado.",
       "possibleCauses": [
+        "Dirección de enhebrado del fleje incorrecta en el portabobina",
         "Carga del fleje incorrecta (fleje torcido en la zona de carga)",
         "El fleje se mete entre la bobina y la brida del portabobina",
         "Cantidad de fleje insuficiente o excesiva en el acumulador",
@@ -512,7 +513,7 @@
         "La mordaza de tensión no vuelve a su posición original",
         "Valor del Timer T2 demasiado pequeño"
       ],
-      "solution": "Verificar si el fleje está torcido en la zona de carga y recargarlo. Ajustar la cantidad de fleje acumulado (tornillo del acumulador: antihorario si falta, horario si sobra). Revisar y limpiar la unidad de alimentación. Ajustar el resorte de tensión de la cuchilla o cambiar la cuchilla si la punta sale partida. Ajustar o cambiar el resorte del brazo de tensión del freno. Ajustar el mecanismo F/R si el fleje se sale de la pista. Cortar la parte dañada del fleje o cambiar el rollo. Reubicar el paquete en el CENTRO del cabezal de sellado. Cambiar o reinstalar el resorte de la mordaza de tensión. Ajustar el Timer T2. Fuente: tabla de troubleshooting del manual, pág. 22, causas 9 a 19."
+      "solution": "Recargar el fleje respetando el sentido de enhebrado en el portabobina (ver el procedimiento de carga de bobina, manual P5). Verificar si el fleje está torcido en la zona de carga y recargarlo. Ajustar la cantidad de fleje acumulado (tornillo del acumulador: antihorario si falta, horario si sobra). Revisar y limpiar la unidad de alimentación. Ajustar el resorte de tensión de la cuchilla o cambiar la cuchilla si la punta sale partida. Ajustar o cambiar el resorte del brazo de tensión del freno. Ajustar el mecanismo F/R si el fleje se sale de la pista. Cortar la parte dañada del fleje o cambiar el rollo. Reubicar el paquete en el CENTRO del cabezal de sellado. Cambiar o reinstalar el resorte de la mordaza de tensión. Ajustar el Timer T2. Fuente: tabla de troubleshooting del manual, pág. 22, causas 8 a 19."
     },
     {
       "id": "tp6-diag-fleje-sin-sellar",

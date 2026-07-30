@@ -19,6 +19,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Enzunchadora: reubica 2 causas de troubleshooting (PR pendiente de numero, 1a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 2 hallazgos MEDIOS de la Enzunchadora TP-6000 — causas asignadas a la fila equivocada de la tabla de Troubleshooting (manual pag. 22 / PDF pag. 28).
+- Hecho: (1) "STOP bloqueado" pasa de la fila "piloto no enciende" a "piloto enciende, no opera" (con STOP bloqueado la maquina sigue energizada, pag. 5); (2) "enhebrado incorrecto en portabobina" pasa de "piloto enciende, no opera" a "avance/recogida incorrectos". Las 5 entradas de diagnostico ahora cubren las 26 causas del manual sin solapes ni huecos (3+4+12+4+3=26).
+- Archivos: `apps/pwa/src/services/enzunchadora/enzunchadoraContent.json`.
+- Verificacion: tsc limpio, 773 tests verdes (5 skipped), verificacion en navegador (`/aprendizaje/maquina/enzunchadora-n2`) en ambos temas, consola limpia.
+- Estado: HECHO. Sigue: quedan ~42 hallazgos MEDIOS de la auditoria sin tocar (esta fue la 1a tanda, 2 de 43).
+
 ## 2026-07-30 - claude - Corrige 9 criticos de la auditoria de contenido (PR #301, MERGED)
 
 - Contexto: la auditoria de contenido (workflow `verificar-contenido-fichas`, 26 agentes) encontro 9 errores criticos en fichas de Centro de Aprendizaje, uno de seguridad (Marel HG). Cada correccion cita la pagina del manual fuente.
