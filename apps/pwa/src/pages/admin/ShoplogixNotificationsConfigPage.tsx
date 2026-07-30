@@ -205,6 +205,25 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
             />
             <span className="text-sm text-muted-foreground">minutos después del fin (deja aterrizar el último sync)</span>
           </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor={`endmin-${plantSlug}`} className="text-sm whitespace-nowrap">
+              Solo si hubo
+            </Label>
+            <Input
+              id={`endmin-${plantSlug}`}
+              type="number"
+              min={0}
+              max={100000}
+              step={50}
+              className="w-24 h-8 text-sm"
+              value={config.shiftEnd.minPieces ?? 50}
+              onChange={(e) => patch('shiftEnd', { minPieces: Math.max(0, parseInt(e.target.value) || 0) })}
+              disabled={!config.shiftEnd.enabled}
+            />
+            <span className="text-sm text-muted-foreground">
+              piezas o más (bajo eso fue un lote de prueba, no un turno)
+            </span>
+          </div>
         </CardContent>
       </Card>
 
