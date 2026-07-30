@@ -73,10 +73,10 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
   },
   'fk-manual-compuertas-celdas': {
     objetivo: 'Entender la combinatoria: cada compuerta pesa en una celda con rango definido, el algoritmo suma las que caen en el objetivo, y el sobrepeso mide cuánto se pasa la caja.',
-    porque: 'una celda fuera de rango o sucia degrada la combinatoria y sube el sobrepeso/rechazo; ahí está el mayor apalancamiento de Mantención sobre el rendimiento.',
+    porque: 'el sobrepeso rara vez viene de una compuerta "sucia": viene de calibres recortados, del algoritmo elegido o de la zona de pesaje desajustada (pernos de celda flojos, soportes sueltos, bajada lateral topando). Ahí está el mayor apalancamiento de Mantención, y es todo trabajo semanal y medible.',
     quiz: [
       { question: '¿Qué mide el sobrepeso?', options: ['El peso total del turno', 'Cuánto se pasa la caja del peso objetivo (menor = mejor)', 'El número de compuertas', 'La velocidad'], correctIndex: 1, explanation: 'El sobrepeso (y su %) mide cuánto se pasa la caja del peso objetivo; cuanto menor, mejor rendimiento.' },
-      { question: 'Una compuerta con celda sucia o fuera de rango, ¿qué efecto tiene?', options: ['Ninguno', 'Degrada la combinatoria y sube el sobrepeso/rechazo', 'Mejora el rendimiento', 'Solo afecta esa caja'], correctIndex: 1, explanation: 'Una celda fuera de rango o sucia degrada la combinatoria y sube el sobrepeso y el rechazo.' },
+      { question: 'Sube el sobrepeso. ¿Conviene deshabilitar una compuerta que pesa bien?', options: ['Sí, siempre baja el sobrepeso', 'No: con menos piezas para combinar el sobrepeso SUBE', 'Da lo mismo', 'Solo si es la compuerta 1'], correctIndex: 1, explanation: 'Deshabilitar una compuerta sana reduce el pool de piezas para la combinatoria, así que el sobrepeso sube en vez de bajar (E-Pack S28, págs 3 y 33). La causa más frecuente de sobrepeso son los calibres recortados, que se atacan con Distinto Calibre.' },
     ],
   },
 }
