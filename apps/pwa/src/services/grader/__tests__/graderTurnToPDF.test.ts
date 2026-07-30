@@ -236,6 +236,8 @@ describe('exportTurnToPDF — smoke (M17)', () => {
     shiftId: 'Turno día',
     lineThroughputActual: 400,
     lineThroughputExpected: 500,
+    lineWindowHours: 8,
+    lineWindowSource: 'effective' as const,
     lineAvailability: 0.72,
     machinesProducing: 2,
     machines: [

@@ -22,6 +22,10 @@ export interface ShoplogixProductionInterval {
   total: number;               // acumulado real
   expectedTotal: number;       // acumulado esperado
   totalDuration: number;       // ms (300000 = 5 min)
+  /** Inicio del intervalo ("20260728T120000.000"). Lo manda la API real. */
+  start?: ShoplogixTimestamp;
+  /** Turno al que Shoplogix atribuye el intervalo ("Turno Dia", "Unscheduled"). */
+  shift?: string;
   /** Velocidad del intervalo según Shoplogix. No viene en todos los intervalos. */
   rate?: number;
   /** Piezas dentro del uptime / dentro del turno programado. Opcionales igual que `rate`. */
@@ -283,6 +287,16 @@ export interface UpstreamLineSnapshot {
   // KPIs de la línea (suma/promedio de las 3)
   lineThroughputActual: number;     // cycles/hora promedio
   lineThroughputExpected: number;
+  /**
+   * Horas usadas como denominador del throughput y de dónde salen:
+   *   'effective' = de la primera a la última pieza (ventana real de operación)
+   *   'shift'     = la ventana del turno (fallback si no hubo producción)
+   * Importa cuando el turno no está acotado en Shoplogix: en Filete el turno
+   * "Turno Dia" abarca 24 h, así que dividir por la ventana del turno daba
+   * 2 pz/h para un turno que realmente corrió 6,25 h.
+   */
+  lineWindowHours: number;
+  lineWindowSource: 'effective' | 'shift';
   lineAvailability: number;         // promedio actualRuntime (0..1)
   machinesProducing: number;        // cuántas de las 3 están actualmente en Uptime
 }

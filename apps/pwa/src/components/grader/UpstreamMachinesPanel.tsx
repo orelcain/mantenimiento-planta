@@ -47,6 +47,7 @@ import ReactECharts from 'echarts-for-react'
 import { animate, stagger } from 'animejs'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { machineTypeLabel, lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -861,9 +862,11 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
           <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="font-medium text-sm truncate">{shift.machineName}</span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
-            Baader 142
-          </Badge>
+          {machineTypeLabel(shift.machineType) && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
+              {machineTypeLabel(shift.machineType)}
+            </Badge>
+          )}
           {microAlert && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-900/70 bg-amber-950/50 text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
               <AlertTriangle className="w-3 h-3" /> Atención
@@ -1226,6 +1229,10 @@ export function UpstreamMachinesPanel({
 
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
 
+  // Modelo de las máquinas del turno, derivado de los datos: en Filete la
+  // máquina es una Baader 200 y el header decía "Baader 142" igual.
+  const lineLabel = snapshot ? lineMachinesLabel(snapshot.machines) : ''
+
   const toggleMachine = (id: string) => {
     setExpandedMachines(prev => {
       const next = new Set(prev)
@@ -1255,8 +1262,10 @@ export function UpstreamMachinesPanel({
                 badges al lado. La denominación "Evisceradoras" es redundante:
                 un Baader 142 es ya implícitamente una evisceradora. */}
             <span className="font-medium text-sm truncate text-left">
-              <span className="hidden sm:inline">Línea upstream Baader 142</span>
-              <span className="sm:hidden">Línea Baader 142</span>
+              <span className="hidden sm:inline">
+                {lineLabel ? `Línea upstream ${lineLabel}` : 'Línea upstream'}
+              </span>
+              <span className="sm:hidden">{lineLabel ? `Línea ${lineLabel}` : 'Línea'}</span>
             </span>
             {snapshot && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400 shrink-0">

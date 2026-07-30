@@ -87,6 +87,8 @@ function mkSnap(shifts: UpstreamMachineShift[]): UpstreamLineSnapshot {
     machines: shifts,
     lineThroughputActual: 0,
     lineThroughputExpected: 0,
+    lineWindowHours: 8,
+    lineWindowSource: 'effective' as const,
     lineAvailability: 0,
     machinesProducing: 0,
   }
