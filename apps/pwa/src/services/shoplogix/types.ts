@@ -22,6 +22,13 @@ export interface ShoplogixProductionInterval {
   total: number;               // acumulado real
   expectedTotal: number;       // acumulado esperado
   totalDuration: number;       // ms (300000 = 5 min)
+  /** Velocidad del intervalo según Shoplogix. No viene en todos los intervalos. */
+  rate?: number;
+  /** Piezas dentro del uptime / dentro del turno programado. Opcionales igual que `rate`. */
+  uptimeCycles?: number;
+  scheduledCycles?: number;
+  /** Rechazo por causa. Nunca observado poblado — ver aggregateScrapReasons en el sync. */
+  scrapReasons?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -123,6 +130,12 @@ export interface UpstreamProductionInterval {
   expectedTotal: number;
   ratio: number;               // cycles / expectedCycles (0..1+)
   color: 'green' | 'yellow' | 'red' | 'gray';  // según threshold
+  /**
+   * Velocidad del intervalo calculada por Shoplogix (misma cifra que ve el
+   * operador en el whiteboard). null en docs viejos (sourceVersion < 4) o
+   * cuando el sensor no la reporta — nunca 0, que significaría "parada".
+   */
+  rate: number | null;
 }
 
 /** Estado/paro en timeline Gantt. */
@@ -193,6 +206,21 @@ export interface UpstreamMachineShift {
   actualRuntime: number;
   expectedRuntime: number;
   runtimeVariance: number;
+  /**
+   * Piezas contadas por el sensor DENTRO del uptime y DENTRO del turno
+   * programado. Permiten un Rendimiento honesto (contra el tiempo que la
+   * máquina realmente corrió vs contra el turno completo). 0 en docs con
+   * sourceVersion < 4.
+   */
+  uptimeCycles?: number;
+  scheduledCycles?: number;
+  /**
+   * Rechazo reportado por el sensor, agregado por causa. En Filete es la única
+   * fuente posible de CALIDAD (no hay Grader). Lista vacía = sin rechazo
+   * reportado; ⚠ nunca se ha visto poblado, validar con un turno real.
+   */
+  scrapByReason?: Array<{ reason: string; qty: number }>;
+  scrapTotal?: number;
   /**
    * % del turno en estado Uptime, calculado por nosotros desde los states:
    *   Σ duración(state.type === 'uptime') / (shiftEnd − shiftStart)

@@ -154,6 +154,9 @@ function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
     expectedTotal:  Number(raw.expectedTotal ?? 0),
     ratio:          Number(raw.ratio ?? 0),
     color:          (raw.color as UpstreamProductionInterval['color']) ?? 'gray',
+    // Docs anteriores a sourceVersion 4 no tienen `rate`: null, no 0 (0 sería
+    // "la máquina estuvo parada", que es una afirmación distinta a "no sé").
+    rate:           Number.isFinite(Number(raw.rate)) ? Number(raw.rate) : null,
   }
 }
 
@@ -392,6 +395,15 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     intervals,
     states,
     threshold:           Number(raw.threshold ?? 15),
+    uptimeCycles:        Number(raw.uptimeCycles ?? 0),
+    scheduledCycles:     Number(raw.scheduledCycles ?? 0),
+    scrapByReason:       Array.isArray(raw.scrapByReason)
+      ? (raw.scrapByReason as FirestoreData[]).map(x => ({
+          reason: String(x.reason ?? ''),
+          qty:    Number(x.qty ?? 0),
+        }))
+      : [],
+    scrapTotal:          Number(raw.scrapTotal ?? 0),
     productionUnit:      String(raw.productionUnit ?? ''),
     comments:            Array.isArray(raw.comments)
       ? raw.comments
