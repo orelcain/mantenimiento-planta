@@ -19,6 +19,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Corrige 9 criticos de la auditoria de contenido (PR #301, MERGED)
+
+- Contexto: la auditoria de contenido (workflow `verificar-contenido-fichas`, 26 agentes) encontro 9 errores criticos en fichas de Centro de Aprendizaje, uno de seguridad (Marel HG). Cada correccion cita la pagina del manual fuente.
+- Hecho: (1) Marel HG - paso 1 de seguridad (cortar energia/aire) antes de activar flippers manualmente; (2) Baader 200 - "4.8+30" (numero de diapositiva pegado) corregido a 4,8 mm; (3) Baader 200 - los 12 mm de "Medidas de Cuchillos" no eran la abertura "b" de Cuchillos Dorsales (real: 5/4/7 mm por especie); (4)-(5) Grader - comandos de capacho/flipper en rangos continuos que se solapaban (tipear 141 activaba el flipper 5 en vez del capacho), corregidos a 3 grupos reales cada uno, quiz ampliado 2→4 preguntas; (6) Detector de Metales - W0001 describia la W0003, separadas las 3 alarmas; (7)-(8) Fishken - calibracion de compuertas incompleta + pantalla equivocada ("Ajuste de puertas" en vez de "Calibracion"); (9) Baader 142 - lubricacion agregada a limpieza diaria/mantenimiento (era solo semanal, el manual la exige cada 8 h).
+- Hallazgo de proceso: el Baader 200 lee su contenido de Firestore (`baader200-sections`, 23 docs) en produccion, no del `.ts` (solo fallback) - se corrigio tambien ahi con snapshot previo.
+- Archivos: `apps/pwa/src/services/{marelHg/marelHgContent.json,baader200Learning.ts,graderLearning.ts,detectorMetales/detectorMetalesContent.json,fishken/fishkenContent.json,baader142/baader142Content.json}`, `apps/pwa/src/data/learningQuickRef.ts`, `.claude/workflows/verificar-contenido-fichas.js`.
+- Verificacion: tsc limpio, 761 tests verdes, verificacion en navegador (DOM real) de las 5 fichas afectadas, Baader 200 re-verificado tras el fix de Firestore, movil 375px sin scroll horizontal, consola limpia.
+- Estado: HECHO. Sigue: ~36 hallazgos MEDIOS del informe sin tocar; 2 preguntas de planta abiertas (detector Vistus/IQ4, Marel Filete SmartLine/M-Weigher); capacho 3 del Grader transcrito "130" tal cual (probable errata) marcado para verificar en maquina.
+
 ## 2026-07-30 - claude - Grafico de pz/min: barras por tramo + eje acotado a la operacion real
 
 - Contexto: Orel mando una captura del grafico en produccion. Dos problemas visibles: el eje cubria 24 h (08:00→08:00) para un turno que produjo 6 h, y el objetivo aparecia como rayitas flotantes sueltas.
