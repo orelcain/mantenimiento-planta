@@ -4299,7 +4299,7 @@ async function ariaDataGrader() {
 
 // ---- produccion: turno EN VIVO desde Shoplogix (paridad con la PWA) ----
 // Lee shoplogix/{plant}/shifts/{dk}_{shiftId}/machines (Admin SDK) y reporta
-// piezas (=ciclos), estado/uptime por Baader, averías y causas de detención.
+// piezas (=ciclos), estado/uptime por máquina, averías y causas de detención.
 // Réplica server-side de los tools shift.live/shift.stops de la PWA.
 const SLX_CANDS = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
 const SLX_MAINT_EXCLUDED = new Set(['FALTA MMPP', 'CONTRASTACION', 'CAMBIO LOTE/MMPP', 'AJUSTE OPERADOR'])
@@ -4589,7 +4589,7 @@ const ARIA_ROUTER_SPEC =
   '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
   '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
   '- "historial": historial/bitácora de intervenciones de mantención (inspecciones, capturas rápidas) — término opcional en "consulta" (equipo, área, técnico)\n' +
-  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina Baader, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá la planta en "consulta" (yal/chonchi).\n' +
+  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá el área en "consulta" (yal / chonchi / filete).\n' +
   '- "grader": resumen de los últimos turnos CERRADOS del Grader (Excel: piezas, peso, compuertas, P0%, microdetenciones). Para el turno EN CURSO usá "produccion", no "grader".\n' +
   '- "gantt": tareas planificadas del Gantt (abiertas, atrasadas, próximas a vencer) — "consulta" SOLO si nombran un proyecto/responsable/equipo específico; NO pongas palabras de estado como "atrasadas" o "pendientes"\n' +
   '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
@@ -7031,7 +7031,7 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
 
 
 // ── Sistema de notificaciones Shoplogix ───────────────────────────────────────
-// Detecta primera pieza por Baader, hitos de piezas, detenciones y retrasos de
+// Detecta primera pieza por máquina, hitos de piezas, detenciones y retrasos de
 // inicio de turno. Configurable por planta desde Panel Admin.
 // Colecciones:
 //   notificationConfig/{plantSlug}      — config por planta
@@ -7051,38 +7051,68 @@ const SHOPLOGIX_PLANT_LINE_ID = {
   filete:  'chonchi-filete',
 }
 
-const SHOPLOGIX_NOTIF_DEFAULTS = {
-  // telegramDest: 'bot' = solo DM del admin con @antarfood_mant_bot (rodaje),
-  // 'grupo' = grupo Telegram (topic General), 'ambos' = los dos.
-  channels:      { push: true, telegram: false, telegramDest: 'bot' },
-  shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
-  // Brief de FIN de turno (piezas por Baader, total vs target, uptime, paros,
-  // calidad Grader). delayMinutes = margen tras el fin para que el último sync
-  // (cada 5 min) alcance a dejar la data completa antes de redactar.
-  shiftEnd:      { enabled: true, delayMinutes: 10 },
-  firstPiece:    { enabled: true },
-  pieceInterval: { enabled: false, every: 1000 },
-  // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es
-  // ruido operacional (y las "Micro Detencion" tienen su propio toggle aparte).
-  events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false },
-}
+// Config de notificaciones por planta (defaults + overrides por línea +
+// Firestore). Vive en su propio módulo para poder testear la resolución.
+const notifConfigMod = require('./shoplogix/notifConfig')
+const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 async function getShoplogixNotifConfig(plantSlug) {
   try {
     const snap = await db.collection('notificationConfig').doc(plantSlug).get()
-    if (!snap.exists) return SHOPLOGIX_NOTIF_DEFAULTS
-    const d = snap.data()
-    return {
-      channels:      { ...SHOPLOGIX_NOTIF_DEFAULTS.channels,      ...(d.channels      || {}) },
-      shiftStart:    { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftStart,    ...(d.shiftStart    || {}) },
-      shiftEnd:      { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftEnd,      ...(d.shiftEnd      || {}) },
-      firstPiece:    { ...SHOPLOGIX_NOTIF_DEFAULTS.firstPiece,    ...(d.firstPiece    || {}) },
-      pieceInterval: { ...SHOPLOGIX_NOTIF_DEFAULTS.pieceInterval, ...(d.pieceInterval || {}) },
-      events:        { ...SHOPLOGIX_NOTIF_DEFAULTS.events,        ...(d.events        || {}) },
-    }
+    return notifConfigMod.resolveNotifConfig(plantSlug, snap.exists ? snap.data() : null)
   } catch (e) {
     logger.error('[shoplogix-notif] getShoplogixNotifConfig error', e)
-    return SHOPLOGIX_NOTIF_DEFAULTS
+    return notifConfigMod.resolveNotifConfig(plantSlug, null)
+  }
+}
+
+/**
+ * Cuenta los paros que el sensor midió y todavía no tienen causa anotada.
+ *
+ * Las causas viven en `paros` con `origen: 'shoplogix'` y doc id determinístico
+ * `slx__{plantSlug}__{dateKey}__{shiftId}__{machineid}__{startMs}` (ver
+ * `sensorStopKey` en la PWA). Acá se reconstruye ese id para cada paro del turno
+ * y se mira cuáles faltan.
+ *
+ * Ante cualquier error devuelve null: el brief se manda igual sin esta línea.
+ */
+async function contarParosSinCausa({ plant, dateKey, shiftId, machines, stoppageMinMinutes }) {
+  try {
+    const lineaId = SHOPLOGIX_PLANT_LINE_ID[plant]
+    if (!lineaId) return null
+
+    const minSec = Math.max(0, (stoppageMinMinutes ?? 3) * 60)
+    const shiftKey = String(shiftId).replace(/[^\w-]+/g, '-')
+    const esperados = []
+    for (const m of machines || []) {
+      for (const st of m.states || []) {
+        if (st?.type !== 'downtime' && st?.type !== 'setup') continue
+        if ((st.durationSec || 0) < minSec) continue
+        const startMs = st.startAt?.toDate?.()?.getTime?.() ?? new Date(st.startAt).getTime()
+        if (!Number.isFinite(startMs)) continue
+        esperados.push({
+          key: `slx__${plant}__${dateKey}__${shiftKey}__${m.machineid || m.machineId || ''}__${startMs}`,
+          minutes: (st.durationSec || 0) / 60,
+        })
+      }
+    }
+    if (esperados.length === 0) return { count: 0, minutes: 0 }
+
+    const snap = await db.collection('paros')
+      .where('plantLineId', '==', lineaId)
+      .where('shiftId', '==', shiftId)
+      .get()
+    const anotados = new Set()
+    snap.forEach((d) => { const k = d.data()?.stopKey; if (k) anotados.add(k) })
+
+    const faltan = esperados.filter((e) => !anotados.has(e.key))
+    return {
+      count: faltan.length,
+      minutes: Math.round(faltan.reduce((a, e) => a + e.minutes, 0)),
+    }
+  } catch (e) {
+    logger.warn('[checkShiftEndBriefs] no se pudieron contar los paros sin causa:', e.message)
+    return null
   }
 }
 
@@ -7421,7 +7451,7 @@ exports.checkShiftStartDelays = onSchedule(
 )
 
 // ── checkShiftEndBriefs ───────────────────────────────────────────────────────
-// Cron cada 5 minutos. Brief de FIN de turno a Telegram/push: piezas por Baader,
+// Cron cada 5 minutos. Brief de FIN de turno a Telegram/push: piezas por máquina,
 // total vs target oficial, uptime, paros y calidad Grader si hay Excel.
 //
 // Diseño SIN colección de checks (a diferencia del delay-check de inicio): el
@@ -7505,6 +7535,9 @@ exports.checkShiftEndBriefs = onSchedule(
             const machines = machinesSnap.docs.map((m) => {
               const x = m.data()
               return {
+                // machineid hace falta para reconstruir la clave de la anotación
+                // de causa de cada paro (ver contarParosSinCausa).
+                machineid: x.machineid || m.id,
                 machineName: x.machineName || m.id,
                 totalCycles: x.totalCycles || 0,
                 shiftRuntime: x.shiftRuntime || 0,
@@ -7512,10 +7545,14 @@ exports.checkShiftEndBriefs = onSchedule(
               }
             }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
 
-            // Turnos sin producción real (bucket de ruido): marcar y no molestar.
+            // Turnos sin producción real (bucket de ruido o lote de prueba):
+            // marcar y no molestar. El umbral es POR PLANTA — 50 piezas es nada
+            // en el eviscerado pero es un lote de prueba entero en Filete (caso
+            // real 2026-07-28: 59 piezas dispararon un brief).
             const total = machines.reduce((a, m) => a + m.totalCycles, 0)
-            if (total < 50) {
-              logger.info('[checkShiftEndBriefs] turno sin producción — sin brief', { plant, doc: docSnap.id, total })
+            const minPieces = config.shiftEnd?.minPieces ?? 50
+            if (total < minPieces) {
+              logger.info('[checkShiftEndBriefs] turno sin producción — sin brief', { plant, doc: docSnap.id, total, minPieces })
               continue
             }
 
@@ -7547,6 +7584,22 @@ exports.checkShiftEndBriefs = onSchedule(
             const realSchedule = data.scheduledStart?.toDate?.() && data.scheduledEnd?.toDate?.()
               ? { start: data.scheduledStart.toDate(), end: data.scheduledEnd.toDate() }
               : null
+            // Ventana de la primera a la última pieza. En líneas cuyo turno no
+            // está acotado en Shoplogix (Filete: "Turno Dia" = 24 h) es la única
+            // que informa algo; el composer decide cuál mostrar.
+            const effectiveSchedule = data.effectiveStart?.toDate?.() && data.effectiveEnd?.toDate?.()
+              ? { start: data.effectiveStart.toDate(), end: data.effectiveEnd.toDate() }
+              : null
+
+            // Paros que el sensor midió y siguen sin causa anotada. El brief es
+            // el momento en que alguien todavía se acuerda de lo que pasó.
+            const stopsWithoutCause = await contarParosSinCausa({
+              plant,
+              dateKey: data.dateKey ?? dk,
+              shiftId,
+              machines,
+              stoppageMinMinutes: config.events?.stoppageMinMinutes ?? 3,
+            })
             const msg = turnoBriefMod.componerBriefFinTurno({
               plantLabel,
               shiftId,
@@ -7556,6 +7609,8 @@ exports.checkShiftEndBriefs = onSchedule(
               currentJob: data.currentJob ?? null,
               grader,
               realSchedule,
+              effectiveSchedule,
+              stopsWithoutCause,
             })
             const eligibleIds = await getShoplogixEligibleUsers(plant)
             await dispatchShoplogixNotif(
