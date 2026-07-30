@@ -1239,6 +1239,18 @@ export function UpstreamMachinesPanel({
 
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
 
+  /**
+   * Rango que está dibujando el eje, en texto ("09:56–16:11"). Se muestra en el
+   * chip para que se entienda qué recorta el botón sin abrir el tooltip.
+   */
+  const axisRangeLabel = useMemo(() => {
+    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return ''
+    const a = new Date(shiftWindow.startAt).getTime()
+    const b = new Date(shiftWindow.endAt).getTime()
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return ''
+    return `${fmtTime(a)}–${fmtTime(b)}`
+  }, [shiftWindow])
+
   // Modelo de las máquinas del turno, derivado de los datos: en Filete la
   // máquina es una Baader 200 y el header decía "Baader 142" igual.
   const lineLabel = snapshot ? lineMachinesLabel(snapshot.machines) : ''
@@ -1300,9 +1312,16 @@ export function UpstreamMachinesPanel({
             <button
               type="button"
               onClick={onToggleFraming}
-              title={framedOnProduction
-                ? 'El eje muestra solo las horas con producción. Click para ver el turno completo.'
-                : 'El eje muestra el turno completo. Click para acotarlo a las horas con producción.'}
+              title={
+                `Qué rango de tiempo dibujan el Gantt y el gráfico de tasa (comparten eje).
+
+` +
+                (framedOnProduction
+                  ? `Ahora: SOLO las horas con producción${axisRangeLabel ? ` (${axisRangeLabel})` : ''}. ` +
+                    `Click para ver el turno completo, incluidas las horas sin proceso.`
+                  : `Ahora: el turno completo${axisRangeLabel ? ` (${axisRangeLabel})` : ''}, con horas sin proceso incluidas. ` +
+                    `Click para acotarlo a las horas con producción.`)
+              }
               className={cn(
                 'text-[10px] px-1.5 py-0.5 rounded border shrink-0 transition-colors',
                 framedOnProduction
@@ -1310,7 +1329,12 @@ export function UpstreamMachinesPanel({
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
-              {framedOnProduction ? 'operación real' : 'turno completo'}
+              {/* La etiqueta dice QUÉ está mostrando el eje, no un nombre abstracto:
+                  "operación real" no se entendía sin abrir el tooltip. */}
+              eje: {framedOnProduction ? 'solo con proceso' : 'turno completo'}
+              {axisRangeLabel && (
+                <span className="hidden md:inline text-muted-foreground/80"> · {axisRangeLabel}</span>
+              )}
             </button>
           )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground ml-auto flex-wrap justify-end">

@@ -28,6 +28,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Verificacion: tsc limpio, 761 tests verdes, verificacion en navegador (DOM real) de las 5 fichas afectadas, Baader 200 re-verificado tras el fix de Firestore, movil 375px sin scroll horizontal, consola limpia.
 - Estado: HECHO. Sigue: ~36 hallazgos MEDIOS del informe sin tocar; 2 preguntas de planta abiertas (detector Vistus/IQ4, Marel Filete SmartLine/M-Weigher); capacho 3 del Grader transcrito "130" tal cual (probable errata) marcado para verificar en maquina.
 
+## 2026-07-30 - claude - Arregla el toggle de brecha (merge de ECharts) + chip de eje autoexplicativo
+
+- Contexto: Orel probo en Filete y reporto dos cosas — "ocultar brecha no funciona" y "el boton operacion real no se que hace".
+- Causa raiz del toggle: `setOption` de ECharts MERGEA por defecto, asi que sacar la serie de brecha del array NO la borra del grafico. Prender funcionaba, apagar no. Fix: la serie existe SIEMPRE en modo barras y lo que cambia son los DATOS (`gapSeriesData` devuelve todos null cuando esta apagada) — el merge si reemplaza datos. Ademas el `stack` de la barra real queda FIJO en vez de alternar entre undefined y un id, que dejaba al merge con una config a medias.
+- Chip del eje: la etiqueta era "operacion real / turno completo", que no dice que recorta ni sobre que. Ahora dice **"eje: solo con proceso · 09:45–16:25"** vs **"eje: turno completo · 08:00–08:00"** — el rango visible va en el propio chip (desktop) y el tooltip aclara que el Gantt y el grafico comparten ese eje.
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`.
+- Verificacion: 780 tests verdes (4 nuevos de `gapSeriesData`, incluido "apagada = mismos puntos en null" y "nunca negativa"), tsc y eslint limpios. En el navegador el chip alterna y el RANGO cambia de verdad: 08:00–08:00 ↔ 09:45–16:25 (evidencia del efecto, no solo del texto).
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel confirma que la brecha ahora se apaga. El sabado, Filete con 5.000 pz.
+
 ## 2026-07-30 - claude - Grafico de pz/min: el encoding depende de la linea (barras 1 maq / lineas 2+)
 
 - Contexto: Orel reviso el grafico en Yal (turno de anoche, 3 Baader) y lo llamo "muy sucio". Tenia razon: 3 series x ~100 tramos son barras de 1-2 px pegadas — una reja. Las barras resolvian Filete (1 maquina, 14 tramos sueltos) y arruinaban Yal.
