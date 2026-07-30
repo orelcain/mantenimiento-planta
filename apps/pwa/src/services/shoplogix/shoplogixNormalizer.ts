@@ -61,6 +61,7 @@ export function normalizeInterval(
     total: raw.total,
     expectedTotal: raw.expectedTotal,
     ratio,
+    rate: typeof raw.rate === 'number' ? raw.rate : null,
     color: colorFromRatio(ratio, hadExpected, threshold),
   };
 }
@@ -284,13 +285,31 @@ export function buildLineSnapshot(params: {
   const totalCycles = machines.reduce((a, m) => a + m.totalCycles, 0);
   const expectedCycles = machines.reduce((a, m) => a + m.expectedTotalCycles, 0);
 
-  // Throughput promedio (cycles/hora) sobre la duración de turno
+  // Throughput promedio (cycles/hora) sobre la ventana REAL de operación:
+  // de la primera a la última pieza del turno. Antes se dividía por la ventana
+  // del turno, lo que asume que el turno está acotado en Shoplogix. En Filete
+  // no lo está ("Turno Dia" abarca 24 h) y el resultado era 2 pz/h para un
+  // turno que corrió 6,25 h. En Eviscerado ambas ventanas casi coinciden, así
+  // que sus números no se mueven.
+  let firstMs = Infinity, lastMs = -Infinity;
+  for (const m of machines) {
+    for (const iv of m.intervals) {
+      if ((iv.cycles ?? 0) <= 0) continue;
+      firstMs = Math.min(firstMs, iv.startAt.getTime());
+      lastMs  = Math.max(lastMs,  iv.endAt.getTime());
+    }
+  }
+  const effectiveHours = Number.isFinite(firstMs) && lastMs > firstMs
+    ? (lastMs - firstMs) / (3600 * 1000)
+    : 0;
   const shiftDurationHours = machines[0]
     ? (machines[0].shiftEnd.getTime() - machines[0].shiftStart.getTime()) / (3600 * 1000)
     : 0;
+  const lineWindowSource: UpstreamLineSnapshot['lineWindowSource'] = effectiveHours > 0 ? 'effective' : 'shift';
+  const lineWindowHours = effectiveHours > 0 ? effectiveHours : shiftDurationHours;
 
-  const lineThroughputActual   = shiftDurationHours > 0 ? totalCycles / shiftDurationHours : 0;
-  const lineThroughputExpected = shiftDurationHours > 0 ? expectedCycles / shiftDurationHours : 0;
+  const lineThroughputActual   = lineWindowHours > 0 ? totalCycles / lineWindowHours : 0;
+  const lineThroughputExpected = lineWindowHours > 0 ? expectedCycles / lineWindowHours : 0;
 
   // Promedio del shiftRuntime real (no el `actualRuntime` opaco de Shoplogix).
   const lineAvailability = machines.length > 0
@@ -308,6 +327,8 @@ export function buildLineSnapshot(params: {
     machines,
     lineThroughputActual,
     lineThroughputExpected,
+    lineWindowHours,
+    lineWindowSource,
     lineAvailability,
     machinesProducing,
   };

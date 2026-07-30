@@ -39,9 +39,11 @@ function makeIntervals(
     return {
       startAt, endAt,
       cycles, expectedCycles: expected,
+      rate: null,  // dato sintético: el sensor no participa en el modo demo
       total: cycles * (i + 1),
       expectedTotal: expected * (i + 1),
-      ratio, color,
+      ratio,
+      color,
     };
   });
 }
@@ -150,6 +152,8 @@ export function buildDemoLineSnapshot(): UpstreamLineSnapshot {
     machines,
     lineThroughputActual:   durationH > 0 ? totalCycles / durationH : 0,
     lineThroughputExpected: durationH > 0 ? expected    / durationH : 0,
+    lineWindowHours: durationH,
+    lineWindowSource: 'shift' as const,
     lineAvailability:       machines.reduce((a, m) => a + m.shiftRuntime, 0) / machines.length,
     machinesProducing:      0,
   };

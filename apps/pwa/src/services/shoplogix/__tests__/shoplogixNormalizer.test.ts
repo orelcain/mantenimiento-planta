@@ -405,15 +405,44 @@ describe('buildLineSnapshot', () => {
     });
 
     expect(snap.machines).toHaveLength(3);
-    // shiftDuration = shiftEnd - shiftStart = 9h15m = 9.25h (09:00 → 18:15)
-    // totalCycles = 3000; throughput = 3000 / 9.25
-    expect(snap.lineThroughputActual).toBeCloseTo(3000 / 9.25, 1);
-    expect(snap.lineThroughputExpected).toBeCloseTo(3600 / 9.25, 1);
+    // El throughput se mide sobre la ventana REAL de operación (primera →
+    // última pieza), no sobre la ventana del turno: acá hay un único intervalo
+    // de 1 h con producción, así que 3000 piezas / 1 h.
+    expect(snap.lineWindowSource).toBe('effective');
+    expect(snap.lineWindowHours).toBeCloseTo(1, 2);
+    expect(snap.lineThroughputActual).toBeCloseTo(3000, 1);
+    expect(snap.lineThroughputExpected).toBeCloseTo(3600, 1);
     // lineAvailability ahora promedia `shiftRuntime` (calculado desde states),
     // no el `actualRuntime` opaco de Shoplogix. Las máquinas del test no tienen
     // states, por lo que el shiftRuntime resultante es 0.
     expect(snap.lineAvailability).toBe(0);
     expect(snap.machinesProducing).toBe(0);   // ningún state marcado como current
+  });
+
+  it('turno sin acotar (Filete): mide el ritmo sobre las horas reales, no sobre las 24 h', () => {
+    // Caso real 2026-07-28: el área Filete no tiene el turno acotado en
+    // Shoplogix, así que "Turno Dia" abarca 24 h. Dividir por la ventana del
+    // turno daba 2 pz/h para un turno que produjo durante 1 h.
+    const machine = normalizeShift({
+      production: buildRawProduction({
+        machineId: 'f1', machineName: 'Linea 1',
+        machineProduction: [
+          { cycles: 0,  expectedCycles: 0,  total: 0,  expectedTotal: 0,  totalDuration: 3600000, start: '20260728T080000.000' },
+          { cycles: 60, expectedCycles: 90, total: 60, expectedTotal: 90, totalDuration: 3600000, start: '20260728T120000.000' },
+          { cycles: 0,  expectedCycles: 0,  total: 60, expectedTotal: 90, totalDuration: 3600000, start: '20260728T230000.000' },
+        ],
+      }),
+      summary: buildRawSummary({ machineId: 'f1', machineName: 'Linea 1' }),
+      dateKey: '2026-07-28', shiftId: 'Turno Dia',
+      shiftStartAt: new Date('2026-07-28T08:00:00.000Z'),
+      shiftEndAt:   new Date('2026-07-29T08:00:00.000Z'),
+    });
+
+    const snap = buildLineSnapshot({ dateKey: '2026-07-28', shiftId: 'Turno Dia', machines: [machine] });
+
+    expect(snap.lineWindowSource).toBe('effective');
+    expect(snap.lineWindowHours).toBeCloseTo(1, 2);
+    expect(snap.lineThroughputActual).toBeCloseTo(60, 1);   // NO 60/24 = 2.5
   });
 
   it('retorna throughput 0 si no hay máquinas', () => {

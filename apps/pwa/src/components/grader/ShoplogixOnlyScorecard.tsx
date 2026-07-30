@@ -6,6 +6,7 @@
  * Usado en AnalisisGraderTurnoPage cuando !summary && upstreamLine.snapshot.
  */
 import { cn } from '@/lib/utils'
+import { lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import { Badge, Card, CardContent, InfoTooltip } from '@/components/ui'
 import { Activity, Clock, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
@@ -87,12 +88,23 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
         )
       : null
 
+  // Duración: si el turno NO está acotado en Shoplogix (Filete: "Turno Dia"
+  // abarca 24 h), la ventana del turno no describe nada. Cuando la ventana real
+  // de operación es mucho más corta, se muestra ESA y se dice que es la real.
+  const effectiveMin = snapshot.lineWindowSource === 'effective' && snapshot.lineWindowHours > 0
+    ? Math.round(snapshot.lineWindowHours * 60)
+    : null
+  const useEffectiveDuration =
+    effectiveMin != null && shiftDurationMin != null && effectiveMin < shiftDurationMin * 0.75
+
   const durationLabel =
     shiftWindow?.status === 'live' && shiftWindow.remainingMin != null
       ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
-      : shiftDurationMin != null
-        ? `${shiftDurationMin} min`
-        : '—'
+      : useEffectiveDuration
+        ? `${effectiveMin} min reales`
+        : shiftDurationMin != null
+          ? `${shiftDurationMin} min`
+          : '—'
 
   const uptimeBarColor = (pct: number) =>
     pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
@@ -183,7 +195,11 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
               <div className="flex items-center justify-center gap-1 mb-0.5">
                 <div className="text-xs text-muted-foreground">ciclos/hr</div>
                 <InfoTooltip
-                  text="Ritmo de producción: piezas procesadas por hora durante el tiempo activo del turno."
+                  text={`Ritmo de producción: piezas por hora sobre ${
+                    snapshot.lineWindowSource === 'effective'
+                      ? `la ventana REAL de operación (de la primera a la última pieza, ${snapshot.lineWindowHours.toFixed(1)} h)`
+                      : `la ventana del turno (${snapshot.lineWindowHours.toFixed(1)} h)`
+                  }.`}
                   iconSize={10} position="top"
                 />
               </div>
@@ -201,8 +217,8 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 </div>
                 <InfoTooltip
                   text={isClosed
-                    ? 'Cantidad de evisceradoras que registraron actividad durante este turno cerrado.'
-                    : 'Evisceradoras produciendo en este momento.'}
+                    ? 'Cantidad de máquinas de la línea que registraron actividad durante este turno cerrado.'
+                    : 'Máquinas de la línea produciendo en este momento.'}
                   iconSize={10} position="top"
                 />
               </div>
@@ -232,7 +248,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           <div className="border-t border-border/40 pt-3 space-y-2">
             <div className="flex items-baseline gap-2 text-xs">
               <span className="font-semibold text-muted-foreground uppercase tracking-wider">
-                Evisceradoras Baader 142
+                {lineMachinesLabel(snapshot.machines) || 'Máquinas de la línea'}
               </span>
               <span className="tabular-nums font-semibold">{totalCycles.toLocaleString('es-CL')}</span>
               <span className="text-muted-foreground">ciclos totales</span>

@@ -108,3 +108,27 @@ export function findMachineInfo(machineid: string): UpstreamMachineInfo | undefi
 /** Lista de UUIDs de las Evisceradoras Chonchi (conveniencia para queries batch). */
 export const EVISCERADORAS_IDS: readonly string[] =
   CHONCHI_EVISCERADORAS.map(m => m.machineid);
+
+/** Etiqueta corta del modelo de máquina, para badges y títulos de la UI. */
+export function machineTypeLabel(type: UpstreamMachineInfo['type'] | undefined): string {
+  switch (type) {
+    case 'baader_142': return 'Baader 142'
+    case 'baader_200': return 'Baader 200'
+    case 'marel_hg':   return 'Marel HG'
+    case 'knuro':      return 'Knuro'
+    default:           return ''
+  }
+}
+
+/**
+ * Etiqueta del conjunto de máquinas de un turno ("Baader 142" si todas son
+ * ese modelo, vacío si hay mezcla o no se reconoce el tipo). Se deriva de los
+ * datos en vez de hardcodearse: la vista de turno decía "Baader 142" también
+ * en Filete, donde la máquina es una Baader 200.
+ */
+export function lineMachinesLabel(
+  machines: ReadonlyArray<{ machineType?: UpstreamMachineInfo['type'] }>,
+): string {
+  const types = new Set(machines.map(m => m.machineType).filter(Boolean))
+  return types.size === 1 ? machineTypeLabel([...types][0]) : ''
+}

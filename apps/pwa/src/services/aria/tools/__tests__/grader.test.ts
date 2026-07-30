@@ -53,6 +53,8 @@ function mockSnapshot(machines: UpstreamMachineShift[]): UpstreamLineSnapshot {
     machines,
     lineThroughputActual: 0,
     lineThroughputExpected: 0,
+    lineWindowHours: 8,
+    lineWindowSource: 'effective' as const,
     lineAvailability: 0.5,
     machinesProducing: 0,
   }

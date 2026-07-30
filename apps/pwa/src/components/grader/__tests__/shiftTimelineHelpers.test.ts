@@ -87,6 +87,8 @@ function mkSnap(shifts: UpstreamMachineShift[]): UpstreamLineSnapshot {
     machines: shifts,
     lineThroughputActual: 0,
     lineThroughputExpected: 0,
+    lineWindowHours: 8,
+    lineWindowSource: 'effective' as const,
     lineAvailability: 0,
     machinesProducing: 0,
   }
@@ -260,6 +262,7 @@ function mkInterval(
   return {
     startAt, endAt, cycles, expectedCycles,
     total: cycles, expectedTotal: expectedCycles, ratio,
+    rate: null,  // dato sintético: no viene del sensor
     color: ratio >= 0.85 ? 'green' : ratio > 0 ? 'yellow' : 'red',
   }
 }
