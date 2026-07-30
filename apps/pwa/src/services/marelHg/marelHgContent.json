@@ -4,31 +4,31 @@
       "id": "mhg-manual-que-es",
       "title": "Qué es el A600 y el controlador M3210",
       "order": 1,
-      "content": "La línea Marel HG (eviscerado / procesamiento primario) se opera desde el software del Clasificador A600, una aplicación que corre sobre el controlador M3210. La pantalla Main (Principal) y las demás pantallas concentran el manejo de la producción, la clasificación por peso y los informes.\n\nPuntos clave:\n\n- El A600 clasifica y crea lotes por peso a partir de las piezas que pasan por la balanza (Weigher).\n- El manual de software se divide en cinco capítulos: Introducción, Pantalla principal, Pantallas del A600, Cómo (configuración paso a paso) y Uso (tareas básicas).\n- La aplicación se ejecuta en el controlador M3210; su etiqueta de estado debe estar en RUNNING durante la producción.\n\nNotas operativas:\n\n- Este es el manual del software/operación; para repuestos mecánicos ver el catálogo de piezas de la máquina.\n- Fuente: manual A600 (Marel), pág 7, 11."
+      "content": "La línea Marel HG (eviscerado / procesamiento primario) se opera desde el software del Clasificador A600, una aplicación que corre sobre el controlador M3210. La pantalla Main (Principal) y las demás pantallas concentran el manejo de la producción, la clasificación por peso y los informes.\n\nPuntos clave:\n\n- El A600 clasifica y crea lotes por peso a partir de las piezas que pasan por la balanza (Weigher).\n- El manual de software se divide en cinco capítulos: Introducción, Pantalla principal, Pantallas del A600, Cómo (configuración paso a paso) y Uso (tareas básicas).\n- La aplicación se ejecuta en el controlador M3210; su etiqueta de estado debe estar en RUNNING durante la producción.\n\nNotas operativas:\n\n- Este es el manual del software/operación; para repuestos mecánicos ver el catálogo de piezas de la máquina.\n- Fuente: manual A600 (Marel), pág impresas 1 y 11."
     },
     {
       "id": "mhg-manual-arranque-seguridad",
       "title": "Preparación y arranque de producción",
       "order": 2,
-      "content": "Antes de iniciar la producción en el A600 conviene una verificación breve para evitar alarmas y paros.\n\nPuntos clave:\n\n- La etiqueta de estado del menú de encabezado del controlador M3210 debe estar en RUNNING durante la producción.\n- Las vías que reciben el producto deben estar despejadas (sin herramientas ni objetos).\n- La balanza (Weigher) debe estar inicializada y lista antes de producir.\n\nNotas operativas:\n\n- Si la balanza no está lista, detener toda la producción hasta que se inicialice.\n- Fuente: manual A600 (Marel), pág 8, 13-14."
+      "content": "Antes de iniciar la producción en el A600 conviene una verificación breve para evitar alarmas y paros.\n\nPuntos clave:\n\n- La etiqueta de estado del menú de encabezado del controlador M3210 debe estar en RUNNING durante la producción.\n- Las vías que reciben el producto deben estar despejadas (sin herramientas ni objetos).\n- La balanza (Weigher) debe estar inicializada y lista antes de producir.\n\nNotas operativas:\n\n- Si la balanza no está lista, detener toda la producción hasta que se inicialice.\n- Fuente: manual A600 (Marel), pág impresas 7-8."
     },
     {
       "id": "mhg-manual-pantallas",
       "title": "Las pantallas del A600",
       "order": 3,
-      "content": "El A600 organiza la operación en pantallas accesibles desde el menú principal.\n\nPuntos clave:\n\n- Production (Producción): estado de la producción en curso.\n- Buffer Overview: información general de los buffers.\n- Reports (Informes): informes de producción.\n- Last Pieces / Last Batches (Últimas piezas / Últimos lotes): trazabilidad reciente.\n- Programs (Programas) y Products (Productos): configuración de la clasificación.\n- Cleaner (Limpieza), Advanced (Avanzado) y Service (Servicio): mantenimiento y ajustes.\n\nNotas operativas:\n\n- El botón Alarm (Alarma) del encabezado indica el estado; el botón On/Off arranca/detiene.\n- Fuente: manual A600 (Marel), pág 3, 12-25."
+      "content": "Desde la pantalla Main (Principal) se accede a CUATRO pantallas; el resto se abre desde Production.\n\nPuntos clave:\n\n- Desde Main: Production (Producción), Cleaning (Limpieza), Advanced (Avanzado) y Service (Servicio).\n- Desde Production se abren: Buffer Overview (buffers), Reports (informes), Last Pieces / Last Batches (trazabilidad reciente), Programs (Programas) y Products (Productos).\n- Advanced y Service están protegidas por CONTRASEÑA y reservadas al personal de servicio de Marel u otro personal autorizado; el manual no detalla sus botones a propósito.\n\nNotas operativas:\n\n- El botón Main (Principal) de la esquina superior derecha del encabezado siempre vuelve a la pantalla principal.\n- El botón Alarm (Alarma) del encabezado indica el estado; el botón On/Off arranca/detiene.\n- Fuente: manual A600 (Marel), pág impresas 3 y 12-25."
     },
     {
       "id": "mhg-manual-metodos-clasificacion",
       "title": "Métodos de clasificación",
       "order": 4,
-      "content": "El A600 admite distintos métodos para agrupar las piezas en lotes por peso.\n\nPuntos clave:\n\n- Creación de lotes óptima (Optimal batching): arma los lotes de la forma más eficiente según el objetivo.\n- Tasa: clasificación por tasa/ritmo.\n- Simple Batching (Creación de lotes simple): agrupación directa.\n- Clasificación simple: reparte por rango de peso sin optimización.\n\nNotas operativas:\n\n- El método se elige en la configuración del programa según el objetivo de producción.\n- Fuente: manual A600 (Marel), pág 25-31."
+      "content": "El A600 admite distintos métodos para agrupar las piezas en lotes por peso.\n\nPuntos clave:\n\n- Creación de lotes óptima (Optimal batching): arma los lotes de la forma más eficiente según el objetivo.\n- Tasa: clasificación por tasa/ritmo.\n- Simple Batching (Creación de lotes simple): agrupación directa.\n- Clasificación simple: reparte por rango de peso sin optimización.\n\nNotas operativas:\n\n- El método se elige POR PRODUCTO en la pantalla Products (Productos), manteniendo presionada la columna Method; los parámetros de ese método aparecen en la parte inferior de esa misma pantalla y se confirman con Save. NO se configura desde el programa.\n- Fuente: manual A600 (Marel), pág impresas 25-31."
     },
     {
       "id": "mhg-manual-programas",
       "title": "Programas",
       "order": 5,
-      "content": "Un programa define cómo clasifica el A600 (método, rangos, destinos). Se gestionan desde la pantalla Programs.\n\nPuntos clave:\n\n- Se pueden agregar, copiar, editar, eliminar y activar programas.\n- Solo el programa activo controla la clasificación en curso.\n- La configuración del programa incluye el método de clasificación y sus parámetros.\n\nNotas operativas:\n\n- Copiar un programa existente y editarlo es más rápido que crear uno desde cero.\n- Fuente: manual A600 (Marel), pág 19, 33-39."
+      "content": "Un programa es una PLANTILLA de producción: fija las unidades de peso y la tara/resolución predeterminadas, y agrupa un conjunto de productos definidos en la pantalla Products. Se gestionan desde la pantalla Programs.\n\nPuntos clave:\n\n- Se pueden agregar, copiar, editar, eliminar y activar programas.\n- Solo el programa activo controla la clasificación en curso.\n- Lo editable de la configuración de un programa es: Units for selected program (unidad de pieza, de lote y de informe) y Preset Tare and Resolution (tara de peso y resolución de pantalla), además del nombre y la descripción.\n- El método de clasificación, los pesos/rangos y las ubicaciones de destino NO son del programa: son atributos del PRODUCTO y se definen en la pantalla Products.\n\nNotas operativas:\n\n- Copiar un programa existente y editarlo es más rápido que crear uno desde cero.\n- Un programa activo no se puede eliminar: primero hay que activar otro para desactivarlo.\n- Fuente: manual A600 (Marel), pág impresas 19, 33-35 y 39."
     },
     {
       "id": "mhg-manual-productos",
@@ -40,7 +40,7 @@
       "id": "mhg-manual-alarmas-informes",
       "title": "Alarmas e informes",
       "order": 7,
-      "content": "El A600 comunica su estado por el botón Alarm y registra la producción en informes.\n\nMedidas / tolerancias:\n\n- Alarma en ROJO: error grave, requiere atención inmediata.\n- Alarma en NARANJA / AMARILLO: advertencia de menor gravedad.\n\nPuntos clave:\n\n- Al tocar Alarm Log (Registro de alarmas) se muestra el tipo de error con su descripción, prioridad y solución.\n- Los informes de producción se presentan y se eliminan desde la pantalla Reports.\n\nNotas operativas:\n\n- Ante una alarma, leer siempre el Registro de alarmas antes de actuar.\n- Fuente: manual A600 (Marel), pág 5, 46."
+      "content": "El A600 comunica su estado por el botón Alarm y registra la producción en informes.\n\nMedidas / tolerancias:\n\n- Alarma en ROJO: nivel más alto, requiere atención inmediata.\n- Advertencia NARANJA: nivel medio, solucionar lo antes posible.\n- Advertencia AMARILLA: nivel más bajo, no requiere atención inmediata.\n\nPuntos clave:\n\n- Al tocar Alarm Log (Registro de alarmas) se muestra el tipo de error con su descripción, prioridad y solución.\n- Los informes de producción se presentan desde la pantalla Reports.\n- El botón Reset (Restablecer) de Reports borra el informe actual Y todos los datos anteriores de esa pantalla: no existe borrado de un informe puntual.\n\nNotas operativas:\n\n- Ante una alarma, leer siempre el Registro de alarmas antes de actuar.\n- Fuente: manual A600 (Marel), pág impresas 6, 15 y 46."
     }
   ],
   "procedures": [
@@ -69,22 +69,22 @@
     {
       "id": "mhg-proc-agregar-programa",
       "title": "Agregar un nuevo programa",
-      "description": "Crear un programa de clasificación desde la pantalla Programs. Fuente: manual A600 (Marel), pág 33.",
+      "description": "Crear un programa de clasificación desde la pantalla Programs. Fuente: manual A600 (Marel), pág impresas 33-34.",
       "steps": [
         {
           "order": 1,
           "title": "Abrir Programs",
-          "description": "Ir a la pantalla Programs (Programas)."
+          "description": "Tocar el botón Programs (Programas) desde la pantalla Production (Producción) para abrir la pantalla Programs."
         },
         {
           "order": 2,
-          "title": "Agregar",
-          "description": "Elegir agregar un nuevo programa."
+          "title": "Nuevo y nombre",
+          "description": "Tocar el botón New (Nuevo), escribir el nombre del programa con el teclado y confirmar con el botón Check (✔)."
         },
         {
           "order": 3,
-          "title": "Método y parámetros",
-          "description": "Configurar el método de clasificación (lotes óptimos, tasa, simple) y sus parámetros."
+          "title": "Descripción",
+          "description": "Mantener presionada la columna vacía junto al nombre del nuevo programa, bajo Description (Descripción), escribir la descripción y confirmar con Check. NO hay paso de método acá: el método de clasificación se elige por producto en la pantalla Products."
         },
         {
           "order": 4,
@@ -96,22 +96,22 @@
     {
       "id": "mhg-proc-copiar-programa",
       "title": "Copiar y editar un programa",
-      "description": "Reutilizar un programa existente como base. Fuente: manual A600 (Marel), pág 35-39.",
+      "description": "Reutilizar un programa existente como base. Fuente: manual A600 (Marel), pág impresas 35 y 39.",
       "steps": [
         {
           "order": 1,
           "title": "Seleccionar el programa",
-          "description": "En la pantalla Programs, elegir el programa a copiar."
+          "description": "En la pantalla Programs, resaltar el programa que se quiere copiar."
         },
         {
           "order": 2,
           "title": "Copiar",
-          "description": "Crear una copia del programa."
+          "description": "Tocar el botón Copy (Copiar). La copia se agrega inmediatamente al final de la lista de programas."
         },
         {
           "order": 3,
-          "title": "Editar la configuración",
-          "description": "Ajustar el método, rangos y destinos en la configuración del programa copiado."
+          "title": "Renombrar y editar",
+          "description": "Mantener presionada la columna de nombre o descripción y escribir el texto, confirmando con Check (pág 35). Lo demás editable del programa son las unidades de peso (pieza / lote / informe) y la tara y resolución predeterminadas (pág 39). El método, los rangos y los destinos NO se editan acá: son del producto, en la pantalla Products."
         },
         {
           "order": 4,
@@ -167,17 +167,17 @@
     {
       "id": "mhg-proc-terminar-lotes",
       "title": "Terminar lotes",
-      "description": "Cerrar los lotes en curso. Fuente: manual A600 (Marel), pág 18.",
+      "description": "Cerrar los lotes en curso. Fuente: manual A600 (Marel), pág impresas 14 y 18-19.",
       "steps": [
         {
           "order": 1,
-          "title": "Abrir Last Batches",
-          "description": "Ir a la pantalla Last Batches (Últimos lotes)."
+          "title": "Abrir Buffer Overview",
+          "description": "Desde la pantalla Production (Producción), tocar el botón Buffers para abrir Buffer Overview. OJO: Last Batches (Últimos lotes) NO sirve para esto — es solo consulta histórica y sus únicos botones son Refresh, Pieces y Back (pág 17)."
         },
         {
           "order": 2,
-          "title": "Terminar",
-          "description": "Terminar el/los lote(s) según el flujo de la pantalla."
+          "title": "Terminar todo",
+          "description": "Tocar Terminate all (Terminar todo). Descarga todas las bandejas que tengan lotes completos y TERMINA SIN COMPLETAR las demás (nota del manual, pág 19). Para cerrar un solo lote, usar en cambio el botón de liberación/finalización que está debajo de ese buffer, que descarga un lote completo o interrumpe uno antes de completarse (pág 14)."
         },
         {
           "order": 3,
@@ -189,7 +189,7 @@
     {
       "id": "mhg-proc-presentar-informe",
       "title": "Presentar un informe",
-      "description": "Consultar la producción registrada. Fuente: manual A600 (Marel), pág 46.",
+      "description": "Consultar la producción registrada. Fuente: manual A600 (Marel), pág impresas 15 y 46-47.",
       "steps": [
         {
           "order": 1,
@@ -203,8 +203,8 @@
         },
         {
           "order": 3,
-          "title": "Eliminar si corresponde",
-          "description": "Eliminar informes que ya no se necesiten desde la misma pantalla."
+          "title": "⚠ Eliminar: Reset borra TODO, no un informe suelto",
+          "description": "El único borrado que existe es el botón Reset (Restablecer), y NO borra un informe puntual: borra el informe actual y TODOS los datos anteriores de la pantalla Reports. No hay borrado selectivo. Exportar o anotar lo que se necesite antes de tocarlo."
         }
       ]
     },
@@ -344,10 +344,11 @@
       "title": "¿Qué hago cuando cambio de producto o programa?",
       "trigger": "Se va a correr un producto distinto o cambiar el criterio de clasificación.",
       "actions": [
-        "Abrir la pantalla Programs y activar el programa correspondiente.",
-        "Revisar en Products que los productos estén asignados a las ubicaciones correctas.",
+        "PRIMERO terminar los lotes en curso: Production → Buffers → Terminate all. Si se activa otro programa con la producción en marcha, los lotes del programa desactivado se INTERRUMPEN y se arman lotes con el nuevo — se pierde el lote y su trazabilidad (pág 33).",
+        "Recién entonces abrir la pantalla Programs y activar el programa correspondiente.",
+        "Revisar en Products que los productos estén asignados a las ubicaciones correctas y con el método de clasificación que corresponde.",
         "Confirmar que el programa activo sea el deseado antes de reanudar.",
-        "Fuente: manual A600 (Marel), pág 37, 45."
+        "Fuente: manual A600 (Marel), pág impresas 18, 33 y 45."
       ]
     },
     {
@@ -355,9 +356,11 @@
       "title": "¿Qué hago para terminar un lote?",
       "trigger": "Se completó un lote y hay que cerrarlo.",
       "actions": [
-        "Ir a Last Batches (Últimos lotes) y terminar el lote.",
+        "Ir a Production (Producción) → botón Buffers → Terminate all (Terminar todo) en Buffer Overview: termina todos los lotes y vacía los contenedores.",
+        "Para cerrar UN solo lote: usar el botón de liberación/finalización que está debajo de ese buffer (descarga el lote completo o lo interrumpe antes de completarse).",
+        "Last Batches (Últimos lotes) NO termina lotes: es solo consulta histórica (Refresh / Pieces / Back).",
         "Verificar que quede registrado en Reports (Informes).",
-        "Fuente: manual A600 (Marel), pág 18, 46."
+        "Fuente: manual A600 (Marel), pág impresas 14, 17-19 y 46."
       ]
     },
     {
@@ -368,7 +371,7 @@
         "Detener toda la producción hasta que la balanza esté lista.",
         "Esperar a que termine la inicialización del Weigher.",
         "Si no se inicializa, revisar el registro de alarmas y contactar servicio si persiste.",
-        "Fuente: manual A600 (Marel), pág 14."
+        "Fuente: manual A600 (Marel), pág impresa 8 (Tabla 1)."
       ]
     }
   ],
@@ -378,10 +381,11 @@
       "title": "Entender el color de la alarma (rojo / naranja / amarillo)",
       "symptom": "El botón Alarm parpadea y no sé qué gravedad tiene.",
       "possibleCauses": [
-        "Rojo: error grave que requiere atención inmediata.",
-        "Naranja o amarillo: advertencia de menor gravedad."
+        "ROJO: nivel más alto — error grave, requiere atención inmediata.",
+        "NARANJA: nivel medio — se debe solucionar lo antes posible (no es lo mismo que amarillo).",
+        "AMARILLO: nivel más bajo — no requiere atención inmediata."
       ],
-      "solution": "Tocar Alarm Log para ver el error, su prioridad y la solución. Priorizar los rojos. Fuente: manual A600 (Marel), pág 7."
+      "solution": "Tocar Alarm Log (Registro de alarmas) para ver el error, su prioridad y la solución. Son TRES niveles, no dos: el naranja pide acción pronta aunque no sea inmediata. Dato útil: en la tabla de errores más habituales del manual, todas las alarmas listadas son de prioridad Roja. Fuente: manual A600 (Marel), pág impresa 6."
     },
     {
       "id": "mhg-diag-emergencia",
@@ -409,7 +413,7 @@
         "Cinta transportadora de la balanza sucia.",
         "Residuos que alteran la lectura de peso."
       ],
-      "solution": "Limpiar la cinta transportadora de la balanza. Fuente: manual A600 (Marel), pág 14."
+      "solution": "Limpiar la cinta transportadora de la balanza. Fuente: manual A600 (Marel), pág impresa 8 (Tabla 1)."
     },
     {
       "id": "mhg-diag-balanza-no-lista",
@@ -418,7 +422,7 @@
       "possibleCauses": [
         "La balanza aún se está inicializando o no completó su arranque."
       ],
-      "solution": "Detener toda la producción hasta que la balanza esté lista. Si no se inicializa, revisar el registro y contactar servicio. Fuente: manual A600 (Marel), pág 14."
+      "solution": "Detener toda la producción hasta que la balanza esté lista. Si no se inicializa, revisar el registro y contactar servicio. Fuente: manual A600 (Marel), pág impresa 8 (Tabla 1)."
     },
     {
       "id": "mhg-diag-velocidad-cinta",
@@ -428,7 +432,7 @@
         "Desajuste del accionamiento de la cinta de la balanza.",
         "Fallo en el control de velocidad."
       ],
-      "solution": "No es ajuste de operador: anotar el código y contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 13."
+      "solution": "No es ajuste de operador: anotar el código y contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág impresa 7 (Tabla 1)."
     },
     {
       "id": "mhg-diag-longitud-cinta",
@@ -437,7 +441,7 @@
       "possibleCauses": [
         "Problema en la medición de la longitud de la cinta de pesaje."
       ],
-      "solution": "Contactar al servicio técnico de Marel (no es corregible desde la operación). Fuente: manual A600 (Marel), pág 13-14."
+      "solution": "Contactar al servicio técnico de Marel (no es corregible desde la operación). Fuente: manual A600 (Marel), pág impresa 7 (Tabla 1)."
     },
     {
       "id": "mhg-diag-indice-cinta",
@@ -446,7 +450,7 @@
       "possibleCauses": [
         "Pérdida de la referencia/índice de la cinta de pesaje."
       ],
-      "solution": "Contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág 14."
+      "solution": "Contactar al servicio técnico de Marel. Fuente: manual A600 (Marel), pág impresa 8 (Tabla 1)."
     },
     {
       "id": "mhg-diag-itemtracker",
