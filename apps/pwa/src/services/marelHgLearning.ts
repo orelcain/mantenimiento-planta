@@ -59,7 +59,7 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
   },
   'mhg-manual-metodos-clasificacion': {
     objetivo: 'Distinguir los métodos de clasificación del A600 (creación de lotes óptima, por tasa, simple) y cuándo conviene cada uno.',
-    porque: 'elegir el método equivocado desperdicia rendimiento o sube el sobrepeso; el método se elige según el objetivo de producción, no por costumbre.',
+    porque: 'elegir el método equivocado desperdicia rendimiento o sube el sobrepeso. Ojo dónde se elige: es por PRODUCTO, en la pantalla Products (columna Method), no en la configuración del programa.',
     quiz: [
       { question: '¿Qué método arma los lotes de la forma más eficiente según el objetivo?', options: ['Clasificación simple', 'Creación de lotes óptima (Optimal batching)', 'Por tasa', 'Simple Batching'], correctIndex: 1, explanation: 'La creación de lotes óptima (Optimal batching) arma los lotes de la forma más eficiente según el objetivo.' },
     ],
@@ -79,11 +79,11 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
     ],
   },
   'mhg-manual-alarmas-informes': {
-    objetivo: 'Leer el botón Alarm (rojo = error grave; naranja/amarillo = advertencia) y usar el Registro de alarmas antes de actuar.',
+    objetivo: 'Leer el botón Alarm en sus TRES niveles (rojo = atención inmediata; naranja = solucionar lo antes posible; amarillo = no requiere atención inmediata) y usar el Registro de alarmas antes de actuar.',
     porque: 'actuar sin leer el Registro de alarmas es adivinar; el registro trae el tipo de error, su prioridad y la solución, que es justo lo que acorta la parada.',
     quiz: [
       { question: 'Salta una alarma. ¿Qué hacés primero?', options: ['Reiniciar el equipo', 'Leer el Registro de alarmas (tipo, prioridad y solución)', 'Bajar la velocidad', 'Llamar al proveedor'], correctIndex: 1, explanation: 'Ante una alarma se lee siempre el Registro de alarmas antes de actuar: trae el tipo de error, su prioridad y la solución.' },
-      { question: 'El botón Alarm está en ROJO. ¿Qué indica?', options: ['Advertencia menor', 'Error grave que requiere atención inmediata', 'Todo normal', 'Falta papel'], correctIndex: 1, explanation: 'Alarma en rojo = error grave que requiere atención inmediata; naranja/amarillo es una advertencia de menor gravedad.' },
+      { question: 'El botón Alarm está en ROJO. ¿Qué indica?', options: ['Advertencia menor', 'Error grave que requiere atención inmediata', 'Todo normal', 'Falta papel'], correctIndex: 1, explanation: 'Alarma en rojo = nivel más alto, requiere atención inmediata. Son TRES niveles: naranja es nivel medio (solucionar lo antes posible) y amarillo el más bajo (no requiere atención inmediata) — no van juntos.' },
     ],
   },
 }
