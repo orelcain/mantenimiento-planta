@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-30 - claude - Grafico velocidad real vs objetivo del sensor
+
+- Hecho: el grafico de tasa (pz/min) de la vista de turno ahora superpone el OBJETIVO por bucket que reporta el sensor (`targetRate`, con `expectedCycles/duracion` de respaldo en docs viejos) como linea punteada, y sombrea los tramos con objetivo vigente y produccion 0 ("parada con objetivo"). Ademas corrige el objetivo NOMINAL: se tomaba del PRIMER bucket con expected>0 — que es parcial y miente (en el turno del 28-jul de la Baader 200 daba 5 pz/min cuando el objetivo real era 20). Ahora es el maximo por bucket, mismo criterio que `targetCpmFromIntervals`.
+- Por que importa: separa "la maquina no da el ritmo" de "la maquina estuvo parada". En el 28-jul la Baader 200 llego a 19,0 contra objetivo 20 → el turno no se perdio por velocidad sino por 20 min parada.
+- Archivos: `apps/pwa/src/components/grader/ProductionRateLineEC.tsx`, `apps/pwa/src/components/grader/__tests__/productionRateTarget.test.ts` (nuevo).
+- Verificacion: tsc limpio, eslint sin errores nuevos, 752 tests verdes — incluidos 6 nuevos que corren `buildRateSeries` con la SERIE REAL del 28-jul y fijan: nominal 20 (no 5), objetivo variable por bucket, el bloque unico de 20 min parado, real != objetivo, y degradacion limpia sin `targetRate` ni `expectedCycles`.
+- ⚠ PENDIENTE de verificacion VISUAL: el panel del navegador dejo de componer frames a mitad de la sesion (ECharts pinta en canvas, no renderiza sin pane visible), asi que el grafico no se pudo ver corriendo. La logica esta cubierta por los tests con datos reales, pero hay que mirarlo con ojos antes de darlo por cerrado.
+- Estado: EN REVISION — PR abierto.
+- Sigue: mirar el grafico en pantalla (Filete 28-jul y un turno de Yal con 3 maquinas, cada una con su propio objetivo 16/19). Pendientes #5 (OEE de area con la GEA manual) y #6 (alertas de Filete).
+
 ## 2026-07-30 - claude - Causa de los paros del sensor (dictado) + parametros del sensor
 
 - Hecho: (1) el sync guarda lo que el sensor mandaba y se descartaba — `targetRate` por intervalo (cadencia OBJETIVO, no la real: `expectedCycles = rate x 5min` y hay tramos con rate 20 y cycles 0), `uptimeCycles`/`scheduledCycles`, `scrapByReason`/`scrapTotal` (unica fuente posible de Calidad en Filete) y las unidades; `machineType` de la Baader 200 ya no cae en 'other'. (2) La vista de turno dejo de contar falso en lineas sin turno acotado: el ritmo se mide sobre la ventana REAL de operacion (Filete pasaba de 2 a 9 pz/h) y el copy "Baader 142"/"Evisceradoras" se deriva de `machineType`. (3) NUEVO panel "Causa de los paros": lista los paros que el sensor midio, el tecnico dicta el por que (voz -> `refineText` -> guardar), se clasifica por responsable (mantencion/operacion/externo/planificado) y las de Mantencion pueden ir al historial del equipo.

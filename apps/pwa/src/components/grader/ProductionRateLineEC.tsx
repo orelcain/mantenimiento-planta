@@ -8,7 +8,12 @@
  * Sincroniza con TimelineSyncContext: zoom + axisPointer cross-chart.
  *
  * Datos de entrada: `machines[].intervals` (buckets de 5 min con `cycles`).
- * Rate = cycles / duracion_min del intervalo.
+ * Rate real = cycles / duracion_min del intervalo.
+ *
+ * Encima se dibuja el OBJETIVO por bucket que reporta el sensor (`targetRate`,
+ * con `expectedCycles/duración` como respaldo en docs viejos) y se sombrean los
+ * tramos donde el objetivo estaba corriendo y la producción fue 0 — que es la
+ * lectura que importa: si el turno se perdió por ritmo o por máquina parada.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
@@ -26,6 +31,9 @@ const MACHINE_COLORS = [
   { line: 'rgba(251,191,36,0.9)',  area: 'rgba(251,191,36,0.06)'  },  // amber-400 (más)
 ]
 const AVG_COLOR  = { line: 'rgba(251,191,36,0.95)', area: 'rgba(251,191,36,0.12)' }  // amber
+/** Objetivo del sensor — violeta, el mismo tono que ya usaba la línea de meta. */
+const TARGET_COLOR = 'rgba(139,92,246,0.75)'
+const OBJETIVO_LABEL = 'Objetivo'
 const GRID_COLOR = '#1e293b'
 
 interface Props {
@@ -45,15 +53,23 @@ function shortMachineName(name: string): string {
 }
 
 /** Compila series de tasa pz/min unificando todos los buckets de tiempo. */
-function buildRateSeries(machines: UpstreamMachineShift[]): {
+export function buildRateSeries(machines: UpstreamMachineShift[]): {
   timeAxis: number[]
   series: { name: string; data: (number | null)[] }[]
   avgSeries: { name: string; data: (number | null)[] }
+  /** Objetivo por bucket (promedio de las máquinas con objetivo en ese bucket). */
+  targetSeries: (number | null)[]
+  /** Objetivo nominal = máximo por bucket. Ver por qué el máximo, más abajo. */
   expectedRate: number
+  /** Tramos [desde, hasta] con objetivo vigente y producción 0. */
+  stoppedWithTarget: [number, number][]
   showAvg: boolean
 } {
   if (machines.length === 0) {
-    return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0, showAvg: false }
+    return {
+      timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] },
+      targetSeries: [], expectedRate: 0, stoppedWithTarget: [], showAvg: false,
+    }
   }
 
   // Snap a grilla de 5 min: diferentes máquinas pueden tener buckets en :56/:01/:06
@@ -116,15 +132,48 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
   })
 
-  // Expected rate: primer bucket con expectedCycles > 0
-  let expectedRate = 0
-  for (const m of filteredMachines) {
-    const iv = m.intervals.find((x) => x.expectedCycles > 0)
-    if (iv) {
+  // ── Objetivo por bucket ────────────────────────────────────────────────────
+  // `targetRate` es la cadencia OBJETIVO que reporta el sensor (NO la real). En
+  // docs previos a sourceVersion 4 no existe: se cae a expectedCycles/duración,
+  // que da lo mismo (el sensor calcula uno desde el otro).
+  const machineTargets: Map<number, number>[] = filteredMachines.map((m) => {
+    const map = new Map<number, number>()
+    for (const iv of m.intervals) {
       const durationMin = Math.max(1, (iv.endAt.getTime() - iv.startAt.getTime()) / 60_000)
-      expectedRate = iv.expectedCycles / durationMin
-      break
+      const t = iv.targetRate ?? (iv.expectedCycles > 0 ? iv.expectedCycles / durationMin : null)
+      if (t == null || t <= 0) continue
+      const key = snap(iv.startAt.getTime())
+      if (!map.has(key)) map.set(key, t)
     }
+    return map
+  })
+
+  const targetSeries = timeAxis.map((ts) => {
+    const vals = machineTargets.map((t) => t.get(ts)).filter((v): v is number => v !== undefined)
+    if (vals.length === 0) return null
+    return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+  })
+
+  // Objetivo NOMINAL = máximo de los objetivos por bucket, no el primero.
+  // Los buckets de arranque/cierre son PARCIALES y el sensor escala el objetivo
+  // al tiempo activo, así que el primero miente: en el turno del 28-jul de la
+  // Baader 200 valía 5 pz/min cuando el objetivo real era 20 (mismo criterio que
+  // `targetCpmFromIntervals` en plantKpiCompute).
+  const expectedRate = targetSeries.reduce<number>((mx, v) => (v != null && v > mx ? v : mx), 0)
+
+  // Tramos con objetivo vigente y producción 0 — buckets contiguos se fusionan
+  // para que el sombreado sea un bloque y no una reja de rayitas.
+  const stoppedWithTarget: [number, number][] = []
+  const BUCKET_SPAN = BUCKET_MS
+  for (let i = 0; i < timeAxis.length; i++) {
+    const ts = timeAxis[i]!
+    const target = targetSeries[i]
+    if (target == null || target <= 0) continue
+    const reales = machineRates.map((r) => r.get(ts)).filter((v): v is number => v !== undefined)
+    if (reales.length === 0 || reales.some((v) => v > 0)) continue
+    const last = stoppedWithTarget[stoppedWithTarget.length - 1]
+    if (last && last[1] >= ts) { last[1] = ts + BUCKET_SPAN }
+    else stoppedWithTarget.push([ts, ts + BUCKET_SPAN])
   }
 
   // Promedio solo tiene sentido cuando ≥2 máquinas tienen datos —
@@ -136,7 +185,9 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     timeAxis,
     series,
     avgSeries: { name: 'Promedio', data: avgData },
+    targetSeries,
     expectedRate,
+    stoppedWithTarget,
     showAvg: machinesWithData >= 2,
   }
 }
@@ -147,7 +198,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
-  const { timeAxis, series, avgSeries, expectedRate, showAvg } = useMemo(
+  const { timeAxis, series, avgSeries, targetSeries, expectedRate, stoppedWithTarget, showAvg } = useMemo(
     () => buildRateSeries(machines),
     [machines],
   )
@@ -266,6 +317,37 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       }
     })
 
+    // Objetivo del sensor: línea punteada violeta, sin área y detrás de todo.
+    // Va como serie propia (no como markLine horizontal) porque el objetivo NO
+    // es constante: el sensor lo escala en los buckets parciales.
+    const targetHasData = targetSeries.some((v) => v != null && v > 0)
+    const targetS = targetHasData ? {
+      name:        OBJETIVO_LABEL,
+      type:        'line' as const,
+      data:        timeAxis.map((ts, ti) => [ts, targetSeries[ti]] as [number, number | null]),
+      step:        'end' as const,
+      connectNulls: false,
+      symbol:      'none',
+      lineStyle:   { color: TARGET_COLOR, width: 1.4, type: 'dashed' as const },
+      itemStyle:   { color: TARGET_COLOR },
+      z:           0,
+      // Tramos con objetivo corriendo y producción 0: el sombreado dice de un
+      // vistazo que la pérdida fue por máquina parada, no por ritmo lento.
+      markArea: stoppedWithTarget.length > 0 ? {
+        silent: true,
+        itemStyle: {
+          color: 'rgba(176,112,109,0.16)',
+          borderWidth: 1,
+          borderColor: 'rgba(176,112,109,0.45)',
+          borderType: 'dashed' as const,
+        },
+        data: stoppedWithTarget.map(([from, to]) => ([
+          { xAxis: from, name: 'parada con objetivo' },
+          { xAxis: to },
+        ])),
+      } : undefined,
+    } : null
+
     // Promedio: línea punteada sin área fill — queda visualmente detrás de las
     // líneas individuales (que son sólidas con área). Así B1/B2/B3 nunca quedan
     // tapadas aunque Promedio coincida con alguna de ellas.
@@ -290,7 +372,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
           lineStyle: { color: 'rgba(139,92,246,0.6)', type: 'dashed', width: 1 },
           label: {
             show: true,
-            formatter: `${expectedRate.toFixed(0)} pz/m`,
+            formatter: `objetivo ${expectedRate.toFixed(0)} pz/m`,
             color: 'rgba(139,92,246,0.9)',
             fontSize: 9,
             position: 'end',
@@ -309,7 +391,11 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         textStyle: { color: '#64748b', fontSize: 9 },
         itemWidth: 12,
         itemHeight: 8,
-        data: [...series.map(s => s.name), ...(showAvg ? ['Promedio'] : [])],
+        data: [
+          ...series.map(s => s.name),
+          ...(showAvg ? ['Promedio'] : []),
+          ...(targetHasData ? [OBJETIVO_LABEL] : []),
+        ],
       },
       xAxis: {
         type: 'time' as const,
@@ -368,9 +454,14 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         zoomOnMouseWheel: 'ctrl',
         moveOnMouseWheel: false,
       }] : [],
-      series: avgS ? [...machineSeries, avgS] : machineSeries,
+      // El objetivo va PRIMERO para quedar detrás de las líneas reales.
+      series: [
+        ...(targetS ? [targetS] : []),
+        ...machineSeries,
+        ...(avgS ? [avgS] : []),
+      ],
     }
-  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges])
 
   if (timeAxis.length < 2) return null
 
