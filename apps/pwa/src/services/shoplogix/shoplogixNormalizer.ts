@@ -61,7 +61,7 @@ export function normalizeInterval(
     total: raw.total,
     expectedTotal: raw.expectedTotal,
     ratio,
-    rate: typeof raw.rate === 'number' ? raw.rate : null,
+    targetRate: typeof raw.rate === 'number' ? raw.rate : null,
     color: colorFromRatio(ratio, hadExpected, threshold),
   };
 }

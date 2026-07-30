@@ -39,7 +39,7 @@ function makeIntervals(
     return {
       startAt, endAt,
       cycles, expectedCycles: expected,
-      rate: null,  // dato sintético: el sensor no participa en el modo demo
+      targetRate: null,  // dato sintético: el sensor no participa en el modo demo
       total: cycles * (i + 1),
       expectedTotal: expected * (i + 1),
       ratio,

@@ -41,11 +41,18 @@ function normalizeInterval(raw, startAt, threshold) {
     expectedTotal: raw.expectedTotal || 0,
     ratio,
     color: colorFromRatio(ratio, hadExpected, threshold),
-    // Velocidad que calcula el PROPIO Shoplogix para el intervalo. La podríamos
-    // derivar de cycles/duración, pero entonces el número de la app no sería el
-    // mismo que el operador ve en el whiteboard y toda discusión de cadencia
-    // arranca con dos cifras distintas. null cuando el sensor no la reporta.
-    rate: Number.isFinite(raw.rate) ? raw.rate : null,
+    // Cadencia OBJETIVO del intervalo en pz/min, según Shoplogix.
+    //
+    // ⚠ NO es la velocidad real (esa es cycles/duración). Verificado contra el
+    // turno del 2026-07-28 de la Baader 200: en los 14 intervalos con dato se
+    // cumple `expectedCycles = targetRate × 5 min` exacto, y hay intervalos con
+    // targetRate 20 y cycles 0 — máquina parada con objetivo 20 pz/min. El
+    // valor baja en intervalos parciales porque Shoplogix escala el objetivo al
+    // tiempo activo del intervalo.
+    //
+    // Sirve para leer el objetivo por tramo sin re-derivarlo de expectedCycles.
+    // null cuando el sensor no lo reporta (nunca 0: eso sería objetivo cero).
+    targetRate: Number.isFinite(raw.rate) ? raw.rate : null,
   }
 }
 
@@ -307,7 +314,7 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     productionUnit: summary.productionUnits || production.productionUnits || '',
     comments: normalizeComments([...(summary.comments || []), ...(production.comments || [])]),
     source: 'shoplogix',
-    // 4 = agrega rate por intervalo + uptimeCycles/scheduledCycles/scrap del sensor
+    // 4 = agrega targetRate por intervalo + uptimeCycles/scheduledCycles/scrap
     sourceVersion: 4,
     syncedAt: syncedAt || new Date(),
   }

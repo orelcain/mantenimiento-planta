@@ -76,7 +76,13 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
 
     // Paros de etapa del mes (minutos) + por etapa.
     const now = month
-    const parosMes = paros.filter((p) => p.fecha.getMonth() === now.getMonth() && p.fecha.getFullYear() === now.getFullYear())
+    // Solo paros capturados A MANO: los `origen: 'shoplogix'` son anotaciones
+    // de causa sobre paros que el sensor YA midió, así que sus minutos están
+    // dentro de la Disponibilidad de la máquina. Sumarlos acá los descontaría
+    // dos veces del OEE de área.
+    const parosMes = paros.filter((p) =>
+      p.origen !== 'shoplogix' &&
+      p.fecha.getMonth() === now.getMonth() && p.fecha.getFullYear() === now.getFullYear())
     const parosMin = parosMes.reduce((a, p) => a + p.duracionMin, 0)
     const parosByEtapa = new Map<string, number>()
     for (const p of parosMes) parosByEtapa.set(p.etapa, (parosByEtapa.get(p.etapa) ?? 0) + p.duracionMin)

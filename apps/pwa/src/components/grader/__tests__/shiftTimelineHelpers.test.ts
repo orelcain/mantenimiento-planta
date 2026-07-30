@@ -262,7 +262,7 @@ function mkInterval(
   return {
     startAt, endAt, cycles, expectedCycles,
     total: cycles, expectedTotal: expectedCycles, ratio,
-    rate: null,  // dato sintético: no viene del sensor
+    targetRate: null,  // dato sintético: no viene del sensor
     color: ratio >= 0.85 ? 'green' : ratio > 0 ? 'yellow' : 'red',
   }
 }

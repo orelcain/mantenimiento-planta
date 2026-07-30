@@ -61,6 +61,7 @@ import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
+import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
 import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -1469,6 +1470,19 @@ export function AnalisisGraderTurnoPage() {
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
           />
+
+          {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
+              Shoplogix. Se monta junto al panel de máquinas para que el paro y
+              su explicación se vean en el mismo lugar. */}
+          {upstreamLine.snapshot && (
+            <SensorStopsCausePanel
+              snapshot={upstreamLine.snapshot}
+              plantLineId={plantLineCfg.id}
+              plantSlug={plantLineCfg.plantSlug}
+              dateKey={upstreamLine.snapshot.dateKey || dateKey}
+              shiftId={upstreamLine.snapshot.shiftId}
+            />
+          )}
         </div>
       )}
 
@@ -1738,6 +1752,19 @@ export function AnalisisGraderTurnoPage() {
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
           />
+
+          {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
+              Shoplogix. Se monta junto al panel de máquinas para que el paro y
+              su explicación se vean en el mismo lugar. */}
+          {upstreamLine.snapshot && (
+            <SensorStopsCausePanel
+              snapshot={upstreamLine.snapshot}
+              plantLineId={plantLineCfg.id}
+              plantSlug={plantLineCfg.plantSlug}
+              dateKey={upstreamLine.snapshot.dateKey || dateKey}
+              shiftId={upstreamLine.snapshot.shiftId}
+            />
+          )}
 
           {/* Correlación automática Grader↔Baader y scatter — solo aplican
               en plantas donde el Grader Marelec MS4/12 procesa downstream de
