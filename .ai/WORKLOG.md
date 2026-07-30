@@ -19,7 +19,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
-## 2026-07-30 - claude - Enzunchadora: reubica 2 causas de troubleshooting (PR pendiente de numero, 1a tanda de MEDIOS)
+## 2026-07-30 - claude - Marel HG: 7 medios + 3 menores corregidos (PR #306, MERGED, 2a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS de la Marel HG mas 3 menores de las mismas secciones, cruzados contra `785_A600 User Manual_ES.pdf` citando pagina impresa.
+- Hecho: (1) terminar lotes apuntaba a Last Batches (solo historico) en vez de Production > Buffers > Terminate all; (2) metodo de clasificacion se elige por PRODUCTO (pantalla Products), no en el programa; (3) definicion correcta de que es un programa (plantilla de unidades/tara, no metodo/rangos/destinos); (4) pasos inventados en agregar/copiar programa; (5) "eliminar informes" no existe, el unico borrado es Reset (borra todo lo anterior, se agrego advertencia de exportar antes); (6) cambiar de programa con produccion en curso interrumpe lotes abiertos; menores: Main da acceso a 4 pantallas no a todas, alarmas son 3 niveles no 2, 8 citas de pagina unificadas a numeracion impresa.
+- Archivos: `apps/pwa/src/services/marelHg/marelHgContent.json`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped, 52 archivos), verificador-web PASA en 11 puntos/ambos temas/sin errores de consola/sin scroll horizontal (888px y 375px).
+- Estado: HECHO. Sigue: quedan ~34 hallazgos MEDIOS de la auditoria sin tocar (2a tanda, 9 de 43 acumulados).
+
+## 2026-07-30 - claude - Enzunchadora: reubica 2 causas de troubleshooting (PR #305, MERGED, 1a tanda de MEDIOS)
 
 - Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 2 hallazgos MEDIOS de la Enzunchadora TP-6000 — causas asignadas a la fila equivocada de la tabla de Troubleshooting (manual pag. 22 / PDF pag. 28).
 - Hecho: (1) "STOP bloqueado" pasa de la fila "piloto no enciende" a "piloto enciende, no opera" (con STOP bloqueado la maquina sigue energizada, pag. 5); (2) "enhebrado incorrecto en portabobina" pasa de "piloto enciende, no opera" a "avance/recogida incorrectos". Las 5 entradas de diagnostico ahora cubren las 26 causas del manual sin solapes ni huecos (3+4+12+4+3=26).
