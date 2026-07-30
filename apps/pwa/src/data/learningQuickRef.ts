@@ -161,19 +161,19 @@ const MAREL_FILETE: QuickRefGroup[] = [
       { label: 'Masa', value: 'Single Lane ~165 kg · Dual Lane ~200 kg' },
       { label: 'Temperatura ambiente', value: '7 °C a 40 °C' },
       { label: 'Altura de cinta', value: 'H950 / H1050 / H1250, ajuste ±100 mm' },
-      { label: 'Eslabones cinta', value: 'MW1000=180 · MW1450=252 · MW1900=324 — nunca quitar para acortar' },
+      { label: 'Eslabones cinta', value: 'nunca quitar eslabones para acortar la cinta. El conteo por modelo (MW1000=180 · MW1450=252 · MW1900=324) es de la familia SmartLine: confirmar contra la placa de esta máquina' },
     ],
   },
   {
     title: 'Sensor de producto',
     rows: [
-      { label: 'Altura del haz', value: '5–10 mm sobre la cinta (SmartLine: ~6 mm)' },
+      { label: 'Altura del haz', value: '5–10 mm sobre la cinta, según el producto' },
       { label: 'Ajuste', value: 'sensibilidad media, regulador vertical, selector en L (luz encendida)' },
       { label: 'Piezas finas', value: 'no debe detectar 3 mm · sí debe detectar 6 mm' },
     ],
   },
   {
-    title: 'Instalación SmartLine',
+    title: 'Instalación y nivelación',
     rows: [
       { label: 'Nivelación plataforma', value: 'perfectamente recta y nivelada, sin girar al atornillar al suelo' },
       { label: 'Deformación máx. plataforma', value: '0,2 mm (revisar con regla y lámina calibradora)' },
@@ -188,17 +188,8 @@ const MAREL_FILETE: QuickRefGroup[] = [
       { label: 'Aire requerido', value: 'limpio y seco, ISO 8573-1 clase 3' },
       { label: 'Presión de línea', value: 'mínimo 7 bar · sobre 10 bar puede dañar la línea' },
       { label: 'Presión de funcionamiento', value: '6 bar (85–87 psi) en regulador de cabina' },
-      { label: 'Suministro SmartLine', value: '3×400V+N+PE · 3×230V+GND · 3×208V+GND' },
-      { label: 'Arranque diario', value: 'Start → dejar cintas al vacío hasta ver "Steady" en el M3210' },
-      { label: 'Al detener', value: 'NO apagar el interruptor principal — el calor evita condensación' },
-    ],
-  },
-  {
-    title: 'Brazos de puerta y cilindros (SmartLine)',
-    rows: [
-      { label: 'Separación brazo-cinta', value: '1–2 mm' },
-      { label: 'Revisión semanal', value: 'cilindros de aire; limpiar biela del pistón con paño con aceite' },
-      { label: 'Ajuste', value: 'ángulo/posiciones primero, luego espacio brazo-cinta (aflojar 2 pernos)' },
+      { label: 'Suministro eléctrico', value: '3×400V+N+PE · 3×230V+GND · 3×208V+GND' },
+            { label: 'Al detener', value: 'NO apagar el interruptor principal — mantiene corriente constante y evita la condensación de humedad' },
     ],
   },
   {
