@@ -56,6 +56,7 @@ import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import { deriveYalSuggestions } from '@/services/grader/graderInsightsYal'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { listShiftInfosForDay } from '@/services/shoplogix/shoplogixShift.service'
+import { effectiveProductionWindow, shouldFrameOnProduction } from '@/services/shoplogix/shoplogixNormalizer'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
@@ -940,6 +941,12 @@ export function AnalisisGraderTurnoPage() {
   // no en este componente. Los hijos lo leen/escriben via useTimelineSync.
   // Aquí solo computamos el rango BASE (full) que el panel usará cuando
   // no hay zoom activo — sirve de fallback cuando context.range es null.
+  // Encuadre del eje: cuando el turno NO está acotado en Shoplogix (Filete
+  // etiqueta "Turno Dia" sobre 24 h), dibujar el turno completo comprime 6 h de
+  // operación en el 15% del ancho — el Gantt y el gráfico de tasa quedan
+  // ilegibles. `verTurnoCompleto` deja volver a la ventana del turno.
+  const [verTurnoCompleto, setVerTurnoCompleto] = useState(false)
+
   const baseAxisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
     if (chartAxisWindow) return chartAxisWindow
 
@@ -962,6 +969,38 @@ export function AnalisisGraderTurnoPage() {
 
     return null
   }, [chartAxisWindow, shiftWindow, upstreamLine.snapshot])
+
+  /**
+   * Ventana efectiva de producción y si conviene encuadrar el eje en ella. Se
+   * calcula sobre las MÁQUINAS (no sobre el doc padre) para que valga también
+   * cuando el snapshot viene del fallback en vivo.
+   */
+  const slxProductionWindow = useMemo(
+    () => (upstreamLine.snapshot ? effectiveProductionWindow(upstreamLine.snapshot.machines) : null),
+    [upstreamLine.snapshot],
+  )
+  const framedOnProduction = useMemo(() => {
+    if (verTurnoCompleto || !slxProductionWindow) return false
+    const sw = baseAxisWindow
+      ? { start: new Date(baseAxisWindow.startAt), end: new Date(baseAxisWindow.endAt) }
+      : null
+    return shouldFrameOnProduction(sw, slxProductionWindow)
+  }, [verTurnoCompleto, slxProductionWindow, baseAxisWindow])
+
+  /**
+   * Eje que reciben el Gantt y el gráfico de tasa. Es el MISMO para los dos: van
+   * sincronizados (hover y zoom cruzados), así que acotar solo uno los
+   * desalinearía. Se agregan 10 min de margen a cada lado para que el primer y
+   * el último tramo no queden pegados al borde.
+   */
+  const axisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
+    if (!framedOnProduction || !slxProductionWindow) return baseAxisWindow
+    const PAD_MS = 10 * 60_000
+    return {
+      startAt: new Date(slxProductionWindow.start.getTime() - PAD_MS).toISOString(),
+      endAt:   new Date(slxProductionWindow.end.getTime() + PAD_MS).toISOString(),
+    }
+  }, [framedOnProduction, slxProductionWindow, baseAxisWindow])
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
@@ -1466,10 +1505,12 @@ export function AnalisisGraderTurnoPage() {
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
-            shiftWindow={baseAxisWindow}
+            shiftWindow={axisWindow}
             pauses={[]}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            framedOnProduction={framedOnProduction}
+            onToggleFraming={slxProductionWindow ? () => setVerTurnoCompleto((v) => !v) : undefined}
           />
 
           {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
@@ -1748,10 +1789,12 @@ export function AnalisisGraderTurnoPage() {
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
-            shiftWindow={baseAxisWindow}
+            shiftWindow={axisWindow}
             pauses={pauses}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            framedOnProduction={framedOnProduction}
+            onToggleFraming={slxProductionWindow ? () => setVerTurnoCompleto((v) => !v) : undefined}
           />
 
           {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
