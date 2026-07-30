@@ -19,6 +19,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Fishken: 6 medios + restos de quiz/"por que importa" corregidos (PR #308, MERGED, 3a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 6 hallazgos MEDIOS de la Fishken cruzados contra los 4 manuales del equipo (E-Pack S28, Hardware, Diagramas de Conexion, FishKen Web), citando pagina.
+- Hecho: (1) procedimiento de arranque saltaba el Autozero (pag 10), ahora 7 pasos + Pausar/Detener; (2) rango de calibre no se edita en el E-Pack, se corrige en FishKen Web > Calibres; (3) causas de sobrepeso estaban al reves de lo documentado (deshabilitar compuerta SUBE el sobrepeso, no lo baja); (4) "compuertas no accionan" culpaba directo a la tarjeta NUMATO en vez de aire/electrovalvulas/24V primero; (5) "celda sucia" no es causa documentada, se agrego bloque de mantencion semanal con causas mecanicas reales; (6) cambio de producto no se hace en el E-Pack sino en FishKen Web > Configuracion, y no existe boton "reiniciar estadisticas". Ademas se corrigieron restos en `fishkenLearning.ts` (por que importa + quiz seguian atribuyendo sobrepeso a "celda sucia") y en `marelHgLearning.ts` (resto del PR #306: Metodos de clasificacion y Alarmas contradecian el JSON ya corregido).
+- Archivos: `apps/pwa/src/services/fishken/fishkenContent.json`, `apps/pwa/src/services/fishkenLearning.ts`, `apps/pwa/src/services/marelHgLearning.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web en dos pasadas (1a detecto la falla de los `*Learning.ts`, 2a dio PASA en 5 puntos leidos del DOM en ambas fichas, incluyendo responder el quiz).
+- Estado: HECHO. Sigue: 15 de 43 medios corregidos acumulados; quedan medios sin tocar en otros equipos (4a tanda).
+
 ## 2026-07-30 - claude - Marel HG: 7 medios + 3 menores corregidos (PR #306, MERGED, 2a tanda de MEDIOS)
 
 - Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS de la Marel HG mas 3 menores de las mismas secciones, cruzados contra `785_A600 User Manual_ES.pdf` citando pagina impresa.
