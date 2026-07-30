@@ -286,22 +286,27 @@
     {
       "id": "mhg-proc-activar-flippers-entrada-baader",
       "title": "Activación manual de flippers de entrada al Baader",
-      "description": "Abrir manualmente una compuerta específica desde el menú Servicio, sin esperar producto — útil para pruebas y despeje de atascos.",
+      "description": "PRUEBA FUNCIONAL de una compuerta desde el menú Servicio, con la zona despejada. NO es un método para desatascar producto: para eso hay que detener y bloquear energía y aire (ver paso 1).",
       "steps": [
         {
           "order": 1,
+          "title": "⚠ Seguridad ANTES de activar: zona despejada y nadie en las compuertas",
+          "description": "Este procedimiento MUEVE brazos de compuerta con la máquina energizada. El manual A600 es explícito: no trabajar en piezas móviles «sin desconectar primero la alimentación eléctrica y cerrar la válvula de suministro de aire principal… podrían producirse graves lesiones personales o la muerte».\n\nAntes de presionar Iniciar/detener: (1) verificar que NADIE tenga manos ni cuerpo en la zona de compuertas; (2) confirmar que no haya riesgo de lesiones al activar (A600 pág. 5); (3) activar UNA puerta a la vez — accionar pares e impares simultáneamente hace que los brazos SE GOLPEEN ENTRE SÍ (A600 pág. 24).\n\nPARA DESATASCAR PRODUCTO NO SE USA ESTE PROCEDIMIENTO: detener la máquina, cortar la energía y cerrar el aire principal (LOTO) antes de meter la mano."
+        },
+        {
+          "order": 2,
           "title": "Ingresar la clave de Servicio",
           "description": "Misma pantalla \"Introduzca la contraseña\": ingresa la clave de Servicio con el teclado numérico y confirma con ✔.",
           "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-1.jpg?alt=media&token=d5320998-44bf-41df-a3fd-5d7742724915"
         },
         {
-          "order": 2,
+          "order": 3,
           "title": "Confirmar la clave",
           "description": "El campo muestra la clave enmascarada con asteriscos mientras se escribe. Verifica los dígitos antes de confirmar.",
           "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-2.jpg?alt=media&token=7b9fdb73-e096-4242-a572-41cbb483364d"
         },
         {
-          "order": 3,
+          "order": 4,
           "title": "Elegir la puerta y activarla",
           "description": "En la pantalla de activación manual: arriba a la derecha selecciona el número de \"Puerta por ajustar\" con los botones \"−\"/\"+\"; abajo a la izquierda se ve el \"Tiempo apertura/cierre puerta\" (ej. 0.75 s). Presiona \"Iniciar/detener\" (abajo a la derecha) para abrir y cerrar esa puerta manualmente.",
           "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-hg%2Fprocedures%2Fmhg-proc-activar-flippers-entrada-baader%2Fstep-3.jpg?alt=media&token=26425f8f-2845-4387-b721-e97a64b66888"

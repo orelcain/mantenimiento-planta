@@ -20,9 +20,9 @@
     },
     {
       "id": "fk-manual-servicio",
-      "title": "Servicio FishKen: calibración, puertas y conexiones",
+      "title": "Servicio FishKen: calibración, ajuste neumático y conexiones",
       "order": 4,
-      "content": "La sección Servicio FishKen agrupa las tareas de mantenimiento del software.\n\nPuntos clave:\n\n- Calibración: calibración del sistema de pesaje.\n- Ajuste de puertas: habilitar/deshabilitar cada compuerta (casilla Activo + Guardar Cambios).\n- Pruebas de conexión: verifican que la E-Pack esté operativa en 3 grupos — Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.\n\nNotas operativas:\n\n- Deshabilitar una compuerta si presenta problemas de pesaje, hasta resolverla.\n- Fuente: manual Fishken E-Pack S28, pág 19, 25, 27-28."
+      "content": "La sección Servicio FishKen agrupa las tareas de mantenimiento del software.\n\nPuntos clave:\n\n- Calibración: calibración del sistema de pesaje Y habilitar/deshabilitar cada compuerta (la casilla Activo + Guardar Cambios está ACÁ, pág. 24).\n- Ajuste de puertas: regulación NEUMÁTICA de los cilindros (Abrir / Cerrar / Ciclo), págs. 25-26. NO sirve para habilitar ni deshabilitar compuertas.\n- Pruebas de conexión: verifican que la E-Pack esté operativa en 3 grupos — Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.\n\nNotas operativas:\n\n- Deshabilitar una compuerta si presenta problemas de pesaje, hasta resolverla (se hace en Calibración).\n- ⚠ En \"Ajuste de puertas\" hay 3 controles que accionan TODAS las compuertas a la vez: usarlos con producto cargado lo descarga a la cinta central.\n- Fuente: manual Fishken E-Pack S28, pág 19, 25, 27-28."
     },
     {
       "id": "fk-manual-web-reportes",
@@ -43,20 +43,63 @@
       "title": "Iniciar el proceso",
       "description": "Arrancar la producción desde el software E-Pack. Fuente: manual Fishken E-Pack S28, pág 9.",
       "steps": [
-        { "order": 1, "title": "Abrir Iniciar Proceso", "description": "En el menú principal del E-Pack, entrar a Iniciar Proceso." },
-        { "order": 2, "title": "Verificar producto y compuertas", "description": "Confirmar el producto configurado y que las compuertas necesarias estén habilitadas (no en rojo)." },
-        { "order": 3, "title": "Iniciar", "description": "Presionar Iniciar Proceso: todas las compuertas se levantan por un tiempo configurable y luego vuelven a su estado original." },
-        { "order": 4, "title": "Vigilar estadísticas", "description": "Seguir cajas producidas/rechazadas, sobrepeso % y productividad en la pantalla." }
+        {
+          "order": 1,
+          "title": "Abrir Iniciar Proceso",
+          "description": "En el menú principal del E-Pack, entrar a Iniciar Proceso."
+        },
+        {
+          "order": 2,
+          "title": "Verificar producto y compuertas",
+          "description": "Confirmar el producto configurado y que las compuertas necesarias estén habilitadas (no en rojo)."
+        },
+        {
+          "order": 3,
+          "title": "Iniciar",
+          "description": "Presionar Iniciar Proceso: todas las compuertas se levantan por un tiempo configurable y luego vuelven a su estado original."
+        },
+        {
+          "order": 4,
+          "title": "Vigilar estadísticas",
+          "description": "Seguir cajas producidas/rechazadas, sobrepeso % y productividad en la pantalla."
+        }
       ]
     },
     {
       "id": "fk-proc-calibrar",
       "title": "Calibrar el sistema de pesaje",
-      "description": "Mantener el pesaje exacto. Fuente: manual Fishken E-Pack S28, pág 19.",
+      "description": "Calibrar el pesaje compuerta por compuerta. Los DOS pasos (ZERO y patrón) deben completarse en una compuerta antes de pasar a la siguiente. Fuente: manual Fishken E-Pack S28, págs. 20-24.",
       "steps": [
-        { "order": 1, "title": "Abrir Servicio FishKen", "description": "Desde el menú principal, entrar a Servicio FishKen." },
-        { "order": 2, "title": "Calibración", "description": "Ir a la sección Calibración y seguir el procedimiento del sistema de pesaje." },
-        { "order": 3, "title": "Verificar", "description": "Comprobar que las lecturas de las celdas queden dentro del rango esperado." }
+        {
+          "order": 1,
+          "title": "Abrir Servicio FishKen › Calibración",
+          "description": "Desde el menú principal, entrar a Servicio FishKen y luego a Calibración. Es la pantalla que tiene la casilla Activo y el botón Guardar Cambios."
+        },
+        {
+          "order": 2,
+          "title": "Ingresar el peso patrón EN GRAMOS",
+          "description": "Escribir el valor del peso patrón en gramos. Si se ingresa en otra unidad, toda la calibración queda corrida."
+        },
+        {
+          "order": 3,
+          "title": "Elegir el rango de tarjetas",
+          "description": "Seleccionar el rango de tarjetas de pesaje sobre el que se va a calibrar."
+        },
+        {
+          "order": 4,
+          "title": "Por compuerta, SIN peso: \"Obtener ZERO\"",
+          "description": "Con la compuerta vacía (sin ningún peso encima), presionar \"Obtener ZERO\". Este es el primero de los dos pasos obligatorios."
+        },
+        {
+          "order": 5,
+          "title": "Colocar el patrón, esperar estabilización y \"Calibrar\"",
+          "description": "Poner el peso patrón en la compuerta, ESPERAR a que la lectura se estabilice y presionar \"Calibrar\". Recién ahí la compuerta quedó calibrada."
+        },
+        {
+          "order": 6,
+          "title": "⚠ Completar AMBOS pasos antes de pasar a otra compuerta",
+          "description": "El manual es explícito (pág. 24): «se deben completar los dos pasos en una compuerta para pasar a otra, de lo contrario la calibración no será correcta y la máquina presentará problemas de pesaje». No saltar de compuerta a compuerta haciendo solo el ZERO."
+        }
       ]
     },
     {
@@ -64,9 +107,21 @@
       "title": "Habilitar o deshabilitar una compuerta",
       "description": "Sacar de servicio una compuerta con problemas sin parar la máquina. Fuente: manual Fishken E-Pack S28, pág 25.",
       "steps": [
-        { "order": 1, "title": "Abrir Ajuste de puertas", "description": "En Servicio FishKen, ir a Ajuste de puertas." },
-        { "order": 2, "title": "Marcar/desmarcar Activo", "description": "Para deshabilitar una compuerta con problemas de pesaje, desmarcar la casilla Activo (para habilitarla, marcarla)." },
-        { "order": 3, "title": "Guardar Cambios", "description": "Dar clic en Guardar Cambios; la compuerta deshabilitada se muestra en rojo." }
+        {
+          "order": 1,
+          "title": "Abrir Calibración",
+          "description": "En Servicio FishKen, ir a Calibración. ⚠ NO uses \"Ajuste de puertas\": esa pantalla es la regulación neumática de cilindros (Abrir/Cerrar/Ciclo) y sus controles accionan TODAS las compuertas a la vez — con producto cargado lo descargarían a la cinta central."
+        },
+        {
+          "order": 2,
+          "title": "Marcar/desmarcar Activo",
+          "description": "Para deshabilitar una compuerta con problemas de pesaje, desmarcar la casilla Activo (para habilitarla, marcarla)."
+        },
+        {
+          "order": 3,
+          "title": "Guardar Cambios",
+          "description": "Dar clic en Guardar Cambios; la compuerta deshabilitada se muestra en rojo."
+        }
       ]
     },
     {
@@ -74,10 +129,26 @@
       "title": "Pruebas de conexión",
       "description": "Verificar que la E-Pack esté operativa. Fuente: manual Fishken E-Pack S28, pág 27-28.",
       "steps": [
-        { "order": 1, "title": "Abrir Pruebas de conexión", "description": "En Servicio FishKen, ir a Pruebas de conexión." },
-        { "order": 2, "title": "Base de Datos", "description": "Ejecutar la prueba de Base de Datos para corroborar la conexión." },
-        { "order": 3, "title": "Tarjetas de Relé", "description": "Probar las Tarjetas de Relé (NUMATO) que accionan las compuertas." },
-        { "order": 4, "title": "Tarjetas de Pesaje", "description": "Probar las Tarjetas de Pesaje que leen las celdas de carga." }
+        {
+          "order": 1,
+          "title": "Abrir Pruebas de conexión",
+          "description": "En Servicio FishKen, ir a Pruebas de conexión."
+        },
+        {
+          "order": 2,
+          "title": "Base de Datos",
+          "description": "Ejecutar la prueba de Base de Datos para corroborar la conexión."
+        },
+        {
+          "order": 3,
+          "title": "Tarjetas de Relé",
+          "description": "Probar las Tarjetas de Relé (NUMATO) que accionan las compuertas."
+        },
+        {
+          "order": 4,
+          "title": "Tarjetas de Pesaje",
+          "description": "Probar las Tarjetas de Pesaje que leen las celdas de carga."
+        }
       ]
     },
     {
@@ -85,9 +156,21 @@
       "title": "Generar un reporte en FishKen Web",
       "description": "Obtener reportes de producción por especie/calidad/calibre. Fuente: manual FishKen Web, pág 19-21.",
       "steps": [
-        { "order": 1, "title": "Abrir FishKen Web", "description": "Entrar a la aplicación FishKen Web." },
-        { "order": 2, "title": "Elegir el tipo de reporte", "description": "Seleccionar por Especie, Calidad o Calibre, en versión General o Detallado." },
-        { "order": 3, "title": "Filtrar y generar", "description": "Aplicar el rango/orden deseado y generar el reporte." }
+        {
+          "order": 1,
+          "title": "Abrir FishKen Web",
+          "description": "Entrar a la aplicación FishKen Web."
+        },
+        {
+          "order": 2,
+          "title": "Elegir el tipo de reporte",
+          "description": "Seleccionar por Especie, Calidad o Calibre, en versión General o Detallado."
+        },
+        {
+          "order": 3,
+          "title": "Filtrar y generar",
+          "description": "Aplicar el rango/orden deseado y generar el reporte."
+        }
       ]
     },
     {
@@ -95,9 +178,21 @@
       "title": "Revisar rechazo y sobrepeso",
       "description": "Controlar el rendimiento del proceso. Fuente: manual Fishken E-Pack S28, pág 7.",
       "steps": [
-        { "order": 1, "title": "Ver estadísticas", "description": "En Iniciar Proceso, mirar cajas rechazadas, sobrepeso y % de sobrepeso." },
-        { "order": 2, "title": "Identificar la causa", "description": "Sobrepeso o rechazo alto suele venir de compuertas con pesaje malo o rango de celda incorrecto." },
-        { "order": 3, "title": "Actuar", "description": "Deshabilitar la compuerta problemática o recalibrar; verificar la mejora en las estadísticas." }
+        {
+          "order": 1,
+          "title": "Ver estadísticas",
+          "description": "En Iniciar Proceso, mirar cajas rechazadas, sobrepeso y % de sobrepeso."
+        },
+        {
+          "order": 2,
+          "title": "Identificar la causa",
+          "description": "Sobrepeso o rechazo alto suele venir de compuertas con pesaje malo o rango de celda incorrecto."
+        },
+        {
+          "order": 3,
+          "title": "Actuar",
+          "description": "Deshabilitar la compuerta problemática o recalibrar; verificar la mejora en las estadísticas."
+        }
       ]
     }
   ],
@@ -130,7 +225,7 @@
       "title": "¿Qué hago cuando una compuerta pesa mal?",
       "trigger": "Una compuerta entrega pesajes erráticos o sube el rechazo/sobrepeso.",
       "actions": [
-        "Ir a Servicio FishKen › Ajuste de puertas.",
+        "Ir a Servicio FishKen › Calibración (ahí está la casilla Activo, NO en Ajuste de puertas).",
         "Desmarcar Activo en la compuerta problemática y Guardar Cambios (queda en rojo).",
         "Seguir produciendo con el resto mientras se revisa la celda/mecánica de esa compuerta.",
         "Recalibrar o reparar antes de volver a habilitarla.",
@@ -169,7 +264,7 @@
         "La compuerta fue deshabilitada a propósito (casilla Activo desmarcada).",
         "Se deshabilitó por problemas de pesaje."
       ],
-      "solution": "Es el estado 'deshabilitada'. Para volver a usarla: Servicio FishKen › Ajuste de puertas, marcar Activo y Guardar Cambios (tras resolver el problema de pesaje). Fuente: manual Fishken E-Pack S28, pág 8, 25."
+      "solution": "Es el estado 'deshabilitada'. Para volver a usarla: Servicio FishKen › Calibración, marcar Activo y Guardar Cambios (tras resolver el problema de pesaje). Fuente: manual Fishken E-Pack S28, pág 8, 25."
     },
     {
       "id": "fk-diag-sobrepeso-rechazo",

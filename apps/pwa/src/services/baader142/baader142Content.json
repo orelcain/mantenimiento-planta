@@ -305,7 +305,7 @@
     {
       "id": "b142-proc-limpieza-diaria",
       "title": "Limpieza diaria",
-      "description": "Limpieza diaria BAADER 142.\n\nFuente: manual 142, pág 52",
+      "description": "Limpieza diaria BAADER 142. TERMINA CON ENGRASE: el manual exige lubricar siempre después de limpiar, para expulsar el agua de los cojinetes.\n\nFuente: manual 142, pág 52",
       "steps": [
         {
           "order": 1,
@@ -346,6 +346,11 @@
           "order": 8,
           "title": "Paso 8",
           "description": "¡No debe desconectarse el interruptor principal!"
+        },
+        {
+          "order": 9,
+          "title": "⚠ ENGRASAR después de limpiar — no es opcional",
+          "description": "El manual lo exige siempre después de la limpieza (§17.1 y §15.4): engrasar para EXPULSAR EL AGUA que penetró en los cojinetes durante el lavado, y después quitar la grasa sobrante. Como la máquina se limpia completamente cada 8 horas de servicio (§15), en la práctica el engrase es POR TURNO, no semanal. Saltarlo deja agua adentro de los cojinetes."
         }
       ]
     },
@@ -393,36 +398,41 @@
       "steps": [
         {
           "order": 1,
+          "title": "Por turno (cada 8 h de servicio) y después de CADA limpieza: engrasar",
+          "description": "Lubrificar el punto de engrase al cabo de 8 horas de servicio (§17.1.1) y siempre después de la limpieza, para expulsar el agua penetrada en los cojinetes (§17.1, §15.4). Grasa GLS 380/N3; la presión en la boquilla de la pistola no debe pasar de 190 bar. Quitar la grasa sobrante."
+        },
+        {
+          "order": 2,
           "title": "Paso 1",
           "description": "Diario: verificar palpador por marcha suave; cambiar hoja de membrana; verificar cuchillas y hojas."
         },
         {
-          "order": 2,
+          "order": 3,
           "title": "Paso 2",
           "description": "Diario: rociar bomba BNM (BUSCH) con 10 l de agua; girar interruptores 360°; resetear contador."
         },
         {
-          "order": 3,
+          "order": 4,
           "title": "Paso 3",
-          "description": "Semanal: lubrificar máquina, palpador y bielas; desmontar cuchilla hendedora y reafilarla o sustituirla."
+          "description": "Semanal: desmontar la cuchilla hendedora y reafilarla o sustituirla. ⚠ OJO: la LUBRICACIÓN de máquina, palpador y bielas NO es semanal — el manual la exige cada 8 horas de servicio (§17.1.1) y siempre después de cada limpieza (§17.1, §15.4). Ver el paso de engrase al final del procedimiento de Limpieza diaria."
         },
         {
-          "order": 4,
+          "order": 5,
           "title": "Paso 4",
           "description": "Semanal: controlar hermeticidad de mangueras, tensión de correas dentadas y sujeciones."
         },
         {
-          "order": 5,
+          "order": 6,
           "title": "Paso 5",
           "description": "Semanal: controlar presión de aire 4 bar, presión de agua 2 bar y vacío -0,4 bar."
         },
         {
-          "order": 6,
+          "order": 7,
           "title": "Paso 6",
           "description": "Lubrificar con GLS 380/N3; presión máxima en boquilla de pistola no deberáa sobrepasar 190 bar."
         },
         {
-          "order": 7,
+          "order": 8,
           "title": "Paso 7",
           "description": "Palpador, cabezas articuladas y cadena: intervalo 40 horas, Spray especial FLC 65."
         }
