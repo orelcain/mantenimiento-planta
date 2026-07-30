@@ -13,6 +13,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-07-30 - claude - Arregla los 2 crones que fallaban por la proteccion de main (PR #292)
+
+- Hecho: causa raiz comun — `main` exige el check "build" con `enforce_admins: true`, ninguna escritura directa entra. `Daily Sync (versions)` fallaba desde el 24-jul (`GH006`): se le quito el `schedule` y `version.ts` ahora se sincroniza solo via `prebuild` y el nuevo `dev` (`sync:version && vite`); el workflow queda de auditoria manual. `Weekly NanoBanana Check` fallaba 3 domingos seguidos (`HTTP 409`): ahora sube a la rama sin proteccion `nanobanana-assets`.
+- Archivos: `.github/workflows/{sync-version.yml,nanobanana-weekly.yml}` (o equivalentes), `apps/pwa/package.json` (script `dev`), `.claude/launch.json` (`autoPort`).
+- Verificacion: sintaxis .py/.yaml OK; sync manual llevo `version.ts` 3.99.1→3.99.6; `pnpm dev` encadena bien; los 2 workflows disparados a mano en `success` (antes fallaban siempre); NanoBanana genero imagen valida (PNG real, HTTP 200) y abrio issue #291. Check "build" del PR: pass.
+- Estado: HECHO — PR #292 mergeado (squash+admin), deploy a GitHub Pages y Firebase Hosting disparado automaticamente al mergear.
+- Sigue: confirmar en el proximo domingo/medianoche que los 2 crones corren solos sin intervencion.
+
 ## 2026-07-30 - claude - Grafico velocidad real vs objetivo del sensor
 
 - Hecho: el grafico de tasa (pz/min) de la vista de turno ahora superpone el OBJETIVO por bucket que reporta el sensor (`targetRate`, con `expectedCycles/duracion` de respaldo en docs viejos) como linea punteada, y sombrea los tramos con objetivo vigente y produccion 0 ("parada con objetivo"). Ademas corrige el objetivo NOMINAL: se tomaba del PRIMER bucket con expected>0 — que es parcial y miente (en el turno del 28-jul de la Baader 200 daba 5 pz/min cuando el objetivo real era 20). Ahora es el maximo por bucket, mismo criterio que `targetCpmFromIntervals`.
