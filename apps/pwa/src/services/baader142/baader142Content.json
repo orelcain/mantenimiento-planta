@@ -167,7 +167,7 @@
         {
           "order": 2,
           "title": "Paso 2",
-          "description": "Ajustar 400 mm entre chapaleta medidora de largos y canto delantero del carro."
+          "description": "Ajustar 400 ±2 mm entre la chapaleta medidora de largos y el canto delantero del carro (dib. 15; la tabla de medidas de ajuste lo repite como punto cero del carro, -400 ±2 mm). ⚠ El manual advierte que esta medida influye esencialmente en la medición de largos — y una medición de largos incorrecta es la causa que el propio manual lista para \"las herramientas no se bajan\" y para \"el corte princesa queda partido\"."
         },
         {
           "order": 3,
@@ -199,42 +199,52 @@
     {
       "id": "b142-proc-ajustar-palpador-medicion",
       "title": "Ajustar palpador de medición",
-      "description": "Ajuste del palpador y su interruptor de aproximación.\n\nFuente: manual 142, pág 28-29",
+      "description": "Ajuste del palpador y su interruptor de aproximación. ⚠ El manual encabeza esta secuencia con \"¡Observar el orden de conexión!\": los pasos 2 y 5 (enroscar y desenroscar la clavija de tope) abren y cierran el ajuste, y saltárselos deja la aleta de conexión sin tope de goma.\n\nFuente: manual 142, §12.4, pág 28 del PDF (impresa 26)",
       "steps": [
         {
           "order": 1,
-          "title": "Paso 1",
-          "description": "Controlar marcha suave; la aleta de conexión no debe engancharse."
+          "title": "Paso 1 — Marcha suave",
+          "description": "Controlar el palpador de medición (dib. 18, pos. 1) por marcha suave; la aleta de conexión (pos. 2) no debe engancharse."
         },
         {
           "order": 2,
-          "title": "Paso 2",
-          "description": "Ajustar muelles de tracción a 65 mm y 100 mm, y muelles de compresión a 25 mm."
+          "title": "Paso 2 — Enroscar la clavija de tope A FONDO",
+          "description": "Enroscar completamente la clavija de tope (dib. 18, pos. 3). Este es el PRIMER paso del orden de conexión: sin él, el resto del ajuste queda sin referencia."
         },
         {
           "order": 3,
-          "title": "Paso 3",
-          "description": "Ajustar tornillo de tope para que las puntas se toquen ligeramente."
+          "title": "Paso 3 — Muelles",
+          "description": "Ajustar los muelles de tracción (pos. 4 y 5) a 65 mm y 100 mm (medida de ojales) y los muelles de compresión (pos. 6) a 25 mm (medida de casquillos)."
         },
         {
           "order": 4,
-          "title": "Paso 4",
-          "description": "Con ambas puntas tocándose se enciende el diodo; con regleta de 1 mm se apaga."
+          "title": "Paso 4 — Tornillo de tope",
+          "description": "Ajustar el tornillo de tope (pos. 7) de forma que las puntas del palpador se toquen ligeramente."
         },
         {
           "order": 5,
-          "title": "Paso 5",
-          "description": "Centrar el punto medio de las puntas respecto a la cadena de transporte."
+          "title": "Paso 5 — Desenroscar la clavija hasta el tope de goma",
+          "description": "Desenroscar LENTAMENTE la clavija de tope (pos. 3) hasta que la aleta de conexión (pos. 2) haga contacto con el tope de goma (pos. 8). Cierra el orden de conexión. Si se omite, la aleta queda sin amortiguador — y \"falta el amortiguador de la aleta de conexión o está defectuoso\" es justamente la causa que el manual lista (pág 38) para \"el puntero entra en acción con retraso\" y \"el puntero se asienta con irregularidad\"."
         },
         {
           "order": 6,
-          "title": "Paso 6",
-          "description": "Ajustar 51 mm entre puntas y canto superior del carro."
+          "title": "Paso 6 — Verificar el interruptor de aproximación",
+          "description": "Con ambas puntas tocándose se enciende el diodo del interruptor de aproximación (pos. 9); poniendo una regleta de acero de 1 mm entre las puntas, se apaga. Las puntas NO deben separarse por un lado solamente."
         },
         {
           "order": 7,
-          "title": "Paso 7",
-          "description": "En posición 4 verificar que valor y medido y visualizado sean idénticos."
+          "title": "Paso 7 — Centrar",
+          "description": "Soltar el anillo de ajuste (pos. 10) y desplazar el cubo de sujeción (pos. 11) en el eje (pos. 12) de forma que el punto medio entre ambas puntas quede céntrico respecto a la cadena de transporte; la plantilla (dib. 19, pos. 1; opcional) facilita el ajuste. Después empujar el anillo contra el buje fijador y sujetarlo."
+        },
+        {
+          "order": 8,
+          "title": "Paso 8 — 51 mm al carro",
+          "description": "Ajustar una distancia de 51 mm entre las puntas del palpador y el canto superior del carro (pos. 13), mediante el tornillo de tope (pos. 14) en la caja de engranaje."
+        },
+        {
+          "order": 9,
+          "title": "Paso 9 — Verificar",
+          "description": "En posición 4, verificar que el valor medido y el visualizado sean idénticos."
         }
       ]
     },
@@ -652,7 +662,7 @@
       "possibleCauses": [
         "La tarjeta del contador de valor de rotación está defectuosa."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e771",
@@ -661,7 +671,7 @@
       "possibleCauses": [
         "Transmisor de valor de rotación B21 para SM1 defectuoso (centraje)."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e772",
@@ -670,7 +680,7 @@
       "possibleCauses": [
         "Transmisor de valor de rotación B22 para SM2 defectuoso (cuchilla abridora)."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e773",
@@ -679,7 +689,7 @@
       "possibleCauses": [
         "Transmisor de valor de rotación B23 para SM3 defectuoso (aspirador)."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e774",
@@ -688,7 +698,7 @@
       "possibleCauses": [
         "Transmisor de valor de rotación B24 para SM4 defectuoso (excavador A)."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e775",
@@ -697,7 +707,7 @@
       "possibleCauses": [
         "Transmisor de valor de rotación B25 para SM5 defectuoso (excavador B)."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41. ⚠ CONDICIONAL: en el manual estos seis códigos (E 770 a E 775) llevan asterisco y la nota al pie de la pág 42 dice \"Indicación solo con el Upgrade Kit de la BAADER 142\"; el §22.4.4 (pág 87) confirma que los transmisores de valor de rotación por herramienta son parte de ese equipo especial. En una 142 SIN Upgrade Kit estos códigos no se muestran — no salir a buscar transmisores B21-B25 que la máquina puede no tener instalados. PENDIENTE de confirmar en planta si esta 142 tiene el Upgrade Kit."
     },
     {
       "id": "b142-diag-e777",
@@ -713,9 +723,10 @@
       "title": "E 8 N X",
       "symptom": "E 8 N X",
       "possibleCauses": [
-        "N = función del motor paso a paso de 0 a 6; X = 1 Cuchilla abridora, 2 Centraje, 3 Aspirador, 4 Excavador A, 5 Excavador B."
+        "N = función del motor paso a paso, de 0 a 6.",
+        "X = número del motor paso a paso: 1 = SM1 Centraje · 2 = SM2 Cuchilla abridora · 3 = SM3 Aspirador · 4 = SM4 Excavador A · 5 = SM5 Excavador B."
       ],
-      "solution": "El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, pág 41."
+      "solution": "⚠ OJO — el manual se contradice a sí mismo acá, y conviene saberlo antes de decodificar un código. La tabla \"E 8 N X\" de la pág 41 asigna X=1 a la Cuchilla abridora y X=2 al Centraje, pero el resto del manual dice lo contrario DOS veces: en esa misma página 41, \"E 771 → transmisor B21 para el motor paso a paso SM1 (centraje)\" y \"E 772 → B22 para SM2 (cuchilla abridora)\"; y el protocolo de la pág 45 confirma \"CENTERING SM1\" y \"SLIT KNIFE SM2\". Como los códigos E801-E805, E821-E825, E831-E835, E841-E845, E851-E855 y E861-E865 se numeran por SMn, acá se publica el mapeo confirmado dos veces (1 = SM1 Centraje, 2 = SM2 Cuchilla abridora). Decodificar E821 con la regla X de la tabla llevaría a intervenir la cuchilla abridora cuando el fallo es del centraje. El manual no entrega una solución separada para esta fila; revisar y corregir las causas indicadas. Fuente: manual 142, págs 41 y 45 del PDF (impresas 39 y 43)."
     },
     {
       "id": "b142-diag-e801-e805",
