@@ -797,9 +797,18 @@ export async function deleteFlow(machineSlug: string, id: string): Promise<void>
 // DIAGNOSIS
 // ─────────────────────────────────────────────────────────────
 
+/** Mergea el seed de diagnóstico de una máquina con sus overrides de Firestore
+ *  (lo que se edita desde el editor admin). Sin esto el editor escribe a
+ *  Firestore pero nadie lo lee nunca: la edición queda invisible en la ficha.
+ *  Mismo patrón que `withManualOverrides` para la sección manual. */
+async function withDiagnosisOverrides(slug: string, base: DiagnosisEntry[]): Promise<DiagnosisEntry[]> {
+  const stored = await listStoredDiagnosis(slug)
+  return mergeSeedOverrides(base, stored)
+}
+
 export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Diagnosis()
-  if (machineSlug === B142_LEARNING_SLUG) return listB142Diagnosis()
+  if (machineSlug === B142_LEARNING_SLUG) return withDiagnosisOverrides(B142_LEARNING_SLUG, listB142Diagnosis())
   if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorDiagnosis()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgDiagnosis()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenDiagnosis()
@@ -829,6 +838,10 @@ export async function deleteDiagnosis(machineSlug: string, id: string): Promise<
     return
   }
   if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-diagnosis-')) {
+    await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
+  if (machineSlug === B142_LEARNING_SLUG && id.startsWith('b142-diag-')) {
     await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
   }
@@ -894,12 +907,33 @@ export interface MachineContentCounts {
   quiz?: number
 }
 
+/** Counts de la 142 con la sección diagnosis ya mergeada con Firestore (el resto
+ *  sigue viniendo del seed). Si no, el contador de la tarjeta mostraría el 34 del
+ *  seed mientras la pestaña lista otra cantidad. Devuelve también el updatedAt más
+ *  reciente para que el badge "Nuevo" reaccione a lo editado por el admin. */
+async function getB142CountsAndStamp(): Promise<{
+  counts: MachineContentCounts
+  lastUpdatedAt: number
+}> {
+  const base = getB142ContentCounts()
+  try {
+    const diagnosis = await listDiagnosis(B142_LEARNING_SLUG)
+    const newest = diagnosis.reduce(
+      (max, d) => Math.max(max, d.updatedAt || 0),
+      B142_CONTENT_UPDATED_AT
+    )
+    return { counts: { ...base, diagnosis: diagnosis.length }, lastUpdatedAt: newest }
+  } catch {
+    return { counts: base, lastUpdatedAt: B142_CONTENT_UPDATED_AT }
+  }
+}
+
 /** Obtiene conteo de items por seccion para una maquina */
 export async function getMachineContentCounts(
   machineSlug: string
 ): Promise<MachineContentCounts> {
   if (machineSlug === B200_LEARNING_SLUG) return getB200ContentCounts()
-  if (machineSlug === B142_LEARNING_SLUG) return getB142ContentCounts()
+  if (machineSlug === B142_LEARNING_SLUG) return getB142CountsAndStamp().then(r => r.counts)
   if (machineSlug === DETECTOR_LEARNING_SLUG) return getDetectorContentCounts()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return getMarelHgContentCounts()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return getFishkenContentCounts()
@@ -938,7 +972,8 @@ export async function getMachineContentMeta(
     return { ...counts, lastUpdatedAt: B200_CONTENT_UPDATED_AT }
   }
   if (machineSlug === B142_LEARNING_SLUG) {
-    return { ...getB142ContentCounts(), lastUpdatedAt: B142_CONTENT_UPDATED_AT }
+    const { counts, lastUpdatedAt } = await getB142CountsAndStamp()
+    return { ...counts, lastUpdatedAt }
   }
   if (machineSlug === DETECTOR_LEARNING_SLUG) {
     return { ...getDetectorContentCounts(), lastUpdatedAt: DETECTOR_CONTENT_UPDATED_AT }
