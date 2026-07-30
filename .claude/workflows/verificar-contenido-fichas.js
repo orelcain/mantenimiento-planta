@@ -63,6 +63,12 @@ const MAQUINAS = [
     fuente: 'C:/Users/orelc/OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GRADER',
     nota: 'Marelec MS4/12. Verificar la clave de servicio 8620, la fórmula fsWc y los parámetros del Z2 contra el manual.',
   },
+  {
+    slug: 'enzunchadora-n2',
+    seed: 'apps/pwa/src/services/enzunchadora/enzunchadoraContent.json',
+    fuente: 'C:/Users/orelc/OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ ENZUNCHADORA TP-6000',
+    nota: 'Transpak TP-6000-1. ⚠ ES LA MÁS RIESGOSA DE TODAS: el manual está en INGLÉS y el contenido se TRADUJO al curar (2026-07-30), así que además de datos inventados hay que buscar errores de traducción y de conversión de unidades. Verificá con lupa: rango de fleje (8-12 mm ancho, 0,55-0,75 mm espesor), peso máx. del paquete 100 kg, tamaño mín. 100x20 mm, tensión 0-10 con 4-5 para cartón, temperatura 1-6 fijada en 3-4, T1 take-up ≈0,4 s trifásica / ≈0,3 s monofásica, T2 feed ≈0,8 s / ≈0,7 s para arco 850x600, y el sentido de giro del tornillo del acumulador (antihorario si falta fleje, horario si sobra). La tabla de Troubleshooting está en la pág. 22 del manual COMO IMAGEN: para leerla usá `page.get_pixmap(dpi=170).save(...)` con fitz y mirá el PNG; sus 26 causas deben coincidir con las 5 entradas de diagnóstico.',
+  },
 ]
 
 const HALLAZGOS = {

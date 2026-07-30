@@ -49,12 +49,36 @@
       "title": "Crear un nuevo perfil de datos de producto",
       "description": "Alta de un producto nuevo antes de poder inspeccionarlo. Requiere privilegios de ingeniero. Fuente: manual Vistus, pág 121.",
       "steps": [
-        { "order": 1, "title": "Abrir Definir producto", "description": "En la lista de productos, tocar sobre << Definir producto >>. Aparece el menú Definir producto." },
-        { "order": 2, "title": "Confirmar el número de posición", "description": "En el campo Posición aparece automáticamente el número libre más bajo. Se puede cambiar tocándolo; los números ya ocupados no se reutilizan." },
-        { "order": 3, "title": "Nombre y número de artículo", "description": "Introducir el nombre del producto y el número de artículo. Máximo 15 caracteres cada uno para que se vean en el área línea/producto." },
-        { "order": 4, "title": "Completar la descripción", "description": "Tocar Siguiente y completar la descripción del producto (humedad, viscosidad, temperatura)." },
-        { "order": 5, "title": "Completar los datos de detección", "description": "Completar los datos para la detección de metal por aprendizaje automático (recomendado) o introducción manual (requiere curso de formación de Sartorius)." },
-        { "order": 6, "title": "Opcional: comprobaciones de funcionamiento", "description": "Configurar las comprobaciones de funcionamiento periódicas para este producto si corresponde." }
+        {
+          "order": 1,
+          "title": "Abrir Definir producto",
+          "description": "En la lista de productos, tocar sobre << Definir producto >>. Aparece el menú Definir producto."
+        },
+        {
+          "order": 2,
+          "title": "Confirmar el número de posición",
+          "description": "En el campo Posición aparece automáticamente el número libre más bajo. Se puede cambiar tocándolo; los números ya ocupados no se reutilizan."
+        },
+        {
+          "order": 3,
+          "title": "Nombre y número de artículo",
+          "description": "Introducir el nombre del producto y el número de artículo. Máximo 15 caracteres cada uno para que se vean en el área línea/producto."
+        },
+        {
+          "order": 4,
+          "title": "Completar la descripción",
+          "description": "Tocar Siguiente y completar la descripción del producto (humedad, viscosidad, temperatura)."
+        },
+        {
+          "order": 5,
+          "title": "Completar los datos de detección",
+          "description": "Completar los datos para la detección de metal por aprendizaje automático (recomendado) o introducción manual (requiere curso de formación de Sartorius)."
+        },
+        {
+          "order": 6,
+          "title": "Opcional: comprobaciones de funcionamiento",
+          "description": "Configurar las comprobaciones de funcionamiento periódicas para este producto si corresponde."
+        }
       ]
     },
     {
@@ -62,12 +86,36 @@
       "title": "Aprender automáticamente un producto",
       "description": "El procedimiento central: el detector mide el efecto del transporte y del producto para poder distinguir el metal. Requiere privilegios de ingeniero o responsable de mantenimiento. Fuente: manual Vistus, pág 122-125.",
       "steps": [
-        { "order": 1, "title": "Preparar producto sin metal", "description": "Tener a mano suficientes productos libres de metal (mínimo 3) del tipo a aprender." },
-        { "order": 2, "title": "Cargar el perfil", "description": "En la lista de productos, tocar el perfil a aprender. Si el nombre no aparece en el área línea/producto, tocar Cargar." },
-        { "order": 3, "title": "Iniciar el ajuste automático", "description": "Tocar Ajuste automático de producto y seguir las indicaciones de la pantalla táctil." },
-        { "order": 4, "title": "Medir el efecto del transporte", "description": "Tras confirmar la solicitud, hacer funcionar el sistema de transporte SIN productos hasta la siguiente solicitud. El detector mide el efecto del sistema de transporte en la primera frecuencia." },
-        { "order": 5, "title": "Medir el efecto de producto", "description": "Tras confirmar, dejar pasar un mínimo de 3 productos libres de metal por la abertura. El detector mide el efecto de producto y determina umbrales apropiados por frecuencia." },
-        { "order": 6, "title": "Optimizar si hace falta", "description": "Seguir las solicitudes hasta terminar. El resultado puede optimizarse después si la detección no es suficiente." }
+        {
+          "order": 1,
+          "title": "Preparar producto sin metal",
+          "description": "Tener a mano suficientes productos libres de metal (mínimo 3) del tipo a aprender."
+        },
+        {
+          "order": 2,
+          "title": "Cargar el perfil",
+          "description": "En la lista de productos, tocar el perfil a aprender. Si el nombre no aparece en el área línea/producto, tocar Cargar."
+        },
+        {
+          "order": 3,
+          "title": "Iniciar el ajuste automático",
+          "description": "Tocar Ajuste automático de producto y seguir las indicaciones de la pantalla táctil."
+        },
+        {
+          "order": 4,
+          "title": "Medir el efecto del transporte",
+          "description": "Tras confirmar la solicitud, hacer funcionar el sistema de transporte SIN productos hasta la siguiente solicitud. El detector mide el efecto del sistema de transporte en la primera frecuencia."
+        },
+        {
+          "order": 5,
+          "title": "Medir el efecto de producto",
+          "description": "Tras confirmar, dejar pasar un mínimo de 3 productos libres de metal por la abertura. El detector mide el efecto de producto y determina umbrales apropiados por frecuencia."
+        },
+        {
+          "order": 6,
+          "title": "Optimizar si hace falta",
+          "description": "Seguir las solicitudes hasta terminar. El resultado puede optimizarse después si la detección no es suficiente."
+        }
       ]
     },
     {
@@ -75,10 +123,26 @@
       "title": "Seleccionar el producto para producción",
       "description": "El operador elige qué perfil se usa para inspeccionar el flujo actual. Fuente: manual Vistus, pág 150-152.",
       "steps": [
-        { "order": 1, "title": "Abrir la lista de productos", "description": "Desde el menú principal de operador, abrir la lista de productos. Se puede ordenar por Posición, Producto o N.º art." },
-        { "order": 2, "title": "Tocar el perfil deseado", "description": "Tocar el perfil de datos de producto a utilizar. Su nombre y número de artículo aparecen en el área línea/producto." },
-        { "order": 3, "title": "Asignar lote si corresponde", "description": "Si aparece la página de nombre/número de lote, introducir esos datos (ver el procedimiento de iniciar/parar lote)." },
-        { "order": 4, "title": "Comenzar a transportar", "description": "Con el producto seleccionado, transportar ese tipo de producto por el detector." }
+        {
+          "order": 1,
+          "title": "Abrir la lista de productos",
+          "description": "Desde el menú principal de operador, abrir la lista de productos. Se puede ordenar por Posición, Producto o N.º art."
+        },
+        {
+          "order": 2,
+          "title": "Tocar el perfil deseado",
+          "description": "Tocar el perfil de datos de producto a utilizar. Su nombre y número de artículo aparecen en el área línea/producto."
+        },
+        {
+          "order": 3,
+          "title": "Asignar lote si corresponde",
+          "description": "Si aparece la página de nombre/número de lote, introducir esos datos (ver el procedimiento de iniciar/parar lote)."
+        },
+        {
+          "order": 4,
+          "title": "Comenzar a transportar",
+          "description": "Con el producto seleccionado, transportar ese tipo de producto por el detector."
+        }
       ]
     },
     {
@@ -86,10 +150,26 @@
       "title": "Iniciar o parar un lote",
       "description": "Agrupa los mensajes bajo un lote para poder filtrar informes por él. Fuente: manual Vistus, pág 150-153.",
       "steps": [
-        { "order": 1, "title": "Elegir el perfil", "description": "En la lista de productos, tocar el perfil cuyo modo lote se desea iniciar. Aparece la página para asignar nombres/números de lote." },
-        { "order": 2, "title": "Nombrar el lote", "description": "Introducir en el campo Lote el nombre o número Lot que identifica el lote; bajo ese nombre se encontrarán luego todos sus mensajes en los informes." },
-        { "order": 3, "title": "Iniciar el lote", "description": "Confirmar para iniciar el lote. La inspección queda asociada a ese lote." },
-        { "order": 4, "title": "Parar el lote", "description": "Al terminar la producción, parar el lote desde la misma página para cerrar el registro." }
+        {
+          "order": 1,
+          "title": "Elegir el perfil",
+          "description": "En la lista de productos, tocar el perfil cuyo modo lote se desea iniciar. Aparece la página para asignar nombres/números de lote."
+        },
+        {
+          "order": 2,
+          "title": "Nombrar el lote",
+          "description": "Introducir en el campo Lote el nombre o número Lot que identifica el lote; bajo ese nombre se encontrarán luego todos sus mensajes en los informes."
+        },
+        {
+          "order": 3,
+          "title": "Iniciar el lote",
+          "description": "Confirmar para iniciar el lote. La inspección queda asociada a ese lote."
+        },
+        {
+          "order": 4,
+          "title": "Parar el lote",
+          "description": "Al terminar la producción, parar el lote desde la misma página para cerrar el registro."
+        }
       ]
     },
     {
@@ -97,10 +177,26 @@
       "title": "Configurar las comprobaciones de funcionamiento",
       "description": "Programa las pruebas periódicas con bolas de test para verificar la sensibilidad. Requiere haber activado 'Comprobar con piezas de prueba' en Ajustes del detector. Fuente: manual Vistus, pág 130-134.",
       "steps": [
-        { "order": 1, "title": "Elegir el tipo de prueba", "description": "Definir el tipo: prueba única (1 pieza), prueba estándar (3 piezas) o ampliada, según el nivel de control deseado." },
-        { "order": 2, "title": "Elegir las bolas de test", "description": "Usar bolas de test de los metales más frecuentes en la producción y del tamaño acorde a la sensibilidad de control deseada. Recordar que el acero inoxidable no magnetizable (AISI 304 / V2A) es más difícil de detectar que el magnetizable (AISI 420)." },
-        { "order": 3, "title": "Fijar tolerancias", "description": "Introducir la Tolerancia de amplitud y la Tolerancia de fase en porcentaje. Si en la prueba la amplitud o la fase quedan fuera, esa parte se considera no superada." },
-        { "order": 4, "title": "Definir y aprender la pieza de prueba", "description": "Dar a la bola de test un nombre representativo que los operadores reconozcan, tocar Aprender y seguir las instrucciones. Si el producto tiene efecto de producto, colocar la bola en la zona de señal de metal más débil." }
+        {
+          "order": 1,
+          "title": "Elegir el tipo de prueba",
+          "description": "Definir el tipo: prueba única (1 pieza), prueba estándar (3 piezas) o ampliada, según el nivel de control deseado."
+        },
+        {
+          "order": 2,
+          "title": "Elegir las bolas de test",
+          "description": "Usar bolas de test de los metales más frecuentes en la producción y del tamaño acorde a la sensibilidad de control deseada. Recordar que el acero inoxidable no magnetizable (AISI 304 / V2A) es más difícil de detectar que el magnetizable (AISI 420)."
+        },
+        {
+          "order": 3,
+          "title": "Fijar tolerancias",
+          "description": "Introducir la Tolerancia de amplitud y la Tolerancia de fase en porcentaje. Si en la prueba la amplitud o la fase quedan fuera, esa parte se considera no superada."
+        },
+        {
+          "order": 4,
+          "title": "Definir y aprender la pieza de prueba",
+          "description": "Dar a la bola de test un nombre representativo que los operadores reconozcan, tocar Aprender y seguir las instrucciones. Si el producto tiene efecto de producto, colocar la bola en la zona de señal de metal más débil."
+        }
       ]
     },
     {
@@ -108,10 +204,26 @@
       "title": "Ejecutar la prueba de funcionamiento",
       "description": "Verificación periódica que ejecuta el jefe de calidad cuando el equipo la solicita. Los resultados se protocolizan. Fuente: manual Vistus, pág 133, 161-163.",
       "steps": [
-        { "order": 1, "title": "Atender la solicitud", "description": "El equipo instala al jefe de calidad a ejecutar la prueba a los intervalos configurados; abrir la prueba solicitada." },
-        { "order": 2, "title": "Pasar la bola de test", "description": "Pasar por la abertura la bola de test indicada. Si hay efecto de producto, colocarla junto al producto en la zona de señal más débil." },
-        { "order": 3, "title": "Verificar la detección y el rechazo", "description": "Comprobar que el equipo detecta la pieza y que el separador la rechaza dentro de las tolerancias de amplitud y fase." },
-        { "order": 4, "title": "Registrar el resultado", "description": "Confirmar el resultado; queda protocolizado automáticamente en los informes para trazabilidad." }
+        {
+          "order": 1,
+          "title": "Atender la solicitud",
+          "description": "El equipo instala al jefe de calidad a ejecutar la prueba a los intervalos configurados; abrir la prueba solicitada."
+        },
+        {
+          "order": 2,
+          "title": "Pasar la bola de test",
+          "description": "Pasar por la abertura la bola de test indicada. Si hay efecto de producto, colocarla junto al producto en la zona de señal más débil."
+        },
+        {
+          "order": 3,
+          "title": "Verificar la detección y el rechazo",
+          "description": "Comprobar que el equipo detecta la pieza y que el separador la rechaza dentro de las tolerancias de amplitud y fase."
+        },
+        {
+          "order": 4,
+          "title": "Registrar el resultado",
+          "description": "Confirmar el resultado; queda protocolizado automáticamente en los informes para trazabilidad."
+        }
       ]
     },
     {
@@ -119,10 +231,26 @@
       "title": "Confirmar mensajes de error o advertencia",
       "description": "Tras solventar la causa hay que confirmar el mensaje para reanudar. Fuente: manual Vistus, pág 153, 176.",
       "steps": [
-        { "order": 1, "title": "Solventar la causa", "description": "Corregir la causa del mensaje antes de confirmarlo (un error confirmado sin resolver reaparece)." },
-        { "order": 2, "title": "Tocar Confirmar", "description": "Tocar Confirmar en el mensaje activo, o pulsar la tecla externa de confirmación si está conectada." },
-        { "order": 3, "title": "Confirmación múltiple", "description": "La tecla externa confirma de una sola vez todos los mensajes de error y advertencia ya solventados." },
-        { "order": 4, "title": "Respetar privilegios", "description": "Confirmar un error requiere privilegio de ingeniero; confirmar advertencia o detección, operador o ingeniero." }
+        {
+          "order": 1,
+          "title": "Solventar la causa",
+          "description": "Corregir la causa del mensaje antes de confirmarlo (un error confirmado sin resolver reaparece)."
+        },
+        {
+          "order": 2,
+          "title": "Tocar Confirmar",
+          "description": "Tocar Confirmar en el mensaje activo, o pulsar la tecla externa de confirmación si está conectada."
+        },
+        {
+          "order": 3,
+          "title": "Confirmación múltiple",
+          "description": "La tecla externa confirma de una sola vez todos los mensajes de error y advertencia ya solventados."
+        },
+        {
+          "order": 4,
+          "title": "Respetar privilegios",
+          "description": "Confirmar un error requiere privilegio de ingeniero; confirmar advertencia o detección, operador o ingeniero."
+        }
       ]
     },
     {
@@ -130,10 +258,26 @@
       "title": "Crear una copia de seguridad en USB",
       "description": "Respalda perfiles de producto, usuarios, ajustes, informes y registros en un soporte externo. Fuente: manual Vistus, pág 156-158.",
       "steps": [
-        { "order": 1, "title": "Conectar el USB", "description": "Conectar un lápiz de memoria USB; el detector debe contar con la interfaz correspondiente." },
-        { "order": 2, "title": "Abrir Copia de seguridad", "description": "En el menú principal de operador, tocar el botón '...' y luego 'Copia seg.'. Aparece el menú Copia seg. sistema." },
-        { "order": 3, "title": "Elegir el destino", "description": "Tocar Medio de destino y seleccionar el soporte externo para la copia." },
-        { "order": 4, "title": "Ejecutar la copia", "description": "Confirmar para guardar los datos. Conviene respaldar periódicamente porque la memoria del detector es limitada y sobrescribe los datos antiguos." }
+        {
+          "order": 1,
+          "title": "Conectar el USB",
+          "description": "Conectar un lápiz de memoria USB; el detector debe contar con la interfaz correspondiente."
+        },
+        {
+          "order": 2,
+          "title": "Abrir Copia de seguridad",
+          "description": "En el menú principal de operador, tocar el botón '...' y luego 'Copia seg.'. Aparece el menú Copia seg. sistema."
+        },
+        {
+          "order": 3,
+          "title": "Elegir el destino",
+          "description": "Tocar Medio de destino y seleccionar el soporte externo para la copia."
+        },
+        {
+          "order": 4,
+          "title": "Ejecutar la copia",
+          "description": "Confirmar para guardar los datos. Conviene respaldar periódicamente porque la memoria del detector es limitada y sobrescribe los datos antiguos."
+        }
       ]
     },
     {
@@ -141,10 +285,26 @@
       "title": "Sustituir la batería del terminal",
       "description": "La batería alimenta el reloj interno; dura unos 3 años y al agotarse se pierden fecha y hora. Fuente: manual Vistus, pág 176-177.",
       "steps": [
-        { "order": 1, "title": "Abrir la tapa del terminal", "description": "Soltar los 4 tornillos de sujeción de la tapa del terminal, evitando que caigan al flujo de productos, y abrir la tapa." },
-        { "order": 2, "title": "Localizar la batería", "description": "La batería está en el módulo HMI, en la parte trasera de la tapa del terminal. Extraerla de su soporte." },
-        { "order": 3, "title": "Colocar la batería nueva", "description": "Colocar una batería de litio de 3 V tipo CR 2032 respetando la polaridad." },
-        { "order": 4, "title": "Cerrar y reajustar la hora", "description": "Cerrar la tapa, apretar a mano los 4 tornillos y volver a ajustar la fecha y hora del detector." }
+        {
+          "order": 1,
+          "title": "Abrir la tapa del terminal",
+          "description": "Soltar los 4 tornillos de sujeción de la tapa del terminal, evitando que caigan al flujo de productos, y abrir la tapa."
+        },
+        {
+          "order": 2,
+          "title": "Localizar la batería",
+          "description": "La batería está en el módulo HMI, en la parte trasera de la tapa del terminal. Extraerla de su soporte."
+        },
+        {
+          "order": 3,
+          "title": "Colocar la batería nueva",
+          "description": "Colocar una batería de litio de 3 V tipo CR 2032 respetando la polaridad."
+        },
+        {
+          "order": 4,
+          "title": "Cerrar y reajustar la hora",
+          "description": "Cerrar la tapa, apretar a mano los 4 tornillos y volver a ajustar la fecha y hora del detector."
+        }
       ]
     },
     {
@@ -152,9 +312,21 @@
       "title": "Ajustar la fecha y la hora",
       "description": "Necesario tras cambiar la batería o al perder la hora. Fuente: manual Vistus, pág 78-79.",
       "steps": [
-        { "order": 1, "title": "Abrir Ajustes del sistema", "description": "Entrar al menú de características de la pantalla táctil / fecha y hora dentro de Ajustes del sistema." },
-        { "order": 2, "title": "Introducir fecha y hora", "description": "Introducir la fecha y la hora actuales." },
-        { "order": 3, "title": "Guardar", "description": "Guardar las introducciones en el menú Ajustes del sistema para que queden aplicadas." }
+        {
+          "order": 1,
+          "title": "Abrir Ajustes del sistema",
+          "description": "Entrar al menú de características de la pantalla táctil / fecha y hora dentro de Ajustes del sistema."
+        },
+        {
+          "order": 2,
+          "title": "Introducir fecha y hora",
+          "description": "Introducir la fecha y la hora actuales."
+        },
+        {
+          "order": 3,
+          "title": "Guardar",
+          "description": "Guardar las introducciones en el menú Ajustes del sistema para que queden aplicadas."
+        }
       ]
     }
   ],
@@ -288,12 +460,35 @@
     },
     {
       "id": "det-diag-product-trigger",
-      "title": "W0001 – Señal de sincronización más larga que el producto",
-      "symptom": "Advertencia W0001 'Product Trigger': la señal del sensor de sincronización es más larga que la longitud de producto indicada.",
+      "title": "W0001 – La señal del sensor excede el tiempo de supervisión",
+      "symptom": "Advertencia W0001: la señal del sensor de sincronización dura más que el \"Tiempo supervisión sensor 1\" configurado.",
+      "possibleCauses": [
+        "Barrera de luz (fotocélula) tapada o sucia.",
+        "Sensor de sincronización dañado.",
+        "La cinta se detuvo con un producto sobre la fotocélula.",
+        "\"Tiempo supervisión sensor 1\" configurado más corto que el paso real de un producto."
+      ],
+      "solution": "Revisar y limpiar la barrera de luz; si sigue, verificar si el sensor está dañado. Confirmar que no haya quedado producto detenido sobre la fotocélula. Verificar que el \"Tiempo supervisión sensor 1\" sea MAYOR que el tiempo que tarda un producto en pasar frente al sensor. Fuente: manual Vistus, pág 180. OJO: esta advertencia NO es la comparación de longitud de producto — esa es la W0003."
+    },
+    {
+      "id": "det-diag-product-distance",
+      "title": "W0002 – Distancia entre productos insuficiente",
+      "symptom": "Advertencia W0002: la distancia entre dos productos consecutivos es menor que la mínima que el equipo necesita para distinguirlos.",
+      "possibleCauses": [
+        "Productos demasiado juntos en la cinta de alimentación.",
+        "Velocidad de cinta o de alimentación mal ajustada.",
+        "Longitud de producto configurada distinta de la real."
+      ],
+      "solution": "Separar los productos en la alimentación y revisar la velocidad de la cinta. Verificar que la longitud de producto del perfil coincida con la real. Fuente: manual Vistus, pág 180."
+    },
+    {
+      "id": "det-diag-package-length",
+      "title": "W0003 – Señal de sincronización más larga que la longitud de producto",
+      "symptom": "Advertencia W0003 \"Package length\": la señal del sensor de sincronización es más larga que la longitud de producto indicada en el perfil.",
       "possibleCauses": [
         "Velocidad de producto mal indicada en los datos de producto.",
         "Impulsos proporcionales al recorrido (transmisor de impulsos) mal ajustados.",
-        "Longitud de producto mal configurada."
+        "Longitud de producto mal configurada en el perfil."
       ],
       "solution": "Revisar la velocidad de producto, el ajuste del transmisor de impulsos y la longitud de producto en el perfil. La advertencia no ocurre si se desactiva la supervisión de longitud de producto. Fuente: manual Vistus, pág 180-181."
     },
