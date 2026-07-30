@@ -26,7 +26,7 @@ export interface ShoplogixProductionInterval {
   start?: ShoplogixTimestamp;
   /** Turno al que Shoplogix atribuye el intervalo ("Turno Dia", "Unscheduled"). */
   shift?: string;
-  /** Velocidad del intervalo según Shoplogix. No viene en todos los intervalos. */
+  /** Cadencia OBJETIVO del intervalo en pz/min (NO la real). No viene en todos. */
   rate?: number;
   /** Piezas dentro del uptime / dentro del turno programado. Opcionales igual que `rate`. */
   uptimeCycles?: number;
@@ -135,11 +135,14 @@ export interface UpstreamProductionInterval {
   ratio: number;               // cycles / expectedCycles (0..1+)
   color: 'green' | 'yellow' | 'red' | 'gray';  // según threshold
   /**
-   * Velocidad del intervalo calculada por Shoplogix (misma cifra que ve el
-   * operador en el whiteboard). null en docs viejos (sourceVersion < 4) o
-   * cuando el sensor no la reporta — nunca 0, que significaría "parada".
+   * Cadencia OBJETIVO del intervalo en pz/min según Shoplogix.
+   *
+   * ⚠ NO es la velocidad real: esa se deriva de `cycles`. Verificado con el
+   * turno del 28-jul de la Baader 200 (`expectedCycles = targetRate × 5 min`,
+   * e intervalos con targetRate 20 y cycles 0). null en docs con
+   * sourceVersion < 4 o cuando el sensor no lo reporta.
    */
-  rate: number | null;
+  targetRate: number | null;
 }
 
 /** Estado/paro en timeline Gantt. */

@@ -154,9 +154,9 @@ function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
     expectedTotal:  Number(raw.expectedTotal ?? 0),
     ratio:          Number(raw.ratio ?? 0),
     color:          (raw.color as UpstreamProductionInterval['color']) ?? 'gray',
-    // Docs anteriores a sourceVersion 4 no tienen `rate`: null, no 0 (0 sería
-    // "la máquina estuvo parada", que es una afirmación distinta a "no sé").
-    rate:           Number.isFinite(Number(raw.rate)) ? Number(raw.rate) : null,
+    // Docs anteriores a sourceVersion 4 no lo tienen: null, no 0 (0 sería
+    // "objetivo cero", una afirmación distinta a "no sé").
+    targetRate:     Number.isFinite(Number(raw.targetRate)) ? Number(raw.targetRate) : null,
   }
 }
 

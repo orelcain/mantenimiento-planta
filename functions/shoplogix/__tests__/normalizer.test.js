@@ -212,12 +212,15 @@ test('normalizeShift: comments se normalizan y dedupean entre summary y producti
 /** UUID real de la Baader 200 de Línea 1 (Filete) — ver docs/SHOPLOGIX_API.md. */
 const BAADER_200_ID = '3c0581da-9f19-49f0-aa15-b1596ae94dbd'
 
-test('normalizeInterval: preserva el rate del sensor y lo deja null si no viene', () => {
+test('normalizeInterval: guarda la cadencia OBJETIVO del sensor y null si no viene', () => {
   const start = new Date('2026-07-28T12:00:00.000Z')
-  const conRate = normalizeInterval({ cycles: 100, expectedCycles: 100, totalDuration: 300000, rate: 20.5 }, start, 15)
-  assert.strictEqual(conRate.rate, 20.5, 'debe ser el número del sensor, no uno derivado')
+  // Caso real: objetivo 20 pz/min con la máquina PARADA (cycles 0). Si esto se
+  // interpretara como velocidad real, el gráfico mostraría 20 pz/min sin producción.
+  const parada = normalizeInterval({ cycles: 0, expectedCycles: 100, totalDuration: 300000, rate: 20 }, start, 15)
+  assert.strictEqual(parada.targetRate, 20)
+  assert.strictEqual(parada.cycles, 0, 'la velocidad real es cycles/duración, no targetRate')
   const sinRate = normalizeInterval({ cycles: 100, expectedCycles: 100, totalDuration: 300000 }, start, 15)
-  assert.strictEqual(sinRate.rate, null, 'sin dato del sensor => null, nunca 0 (0 significa parada)')
+  assert.strictEqual(sinRate.targetRate, null, 'sin dato del sensor => null, nunca 0 (0 sería objetivo cero)')
 })
 
 test('aggregateScrapReasons: suma por causa, ordena por cantidad y tolera formas distintas', () => {
@@ -253,7 +256,7 @@ test('normalizeShift: totaliza uptimeCycles/scheduledCycles y el scrap del senso
   assert.strictEqual(shift.scheduledCycles, 15)
   assert.strictEqual(shift.scrapTotal, 2)
   assert.deepStrictEqual(shift.scrapByReason, [{ reason: 'CORTE MALO', qty: 2 }])
-  assert.strictEqual(shift.intervals[0].rate, 2)
+  assert.strictEqual(shift.intervals[0].targetRate, 2)
   assert.strictEqual(shift.productionUnit, 'Filetes')
   assert.strictEqual(shift.machineType, 'baader_200', 'la Baader 200 debe reconocerse, no caer en "other"')
 })
