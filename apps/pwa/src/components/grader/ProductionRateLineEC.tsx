@@ -222,6 +222,32 @@ export function buildRateSeries(machines: UpstreamMachineShift[]): {
 }
 
 /**
+ * Datos de la serie de BRECHA (lo que faltó para el objetivo en cada tramo).
+ *
+ * Cuando la capa está apagada devuelve la misma cantidad de puntos pero todos en
+ * null, en vez de una serie vacía. Es a propósito: `setOption` de ECharts MERGEA
+ * por defecto, así que sacar una serie del array NO la borra del gráfico — la
+ * capa se prendía y no se podía apagar. Manteniendo la serie con datos vacíos, el
+ * merge sí reemplaza los datos y la capa desaparece de verdad.
+ */
+export function gapSeriesData(
+  axis: number[],
+  real: (number | null)[],
+  target: (number | null)[],
+  showGap: boolean,
+): [number, number | null][] {
+  return axis.map((ts, ti) => {
+    if (!showGap) return [ts, null]
+    const r = real[ti]
+    const t = target[ti]
+    // Sin dato real no hay brecha que mostrar (el tramo no existe), y sin
+    // objetivo tampoco: nadie esperaba producción ahí.
+    if (r == null || t == null || t <= 0) return [ts, null]
+    return [ts, Math.max(0, Math.round((t - r) * 10) / 10)]
+  })
+}
+
+/**
  * Encoding del gráfico según cuántas máquinas tiene la línea.
  *
  * No es preferencia estética: responde a preguntas distintas. Con una máquina
@@ -421,7 +447,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
       return {
         ...comun,
         type:        'bar' as const,
-        stack:       showGap ? `pz-${s.name}` : undefined,
+        // Stack FIJO: cambiarlo entre undefined y un id según el toggle dejaba al
+        // merge de ECharts con una configuración a medias. Apilar una sola barra
+        // con la brecha vacía se ve idéntico a no apilar.
+        stack:       `pz-${s.name}`,
         barWidth:    barPx,
         barGap:      '10%',
         barCategoryGap: '0%',
@@ -433,20 +462,15 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
     // Brecha al objetivo, apilada encima de cada barra: lo que faltó en ese tramo.
     // Solo con showGap; se calcula por máquina para que apile con su propia barra.
     // La brecha se apila sobre la barra: en modo línea no tiene dónde apilarse.
-    const gapSeries = showGap && mode === 'bar'
+    // La serie existe SIEMPRE en modo barras (ver `gapSeriesData`): con el toggle
+    // apagado va con datos vacíos, no se saca del array.
+    const gapSeries = mode === 'bar'
       ? series.map((s, i) => ({
           name:     i === 0 ? GAP_LABEL : `${GAP_LABEL} ${s.name}`,
           type:     'bar' as const,
           stack:    `pz-${s.name}`,
           barWidth: barPx,
-          data: axis.map((ts, ti) => {
-            const real = regrouped.series[i]?.[ti] ?? null
-            const target = regrouped.target[ti]
-            // Sin dato real no hay brecha que mostrar (el tramo no existe), y sin
-            // objetivo tampoco: nadie esperaba producción ahí.
-            if (real == null || target == null || target <= 0) return [ts, null] as [number, null]
-            return [ts, Math.max(0, Math.round((target - real) * 10) / 10)] as [number, number]
-          }),
+          data:     gapSeriesData(axis, regrouped.series[i] ?? [], regrouped.target, showGap),
           itemStyle: { color: GAP_COLOR },
           emphasis:  { itemStyle: { color: GAP_COLOR } },
           tooltip:   { valueFormatter: (v: number) => `${v} pz/min sin producir` },
@@ -535,7 +559,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
           ...series.map(s => s.name),
           ...(showAvg ? ['Promedio'] : []),
           ...(targetHasData ? [OBJETIVO_LABEL] : []),
-          ...(showGap && gapSeries.length > 0 ? [GAP_LABEL] : []),
+          ...(showGap && mode === 'bar' && gapSeries.length > 0 ? [GAP_LABEL] : []),
         ],
       },
       xAxis: {

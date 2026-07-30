@@ -10,7 +10,7 @@
  *     objetivo corriendo, que es lo que el sombreado tiene que marcar
  */
 import { describe, it, expect } from 'vitest'
-import { buildRateSeries, regroupRates, rateChartMode } from '../ProductionRateLineEC'
+import { buildRateSeries, regroupRates, rateChartMode, gapSeriesData } from '../ProductionRateLineEC'
 import type { UpstreamMachineShift, UpstreamProductionInterval } from '@/services/shoplogix/types'
 
 const BUCKET_MS = 5 * 60_000
@@ -196,5 +196,39 @@ describe('rateChartMode', () => {
 
   it('sin máquinas no revienta', () => {
     expect(rateChartMode(0)).toBe('bar')
+  })
+})
+
+// ── Toggle de la brecha ──────────────────────────────────────────────────────
+// `setOption` de ECharts MERGEA: sacar una serie del array no la borra del
+// gráfico. Por eso la capa se prendía y no se podía apagar. La serie se mantiene
+// siempre y lo que cambia son los datos.
+
+describe('gapSeriesData', () => {
+  const axis = [1_000, 2_000, 3_000]
+
+  it('apagada: mismos puntos, todos en null (la serie no se saca del array)', () => {
+    const d = gapSeriesData(axis, [1, 2, 3], [10, 10, 10], false)
+    expect(d).toHaveLength(axis.length)
+    expect(d.every(([, v]) => v === null)).toBe(true)
+    expect(d.map(([t]) => t)).toEqual(axis)
+  })
+
+  it('prendida: la brecha es objetivo − real', () => {
+    const d = gapSeriesData(axis, [3.2, 1.4, 20], [10, 7, 20], true)
+    expect(d[0]![1]).toBeCloseTo(6.8, 1)
+    expect(d[1]![1]).toBeCloseTo(5.6, 1)
+    expect(d[2]![1]).toBe(0)          // llegó al objetivo: sin brecha
+  })
+
+  it('nunca negativa: producir MÁS que el objetivo no dibuja brecha invertida', () => {
+    const d = gapSeriesData([1_000], [25], [20], true)
+    expect(d[0]![1]).toBe(0)
+  })
+
+  it('sin dato real o sin objetivo no inventa brecha', () => {
+    expect(gapSeriesData([1_000], [null], [20], true)[0]![1]).toBeNull()
+    expect(gapSeriesData([1_000], [5], [null], true)[0]![1]).toBeNull()
+    expect(gapSeriesData([1_000], [5], [0], true)[0]![1]).toBeNull()
   })
 })
