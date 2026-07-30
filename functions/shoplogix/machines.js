@@ -46,4 +46,23 @@ const PLANT_AREA_ID = Object.freeze({
   filete:  8181,   // Planta Chonchi (3640) → Filetes
 })
 
-module.exports = { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, CHONCHI_FILETE, PLANT_MACHINES, PLANT_AREA_ID }
+/**
+ * Piezas que planta PIDE por turno, por área. Target de PLANIFICACIÓN (lo define
+ * producción), NO la cadencia del sensor. Se usa como referencia de cumplimiento
+ * cuando Shoplogix no manda target oficial del turno — el caso de Filete.
+ *
+ * Espejo de `shiftTargetPieces` en apps/pwa/src/config/plantLines.ts.
+ * Filete: ~5.000 pz por turno, 2 turnos (dato de producción, 2026-07-30).
+ */
+const PLANT_SHIFT_TARGET_PIECES = Object.freeze({
+  filete: 5000,
+})
+
+module.exports = {
+  CHONCHI_EVISCERADORAS,
+  YAL_EVISCERADORAS,
+  CHONCHI_FILETE,
+  PLANT_MACHINES,
+  PLANT_AREA_ID,
+  PLANT_SHIFT_TARGET_PIECES,
+}

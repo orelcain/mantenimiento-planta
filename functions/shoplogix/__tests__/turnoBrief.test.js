@@ -239,3 +239,45 @@ test('componerBriefFinTurno: nombra los paros que quedaron sin causa anotada', (
   const nulo = componerBriefFinTurno({ ...base, stopsWithoutCause: null })
   assert.ok(!nulo.includes('sin causa anotada'), 'si no se pudo contar, el brief sale igual sin la linea')
 })
+
+// ── Cumplimiento vs lo PLANIFICADO (5.000 pz/turno en Filete) ───────────────
+// Shoplogix no manda target oficial en Filete, asi que sin esto el brief no
+// tenia contra que medir el turno.
+
+test('componerBriefFinTurno: sin target oficial usa lo planificado y lo rotula asi', () => {
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Filete', shiftId: 'Turno Dia', dateKey: '2026-08-01',
+    machines: [{ machineName: 'Linea 1', totalCycles: 4200, shiftRuntime: 0.8, states: [] }],
+    officialTargets: null, currentJob: null, grader: null, realSchedule: null,
+    plannedTargetPieces: 5000,
+  })
+  assert.ok(msg.includes('84% de lo planificado'), 'debe medir 4.200 sobre 5.000')
+  assert.ok(msg.includes('5.000'))
+  assert.ok(!msg.includes('del target'), 'no debe llamarlo "target": no es el del sensor')
+})
+
+test('componerBriefFinTurno: el target OFICIAL de Shoplogix le gana al planificado', () => {
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Filete', shiftId: 'Turno Dia', dateKey: '2026-08-01',
+    machines: [{ machineName: 'Linea 1', totalCycles: 4200, shiftRuntime: 0.8, states: [] }],
+    officialTargets: { m1: 4000 }, currentJob: null, grader: null, realSchedule: null,
+    plannedTargetPieces: 5000,
+  })
+  assert.ok(msg.includes('del target'), 'con target oficial, ese manda')
+  assert.ok(msg.includes('105%'), '4.200 sobre 4.000')
+  assert.ok(!msg.includes('de lo planificado'))
+})
+
+test('componerBriefFinTurno: sin ningun target no inventa un porcentaje', () => {
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Yal', shiftId: 'Turno 2', dateKey: '2026-08-01',
+    machines: [{ machineName: 'YAL Evisceradora 1', totalCycles: 4200, shiftRuntime: 0.8, states: [] }],
+    officialTargets: null, currentJob: null, grader: null, realSchedule: null,
+    plannedTargetPieces: null,
+  })
+  // El uptime lleva su propio % legitimo: lo que NO debe aparecer es una linea
+  // de cumplimiento inventada sobre el total de piezas.
+  assert.ok(!msg.includes('de lo planificado'))
+  assert.ok(!msg.includes('del target'))
+  assert.match(msg, /📦 Total: <b>4\.200<\/b> piezas$/m, 'el total va solo, sin porcentaje')
+})

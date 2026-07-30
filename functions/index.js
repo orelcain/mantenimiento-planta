@@ -7054,6 +7054,7 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 // Config de notificaciones por planta (defaults + overrides por línea +
 // Firestore). Vive en su propio módulo para poder testear la resolución.
 const notifConfigMod = require('./shoplogix/notifConfig')
+const shoplogixMachinesMod = require('./shoplogix/machines')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 async function getShoplogixNotifConfig(plantSlug) {
@@ -7611,6 +7612,7 @@ exports.checkShiftEndBriefs = onSchedule(
               realSchedule,
               effectiveSchedule,
               stopsWithoutCause,
+              plannedTargetPieces: shoplogixMachinesMod.PLANT_SHIFT_TARGET_PIECES[plant] ?? null,
             })
             const eligibleIds = await getShoplogixEligibleUsers(plant)
             await dispatchShoplogixNotif(
