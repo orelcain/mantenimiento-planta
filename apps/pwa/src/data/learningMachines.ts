@@ -140,10 +140,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'enzunchadora-n2',
     name: 'Enzunchadora N2',
     area: 'Planta Principal',
-    description: 'Enzunchadora automatica de cajas terminadas.',
+    description: 'Enzunchadora automática Transpak TP-6000-1: fleja cajas terminadas con sellado por calor.',
     icon: Boxes,
     color: '#9c7186',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'seguridad-electrica',
