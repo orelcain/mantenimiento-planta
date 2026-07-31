@@ -19,6 +19,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 > se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
 > El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
 
+## 2026-07-30 - claude - Baader 200: 9 medios MEDIOS + 2 menores corregidos, mostrando ambas fuentes planta/OEM (PR #320, MERGED, 43/43 medios cerrados)
+
+- Hecho: cierra los 9 hallazgos MEDIOS de la auditoria del 2026-07-30 para la Baader 200. Criterio: donde habia choque de fuentes (manual de planta sin distinguir especie vs. manual OEM V4 con tablas por especie), se conserva el valor de planta como valor de la medida y se agrega la cota del OEM como nota con pagina (rascadores, guias flotantes, ventrales, punzones x2). Ademas: "avance a" -> "abertura entre cuchillos a" (errata de planta), 1ra Alimentacion separada en 2 cotas (32 mm entrada / 26 mm salida, el rango "32-28" no existia), mando de dorsales reatribuido (20 mm = distancia de control, no carrera; 12 mm entre trinquete y fiador), Trim D/E transcrito desde laminas rasterizadas del manual (sin texto de procedimiento), silleta 1350 mm etiquetada como criterio de planta, sensores de pasillo sin "zona N" inventada.
+- Archivos: `apps/pwa/src/services/baader200Learning.ts`, `apps/pwa/src/services/learningContent.ts`, `apps/pwa/src/data/learningQuickRef.ts`, `scripts/fix-b200-medios-auditoria.js` (nuevo, dry-run por defecto, ya corrido con --confirm: 9 docs de Firestore `baader200-sections` actualizados).
+- Verificacion: `tsc --noEmit` limpio, 780 tests verdes (5 skipped); paridad Firestore <-> fallback verificada con script; verificador-web 3 pasadas (las 2 primeras encontraron superficies sin sincronizar - objetivo/quiz y Consulta rapida - corregidas antes de cerrar).
+- Estado: HECHO. Sigue: nada pendiente de esta tanda; con esto quedan 43 de 43 medios de la auditoria `verificar-contenido-fichas` cerrados.
+
 ## 2026-07-30 - claude - Marel Filete: corregida identidad (M-Weigher WTR, no SmartLine) + hardware inexistente eliminado (PR #317, MERGED, 7a tanda de MEDIOS)
 
 - Contexto: Orel confirmo en planta que el equipo de Filete es un **M-Weigher WTR (GR8251)** con indicador M6410, NO una linea SmartLine. Verificado contra `M-WeigherWTR_UM_v1.02_SPA.pdf` (71 pags): "brazo" y "lote" dan 0 coincidencias en el manual.
