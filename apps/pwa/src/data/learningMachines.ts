@@ -104,7 +104,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'marel-filete',
     name: 'Marel Filete',
     area: 'Planta Principal',
-    description: 'Linea de fileteado/porcionado Marel con SmartLine: alimentacion, bascula dinamica MW (celdas de carga) y descarga por brazos neumaticos en lotes; control por software A600. Seguridad, limpieza y mantenimiento.',
+    description: 'Pesador dinamico Marel M-Weigher WTR (GR8251) con indicador M6410: alimentacion, plataforma de pesaje (celda de carga + modulo MWS2) y salida al proceso siguiente. NO clasifica ni arma lotes: eso ocurre aguas abajo. Seguridad, limpieza y mantenimiento.',
     icon: Fish,
     color: '#86769c',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },

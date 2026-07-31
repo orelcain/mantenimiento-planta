@@ -161,19 +161,19 @@ const MAREL_FILETE: QuickRefGroup[] = [
       { label: 'Masa', value: 'Single Lane ~165 kg · Dual Lane ~200 kg' },
       { label: 'Temperatura ambiente', value: '7 °C a 40 °C' },
       { label: 'Altura de cinta', value: 'H950 / H1050 / H1250, ajuste ±100 mm' },
-      { label: 'Eslabones cinta', value: 'MW1000=180 · MW1450=252 · MW1900=324 — nunca quitar para acortar' },
+      { label: 'Eslabones cinta', value: 'nunca quitar eslabones para acortar la cinta. El conteo por modelo (MW1000=180 · MW1450=252 · MW1900=324) es de la familia SmartLine: confirmar contra la placa de esta máquina' },
     ],
   },
   {
     title: 'Sensor de producto',
     rows: [
-      { label: 'Altura del haz', value: '5–10 mm sobre la cinta (SmartLine: ~6 mm)' },
+      { label: 'Altura del haz', value: '5–10 mm sobre la cinta, según el producto' },
       { label: 'Ajuste', value: 'sensibilidad media, regulador vertical, selector en L (luz encendida)' },
       { label: 'Piezas finas', value: 'no debe detectar 3 mm · sí debe detectar 6 mm' },
     ],
   },
   {
-    title: 'Instalación SmartLine',
+    title: 'Instalación y nivelación',
     rows: [
       { label: 'Nivelación plataforma', value: 'perfectamente recta y nivelada, sin girar al atornillar al suelo' },
       { label: 'Deformación máx. plataforma', value: '0,2 mm (revisar con regla y lámina calibradora)' },
@@ -188,17 +188,8 @@ const MAREL_FILETE: QuickRefGroup[] = [
       { label: 'Aire requerido', value: 'limpio y seco, ISO 8573-1 clase 3' },
       { label: 'Presión de línea', value: 'mínimo 7 bar · sobre 10 bar puede dañar la línea' },
       { label: 'Presión de funcionamiento', value: '6 bar (85–87 psi) en regulador de cabina' },
-      { label: 'Suministro SmartLine', value: '3×400V+N+PE · 3×230V+GND · 3×208V+GND' },
-      { label: 'Arranque diario', value: 'Start → dejar cintas al vacío hasta ver "Steady" en el M3210' },
-      { label: 'Al detener', value: 'NO apagar el interruptor principal — el calor evita condensación' },
-    ],
-  },
-  {
-    title: 'Brazos de puerta y cilindros (SmartLine)',
-    rows: [
-      { label: 'Separación brazo-cinta', value: '1–2 mm' },
-      { label: 'Revisión semanal', value: 'cilindros de aire; limpiar biela del pistón con paño con aceite' },
-      { label: 'Ajuste', value: 'ángulo/posiciones primero, luego espacio brazo-cinta (aflojar 2 pernos)' },
+      { label: 'Suministro eléctrico', value: '3×400V+N+PE · 3×230V+GND · 3×208V+GND' },
+            { label: 'Al detener', value: 'NO apagar el interruptor principal — mantiene corriente constante y evita la condensación de humedad' },
     ],
   },
   {
@@ -329,16 +320,16 @@ const BAADER_200: QuickRefGroup[] = [
   {
     title: 'Ajustes clave (tolerancias)',
     rows: [
-      { label: '1ra Alimentación — chapaletas', value: 'referencia catálogo 32-28mm; en la práctica generalmente menos' },
+      { label: '1ra Alimentación — chapaletas', value: 'entrada 32 mm (tornillo de tope pos. 3) · salida 26 mm (biela de mando pos. 5, rodillo en el punto más alto de la leva) — V4 págs 2 y 6. El rango “32-28” no existe en ninguna fuente' },
       { label: '2da Alimentación — chapaletas vs dorsales', value: '±0.5mm (casi chocando)' },
       { label: '2do levantador — vs contradiente', value: '5mm' },
-      { label: 'Cuchillos ventrales — avance "a"', value: '5mm' },
-      { label: 'Guías flotantes — abertura máxima', value: '4.8mm (ajustar SIEMPRE después de ventrales)' },
+      { label: 'Cuchillos ventrales — abertura ENTRE cuchillos "a"', value: '5 mm salmón · 4 mm trucha · 7 mm pescado blanco (V4 págs 9-10). No es un “avance”: es la distancia entre ambos cuchillos, con bujes apretadores pos 8-9' },
+      { label: 'Guías flotantes — abertura “e”', value: 'planta 4,8 mm · OEM por especie (V4 pág 23): 6,5 mm salmón · 4,8 mm trucha · 8 mm pescado blanco. Ajustar SIEMPRE después de ventrales' },
       { label: 'Ventrales vs dorsales', value: '12mm — pernos topes pos 4-5; verificar siempre al cambiar cuchillos' },
       { label: 'Dorsales — abertura "b" POR ESPECIE', value: 'Salmón 5mm · Trucha 4mm · Blanco 7mm — cubos sujetadores pos 3 (NO confundir con los 12mm)' },
       { label: 'Levante cuchillos dorsales', value: '20mm al paso de la silleta' },
       { label: 'Cuchillos punzones — separación', value: '8mm' },
-      { label: 'Cuchillos rascadores — abertura', value: '17-18mm' },
+      { label: 'Cuchillos rascadores — abertura “g”', value: 'planta 17-18 mm · OEM por especie (V4 pág 37): 14 mm salmón y trucha asalmonada · 18 mm yellowtail y salmón de Noruega · 22 mm bacalao japonés' },
       { label: 'Cuchillos ventrales — diámetro objetivo', value: '~200mm (el mayor disponible)' },
     ],
   },

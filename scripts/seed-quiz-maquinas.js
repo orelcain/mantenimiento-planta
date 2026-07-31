@@ -289,10 +289,10 @@ const QUIZ = {
 
   'marel-filete': [
     {
-      question: '¿Qué modelo es la báscula dinámica de la línea de filete?',
-      options: ['Marel A600 M3310', 'Marel M6410', 'Marelec MS4/12', 'Marel M-2200'],
-      correctIndex: 1,
-      explanation: 'La báscula dinámica de filete es la Marel M6410; la A600 M3310 es el HG de eviscerado.',
+      question: 'En la máquina de filete, ¿qué es el M6410?',
+      options: ['La báscula', 'La celda de carga', 'El indicador (la HMI)', 'El motor de la cinta'],
+      correctIndex: 2,
+      explanation: 'El equipo de filete es una M-Weigher WTR (GR8251) y el M6410 es su INDICADOR, o sea la HMI. La báscula es la unidad de pesaje: plataforma, celda de carga y módulo de pesaje electrónico MWS2. Confundirlos manda a buscar un problema de pesaje en la pantalla en vez de en la celda o el MWS2.',
     },
     {
       question: '¿Qué dos tipos de calibración tiene registrados el equipo en su procedimiento?',

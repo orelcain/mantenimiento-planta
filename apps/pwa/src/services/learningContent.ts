@@ -384,11 +384,11 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
     ],
   },
   'cuchillos-ventrales': {
-    objetivo: 'Calibrar los cuchillos ventrales con la cruz patrón: avance «a» de 5 mm y referencia de 177.5 mm a la cara interna del cuchillo izquierdo.',
+    objetivo: 'Calibrar los cuchillos ventrales con la cruz patrón: abertura «a» ENTRE ambos cuchillos de 5 mm y referencia de 177.5 mm a la cara interna del cuchillo izquierdo.',
     porque: 'los pernos de fijación pos 1-2 (alineamiento entre cuchillos) SOLO se tocan en la mantención anual; moverlos en un ajuste de turno descalibra el alineamiento fino.',
     quiz: [
       { question: '¿Cuándo se mueven los pernos de fijación pos 1-2 de los cuchillos ventrales?', options: ['Cada turno', 'Solo en la mantención anual', 'Al cambiar de especie', 'Nunca'], correctIndex: 1, explanation: 'Los pernos de fijación pos 1-2 solo se mueven en la mantención anual, para el alineamiento de los cuchillos entre sí.' },
-      { question: '¿Cuál es el avance «a» de los cuchillos ventrales?', options: ['5 mm', '12 mm', '177.5 mm', '20 mm'], correctIndex: 0, explanation: 'El avance «a» es 5 mm; la referencia a la cara interna del cuchillo izquierdo es 177.5 mm.' },
+      { question: 'La medida «a» de los cuchillos ventrales, ¿qué es y cuánto vale para salmón?', options: ['La abertura ENTRE ambos cuchillos: 5 mm', 'El avance del cuchillo: 5 mm', 'La abertura entre ambos: 12 mm', 'La referencia al cuchillo izquierdo: 177.5 mm'], correctIndex: 0, explanation: 'La «a» es la distancia ENTRE ambos cuchillos ventrales, que se ajusta con los bujes apretadores pos 8-9 — no es un “avance” (esa palabra vino de una errata del manual de planta). Para salmón son 5 mm; el fabricante da 4 mm para trucha y 7 mm para pescado blanco.' },
     ],
   },
   'guias-flotantes': {
@@ -414,7 +414,7 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
     ],
   },
   'mando-cuchillos-dorsales': {
-    objetivo: 'Ajustar el levante de 20 mm de los cuchillos dorsales al paso de la silleta y seguir la secuencia de diagnóstico si no levantan.',
+    objetivo: 'Ajustar el mando de los cuchillos dorsales y seguir la secuencia de diagnóstico si no levantan. OJO con las dos cotas: los 20 mm son una distancia de CONTROL entre ventrales y dorsales (no una carrera de levante) y los 12 mm son entre trinquete y fiador.',
     porque: 'si no levantan, el orden de revisión es primero el trinquete y después el bulón con gollete; saltarse el orden hace perder tiempo.',
     quiz: [
       { question: 'Los cuchillos dorsales no levantan al paso de la silleta. ¿Qué se revisa PRIMERO?', options: ['El bulón con gollete', 'La posición del trinquete', 'Los resortes', 'La leva'], correctIndex: 1, explanation: 'Primero se verifica la posición del trinquete; después, el bulón con gollete del mando dorsales en el carter de las levas. El levante debe ser 20 mm.' },
