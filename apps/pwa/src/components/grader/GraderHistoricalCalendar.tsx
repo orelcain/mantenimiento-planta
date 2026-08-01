@@ -19,6 +19,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  estimateManualLine,
+  BAADER_SHORT,
+  MANUAL_LINE_SHORT,
+  MANUAL_LINE_LABEL,
+  MANUAL_LINE_TOOLTIP,
+} from '@/services/grader/graderManualLine'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity } from 'lucide-react'
@@ -364,19 +371,83 @@ function ShiftChip({
     </div>
   )
 
-  return (
+  // ── Desglose Baader / línea manual ──────────────────────────────────────────
+  //
+  // El turno engloba TODO lo que se produjo: lo que pasó por las Baader más lo
+  // que entró por la línea manual (que Shoplogix no cuenta porque no está
+  // instrumentada). Antes la celda mostraba solo los ciclos de Baader, así que
+  // el día se veía con la mitad de la producción.
+  const baaderCycles: number | null = (() => {
+    // El shiftId del Excel ya coincide con el de Shoplogix; los alias cubren
+    // los summaries legacy que quedaron con "Turno día/noche".
+    const keys = [
+      `${chip.shiftDateKey}__${chip.shiftId}`,
+      ...(chip.shiftId === 'Turno día'
+        ? [`${chip.shiftDateKey}__Turno 2`]
+        : [`${chip.shiftDateKey}__Turno 1`, `${chip.shiftDateKey}__Turno 3`]),
+    ]
+    for (const k of keys) {
+      const v = slxByShift.get(k)?.totalCycles
+      if (v != null && v > 0) return v
+    }
+    return null
+  })()
+  const manualLine = chip.pieces != null && baaderCycles != null
+    ? estimateManualLine({ graderPieces: chip.pieces, baaderCycles })
+    : null
+  // Solo en la vista de piezas: en P0%/uptime el desglose no aplica y la celda
+  // es demasiado chica para meter números que no se comparan entre sí.
+  const showBreakdown = view === 'piezas' && manualLine != null
+
+  const mainRow = (
     <ChipTooltip
       content={tooltipContent}
       className={cn('flex items-center justify-between rounded px-1 py-px leading-none cursor-help', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
-      <span className="text-[9px] font-bold tabular-nums">{chipValue}</span>
+      <span className="text-[9px] font-bold tabular-nums">
+        {/* Con desglose, el turno muestra el TOTAL para que BAA + MAN cuadre. */}
+        {showBreakdown ? manualLine!.graderPieces.toLocaleString('es-CL') : chipValue}
+      </span>
       {untaggedCount !== null && untaggedCount > 0 && (
         <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
           🏷{untaggedCount}
         </span>
       )}
     </ChipTooltip>
+  )
+
+  if (!showBreakdown) return mainRow
+
+  const subRow = (
+    key: string, etiqueta: string, valor: number, clase: string, tip: string,
+  ) => (
+    <ChipTooltip
+      key={key}
+      content={tip}
+      className={cn('flex items-center justify-between rounded-sm px-1 leading-none cursor-help', clase)}
+    >
+      <span className="text-[7px] font-medium opacity-80">{etiqueta}</span>
+      <span className="text-[8px] font-semibold tabular-nums">{valor.toLocaleString('es-CL')}</span>
+    </ChipTooltip>
+  )
+
+  return (
+    <div className="flex flex-col gap-px">
+      {mainRow}
+      {/* Indentado y con guía a la izquierda: se lee como parte del turno y no
+          como tres cosas sueltas. */}
+      <div className="ml-0.5 pl-1 border-l-2 border-current/25 flex flex-col gap-px">
+        {subRow(
+          'baa', BAADER_SHORT, manualLine!.baaderCycles, 'bg-sky-500/15 text-sky-500',
+          `Procesadas en las Baader: ${manualLine!.baaderCycles.toLocaleString('es-CL')} ciclos (Shoplogix).`,
+        )}
+        {subRow(
+          'man', MANUAL_LINE_SHORT, manualLine!.manualPieces, 'bg-violet-500/15 text-violet-400',
+          `${MANUAL_LINE_LABEL}: ${manualLine!.manualPieces.toLocaleString('es-CL')} piezas (${manualLine!.pctOfGrader}% del turno). ${MANUAL_LINE_TOOLTIP}`,
+        )}
+      </div>
+    </div>
   )
 }
 
