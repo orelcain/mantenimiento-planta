@@ -51,6 +51,7 @@ import { machineTypeLabel, lineMachinesLabel } from '@/services/shoplogix/shoplo
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
+import { resolvePanelWindow } from './shiftTimelineHelpers'
 import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { LossCascadeCard } from './LossCascadeCard'
@@ -1132,31 +1133,28 @@ export function UpstreamMachinesPanel({
   //      como "islas" de datos dentro del eje SLX completo.
   //   3. Prop `shiftWindow` legacy — fallback cuando no hay snapshot SLX
   //      (turno sin datos upstream o pre-suscripción).
+  //
+  //   ⚠ EXCEPCIÓN (`framedOnProduction`): cuando el eje está acotado a las horas
+  //   con proceso, ese encuadre viaja por `shiftWindow` y tiene que GANARLE al
+  //   punto 2. Sin esta excepción el chip cambiaba de estado pero el eje seguía
+  //   saliendo de los bounds del snapshot — el botón no hacía nada visible.
   const timelineSync = useTimelineSyncOptional()
   const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
-    // 1. Context (zoom del Grader sincronizado)
-    if (timelineSync?.range) {
-      return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
-    }
-    // 2. SLX bounds — preferido cuando hay snapshot. Usamos shiftStart/End
-    // (rango real con datos, crece conforme avanza el turno) en vez de
-    // scheduledStart/End (planeado, deja huecos vacíos cuando el turno aún
-    // no termina o las máquinas pararon antes).
+    // La prioridad vive en `resolvePanelWindow` (testeada): el orden ya se
+    // rompió una vez y dejó el botón de encuadre sin efecto.
     const slxMachine = snapshot?.machines[0]
-    if (slxMachine) {
-      const s = slxMachine.shiftStart
-      const e = slxMachine.shiftEnd
-      if (s && e && !isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
-    }
-    // 3. Prop legacy (fallback sin snapshot)
-    if (shiftWindow?.startAt && shiftWindow?.endAt) {
-      const s = new Date(shiftWindow.startAt)
-      const e = new Date(shiftWindow.endAt)
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
-    }
-    // 4. Cada máquina usa su propio shiftStart/End downstream
-    return [undefined, undefined]
-  }, [timelineSync?.range, snapshot, shiftWindow?.startAt, shiftWindow?.endAt])
+    const snapshotBounds = slxMachine?.shiftStart && slxMachine?.shiftEnd
+      && !isNaN(slxMachine.shiftStart.getTime()) && !isNaN(slxMachine.shiftEnd.getTime())
+      ? { start: slxMachine.shiftStart, end: slxMachine.shiftEnd }
+      : null
+    const r = resolvePanelWindow({
+      zoom: timelineSync?.range ?? null,
+      framedOnProduction,
+      shiftWindow: shiftWindow ?? null,
+      snapshotBounds,
+    })
+    return r ? [r.start, r.end] : [undefined, undefined]
+  }, [timelineSync?.range, snapshot, shiftWindow, framedOnProduction])
 
   // ¿Hay zoom activo? Source of truth: context.range. null = no zoom (vista
   // completa del turno alineada al Grader). Cualquier valor = zoom activo.
@@ -1486,12 +1484,21 @@ export function UpstreamMachinesPanel({
                     ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
                   </p>
                 )}
+                {/* data-axis-* expone el rango EFECTIVO que dibuja el chart.
+                    ECharts pinta en canvas, asi que sin esto no hay forma de
+                    verificar el eje desde fuera (ni a ojo ni automatizado). */}
+                <div
+                  data-testid="rate-chart-axis"
+                  data-axis-start={chartWindowStart ? chartWindowStart.toISOString() : ''}
+                  data-axis-end={chartWindowEnd ? chartWindowEnd.toISOString() : ''}
+                >
                 <ProductionRateLineEC
                   machines={snapshot.machines}
                   windowStart={chartWindowStart}
                   windowEnd={chartWindowEnd}
                   showGap={showRateGap}
                 />
+                </div>
               </div>
             )}
 
