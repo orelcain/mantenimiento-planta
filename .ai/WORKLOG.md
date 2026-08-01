@@ -13,6 +13,17 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-01 - claude - El boton de encuadre del eje no hacia nada (bug propio)
+
+- Reporte de Orel: "no hace nada el boton". Tenia razon y el bug era mio.
+- Causa raiz: el panel resuelve su ventana temporal con una prioridad — (1) zoom, (2) bounds del snapshot Shoplogix, (3) prop `shiftWindow`. El encuadre "solo con proceso" viaja por el PROP, o sea la fuente #3, asi que los bounds del snapshot (08:00→08:00, las 24 h de Filete) le ganaban siempre. El chip cambiaba de estado (lo alimenta el prop) y el eje seguia clavado.
+- Por que no lo detecte antes: verifique el TEXTO del chip y el prop, no el eje que realmente dibuja el chart. Como ECharts pinta en canvas, no habia forma de leer el eje desde fuera → ahora el contenedor expone `data-axis-start/end` con el rango EFECTIVO, y con eso la verificacion es real (y automatizable).
+- Fix: la prioridad se extrae a `resolvePanelWindow` (pura y testeada) con el encuadre explicito en el puesto 1b, sobre los bounds del snapshot. El panel la usa, asi que los tests protegen el codigo real y no una copia.
+- Archivos: `apps/pwa/src/components/grader/{UpstreamMachinesPanel.tsx,shiftTimelineHelpers.ts,__tests__/resolvePanelWindow.test.ts (nuevo)}`.
+- Verificacion: 785 tests verdes (5 nuevos de prioridad, incluido "con encuadre activo la ventana acotada GANA a los bounds del snapshot"), tsc y eslint limpios. En el navegador, leyendo `data-axis-*`: el eje pasa de 09:45–16:25 a 08:00–08:00 al togglear — antes se quedaba en 08:00–08:00 siempre.
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel confirma en pantalla. El sabado, Filete con 5.000 pz reales.
+
 > **Compactado el 2026-07-30.** Las entradas anteriores al 2026-07-19 se resumieron en bloques
 > temáticos al final de este archivo (el detalle completo de cada una vive en git:
 > `git log -p .ai/WORKLOG.md`, y en los commits de cada PR). Los pendientes que seguían abiertos

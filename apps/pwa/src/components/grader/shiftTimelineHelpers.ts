@@ -924,3 +924,39 @@ function colorWithAlpha(color: string, alpha: number): string {
   // rgba(...) o rgb(...) — devuelve tal cual; el caller absorbe el alpha del original
   return c
 }
+
+
+/**
+ * Ventana temporal que dibujan el Gantt y el gráfico de tasa (comparten eje).
+ *
+ * El ORDEN importa y ya se rompió una vez: el encuadre "solo con proceso" viajaba
+ * por `shiftWindow`, que estaba DESPUÉS de los bounds del snapshot, así que el
+ * chip cambiaba de estado y el eje no se movía — el botón no hacía nada.
+ *
+ * Prioridad:
+ *   1. zoom activo (context)
+ *   2. encuadre explícito en las horas con proceso
+ *   3. bounds del snapshot Shoplogix (ventana completa del turno)
+ *   4. `shiftWindow` como fallback sin snapshot
+ */
+export function resolvePanelWindow(args: {
+  zoom?: { startMs: number; endMs: number } | null
+  framedOnProduction?: boolean
+  shiftWindow?: { startAt: string; endAt: string } | null
+  snapshotBounds?: { start: Date; end: Date } | null
+}): { start: Date; end: Date } | null {
+  const { zoom, framedOnProduction, shiftWindow, snapshotBounds } = args
+
+  if (zoom) return { start: new Date(zoom.startMs), end: new Date(zoom.endMs) }
+
+  const fromProp = (() => {
+    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return null
+    const s = new Date(shiftWindow.startAt)
+    const e = new Date(shiftWindow.endAt)
+    return isNaN(s.getTime()) || isNaN(e.getTime()) ? null : { start: s, end: e }
+  })()
+
+  if (framedOnProduction && fromProp) return fromProp
+  if (snapshotBounds?.start && snapshotBounds?.end) return snapshotBounds
+  return fromProp
+}
