@@ -9,7 +9,7 @@ import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, 
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
-import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
+import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from './GraderHistoricalCalendar'
@@ -65,7 +65,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
     const maxCausaPct = causasRaw[0]?.pct ?? 1
     const causas = causasRaw.map(c => ({ ...c, barPct: maxCausaPct > 0 ? (c.pct / maxCausaPct) * 100 : 0 }))
 
-    const calendarAgg = aggregateByCalendarDay({ summaries: valid })
+    // Mismo criterio que el calendario: el turno cuenta en el dia que le
+    // asigno Shoplogix, no en el dia fisico en que produjo.
+    const calendarAgg = aggregateByShiftDay({ summaries: valid })
     const uniqueDays  = calendarAgg.size
     const startedDays = new Set(valid.map(s => s.dateKey)).size
 

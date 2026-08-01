@@ -55,7 +55,7 @@ import {
 } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import {
-  aggregateByCalendarDay,
+  aggregateByShiftDay,
   buildShiftChipDescriptors,
   type ShiftChipDescriptor,
 } from '@/services/grader/graderCalendarAggregation'
@@ -1634,9 +1634,13 @@ export function GraderHistoricalCalendar({
     return m
   }, [allSummariesRaw])
 
+  // Shoplogix manda con la asignación del día: el turno se dibuja entero en la
+  // celda del día que arrancó, no repartido entre los dos días en que ocurrió
+  // físicamente. El cruce de medianoche no se pierde — la contribución trae
+  // `crossesMidnight` y el chip sale con dirección 'exits' (“→”).
   const calendarAgg = useMemo(() => {
     const valid = allSummariesRaw.filter((s) => s.totalPieces > 0)
-    return aggregateByCalendarDay({ summaries: valid })
+    return aggregateByShiftDay({ summaries: valid })
   }, [allSummariesRaw])
 
   const chipsByDate = useMemo(
@@ -4124,18 +4128,20 @@ export function GraderHistoricalCalendar({
                       ? (slxNightUptimePct > 0 ? `${slxNightUptimePct.toFixed(0)}%` : '—')
                       : calendarView === 'p0' ? '—'
                       : slxNightCycles.toLocaleString('es-CL')
-                    // Label del chip — en plantas clasificadoras (Chonchi) usa D/N;
-                    // en no-clasificadoras (Yal) usa la nomenclatura real del turno
-                    // (T1/T2/T3) para no confundir con la convención Día/Noche del
-                    // Grader. Si por alguna razón sigue siendo legacy día/noche en
-                    // un doc, se respeta el shiftId que tenga.
-                    const isNonClassif = plantLine.isClassificationPlant === false
+                    // Label del chip: el nombre REAL del turno que emite Shoplogix.
+                    //
+                    // Antes esto mostraba D/N en las plantas clasificadoras para no
+                    // chocar con la convención Día/Noche del Grader. Ese motivo ya no
+                    // existe: Chonchi dejó de emitir "Turno día/noche" (desde 2026-05
+                    // manda Turno 1 / Turno 2 / "Turno 1 Lunes") y el Grader ahora
+                    // segmenta con esos mismos nombres. Mostrar "D" en un turno que
+                    // se llama "Turno 1" era decirle al operador algo que no existe.
                     const labelFor = (shiftId: string | undefined, fallback: 'D' | 'N'): string => {
                       if (!shiftId) return fallback
-                      if (!isNonClassif) return fallback
-                      if (shiftId === 'Turno 1') return 'T1'
-                      if (shiftId === 'Turno 2') return 'T2'
-                      if (shiftId === 'Turno 3') return 'T3'
+                      if (shiftId === 'Turno día') return 'D'
+                      if (shiftId === 'Turno noche') return 'N'
+                      const m = shiftId.match(/^Turno\s+(\d+)/i)
+                      if (m) return `T${m[1]}${/lunes/i.test(shiftId) ? 'L' : ''}`
                       return fallback
                     }
                     const slxDayLabel   = labelFor(slxDayNav?.shiftId, 'D')
