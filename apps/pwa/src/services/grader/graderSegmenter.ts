@@ -130,6 +130,54 @@ export function assignShiftAndDate(
   return { shiftId: 'Sin turno', sessionDate: ts.slice(0, 10) }
 }
 
+// ── Ventanas reales de Shoplogix ──────────────────────────────────────────────
+
+/**
+ * Turno REAL de Shoplogix: una ventana concreta con fecha y hora, no un patrón
+ * horario. Shoplogix es la fuente de verdad tanto del horario como del DÍA al
+ * que pertenece el turno (`sessionDate` = su `dateKey`).
+ *
+ * Por qué ventanas concretas y no un schedule: los horarios los define
+ * Shoplogix y CAMBIAN día a día (el T2 de Chonchi ha arrancado 09:00 y 08:00;
+ * el "Turno 1 Lunes" solo existe los lunes). Un patrón hora-del-día no puede
+ * representar eso; una ventana con timestamps sí.
+ */
+export interface ShoplogixShiftWindow {
+  /** dateKey del turno según Shoplogix — manda para la asignación del día. */
+  sessionDate: string
+  shiftId: string
+  /** ms de inicio (inclusive), convención wall-clock-as-UTC. */
+  startMs: number
+  /** ms de fin (exclusivo). */
+  endMs: number
+}
+
+/**
+ * Ubica un timestamp dentro de las ventanas reales de Shoplogix.
+ *
+ * Si varias ventanas lo contienen (p.ej. 'Turno 1' 21:30–05:45 y
+ * 'Turno 1 Lunes' 00:00–07:00 se solapan la madrugada del lunes), gana la de
+ * arranque MÁS TARDÍO: es la más específica para ese instante y el criterio es
+ * determinista, así que el mismo Excel siempre produce el mismo corte.
+ *
+ * Devuelve null si el registro no cae en ningún turno sincronizado — el caller
+ * decide el fallback (schedule declarado de la planta).
+ */
+export function assignFromShoplogixWindows(
+  ts: string,
+  windows: readonly ShoplogixShiftWindow[],
+): { shiftId: string; sessionDate: string } | null {
+  const t = Date.parse(ts)
+  if (isNaN(t)) return null
+
+  let best: ShoplogixShiftWindow | null = null
+  for (const w of windows) {
+    if (t < w.startMs || t >= w.endMs) continue
+    if (!best || w.startMs > best.startMs) best = w
+  }
+  return best ? { shiftId: best.shiftId, sessionDate: best.sessionDate } : null
+}
+
 // ── Segmentación ──────────────────────────────────────────────────────────────
 
 /**
@@ -153,6 +201,7 @@ export function segmentByDayAndShift(
   pieceRecords: PieceRecord[],
   gate0Records: Gate0Record[],
   schedule: GraderShiftSchedule[] = DEFAULT_SHIFT_SCHEDULE,
+  shoplogixWindows?: readonly ShoplogixShiftWindow[],
 ): Map<SegmentKey, ShiftSegment> {
   const map = new Map<SegmentKey, ShiftSegment>()
 
@@ -164,15 +213,23 @@ export function segmentByDayAndShift(
     return map.get(key)!
   }
 
+  // Shoplogix manda: si el registro cae en un turno sincronizado, ese turno y
+  // ese día ganan. Solo si no hay turno sincronizado que lo contenga se cae al
+  // schedule declarado de la planta.
+  const assign = (ts: string) =>
+    (shoplogixWindows && shoplogixWindows.length > 0
+      ? assignFromShoplogixWindows(ts, shoplogixWindows)
+      : null) ?? assignShiftAndDate(ts, schedule)
+
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = assign(rec.ts)
     getOrCreate(sessionDate, shiftId).pieceRecords.push(rec)
   }
 
   for (const rec of gate0Records) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = assign(rec.ts)
     getOrCreate(sessionDate, shiftId).gate0Records.push(rec)
   }
 
@@ -555,7 +612,14 @@ export function computeShiftSummary(
 
 // ── Helpers de presentación ───────────────────────────────────────────────────
 
-/** Ordena los segmentos por fecha + turno (día → noche) */
+/**
+ * Ordena los segmentos por fecha + turno (día → noche).
+ *
+ * Los turnos reales de Shoplogix (Turno 1, Turno 2, 'Turno 1 Lunes') no están
+ * en la tabla de orden: caían todos en el mismo rango y quedaban en el orden
+ * arbitrario del Map. Se desempatan alfabéticamente para que el listado del
+ * wizard sea estable entre cargas.
+ */
 export function sortedSegmentEntries(
   map: Map<string, ShiftSegment>,
 ): Array<[string, ShiftSegment]> {
@@ -566,7 +630,10 @@ export function sortedSegmentEntries(
   }
   return Array.from(map.entries()).sort(([, a], [, b]) => {
     if (a.sessionDate !== b.sessionDate) return a.sessionDate < b.sessionDate ? -1 : 1
-    return (shiftOrder[a.shiftId] ?? 9) - (shiftOrder[b.shiftId] ?? 9)
+    const oa = shiftOrder[a.shiftId] ?? 9
+    const ob = shiftOrder[b.shiftId] ?? 9
+    if (oa !== ob) return oa - ob
+    return a.shiftId.localeCompare(b.shiftId, 'es')
   })
 }
 
