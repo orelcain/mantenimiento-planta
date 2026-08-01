@@ -490,12 +490,29 @@
       "title": "¿Qué hago para ajustar motores paso a paso?",
       "trigger": "Selector 5 en Service for Stepmotors.",
       "actions": [
-        "Pulsar I para posición cero.",
-        "Pulsar I para posición máxima.",
-        "Pulsar I para posición mínima.",
-        "Pulsar I para posición cero.",
-        "Pulsar I para pasar al siguiente motor paso a paso.",
+        "Pulsar I: el motor que indica el display avanza a su posición CERO.",
+        "Pulsar I: avanza a la posición MÁXIMA, que es la distancia MÁS GRANDE entre la herramienta (por ejemplo el aspirador) y la cadena de transporte. Acá se controla ese tope.",
+        "Pulsar I: avanza a la posición MÍNIMA, la distancia MÁS CHICA entre la herramienta y la cadena. Acá se controla el tope opuesto.",
+        "Pulsar I: vuelve a la posición CERO.",
+        "Pulsar I: el display pasa al siguiente motor paso a paso.",
+        "Para qué sirven MÁX y MÍN: son las dos paradas donde se comprueban los topes de cada herramienta. Si un tope quedó mal, se ve en esas dos posiciones, no en CERO.",
+        "¿Esta máquina tiene el Upgrade Kit? Se comprueba en esta misma pantalla: con el kit el display dice «Service for Stepmotors & Kit» en vez de «Service for Stepmotors». De eso depende que los códigos E770-E775 (transmisores de valor de rotación por herramienta) apliquen a esta máquina.",
         "Fuente: manual 142, pág 47."
+      ]
+    },
+    {
+      "id": "b142-flow-contadores-fallos-motores",
+      "title": "¿Qué hago para saber qué motor paso a paso está fallando más?",
+      "trigger": "Se repiten paradas por códigos E82x, o se quiere anticipar qué herramienta se está degradando antes de que pare la máquina.",
+      "actions": [
+        "Entrar al Esquema de programas del control: trae un bloque de contadores por cada motor paso a paso.",
+        "Los cinco bloques: CENTERING SM1 (centraje) · SLIT KNIFE SM2 (cuchilla abridora) · SUCTION DEV. SM3 (aspirador) · SCRAPER A SM4 (excavador A) · SCRAPER B SM5 (excavador B).",
+        "«∑ E82x» = cuántas veces ESE motor no alcanzó su posición cero durante la producción y el ordenador PARÓ la máquina.",
+        "«∑ E82x-C» = cuántas veces falló pero el ordenador lo CORRIGIÓ solo, sin parar. Es la señal temprana: sube antes de que empiecen las paradas.",
+        "«/1000Fi» = correcciones por cada 1000 pescados. Aparece recién después de elaborar 1000 pescados. Sirve para comparar motores entre sí sin que el volumen de producción distorsione.",
+        "El motor con el «/1000Fi» más alto es el candidato a intervenir, aunque todavía no esté parando la máquina.",
+        "En la misma pantalla está «∑ ANUS-O» con su «/1000Fi»: fallos de la cuchilla de punta (palpador de ano del lado de entrada), que no es un motor paso a paso pero se lee igual.",
+        "Fuente: manual 142, págs 45-46 (Esquema de programas)."
       ]
     },
     {
