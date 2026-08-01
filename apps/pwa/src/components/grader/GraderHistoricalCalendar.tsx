@@ -18,7 +18,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { shortMachineName } from './ProductionRateLineEC'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  estimateManualLine,
+  BAADER_SHORT,
+  MANUAL_LINE_SHORT,
+  MANUAL_LINE_LABEL,
+  MANUAL_LINE_TOOLTIP,
+} from '@/services/grader/graderManualLine'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity } from 'lucide-react'
@@ -55,7 +63,7 @@ import {
 } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import {
-  aggregateByCalendarDay,
+  aggregateByShiftDay,
   buildShiftChipDescriptors,
   type ShiftChipDescriptor,
 } from '@/services/grader/graderCalendarAggregation'
@@ -364,19 +372,83 @@ function ShiftChip({
     </div>
   )
 
-  return (
+  // ── Desglose Baader / línea manual ──────────────────────────────────────────
+  //
+  // El turno engloba TODO lo que se produjo: lo que pasó por las Baader más lo
+  // que entró por la línea manual (que Shoplogix no cuenta porque no está
+  // instrumentada). Antes la celda mostraba solo los ciclos de Baader, así que
+  // el día se veía con la mitad de la producción.
+  const baaderCycles: number | null = (() => {
+    // El shiftId del Excel ya coincide con el de Shoplogix; los alias cubren
+    // los summaries legacy que quedaron con "Turno día/noche".
+    const keys = [
+      `${chip.shiftDateKey}__${chip.shiftId}`,
+      ...(chip.shiftId === 'Turno día'
+        ? [`${chip.shiftDateKey}__Turno 2`]
+        : [`${chip.shiftDateKey}__Turno 1`, `${chip.shiftDateKey}__Turno 3`]),
+    ]
+    for (const k of keys) {
+      const v = slxByShift.get(k)?.totalCycles
+      if (v != null && v > 0) return v
+    }
+    return null
+  })()
+  const manualLine = chip.pieces != null && baaderCycles != null
+    ? estimateManualLine({ graderPieces: chip.pieces, baaderCycles })
+    : null
+  // Solo en la vista de piezas: en P0%/uptime el desglose no aplica y la celda
+  // es demasiado chica para meter números que no se comparan entre sí.
+  const showBreakdown = view === 'piezas' && manualLine != null
+
+  const mainRow = (
     <ChipTooltip
       content={tooltipContent}
       className={cn('flex items-center justify-between rounded px-1 py-px leading-none cursor-help', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
-      <span className="text-[9px] font-bold tabular-nums">{chipValue}</span>
+      <span className="text-[9px] font-bold tabular-nums">
+        {/* Con desglose, el turno muestra el TOTAL para que BAA + MAN cuadre. */}
+        {showBreakdown ? manualLine!.graderPieces.toLocaleString('es-CL') : chipValue}
+      </span>
       {untaggedCount !== null && untaggedCount > 0 && (
         <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
           🏷{untaggedCount}
         </span>
       )}
     </ChipTooltip>
+  )
+
+  if (!showBreakdown) return mainRow
+
+  const subRow = (
+    key: string, etiqueta: string, valor: number, clase: string, tip: string,
+  ) => (
+    <ChipTooltip
+      key={key}
+      content={tip}
+      className={cn('flex items-center justify-between rounded-sm px-1 leading-none cursor-help', clase)}
+    >
+      <span className="text-[7px] font-medium opacity-80">{etiqueta}</span>
+      <span className="text-[8px] font-semibold tabular-nums">{valor.toLocaleString('es-CL')}</span>
+    </ChipTooltip>
+  )
+
+  return (
+    <div className="flex flex-col gap-px">
+      {mainRow}
+      {/* Indentado y con guía a la izquierda: se lee como parte del turno y no
+          como tres cosas sueltas. */}
+      <div className="ml-0.5 pl-1 border-l-2 border-current/25 flex flex-col gap-px">
+        {subRow(
+          'baa', BAADER_SHORT, manualLine!.baaderCycles, 'bg-sky-500/15 text-sky-500',
+          `Procesadas en las Baader: ${manualLine!.baaderCycles.toLocaleString('es-CL')} ciclos (Shoplogix).`,
+        )}
+        {subRow(
+          'man', MANUAL_LINE_SHORT, manualLine!.manualPieces, 'bg-violet-500/15 text-violet-400',
+          `${MANUAL_LINE_LABEL}: ${manualLine!.manualPieces.toLocaleString('es-CL')} piezas (${manualLine!.pctOfGrader}% del turno). ${MANUAL_LINE_TOOLTIP}`,
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -446,22 +518,27 @@ function enrichEntriesByKind(
         kind = 'madrugada'
         sortMin = 0
         fragSuffix = 'mad'
-      } else if (chip?.direction === 'exits') {
-        // Turno noche que arranca aquí y continúa mañana — strip compacto
-        kind = 'salida'
-        sortMin = 99999
-        fragSuffix = 'sal'
-      } else if (
-        (chip?.direction === 'same' && summary.shiftId === 'Turno noche') ||
-        (!chip && (summary.shiftId === 'Turno noche' || summary.shiftId === 'Turno 3'))
-      ) {
-        kind = 'noche'
-        sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
-        fragSuffix = 'noc'
       } else {
-        kind = 'dia'
-        sortMin = getStartMinutesUTC(summary.startAt) ?? 9 * 60
-        fragSuffix = 'dia'
+        // 'same' y 'exits' son AMBOS turnos que viven en este día.
+        //
+        // 'exits' solo agrega que el turno siguió después de medianoche — la
+        // marca “→”. Antes lo degradaba a tira compacta ("continúa mañana")
+        // porque la tarjeta completa se dibujaba en el día siguiente. Con la
+        // atribución por día de turno eso ya no pasa: el turno vive acá, así
+        // que degradarlo lo dejaba SIN detalle en ninguna celda.
+        //
+        // El período se decide por la HORA de inicio y no por el nombre: los
+        // turnos reales de Shoplogix (Turno 1, Turno 2, "Turno 1 Lunes") no
+        // dicen día ni noche.
+        const startMin = getStartMinutesUTC(summary.startAt)
+        const esNocturno =
+          chip?.direction === 'exits' ||
+          summary.shiftId === 'Turno noche' ||
+          summary.shiftId === 'Turno 3' ||
+          (startMin != null && (startMin >= 19 * 60 || startMin < 7 * 60))
+        kind = esNocturno ? 'noche' : 'dia'
+        sortMin = startMin ?? (esNocturno ? 21 * 60 : 9 * 60)
+        fragSuffix = esNocturno ? 'noc' : 'dia'
       }
 
       return {
@@ -1634,9 +1711,13 @@ export function GraderHistoricalCalendar({
     return m
   }, [allSummariesRaw])
 
+  // Shoplogix manda con la asignación del día: el turno se dibuja entero en la
+  // celda del día que arrancó, no repartido entre los dos días en que ocurrió
+  // físicamente. El cruce de medianoche no se pierde — la contribución trae
+  // `crossesMidnight` y el chip sale con dirección 'exits' (“→”).
   const calendarAgg = useMemo(() => {
     const valid = allSummariesRaw.filter((s) => s.totalPieces > 0)
-    return aggregateByCalendarDay({ summaries: valid })
+    return aggregateByShiftDay({ summaries: valid })
   }, [allSummariesRaw])
 
   const chipsByDate = useMemo(
@@ -1666,6 +1747,26 @@ export function GraderHistoricalCalendar({
   }, [calendarAgg, slxTotalsByShift, currentMonth])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
+
+  // Al cambiar de mes, la selección tiene que moverse con él.
+  //
+  // Antes solo cambiaba `currentMonth` y el día seleccionado quedaba apuntando
+  // al mes anterior: el calendario mostraba julio pero el panel de resumen
+  // seguía con las tarjetas de agosto, como si ese día tuviera datos que no son
+  // suyos. Se elige el día MÁS RECIENTE con datos del mes nuevo; si el mes no
+  // tiene nada, se limpia la selección y el panel muestra su estado vacío.
+  //
+  // Va como efecto y no dentro de los handlers de flecha porque hay una decena
+  // de lugares que cambian de mes (flechas, "hoy", "último registro", clicks en
+  // el panel mensual, deep links…) y todos tienen que comportarse igual.
+  useEffect(() => {
+    if (!selectedKey) return
+    const prefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+    if (selectedKey.startsWith(prefix)) return
+    const delMes = sortedDayKeys.filter((k) => k.startsWith(prefix))
+    const objetivo = delMes[delMes.length - 1]
+    setSelectedDate(objetivo ? new Date(`${objetivo}T00:00:00`) : null)
+  }, [currentMonth, selectedKey, sortedDayKeys])
 
   // Sincroniza ref mutable para acceso imperativo dentro del RAF de inercia
   useEffect(() => {
@@ -4124,18 +4225,20 @@ export function GraderHistoricalCalendar({
                       ? (slxNightUptimePct > 0 ? `${slxNightUptimePct.toFixed(0)}%` : '—')
                       : calendarView === 'p0' ? '—'
                       : slxNightCycles.toLocaleString('es-CL')
-                    // Label del chip — en plantas clasificadoras (Chonchi) usa D/N;
-                    // en no-clasificadoras (Yal) usa la nomenclatura real del turno
-                    // (T1/T2/T3) para no confundir con la convención Día/Noche del
-                    // Grader. Si por alguna razón sigue siendo legacy día/noche en
-                    // un doc, se respeta el shiftId que tenga.
-                    const isNonClassif = plantLine.isClassificationPlant === false
+                    // Label del chip: el nombre REAL del turno que emite Shoplogix.
+                    //
+                    // Antes esto mostraba D/N en las plantas clasificadoras para no
+                    // chocar con la convención Día/Noche del Grader. Ese motivo ya no
+                    // existe: Chonchi dejó de emitir "Turno día/noche" (desde 2026-05
+                    // manda Turno 1 / Turno 2 / "Turno 1 Lunes") y el Grader ahora
+                    // segmenta con esos mismos nombres. Mostrar "D" en un turno que
+                    // se llama "Turno 1" era decirle al operador algo que no existe.
                     const labelFor = (shiftId: string | undefined, fallback: 'D' | 'N'): string => {
                       if (!shiftId) return fallback
-                      if (!isNonClassif) return fallback
-                      if (shiftId === 'Turno 1') return 'T1'
-                      if (shiftId === 'Turno 2') return 'T2'
-                      if (shiftId === 'Turno 3') return 'T3'
+                      if (shiftId === 'Turno día') return 'D'
+                      if (shiftId === 'Turno noche') return 'N'
+                      const m = shiftId.match(/^Turno\s+(\d+)/i)
+                      if (m) return `T${m[1]}${/lunes/i.test(shiftId) ? 'L' : ''}`
                       return fallback
                     }
                     const slxDayLabel   = labelFor(slxDayNav?.shiftId, 'D')
@@ -5116,7 +5219,7 @@ export function GraderHistoricalCalendar({
                                 return (
                                   <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-medium text-foreground/85">{m.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')}</span>
+                                      <span className="font-medium text-foreground/85">{shortMachineName(m.name)}</span>
                                       <span className={cn('font-mono tabular-nums', theme.text)}>{bigPct.toFixed(0)}%</span>
                                     </div>
                                     <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
@@ -5284,7 +5387,7 @@ export function GraderHistoricalCalendar({
                         <span className="text-right" title="MTTR de MICRO-detenciones: interferencias breves <5 min (atascos, sensores). Se reportan aparte para no distorsionar el MTTR de averías">MTTR micro</span>
                       </div>
                       {pms.map((pm) => {
-                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const shortName = shortMachineName(pm.name)
                         const uptimeColor =
                           pm.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-300'
                           : pm.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-300'
@@ -5369,7 +5472,7 @@ export function GraderHistoricalCalendar({
                         Todas
                       </button>
                       {slxMonthlyStats.perMachineMonth.map((pm) => {
-                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const shortName = shortMachineName(pm.name)
                         const active = paretoMachineFilter === pm.machineid
                         return (
                           <button
@@ -5648,7 +5751,7 @@ export function GraderHistoricalCalendar({
                 const machineSeries = [...selectedByMachine.entries()]
                   .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
                   .map(([, v], idx) => ({
-                    name:   v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+                    name:   shortMachineName(v.name),
                     color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
                     points: v.points,
                   }))

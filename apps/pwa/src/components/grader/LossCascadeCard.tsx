@@ -28,6 +28,7 @@
  */
 
 import { useMemo, useState, useEffect } from 'react'
+import { shortMachineName } from './ProductionRateLineEC'
 import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cascadeFromStates, classifyLossState, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
@@ -76,7 +77,6 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
    *  necesario acá para poder volver a filtrar states CRUDOS por causal. */
   const stateCauseLabel = (s: { name: string; reason: string }) =>
     s.reason || (s.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
-  const shortMachineName = (name: string) => name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
 
   // Filtrar por grupo (o por causal+máquina específica) RESALTA en los 3
   // Gantts + el chart de velocidad upstream — "demostrar" cómo se comportaron
@@ -156,7 +156,7 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
     // MANTENIMIENTO ¿en qué Baader fue?" — antes se perdía al sumar entre las 3).
     const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number; machines: Set<string> }>()
     for (const x of perMachine) {
-      const shortName = x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+      const shortName = shortMachineName(x.m.machineName)
       for (const item of x.cascade.items) {
         const label = item.reason || (item.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
         const key = `${item.bucket}__${label}`
@@ -174,8 +174,16 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
 
     const perMachineOut = perMachine.map((x) => ({
       machineid: x.m.machineid,
-      name: x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+      // Mismo nombre que la leyenda del gráfico. Antes acá se abreviaba a
+      // "Ev 1" y en el gráfico a "M1": la misma máquina con dos nombres en la
+      // misma pantalla, y ninguno de los dos es como se le dice en planta.
+      name: shortMachineName(x.m.machineName),
       cascade: x.cascade,
+      piezas: x.m.totalCycles,
+      // Cadencia sobre el tiempo EN PROCESO, no sobre el turno completo: una
+      // máquina detenida mostraría 0,3 pz/min y parecería lenta en vez de
+      // parada. Son dos problemas distintos y se arreglan distinto.
+      pzMin: x.cadencePzSec * 60,
     }))
 
     return { totals, usoReal, piezasReales, piezasMax, causes, perMachine: perMachineOut }
@@ -415,6 +423,19 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
                             ? `${fmtHm(m.cascade.produccionSec)} de ${fmtHm(m.cascade.techoSec)} de techo`
                             : `${fmtHm(sec)} · ${pctOfOwnDenom.toFixed(0)}% de ${activeBucket === 'planificado' ? 'su turno' : 'su techo'}`}
                         </div>
+                        {/* Piezas y cadencia real de la máquina. Sin esto, dos
+                            máquinas con el mismo % de uso se veían iguales
+                            aunque una produjera el triple que la otra. */}
+                        {activeBucket == null && m.piezas > 0 && (
+                          <div
+                            className="mt-0.5 text-[9px] tabular-nums text-foreground/70"
+                            title={`${m.piezas.toLocaleString('es-CL')} piezas en ${fmtHm(m.cascade.produccionSec)} de proceso. La cadencia se mide solo sobre el tiempo en proceso: si contara las horas paradas, una máquina detenida parecería lenta en vez de parada.`}
+                          >
+                            {m.piezas.toLocaleString('es-CL')} pz
+                            <span className="text-muted-foreground"> · </span>
+                            <span className="font-medium">{m.pzMin.toFixed(1)} pz/min</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}

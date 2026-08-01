@@ -6,7 +6,14 @@ import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
-import { deriveBaaderRejection, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
+import { type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
+import {
+  estimateManualLine,
+  MANUAL_LINE_LABEL,
+  MANUAL_LINE_TOOLTIP,
+} from '@/services/grader/graderManualLine'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { shortMachineName } from './ProductionRateLineEC'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
@@ -49,15 +56,18 @@ interface HeroScorecardProps {
   shiftWindow: ShiftTimeWindow
   upstreamSnapshot?: UpstreamLineSnapshot | null
   /**
-   * Captura manual Marel HG. Si está, se calcula rechazo Baader puro.
-   * Si no, se cae a estimación bruta (rechazos + no-controladas Marel mezclados).
+   * @deprecated Ya no se usa acá. Servía para calcular el "rechazo Baader puro"
+   * restando las no-controladas del Marel HG; ese cálculo se retiró porque
+   * asumía que por la línea manual solo volvía rechazo (ver graderManualLine).
+   * Se mantiene la prop para no romper a los callers; el panel Marel HG sigue
+   * recibiendo la captura por su cuenta.
    */
   marelHgCapture?: MarelHgCapture | null
   /** Timestamp del último sync Shoplogix (para el badge "hace Xs"). */
   upstreamSyncedAt?: Date | null
 }
 
-export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgCapture, upstreamSyncedAt }: HeroScorecardProps) {
+export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstreamSyncedAt }: HeroScorecardProps) {
   const verdict = verdictFromP0Pct(summary.pointZeroPct)
   const style = VERDICT_STYLE[verdict]
   const throughputPerMin = summary.productionRatePerHour
@@ -66,18 +76,18 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
 
   const baaderTotal = upstreamSnapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? 0
 
-  // Si hay captura Marel HG → rechazo Baader puro (Grader − Baader − Marel_no_controladas).
-  // Si no hay captura → estimación bruta (Grader − Baader, mezcla rechazos + no-controladas).
-  const baaderRejectionPure = deriveBaaderRejection({
-    graderTotalPieces: summary.totalPieces,
-    baaderTotalCycles: baaderTotal,
-    marelHgCapture: marelHgCapture ?? null,
+  // Grader − Baader = piezas que NO pasaron por las evisceradoras.
+  //
+  // Antes esto se mostraba como "rechazo": el modelo asumía que por la línea
+  // manual solo volvían los rechazos de las Baader. Desde 2026 la línea manual
+  // PRODUCE, así que el número dejó de significar rechazo — daba 102%, que es
+  // imposible. Con dos incógnitas (manual y rechazo) y un solo dato no se
+  // pueden separar, así que se informa la línea manual y el rechazo se retiró.
+  // Ver `graderManualLine.ts` para el desarrollo completo.
+  const manualLine = estimateManualLine({
+    graderPieces: summary.totalPieces,
+    baaderCycles: baaderTotal,
   })
-  const upstreamDelta = baaderTotal > 0 ? summary.totalPieces - baaderTotal : null
-  const rejectedRaw = upstreamDelta != null && upstreamDelta > 0 ? upstreamDelta : null
-  const rejectedRawPct = rejectedRaw != null && baaderTotal > 0
-    ? ((rejectedRaw / baaderTotal) * 100).toFixed(1)
-    : null
 
   const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
     ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
@@ -112,7 +122,11 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
             <Badge
               variant="outline"
               className="text-xs px-2 py-0 border-zinc-600/50 text-zinc-400"
-              title={`Turno cerrado · ${new Date(shiftWindow.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} → ${new Date(shiftWindow.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`}
+              // fmtTime (wall-clock) y no toLocaleTimeString: los ISO llevan
+              // sufijo Z pero son hora de planta. Formatearlos con la TZ del
+              // navegador restaba 4 h y mostraba "05:30 p.m. → 01:45 a.m."
+              // para un turno que corre 21:30 → 05:45.
+              title={`Turno cerrado · ${fmtTime(shiftWindow.startAt)} → ${fmtTime(shiftWindow.endAt)}`}
             >
               CERRADO
             </Badge>
@@ -185,7 +199,8 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
                       {m.totalCycles.toLocaleString('es-CL')}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {m.machineName.replace(/^YAL\s+/, '').replace(/Evisceradora/, 'Ev')}
+                      {/* Mismo nombre que el gráfico y la cascada: "Baader N". */}
+                      {shortMachineName(m.machineName)}
                     </div>
                     <div className="text-[10px] text-muted-foreground/70 tabular-nums">
                       {uptimePct}% uptime
@@ -253,28 +268,16 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
         </div>
       </CardContent>
 
-      {/* Footer — derivado: rechazo Baader (Grader vs Σciclos) cuando ambas fuentes presentes */}
-      {baaderTotal > 0 && upstreamSnapshot && (baaderRejectionPure != null || rejectedRaw != null) && (
+      {/* Footer — desglose Baader vs línea manual (antes: "rechazo estimado") */}
+      {baaderTotal > 0 && upstreamSnapshot && manualLine != null && (
         <div className="px-4 py-1.5 border-t bg-muted flex items-center gap-2 flex-wrap text-[11px]">
-          {baaderRejectionPure != null ? (
-            <span
-              className="text-amber-400 cursor-help"
-              title={`Rechazo Baader puro = Grader_total − ΣBaader_procesadas − Marel_no_controladas (${marelHgCapture!.uncontrolled.toLocaleString('es-CL')}). Asume que rechazos Baader + no-controladas Marel vuelven al Grader vía línea manual.`}
-            >
-              <span className="text-muted-foreground">Rechazo Baader (puro):</span>{' '}
-              <span className="tabular-nums font-semibold">{baaderRejectionPure.rejected.toLocaleString('es-CL')}</span>
-              <span className="text-muted-foreground"> ({baaderRejectionPure.rejectedPctOfBaader.toFixed(1)}%)</span>
+          <span className="text-violet-400 cursor-help" title={MANUAL_LINE_TOOLTIP}>
+            <span className="text-muted-foreground">{MANUAL_LINE_LABEL}:</span>{' '}
+            <span className="tabular-nums font-semibold">
+              {manualLine.manualPieces.toLocaleString('es-CL')}
             </span>
-          ) : rejectedRaw != null ? (
-            <span
-              className="text-amber-400 cursor-help"
-              title="Estimación bruta: Grader_total − ΣBaader_procesadas. Incluye rechazos Baader + no-controladas Marel HG (1-7% típico)."
-            >
-              <span className="text-muted-foreground">Rechazo est. (bruto):</span>{' '}
-              <span className="tabular-nums font-semibold">{rejectedRaw.toLocaleString('es-CL')}</span>
-              <span className="text-muted-foreground"> ({rejectedRawPct ?? '—'}%)</span>
-            </span>
-          ) : null}
+            <span className="text-muted-foreground"> ({manualLine.pctOfGrader}% del total)</span>
+          </span>
           <span
             className="ml-auto text-muted-foreground/70 cursor-help"
             title="Diferencia entre piezas Marelec/Grader y ciclos Baader. Al final del turno deberían converger; si la cobertura Grader es parcial, este número aún no es definitivo."

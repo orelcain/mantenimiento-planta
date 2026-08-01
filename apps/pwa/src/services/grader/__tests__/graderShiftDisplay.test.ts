@@ -68,9 +68,19 @@ describe('getShiftMeta — período derivado del HORARIO real (no del nombre)', 
     expect(meta.period).toBe('noche')
     expect(meta.iconName).toBe('Moon')
     expect(meta.isDayLike).toBe(false)
-    // El LABEL sigue fiel a Shoplogix (no inventamos "Turno 3")
-    expect(meta.label).toBe('Turno 1 — Mañana')
+    // El NOMBRE del turno sigue fiel a Shoplogix (no inventamos "Turno 3")…
+    expect(meta.label.startsWith('Turno 1')).toBe(true)
     expect(meta.shortLabel).toBe('T1')
+    // …pero el período del título también sigue la hora real. Antes decía
+    // "Turno 1 — Mañana" con el ícono 🌙 al lado: se contradecía solo.
+    expect(meta.label).toBe('Turno 1 — Madrugada')
+  })
+
+  it('distingue madrugada de noche en el título', () => {
+    // Para el operador no es lo mismo entrar 21:30 que 01:30, aunque el color
+    // de ambos sea "noche".
+    expect(getShiftMeta('Turno 1', '2026-07-31T21:30:00.000Z').label).toBe('Turno 1 — Noche')
+    expect(getShiftMeta('Turno 1', '2026-08-01T01:34:00.000Z').label).toBe('Turno 1 — Madrugada')
   })
 
   it('"Turno 2" a las 09:00 (chonchi) es MAÑANA ☀ aunque el nombre sugiera tarde', () => {
