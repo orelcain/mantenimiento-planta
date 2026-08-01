@@ -81,7 +81,9 @@ describe('deriveSuggestions — context upstream (v2.99.2)', () => {
     })
     const action = out.find(a => a.id === 'upstream-attend-e2-uuid')
     expect(action!.description).toContain('100%')
-    expect(action!.description).not.toMatch(/1[1-9]\d%|[2-9]\d\d%/)
+    // Ningún porcentaje mayor a 100: el bug real mostraba 114%.
+    const pct = Number((action!.description.match(/\((\d+)%/) ?? [])[1])
+    expect(pct).toBeLessThanOrEqual(100)
   })
 
   it('NO agrega "Atender máquina" si overlap < 5 min (no significativo)', () => {
