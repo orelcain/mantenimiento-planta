@@ -37,7 +37,10 @@ import {
   sortedSegmentEntries,
   dedupePieceRecords,
   dedupeGate0Records,
+  type ShoplogixShiftWindow,
 } from '@/services/grader/graderSegmenter'
+import { loadShoplogixShiftWindows } from '@/services/grader/graderShoplogixWindows'
+import { normalizeShiftSchedule, DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import {
   saveDailySummaryBatch,
   fetchExistingSummaryIds,
@@ -88,6 +91,13 @@ export function AnalisisGraderWizardPage() {
 
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
+  // Turnos REALES de Shoplogix para los días que toca el Excel. Shoplogix manda
+  // sobre el horario y sobre el día del turno; el schedule declarado de la
+  // planta queda como fallback para días sin sincronizar.
+  const [slxWindows, setSlxWindows] = useState<ShoplogixShiftWindow[]>([])
+  const [shiftSchedule, setShiftSchedule] = useState(
+    lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE,
+  )
   // Panel "Cargar Excel del Grader" — colapsable. Por defecto cerrado en mobile
   // si ya hay summaries (no es la acción primaria), abierto si está vacío.
   const [uploadPanelExpanded, setUploadPanelExpanded] = useState(true)
@@ -170,6 +180,36 @@ export function AnalisisGraderWizardPage() {
   // dejaba a los Excels de un solo turno SIN forma de guardar — el wizard
   // mostraba el dashboard pero nunca persistía nada en Firestore. Ahora
   // exponemos siempre que haya ≥1 segmento, y el banner se adapta al copy.
+  // Fallback de horarios: el schedule declarado de la planta (o el guardado en
+  // Firestore). Solo se usa para registros que no caen en ningún turno
+  // sincronizado de Shoplogix.
+  useEffect(() => {
+    let cancelled = false
+    const base = lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
+    getModuleRanges(lineId)
+      .then((cfg) => {
+        if (cancelled) return
+        setShiftSchedule(normalizeShiftSchedule(cfg?.shiftSchedule, base))
+      })
+      .catch(() => { if (!cancelled) setShiftSchedule(base) })
+    return () => { cancelled = true }
+  }, [lineId, lineConfig.defaultShiftSchedule])
+
+  // Traer los turnos reales de Shoplogix para los días que cubre el Excel.
+  useEffect(() => {
+    if (!parsedData) { setSlxWindows([]); return }
+    const dateKeys = new Set<string>()
+    for (const r of parsedData.pieceRecords) if (r.ts) dateKeys.add(r.ts.slice(0, 10))
+    for (const r of parsedData.gate0Records) if (r.ts) dateKeys.add(r.ts.slice(0, 10))
+    if (dateKeys.size === 0) { setSlxWindows([]); return }
+
+    let cancelled = false
+    loadShoplogixShiftWindows(Array.from(dateKeys), lineConfig.plantSlug)
+      .then((w) => { if (!cancelled) setSlxWindows(w) })
+      .catch(() => { if (!cancelled) setSlxWindows([]) })
+    return () => { cancelled = true }
+  }, [parsedData, lineConfig.plantSlug])
+
   const multiDayInfo = useMemo(() => {
     if (!parsedData) return null
     const totalRecords = parsedData.pieceRecords.length + parsedData.gate0Records.length
@@ -177,13 +217,16 @@ export function AnalisisGraderWizardPage() {
     // Dedupe por si el archivo viene con registros repetidos internamente
     const pieceUnique = dedupePieceRecords(parsedData.pieceRecords).unique
     const gate0Unique = dedupeGate0Records(parsedData.gate0Records).unique
-    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique)
+    // Antes esto se llamaba SIN horario: siempre cortaba con día 07-19 /
+    // noche 19-07, ignorando la config de la planta y a Shoplogix, así que un
+    // turno real (T1 21:30-05:45) nunca calzaba con su tarjeta.
+    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique, shiftSchedule, slxWindows)
     const entries = sortedSegmentEntries(segmentMap)
     if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     const isP0Only = parsedData.pieceRecords.length === 0
     return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
-  }, [parsedData])
+  }, [parsedData, shiftSchedule, slxWindows])
 
   // Consultar Firestore: cuántos de los turnos detectados ya existen
   useEffect(() => {

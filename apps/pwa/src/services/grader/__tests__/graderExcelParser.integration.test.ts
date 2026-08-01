@@ -15,10 +15,22 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 import { parseFile, mergeParsedData } from '../graderExcelParser'
+import { segmentByDayAndShift, dedupePieceRecords } from '../graderSegmenter'
+import type { GraderShiftSchedule } from '../types'
+
+/** Horario real de Planta Principal (el que emite Shoplogix). */
+const PRINCIPAL_SCHEDULE: GraderShiftSchedule[] = [
+  { shiftId: 'Turno 1', startHour: 21, startMinute: 30, endHour: 5, endMinute: 45 },
+  { shiftId: 'Turno 2', startHour: 9, startMinute: 0, endHour: 17, endMinute: 15 },
+]
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 
-const BASE_DIR = 'C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026'
+// Se resuelve desde el HOME del usuario: el path estaba clavado al perfil
+// 'pc hp' y a la ubicación vieja de la carpeta, así que estos tests venían
+// saltándose en silencio desde que el Grader se movió bajo EQUIPOS PLANTA.
+const HOME = process.env.USERPROFILE || process.env.HOME || ''
+const BASE_DIR = path.join(HOME, 'OneDrive/ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GRADER/temporada 2025-2026')
 const PP_FILE = path.join(BASE_DIR, 'pieza a pieza/julio 2025/Pieza pieza Grader STATICGRADER1 (20250701_000000 - 20250801_000000).xlsx')
 const P0_FILE = path.join(BASE_DIR, 'punto 0/julio 2025/Puerta 0 STATICGRADER1 (20250701_000000 - 20250731_000000).xlsx')
 
@@ -182,4 +194,51 @@ describe('Flujo PP→P0 incremental (Excel reales julio 2025)', () => {
       expect(inferredErrors.size).toBeGreaterThanOrEqual(1)
     }
   }, 60_000)
+
+  // ── Turno que cruza medianoche (caso reportado 31-jul → 1-ago 2025) ────────
+  //
+  // El turno de Shoplogix corrió 21:30 → 05:45. TODAS las piezas — incluida la
+  // madrugada del 1-ago — deben quedar en el turno del 31-jul (el día en que
+  // arrancó), en UN solo segmento. Antes se repartían en 3 segmentos sobre 2
+  // días por leer los timestamps con hora local en vez de wall-clock.
+  const AGO_FILE = path.join(
+    BASE_DIR,
+    'pieza a pieza/agosto 2025/Pieza pieza Grader STATICGRADER1 (20250731_000000 - 20250815_000000).xlsx',
+  )
+  const agoExists = fs.existsSync(AGO_FILE)
+
+  it.skipIf(!ppExists || !agoExists)(
+    'el turno noche 31-jul→1-ago queda en UN turno del 31-jul',
+    async () => {
+      const parts = await Promise.all(
+        [PP_FILE, AGO_FILE].map(async (f) => {
+          const r = await parseFile(fileFromDisk(f))
+          return { fileMeta: r.fileMeta, partialData: r.partialData }
+        }),
+      )
+      const merged = mergeParsedData(parts)
+      const { unique } = dedupePieceRecords(merged.pieceRecords)
+
+      // Registros del turno físico, según el reloj de planta
+      const delTurno = unique.filter(
+        (r) => r.ts >= '2025-07-31T21:30' && r.ts < '2025-08-01T05:45',
+      )
+      const piezasDelTurno = delTurno.reduce((s, r) => s + r.pieces, 0)
+      expect(piezasDelTurno).toBeGreaterThan(10_000) // ~15.4k en el turno real
+
+      const segs = segmentByDayAndShift(delTurno, [], PRINCIPAL_SCHEDULE)
+
+      // UN solo segmento, atribuido al día de inicio
+      expect(Array.from(segs.keys())).toEqual(['2025-07-31|Turno 1'])
+      // …y con TODAS las piezas, sin perder la madrugada del 1-ago
+      expect(
+        segs.get('2025-07-31|Turno 1')!.pieceRecords.reduce((s, r) => s + r.pieces, 0),
+      ).toBe(piezasDelTurno)
+
+      // Sanity: el tramo de madrugada existe de verdad en el Excel
+      const madrugada = delTurno.filter((r) => r.ts >= '2025-08-01')
+      expect(madrugada.reduce((s, r) => s + r.pieces, 0)).toBeGreaterThan(1_000)
+    },
+    120_000,
+  )
 })
