@@ -960,3 +960,30 @@ export function resolvePanelWindow(args: {
   if (snapshotBounds?.start && snapshotBounds?.end) return snapshotBounds
   return fromProp
 }
+
+
+/** Cómo se decide el encuadre del eje temporal. */
+export type FramingOverride = 'auto' | 'produccion' | 'turno'
+
+/**
+ * ¿El eje va acotado a las horas con proceso?
+ *
+ * `auto` deja decidir a la heurística (acotar solo si la operación ocupa una
+ * fracción chica del turno). Los otros dos valores son decisión explícita del
+ * usuario y MANDAN sobre la heurística.
+ *
+ * Regresión que esto evita: antes el estado era un booleano "ver turno completo"
+ * y el encuadre siempre pasaba por la heurística, así que en las líneas donde
+ * ésta decía que no hacía falta (Yal, Chonchi — su turno sí está acotado) el
+ * botón no podía forzar nada y no hacía absolutamente nada.
+ */
+export function resolveFraming(args: {
+  override: FramingOverride
+  hasProductionWindow: boolean
+  autoDecision: boolean
+}): boolean {
+  if (!args.hasProductionWindow) return false
+  if (args.override === 'produccion') return true
+  if (args.override === 'turno') return false
+  return args.autoDecision
+}

@@ -1242,12 +1242,16 @@ export function UpstreamMachinesPanel({
    * chip para que se entienda qué recorta el botón sin abrir el tooltip.
    */
   const axisRangeLabel = useMemo(() => {
-    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return ''
-    const a = new Date(shiftWindow.startAt).getTime()
-    const b = new Date(shiftWindow.endAt).getTime()
+    // Sale de la ventana RESUELTA (la que dibuja el chart), no del prop: en un
+    // turno en curso el prop decía "14:45–00:00" mientras el eje mostraba
+    // 15:15–23:09 (los bounds del snapshot, que crecen con cada sync). Un chip
+    // que anuncia un rango distinto al dibujado es peor que no tener chip.
+    if (!windowStart || !windowEnd) return ''
+    const a = windowStart.getTime()
+    const b = windowEnd.getTime()
     if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return ''
     return `${fmtTime(a)}–${fmtTime(b)}`
-  }, [shiftWindow])
+  }, [windowStart, windowEnd])
 
   // Modelo de las máquinas del turno, derivado de los datos: en Filete la
   // máquina es una Baader 200 y el header decía "Baader 142" igual.
@@ -1316,6 +1320,7 @@ export function UpstreamMachinesPanel({
 ` +
                 (framedOnProduction
                   ? `Ahora: SOLO las horas con producción${axisRangeLabel ? ` (${axisRangeLabel})` : ''}. ` +
+                    `En un turno en curso el borde derecho avanza con la última pieza. ` +
                     `Click para ver el turno completo, incluidas las horas sin proceso.`
                   : `Ahora: el turno completo${axisRangeLabel ? ` (${axisRangeLabel})` : ''}, con horas sin proceso incluidas. ` +
                     `Click para acotarlo a las horas con producción.`)
