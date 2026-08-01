@@ -44,13 +44,50 @@ describe('assignFromShoplogixWindows', () => {
       .toBe('Turno 2')
   })
 
-  it('el fin de ventana es exclusivo', () => {
-    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:44'), WINDOWS_31_JUL)).not.toBeNull()
-    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:45'), WINDOWS_31_JUL)).toBeNull()
+  it('el fin de ventana es exclusivo para la CONTENCIÓN', () => {
+    // Con tolerancia 0 se ve el borde puro: 05:44 dentro, 05:45 ya fuera.
+    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:44'), WINDOWS_31_JUL, 0)).not.toBeNull()
+    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:45'), WINDOWS_31_JUL, 0)).toBeNull()
+    // Con la tolerancia por defecto, esa pieza igual pertenece al turno.
+    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:45'), WINDOWS_31_JUL)?.shiftId)
+      .toBe('Turno 1')
   })
 
-  it('fuera de todo turno sincronizado devuelve null (el caller cae al fallback)', () => {
+  it('fuera de toda tolerancia devuelve null (el caller cae al fallback)', () => {
+    // 19:00 está a 2h30 del T1 (21:30) y a 1h45 del cierre del T2 (17:15)
     expect(assignFromShoplogixWindows(wall('2025-07-31', '19:00'), WINDOWS_31_JUL)).toBeNull()
+  })
+
+  it('la cola del turno se pega al turno, no arma uno nuevo', () => {
+    // Caso real feb-2026: el T1 cierra 05:45 y hay piezas hasta 05:48.
+    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:48'), WINDOWS_31_JUL))
+      .toEqual({ shiftId: 'Turno 1', sessionDate: '2025-07-31' })
+    // …y el T2 cierra 17:15 con piezas hasta 17:27
+    expect(assignFromShoplogixWindows(wall('2025-07-31', '17:27'), WINDOWS_31_JUL))
+      .toEqual({ shiftId: 'Turno 2', sessionDate: '2025-07-31' })
+  })
+
+  it('arrancar un poco antes tambien cuenta como el turno', () => {
+    expect(assignFromShoplogixWindows(wall('2025-07-31', '21:05'), WINDOWS_31_JUL)?.shiftId)
+      .toBe('Turno 1')
+  })
+
+  it('gana el turno mas cercano, no el primero del array', () => {
+    // 18:00 está a 45min del cierre del T2 y a 3h30 del inicio del T1
+    expect(assignFromShoplogixWindows(wall('2025-07-31', '18:00'), WINDOWS_31_JUL)?.shiftId)
+      .toBe('Turno 2')
+    expect(assignFromShoplogixWindows(wall('2025-07-31', '18:00'), [...WINDOWS_31_JUL].reverse())?.shiftId)
+      .toBe('Turno 2')
+  })
+
+  it('estar DENTRO de un turno le gana a estar cerca de otro', () => {
+    // 09:30 está dentro del T2; también a menos de 1h de su propio borde.
+    expect(assignFromShoplogixWindows(wall('2025-07-31', '09:30'), WINDOWS_31_JUL))
+      .toEqual({ shiftId: 'Turno 2', sessionDate: '2025-07-31' })
+  })
+
+  it('la tolerancia es configurable (0 = corte estricto al horario)', () => {
+    expect(assignFromShoplogixWindows(wall('2025-08-01', '05:48'), WINDOWS_31_JUL, 0)).toBeNull()
   })
 
   it('si dos turnos se solapan gana el de arranque más tardío', () => {

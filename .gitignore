@@ -101,3 +101,6 @@ __pycache__/
 
 # Reportes de migración con data de planta (no versionar)
 scripts/normalizacion/*-report.json
+
+# Artefacto del bundle para scripts Node (ver scripts/build-grader-core.js)
+scripts/_grader-core.cjs

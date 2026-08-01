@@ -153,28 +153,61 @@ export interface ShoplogixShiftWindow {
 }
 
 /**
+ * Cuánto puede pasarse un turno de su horario programado y seguir siendo el
+ * mismo turno.
+ *
+ * La línea sigue produciendo unos minutos después del cierre: verificado sobre
+ * los datos reales de feb-2026, hay piezas hasta 05:48 con el T1 cerrando
+ * 05:45, y hasta 17:27 con el T2 cerrando 17:15. Sin tolerancia esas colas
+ * formaban turnos residuales de 3 minutos — tarjetas basura en el calendario
+ * por 1.065 piezas (0,34% del total).
+ */
+export const SHIFT_WINDOW_TOLERANCE_MS = 60 * 60 * 1000
+
+/**
  * Ubica un timestamp dentro de las ventanas reales de Shoplogix.
  *
- * Si varias ventanas lo contienen (p.ej. 'Turno 1' 21:30–05:45 y
- * 'Turno 1 Lunes' 00:00–07:00 se solapan la madrugada del lunes), gana la de
- * arranque MÁS TARDÍO: es la más específica para ese instante y el criterio es
- * determinista, así que el mismo Excel siempre produce el mismo corte.
+ * 1. Si alguna ventana lo CONTIENE, gana esa. Si varias lo contienen (p.ej.
+ *    'Turno 1' 21:30–05:45 y 'Turno 1 Lunes' 00:00–07:00 se solapan la
+ *    madrugada del lunes), gana la de arranque MÁS TARDÍO: es la más
+ *    específica para ese instante.
+ * 2. Si ninguna lo contiene, se pega a la ventana más cercana dentro de
+ *    `toleranceMs` — el turno se pasó de su horario, que es lo que ocurre en
+ *    planta. Empate → la de arranque más tardío.
  *
- * Devuelve null si el registro no cae en ningún turno sincronizado — el caller
+ * Ambos criterios son deterministas: el mismo Excel produce siempre el mismo
+ * corte, sin importar el orden del array.
+ *
+ * Devuelve null si el registro queda fuera de toda tolerancia — el caller
  * decide el fallback (schedule declarado de la planta).
  */
 export function assignFromShoplogixWindows(
   ts: string,
   windows: readonly ShoplogixShiftWindow[],
+  toleranceMs: number = SHIFT_WINDOW_TOLERANCE_MS,
 ): { shiftId: string; sessionDate: string } | null {
   const t = Date.parse(ts)
   if (isNaN(t)) return null
 
-  let best: ShoplogixShiftWindow | null = null
+  let inside: ShoplogixShiftWindow | null = null
+  let nearest: ShoplogixShiftWindow | null = null
+  let nearestGap = Infinity
+
   for (const w of windows) {
-    if (t < w.startMs || t >= w.endMs) continue
-    if (!best || w.startMs > best.startMs) best = w
+    if (t >= w.startMs && t < w.endMs) {
+      if (!inside || w.startMs > inside.startMs) inside = w
+      continue
+    }
+    if (inside) continue // ya hay una que lo contiene: no hace falta medir
+    const gap = t < w.startMs ? w.startMs - t : t - w.endMs + 1
+    if (gap > toleranceMs) continue
+    if (gap < nearestGap || (gap === nearestGap && nearest && w.startMs > nearest.startMs)) {
+      nearest = w
+      nearestGap = gap
+    }
   }
+
+  const best = inside ?? nearest
   return best ? { shiftId: best.shiftId, sessionDate: best.sessionDate } : null
 }
 
