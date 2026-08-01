@@ -13,7 +13,7 @@ import {
   MANUAL_LINE_TOOLTIP,
 } from '@/services/grader/graderManualLine'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { shortMachineName } from './ProductionRateLineEC'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
@@ -193,7 +193,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
                   <div
                     key={m.machineid}
                     className="text-center cursor-help"
-                    title={`${m.machineName} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
+                    title={`${shortMachineName(m.machineName)} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
                   >
                     <div className="text-sm font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}

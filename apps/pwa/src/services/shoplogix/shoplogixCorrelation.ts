@@ -15,6 +15,7 @@
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from './types'
 import { isOrganizationalTag } from '@/services/grader/graderPauseTags'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 // ============================================================================
 // Tipos
@@ -238,7 +239,7 @@ export function correlatePausesWithUpstream(
       } else if (fraction >= 2 / 3) {
         kind = 'upstream_majority'
         confidence = 0.6
-        const names = operationalContribs.map(c => c.machineName).join(', ')
+        const names = operationalContribs.map(c => shortMachineName(c.machineName)).join(', ')
         hypothesis = `${machinesInvolved}/${totalMachines} Baaders paradas (${names}) — flujo upstream reducido.`
       } else {
         kind = 'upstream_single'

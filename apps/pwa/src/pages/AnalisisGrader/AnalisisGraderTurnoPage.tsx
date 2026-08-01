@@ -875,7 +875,9 @@ export function AnalisisGraderTurnoPage() {
     return unsub
   }, [effectiveSummaryId])
 
-  // Captura Marel HG (corta-cabeza) — usada para deducir rechazo Baader puro
+  // Captura Marel HG (corta-cabeza) — mide las piezas no controladas del
+  // corta-cabeza. Ya NO se usa para "deducir rechazo Baader puro": ese cálculo
+  // se retiró al aparecer la línea manual productiva (ver graderManualLine).
   useEffect(() => {
     if (!effectiveSummaryId) return
     setMarelHgCapture(null)
@@ -1527,6 +1529,10 @@ export function AnalisisGraderTurnoPage() {
             pauses={[]}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            // Esta rama se renderiza SIN Excel del Grader: no hay total con el
+            // que descontar la línea manual, así que la cascada informa la
+            // pérdida bruta.
+            graderTotalPieces={null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
@@ -1779,7 +1785,7 @@ export function AnalisisGraderTurnoPage() {
                 className="text-[11px] text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
                 title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / paros afectan directamente al throughput del Grader."
               >
-                Línea upstream · Evisceradoras Baader 142
+                Línea upstream · Baader 142
               </span>
               <div className="flex items-center gap-2">
                 {slxBestSyncedAt && (
@@ -1811,6 +1817,7 @@ export function AnalisisGraderTurnoPage() {
             pauses={pauses}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            graderTotalPieces={summary?.totalPieces ?? null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />

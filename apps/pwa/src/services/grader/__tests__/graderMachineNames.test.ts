@@ -7,7 +7,7 @@
  * la planta, ni el resto de la app, que ya mostraba "Ev 1" y "Evisceradora 1".
  */
 import { describe, it, expect } from 'vitest'
-import { shortMachineName } from '../ProductionRateLineEC'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 describe('shortMachineName', () => {
   it('nombra las evisceradoras de Shoplogix como las llama la planta', () => {

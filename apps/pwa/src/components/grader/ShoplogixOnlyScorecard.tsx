@@ -12,6 +12,7 @@ import { Activity, Clock, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 const VERDICT_STYLE = {
   ok: {
@@ -298,8 +299,8 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                 return (
                   <div key={m.machineid} className={cn('rounded-md border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
                     <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="text-[11px] text-muted-foreground truncate" title={m.machineName}>
-                        <span className="hidden sm:inline">{m.machineName}</span>
+                      <div className="text-[11px] text-muted-foreground truncate" title={shortMachineName(m.machineName)}>
+                        <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>
                         <span className="sm:hidden">{shortLabel}</span>
                       </div>
                       {/* Veredicto de un vistazo: combina uptime + ritmo vs objetivo

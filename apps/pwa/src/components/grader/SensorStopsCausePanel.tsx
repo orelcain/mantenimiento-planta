@@ -32,6 +32,7 @@ import type { PlantLineId } from '@/config/plantLines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
 import type { ParoEtapa } from '@/types'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
@@ -190,7 +191,7 @@ export function SensorStopsCausePanel({
           equipmentId: `area:${plantLineId}`,
           fecha: stop.startAt,
           tipo: 'correctivo',
-          hallazgo: `Paro de ${Math.round(stop.durationMin)} min en ${stop.machineName} (${fmtHora(stop.startAt)}): ${causa}`,
+          hallazgo: `Paro de ${Math.round(stop.durationMin)} min en ${shortMachineName(stop.machineName)} (${fmtHora(stop.startAt)}): ${causa}`,
           severidad: stop.durationMin >= 15 ? 'rojo' : 'amarillo',
           tecnico: user?.nombre ?? user?.email ?? undefined,
           plantLineId,
@@ -280,7 +281,7 @@ export function SensorStopsCausePanel({
                   </span>
                 )}
                 {snapshot.machines.length > 1 && (
-                  <span className="text-muted-foreground/70 truncate max-w-[8rem]">{stop.machineName}</span>
+                  <span className="text-muted-foreground/70 truncate max-w-[8rem]">{shortMachineName(stop.machineName)}</span>
                 )}
 
                 <div className="flex-1" />

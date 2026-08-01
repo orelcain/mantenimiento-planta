@@ -34,6 +34,7 @@ import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
 const MACHINE_COLORS = [
@@ -71,26 +72,6 @@ interface Props {
   showGap?: boolean
 }
 
-// ── Helper: toma nombre de máquina y devuelve etiqueta corta ─────────────────
-/**
- * Etiqueta de la máquina en la leyenda del gráfico.
- *
- * Shoplogix las nombra "Evisceradora 1/2/3" (verificado en la vista Chronological
- * de Planta Chonchi) y en planta se les dice "Baader". La versión anterior
- * devolvía "M1" — una nomenclatura que no usa nadie: ni Shoplogix, ni la planta,
- * ni el resto de la app, que ya mostraba "Ev 1" y "Evisceradora 1". Tres nombres
- * distintos para la misma máquina en la misma pantalla.
- *
- * Los nombres con número al final cubren todo lo que emite Shoplogix hoy:
- * "Evisceradora 2", "YAL Evisceradora 3", "Baader 142 / 1".
- */
-export function shortMachineName(name: string): string {
-  const mSlash = name.match(/\/\s*(\d+)\s*$/)
-  if (mSlash) return `Baader ${mSlash[1]}`
-  const mNum = name.match(/(\d+)\s*$/)
-  if (mNum) return `Baader ${mNum[1]}`
-  return name
-}
 
 /** Compila series de tasa pz/min unificando todos los buckets de tiempo. */
 export function buildRateSeries(machines: UpstreamMachineShift[]): {
