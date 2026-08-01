@@ -18,6 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { shortMachineName } from './ProductionRateLineEC'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   estimateManualLine,
@@ -5198,7 +5199,7 @@ export function GraderHistoricalCalendar({
                                 return (
                                   <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-medium text-foreground/85">{m.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')}</span>
+                                      <span className="font-medium text-foreground/85">{shortMachineName(m.name)}</span>
                                       <span className={cn('font-mono tabular-nums', theme.text)}>{bigPct.toFixed(0)}%</span>
                                     </div>
                                     <div className="mt-1 h-1.5 rounded-full bg-muted/70 overflow-hidden">
@@ -5366,7 +5367,7 @@ export function GraderHistoricalCalendar({
                         <span className="text-right" title="MTTR de MICRO-detenciones: interferencias breves <5 min (atascos, sensores). Se reportan aparte para no distorsionar el MTTR de averías">MTTR micro</span>
                       </div>
                       {pms.map((pm) => {
-                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const shortName = shortMachineName(pm.name)
                         const uptimeColor =
                           pm.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-300'
                           : pm.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-300'
@@ -5451,7 +5452,7 @@ export function GraderHistoricalCalendar({
                         Todas
                       </button>
                       {slxMonthlyStats.perMachineMonth.map((pm) => {
-                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const shortName = shortMachineName(pm.name)
                         const active = paretoMachineFilter === pm.machineid
                         return (
                           <button
@@ -5730,7 +5731,7 @@ export function GraderHistoricalCalendar({
                 const machineSeries = [...selectedByMachine.entries()]
                   .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
                   .map(([, v], idx) => ({
-                    name:   v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+                    name:   shortMachineName(v.name),
                     color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
                     points: v.points,
                   }))
