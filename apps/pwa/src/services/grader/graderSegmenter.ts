@@ -94,7 +94,12 @@ export function assignShiftAndDate(
   const d = new Date(ts)
   if (isNaN(d.getTime())) return { shiftId: 'Sin turno', sessionDate: ts.slice(0, 10) }
 
-  const minutesOfDay = d.getHours() * 60 + d.getMinutes()
+  // CONVENCIÓN wall-clock-as-UTC: el parser guarda "21:30 de planta" como
+  // "…T21:30:00.000Z" (ver graderExcelParser.toWallClockIso). Hay que leerlo
+  // con getUTC*: con getHours() el navegador aplica el offset local (Chile
+  // UTC-4/-3) y las 21:30 se leían como 17:30 → un turno noche 21:30–05:45
+  // se partía en 3 pedazos repartidos en 2 días (ver test de regresión).
+  const minutesOfDay = d.getUTCHours() * 60 + d.getUTCMinutes()
 
   for (const shift of schedule) {
     const start = shift.startHour * 60 + shift.startMinute
@@ -112,9 +117,11 @@ export function assignShiftAndDate(
         // Parte vespertina (antes de medianoche) → misma fecha del registro
         return { shiftId: shift.shiftId, sessionDate: ts.slice(0, 10) }
       } else if (minutesOfDay < end) {
-        // Parte madrugada (después de medianoche) → fecha del día anterior
+        // Parte madrugada (después de medianoche) → fecha del día anterior.
+        // setUTCDate (no setDate): mezclar mutación local con toISOString()
+        // devolvía el día equivocado y mandaba la madrugada a un día aparte.
         const prev = new Date(d)
-        prev.setDate(prev.getDate() - 1)
+        prev.setUTCDate(prev.getUTCDate() - 1)
         return { shiftId: shift.shiftId, sessionDate: prev.toISOString().slice(0, 10) }
       }
     }

@@ -91,8 +91,12 @@ export function normalizeShiftSchedule(
 export function inferShiftIdFromSchedule(startAt: string | undefined, schedule?: GraderShiftSchedule[]): GraderShiftSchedule['shiftId'] {
   if (!startAt) return 'Turno noche'
   const d = new Date(startAt)
-  const minutesOfDay = d.getHours() * 60 + d.getMinutes()
-  const normalized = normalizeShiftSchedule(schedule)
+  // wall-clock-as-UTC — ver nota en graderSegmenter.assignShiftAndDate
+  const minutesOfDay = d.getUTCHours() * 60 + d.getUTCMinutes()
+  // El schedule recibido ES la verdad (trae los turnos reales de la planta:
+  // Turno 1, Turno 2…). Antes se pasaba por normalizeShiftSchedule() sin base,
+  // que los descartaba y dejaba solo día/noche.
+  const normalized = schedule && schedule.length > 0 ? schedule : DEFAULT_SHIFT_SCHEDULE
 
   for (const item of normalized) {
     const start = toMinutesOfDay(item.startHour, item.startMinute)
@@ -109,7 +113,24 @@ export function inferShiftIdFromSchedule(startAt: string | undefined, schedule?:
   return 'Turno noche'
 }
 
+/**
+ * Key corta y estable para IDs de documento a partir del shiftId.
+ *
+ * 'Turno día' → 'dia' y 'Turno noche' → 'noche' se conservan TAL CUAL para no
+ * romper los IDs ya guardados en Firestore. El resto (Turno 1, Turno 2,
+ * 'Turno 1 Lunes'… que es lo que emite Shoplogix en Planta Principal desde
+ * 2026-05) se slugifica en vez de caer todo en 'noche' — antes dos turnos
+ * distintos del mismo día compartían ID y el segundo pisaba al primero.
+ */
 export function shiftIdToKey(shiftId?: string): string {
   if (shiftId === 'Turno día') return 'dia'
-  return 'noche'
+  if (!shiftId || shiftId === 'Turno noche') return 'noche'
+  const slug = shiftId
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || 'noche'
 }
