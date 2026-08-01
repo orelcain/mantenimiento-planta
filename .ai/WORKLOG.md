@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-01 - claude - El encuadre del eje ahora funciona en TODAS las lineas (y en turno en curso)
+
+- Orel: "ahora si funciona en filete... podemos ponerlo en las demas?". El chip YA aparecia en Yal y Chonchi, pero ahi no hacia nada: el estado era un booleano "ver turno completo" y el encuadre pasaba SIEMPRE por la heuristica, que en esas lineas dice que no hace falta acotar (su turno si esta acotado). O sea el boton era de una sola via.
+- Hecho: el estado pasa a override de 3 valores — `auto` (heuristica) / `produccion` / `turno` — y los explicitos MANDAN. Regla extraida a `resolveFraming` (pura, testeada) y usada por el TurnoPage.
+- Verificado con datos reales en las 3 lineas, leyendo `data-axis-*` (el rango EFECTIVO, no la etiqueta): Yal 15:15–23:00 → 15:30–22:05 · Chonchi arranca acotado 09:00–12:50 · Filete 09:45–16:25 ↔ 08:00–08:00. Y **en el turno EN CURSO de Yal** (17.872 ciclos, sync hace 5 min): 15:15–23:16 ↔ 16:00–23:19, con el borde derecho avanzando con la ultima pieza.
+- Bug adicional encontrado en el camino: el chip mostraba el rango del PROP y el eje dibujaba otro (en turno en curso decia "14:45–00:00" mientras el eje era 15:15–23:09, los bounds del snapshot que crecen con cada sync). Ahora la etiqueta sale de la ventana RESUELTA — un chip que anuncia un rango distinto al dibujado es peor que no tener chip.
+- Archivos: `apps/pwa/src/components/grader/{UpstreamMachinesPanel.tsx,shiftTimelineHelpers.ts,__tests__/resolvePanelWindow.test.ts}`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: 789 tests verdes (4 nuevos de `resolveFraming`, incluido "el usuario puede forzar el encuadre donde la heuristica dice que no"), tsc y eslint limpios.
+- Estado: EN REVISION — PR abierto.
+- Sigue: hoy sabado arranca el proceso normal de Filete (5.000 pz/turno, 2 turnos).
 ## 2026-08-01 - claude - Barrido de worktrees y ramas locales: 141 ramas -> 11, 6 worktrees -> 3 (+ PR #324)
 
 - Contexto: el repo habia acumulado 141 ramas locales y 6 worktrees de trabajo ya cerrado. Se barrio en tandas, verificando cada una antes de borrar. Ningun cambio de codigo salvo el PR #324.
