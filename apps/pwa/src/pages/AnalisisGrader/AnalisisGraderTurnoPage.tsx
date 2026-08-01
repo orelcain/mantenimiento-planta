@@ -30,7 +30,7 @@ import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
-import { resolveAxisWindow, computeProductionWindow } from '@/components/grader/shiftTimelineHelpers'
+import { resolveAxisWindow, computeProductionWindow, resolveFraming, type FramingOverride } from '@/components/grader/shiftTimelineHelpers'
 import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
@@ -941,11 +941,21 @@ export function AnalisisGraderTurnoPage() {
   // no en este componente. Los hijos lo leen/escriben via useTimelineSync.
   // Aquí solo computamos el rango BASE (full) que el panel usará cuando
   // no hay zoom activo — sirve de fallback cuando context.range es null.
-  // Encuadre del eje: cuando el turno NO está acotado en Shoplogix (Filete
-  // etiqueta "Turno Dia" sobre 24 h), dibujar el turno completo comprime 6 h de
-  // operación en el 15% del ancho — el Gantt y el gráfico de tasa quedan
-  // ilegibles. `verTurnoCompleto` deja volver a la ventana del turno.
-  const [verTurnoCompleto, setVerTurnoCompleto] = useState(false)
+  /**
+   * Encuadre del eje temporal.
+   *
+   *   'auto'       — decide la heurística: acotar solo si la operación ocupa
+   *                  menos del 75% del turno (caso Filete: 6 h dentro de 24 h).
+   *   'produccion' — el usuario pidió ver solo las horas con proceso.
+   *   'turno'      — el usuario pidió ver el turno completo.
+   *
+   * Antes esto era un booleano "ver turno completo" y el encuadre dependía
+   * SIEMPRE de la heurística. Resultado: en las líneas donde la heurística dice
+   * que no hace falta acotar (Yal, Chonchi — su turno sí está acotado), el botón
+   * no podía forzar el encuadre y no hacía nada. Con el override explícito el
+   * control funciona en todas.
+   */
+  const [framingOverride, setFramingOverride] = useState<FramingOverride>('auto')
 
   const baseAxisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
     if (chartAxisWindow) return chartAxisWindow
@@ -980,12 +990,15 @@ export function AnalisisGraderTurnoPage() {
     [upstreamLine.snapshot],
   )
   const framedOnProduction = useMemo(() => {
-    if (verTurnoCompleto || !slxProductionWindow) return false
     const sw = baseAxisWindow
       ? { start: new Date(baseAxisWindow.startAt), end: new Date(baseAxisWindow.endAt) }
       : null
-    return shouldFrameOnProduction(sw, slxProductionWindow)
-  }, [verTurnoCompleto, slxProductionWindow, baseAxisWindow])
+    return resolveFraming({
+      override: framingOverride,
+      hasProductionWindow: slxProductionWindow != null,
+      autoDecision: shouldFrameOnProduction(sw, slxProductionWindow),
+    })
+  }, [framingOverride, slxProductionWindow, baseAxisWindow])
 
   /**
    * Eje que reciben el Gantt y el gráfico de tasa. Es el MISMO para los dos: van
@@ -1510,7 +1523,7 @@ export function AnalisisGraderTurnoPage() {
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
             framedOnProduction={framedOnProduction}
-            onToggleFraming={slxProductionWindow ? () => setVerTurnoCompleto((v) => !v) : undefined}
+            onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
 
           {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
@@ -1794,7 +1807,7 @@ export function AnalisisGraderTurnoPage() {
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
             framedOnProduction={framedOnProduction}
-            onToggleFraming={slxProductionWindow ? () => setVerTurnoCompleto((v) => !v) : undefined}
+            onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
 
           {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae

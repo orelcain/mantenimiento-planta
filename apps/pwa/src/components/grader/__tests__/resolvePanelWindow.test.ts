@@ -7,7 +7,7 @@
  * 24 h del snapshot. El botón no hacía nada.
  */
 import { describe, it, expect } from 'vitest'
-import { resolvePanelWindow } from '../shiftTimelineHelpers'
+import { resolvePanelWindow, resolveFraming } from '../shiftTimelineHelpers'
 
 const win = (a: string, b: string) => ({ startAt: a, endAt: b })
 const bounds = (a: string, b: string) => ({ start: new Date(a), end: new Date(b) })
@@ -50,5 +50,30 @@ describe('resolvePanelWindow', () => {
   it('sin ninguna fuente devuelve null (cada máquina usa su propio rango)', () => {
     expect(resolvePanelWindow({})).toBeNull()
     expect(resolvePanelWindow({ shiftWindow: win('no-es-fecha', 'tampoco') })).toBeNull()
+  })
+})
+
+// ── Override del encuadre ────────────────────────────────────────────────────
+// Regresión real: el estado era un booleano "ver turno completo" y el encuadre
+// siempre pasaba por la heurística. En Yal y Chonchi (turno ya acotado, la
+// heurística dice que no hace falta) el botón no podía forzar nada.
+
+describe('resolveFraming', () => {
+  it('auto: manda la heurística', () => {
+    expect(resolveFraming({ override: 'auto', hasProductionWindow: true, autoDecision: true })).toBe(true)
+    expect(resolveFraming({ override: 'auto', hasProductionWindow: true, autoDecision: false })).toBe(false)
+  })
+
+  it('el usuario puede FORZAR el encuadre donde la heurística dice que no (Yal)', () => {
+    expect(resolveFraming({ override: 'produccion', hasProductionWindow: true, autoDecision: false })).toBe(true)
+  })
+
+  it('el usuario puede FORZAR el turno completo donde la heurística acota (Filete)', () => {
+    expect(resolveFraming({ override: 'turno', hasProductionWindow: true, autoDecision: true })).toBe(false)
+  })
+
+  it('sin ventana de producción no se acota nunca, ni forzando', () => {
+    expect(resolveFraming({ override: 'produccion', hasProductionWindow: false, autoDecision: true })).toBe(false)
+    expect(resolveFraming({ override: 'auto', hasProductionWindow: false, autoDecision: true })).toBe(false)
   })
 })
