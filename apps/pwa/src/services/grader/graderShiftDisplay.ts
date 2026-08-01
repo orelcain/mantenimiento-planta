@@ -338,9 +338,34 @@ export function getShiftMeta(shiftId: string, scheduledStart?: string | Date | n
   return {
     ...base,
     ...VISUAL_BY_PERIOD[periodFromStartHour(hour)],
+    // El label también tiene que seguir la hora real. Antes solo se corregían
+    // ícono y color, así que un turno que arrancó 01:34 mostraba el ☀ correcto
+    // en el calendario pero el título decía "Turno 1 — Mañana". Se contradecían
+    // entre sí en la misma pantalla.
+    label: `${shiftBaseName(base.label)} — ${periodLabelFromHour(hour)}`,
     // scheduleHint honesto: hora real de inicio (el rango del nombre mentía).
     scheduleHint: `desde ${pad(hour)}:${pad(d.getUTCMinutes())}`,
   }
+}
+
+/** Nombre del turno sin el sufijo de período: "Turno 1 — Mañana" → "Turno 1". */
+function shiftBaseName(label: string): string {
+  const i = label.indexOf(' — ')
+  return i === -1 ? label : label.slice(0, i)
+}
+
+/**
+ * Período legible para el título, a partir de la hora real de inicio.
+ *
+ * Distingue madrugada de noche — para el operador no es lo mismo un turno que
+ * arranca 21:30 que uno que arranca 01:30, aunque a efectos de color ambos
+ * sean "noche".
+ */
+function periodLabelFromHour(hour: number): string {
+  if (hour >= 6 && hour < 12) return 'Mañana'
+  if (hour >= 12 && hour < 19) return 'Tarde'
+  if (hour >= 19) return 'Noche'
+  return 'Madrugada'
 }
 
 /** Atajo: solo el label corto ("T1", "Día", "Noche"). */

@@ -429,13 +429,18 @@ export function AnalisisGraderTurnoPage() {
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
 
-  // Contexto del turno respecto al día calendario (Opción D, sub-paso 3.D):
-  //   - 'orphan': el turno fue programado para un día pero su primera pieza fue
-  //     en un día posterior (típico domingos en planta Chonchi).
+  // Contexto del turno respecto al día calendario:
+  //   - 'madrugada': toda la producción ocurrió después de medianoche.
   //   - 'crosses': el turno cruza medianoche (arranca un día y termina otro).
   //   - null: turno normal sin cruce.
+  //
+  // 'madrugada' reemplaza al viejo 'orphan'. Un turno cuya producción ocurrió
+  // toda después de medianoche NO es huérfano: es un turno de noche normal que
+  // arrancó tarde. Llamarlo huérfano y decir "sin actividad ese día" sonaba a
+  // que faltaban datos, cuando el turno estaba completo — y contradice que
+  // Shoplogix asigna el turno al día en que empieza.
   const turnoContext = useMemo<{
-    type: 'orphan' | 'crosses'
+    type: 'madrugada' | 'crosses'
     startDateKey: string
     endDateKey: string
     startTime: string
@@ -447,11 +452,11 @@ export function AnalisisGraderTurnoPage() {
     const endDateKey = summary.endAt.slice(0, 10)
     const startTime = summary.startAt.slice(11, 16)
     const endTime = summary.endAt.slice(11, 16)
-    const isOrphan = startDateKey !== summary.dateKey
-    const crossesMidnight = !isOrphan && startDateKey !== endDateKey
-    if (isOrphan) {
+    const soloMadrugada = startDateKey !== summary.dateKey
+    const crossesMidnight = !soloMadrugada && startDateKey !== endDateKey
+    if (soloMadrugada) {
       return {
-        type: 'orphan',
+        type: 'madrugada',
         startDateKey,
         endDateKey,
         startTime,
@@ -1381,25 +1386,25 @@ export function AnalisisGraderTurnoPage() {
         </div>
       </div>
 
-      {/* Banner contextual: turno huérfano o cruza medianoche (Opción D, 3.D) */}
+      {/* Banner contextual: el turno operó de madrugada, o cruza medianoche. */}
       {turnoContext && (
         <div
           className={`mt-2 mx-1 px-3 py-1.5 rounded-md border text-xs flex items-start gap-2 ${
-            turnoContext.type === 'orphan'
+            turnoContext.type === 'madrugada'
               ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
               : 'bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-200'
           }`}
         >
           <span className="text-base leading-none mt-0.5 select-none" aria-hidden>
-            {turnoContext.type === 'orphan' ? '↪' : '⏵'}
+            {turnoContext.type === 'madrugada' ? '🌙' : '⏵'}
           </span>
           <span className="flex-1 min-w-0">
-            {turnoContext.type === 'orphan' ? (
+            {turnoContext.type === 'madrugada' ? (
               <>
-                <strong className="font-semibold">Turno huérfano:</strong>{' '}
-                programado {turnoContext.scheduleDateKey} pero sin actividad ese día. Toda la
-                operación fue {turnoContext.startDateKey} ({turnoContext.startTime} →{' '}
-                {turnoContext.endTime}).
+                <strong className="font-semibold">Turno de madrugada:</strong>{' '}
+                pertenece al {turnoContext.scheduleDateKey} y toda su producción ocurrió en la
+                madrugada del {turnoContext.startDateKey} ({turnoContext.startTime} →{' '}
+                {turnoContext.endTime}). Los datos están completos.
               </>
             ) : (
               <>

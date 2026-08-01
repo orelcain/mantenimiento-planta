@@ -517,22 +517,27 @@ function enrichEntriesByKind(
         kind = 'madrugada'
         sortMin = 0
         fragSuffix = 'mad'
-      } else if (chip?.direction === 'exits') {
-        // Turno noche que arranca aquí y continúa mañana — strip compacto
-        kind = 'salida'
-        sortMin = 99999
-        fragSuffix = 'sal'
-      } else if (
-        (chip?.direction === 'same' && summary.shiftId === 'Turno noche') ||
-        (!chip && (summary.shiftId === 'Turno noche' || summary.shiftId === 'Turno 3'))
-      ) {
-        kind = 'noche'
-        sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
-        fragSuffix = 'noc'
       } else {
-        kind = 'dia'
-        sortMin = getStartMinutesUTC(summary.startAt) ?? 9 * 60
-        fragSuffix = 'dia'
+        // 'same' y 'exits' son AMBOS turnos que viven en este día.
+        //
+        // 'exits' solo agrega que el turno siguió después de medianoche — la
+        // marca “→”. Antes lo degradaba a tira compacta ("continúa mañana")
+        // porque la tarjeta completa se dibujaba en el día siguiente. Con la
+        // atribución por día de turno eso ya no pasa: el turno vive acá, así
+        // que degradarlo lo dejaba SIN detalle en ninguna celda.
+        //
+        // El período se decide por la HORA de inicio y no por el nombre: los
+        // turnos reales de Shoplogix (Turno 1, Turno 2, "Turno 1 Lunes") no
+        // dicen día ni noche.
+        const startMin = getStartMinutesUTC(summary.startAt)
+        const esNocturno =
+          chip?.direction === 'exits' ||
+          summary.shiftId === 'Turno noche' ||
+          summary.shiftId === 'Turno 3' ||
+          (startMin != null && (startMin >= 19 * 60 || startMin < 7 * 60))
+        kind = esNocturno ? 'noche' : 'dia'
+        sortMin = startMin ?? (esNocturno ? 21 * 60 : 9 * 60)
+        fragSuffix = esNocturno ? 'noc' : 'dia'
       }
 
       return {
