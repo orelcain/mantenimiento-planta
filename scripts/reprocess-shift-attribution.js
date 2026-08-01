@@ -206,14 +206,29 @@ async function main() {
 
     // Mover pieceRecords al doc destino (dedupe por dedupeKey)
     const destCol = db.collection(SUMMARIES).doc(p.targetId).collection(PIECE_SUB)
-    const existing = new Set((await destCol.get()).docs.map((d) => d.data().dedupeKey))
+    const actuales = (await destCol.get()).docs
+    const existing = new Set(actuales.map((d) => d.data().dedupeKey))
     const nuevos = p.segment.pieceRecords.filter((r) => !existing.has(r.dedupeKey))
     for (let i = 0; i < nuevos.length; i += 400) {
       const batch = db.batch()
       for (const r of nuevos.slice(i, i + 400)) batch.set(destCol.doc(), r)
       await batch.commit()
     }
-    console.log(`  ✓ ${p.targetId} · ${p.segment.pieceRecords.length} pzs (${nuevos.length} escritos)`)
+
+    // PODA: cuando el destino ya existía, puede conservar registros que ahora
+    // pertenecen a otro turno — y que ya fueron copiados allá. Sin esto quedan
+    // duplicados: el resumen dice 1 pieza y la subcolección tiene 17.426.
+    const deben = new Set(p.segment.pieceRecords.map((r) => r.dedupeKey))
+    const sobran = actuales.filter((d) => !deben.has(d.data().dedupeKey))
+    for (let i = 0; i < sobran.length; i += 400) {
+      const batch = db.batch()
+      for (const d of sobran.slice(i, i + 400)) batch.delete(d.ref)
+      await batch.commit()
+    }
+
+    console.log(
+      `  ✓ ${p.targetId} · ${p.segment.pieceRecords.length} registros ` +
+      `(+${nuevos.length} escritos, -${sobran.length} podados)`)
   }
 
   for (const d of toDelete) {
