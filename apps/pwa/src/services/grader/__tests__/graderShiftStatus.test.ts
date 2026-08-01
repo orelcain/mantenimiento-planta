@@ -66,6 +66,28 @@ describe('computeShiftTimeWindow — shiftId desconocido', () => {
     const result = computeShiftTimeWindow('2026-04-17', 'Turno X', SCHEDULE, now)
     expect(result.status).toBe('closed')
   })
+
+  // Los dos casos de abajo fijan la ventana EXACTA del fallback, no solo que
+  // esté cerrado: un turno fuera del schedule (los "Turno 1/2/3" que manda
+  // Shoplogix) no se trata como cerrado, cae a la ventana del día de producción
+  // 08:00→08:00 wall-clock-as-UTC, que el frontend refina después con
+  // scheduledStart/End. Sin esto, un cambio que devolviera `closed` siempre —o
+  // que corriera los bordes— pasaría verde. Usan sufijo `Z` por la misma razón
+  // que el bloque de progressPct: sin él el resultado depende del huso del runner.
+  it('usa la ventana del día de producción (08:00→08:00) como fallback', () => {
+    const now = new Date('2026-04-17T12:00:00Z')
+    const result = computeShiftTimeWindow('2026-04-17', 'Turno X', SCHEDULE, now)
+    expect(result.status).toBe('live')
+    expect(result.startAt).toBe('2026-04-17T08:00:00.000Z')
+    expect(result.endAt).toBe('2026-04-18T08:00:00.000Z')
+  })
+
+  it('en el fallback respeta future antes de 08:00 y closed tras el cierre', () => {
+    const antes = computeShiftTimeWindow('2026-04-17', 'Turno X', SCHEDULE, new Date('2026-04-17T06:00:00Z'))
+    expect(antes.status).toBe('future')
+    const despues = computeShiftTimeWindow('2026-04-17', 'Turno X', SCHEDULE, new Date('2026-04-18T09:00:00Z'))
+    expect(despues.status).toBe('closed')
+  })
 })
 
 describe('detectShiftStatusFromData', () => {
@@ -92,6 +114,16 @@ describe('computeShiftTimeWindow — edge cases', () => {
     const now = new Date('2026-04-19T12:00:00')
     const result = computeShiftTimeWindow('2026-04-17', 'Turno día', [], now)
     expect(result.status).toBe('closed')
+  })
+
+  it('schedule vacío usa la ventana del día de producción como fallback', () => {
+    // Mismo branch que el caso de arriba, pero dentro de la ventana: con el
+    // schedule vacío el turno sigue vivo entre 08:00 y 08:00 del día siguiente.
+    const now = new Date('2026-04-17T12:00:00Z')
+    const result = computeShiftTimeWindow('2026-04-17', 'Turno día', [], now)
+    expect(result.status).toBe('live')
+    expect(result.startAt).toBe('2026-04-17T08:00:00.000Z')
+    expect(result.endAt).toBe('2026-04-18T08:00:00.000Z')
   })
 
   it('progressPct es monótonamente creciente durante el turno', () => {
