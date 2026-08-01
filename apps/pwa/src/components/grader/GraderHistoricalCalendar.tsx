@@ -1748,6 +1748,26 @@ export function GraderHistoricalCalendar({
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
 
+  // Al cambiar de mes, la selección tiene que moverse con él.
+  //
+  // Antes solo cambiaba `currentMonth` y el día seleccionado quedaba apuntando
+  // al mes anterior: el calendario mostraba julio pero el panel de resumen
+  // seguía con las tarjetas de agosto, como si ese día tuviera datos que no son
+  // suyos. Se elige el día MÁS RECIENTE con datos del mes nuevo; si el mes no
+  // tiene nada, se limpia la selección y el panel muestra su estado vacío.
+  //
+  // Va como efecto y no dentro de los handlers de flecha porque hay una decena
+  // de lugares que cambian de mes (flechas, "hoy", "último registro", clicks en
+  // el panel mensual, deep links…) y todos tienen que comportarse igual.
+  useEffect(() => {
+    if (!selectedKey) return
+    const prefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+    if (selectedKey.startsWith(prefix)) return
+    const delMes = sortedDayKeys.filter((k) => k.startsWith(prefix))
+    const objetivo = delMes[delMes.length - 1]
+    setSelectedDate(objetivo ? new Date(`${objetivo}T00:00:00`) : null)
+  }, [currentMonth, selectedKey, sortedDayKeys])
+
   // Sincroniza ref mutable para acceso imperativo dentro del RAF de inercia
   useEffect(() => {
     carouselStateRef.current.sortedDayKeys = sortedDayKeys
