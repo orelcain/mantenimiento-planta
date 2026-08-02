@@ -29,6 +29,7 @@ import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
+import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { resolveAxisWindow, computeProductionWindow, resolveFraming, type FramingOverride } from '@/components/grader/shiftTimelineHelpers'
 import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
@@ -1747,6 +1748,15 @@ export function AnalisisGraderTurnoPage() {
               plantLineId={plantLineCfg.id}
             />
           )}
+
+          {/* Cuánto del turno cubre el Excel cargado. Va ARRIBA del timeline
+              porque condiciona cómo leerlo: un tramo vacío puede ser línea
+              parada o Excel sin cargar, y son conclusiones opuestas. */}
+          <GraderCoverageBar
+            shiftStartAt={shiftWindow?.startAt ?? summary?.startAt}
+            shiftEndAt={shiftWindow?.endAt ?? summary?.endAt}
+            buckets={enrichedTimelineBuckets}
+          />
 
           {/* Timeline — full width */}
           <ShiftTimelineView
