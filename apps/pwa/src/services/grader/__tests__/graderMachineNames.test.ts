@@ -34,3 +34,21 @@ describe('shortMachineName', () => {
     expect(shortMachineName('Baader 200')).toBe('Baader 200')
   })
 })
+
+// ── Regresión del primer turno real de Filete (2026-08-02) ───────────────────
+// La regla era "si el nombre termina en número, llamalo Baader N". La Baader 200
+// de Filete, que Shoplogix nombra "Linea 1", salía como "Baader 1" en la cascada
+// de pérdidas: un nombre que no existe en planta y que además la confunde con
+// las Baader 142 del eviscerado.
+
+describe('shortMachineName · máquinas que no son evisceradoras', () => {
+  it('NO renombra "Linea 1" (la Baader 200 de Filete) a "Baader 1"', () => {
+    expect(shortMachineName('Linea 1')).toBe('Linea 1')
+    expect(shortMachineName('Línea 1')).toBe('Línea 1')
+  })
+
+  it('tampoco inventa un Baader con otras máquinas numeradas', () => {
+    expect(shortMachineName('GEA 2')).toBe('GEA 2')
+    expect(shortMachineName('Enzunchadora 1')).toBe('Enzunchadora 1')
+  })
+})
