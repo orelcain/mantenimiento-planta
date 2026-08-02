@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils'
-import { Badge, Card, CardContent } from '@/components/ui'
-import { Activity, Clock, Radio, FileSpreadsheet, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
-import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { Card, CardContent } from '@/components/ui'
+import { Radio, FileSpreadsheet } from 'lucide-react'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -12,7 +11,6 @@ import {
   MANUAL_LINE_LABEL,
   MANUAL_LINE_TOOLTIP,
 } from '@/services/grader/graderManualLine'
-import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
@@ -89,54 +87,15 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
     baaderCycles: baaderTotal,
   })
 
-  const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
-    ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
-    : summary.durationMinutes
-      ? `${summary.durationMinutes} min`
-      : '—'
 
-  // Metadata canónica del turno (label, ícono, color) — single source of truth.
-  // Horario real (summary/shiftWindow) → período/ícono por HORA, no por nombre.
-  const shiftMeta = getShiftMeta(summary.shiftId, summary.startAt ?? shiftWindow.startAt)
-  const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
-    : shiftMeta.iconName === 'Sunset' ? Sunset
-    : shiftMeta.iconName === 'Moon' ? Moon
-    : shiftMeta.iconName === 'Sunrise' ? Sunrise
-    : null
 
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
-        <div className="flex items-center gap-2 flex-wrap">
-          {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
-          <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
-          <span className="text-muted-foreground text-sm">· {summary.dateKey}</span>
-          {shiftWindow.status === 'live' && (
-            <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">
-              <Activity className="w-3 h-3 mr-1" />
-              EN VIVO
-            </Badge>
-          )}
-          {shiftWindow.status === 'closed' && (
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-0 border-zinc-600/50 text-zinc-400"
-              // fmtTime (wall-clock) y no toLocaleTimeString: los ISO llevan
-              // sufijo Z pero son hora de planta. Formatearlos con la TZ del
-              // navegador restaba 4 h y mostraba "05:30 p.m. → 01:45 a.m."
-              // para un turno que corre 21:30 → 05:45.
-              title={`Turno cerrado · ${fmtTime(shiftWindow.startAt)} → ${fmtTime(shiftWindow.endAt)}`}
-            >
-              CERRADO
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          {durationLabel}
-        </div>
-      </div>
+      {/* SIN encabezado propio a propósito.
+          Nombre del turno, fecha, estado y horario ya están en la barra
+          superior de la página y en la línea de tiempos: repetirlos acá hacía
+          que se leyeran TRES veces antes de llegar al primer número. La
+          tarjeta arranca directo en el dato. */}
 
       {/* Hero metric — 3 columnas: verdict P0% · Shoplogix (live) · Grader (manual) */}
       <CardContent className={cn('p-4 grid grid-cols-1 md:grid-cols-[auto_1fr_1fr] gap-4', style.bg)}>
