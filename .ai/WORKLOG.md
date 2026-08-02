@@ -13,6 +13,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-02 - claude - Primer turno real de Filete revisado + 2 textos que asumian eviscerado
+
+- Revision del turno del sabado 01-08 (el primero real de Filete) con datos de Firestore y la vista en el navegador. Resultado del TURNO: 180 pz en "Turno Dia" + 60 en Unscheduled = 240 de las 5.000 planificadas (4%), 22 min de uptime sobre una ventana efectiva de 12:57→14:45, velocidad real maxima 7,2 pz/min contra un objetivo de 20, y 16 paros (11 micro). Fue arranque, no produccion.
+- Dato importante para el modelo: **Shoplogix YA acota el turno de Filete** (08:00→14:45, no las 24 h de la semana pasada), asi que el "Turno Dia" dejo de ser un bucket de 24 h. El encuadre automatico igual se activa porque la operacion real ocupa el 26% del turno.
+- **`scrapReasons` volvio VACIO** con produccion real → se descarta la Calidad automatica en Filete. Su OEE se queda en A×R (ya rotulado).
+- 0 de 16 paros trajeron causa del sensor → confirma que el panel de causas dictadas es la unica via. Nadie lo uso todavia (0 anotaciones).
+- Bugs de copy encontrados al revisar (mismo patron de siempre: texto que asume eviscerado): (1) `shortMachineName` renombraba a "Baader N" cualquier maquina terminada en numero, asi que la Baader 200 —que Shoplogix llama "Linea 1"— aparecia como "Baader 1" en la cascada de perdidas, confundiendola con las 142; ahora solo traduce evisceradoras y el resto se muestra tal cual. (2) `DayTimeSummaryBar` decia "las 3 Baader" tambien en Filete; ahora el texto sale de las maquinas de la linea ("la Baader 200" / "las 3 Baader 142").
+- Nota: `endBriefSentAt` se estampa en el claim ANTES de evaluar el umbral de piezas, asi que marca "procesado", no "enviado". El turno de 180 pz quedo marcado pero NO se mando brief (180 < 200) — comportamiento correcto, nombre de campo enganoso.
+- Archivos: `apps/pwa/src/services/grader/{graderMachineNames.ts,__tests__/graderMachineNames.test.ts}`, `apps/pwa/src/components/grader/DayTimeSummaryBar.tsx`.
+- Verificacion: 864 tests verdes (2 nuevos de regresion), tsc y eslint limpios. En el navegador con el turno real: Filete dice "la Baader 200" y "Linea 1"; Yal sigue diciendo "las 3 Baader 142" y "Baader 1/2/3".
+- Estado: EN REVISION — PR abierto.
+- Sigue: cuando haya un turno de verdad (~5.000 pz) revisar el grafico de barras con la maquina corriendo, y que alguien dicte la primera causa en planta.
+
 ## 2026-08-01 - claude - El encuadre del eje ahora funciona en TODAS las lineas (y en turno en curso)
 
 - Orel: "ahora si funciona en filete... podemos ponerlo en las demas?". El chip YA aparecia en Yal y Chonchi, pero ahi no hacia nada: el estado era un booleano "ver turno completo" y el encuadre pasaba SIEMPRE por la heuristica, que en esas lineas dice que no hace falta acotar (su turno si esta acotado). O sea el boton era de una sola via.

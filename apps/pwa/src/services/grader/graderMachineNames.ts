@@ -12,16 +12,21 @@
  */
 
 /**
- * Etiqueta corta y estable de una máquina: `Baader N`.
+ * Etiqueta corta y estable de una máquina.
  *
- * Cubre lo que emite Shoplogix hoy: "Evisceradora 2", "YAL Evisceradora 3",
- * "Baader 142 / 1". Un nombre sin número al final se devuelve tal cual — antes
- * se recortaba a 4 letras y salían cosas ilegibles como "Line" o "Grad".
+ * Las evisceradoras de Chonchi y Yal se llaman "Baader N" en planta, así que se
+ * traducen desde lo que emite Shoplogix ("Evisceradora 2", "YAL Evisceradora 3",
+ * "Baader 142 / 1").
+ *
+ * ⚠ Cualquier otro nombre se devuelve TAL CUAL. Antes bastaba con que el nombre
+ * terminara en un número para llamarlo "Baader N", y la Baader 200 de Filete
+ * —que Shoplogix nombra "Linea 1"— aparecía como "Baader 1": un nombre que no
+ * existe en planta y que además la confunde con las Baader 142 del eviscerado.
  */
 export function shortMachineName(name: string): string {
-  const mSlash = name.match(/\/\s*(\d+)\s*$/)
+  const mSlash = name.match(/^baader[^/]*\/\s*(\d+)\s*$/i)
   if (mSlash) return `Baader ${mSlash[1]}`
-  const mNum = name.match(/(\d+)\s*$/)
-  if (mNum) return `Baader ${mNum[1]}`
+  const mEvisceradora = name.match(/evisceradora\s*(\d+)\s*$/i)
+  if (mEvisceradora) return `Baader ${mEvisceradora[1]}`
   return name
 }

@@ -4,8 +4,8 @@
  * El operador pedía "tiempos del día", no solo del turno abierto — hasta ahora
  * la página solo mostraba tiempos de UN turno a la vez. Descubre los turnos
  * reales del día (`listShiftInfosForDay`, misma fuente de verdad que el resto
- * del módulo: Shoplogix define los turnos) y suma uptime/paro/break de las 3
- * Baaders a través de TODOS ellos.
+ * del módulo: Shoplogix define los turnos) y suma uptime/paro/break de las
+ * máquinas instrumentadas a través de TODOS ellos.
  */
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
@@ -14,6 +14,7 @@ import {
   listShiftInfosForDay,
   loadShoplogixShift,
 } from '@/services/shoplogix/shoplogixShift.service'
+import { PLANT_MACHINES, lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
@@ -65,6 +66,13 @@ interface Props {
 }
 
 export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Props) {
+  // Cómo nombrar el conjunto de máquinas de ESTA línea: en Filete es una sola
+  // Baader 200 y el texto decía "las 3 Baader" igual.
+  const maquinas = PLANT_MACHINES[plantSlug] ?? []
+  const modelo = lineMachinesLabel(maquinas.map((m) => ({ machineType: m.type })))
+  const maquinasLabel = maquinas.length === 1
+    ? `la ${modelo || 'máquina'}`
+    : `las ${maquinas.length} ${modelo || 'máquinas'}`
   const [totals, setTotals] = useState<DayTotals | null>(null)
 
   useEffect(() => {
@@ -85,12 +93,12 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
     )}>
       <span className="flex items-center gap-1.5 text-muted-foreground font-medium shrink-0">
         <Clock className="w-3.5 h-3.5" />
-        Tiempos del día · las 3 Baader, todos los turnos
+        Tiempos del día · {maquinasLabel}, todos los turnos
       </span>
-      <span className="text-emerald-400 tabular-nums" title="Tiempo total procesando (suma de las 3 Baaders, todos los turnos)">
+      <span className="text-emerald-400 tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
-      <span className="text-rose-400 tabular-nums" title="Tiempo total de detención/paro (suma de las 3 Baaders, todos los turnos)">
+      <span className="text-rose-400 tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
         ⏸ {fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {totals.breakSec > 0 && (
