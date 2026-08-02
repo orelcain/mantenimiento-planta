@@ -21,7 +21,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
+import { VARIADORES, TOTAL_PARAMETROS } from '@/data/variadores'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -75,6 +76,12 @@ const SPECIAL_MODULES: SpecialModule[] = [
     icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5a7d9e', stats: 'ciclo 90 s · 10 válvulas',
     // Oculto del hub mientras se rediseña (decisión Orel 2026-07-19); admins lo ven con etiqueta.
     inDevelopment: true,
+  },
+  {
+    id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
+    description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
+    icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
+    stats: `${VARIADORES.length} familias · ${TOTAL_PARAMETROS} parámetros`,
   },
 ]
 
