@@ -1655,6 +1655,15 @@ export function AnalisisGraderTurnoPage() {
                 marelHgCapture={marelHgCapture}
                 upstreamSyncedAt={upstreamLine.syncedAt}
               />
+              {/* Zona 2 del orden: qué tan completo está el dato. Va acá
+                  arriba y no enterrada sobre el timeline porque condiciona
+                  cómo leer todo lo que viene después — si el Excel cubre el
+                  44% del turno, el resto de la pantalla se lee distinto. */}
+              <GraderCoverageBar
+                shiftStartAt={shiftWindow?.startAt ?? summary.startAt}
+                shiftEndAt={shiftWindow?.endAt ?? summary.endAt}
+                buckets={enrichedTimelineBuckets}
+              />
               <ShiftQuotaCard
                 quota={currentShiftQuota}
                 summary={summary}
@@ -1748,15 +1757,6 @@ export function AnalisisGraderTurnoPage() {
               plantLineId={plantLineCfg.id}
             />
           )}
-
-          {/* Cuánto del turno cubre el Excel cargado. Va ARRIBA del timeline
-              porque condiciona cómo leerlo: un tramo vacío puede ser línea
-              parada o Excel sin cargar, y son conclusiones opuestas. */}
-          <GraderCoverageBar
-            shiftStartAt={shiftWindow?.startAt ?? summary?.startAt}
-            shiftEndAt={shiftWindow?.endAt ?? summary?.endAt}
-            buckets={enrichedTimelineBuckets}
-          />
 
           {/* Timeline — full width */}
           <ShiftTimelineView

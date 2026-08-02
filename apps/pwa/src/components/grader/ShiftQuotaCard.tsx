@@ -294,18 +294,22 @@ export function ShiftQuotaCard({
               )}
             </div>
 
-            {/* Bandera de discrepancia — piezas no contabilizadas vs Shoplogix */}
-            {discrepancy && (
+            {/* Bandera de discrepancia — SOLO cuando faltan piezas.
+                Antes también saltaba al revés (Grader > Baader) y marcaba en
+                ámbar "774 piezas extra vs Shoplogix · 102,0% delta", con un
+                tooltip que describía el caso contrario. Esa diferencia es la
+                línea manual: ni anomalía ni sorpresa, y ya se explica en la
+                producción del turno. Repetirla acá como alarma hacía dudar de
+                un dato que está bien. */}
+            {discrepancy && discrepancy.missing > 0 && (
               <div
                 className="flex items-start gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5"
-                title="Shoplogix reporta más ciclos en las Baaders que piezas pesadas en el Grader. Como todas las piezas deben pasar por el Grader, la diferencia podría ser: Excel parcial, fallas de registro Marelec, o pérdidas físicas."
+                title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
                 <div className="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
                   <span className="font-semibold tabular-nums">
-                    {discrepancy.missing > 0
-                      ? `${Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar`
-                      : `${Math.round(Math.abs(discrepancy.missing)).toLocaleString('es-CL')} piezas extra vs Shoplogix`}
+                    {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
                   </span>
                   <span className="text-amber-400/70"> · </span>
                   <span className="tabular-nums">{discrepancy.pct.toFixed(1)}% delta</span>
