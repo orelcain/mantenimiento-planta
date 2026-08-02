@@ -18,7 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { shortMachineName } from './ProductionRateLineEC'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   estimateManualLine,

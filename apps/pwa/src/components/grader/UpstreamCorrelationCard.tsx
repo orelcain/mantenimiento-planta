@@ -15,6 +15,7 @@ import { Link2, ChevronDown, ChevronRight, AlertTriangle, Info, CheckCircle2, Fa
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 import {
   correlatePausesWithUpstream,
   summarizeCorrelations,
@@ -84,7 +85,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <div className="mt-2 ml-6 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border/60 pl-3">
           {corr.contributors.map(c => (
             <div key={c.machineid} className="flex items-center gap-2">
-              <span className="text-foreground min-w-[9rem]">{c.machineName}</span>
+              <span className="text-foreground min-w-[9rem]">{shortMachineName(c.machineName)}</span>
               <span>{c.stateName}</span>
               {c.reason && <span className="text-muted-foreground">· {c.reason}</span>}
               <span className="ml-auto tabular-nums text-muted-foreground">
@@ -189,7 +190,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           </div>
         ) : (
           <>
-            {/* Breakdown por máquina — qué Evisceradora atender primero */}
+            {/* Breakdown por máquina — qué Baader atender primero */}
             {summary.byMachine.length > 0 && (
               <div className="mb-3 p-2 rounded border border-border/80 bg-muted/40">
                 <div className="text-[10px] text-muted-foreground mb-1.5 flex items-center gap-1">
@@ -197,9 +198,14 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                   Impacto por máquina (paros del Grader donde la máquina contribuyó)
                 </div>
                 <div className="space-y-0.5">
+                  {/* Base = suma de los solapes POR MÁQUINA, no la unión del
+                      tiempo muerto: dos Baader paradas a la vez cubren el mismo
+                      paro del Grader, así que con la unión una sola máquina
+                      llegaba a 114% — imposible, y le quitaba credibilidad al
+                      panel. Con esta base los porcentajes suman 100%. */}
                   {summary.byMachine.map((m, idx) => {
-                    const totalUpstreamSec = summary.upstreamCausedDurSec
-                    const sharePct = totalUpstreamSec > 0 ? (m.totalOverlapSec / totalUpstreamSec) * 100 : 0
+                    const sumaSolapesSec = summary.byMachine.reduce((a, x) => a + x.totalOverlapSec, 0)
+                    const sharePct = sumaSolapesSec > 0 ? (m.totalOverlapSec / sumaSolapesSec) * 100 : 0
                     // Top máquina destacada en rojo, resto slate
                     const isTop = idx === 0
                     return (
@@ -207,7 +213,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         key={m.machineid}
                         className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-800 dark:text-rose-300' : 'text-muted-foreground'}`}
                       >
-                        <span className="min-w-[8rem]">{m.machineName}</span>
+                        <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
                         <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>

@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils'
-import { Badge, Card, CardContent } from '@/components/ui'
-import { Activity, Clock, Radio, FileSpreadsheet, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
-import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { Card, CardContent } from '@/components/ui'
+import { Radio, FileSpreadsheet } from 'lucide-react'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -12,8 +11,7 @@ import {
   MANUAL_LINE_LABEL,
   MANUAL_LINE_TOOLTIP,
 } from '@/services/grader/graderManualLine'
-import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { shortMachineName } from './ProductionRateLineEC'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
@@ -89,54 +87,15 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
     baaderCycles: baaderTotal,
   })
 
-  const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
-    ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
-    : summary.durationMinutes
-      ? `${summary.durationMinutes} min`
-      : '—'
 
-  // Metadata canónica del turno (label, ícono, color) — single source of truth.
-  // Horario real (summary/shiftWindow) → período/ícono por HORA, no por nombre.
-  const shiftMeta = getShiftMeta(summary.shiftId, summary.startAt ?? shiftWindow.startAt)
-  const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
-    : shiftMeta.iconName === 'Sunset' ? Sunset
-    : shiftMeta.iconName === 'Moon' ? Moon
-    : shiftMeta.iconName === 'Sunrise' ? Sunrise
-    : null
 
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
-        <div className="flex items-center gap-2 flex-wrap">
-          {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
-          <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
-          <span className="text-muted-foreground text-sm">· {summary.dateKey}</span>
-          {shiftWindow.status === 'live' && (
-            <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">
-              <Activity className="w-3 h-3 mr-1" />
-              EN VIVO
-            </Badge>
-          )}
-          {shiftWindow.status === 'closed' && (
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-0 border-zinc-600/50 text-zinc-400"
-              // fmtTime (wall-clock) y no toLocaleTimeString: los ISO llevan
-              // sufijo Z pero son hora de planta. Formatearlos con la TZ del
-              // navegador restaba 4 h y mostraba "05:30 p.m. → 01:45 a.m."
-              // para un turno que corre 21:30 → 05:45.
-              title={`Turno cerrado · ${fmtTime(shiftWindow.startAt)} → ${fmtTime(shiftWindow.endAt)}`}
-            >
-              CERRADO
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          {durationLabel}
-        </div>
-      </div>
+      {/* SIN encabezado propio a propósito.
+          Nombre del turno, fecha, estado y horario ya están en la barra
+          superior de la página y en la línea de tiempos: repetirlos acá hacía
+          que se leyeran TRES veces antes de llegar al primer número. La
+          tarjeta arranca directo en el dato. */}
 
       {/* Hero metric — 3 columnas: verdict P0% · Shoplogix (live) · Grader (manual) */}
       <CardContent className={cn('p-4 grid grid-cols-1 md:grid-cols-[auto_1fr_1fr] gap-4', style.bg)}>
@@ -193,7 +152,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
                   <div
                     key={m.machineid}
                     className="text-center cursor-help"
-                    title={`${m.machineName} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
+                    title={`${shortMachineName(m.machineName)} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
                   >
                     <div className="text-sm font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}
@@ -269,21 +228,61 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
       </CardContent>
 
       {/* Footer — desglose Baader vs línea manual (antes: "rechazo estimado") */}
+      {/* Composición de la producción: de dónde salió cada pieza.
+          Antes esto era una línea de texto ("Línea manual (est.): 774") al pie.
+          Como barra apilada, el reparto se ve sin leer un número — y en este
+          turno lo que se ve es que la MITAD salió a mano. Ese es el hecho del
+          turno, y una línea de texto no lo transmitía.
+          Al ocupar el ancho de las dos columnas de arriba, ata visualmente los
+          759 ciclos de Shoplogix con las 1.533 piezas del Grader: la diferencia
+          deja de parecer un descuadre entre fuentes. */}
       {baaderTotal > 0 && upstreamSnapshot && manualLine != null && (
-        <div className="px-4 py-1.5 border-t bg-muted flex items-center gap-2 flex-wrap text-[11px]">
-          <span className="text-violet-400 cursor-help" title={MANUAL_LINE_TOOLTIP}>
-            <span className="text-muted-foreground">{MANUAL_LINE_LABEL}:</span>{' '}
-            <span className="tabular-nums font-semibold">
-              {manualLine.manualPieces.toLocaleString('es-CL')}
+        <div className="px-4 py-2 border-t bg-muted space-y-1">
+          <div className="flex items-baseline gap-2 text-[11px]">
+            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
+              Composición
             </span>
-            <span className="text-muted-foreground"> ({manualLine.pctOfGrader}% del total)</span>
-          </span>
-          <span
-            className="ml-auto text-muted-foreground/70 cursor-help"
-            title="Diferencia entre piezas Marelec/Grader y ciclos Baader. Al final del turno deberían converger; si la cobertura Grader es parcial, este número aún no es definitivo."
-          >
-            ⓘ Las cifras Grader y Shoplogix convergen al cerrar el turno
-          </span>
+            <span className="ml-auto tabular-nums text-muted-foreground">
+              {manualLine.graderPieces.toLocaleString('es-CL')} pz en total
+            </span>
+          </div>
+
+          <div className="flex h-2 rounded-sm overflow-hidden bg-background/60">
+            <div
+              className="h-full bg-sky-500/70 cursor-help"
+              style={{ width: `${100 - manualLine.pctOfGrader}%` }}
+              title={`Procesadas por las Baader: ${manualLine.baaderCycles.toLocaleString('es-CL')} ciclos (Shoplogix).`}
+            />
+            <div
+              className="h-full bg-violet-500/70 cursor-help"
+              style={{ width: `${manualLine.pctOfGrader}%` }}
+              title={MANUAL_LINE_TOOLTIP}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-[2px] bg-sky-500/70" />
+              <span className="text-muted-foreground">Baader</span>
+              <b className="tabular-nums">{manualLine.baaderCycles.toLocaleString('es-CL')}</b>
+            </span>
+            <span className="flex items-center gap-1.5 cursor-help" title={MANUAL_LINE_TOOLTIP}>
+              <span className="w-2 h-2 rounded-[2px] bg-violet-500/70" />
+              <span className="text-muted-foreground">{MANUAL_LINE_LABEL}</span>
+              <b className="tabular-nums text-violet-400">
+                {manualLine.manualPieces.toLocaleString('es-CL')}
+              </b>
+              <span className="text-muted-foreground tabular-nums">
+                ({manualLine.pctOfGrader}%)
+              </span>
+            </span>
+            <span
+              className="ml-auto text-muted-foreground/70 cursor-help"
+              title="La línea manual no está instrumentada en Shoplogix: sus piezas solo aparecen en el Grader. Si el Excel del turno está incompleto, este reparto todavía puede cambiar."
+            >
+              ⓘ estimado desde Grader − Baader
+            </span>
+          </div>
         </div>
       )}
     </Card>

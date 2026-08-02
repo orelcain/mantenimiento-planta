@@ -29,6 +29,8 @@ import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
+import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
+import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { resolveAxisWindow, computeProductionWindow, resolveFraming, type FramingOverride } from '@/components/grader/shiftTimelineHelpers'
 import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
@@ -429,53 +431,6 @@ export function AnalisisGraderTurnoPage() {
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
 
-  // Contexto del turno respecto al día calendario:
-  //   - 'madrugada': toda la producción ocurrió después de medianoche.
-  //   - 'crosses': el turno cruza medianoche (arranca un día y termina otro).
-  //   - null: turno normal sin cruce.
-  //
-  // 'madrugada' reemplaza al viejo 'orphan'. Un turno cuya producción ocurrió
-  // toda después de medianoche NO es huérfano: es un turno de noche normal que
-  // arrancó tarde. Llamarlo huérfano y decir "sin actividad ese día" sonaba a
-  // que faltaban datos, cuando el turno estaba completo — y contradice que
-  // Shoplogix asigna el turno al día en que empieza.
-  const turnoContext = useMemo<{
-    type: 'madrugada' | 'crosses'
-    startDateKey: string
-    endDateKey: string
-    startTime: string
-    endTime: string
-    scheduleDateKey: string
-  } | null>(() => {
-    if (!summary?.startAt || !summary?.endAt || !summary?.dateKey) return null
-    const startDateKey = summary.startAt.slice(0, 10)
-    const endDateKey = summary.endAt.slice(0, 10)
-    const startTime = summary.startAt.slice(11, 16)
-    const endTime = summary.endAt.slice(11, 16)
-    const soloMadrugada = startDateKey !== summary.dateKey
-    const crossesMidnight = !soloMadrugada && startDateKey !== endDateKey
-    if (soloMadrugada) {
-      return {
-        type: 'madrugada',
-        startDateKey,
-        endDateKey,
-        startTime,
-        endTime,
-        scheduleDateKey: summary.dateKey,
-      }
-    }
-    if (crossesMidnight) {
-      return {
-        type: 'crosses',
-        startDateKey,
-        endDateKey,
-        startTime,
-        endTime,
-        scheduleDateKey: summary.dateKey,
-      }
-    }
-    return null
-  }, [summary])
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
@@ -875,7 +830,9 @@ export function AnalisisGraderTurnoPage() {
     return unsub
   }, [effectiveSummaryId])
 
-  // Captura Marel HG (corta-cabeza) — usada para deducir rechazo Baader puro
+  // Captura Marel HG (corta-cabeza) — mide las piezas no controladas del
+  // corta-cabeza. Ya NO se usa para "deducir rechazo Baader puro": ese cálculo
+  // se retiró al aparecer la línea manual productiva (ver graderManualLine).
   useEffect(() => {
     if (!effectiveSummaryId) return
     setMarelHgCapture(null)
@@ -1386,36 +1343,18 @@ export function AnalisisGraderTurnoPage() {
         </div>
       </div>
 
-      {/* Banner contextual: el turno operó de madrugada, o cruza medianoche. */}
-      {turnoContext && (
-        <div
-          className={`mt-2 mx-1 px-3 py-1.5 rounded-md border text-xs flex items-start gap-2 ${
-            turnoContext.type === 'madrugada'
-              ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
-              : 'bg-amber-500/15 border-amber-500/30 text-amber-800 dark:text-amber-200'
-          }`}
-        >
-          <span className="text-base leading-none mt-0.5 select-none" aria-hidden>
-            {turnoContext.type === 'madrugada' ? '🌙' : '⏵'}
-          </span>
-          <span className="flex-1 min-w-0">
-            {turnoContext.type === 'madrugada' ? (
-              <>
-                <strong className="font-semibold">Turno de madrugada:</strong>{' '}
-                pertenece al {turnoContext.scheduleDateKey} y toda su producción ocurrió en la
-                madrugada del {turnoContext.startDateKey} ({turnoContext.startTime} →{' '}
-                {turnoContext.endTime}). Los datos están completos.
-              </>
-            ) : (
-              <>
-                <strong className="font-semibold">Cruza medianoche:</strong>{' '}
-                {turnoContext.startDateKey} {turnoContext.startTime} →{' '}
-                {turnoContext.endDateKey} {turnoContext.endTime}.
-              </>
-            )}
-          </span>
-        </div>
-      )}
+      {/* Todos los tiempos del turno en UNA línea etiquetada.
+          Reemplaza al banner "Turno de madrugada…", al rango repetido en el
+          encabezado de la tarjeta y a los "131 min" sueltos: eran seis medidas
+          de tiempo repartidas por la pantalla, sin decir contra qué se medía
+          cada una — y dos de ellas casi iguales con números distintos. */}
+      <TurnoTiemposLine
+        programadoStart={shiftWindow?.startAt}
+        programadoEnd={shiftWindow?.endAt}
+        produjoStart={summary?.startAt}
+        produjoEnd={summary?.endAt}
+        minutosActivos={summary?.durationMinutes ?? null}
+      />
 
       {/* Chip rollup oficial de Shoplogix (horario/especie/% target) — solo
           existe para el turno VIGENTE, degrada a nada en históricos. */}
@@ -1527,6 +1466,10 @@ export function AnalisisGraderTurnoPage() {
             pauses={[]}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            // Esta rama se renderiza SIN Excel del Grader: no hay total con el
+            // que descontar la línea manual, así que la cascada informa la
+            // pérdida bruta.
+            graderTotalPieces={null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
@@ -1647,6 +1590,16 @@ export function AnalisisGraderTurnoPage() {
                 upstreamSnapshot={upstreamLine.snapshot}
                 marelHgCapture={marelHgCapture}
                 upstreamSyncedAt={upstreamLine.syncedAt}
+              />
+              {/* Zona 2 del orden: qué tan completo está el dato. Va acá
+                  arriba y no enterrada sobre el timeline porque condiciona
+                  cómo leer todo lo que viene después — si el Excel cubre el
+                  44% del turno, el resto de la pantalla se lee distinto. */}
+              <GraderCoverageBar
+                shiftStartAt={shiftWindow?.startAt ?? summary.startAt}
+                shiftEndAt={shiftWindow?.endAt ?? summary.endAt}
+                produccionReal={slxProductionWindow}
+                buckets={enrichedTimelineBuckets}
               />
               <ShiftQuotaCard
                 quota={currentShiftQuota}
@@ -1779,7 +1732,7 @@ export function AnalisisGraderTurnoPage() {
                 className="text-[11px] text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
                 title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / paros afectan directamente al throughput del Grader."
               >
-                Línea upstream · Evisceradoras Baader 142
+                Línea upstream · Baader 142
               </span>
               <div className="flex items-center gap-2">
                 {slxBestSyncedAt && (
@@ -1811,6 +1764,7 @@ export function AnalisisGraderTurnoPage() {
             pauses={pauses}
             plantSlug={plantLineCfg.plantSlug}
             dataSource={upstreamLine.source}
+            graderTotalPieces={summary?.totalPieces ?? null}
             framedOnProduction={framedOnProduction}
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />

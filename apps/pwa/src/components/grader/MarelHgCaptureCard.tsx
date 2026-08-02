@@ -3,7 +3,14 @@
  *
  * Marel HG es la primera estación del pipeline (antes de las 3 Baader).
  * Su data NO está automatizada — el operador la captura desde la pantalla
- * Marel HG. Con esos valores podemos deducir el rechazo Baader puro.
+ * Marel HG.
+ *
+ * Antes esta card prometía "deducir el rechazo Baader puro". Ese cálculo se
+ * retiró: desde 2026 la línea manual PRODUCE, así que Grader − Baader mezcla
+ * dos incógnitas (manual y rechazo) y no se pueden separar — ver
+ * `graderManualLine.ts`. Lo que la captura sí aporta son las piezas NO
+ * CONTROLADAS del Marel HG, que hoy no se miden en ningún otro lado y son uno
+ * de los dos datos que permitirían despejar el rechazo más adelante.
  *
  * RESET EN COLACIÓN:
  *   Al entrar en modo contrastación, el contador se resetea. Por eso el
@@ -56,7 +63,7 @@ export function MarelHgCaptureCard({ summaryId, capture, canEdit, onSaved }: Mar
           Marel HG (corta-cabeza)
         </CardTitle>
         <CardDescription className="text-xs">
-          Captura manual desde la pantalla Marel — necesaria para deducir rechazo Baader puro
+          Captura manual desde la pantalla Marel — mide las piezas no controladas del corta-cabeza
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -146,7 +153,7 @@ export function MarelHgCaptureCard({ summaryId, capture, canEdit, onSaved }: Mar
         ) : (
           <div className="text-center py-2">
             <p className="text-xs text-muted-foreground mb-3">
-              Sin captura — al ingresar los datos se deducirá el rechazo Baader puro.
+              Sin captura — las piezas no controladas del Marel HG no se miden en ningún otro lado.
             </p>
             <Button
               variant="outline"

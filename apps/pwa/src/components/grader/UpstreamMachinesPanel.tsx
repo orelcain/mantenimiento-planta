@@ -60,6 +60,7 @@ import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -90,6 +91,13 @@ interface Props {
   framedOnProduction?: boolean
   /** Alterna entre operación real y turno completo. Ausente = sin datos para acotar. */
   onToggleFraming?: () => void
+  /**
+   * Piezas totales del Grader en el turno. Se usa en la cascada para descontar
+   * la línea manual de la pérdida: lo que la planta produjo a mano no es
+   * pérdida de máquina. Sin Excel del Grader queda null y la cascada informa
+   * la pérdida bruta, como antes.
+   */
+  graderTotalPieces?: number | null
   /**
    * Fuente de los datos: 'firestore' (real), 'demo' (sintético DEV), 'none'.
    * Se muestra badge "DEMO" cuando es demo. La detección de desfase SLX
@@ -866,7 +874,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
           <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
           <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <span className="font-medium text-sm truncate">{shift.machineName}</span>
+          <span className="font-medium text-sm truncate">{shortMachineName(shift.machineName)}</span>
           {machineTypeLabel(shift.machineType) && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
               {machineTypeLabel(shift.machineType)}
@@ -1111,6 +1119,7 @@ export function UpstreamMachinesPanel({
   dataSource = 'none',
   framedOnProduction = false,
   onToggleFraming,
+  graderTotalPieces = null,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -1510,7 +1519,7 @@ export function UpstreamMachinesPanel({
             {/* Cascada de pérdidas del turno — quién limitó la producción y
                 cuántas piezas costó cada causal. Ver LossCascadeCard. */}
             {snapshot && snapshot.machines.length > 0 && (
-              <LossCascadeCard machines={snapshot.machines} />
+              <LossCascadeCard machines={snapshot.machines} graderTotalPieces={graderTotalPieces} />
             )}
 
             {snapshot && snapshot.machines.length > 0 && (

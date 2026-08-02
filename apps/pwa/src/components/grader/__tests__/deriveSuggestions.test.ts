@@ -53,15 +53,37 @@ describe('deriveSuggestions — context upstream (v2.99.2)', () => {
 
   it('agrega "Atender máquina top" cuando overlap >= 5 min', () => {
     const out = deriveSuggestions(2.5, null, {
-      upstreamByMachine: [mkMachineImpact({ totalOverlapSec: 600 })],
-      upstreamCausedDurSec: 1200,
+      upstreamByMachine: [
+        mkMachineImpact({ totalOverlapSec: 600 }),
+        mkMachineImpact({ machineid: 'e3-uuid', machineName: 'Evisceradora 3', totalOverlapSec: 200 }),
+      ],
+      upstreamCausedDurSec: 400,
     })
     const action = out.find(a => a.id === 'upstream-attend-e2-uuid')
     expect(action).toBeDefined()
-    expect(action!.title).toContain('Evisceradora 2')
+    // Nombre unificado: la planta les dice "Baader", no "Evisceradora".
+    expect(action!.title).toContain('Baader 2')
     expect(action!.category).toBe('terreno')
     expect(action!.description).toContain('10 min')   // 600 sec → "10 min"
-    expect(action!.description).toContain('50%')      // 600 / 1200 = 50%
+    // 600 de 800 (600+200) = 75%. El denominador es la SUMA de los solapes por
+    // máquina, no la unión del tiempo muerto (400 acá): con la unión, dos
+    // Baader paradas a la vez cubren el mismo paro del Grader y una sola daba
+    // 150% — el caso real mostraba 114%.
+    expect(action!.description).toContain('75%')
+  })
+
+  it('nunca informa una participación mayor al 100%', () => {
+    // Caso real 31-jul-2026: la unión del tiempo muerto era MENOR que el solape
+    // de una sola máquina, y el panel mostraba "114% del tiempo muerto".
+    const out = deriveSuggestions(2.5, null, {
+      upstreamByMachine: [mkMachineImpact({ totalOverlapSec: 4980 })],
+      upstreamCausedDurSec: 4380,
+    })
+    const action = out.find(a => a.id === 'upstream-attend-e2-uuid')
+    expect(action!.description).toContain('100%')
+    // Ningún porcentaje mayor a 100: el bug real mostraba 114%.
+    const pct = Number((action!.description.match(/\((\d+)%/) ?? [])[1])
+    expect(pct).toBeLessThanOrEqual(100)
   })
 
   it('NO agrega "Atender máquina" si overlap < 5 min (no significativo)', () => {

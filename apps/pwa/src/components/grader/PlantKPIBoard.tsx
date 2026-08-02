@@ -16,6 +16,7 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { getPlantLineConfig, getMachineKind, type PlantLineId } from '@/config/plantLines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 interface Props {
   plantSlug: PlantSlug
@@ -424,14 +425,14 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 text-[11px] bg-muted rounded px-2 py-1 border border-border',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
-                  title={`${m.machineName} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
+                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
                     className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
-                    title={`${m.machineName} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}`}
+                    title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}`}
                   >
-                    <span className="hidden sm:inline">{m.machineName}</span>
+                    <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>
                     <span className="sm:hidden">{machineKind.short} {idx + 1}</span>
                   </span>
                   <span

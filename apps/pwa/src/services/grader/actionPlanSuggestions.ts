@@ -11,6 +11,7 @@
 
 import type { MatrixP0Cause } from '@/services/grader/types'
 import type { MachineImpact } from '@/services/shoplogix/shoplogixCorrelation'
+import { shortMachineName } from './graderMachineNames'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -187,13 +188,17 @@ export function deriveSuggestions(
   // 1) Máquina top con overlap significativo (>= 5 min causados) → atender
   const topMachine = context.upstreamByMachine?.[0]
   if (topMachine && topMachine.totalOverlapSec >= 300) {
-    const totalUpstream = context.upstreamCausedDurSec ?? 0
-    const sharePct = totalUpstream > 0 ? (topMachine.totalOverlapSec / totalUpstream) * 100 : 0
+    // Denominador = suma de los solapes POR MÁQUINA, no la unión del tiempo
+    // muerto. Con la unión, dos Baader paradas a la vez cubren el mismo paro
+    // del Grader y una sola podía dar 114% — un porcentaje imposible que le
+    // quitaba credibilidad al panel entero.
+    const sumaSolapes = (context.upstreamByMachine ?? []).reduce((a, m) => a + m.totalOverlapSec, 0)
+    const sharePct = sumaSolapes > 0 ? (topMachine.totalOverlapSec / sumaSolapes) * 100 : 0
     actions.push({
       id: `upstream-attend-${topMachine.machineid}`,
       category: 'terreno',
-      title: `Atender ${topMachine.machineName} (mantención prioritaria)`,
-      description: `Esta máquina causó ${fmtDur(topMachine.totalOverlapSec)} de paro del Grader en ${topMachine.pauseCount} evento${topMachine.pauseCount !== 1 ? 's' : ''} (${sharePct.toFixed(0)}% del tiempo muerto upstream del turno). Priorizar mantención reduce tiempo muerto sin tener que cambiar configuración del Grader.`,
+      title: `Atender ${shortMachineName(topMachine.machineName)} (mantención prioritaria)`,
+      description: `Esta máquina causó ${fmtDur(topMachine.totalOverlapSec)} de paro del Grader en ${topMachine.pauseCount} evento${topMachine.pauseCount !== 1 ? 's' : ''} (${sharePct.toFixed(0)}% del paro upstream atribuido a máquinas). Priorizar mantención reduce tiempo muerto sin tener que cambiar configuración del Grader.`,
       severity: topMachine.totalOverlapSec >= 1800 ? 'critical' : 'warning',
     })
   }
@@ -203,7 +208,7 @@ export function deriveSuggestions(
     actions.push({
       id: 'scatter-baader-rate',
       category: 'oficina',
-      title: 'Investigar caídas de ritmo en Evisceradoras',
+      title: 'Investigar caídas de ritmo en las Baader',
       description: `Detectada correlación operacional: cada -10 ciclos/5min de las Baaders → +${context.scatterSlope.deltaP0_per_minus10cycles.toFixed(2)} puntos P0% del Grader. Indica que la calidad del corte en evisceración impacta la clasificación. Verificar materia prima, dotación de operadores y mantenciones programadas en esa línea.`,
       severity: 'warning',
     })
