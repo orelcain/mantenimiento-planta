@@ -52,8 +52,6 @@ import { useSyncAge } from '@/hooks/useSyncAge'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel } from '@/components/grader/ActionPlanPanel'
-import { MarelHgCaptureCard } from '@/components/grader/MarelHgCaptureCard'
-import { subscribeMarelHgCapture, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import { deriveYalSuggestions } from '@/services/grader/graderInsightsYal'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
@@ -257,7 +255,7 @@ export function AnalisisGraderTurnoPage() {
    * - Chonchi (default):   `${dateKey}__${shiftLabel}`
    * - Yal y otras líneas:  `${plantLineId}__${dateKey}__${shiftLabel}`
    * Usar este ID (no el literal) en todas las operaciones sobre graderDailySummaries
-   * y sus sub-colecciones (timeline, pauses, pieceRecords, marelHg).
+   * y sus sub-colecciones (timeline, pauses, pieceRecords).
    * Las operaciones sobre graderShifts siguen usando shiftDocId (sin prefix).
    */
   const effectiveSummaryId = useMemo(
@@ -437,7 +435,6 @@ export function AnalisisGraderTurnoPage() {
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
   const [pauses, setPauses] = useState<Pause[]>([])
   const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
-  const [marelHgCapture, setMarelHgCapture] = useState<MarelHgCapture | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -830,15 +827,6 @@ export function AnalisisGraderTurnoPage() {
     return unsub
   }, [effectiveSummaryId])
 
-  // Captura Marel HG (corta-cabeza) — mide las piezas no controladas del
-  // corta-cabeza. Ya NO se usa para "deducir rechazo Baader puro": ese cálculo
-  // se retiró al aparecer la línea manual productiva (ver graderManualLine).
-  useEffect(() => {
-    if (!effectiveSummaryId) return
-    setMarelHgCapture(null)
-    const unsub = subscribeMarelHgCapture(effectiveSummaryId, setMarelHgCapture)
-    return unsub
-  }, [effectiveSummaryId])
 
   // Carga pieceRecords gate=0 para drill-down en timeline
   useEffect(() => {
@@ -1588,7 +1576,6 @@ export function AnalisisGraderTurnoPage() {
                 summary={summary}
                 shiftWindow={shiftWindow}
                 upstreamSnapshot={upstreamLine.snapshot}
-                marelHgCapture={marelHgCapture}
                 upstreamSyncedAt={upstreamLine.syncedAt}
               />
               {/* Zona 2 del orden: qué tan completo está el dato. Va acá
@@ -1609,16 +1596,6 @@ export function AnalisisGraderTurnoPage() {
                 allowEdit={isAdmin || isSupervisor}
                 onSave={handleSaveShiftQuota}
               />
-              {/* Marel HG (corta-cabeza) solo aplica en Chonchi — Yal solo
-                  eviscera, los salmones salen con cabeza al camión. Ocultar
-                  card y banner para no confundir al usuario Yal. */}
-              {isClassificationPlant && (upstreamLine.snapshot || marelHgCapture) && (
-                <MarelHgCaptureCard
-                  summaryId={effectiveSummaryId}
-                  capture={marelHgCapture}
-                  canEdit={isSupervisor}
-                />
-              )}
             </div>
 
             {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height.
