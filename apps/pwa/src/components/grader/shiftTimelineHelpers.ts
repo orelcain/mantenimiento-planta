@@ -14,6 +14,7 @@ import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.
 import type { SegmentVerdict, VerdictStatus } from '@/services/grader/graderP0Segmentation'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 // ── Formato de hora ───────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ export function computeProductionWindow(timelineBuckets: TimelineBucket[]): Prod
   const MIN_ACTIVE = 3
   const MIN_PIECES = 20
   const bucketByMs = new Map<number, { pieces: number }>()
-  for (const b of cleanBuckets) bucketByMs.set(Date.parse(b.tsMin), { pieces: b.pieces })
+  for (const b of cleanBuckets) bucketByMs.set(parseWallClockMs(b.tsMin), { pieces: b.pieces })
 
   const windowMeetsCriteria = (anchorMs: number, direction: 1 | -1): boolean => {
     let active = 0
@@ -113,21 +114,21 @@ export function computeProductionWindow(timelineBuckets: TimelineBucket[]): Prod
 
   let startBucket = cleanBuckets[0]!
   for (const b of cleanBuckets) {
-    if (windowMeetsCriteria(Date.parse(b.tsMin), 1)) { startBucket = b; break }
+    if (windowMeetsCriteria(parseWallClockMs(b.tsMin), 1)) { startBucket = b; break }
   }
   let endBucket = cleanBuckets[cleanBuckets.length - 1]!
   for (let i = cleanBuckets.length - 1; i >= 0; i--) {
     const b = cleanBuckets[i]!
-    if (windowMeetsCriteria(Date.parse(b.tsMin), -1)) { endBucket = b; break }
+    if (windowMeetsCriteria(parseWallClockMs(b.tsMin), -1)) { endBucket = b; break }
   }
 
   const startTs = startBucket.tsMin
   const endTs = endBucket.tsMin
-  const startMs = Date.parse(startTs)
-  const endMs = Date.parse(endTs)
+  const startMs = parseWallClockMs(startTs)
+  const endMs = parseWallClockMs(endTs)
   const excludedPieces = timelineBuckets
     .filter((b) => {
-      const ts = Date.parse(b.tsMin)
+      const ts = parseWallClockMs(b.tsMin)
       return ts < startMs || ts > endMs
     })
     .reduce((s, b) => s + b.pieces, 0)
@@ -165,11 +166,11 @@ export function resolveAxisWindow(
   const lastBucket = buckets[buckets.length - 1]
   const padMs = paddingMin * 60_000
   let effectiveStartMs = firstBucket
-    ? Date.parse(firstBucket.tsMin) - padMs
-    : Date.parse(shiftWindow.startAt)
+    ? parseWallClockMs(firstBucket.tsMin) - padMs
+    : parseWallClockMs(shiftWindow.startAt)
   let effectiveEndMs = lastBucket
-    ? Date.parse(lastBucket.tsMin) + padMs
-    : Date.parse(shiftWindow.endAt)
+    ? parseWallClockMs(lastBucket.tsMin) + padMs
+    : parseWallClockMs(shiftWindow.endAt)
 
   // outerBounds (típicamente rango SLX completo) extiende el eje para que el
   // Grader se vea como una "isla" dentro del turno upstream. El supervisor
@@ -417,8 +418,8 @@ export function buildMarkAreas(
 ): Array<[object, object]> {
   const pausesInWindow = pauses.filter((p) => {
     if (!productionWindow) return true
-    const pStart = Date.parse(p.startAt)
-    const pEnd = Date.parse(p.endAt)
+    const pStart = parseWallClockMs(p.startAt)
+    const pEnd = parseWallClockMs(p.endAt)
     return pEnd >= productionWindow.startMs && pStart <= productionWindow.endMs
   })
   return pausesInWindow.map((p) => {
@@ -473,8 +474,8 @@ export function buildPauseBoundaryMarkLines(
 ): object[] {
   const pausesInWindow = pauses.filter((p) => {
     if (!productionWindow) return true
-    const pStart = Date.parse(p.startAt)
-    const pEnd = Date.parse(p.endAt)
+    const pStart = parseWallClockMs(p.startAt)
+    const pEnd = parseWallClockMs(p.endAt)
     return pEnd >= productionWindow.startMs && pStart <= productionWindow.endMs
   })
   const lines: object[] = []
@@ -571,8 +572,8 @@ export function buildConfigSegmentMarkAreas(
     const startIso = snap.at
     const endIso = manualSnaps[i + 1]?.at ?? productionEndIso
 
-    const startMs = Date.parse(startIso)
-    const endMs = Date.parse(endIso)
+    const startMs = parseWallClockMs(startIso)
+    const endMs = parseWallClockMs(endIso)
     if (endMs < productionWindow.startMs || startMs > productionWindow.endMs) continue
 
     const tA = fmtTime(startIso)
@@ -743,7 +744,7 @@ export function buildScatterData(
   // Pre-index: bucket por timestamp de inicio de minuto (ms) para O(1) lookup
   const bucketByTs = new Map<number, TimelineBucket>()
   for (const b of buckets) {
-    const ms = new Date(b.tsMin).getTime()
+    const ms = parseWallClockMs(b.tsMin)
     bucketByTs.set(ms, b)
   }
 

@@ -54,6 +54,7 @@ import {
 } from '@/services/grader/graderP0Segmentation'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -308,7 +309,7 @@ export function ShiftTimelineView({
     if (!onZoomRangeChange && !timelineSync) return
     const inProductionWindow = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
@@ -342,7 +343,7 @@ export function ShiftTimelineView({
   const hourlySegments = useMemo(() => {
     const inWin = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
@@ -353,8 +354,11 @@ export function ShiftTimelineView({
 
     const byHour = new Map<number, { pieces: number; p0: number; firstMs: number; lastMs: number }>()
     for (const b of buckets) {
-      const ts = Date.parse(b.tsMin)
-      const h = new Date(b.tsMin).getUTCHours()
+      const ts = parseWallClockMs(b.tsMin)
+      // parseWallClockMs primero: sin eso el Date se creaba en hora LOCAL y
+      // getUTCHours() devolvía la hora corrida 4 h — el agrupado por hora
+      // quedaba en la franja equivocada.
+      const h = new Date(parseWallClockMs(b.tsMin)).getUTCHours()
       const cur = byHour.get(h) ?? { pieces: 0, p0: 0, firstMs: ts, lastMs: ts }
       cur.pieces += b.pieces
       cur.p0 += b.p0Pieces ?? 0
@@ -381,7 +385,7 @@ export function ShiftTimelineView({
   const axisAnchorMs = useMemo(() => {
     const inProductionWindow = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
@@ -398,7 +402,7 @@ export function ShiftTimelineView({
     if (!timelineSync) return
     const inProductionWindow = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
@@ -407,7 +411,7 @@ export function ShiftTimelineView({
       const prev = buckets[i - 1]
       const curr = buckets[i]
       if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
-        changes.push({ ms: Date.parse(curr.tsMin), lot: curr.lot })
+        changes.push({ ms: parseWallClockMs(curr.tsMin), lot: curr.lot })
       }
     }
     timelineSync.setLotChanges(changes)
@@ -598,7 +602,7 @@ export function ShiftTimelineView({
   const downloadCSV = useCallback(() => {
     const inWin = (tsMin: string) => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     // Agrupar por hora (UTC — consistente con fmtTime que usa getUTCHours)
@@ -612,7 +616,8 @@ export function ShiftTimelineView({
     }
     const hourMap = new Map<string, HourRow>()
     for (const b of buckets) {
-      const d = new Date(b.tsMin)
+      // Igual que arriba: wall-clock primero, después getUTCHours().
+      const d = new Date(parseWallClockMs(b.tsMin))
       const hh = String(d.getUTCHours()).padStart(2, '0')
       const key = `${hh}:00`
       const row = hourMap.get(key) ?? {
@@ -676,7 +681,7 @@ export function ShiftTimelineView({
     const atMs = Date.parse(atIso)
     const inPW = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inPW(b.tsMin))
@@ -700,7 +705,7 @@ export function ShiftTimelineView({
     // comunica via el badge "Pre/post-turno" arriba.
     const inWindow = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWindow(b.tsMin))

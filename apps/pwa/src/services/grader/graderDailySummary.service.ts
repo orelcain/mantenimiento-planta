@@ -36,6 +36,7 @@ import { db } from '../firebase'
 import { logger } from '@/lib/logger'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
 import { fmtTime } from './graderTimeFormat'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 const COLLECTION = 'graderDailySummaries'
 /** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
@@ -645,7 +646,7 @@ export async function listPieceRecordsByMinute(
 ): Promise<FirestorePieceRecord[]> {
   const startTs = tsMin
   // Fin del minuto: ts estricto < startMs + 60s
-  const startMs = Date.parse(tsMin)
+  const startMs = parseWallClockMs(tsMin)
   const endTs = new Date(startMs + 60_000).toISOString()
   const q = query(
     pieceRecordsCol(summaryId),

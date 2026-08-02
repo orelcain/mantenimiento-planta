@@ -23,6 +23,7 @@ import { Activity, Coffee } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { TimelineBucket } from '@/services/grader/types'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
 
@@ -270,7 +271,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
   let totalWeightCount = 0
   let minW = Infinity, maxW = 0
   for (const b of sorted) {
-    const tsMs = new Date(b.tsMin).getTime()
+    const tsMs = parseWallClockMs(b.tsMin)
     const cal = b.dominantCalibre ?? '?'
     if (b.weightMinGrams != null) {
       wts.push([tsMs, b.weightMinGrams, cal])
@@ -293,7 +294,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
   const p50Series: Array<[number, number]> = []
   for (const b of sorted) {
     if (b.weightP50Grams != null) {
-      p50Series.push([new Date(b.tsMin).getTime(), b.weightP50Grams])
+      p50Series.push([parseWallClockMs(b.tsMin), b.weightP50Grams])
     }
   }
   const movAvg = computeMovingAvg(p50Series, Math.min(5, p50Series.length))
@@ -303,7 +304,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
   const errorSet = new Set<string>()
   for (const b of sorted) {
     if (!b.errorCounts) continue
-    const tsMs = new Date(b.tsMin).getTime()
+    const tsMs = parseWallClockMs(b.tsMin)
     for (const [err, pieces] of Object.entries(b.errorCounts)) {
       errs.push([tsMs, pieces, err])
       errorSet.add(err)
@@ -322,18 +323,18 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
     }
     if (total > 0 && i >= WINDOW_BUCKETS) {
       const pct = Math.min(100, +((p0 / total) * 100).toFixed(2))
-      p0Pts.push([new Date(sorted[i]!.tsMin).getTime(), pct])
+      p0Pts.push([parseWallClockMs(sorted[i]!.tsMin), pct])
     }
   }
 
   // Producción: bucket.pieces ya ES piezas/minuto
-  const prodPts: Array<[number, number]> = sorted.map((b) => [new Date(b.tsMin).getTime(), b.pieces])
+  const prodPts: Array<[number, number]> = sorted.map((b) => [parseWallClockMs(b.tsMin), b.pieces])
 
   // Gaps: minutos faltantes > 15 min entre buckets consecutivos
   const detectedGaps: Array<{ start: number; end: number; durationMin: number }> = []
   for (let i = 1; i < sorted.length; i++) {
-    const prevTs = new Date(sorted[i - 1]!.tsMin).getTime()
-    const currTs = new Date(sorted[i]!.tsMin).getTime()
+    const prevTs = parseWallClockMs(sorted[i - 1]!.tsMin)
+    const currTs = parseWallClockMs(sorted[i]!.tsMin)
     const deltaMin = (currTs - prevTs) / 60_000
     if (deltaMin > 15) {
       detectedGaps.push({ start: prevTs, end: currTs, durationMin: Math.round(deltaMin) })
@@ -347,7 +348,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
     cumTotal += b.pieces
     cumP0 += b.p0Pieces
     if (cumTotal > 30) {
-      p0CumPts.push([new Date(b.tsMin).getTime(), +((cumP0 / cumTotal) * 100).toFixed(2)])
+      p0CumPts.push([parseWallClockMs(b.tsMin), +((cumP0 / cumTotal) * 100).toFixed(2)])
     }
   }
 
@@ -357,7 +358,7 @@ function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSe
   const gateSet = new Set<number>()
   for (const b of sorted) {
     if (!b.gateCounts) continue
-    const tsMs = new Date(b.tsMin).getTime()
+    const tsMs = parseWallClockMs(b.tsMin)
     const bucket5 = Math.floor(tsMs / GATE_BUCKET_MS) * GATE_BUCKET_MS
     for (const [gateStr, pieces] of Object.entries(b.gateCounts)) {
       const gate = Number(gateStr)

@@ -7,6 +7,7 @@
  */
 
 import type { TimelineBucket } from '@/services/grader/types'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 /**
  * Calcula el contexto P0% de una pausa: antes de empezar (window móvil
@@ -46,7 +47,7 @@ export function computePauseP0Context(
   let duringPieces = 0
   let duringP0 = 0
   for (const b of buckets) {
-    const ms = Date.parse(b.tsMin)
+    const ms = parseWallClockMs(b.tsMin)
     if (!Number.isFinite(ms)) continue
     if (ms >= beforeFromMs && ms < startMs) {
       beforePieces += b.pieces

@@ -76,6 +76,7 @@ import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, Timeli
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
 function parseShiftId(raw: string | undefined): [string, string] {
@@ -514,7 +515,7 @@ export function AnalisisGraderTurnoPage() {
     const productionWindow = computeProductionWindow(enrichedTimelineBuckets)
     const inWindow = (tsMin: string): boolean => {
       if (!productionWindow) return true
-      const ts = Date.parse(tsMin)
+      const ts = parseWallClockMs(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
     const filtered = enrichedTimelineBuckets.filter(b => b.pieces > 0 && inWindow(b.tsMin))

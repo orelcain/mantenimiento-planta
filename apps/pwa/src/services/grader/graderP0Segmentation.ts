@@ -22,6 +22,7 @@
 
 import type { TimelineBucket } from './types'
 import type { GateConfigSnapshot } from './graderConfigSnapshot.service'
+import { parseWallClockMs } from '@/services/grader/graderTimeFormat'
 
 export interface SegmentVerdict {
   beforePct: number
@@ -146,7 +147,7 @@ export function computeSegmentVerdicts(
 
     const lastAfter = afterBuckets[afterBuckets.length - 1]
     const afterMinutes = lastAfter
-      ? Math.round((new Date(lastAfter.tsMin).getTime() - new Date(snap.at).getTime()) / 60_000)
+      ? Math.round((parseWallClockMs(lastAfter.tsMin) - new Date(snap.at).getTime()) / 60_000)
       : 0
 
     result.set(snap.id, {
