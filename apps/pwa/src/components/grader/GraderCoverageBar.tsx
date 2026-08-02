@@ -1,20 +1,29 @@
 /**
  * Cuánto del turno cubre el Excel del Grader.
  *
- * El Excel de Matrix se carga por tandas: un turno puede tener cargado solo un
- * tramo. Hasta ahora eso no se decía en ninguna parte — había que comparar a
- * ojo el horario del turno (21:30–05:45) contra el rango del Excel
- * (01:34–05:11) para darse cuenta de que faltaban 4 horas.
+ * ── Contra qué se compara ────────────────────────────────────────────────────
  *
- * La distinción que importa, y que la app no hacía:
+ * Contra la producción REAL de las Baader (Shoplogix), no contra el horario
+ * programado del turno. El pescado va Baader → Grader, así que entre ambas
+ * fuentes solo hay minutos de tránsito: si las Baader arrancaron 01:19 y la
+ * primera pieza llegó al Grader 01:34, el Excel está completo — el turno
+ * simplemente empezó tarde.
  *
- *   SIN DATOS      → ningún Excel cubre ese tramo. Puede haber producción
- *                    sin registrar: falta cargar el archivo.
- *   SIN PRODUCCIÓN → el Excel SÍ cubre el tramo y no pasaron piezas. La línea
- *                    estuvo parada; el dato está completo.
+ * La primera versión comparaba contra el horario programado (21:30–05:45) y en
+ * ese mismo turno decía "faltan 4 h 37 min sin Excel cargado": mandaba a buscar
+ * un archivo que no existe y tapaba el dato real, que era un arranque casi 4 h
+ * tarde. Verificado contra Shoplogix: entre 21:30 y 01:19 no produjo ninguna de
+ * las tres Baader.
  *
- * Confundirlas lleva a conclusiones opuestas: en un caso falta trabajo de
- * carga, en el otro hay un paro que investigar.
+ * ── Qué informa ─────────────────────────────────────────────────────────────
+ *
+ *   SIN DATOS      → las Baader produjeron y el Grader no tiene nada de ese
+ *                    tramo. Falta cargar Excel.
+ *   SIN PRODUCCIÓN → dentro del tramo cubierto, minutos sin piezas: la línea
+ *                    estuvo parada. El dato está completo.
+ *
+ * Sin ventana de Shoplogix (turno sin sincronizar) se cae al horario del turno,
+ * que es lo único disponible — y se dice en el texto para no afirmar de más.
  */
 
 import { useMemo } from 'react'
@@ -26,31 +35,54 @@ import type { TimelineBucket } from '@/services/grader/types'
 type Tramo = 'produccion' | 'sin-produccion' | 'sin-datos'
 
 const ESTILO: Record<Tramo, { clase: string; label: string }> = {
-  'produccion':     { clase: 'bg-emerald-500/70',  label: 'Con piezas' },
-  'sin-produccion': { clase: 'bg-slate-500/45',    label: 'Sin piezas (línea parada)' },
+  'produccion':     { clase: 'bg-emerald-500/70', label: 'Con piezas' },
+  'sin-produccion': { clase: 'bg-slate-500/45',   label: 'Sin piezas (línea parada)' },
   'sin-datos':      { clase: 'bg-amber-500/25 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
 }
 
+/**
+ * Tolerancia de tránsito Baader → Grader. Una pieza tarda unos minutos en
+ * llegar de la evisceradora al Marelec, así que arrancar o cerrar con unos
+ * minutos de diferencia NO es dato faltante.
+ */
+const TRANSITO_MIN = 20
+
 export interface GraderCoverageBarProps {
-  /** Inicio del turno (wall-clock-as-UTC). */
+  /** Inicio del turno programado (wall-clock-as-UTC). Fallback. */
   shiftStartAt?: string | null
-  /** Fin del turno (wall-clock-as-UTC). */
+  /** Fin del turno programado (wall-clock-as-UTC). Fallback. */
   shiftEndAt?: string | null
+  /**
+   * Ventana en que las Baader realmente produjeron, según Shoplogix. Es la
+   * referencia correcta: el Excel no puede cubrir lo que nunca se produjo.
+   */
+  produccionReal?: { start: Date; end: Date } | null
   /** Buckets por minuto del Excel cargado. Cada uno = 1 minuto con registros. */
   buckets: TimelineBucket[]
 }
 
-export function GraderCoverageBar({ shiftStartAt, shiftEndAt, buckets }: GraderCoverageBarProps) {
+export function GraderCoverageBar({
+  shiftStartAt, shiftEndAt, produccionReal, buckets,
+}: GraderCoverageBarProps) {
   const data = useMemo(() => {
-    if (!shiftStartAt || !shiftEndAt) return null
-    const inicio = parseWallClockMs(shiftStartAt)
-    const fin = parseWallClockMs(shiftEndAt)
+    // Referencia: la producción real si Shoplogix la conoce; si no, el turno.
+    //
+    // La ventana es la producción TAL CUAL: el tránsito Baader→Grader se aplica
+    // después, como tolerancia al juzgar los huecos. Ensanchar la ventana por el
+    // tránsito la volvía imposible de cubrir — el Excel nunca puede traer
+    // piezas de minutos en que no se produjo, así que siempre "faltaba".
+    const usandoProduccion = produccionReal != null
+    const inicio = usandoProduccion
+      ? produccionReal!.start.getTime()
+      : parseWallClockMs(shiftStartAt)
+    const fin = usandoProduccion
+      ? produccionReal!.end.getTime()
+      : parseWallClockMs(shiftEndAt)
     if (!Number.isFinite(inicio) || !Number.isFinite(fin) || fin <= inicio) return null
 
     const totalMin = Math.round((fin - inicio) / 60_000)
     if (totalMin <= 0) return null
 
-    // Minutos (offset desde el inicio del turno) que trae el Excel.
     const conDatos = new Set<number>()
     let primero = Infinity
     let ultimo = -Infinity
@@ -60,16 +92,17 @@ export function GraderCoverageBar({ shiftStartAt, shiftEndAt, buckets }: GraderC
       const t = parseWallClockMs(b.tsMin)
       if (!Number.isFinite(t)) continue
       const off = Math.floor((t - inicio) / 60_000)
-      if (off < 0 || off >= totalMin) continue   // fuera del turno: no se dibuja
+      if (off < 0 || off >= totalMin) continue
       conDatos.add(off)
       if (off < primero) primero = off
       if (off > ultimo) ultimo = off
     }
-    if (conDatos.size === 0) return { totalMin, tramos: [], sinDatosMin: totalMin, conPiezasMin: 0, rango: null }
+    if (conDatos.size === 0) {
+      return { totalMin, tramos: [], sinDatosMin: totalMin, faltaExcelMin: totalMin, conPiezasMin: 0, rango: null, usandoProduccion }
+    }
 
-    // Todo lo que cae ENTRE el primer y el último registro está cubierto por
-    // el Excel: que un minuto no traiga piezas ahí significa línea parada, no
-    // dato faltante.
+    // Entre el primer y el último registro el Excel cubre: un minuto sin piezas
+    // ahí es línea parada, no dato faltante.
     const clasificar = (off: number): Tramo =>
       off < primero || off > ultimo ? 'sin-datos'
         : conDatos.has(off) ? 'produccion'
@@ -83,19 +116,33 @@ export function GraderCoverageBar({ shiftStartAt, shiftEndAt, buckets }: GraderC
       else tramos.push({ tipo, desde: off, largo: 1 })
     }
 
+    // Los huecos "sin datos" solo pueden estar en los extremos: adentro del
+    // rango del Excel, un minuto sin piezas es línea parada.
+    //
+    // El de la cabeza es el tránsito de la primera pieza desde la Baader; el de
+    // la cola, el vaciado de la línea. Se toleran; lo que exceda es Excel que
+    // de verdad falta.
+    const huecoInicio = primero
+    const huecoFin = totalMin - 1 - ultimo
+    const faltaExcelMin =
+      Math.max(0, huecoInicio - TRANSITO_MIN) + Math.max(0, huecoFin - TRANSITO_MIN)
+
     return {
       totalMin,
       tramos,
-      sinDatosMin: tramos.filter(t => t.tipo === 'sin-datos').reduce((s, t) => s + t.largo, 0),
+      sinDatosMin: huecoInicio + huecoFin,
+      faltaExcelMin,
       conPiezasMin: conDatos.size,
       rango: { desdeMs: inicio + primero * 60_000, hastaMs: inicio + (ultimo + 1) * 60_000 },
+      usandoProduccion,
     }
-  }, [shiftStartAt, shiftEndAt, buckets])
+  }, [shiftStartAt, shiftEndAt, produccionReal, buckets])
 
   if (!data) return null
 
-  const { totalMin, tramos, sinDatosMin, conPiezasMin, rango } = data
+  const { totalMin, tramos, sinDatosMin, faltaExcelMin, conPiezasMin, rango, usandoProduccion } = data
   const cubiertoPct = totalMin > 0 ? ((totalMin - sinDatosMin) / totalMin) * 100 : 0
+  const faltaExcel = (faltaExcelMin ?? 0) > 0
 
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 space-y-1.5">
@@ -108,12 +155,15 @@ export function GraderCoverageBar({ shiftStartAt, shiftEndAt, buckets }: GraderC
             : 'sin registros en el turno'}
         </span>
         <span className="ml-auto tabular-nums text-muted-foreground">
-          <b className="text-foreground">{cubiertoPct.toFixed(0)}%</b> del turno
+          <b className={cn(faltaExcel ? 'text-amber-500' : 'text-emerald-500')}>
+            {cubiertoPct.toFixed(0)}%
+          </b>{' '}
+          {usandoProduccion ? 'de lo producido' : 'del turno programado'}
         </span>
       </div>
 
       <div className="flex h-2.5 rounded-sm overflow-hidden bg-muted" role="img"
-        aria-label={`El Excel cubre el ${cubiertoPct.toFixed(0)}% del turno`}>
+        aria-label={`El Excel cubre el ${cubiertoPct.toFixed(0)}% de lo producido`}>
         {tramos.map((t) => (
           <div
             key={`${t.tipo}-${t.desde}`}
@@ -131,15 +181,20 @@ export function GraderCoverageBar({ shiftStartAt, shiftEndAt, buckets }: GraderC
             {ESTILO[k].label}
           </span>
         ))}
-        <span className="ml-auto tabular-nums">
-          {fmtDurationMin(conPiezasMin)} con piezas
-        </span>
+        <span className="ml-auto tabular-nums">{fmtDurationMin(conPiezasMin)} con piezas</span>
       </div>
 
-      {sinDatosMin > 0 && (
+      {faltaExcel ? (
         <p className="text-[10px] text-amber-600 dark:text-amber-400/90">
-          Faltan <b>{fmtDurationMin(sinDatosMin)}</b> del turno sin Excel cargado. Si hubo
-          producción en ese tramo, todavía no está contada.
+          Las Baader produjeron <b>{fmtDurationMin(faltaExcelMin ?? sinDatosMin)}</b> que el Excel no cubre.
+          Esas piezas todavía no están contadas.
+        </p>
+      ) : (
+        <p
+          className="text-[10px] text-emerald-600 dark:text-emerald-400/90 cursor-help"
+          title={`El pescado va Baader → Grader, así que entre ambas fuentes solo hay minutos de tránsito (se toleran ${TRANSITO_MIN}). Que el Excel arranque después no es dato faltante: es cuando llegó la primera pieza.`}
+        >
+          El Excel cubre toda la producción del turno.
         </p>
       )}
     </div>

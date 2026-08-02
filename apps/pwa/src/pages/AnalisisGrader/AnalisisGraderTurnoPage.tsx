@@ -1662,6 +1662,7 @@ export function AnalisisGraderTurnoPage() {
               <GraderCoverageBar
                 shiftStartAt={shiftWindow?.startAt ?? summary.startAt}
                 shiftEndAt={shiftWindow?.endAt ?? summary.endAt}
+                produccionReal={slxProductionWindow}
                 buckets={enrichedTimelineBuckets}
               />
               <ShiftQuotaCard

@@ -1,15 +1,20 @@
 /**
- * Cobertura del Excel sobre el turno.
+ * Cobertura del Excel sobre la producción REAL.
  *
- * Lo que se prueba es la distinción que motivó el componente: un tramo vacío
- * DENTRO del rango del Excel es línea parada (dato completo), y fuera del rango
- * es Excel sin cargar (falta trabajo). Confundirlas lleva a conclusiones
- * opuestas.
+ * La referencia es lo que produjeron las Baader (Shoplogix), no el horario
+ * programado del turno: el pescado va Baader → Grader, así que entre ambas
+ * fuentes solo hay minutos de tránsito.
  *
- * Caso real: turno 1 del 31-jul-2026, 21:30 → 05:45, con Excel desde 01:34.
+ * Caso real que motivó el cambio — turno 1 del 31-jul-2026:
+ *   turno programado   21:30 → 05:45
+ *   primera Baader     01:19
+ *   primera pieza      01:34   (15 min de tránsito)
+ * Comparando contra el turno programado la app decía "faltan 4 h 37 min sin
+ * Excel cargado", mandando a buscar un archivo inexistente y tapando el dato
+ * real: el turno arrancó casi 4 h tarde.
  *
- * Se asierta sobre `container.textContent` y no con `getByText` porque los
- * números viven partidos entre varios nodos (`<b>12%</b> del turno`).
+ * Se asierta sobre `container.textContent` porque los números viven partidos
+ * entre varios nodos (`<b>44%</b> de lo producido`).
  */
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
@@ -26,64 +31,92 @@ function minutos(desdeIso: string, cuantos: number): TimelineBucket[] {
     bucket(new Date(t0 + i * 60_000).toISOString().slice(0, 16)))
 }
 
-/** Turno 1 de Planta Principal: 21:30 → 05:45 = 495 min. */
+/** Turno 1 de Planta Principal: 21:30 → 05:45. */
 const TURNO = { inicio: '2026-07-31T21:30:00.000Z', fin: '2026-08-01T05:45:00.000Z' }
 
-const texto = (buckets: TimelineBucket[], turno = TURNO) =>
-  render(
-    <GraderCoverageBar shiftStartAt={turno.inicio} shiftEndAt={turno.fin} buckets={buckets} />,
-  ).container.textContent ?? ''
+const ventana = (desde: string, hasta: string) =>
+  ({ start: new Date(desde), end: new Date(hasta) })
 
-describe('GraderCoverageBar', () => {
-  it('sin ventana de turno no renderiza nada', () => {
+function texto(buckets: TimelineBucket[], produccionReal: { start: Date; end: Date } | null = null) {
+  return render(
+    <GraderCoverageBar
+      shiftStartAt={TURNO.inicio}
+      shiftEndAt={TURNO.fin}
+      produccionReal={produccionReal}
+      buckets={buckets}
+    />,
+  ).container.textContent ?? ''
+}
+
+describe('GraderCoverageBar — contra la producción real', () => {
+  it('el turno del 31-jul queda COMPLETO: arrancó tarde, no falta Excel', () => {
+    // Baader desde 01:19, Excel desde 01:34 → 15 min de tránsito.
+    const t = texto(
+      minutos('2026-08-01T01:34:00.000Z', 218),
+      ventana('2026-08-01T01:19:00.000Z', '2026-08-01T05:12:00.000Z'),
+    )
+    expect(t).toContain('El Excel cubre toda la producción del turno')
+    expect(t).not.toContain('no están contadas')
+    expect(t).toContain('de lo producido')
+  })
+
+  it('sí avisa cuando las Baader produjeron y el Excel no lo cubre', () => {
+    // Baader desde 21:30, Excel recién desde 01:34 → 4 h reales sin cargar.
+    const t = texto(
+      minutos('2026-08-01T01:34:00.000Z', 60),
+      ventana('2026-07-31T21:30:00.000Z', '2026-08-01T02:34:00.000Z'),
+    )
+    expect(t).toContain('que el Excel no cubre')
+    expect(t).toContain('todavía no están contadas')
+  })
+
+  it('un desfase menor al tránsito no cuenta como dato faltante', () => {
+    // 10 min de diferencia al arranque: es el viaje de la pieza.
+    const t = texto(
+      minutos('2026-08-01T01:29:00.000Z', 60),
+      ventana('2026-08-01T01:19:00.000Z', '2026-08-01T02:29:00.000Z'),
+    )
+    expect(t).toContain('El Excel cubre toda la producción del turno')
+  })
+
+  it('sin ventana de Shoplogix cae al turno programado, y lo dice', () => {
+    const t = texto(minutos('2026-08-01T01:34:00.000Z', 60), null)
+    expect(t).toContain('del turno programado')
+    expect(t).not.toContain('de lo producido')
+  })
+
+  it('un hueco DENTRO del rango es línea parada, no dato faltante', () => {
+    const t = texto(
+      [
+        ...minutos('2026-08-01T01:00:00.000Z', 10),
+        ...minutos('2026-08-01T01:30:00.000Z', 10),
+      ],
+      ventana('2026-08-01T01:00:00.000Z', '2026-08-01T01:40:00.000Z'),
+    )
+    expect(t).toContain('20 min con piezas')
+    expect(t).toContain('El Excel cubre toda la producción del turno')
+  })
+
+  it('sin ventana ni turno no renderiza nada', () => {
     const { container } = render(
       <GraderCoverageBar shiftStartAt={null} shiftEndAt={null} buckets={[]} />)
     expect(container.firstChild).toBeNull()
   })
 
-  it('informa el rango del Excel y el % del turno cubierto', () => {
-    // 60 min de datos sobre un turno de 495 → 12%
-    const t = texto(minutos('2026-08-01T01:34:00.000Z', 60))
+  it('sin registros lo dice, en vez de mostrar 0% a secas', () => {
+    expect(texto([], ventana('2026-08-01T01:19:00.000Z', '2026-08-01T05:12:00.000Z')))
+      .toContain('sin registros en el turno')
+  })
+
+  it('ignora registros fuera de la ventana', () => {
+    const t = texto(
+      [
+        ...minutos('2026-07-30T10:00:00.000Z', 30),   // otro día
+        ...minutos('2026-08-01T01:34:00.000Z', 60),
+      ],
+      ventana('2026-08-01T01:19:00.000Z', '2026-08-01T02:34:00.000Z'),
+    )
     expect(t).toContain('01:34–02:34')
-    expect(t).toContain('12%')
-  })
-
-  it('avisa cuánto turno quedó sin Excel', () => {
-    const t = texto(minutos('2026-08-01T01:34:00.000Z', 60))
-    expect(t).toContain('7 h 15 min')          // 495 − 60
-    expect(t).toContain('todavía no está contada')
-  })
-
-  it('un hueco DENTRO del rango es línea parada, no dato faltante', () => {
-    // 10 min con piezas · 20 sin · 10 con → el Excel cubre los 40.
-    const t = texto([
-      ...minutos('2026-08-01T01:00:00.000Z', 10),
-      ...minutos('2026-08-01T01:30:00.000Z', 10),
-    ])
-    expect(t).toContain('01:00–01:40')
-    expect(t).toContain('20 min con piezas')
-    // 495 − 40 = 455. Si el hueco contara como dato faltante daría 7 h 55 min.
-    expect(t).toContain('7 h 35 min')
-    expect(t).not.toContain('7 h 55 min')
-  })
-
-  it('turno completamente cubierto no muestra el aviso', () => {
-    const t = texto(minutos(TURNO.inicio, 495))
-    expect(t).toContain('100%')
-    expect(t).not.toContain('todavía no está contada')
-  })
-
-  it('ignora registros fuera de la ventana del turno', () => {
-    // Un Excel mensual trae piezas de otros días: no deben ensanchar el rango.
-    const t = texto([
-      ...minutos('2026-07-30T10:00:00.000Z', 30),   // día anterior
-      ...minutos('2026-08-01T01:34:00.000Z', 60),   // este turno
-    ])
-    expect(t).toContain('01:34–02:34')
-    expect(t).toContain('12%')
-  })
-
-  it('sin registros en el turno lo dice, en vez de mostrar 0% a secas', () => {
-    expect(texto([])).toContain('sin registros en el turno')
+    expect(t).toContain('1 h con piezas')   // los 30 min del otro día no suman
   })
 })
