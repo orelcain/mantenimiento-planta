@@ -32,6 +32,8 @@ import {
   FALTAN_DE_PLACA,
   TOTAL_PARAMETROS,
   TOTAL_FALLAS,
+  POSICIONES,
+  RESUMEN_RECETAS,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -39,6 +41,7 @@ import {
   type FichaVariador,
   type EstadoFicha,
   type FallaVariador,
+  type EstadoValor,
 } from '@/data/variadores'
 
 /** lowercase + sin acentos, para búsqueda tolerante (mismo criterio que el hub). */
@@ -462,6 +465,140 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
   )
 }
 
+
+// ── Recetas por posición ──────────────────────────────────────────────────────
+const COLOR_VALOR: Record<EstadoValor, string> = {
+  confirmado: C.ok,
+  pendiente: C.warn,
+  sugerido: C.crit,
+}
+const ROTULO_VALOR: Record<EstadoValor, string> = {
+  confirmado: 'Confirmado',
+  pendiente: 'Pendiente',
+  sugerido: 'Sugerido',
+}
+
+/** Cada cinta/equipo con SU variador y SU motor — sin generalizar por familia. */
+function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void }) {
+  const [q, setQ] = useState('')
+
+  const visibles = useMemo(() => {
+    const term = norm(q.trim())
+    if (!term) return POSICIONES
+    return POSICIONES.filter((p) =>
+      norm(`${p.equipo} ${p.zona} ${p.motor} ${p.variadorEtiqueta ?? ''}`).includes(term),
+    )
+  }, [q])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="m-0 max-w-[68ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
+        La ficha del modelo dice qué parámetros existen; <strong style={{ color: C.ink }}>esta
+        vista dice qué valor va en cada cinta con su motor</strong>. Lo ámbar es lo que falta
+        levantar en terreno; lo rojo se deja sugerido hasta verificarlo con la carga real.
+      </p>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar cinta, zona o motor…"
+            aria-label="Buscar posición"
+            className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-3 text-[12px]" style={{ color: C.inkMid }}>
+          {(['confirmado', 'pendiente', 'sugerido'] as const).map((e) => (
+            <span key={e} className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: COLOR_VALOR[e] }} />
+              {ROTULO_VALOR[e]}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+        {visibles.map((p) => {
+          const fam = p.variadorId ? VARIADORES.find((f) => f.id === p.variadorId) : null
+          return (
+            <div
+              key={p.id}
+              className="flex flex-col gap-2.5 rounded-lg p-4"
+              style={{ background: C.surface, border: `1px solid ${C.border}` }}
+            >
+              <div>
+                <h3 className="m-0 text-[15px] font-semibold leading-tight tracking-[-0.012em]" style={{ color: C.ink }}>
+                  {p.equipo}
+                </h3>
+                <span className="mt-0.5 block text-[12px]" style={{ color: C.inkMid }}>{p.zona}</span>
+              </div>
+
+              <div className="flex flex-col gap-1 text-[12.5px]" style={{ color: C.inkMid }}>
+                <span>
+                  {fam ? (
+                    <button
+                      onClick={() => onAbrirFicha(fam.id)}
+                      className="rounded font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                      style={{ color: C.aquaBright }}
+                    >
+                      {fam.nombre}
+                    </button>
+                  ) : (
+                    <span style={{ color: C.warn }}>Variador por identificar</span>
+                  )}
+                  {p.variadorEtiqueta && <span style={{ color: C.warn }}> · {p.variadorEtiqueta}</span>}
+                </span>
+                <span>Motor: <span className="font-mono text-[12px]">{p.motor}</span></span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 border-t pt-2.5" style={{ borderColor: C.border }}>
+                {p.valores.map((val) => {
+                  const color = COLOR_VALOR[val.estado]
+                  return (
+                    <span
+                      key={val.codigo}
+                      title={val.nota ? `${ROTULO_VALOR[val.estado]} — ${val.nota}` : ROTULO_VALOR[val.estado]}
+                      className="inline-flex items-baseline gap-1.5 rounded px-2 py-1 font-mono text-[12px] tabular-nums"
+                      style={{ color: C.ink, background: `color-mix(in srgb, ${color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 45%, transparent)` }}
+                    >
+                      <span className="font-semibold" style={{ color: C.aquaBright }}>{val.codigo}</span>
+                      {val.valor}
+                    </span>
+                  )
+                })}
+              </div>
+
+              {p.nota && (
+                <span
+                  className="block pl-2 text-[12px] leading-snug"
+                  style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
+                >
+                  {p.nota}
+                </span>
+              )}
+            </div>
+          )
+        })}
+        {visibles.length === 0 && (
+          <p className="py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+            Ninguna posición coincide con esa búsqueda.
+          </p>
+        )}
+      </div>
+
+      <p className="m-0 text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
+        {RESUMEN_RECETAS.posiciones} posiciones · {RESUMEN_RECETAS.confirmados} de{' '}
+        {RESUMEN_RECETAS.total} valores confirmados. Cada placa de motor que llegue por
+        Telegram convierte ámbar en verde.
+      </p>
+    </div>
+  )
+}
+
 // ── Equivalencias entre marcas ────────────────────────────────────────────────
 /** El mismo dato en el dialecto de cada fabricante — para cambiar de marca. */
 function TablaEquivalencias() {
@@ -593,7 +730,8 @@ export function VariadoresPage() {
   // por Telegram y quien lo abra cae directo en su ficha.
   const [params, setParams] = useSearchParams()
   const abierta = params.get('ficha')
-  const vista = params.get('vista') === 'equivalencias' ? 'equivalencias' : 'catalogo'
+  const vistaParam = params.get('vista')
+  const vista = vistaParam === 'equivalencias' || vistaParam === 'recetas' ? vistaParam : 'catalogo'
   const [q, setQ] = useState('')
   const [seccion, setSeccion] = useState<'parametros' | 'fallas'>('parametros')
 
@@ -608,9 +746,9 @@ export function VariadoresPage() {
     window.scrollTo(0, 0)
   }
 
-  const cambiarVista = (v: 'catalogo' | 'equivalencias') => {
+  const cambiarVista = (v: 'catalogo' | 'equivalencias' | 'recetas') => {
     const p = new URLSearchParams(params)
-    if (v === 'equivalencias') p.set('vista', v)
+    if (v !== 'catalogo') p.set('vista', v)
     else p.delete('vista')
     p.delete('ficha')
     setParams(p, { replace: true })
@@ -671,7 +809,8 @@ export function VariadoresPage() {
         {ficha === null && (
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vista">
             {([
-              ['catalogo', 'Por equipo'],
+              ['catalogo', 'Por modelo'],
+              ['recetas', 'Por cinta / equipo'],
               ['equivalencias', 'Equivalencias entre marcas'],
             ] as const).map(([v, rotulo]) => {
               const on = vista === v
@@ -697,6 +836,8 @@ export function VariadoresPage() {
 
         {ficha === null && vista === 'equivalencias' ? (
           <TablaEquivalencias />
+        ) : ficha === null && vista === 'recetas' ? (
+          <RecetasPorEquipo onAbrirFicha={abrirFicha} />
         ) : ficha === null ? (
           <>
             {/* Buscador */}

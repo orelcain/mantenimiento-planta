@@ -111,9 +111,11 @@ export const VARIADORES: FichaVariador[] = [
     estado: 'listo',
     fuente: 'Guía de programación ATV312 · BBV46387 v04 · Schneider (español).',
     aviso:
-      'Calibre confirmado en terreno: ATV312HU30N4 — 3 kW, 380-500 V trifásico. Con esa referencia se resuelven los rangos que dicen «según calibre» para esa unidad.',
+      'Calibre confirmado en terreno: ATV312HU30N4 — 3 kW, 380-500 V trifásico. Primera receta completa — DESANGRADOR: motor SEW KA87R57DRN100L4, 3 kW · 380 V en estrella · 6,8 A · 1456 rpm · cos φ 0,76 (placa del 17-10-2024, grupo Levantamiento). O sea: UnS 380 · FrS 50 · nCr 6,8 · nSP 1456 · COS 0,76 · ItH 6,8.',
     menus: {
       'drC- Control motor': [
+        p('FCS', 'Restaurar configuración', 'nO / rECI / InI', 'nO', false,
+          'Paso 0 con un variador USADO: InI vuelve todo a fábrica (mantener ENT 2 s). Un repuesto con pasado puede traer cargado cualquiera de los ~200 parámetros que esta ficha no tabula — fábrica + esta ficha = estado conocido. PELIGRO del manual: verificar que el cambio sea compatible con el cableado.'),
         p('bFr', 'Frec. estándar motor', '50 / 60 Hz', '50 Hz IEC'),
         p('UnS', 'Tensión nom. motor', 'N4: 100 a 500 V', 'según calibre', true,
           'La planta es 380 V. El manual dice que cuando la tensión de línea es MENOR que la nominal del motor, UnS va con la tensión de línea. O sea 380, aunque la placa del motor diga 400.'),
@@ -193,6 +195,8 @@ export const VARIADORES: FichaVariador[] = [
       'El ATV312 es su sucesor directo y comparte la nomenclatura, pero verifica parámetro por parámetro antes de copiar una configuración de una generación a la otra.',
     menus: {
       'drC- Control motor': [
+        p('FCS', 'Retorno a ajustes de fábrica', 'poner InI', '—', false,
+          'Paso 0 con un variador usado. El manual ATV31 lo deja accesible desde drC-, I-O-, CtL- y FUn-.'),
         p('bFr', 'Frec. estándar motor', '50 / 60 Hz', '50 Hz IEC'),
         p('UnS', 'Tensión nom. motor', 'según calibre', 'según calibre', true),
         p('FrS', 'Frec. nom. motor', '10 a 500 Hz', '50 Hz', true),
@@ -231,6 +235,10 @@ export const VARIADORES: FichaVariador[] = [
         p('0-50', 'Copia con LCP', '1: VFD→LCP · 2: LCP→VFD · 3: LCP→VFD sin datos de placa', '—', false,
           'Entre AutomationDrive y AutomationDrive funciona. Hacia un Midi, NO.'),
         p('0-51', 'Copia de ajuste (Set-Up)', 'al ajuste deseado o a todos', '—'),
+      ],
+      '14-2x Reset a fábrica': [
+        p('14-22', 'Modo de funcionamiento', '[0] Normal · [2] Inicialización', '[0] Normal', false,
+          'Paso 0 con un variador usado: poner [2], cortar la alimentación y volver a energizar — inicializa todo excepto registros de fallos y contadores. Después cargar los datos de esta ficha.'),
       ],
       '1-0x Principio de control': [
         p('1-00', 'Modo configuración', 'par constante / lazo cerrado…', '[0] Par constante'),
@@ -297,6 +305,10 @@ export const VARIADORES: FichaVariador[] = [
           'La opción 3 sirve para el mismo modelo en otro motor: hereda mando, rampas y protecciones, y deja los datos de placa para recargar.'),
         p('0-51', 'Copia de ajuste (Set-Up)', 'al ajuste deseado o a todos', '—'),
       ],
+      '14-2x Reset a fábrica': [
+        p('14-22', 'Modo de funcionamiento', '[0] Normal · [2] Inicialización', '[0] Normal', false,
+          'Paso 0 con un variador usado: poner [2], cortar la alimentación y volver a energizar — inicializa todo excepto registros de fallos y contadores. Después cargar los datos de esta ficha.'),
+      ],
       '1-2x Datos del motor': [
         p('1-20', 'Potencia motor [kW]', 'según calibre', 'según calibre', true),
         p('1-22', 'Tensión motor', 'según calibre', 'según calibre', true,
@@ -359,6 +371,12 @@ export const VARIADORES: FichaVariador[] = [
         p('P1082', 'Frecuencia máxima', '—', '50 Hz'),
         p('P1120', 'Tiempo de aceleración', '—', '10 s'),
         p('P1121', 'Tiempo de deceleración', '—', '10 s'),
+      ],
+      'P0010+P0970 Reset a fábrica': [
+        p('P0010', 'Parámetro de puesta en marcha', '0 / 30', '0', false,
+          'Ponerlo en 30 habilita el restablecimiento.'),
+        p('P0970', 'Restablecer ajustes de fábrica', '0 / 1', '0', false,
+          'Paso 0 con un variador usado: P0010 = 30 y luego P0970 = 1 (procedimiento textual del manual). Ojo: las macros de conexión Cn010/Cn011 NO se restablecen solas.'),
       ],
     },
   },
@@ -431,6 +449,10 @@ export const VARIADORES: FichaVariador[] = [
           'Bornes para el termistor del motor. Si el motor lo tiene, es protección térmica directa — mejor que estimarla por corriente.'),
         p('R1/R2', 'Relés de salida', '—', '—', false, 'Señalizan al tablero: marcha, fallo, bypass.'),
       ],
+      'UtIL Utilidades': [
+        p('FCS', 'Volver a parámetros de fábrica', '—', '—', false,
+          'Paso 0 con un arrancador usado: todos los parámetros vuelven a fábrica. En el mismo menú viven el auto-test del arrancador y el reset del histórico de fallos.'),
+      ],
     },
     fallas: [
       falla('OLF', 'Sobrecarga motor', ['El motor consumió más de lo permitido durante demasiado tiempo', 'Mecanismo duro o trabado'], ['Revisar el mecanismo: desgaste, juego, lubricación, bloqueos', 'Comprobar el dimensionamiento del motor frente a la necesidad mecánica', 'Verificar tHP (menú SEt) e In (menú ConF)', 'Esperar a que el motor se enfríe antes de rearrancar']),
@@ -501,6 +523,10 @@ export const VARIADORES: FichaVariador[] = [
         p('P-23', 'Velocidad preseleccionada 4', '−P-01 a P-01', '0,0 Hz'),
         p('P-24', 'Rampa de deceleración rápida', '—', '—'),
         p('P-29', 'Ajuste de la curva V/f', '0 a P-09', '0 Hz'),
+      ],
+      '↺ Reset a fábrica': [
+        p('▲+▼+Stop', 'Reset a fábrica por teclado', 'mantener > 2 s', '—', false,
+          'Paso 0 con un variador usado: con el equipo parado, mantener las tres teclas más de 2 s; el display muestra P-deF y se confirma con Stop. Después cargar P-07 a P-10.'),
       ],
     },
     fallas: [
@@ -727,6 +753,241 @@ export const EQUIVALENCIAS: EquivalenciaParametro[] = [
     nota: 'Solo Danfoss lo resuelve con la consola LCP, y únicamente entre equipos de la MISMA serie.',
   },
 ]
+
+
+// ── Recetas por posición ──────────────────────────────────────────────────────
+/**
+ * La ficha de familia dice qué parámetros EXISTEN; la receta dice qué VALOR va en
+ * ESTA cinta con ESTE motor. Pedido explícito de Orel (2026-08-02): no generalizar
+ * los seteos del variador — cada posición con su motor.
+ *
+ * Estados: `confirmado` = placa leída o regla verificada (red 380 V, código del
+ * modelo Sumitomo). `pendiente` = falta la placa o el dato de terreno. `sugerido` =
+ * ajuste de fábrica o valor típico — verificar en terreno antes de dejarlo fijo.
+ */
+export type EstadoValor = 'confirmado' | 'pendiente' | 'sugerido'
+
+export interface ValorReceta {
+  codigo: string
+  valor: string
+  estado: EstadoValor
+  nota?: string
+}
+
+export interface PosicionReceta {
+  id: string
+  equipo: string
+  zona: string
+  /** id de la ficha de familia, para saltar al detalle del parámetro. */
+  variadorId: string | null
+  /** Cómo identificar la unidad física (rótulo, posición en el tablero). */
+  variadorEtiqueta?: string
+  motor: string
+  valores: ValorReceta[]
+  nota?: string
+}
+
+const v = (codigo: string, valor: string, estado: EstadoValor, nota?: string): ValorReceta =>
+  ({ codigo, valor, estado, nota })
+
+/** 380 V de línea — confirmado por Orel; regla del manual ATV312 (tensión de línea < nominal del motor). */
+const V380: EstadoValor = 'confirmado'
+
+export const POSICIONES: PosicionReceta[] = [
+  {
+    id: 'desangrador', equipo: 'Desangrador', zona: 'Planta principal',
+    variadorId: 'atv312', motor: 'SEW KA87R57DRN100L4 · 3 kW · i 2371 (placa 17-10-2024)',
+    valores: [
+      v('UnS', '380 V', 'confirmado', 'Motor nativo 220Δ/380Y: en red 380 va en estrella.'),
+      v('FrS', '50 Hz', 'confirmado'),
+      v('nCr', '6,8 A', 'confirmado', 'Corriente en Y según placa (11,7 A sería en Δ).'),
+      v('nSP', '1456 rpm', 'confirmado'),
+      v('COS', '0,76', 'confirmado'),
+      v('ItH', '6,8 A', 'confirmado'),
+      v('ACC / dEC', '3 s', 'sugerido', 'Fábrica; el giro de salida es lentísimo (0,61 rpm), no debería necesitar más.'),
+    ],
+    nota: 'La única receta 100 % confirmada — la placa salió del grupo Levantamiento. Confirmar de pasada que el motor siga siendo este (foto de oct-2024).',
+  },
+  {
+    id: 'baader142-alimentadora', equipo: 'Cinta azul alimentadora Baader 142', zona: 'Salida Marel HG',
+    variadorId: 'atv312', variadorEtiqueta: 'rotulado «CHILLER» — el rótulo miente',
+    motor: 'Sumitomo RNYM1-1320A-7 · 0,75 kW · 1:7 → 207 rpm salida',
+    valores: [
+      v('UnS', '380 V', V380),
+      v('FrS', '50 Hz', 'confirmado'),
+      v('nCr', '— A', 'pendiente', 'De la placa del RNYM1.'),
+      v('nSP', '— rpm', 'pendiente'),
+      v('COS', '—', 'pendiente'),
+      v('ItH', '= nCr', 'pendiente'),
+    ],
+  },
+  {
+    id: 'cuello-cisnes', equipo: 'Cinta cuello de cisnes', zona: 'Antes del infeed Marel',
+    variadorId: 'v20', motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30 → 48,3 rpm salida',
+    valores: [
+      v('P0304', '380 V', V380),
+      v('P0310', '50 Hz', 'confirmado'),
+      v('P0307', '0,75 kW', 'confirmado', 'Del código del modelo (catálogo Hyponic verificado).'),
+      v('P0305', '— A', 'pendiente', 'De la placa — es el dato que fija la protección.'),
+      v('P0311', '— rpm', 'pendiente'),
+      v('P0308', '—', 'pendiente'),
+      v('P1120 / P1121', '10 s', 'sugerido', 'Fábrica.'),
+    ],
+  },
+  {
+    id: 'transversal-baader', equipo: 'Cinta transversal salida Baader 142', zona: 'Salida Baader 142',
+    variadorId: 'v20', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30 → 48,3 rpm salida',
+    valores: [
+      v('P0304', '380 V', V380),
+      v('P0310', '50 Hz', 'confirmado'),
+      v('P0307', '0,55 kW', 'confirmado', 'Del código del modelo.'),
+      v('P0305', '— A', 'pendiente'),
+      v('P0311', '— rpm', 'pendiente'),
+      v('P0308', '—', 'pendiente'),
+    ],
+  },
+  {
+    id: 'grader-zeta', equipo: 'Cinta zeta (elevadora 2)', zona: 'Grader',
+    variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es — los rótulos del tablero no son confiables',
+    motor: 'por levantar',
+    valores: [
+      v('1-22', '380 V', V380),
+      v('1-23', '50 Hz', 'confirmado'),
+      v('1-20', '— kW', 'pendiente'),
+      v('1-24', '— A', 'pendiente'),
+      v('1-25', '— rpm', 'pendiente'),
+      v('3-41 / 3-42', '—', 'sugerido', 'Según carga; correr AMA después de cargar 1-2x.'),
+    ],
+    nota: 'El tablero tiene 3 AutomationDrive + 1 Midi: identificar qué unidad mueve cada cinta es parte del levantamiento.',
+  },
+  {
+    id: 'grader-acel-1', equipo: 'Cinta aceleración 1', zona: 'Grader',
+    variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es',
+    motor: 'por levantar',
+    valores: [
+      v('1-22', '380 V', V380), v('1-23', '50 Hz', 'confirmado'),
+      v('1-20', '— kW', 'pendiente'), v('1-24', '— A', 'pendiente'), v('1-25', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'grader-acel-2', equipo: 'Cinta aceleración 2', zona: 'Grader',
+    variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es',
+    motor: 'por levantar',
+    valores: [
+      v('1-22', '380 V', V380), v('1-23', '50 Hz', 'confirmado'),
+      v('1-20', '— kW', 'pendiente'), v('1-24', '— A', 'pendiente'), v('1-25', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'grader-larga', equipo: 'Cinta larga Grader', zona: 'Grader',
+    variadorId: 'danfoss-midi', variadorEtiqueta: 'confirmar si la larga es la del Midi (la unidad chica)',
+    motor: 'por levantar',
+    valores: [
+      v('1-22', '380 V', V380), v('1-23', '50 Hz', 'confirmado'),
+      v('1-20', '— kW', 'pendiente'), v('1-24', '— A', 'pendiente'), v('1-25', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'filete-cinta', equipo: 'Cinta filete', zona: 'Tablero de filete',
+    variadorId: 'sew', variadorEtiqueta: 'VARIADOR 1…6 — mapear número ↔ cinta',
+    motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
+    valores: [
+      v('P-07', '380 V', V380),
+      v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', '— A', 'pendiente', 'De la placa del RNYM08 — fija la sobrecarga.'),
+      v('P-10', '— rpm', 'pendiente'),
+      v('P-01', '50 Hz', 'sugerido'),
+      v('P-03 / P-04', '5 s', 'sugerido', 'Fábrica.'),
+    ],
+  },
+  {
+    id: 'filete-desperdicio', equipo: 'Cinta desperdicio filete', zona: 'Tablero de filete',
+    variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
+    valores: [
+      v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', '— A', 'pendiente'), v('P-10', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'baader200-desperdicio', equipo: 'Cinta desperdicio Baader 200', zona: 'Tablero de filete',
+    variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
+    valores: [
+      v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', '— A', 'pendiente'), v('P-10', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'pimponeo', equipo: 'Cinta pimponeo + desperdicio pimponeo (2 cintas, 1 variador)', zona: 'Tablero de filete',
+    variadorId: 'sew', motor: '2 × Sumitomo RNYM08-1320B-30 · 0,55 kW c/u',
+    valores: [
+      v('P-07', '380 V', V380),
+      v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', 'Σ 2 motores', 'pendiente', 'Acá P-08 cubre la SUMA de las dos corrientes de placa — y el guardamotor compartido también ve la suma.'),
+      v('P-10', '0', 'sugerido', 'Con 2 motores no usar compensación de deslizamiento individual.'),
+    ],
+    nota: 'La posición más delicada del tablero: ni P-08 ni el guardamotor distinguen cada motor. Si una cinta se traba, el disparo puede llegar tarde.',
+  },
+  {
+    id: 'curva', equipo: 'Cinta curva', zona: 'Filete',
+    variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 ⏳ Orel duda — confirmar modelo',
+    valores: [
+      v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', '— A', 'pendiente', 'Primero confirmar QUÉ motor es; después la placa.'),
+    ],
+  },
+  {
+    id: 'gea-alimentacion', equipo: 'Cinta alimentación GEA', zona: 'Filete → GEA',
+    variadorId: 'sew', motor: 'Sumitomo RNYMS05-1320C-30 · 0,4 kW ⏳ · 1:30',
+    valores: [
+      v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
+      v('P-08', '— A', 'pendiente'), v('P-10', '— rpm', 'pendiente'),
+    ],
+  },
+  {
+    id: 'z-elevadora-hg', equipo: 'Cinta Z elevadora HG', zona: 'Marel HG',
+    variadorId: null, variadorEtiqueta: 'variador por identificar',
+    motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30',
+    valores: [
+      v('tensión', '380 V', V380, 'Cualquiera sea el variador, la tensión de motor va en 380.'),
+      v('corriente', '— A', 'pendiente'),
+    ],
+    nota: 'El motor está en la hoja «Motores nuevos planta» pero no sabemos qué variador la mueve.',
+  },
+  {
+    id: 'sihi-repaso', equipo: 'Bombas SIHI repaso (B1 · B2 · B3)', zona: 'Planta principal',
+    variadorId: 'ats22', variadorEtiqueta: 'rotuladas B1/B2/B3 a plumón en el tablero',
+    motor: 'SIHI — placa por levantar',
+    valores: [
+      v('Uln', '380 V', V380, 'Referencia de las protecciones de tensión.'),
+      v('In', '— A', 'pendiente', 'De la placa. Conectado en línea va directo; NO dividir por √3 salvo montaje en triángulo.'),
+      v('tHP', '10', 'sugerido', 'Clase térmica de fábrica — y recordar que sin ItH=On no actúa.'),
+      v('ACC', '10 s', 'sugerido'),
+      v('tLS', '15 s', 'sugerido', 'Debe ser mayor que ACC.'),
+    ],
+  },
+  {
+    id: 'sopladoras', equipo: 'Sopladoras de vacío (4 = 1 por Baader 142 + respaldo)', zona: 'Baader 142',
+    variadorId: 'psr60', motor: 'por levantar — ¿traen termistor? (bornes PTC)',
+    valores: [
+      v('Start', '— s', 'pendiente', 'Anotar la posición actual de la perilla en las unidades que funcionan bien.'),
+      v('Stop', '— s', 'pendiente'),
+      v('Uini', '— %', 'pendiente'),
+    ],
+    nota: 'Acá la receta es la posición de las 3 perillas: fotografiar el frente de una unidad andando y esa ES la receta para el respaldo.',
+  },
+]
+
+/** Conteo para el footer: cuántos valores están confirmados vs el total. */
+export const RESUMEN_RECETAS = POSICIONES.reduce(
+  (acc, p) => {
+    for (const val of p.valores) {
+      acc.total += 1
+      if (val.estado === 'confirmado') acc.confirmados += 1
+    }
+    return acc
+  },
+  { total: 0, confirmados: 0, posiciones: POSICIONES.length },
+)
 
 /** Total de parámetros catalogados — para el contador del hub. */
 export const TOTAL_PARAMETROS = VARIADORES.reduce(
