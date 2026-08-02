@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -75,6 +75,15 @@ const SPECIAL_MODULES: SpecialModule[] = [
     icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5a7d9e', stats: 'ciclo 90 s · 10 válvulas',
     // Oculto del hub mientras se rediseña (decisión Orel 2026-07-19); admins lo ven con etiqueta.
     inDevelopment: true,
+  },
+  {
+    id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
+    description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
+    icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
+    // Literal como sus hermanos: importar @/data/variadores metería el catálogo entero
+    // (~30 KB de parámetros y fallas) en el chunk del hub y anularía el lazy() de la ruta.
+    // Actualizar al tocar variadores.ts (los conteos viven en TOTAL_PARAMETROS/TOTAL_FALLAS).
+    stats: '8 familias · 164 parámetros · 46 fallas',
   },
 ]
 

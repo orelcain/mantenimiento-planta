@@ -100,6 +100,7 @@ const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then(
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
 const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
+const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').then((mod) => ({ default: mod.VariadoresPage })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
@@ -354,6 +355,14 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <HmiBombeoS2PublicPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/variadores"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <VariadoresPage />
                 </Suspense>
               }
             />
