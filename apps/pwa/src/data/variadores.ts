@@ -41,7 +41,7 @@ export interface OpcionParametro {
 export interface FallaVariador {
   /** Código en el display. */
   codigo: string
-  /** Nombre del fallo según el manual. */
+  /** Nombre de la falla según el manual (unificado a «falla», uso chileno). */
   nombre: string
   causas: string[]
   soluciones: string[]
@@ -174,12 +174,12 @@ export const VARIADORES: FichaVariador[] = [
       falla('SCF', 'Cortocircuito motor', ['Cortocircuito o puesta a tierra a la salida'], ['Verificar los cables de conexión del variador al motor y el aislamiento del motor']),
       falla('ObF', 'Exceso de frenado', ['Frenado demasiado brusco'], ['Aumentar el tiempo de deceleración (dEC)', 'Instalar resistencia de frenado si hace falta']),
       falla('SOF', 'Sobrevelocidad', ['Inestabilidad', 'Carga arrastrante'], ['Comprobar los parámetros del motor y la ganancia (FLG)']),
-      falla('tnF', 'Fallo de autoajuste', ['Motor especial o de potencia muy distinta a la del variador', 'Motor no conectado'], ['Usar la ley U/f L o P en vez del autoajuste', 'Verificar que el motor esté conectado durante el tUn']),
+      falla('tnF', 'Falla de autoajuste', ['Motor especial o de potencia muy distinta a la del variador', 'Motor no conectado'], ['Usar la ley U/f L o P en vez del autoajuste', 'Verificar que el motor esté conectado durante el tUn']),
       falla('LFF', 'Pérdida de la consigna 4-20 mA', ['Se cortó la señal de 4-20 mA'], ['Verificar la conexión en la entrada AI3']),
-      falla('EPF', 'Fallo externo', ['Lo dispara una señal externa asignada por el usuario'], ['Revisar qué equipo o contacto está dando la señal']),
-      falla('SLF', 'Fallo Modbus', ['Interrupción de comunicación en el bus', 'Terminal remoto validado (LCC) pero desconectado'], ['Comprobar el bus de comunicación', 'Comprobar el enlace con el terminal remoto']),
+      falla('EPF', 'Falla externa', ['Lo dispara una señal externa asignada por el usuario'], ['Revisar qué equipo o contacto está dando la señal']),
+      falla('SLF', 'Falla Modbus', ['Interrupción de comunicación en el bus', 'Terminal remoto validado (LCC) pero desconectado'], ['Comprobar el bus de comunicación', 'Comprobar el enlace con el terminal remoto']),
       falla('CFI', 'Configuración no válida', ['Configuración cargada incompatible'], ['Comprobar la configuración previamente cargada', 'Volver a ajuste de fábrica y reconfigurar']),
-      falla('bLF', 'Fallo de control de freno', ['No se alcanzó la intensidad de apertura del freno'], ['Comprobar la conexión variador/motor']),
+      falla('bLF', 'Falla del control de freno', ['No se alcanzó la intensidad de apertura del freno'], ['Comprobar la conexión variador/motor']),
     ],
   },
   {
@@ -445,10 +445,10 @@ export const VARIADORES: FichaVariador[] = [
       falla('StF', 'Tiempo de arranque demasiado largo', ['El arranque superó el tiempo tLS: motor atascado o rampa mal ajustada'], ['Comprobar que el motor no esté atascado', 'Verificar que tLS sea mayor que ACC', 'Revisar la carga en el arranque']),
       falla('SnbF', 'Demasiados arranques', ['Se superó el número de arranques Snb dentro del período SLG'], ['Esperar el período SLG', 'Revisar por qué el equipo arranca tantas veces', 'Ajustar Snb y SLG en el menú AdJ si el uso real lo justifica']),
       falla('GrdF', 'Corriente de fuga a tierra', ['Falla de aislamiento en el motor o el cableado'], ['Comprobar el aislamiento eléctrico del motor', 'Comprobar la instalación', 'Verificar Grdd y Grdt en el menú PrO']),
-      falla('bPF', 'Fallo del contactor de bypass', ['Falla interna del bypass integrado'], ['Apagar el arrancador y contactar al servicio técnico de Schneider']),
+      falla('bPF', 'Falla del contactor de bypass', ['Falla interna del bypass integrado'], ['Apagar el arrancador y contactar al servicio técnico de Schneider']),
       falla('CFF', 'Configuración no válida', ['La configuración cargada no es compatible'], ['Volver al ajuste de fábrica en el menú UtIL (utilidades — ver manual BBV51332)', 'Volver a configurar el arrancador']),
-      falla('EtF', 'Fallo externo', ['Lo dispara una señal externa'], ['Eliminar la causa del fallo detectado']),
-      falla('InF', 'Fallo interno', ['Falla propia del equipo'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
+      falla('EtF', 'Falla externa', ['Lo dispara una señal externa'], ['Eliminar la causa del fallo detectado']),
+      falla('InF', 'Falla interna', ['Falla propia del equipo'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
       falla('trAP', 'Código Trap', ['Falla interna del procesador'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
     ],
   },
@@ -512,7 +512,7 @@ export const VARIADORES: FichaVariador[] = [
       falla('U-t', 'Temperatura demasiado baja', ['Temperatura ambiente por debajo del mínimo'], ['Esperar a que el tablero tome temperatura antes de arrancar']),
       falla('OI-b', 'Sobrecorriente en el circuito de frenado', ['Exceso de corriente en la resistencia de frenado'], ['Comprobar el cableado a la resistencia de frenado', 'Verificar el valor de la resistencia y respetar el mínimo de las tablas']),
       falla('OL-br', 'Sobrecarga de la resistencia de frenado', ['Frenados muy seguidos o inercia alta'], ['Aumentar el tiempo de deceleración', 'Reducir la inercia de la carga o agregar resistencias en paralelo']),
-      falla('PS-trP', 'Fallo de la etapa de potencia', ['Cortocircuito fase-fase o fase-tierra', 'Error de cableado'], ['Buscar cortocircuito entre fases o a tierra', 'Revisar el cableado antes de volver a energizar']),
+      falla('PS-trP', 'Falla de la etapa de potencia', ['Cortocircuito fase-fase o fase-tierra', 'Error de cableado'], ['Buscar cortocircuito entre fases o a tierra', 'Revisar el cableado antes de volver a energizar']),
       falla('th-Flt', 'Termistor del disipador defectuoso', ['Falla del sensor interno'], ['Requiere servicio técnico']),
       falla('E-triP', 'Disparo externo', ['Señal externa conectada a la entrada digital 3'], ['Revisar qué equipo está dando la señal en la entrada digital 3']),
       falla('SC-trP', 'Pérdida de comunicación', ['Se cortó el enlace de comunicación'], ['Comprobar el bus y el cableado de comunicación']),

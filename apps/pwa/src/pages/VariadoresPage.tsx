@@ -31,6 +31,7 @@ import {
   POTENCIOMETROS_PSR,
   FALTAN_DE_PLACA,
   TOTAL_PARAMETROS,
+  TOTAL_FALLAS,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -187,14 +188,27 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
   const activo: string = claves.includes(menu) ? menu : (claves[0] ?? '')
   const filas = useMemo(() => ficha.menus?.[activo] ?? [], [ficha, activo])
 
+  // Con búsqueda o filtro de placa activos se busca en TODA la ficha, no solo en el
+  // menú abierto: el técnico conoce el código («nCr») pero no en qué menú vive — que
+  // es justamente lo que viene a averiguar. Sin búsqueda, manda el chip de menú.
+  const global = q.trim() !== '' || soloPlaca
+  const todas = useMemo(
+    () =>
+      Object.entries(ficha.menus ?? {}).flatMap(([m, fs]) =>
+        fs.map((r) => ({ ...r, menu: m })),
+      ),
+    [ficha],
+  )
+
   const visibles = useMemo(() => {
     const term = norm(q.trim())
-    return filas.filter(
+    const base = global ? todas : filas.map((r) => ({ ...r, menu: activo }))
+    return base.filter(
       (r) =>
         (!soloPlaca || r.dePlaca) &&
         (!term || norm(r.codigo).includes(term) || norm(r.descripcion).includes(term)),
     )
-  }, [filas, q, soloPlaca])
+  }, [global, todas, filas, activo, q, soloPlaca])
 
   return (
     <div className="flex flex-col gap-4">
@@ -255,7 +269,9 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
             Solo datos de placa
           </button>
           <MetaText mono>
-            {visibles.length === filas.length ? `${filas.length} parámetros` : `${visibles.length} de ${filas.length}`}
+            {global
+              ? `${visibles.length} de ${todas.length} en toda la ficha`
+              : `${filas.length} parámetros`}
           </MetaText>
         </div>
       </div>
@@ -283,7 +299,7 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
             {visibles.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
-                  {q.trim() ? `Nada con «${q.trim()}» en este menú.` : 'Este menú no tiene datos de placa.'}
+                  {q.trim() ? `Nada con «${q.trim()}» en esta ficha.` : 'Esta ficha no tiene datos de placa.'}
                 </td>
               </tr>
             )}
@@ -305,6 +321,11 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                   }}
                 >
                   {r.codigo}
+                  {global && (
+                    <span className="mt-0.5 block font-sans text-[10.5px] font-normal" style={{ color: C.inkLo }}>
+                      {r.menu.split(' ')[0]}
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
                   {r.descripcion}
@@ -580,7 +601,9 @@ export function VariadoresPage() {
     const p = new URLSearchParams(params)
     if (id) p.set('ficha', id)
     else p.delete('ficha')
-    setParams(p, { replace: false })
+    // Abrir hace push (atrás del celular vuelve al catálogo); cerrar REEMPLAZA,
+    // para que atrás no re-abra la ficha recién cerrada.
+    setParams(p, { replace: id === null })
     setSeccion('parametros')
     window.scrollTo(0, 0)
   }
@@ -594,6 +617,8 @@ export function VariadoresPage() {
   }
 
   const ficha = abierta ? VARIADORES.find((f) => f.id === abierta) ?? null : null
+  // Deep-link roto (typo, ficha renombrada, enlace viejo): avisar, no fallar en silencio.
+  const fichaRota = abierta !== null && ficha === null
 
   const visibles = useMemo(() => {
     const term = norm(q.trim())
@@ -624,6 +649,23 @@ export function VariadoresPage() {
             reemplazar uno y configurarlo sin buscar el manual.
           </p>
         </header>
+
+        {fichaRota && (
+          <div
+            className="flex gap-2.5 rounded-r px-4 py-3 text-[13px]"
+            style={{
+              color: C.inkMid,
+              background: `color-mix(in srgb, ${C.crit} 9%, transparent)`,
+              borderLeft: `3px solid ${C.crit}`,
+            }}
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: C.crit }} />
+            <span>
+              No existe la ficha «{abierta}» — puede ser un enlace viejo o un error de tipeo.
+              Abajo está el catálogo completo.
+            </span>
+          </div>
+        )}
 
         {/* Selector de vista — solo en el catálogo, no dentro de una ficha */}
         {ficha === null && (
@@ -684,9 +726,9 @@ export function VariadoresPage() {
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div>
-                        <h3 className="m-0 text-base font-semibold leading-tight tracking-[-0.014em]" style={{ color: C.ink }}>
+                        <span className="block text-base font-semibold leading-tight tracking-[-0.014em]" style={{ color: C.ink }}>
                           {f.nombre}
-                        </h3>
+                        </span>
                         <span className="mt-0.5 block text-xs" style={{ color: C.inkMid }}>{f.tipo}</span>
                       </div>
                       <EstadoChip estado={f.estado} />
@@ -769,7 +811,8 @@ export function VariadoresPage() {
               <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13.5px]" style={{ color: C.inkMid }}>
                 <li>
                   Las <strong style={{ color: C.ink }}>{VARIADORES.length} fichas</strong> con manual
-                  descargado — {TOTAL_PARAMETROS} parámetros catalogados.
+                  descargado — {TOTAL_PARAMETROS} parámetros y {TOTAL_FALLAS} códigos de falla con
+                  causa y acción.
                 </li>
                 <li>Los rangos que dicen «según calibre» se resuelven con la placa del variador instalado.</li>
                 <li>

@@ -22,7 +22,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
-import { VARIADORES, TOTAL_PARAMETROS, TOTAL_FALLAS } from '@/data/variadores'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -81,7 +80,10 @@ const SPECIAL_MODULES: SpecialModule[] = [
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
     description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
     icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
-    stats: `${VARIADORES.length} familias · ${TOTAL_PARAMETROS} parámetros · ${TOTAL_FALLAS} fallas`,
+    // Literal como sus hermanos: importar @/data/variadores metería el catálogo entero
+    // (~30 KB de parámetros y fallas) en el chunk del hub y anularía el lazy() de la ruta.
+    // Actualizar al tocar variadores.ts (los conteos viven en TOTAL_PARAMETROS/TOTAL_FALLAS).
+    stats: '8 familias · 164 parámetros · 46 fallas',
   },
 ]
 
