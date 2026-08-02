@@ -85,26 +85,39 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
     )}>
       <span className="flex items-center gap-1.5 text-muted-foreground font-medium shrink-0">
         <Clock className="w-3.5 h-3.5" />
-        Tiempos del día {dateKey}:
+        Tiempos del día · las 3 Baader, todos los turnos
       </span>
       <span className="text-emerald-400 tabular-nums" title="Tiempo total procesando (suma de las 3 Baaders, todos los turnos)">
-        ▲ {fmtDurationSec(totals.uptimeSec)} uptime
+        ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
       <span className="text-rose-400 tabular-nums" title="Tiempo total de detención/paro (suma de las 3 Baaders, todos los turnos)">
-        ⏸ {fmtDurationSec(totals.downtimeSec)} paro
+        ⏸ {fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {totals.breakSec > 0 && (
         <span className="text-amber-400 tabular-nums" title="Pausas programadas (colación/reunión), todos los turnos">
           ☕ {fmtDurationSec(totals.breakSec)}
         </span>
       )}
-      <span className="text-muted-foreground/70 flex items-center gap-1.5 flex-wrap">
-        {totals.turnos.filter(t => t.cycles > 0).map(t => (
-          <span key={t.shiftId} title={`${getShiftMeta(t.shiftId).label}: ${fmtDurationSec(t.downtimeSec)} de detención`}>
-            {getShiftMeta(t.shiftId).shortLabel} {fmtDurationSec(t.downtimeSec)}
-          </span>
-        ))}
-      </span>
+      {/* Desglose por turno. Antes salía como "T2 0 s · T1 9 h 31 min": códigos
+          sueltos, sin decir qué medían, y un "0 s" que parecía un dato roto
+          cuando en realidad es la mejor noticia posible (ese turno no paró). */}
+      {totals.turnos.some(t => t.cycles > 0) && (
+        <span className="text-muted-foreground/70 flex items-center gap-1.5 flex-wrap">
+          <span className="text-muted-foreground/50">detención por turno:</span>
+          {totals.turnos.filter(t => t.cycles > 0).map(t => (
+            <span
+              key={t.shiftId}
+              className="tabular-nums"
+              title={`${getShiftMeta(t.shiftId).label}: ${fmtDurationSec(t.downtimeSec)} de detención`}
+            >
+              {getShiftMeta(t.shiftId).shortLabel}{' '}
+              {t.downtimeSec > 0
+                ? fmtDurationSec(t.downtimeSec)
+                : <span className="text-emerald-500/80">sin paros</span>}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   )
 }

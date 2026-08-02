@@ -98,7 +98,7 @@ export function GraderCoverageBar({
       if (off > ultimo) ultimo = off
     }
     if (conDatos.size === 0) {
-      return { totalMin, tramos: [], sinDatosMin: totalMin, faltaExcelMin: totalMin, conPiezasMin: 0, rango: null, usandoProduccion }
+      return { totalMin, tramos: [], marcas: [], sinDatosMin: totalMin, faltaExcelMin: totalMin, conPiezasMin: 0, rango: null, usandoProduccion }
     }
 
     // Entre el primer y el último registro el Excel cubre: un minuto sin piezas
@@ -127,9 +127,22 @@ export function GraderCoverageBar({
     const faltaExcelMin =
       Math.max(0, huecoInicio - TRANSITO_MIN) + Math.max(0, huecoFin - TRANSITO_MIN)
 
+    // Marcas de hora en punto. Se omiten las de los bordes para que la etiqueta
+    // no quede cortada, y se ralean en ventanas largas para no apelmazarse.
+    const pasoHoras = totalMin > 8 * 60 ? 2 : 1
+    const marcas: Array<{ ms: number; pct: number }> = []
+    const primeraHora = new Date(inicio)
+    primeraHora.setUTCMinutes(0, 0, 0)
+    primeraHora.setUTCHours(primeraHora.getUTCHours() + 1)
+    for (let ms = primeraHora.getTime(); ms < fin; ms += pasoHoras * 3_600_000) {
+      const pct = ((ms - inicio) / (fin - inicio)) * 100
+      if (pct > 6 && pct < 94) marcas.push({ ms, pct })
+    }
+
     return {
       totalMin,
       tramos,
+      marcas,
       sinDatosMin: huecoInicio + huecoFin,
       faltaExcelMin,
       conPiezasMin: conDatos.size,
@@ -140,7 +153,7 @@ export function GraderCoverageBar({
 
   if (!data) return null
 
-  const { totalMin, tramos, sinDatosMin, faltaExcelMin, conPiezasMin, rango, usandoProduccion } = data
+  const { totalMin, tramos, marcas, sinDatosMin, faltaExcelMin, conPiezasMin, rango, usandoProduccion } = data
   const cubiertoPct = totalMin > 0 ? ((totalMin - sinDatosMin) / totalMin) * 100 : 0
   const faltaExcel = (faltaExcelMin ?? 0) > 0
 
@@ -162,16 +175,39 @@ export function GraderCoverageBar({
         </span>
       </div>
 
-      <div className="flex h-2.5 rounded-sm overflow-hidden bg-muted" role="img"
-        aria-label={`El Excel cubre el ${cubiertoPct.toFixed(0)}% de lo producido`}>
-        {tramos.map((t) => (
-          <div
-            key={`${t.tipo}-${t.desde}`}
-            className={cn(ESTILO[t.tipo].clase, 'h-full')}
-            style={{ width: `${(t.largo / totalMin) * 100}%` }}
-            title={`${ESTILO[t.tipo].label} · ${fmtDurationMin(t.largo)}`}
-          />
-        ))}
+      {/* Marcas horarias: sin ellas esta barra y la de composición (que reparte
+          PIEZAS) quedaban pegadas, del mismo alto, y se leían como una sola
+          cosa en dos partes. Las horas dejan claro que acá el eje es tiempo. */}
+      <div className="relative">
+        <div className="flex h-2.5 rounded-sm overflow-hidden bg-muted" role="img"
+          aria-label={`El Excel cubre el ${cubiertoPct.toFixed(0)}% de lo producido`}>
+          {tramos.map((t) => (
+            <div
+              key={`${t.tipo}-${t.desde}`}
+              className={cn(ESTILO[t.tipo].clase, 'h-full')}
+              style={{ width: `${(t.largo / totalMin) * 100}%` }}
+              title={`${ESTILO[t.tipo].label} · ${fmtDurationMin(t.largo)}`}
+            />
+          ))}
+          {marcas.map((m) => (
+            <div
+              key={m.ms}
+              className="absolute top-0 h-2.5 w-px bg-background/60 pointer-events-none"
+              style={{ left: `${m.pct}%` }}
+            />
+          ))}
+        </div>
+        <div className="relative h-3 mt-px">
+          {marcas.map((m) => (
+            <span
+              key={m.ms}
+              className="absolute top-0 -translate-x-1/2 text-[9px] text-muted-foreground/70 tabular-nums"
+              style={{ left: `${m.pct}%` }}
+            >
+              {fmtTime(new Date(m.ms))}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap text-[10px] text-muted-foreground">
