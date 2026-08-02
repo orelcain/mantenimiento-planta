@@ -264,11 +264,15 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
         <table className="w-full border-collapse text-[13.5px]" style={{ minWidth: 600 }}>
           <thead>
             <tr>
-              {['Cód.', 'Descripción', 'Rango', 'Fábrica'].map((h) => (
+              {['Cód.', 'Descripción', 'Rango', 'Fábrica'].map((h, i) => (
                 <th
                   key={h}
                   className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
-                  style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+                  style={{
+                    background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
+                    // Columna fija: en un celular la tabla scrollea y el código no puede perderse de vista.
+                    ...(i === 0 ? { position: 'sticky' as const, left: 0, zIndex: 2, borderRight: `1px solid ${C.border}` } : {}),
+                  }}
                 >
                   {h}
                 </th>
@@ -291,7 +295,15 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
-                <td className="whitespace-nowrap px-3 py-2.5 align-top font-mono font-semibold" style={{ color: C.aquaBright }}>
+                <td
+                  className="whitespace-nowrap px-3 py-2.5 align-top font-mono font-semibold"
+                  style={{
+                    color: C.aquaBright, position: 'sticky', left: 0, zIndex: 1,
+                    // Fondo OPACO: mezclar contra surface (no transparent) para que no se vea lo que pasa debajo.
+                    background: r.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, ${C.surface})` : C.surface,
+                    borderRight: `1px solid ${C.border}`,
+                  }}
+                >
                   {r.codigo}
                 </td>
                 <td className="px-3 py-2.5 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
@@ -380,7 +392,7 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Escribí el código que muestra el display: OLF, O-I, StF…"
+          placeholder="Escribe el código que muestra el display: OLF, O-I, StF…"
           aria-label="Buscar código de falla"
           className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
@@ -471,7 +483,10 @@ function TablaEquivalencias() {
             <tr>
               <th
                 className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
-                style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+                style={{
+                  background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
+                  position: 'sticky', left: 0, zIndex: 2, borderRight: `1px solid ${C.border}`,
+                }}
               >
                 Qué es
               </th>
@@ -502,7 +517,15 @@ function TablaEquivalencias() {
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
-                <td className="px-3 py-2.5 align-top" style={{ color: C.ink, lineHeight: 1.5, minWidth: 190 }}>
+                <td
+                  className="px-3 py-2.5 align-top"
+                  style={{
+                    color: C.ink, lineHeight: 1.5, minWidth: 190, maxWidth: 240,
+                    position: 'sticky', left: 0, zIndex: 1,
+                    background: e.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, ${C.bg})` : C.bg,
+                    borderRight: `1px solid ${C.border}`,
+                  }}
+                >
                   {e.concepto}
                   {e.dePlaca && (
                     <span

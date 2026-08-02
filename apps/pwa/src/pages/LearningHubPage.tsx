@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
-import { VARIADORES, TOTAL_PARAMETROS } from '@/data/variadores'
+import { VARIADORES, TOTAL_PARAMETROS, TOTAL_FALLAS } from '@/data/variadores'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -81,7 +81,7 @@ const SPECIAL_MODULES: SpecialModule[] = [
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
     description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
     icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
-    stats: `${VARIADORES.length} familias · ${TOTAL_PARAMETROS} parámetros`,
+    stats: `${VARIADORES.length} familias · ${TOTAL_PARAMETROS} parámetros · ${TOTAL_FALLAS} fallas`,
   },
 ]
 

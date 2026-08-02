@@ -131,6 +131,8 @@ export const VARIADORES: FichaVariador[] = [
         p('LSP', 'Velocidad mínima', '0 a HSP', '0'),
         p('HSP', 'Velocidad máxima', 'LSP a tFr', 'bFr'),
         p('ItH', 'I térmica motor', '0,2 a 1,5 In', 'según calibre', true),
+        p('CL1', 'Limitación de intensidad', '0,25 a 1,5 In', '1,5 In', false,
+          'No confundir con ItH: CL1 limita el par y el calentamiento en el momento; ItH es la protección térmica acumulada.'),
         p('UFr', 'Compensación RI', '0 a 100 %', '20 %'),
         p('FLG', 'Ganancia velocidad', '1 a 100 %', '20 %'),
         p('SLP', 'Compens. deslizamiento', '0 a 150 %', '100 %'),
@@ -188,7 +190,7 @@ export const VARIADORES: FichaVariador[] = [
     estado: 'parcial',
     fuente: 'Guía de programación ATV31 · Schneider (español).',
     aviso:
-      'El ATV312 es su sucesor directo y comparte la nomenclatura, pero verificá parámetro por parámetro antes de copiar una configuración de una generación a la otra.',
+      'El ATV312 es su sucesor directo y comparte la nomenclatura, pero verifica parámetro por parámetro antes de copiar una configuración de una generación a la otra.',
     menus: {
       'drC- Control motor': [
         p('bFr', 'Frec. estándar motor', '50 / 60 Hz', '50 Hz IEC'),
@@ -408,7 +410,14 @@ export const VARIADORES: FichaVariador[] = [
         p('OIt', 'Retardo de sobreintensidad', '0,0 a 5,0 s', '0,5 s'),
         p('USd', 'Límite de subtensión', '50 a 90 %', '70 %'),
         p('USt', 'Tiempo de límite de subtensión', '1 a 10', '5 s'),
+        p('OSd', 'Límite de sobretensión', '110 a 125 % de Uln', '120 %'),
         p('OSt', 'Retardo de límite de sobretensión', '1 a 10', '2 s'),
+        p('Ubd', 'Límite de desequilibrio de intensidad', 'oFF, 10 a 100 % de In', '25 %'),
+        p('Ubt', 'Retardo de desequilibrio', '1 a 60 s', '10 s'),
+        p('Grdd', 'Límite de fuga a tierra', 'oFF, 10 a 100 % de In', '25 % (S6)'),
+        p('Grdt', 'Tiempo de fuga a tierra', '—', '—'),
+        p('PtC', 'Supervisión de sondas PTC', '—', 'oFF', false,
+          'Habilita el disparo DtF por termistor del motor (bornes PTC1/PTC2 del menú IO).'),
         p('PHL', 'Detección de pérdida de fase', '—', 'On'),
         p('PHr', 'Secuencia de fases', '—', 'oFF'),
         p('ItH', 'Protección de sobrecarga', '—', 'On', false,
@@ -437,7 +446,7 @@ export const VARIADORES: FichaVariador[] = [
       falla('SnbF', 'Demasiados arranques', ['Se superó el número de arranques Snb dentro del período SLG'], ['Esperar el período SLG', 'Revisar por qué el equipo arranca tantas veces', 'Ajustar Snb y SLG en el menú AdJ si el uso real lo justifica']),
       falla('GrdF', 'Corriente de fuga a tierra', ['Falla de aislamiento en el motor o el cableado'], ['Comprobar el aislamiento eléctrico del motor', 'Comprobar la instalación', 'Verificar Grdd y Grdt en el menú PrO']),
       falla('bPF', 'Fallo del contactor de bypass', ['Falla interna del bypass integrado'], ['Apagar el arrancador y contactar al servicio técnico de Schneider']),
-      falla('CFF', 'Configuración no válida', ['La configuración cargada no es compatible'], ['Volver al ajuste de fábrica en el menú UtIL', 'Volver a configurar el arrancador']),
+      falla('CFF', 'Configuración no válida', ['La configuración cargada no es compatible'], ['Volver al ajuste de fábrica en el menú UtIL (utilidades — ver manual BBV51332)', 'Volver a configurar el arrancador']),
       falla('EtF', 'Fallo externo', ['Lo dispara una señal externa'], ['Eliminar la causa del fallo detectado']),
       falla('InF', 'Fallo interno', ['Falla propia del equipo'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
       falla('trAP', 'Código Trap', ['Falla interna del procesador'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
@@ -452,13 +461,13 @@ export const VARIADORES: FichaVariador[] = [
     fuente:
       'Operating Instructions MOVITRAC LTE-B (SEW-EURODRIVE). Los equipos de planta son LTE-B+, la variante posterior: el juego de parámetros es el mismo, pero conviene verificar contra el manual del «+» antes de un cambio.',
     aviso:
-      'En el tablero de filete hay un variador que mueve DOS cintas a la vez (desperdicio pimponeo + pimponeo), con un guardamotor en serie. Ahí P-08 no protege cada motor por separado — protege la suma. El guardamotor es la protección real de cada uno: no lo saques.',
+      'En el tablero de filete hay un variador que mueve DOS cintas a la vez (desperdicio pimponeo + pimponeo), con un solo guardamotor compartido. Ni P-08 ni ese guardamotor distinguen cada motor: ambos protegen la SUMA. Si una sola cinta se traba, el disparo puede llegar tarde — ante olor o recalentamiento de un motor, revisar aunque no haya disparado nada. No sacar el guardamotor: es la única protección aguas abajo del variador.',
     menus: {
       'P-07…P-10 Datos del motor': [
         p('P-07', 'Tensión nominal del motor', '0, 20 a 500 V', '400 V', true,
           'La planta es 380 V. Poner 0 desactiva la compensación de tensión.'),
         p('P-08', 'Corriente nominal del motor', '25 a 100 % de la corriente del variador', 'según motor DR', true,
-          'Es también el nivel de protección por sobrecarga. En el variador que mueve dos cintas, este valor cubre la suma — por eso va el guardamotor.'),
+          'Es también el nivel de protección por sobrecarga. En el variador que mueve dos cintas, este valor cubre la SUMA de ambos motores, no cada uno.'),
         p('P-09', 'Frecuencia nominal del motor', '25 a 500 Hz', '50 Hz', true),
         p('P-10', 'Velocidad nominal del motor', '0 a 30000 rpm', '0', true,
           'Si se carga distinto de 0, todos los parámetros de velocidad pasan a mostrarse en rpm y se activa la compensación de deslizamiento.'),
@@ -689,8 +698,8 @@ export const EQUIVALENCIAS: EquivalenciaParametro[] = [
   },
   {
     concepto: 'Límite de intensidad',
-    codigos: { atv: 'ItH', danfoss: '4-18', v20: null, sew: null, ats22: 'ILt' },
-    nota: 'En el SEW no hay parámetro aparte: el propio P-08 hace de nivel de sobrecarga.',
+    codigos: { atv: 'CL1', danfoss: '4-18', v20: null, sew: null, ats22: 'ILt' },
+    nota: 'Ojo en el Altivar: el límite es CL1 (0,25 a 1,5 In) — ItH es la protección TÉRMICA, otra cosa. En el SEW no hay parámetro aparte: el propio P-08 hace de nivel de sobrecarga.',
   },
   {
     concepto: 'Protección térmica del motor',
