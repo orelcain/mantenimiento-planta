@@ -5,7 +5,6 @@ import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
-import { type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 import {
   estimateManualLine,
   MANUAL_LINE_LABEL,
@@ -53,14 +52,6 @@ interface HeroScorecardProps {
   summary: GraderDailySummary
   shiftWindow: ShiftTimeWindow
   upstreamSnapshot?: UpstreamLineSnapshot | null
-  /**
-   * @deprecated Ya no se usa acá. Servía para calcular el "rechazo Baader puro"
-   * restando las no-controladas del Marel HG; ese cálculo se retiró porque
-   * asumía que por la línea manual solo volvía rechazo (ver graderManualLine).
-   * Se mantiene la prop para no romper a los callers; el panel Marel HG sigue
-   * recibiendo la captura por su cuenta.
-   */
-  marelHgCapture?: MarelHgCapture | null
   /** Timestamp del último sync Shoplogix (para el badge "hace Xs"). */
   upstreamSyncedAt?: Date | null
 }
