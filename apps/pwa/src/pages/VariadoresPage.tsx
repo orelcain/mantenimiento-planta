@@ -37,6 +37,7 @@ import {
   escalonBajadaPSR,
   type FichaVariador,
   type EstadoFicha,
+  type FallaVariador,
 } from '@/data/variadores'
 
 /** lowercase + sin acentos, para búsqueda tolerante (mismo criterio que el hub). */
@@ -311,6 +312,24 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                       {r.nota}
                     </span>
                   )}
+                  {r.opciones && (
+                    <ul className="mt-2 flex list-none flex-col gap-1.5 pl-0">
+                      {r.opciones.map((o) => (
+                        <li key={o.valor} className="text-[12.5px]" style={{ lineHeight: 1.5 }}>
+                          <span className="mr-1.5 font-mono font-semibold" style={{ color: C.aquaBright }}>
+                            {o.valor}
+                          </span>
+                          <span style={{ color: C.ink }}>{o.que}</span>
+                          {o.cuando && <span style={{ color: C.inkMid }}> — {o.cuando}</span>}
+                          {o.requiere && (
+                            <span className="ml-1.5 whitespace-nowrap text-[11px]" style={{ color: C.inkLo }}>
+                              ({o.requiere})
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
                   {r.rango}
@@ -333,6 +352,79 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
         </span>
         el valor lo dicta la placa del motor
       </MetaText>
+    </div>
+  )
+}
+
+// ── Fallas del equipo ─────────────────────────────────────────────────────────
+/** Qué muestra el display, por qué pasa y qué hacer. */
+function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
+  const [q, setQ] = useState('')
+
+  const visibles = useMemo(() => {
+    const term = norm(q.trim())
+    if (!term) return fallas
+    return fallas.filter(
+      (f) =>
+        norm(f.codigo).includes(term) ||
+        norm(f.nombre).includes(term) ||
+        f.causas.some((c) => norm(c).includes(term)),
+    )
+  }, [fallas, q])
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Escribí el código que muestra el display: OLF, O-I, StF…"
+          aria-label="Buscar código de falla"
+          className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
+        />
+      </div>
+
+      {visibles.length === 0 && (
+        <p className="py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+          Nada con «{q.trim()}». Puede ser un código de otro menú, o de comunicación.
+        </p>
+      )}
+
+      {visibles.map((f) => (
+        <div
+          key={f.codigo}
+          className="flex flex-col gap-2.5 rounded-lg p-4"
+          style={{ background: C.surface, border: `1px solid ${C.border}` }}
+        >
+          <div className="flex flex-wrap items-baseline gap-2.5">
+            <span
+              className="rounded px-2 py-0.5 font-mono text-[15px] font-bold"
+              style={{ color: C.crit, background: `color-mix(in srgb, ${C.crit} 16%, transparent)` }}
+            >
+              {f.codigo}
+            </span>
+            <span className="text-[14.5px] font-semibold" style={{ color: C.ink }}>{f.nombre}</span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <MetaText>Por qué pasa</MetaText>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-[13px]" style={{ color: C.inkMid, lineHeight: 1.5 }}>
+                {f.causas.map((c) => <li key={c}>{c}</li>)}
+              </ul>
+            </div>
+            <div className="flex flex-col gap-1">
+              <MetaText>Qué hacer</MetaText>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-[13px]" style={{ color: C.ink, lineHeight: 1.5 }}>
+                {f.soluciones.map((s) => <li key={s}>{s}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -459,12 +551,14 @@ export function VariadoresPage() {
   const abierta = params.get('ficha')
   const vista = params.get('vista') === 'equivalencias' ? 'equivalencias' : 'catalogo'
   const [q, setQ] = useState('')
+  const [seccion, setSeccion] = useState<'parametros' | 'fallas'>('parametros')
 
   const abrirFicha = (id: string | null) => {
     const p = new URLSearchParams(params)
     if (id) p.set('ficha', id)
     else p.delete('ficha')
     setParams(p, { replace: false })
+    setSeccion('parametros')
     window.scrollTo(0, 0)
   }
 
@@ -703,7 +797,41 @@ export function VariadoresPage() {
                   </div>
                 )}
 
-                {ficha.perillas ? <SimuladorPSR /> : <NavegadorParametros ficha={ficha} />}
+                {/* Parámetros / Fallas — solo si la ficha tiene ambas cosas */}
+                {ficha.fallas && ficha.menus && (
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Sección de la ficha">
+                    {([
+                      ['parametros', 'Parámetros'],
+                      ['fallas', `Fallas (${ficha.fallas.length})`],
+                    ] as const).map(([s, rotulo]) => {
+                      const on = seccion === s
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => setSeccion(s)}
+                          aria-pressed={on}
+                          className="rounded px-3.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                          style={{
+                            background: on ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.bgPanel,
+                            border: `1px solid ${on ? C.aqua : C.border}`,
+                            color: C.ink,
+                            fontWeight: on ? 600 : 400,
+                          }}
+                        >
+                          {rotulo}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {ficha.perillas ? (
+                  <SimuladorPSR />
+                ) : seccion === 'fallas' && ficha.fallas ? (
+                  <ListaFallas fallas={ficha.fallas} />
+                ) : (
+                  <NavegadorParametros ficha={ficha} />
+                )}
 
                 <div
                   className="flex gap-2.5 rounded-r px-4 py-3 text-[12.5px]"

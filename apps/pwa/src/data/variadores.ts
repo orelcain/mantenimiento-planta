@@ -18,6 +18,35 @@
 /** Estado del contenido de una ficha. */
 export type EstadoFicha = 'listo' | 'parcial' | 'bloqueado'
 
+/**
+ * Una opción de un parámetro enumerado, con el criterio para elegirla.
+ * El manual lista las opciones pero rara vez dice CUÁNDO usar cada una; ese
+ * criterio es lo que convierte la lista en algo accionable.
+ */
+export interface OpcionParametro {
+  /** Valor tal cual aparece en el equipo. */
+  valor: string
+  /** Qué hace. */
+  que: string
+  /** Cuándo elegirla. */
+  cuando?: string
+  /** Solo visible con cierto nivel de acceso u otra condición. */
+  requiere?: string
+}
+
+/**
+ * Una falla del equipo: qué muestra el display, por qué pasa y qué hacer.
+ * Es el caso de uso más frecuente — más que el cambio de variador.
+ */
+export interface FallaVariador {
+  /** Código en el display. */
+  codigo: string
+  /** Nombre del fallo según el manual. */
+  nombre: string
+  causas: string[]
+  soluciones: string[]
+}
+
 /** Una fila de parámetro dentro de un menú. */
 export interface ParametroVariador {
   /** Código tal cual aparece en el equipo: `nCr`, `1-24`, `P-08`… */
@@ -31,6 +60,8 @@ export interface ParametroVariador {
   dePlaca?: boolean
   /** Advertencia o contexto que evita un error real en terreno. */
   nota?: string
+  /** Para parámetros enumerados: qué significa cada opción y cuándo elegirla. */
+  opciones?: OpcionParametro[]
 }
 
 export interface FichaVariador {
@@ -49,7 +80,17 @@ export interface FichaVariador {
   /** Resumen corto para la tarjeta cuando no hay parámetros tabulados. */
   resumen?: string
   menus?: Record<string, ParametroVariador[]>
+  /** Códigos de falla del display, con causa probable y qué hacer. */
+  fallas?: FallaVariador[]
 }
+
+/** Atajo para las filas de falla. */
+const falla = (
+  codigo: string,
+  nombre: string,
+  causas: string[],
+  soluciones: string[],
+): FallaVariador => ({ codigo, nombre, causas, soluciones })
 
 /** Atajo para no repetir `codigo:`/`descripcion:` en 157 filas. */
 const p = (
@@ -99,10 +140,45 @@ export const VARIADORES: FichaVariador[] = [
           'Selector mantenido = 2 hilos (2C). Botonera de pulsadores = 3 hilos (3C). PELIGRO del manual: al cambiar tCC, los parámetros tCt, rrS y TODAS las funciones de entradas lógicas vuelven a fábrica.'),
         p('tCt', 'Tipo de control 2 hilos', 'LEL / trn / PFO', 'trn · Transición', false,
           'trn exige un flanco para arrancar, «a fin de evitar un rearranque imprevisto tras una interrupción de la alimentación» (texto del manual). Con LEL y el selector en ON, la cinta arranca sola cuando vuelve la luz. El de fábrica es el seguro.'),
-        p('Fr1', 'Canal de referencia 1', 'AI1 / AI2 / AI3 / consola', 'AI1'),
+        {
+          codigo: 'Fr1',
+          descripcion: 'Canal de referencia 1',
+          rango: 'AI1 / AI2 / AI3 / AIV1 / …',
+          fabrica: 'AI1',
+          nota: 'De dónde sale la CONSIGNA de velocidad. Es distinto del mando (tCC): tCC dice quién arranca, Fr1 dice quién fija la frecuencia.',
+          opciones: [
+            { valor: 'AI1', que: 'Entrada analógica AI1', cuando: 'Lo normal en planta: un potenciómetro en la puerta del tablero o una señal 0-10 V del PLC.' },
+            { valor: 'AI2', que: 'Entrada analógica AI2', cuando: 'Cuando AI1 ya está ocupada, o si la señal viene en ±10 V.' },
+            { valor: 'AI3', que: 'Entrada analógica AI3', cuando: 'Es la entrada de 4-20 mA: úsala si la señal viene en corriente. Ventaja real: si se corta el cable el variador lo detecta (fallo LFF), cosa que en 0-10 V no pasa.' },
+            { valor: 'AIV1', que: 'La rueda del propio variador actúa como potenciómetro', cuando: 'Para probar en el banco o mover la cinta sin señal externa. No dejarla así en producción.' },
+            { valor: 'UPdt', que: 'Consigna +velocidad / −velocidad por entradas lógicas', cuando: 'Si el operador sube y baja con dos pulsadores en vez de un potenciómetro.', requiere: 'Nivel de acceso L2 o L3' },
+            { valor: 'UPdH', que: 'Consigna +velocidad / −velocidad girando la rueda', requiere: 'Nivel de acceso L2 o L3' },
+            { valor: 'LCC', que: 'Consigna desde el terminal remoto', requiere: 'Nivel de acceso L3' },
+            { valor: 'Mdb', que: 'Consigna por Modbus', cuando: 'Cuando manda un PLC por red.', requiere: 'Nivel de acceso L3' },
+            { valor: 'nEt', que: 'Consigna por tarjeta de red', requiere: 'Nivel de acceso L3' },
+          ],
+        },
         p('rrS', 'Asignación marcha atrás', '—', '—'),
       ],
     },
+    fallas: [
+      falla('OCF', 'Sobrecorriente', ['Parámetros del menú drC- mal cargados', 'Inercia o carga excesiva', 'Bloqueo mecánico'], ['Verificar los datos de placa en drC-', 'Revisar que la cinta gire libre', 'Alargar la rampa de aceleración (ACC)']),
+      falla('OLF', 'Sobrecarga motor', ['Intensidad del motor demasiado elevada', 'Valor de [Resist. estátor fría] (rSC) erróneo'], ['Verificar el ajuste de I térmica motor (ItH) y comprobar la carga del motor', 'Esperar a que el motor se enfríe antes de rearrancar', 'Recalcular rSC']),
+      falla('OPF', 'Pérdida de fase motor', ['Corte de fase a la salida del variador', 'Contactor aguas abajo abierto', 'Motor no conectado o de potencia demasiado baja'], ['Comprobar las conexiones del variador al motor', 'Con contactor aguas abajo, poner [Pérdida fase motor] (OPL) en OAC', 'Verificar UFr, UnS y nCr, y hacer un autoajuste con tUn']),
+      falla('OSF', 'Sobretensión de red', ['Tensión de red demasiado elevada', 'Red perturbada'], ['Comprobar la tensión de red']),
+      falla('USF', 'Subtensión', ['Red sin potencia suficiente'], ['Verificar la tensión y el parámetro de tensión (UnS)']),
+      falla('PHF', 'Pérdida de fase de red', ['Variador mal alimentado o fusible fundido', 'Corte de una fase', 'ATV312 trifásico alimentado en red monofásica'], ['Comprobar la conexión de potencia y los fusibles', 'Rearmar', 'Usar una red trifásica']),
+      falla('OHF', 'Sobrecalentamiento del variador', ['Temperatura del variador demasiado alta'], ['Comprobar la carga del motor y la ventilación del variador', 'Revisar que el radiador esté limpio y con aire libre']),
+      falla('SCF', 'Cortocircuito motor', ['Cortocircuito o puesta a tierra a la salida'], ['Verificar los cables de conexión del variador al motor y el aislamiento del motor']),
+      falla('ObF', 'Exceso de frenado', ['Frenado demasiado brusco'], ['Aumentar el tiempo de deceleración (dEC)', 'Instalar resistencia de frenado si hace falta']),
+      falla('SOF', 'Sobrevelocidad', ['Inestabilidad', 'Carga arrastrante'], ['Comprobar los parámetros del motor y la ganancia (FLG)']),
+      falla('tnF', 'Fallo de autoajuste', ['Motor especial o de potencia muy distinta a la del variador', 'Motor no conectado'], ['Usar la ley U/f L o P en vez del autoajuste', 'Verificar que el motor esté conectado durante el tUn']),
+      falla('LFF', 'Pérdida de la consigna 4-20 mA', ['Se cortó la señal de 4-20 mA'], ['Verificar la conexión en la entrada AI3']),
+      falla('EPF', 'Fallo externo', ['Lo dispara una señal externa asignada por el usuario'], ['Revisar qué equipo o contacto está dando la señal']),
+      falla('SLF', 'Fallo Modbus', ['Interrupción de comunicación en el bus', 'Terminal remoto validado (LCC) pero desconectado'], ['Comprobar el bus de comunicación', 'Comprobar el enlace con el terminal remoto']),
+      falla('CFI', 'Configuración no válida', ['Configuración cargada incompatible'], ['Comprobar la configuración previamente cargada', 'Volver a ajuste de fábrica y reconfigurar']),
+      falla('bLF', 'Fallo de control de freno', ['No se alcanzó la intensidad de apertura del freno'], ['Comprobar la conexión variador/motor']),
+    ],
   },
   {
     id: 'atv31',
@@ -347,6 +423,25 @@ export const VARIADORES: FichaVariador[] = [
         p('R1/R2', 'Relés de salida', '—', '—', false, 'Señalizan al tablero: marcha, fallo, bypass.'),
       ],
     },
+    fallas: [
+      falla('OLF', 'Sobrecarga motor', ['El motor consumió más de lo permitido durante demasiado tiempo', 'Mecanismo duro o trabado'], ['Revisar el mecanismo: desgaste, juego, lubricación, bloqueos', 'Comprobar el dimensionamiento del motor frente a la necesidad mecánica', 'Verificar tHP (menú SEt) e In (menú ConF)', 'Esperar a que el motor se enfríe antes de rearrancar']),
+      falla('OCF', 'Sobrecorriente motor', ['La corriente superó el límite configurado'], ['Comprobar los valores de OId y OIt en el menú PrO']),
+      falla('UCF', 'Subintensidad', ['La corriente cayó por debajo del límite: bomba en vacío, acople roto, correa cortada'], ['Comprobar los valores de UId y UIt en el menú PrO', 'Revisar si la bomba está cebada y el acople íntegro']),
+      falla('OHF', 'Sobrecalentamiento del arrancador', ['Radiador sucio o sin ventilación', 'Arrancador subdimensionado'], ['Comprobar que el ventilador funcione y que el aire circule libre', 'Verificar que el radiador esté limpio y se respeten las distancias de montaje', 'Esperar a que el Altistart se enfríe']),
+      falla('OSF', 'Sobretensión', ['Tensión de red por encima del límite'], ['Comprobar el parámetro ULn en el menú ConF', 'Revisar el circuito y la tensión de alimentación', 'Comprobar OSd y OSt en el menú PrO']),
+      falla('DtF', 'Sobretemperatura del motor (PTC)', ['Las sondas PTC del motor detectaron exceso de temperatura'], ['Revisar el mecanismo: desgaste, juego, lubricación, bloqueos', 'Comprobar el dimensionamiento del motor', 'Verificar el ajuste PtC en el menú PrO', 'Esperar a que el motor se enfríe']),
+      falla('PHF', 'Pérdida de fase del motor', ['Falta una fase entre el arrancador y el motor'], ['Comprobar la conexión del motor y los contactores o disyuntores intermedios', 'Comprobar el estado del motor']),
+      falla('PHbd', 'Desequilibrio de fases', ['Las tres fases no están equilibradas'], ['Comprobar la tensión de red', 'Comprobar Ubd y Ubt en el menú PrO']),
+      falla('PIF', 'Frecuencia de línea fuera de tolerancia', ['La frecuencia de red se salió del rango'], ['Comprobar la frecuencia de red', 'Comprobar la configuración del parámetro PHL']),
+      falla('StF', 'Tiempo de arranque demasiado largo', ['El arranque superó el tiempo tLS: motor atascado o rampa mal ajustada'], ['Comprobar que el motor no esté atascado', 'Verificar que tLS sea mayor que ACC', 'Revisar la carga en el arranque']),
+      falla('SnbF', 'Demasiados arranques', ['Se superó el número de arranques Snb dentro del período SLG'], ['Esperar el período SLG', 'Revisar por qué el equipo arranca tantas veces', 'Ajustar Snb y SLG en el menú AdJ si el uso real lo justifica']),
+      falla('GrdF', 'Corriente de fuga a tierra', ['Falla de aislamiento en el motor o el cableado'], ['Comprobar el aislamiento eléctrico del motor', 'Comprobar la instalación', 'Verificar Grdd y Grdt en el menú PrO']),
+      falla('bPF', 'Fallo del contactor de bypass', ['Falla interna del bypass integrado'], ['Apagar el arrancador y contactar al servicio técnico de Schneider']),
+      falla('CFF', 'Configuración no válida', ['La configuración cargada no es compatible'], ['Volver al ajuste de fábrica en el menú UtIL', 'Volver a configurar el arrancador']),
+      falla('EtF', 'Fallo externo', ['Lo dispara una señal externa'], ['Eliminar la causa del fallo detectado']),
+      falla('InF', 'Fallo interno', ['Falla propia del equipo'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
+      falla('trAP', 'Código Trap', ['Falla interna del procesador'], ['Desconectar y volver a conectar la alimentación de control', 'Si persiste, contactar al soporte técnico de Schneider']),
+    ],
   },
   {
     id: 'sew',
@@ -399,6 +494,21 @@ export const VARIADORES: FichaVariador[] = [
         p('P-29', 'Ajuste de la curva V/f', '0 a P-09', '0 Hz'),
       ],
     },
+    fallas: [
+      falla('O-I', 'Sobrecorriente a la salida', ['Carga excesiva en el motor', 'Motor trabado o atascado', 'Error de conexión estrella-triángulo del motor', 'Cable al motor demasiado largo'], ['Si dispara a velocidad constante: buscar sobrecarga o falla mecánica', 'Si dispara al habilitar: revisar que el motor no esté trabado y verificar el conexionado Δ/Y', 'Comprobar que el largo del cable esté dentro de especificación']),
+      falla('I.t-trP', 'Sobrecarga del variador', ['El variador entregó más del 100 % de la corriente de P-08 durante demasiado tiempo', 'Rampas demasiado cortas para la carga'], ['Revisar sobrecarga súbita o falla mecánica', 'Posible falla de cable entre variador y motor', 'Aumentar la rampa de aceleración (P-03) o reducir la carga', 'Si P-03 y P-04 no se pueden alargar, hace falta un variador más grande']),
+      falla('O.Uolt', 'Sobretensión en el bus DC', ['Tensión de red alta', 'Frenado demasiado brusco: la carga devuelve energía'], ['Comprobar que la tensión de alimentación esté dentro de límites', 'Si dispara al desacelerar, aumentar el tiempo de P-04', 'Si hace falta, conectar resistencia de frenado (y poner P-39 = 1 si ya está instalada)']),
+      falla('U.Uolt', 'Subtensión en el bus DC', ['Corte o baja de tensión de alimentación'], ['Es normal que aparezca al apagar el equipo', 'Si aparece en marcha, comprobar la tensión de alimentación']),
+      falla('O-t', 'Sobretemperatura del disipador', ['Ventilación insuficiente o ambiente caluroso'], ['Comprobar la refrigeración del variador y las dimensiones del tablero', 'Puede hacer falta más espacio o ventilación forzada']),
+      falla('U-t', 'Temperatura demasiado baja', ['Temperatura ambiente por debajo del mínimo'], ['Esperar a que el tablero tome temperatura antes de arrancar']),
+      falla('OI-b', 'Sobrecorriente en el circuito de frenado', ['Exceso de corriente en la resistencia de frenado'], ['Comprobar el cableado a la resistencia de frenado', 'Verificar el valor de la resistencia y respetar el mínimo de las tablas']),
+      falla('OL-br', 'Sobrecarga de la resistencia de frenado', ['Frenados muy seguidos o inercia alta'], ['Aumentar el tiempo de deceleración', 'Reducir la inercia de la carga o agregar resistencias en paralelo']),
+      falla('PS-trP', 'Fallo de la etapa de potencia', ['Cortocircuito fase-fase o fase-tierra', 'Error de cableado'], ['Buscar cortocircuito entre fases o a tierra', 'Revisar el cableado antes de volver a energizar']),
+      falla('th-Flt', 'Termistor del disipador defectuoso', ['Falla del sensor interno'], ['Requiere servicio técnico']),
+      falla('E-triP', 'Disparo externo', ['Señal externa conectada a la entrada digital 3'], ['Revisar qué equipo está dando la señal en la entrada digital 3']),
+      falla('SC-trP', 'Pérdida de comunicación', ['Se cortó el enlace de comunicación'], ['Comprobar el bus y el cableado de comunicación']),
+      falla('P-dEF', 'Parámetros de fábrica cargados', ['Se restauró la configuración de fábrica'], ['Pulsar la tecla stop; el variador queda listo para configurar', 'Volver a cargar los datos de placa del motor (P-07 a P-10)']),
+    ],
   },
   {
     id: 'psr60',
@@ -614,3 +724,6 @@ export const TOTAL_PARAMETROS = VARIADORES.reduce(
   (acc, f) => acc + Object.values(f.menus ?? {}).reduce((n, filas) => n + filas.length, 0),
   0,
 )
+
+/** Total de códigos de falla catalogados. */
+export const TOTAL_FALLAS = VARIADORES.reduce((acc, f) => acc + (f.fallas?.length ?? 0), 0)
