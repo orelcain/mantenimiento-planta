@@ -4,10 +4,15 @@
  * Para qué: cuando se quema un variador y hay que poner otro, esta página dice qué
  * parámetros espera cada familia y en qué menú están, sin ir a buscar el manual.
  *
- * Dos vistas:
+ * Tres vistas:
  *   · Catálogo — tarjetas por familia + los 4 perfiles de motor de las cintas.
+ *   · Equivalencias — el mismo dato en el dialecto de cada marca, para cuando el
+ *     repuesto que hay a mano no es de la misma marca que el que se quemó.
  *   · Ficha — navegador de parámetros por menú, con buscador y filtro «solo datos
  *     de placa» (que es, en la práctica, la lista de lo que hay que levantar en terreno).
+ *
+ * La vista y la ficha abierta viven en la URL (`?vista=`, `?ficha=`), así el enlace
+ * de un equipo se puede mandar por Telegram y quien lo abra cae directo en su ficha.
  *
  * El ABB PSR60 no tiene teclado: se ajusta con 3 potenciómetros. Su ficha es un
  * simulador de perillas con los valores derivados que el catálogo deja implícitos.
@@ -16,7 +21,7 @@
  * Los datos y su trazabilidad viven en `@/data/variadores`.
  */
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Search, AlertTriangle, BookOpen } from 'lucide-react'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText } from '@/components/learning/primitives'
@@ -26,6 +31,8 @@ import {
   POTENCIOMETROS_PSR,
   FALTAN_DE_PLACA,
   TOTAL_PARAMETROS,
+  EQUIVALENCIAS,
+  COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
   escalonBajadaPSR,
   type FichaVariador,
@@ -330,11 +337,144 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
   )
 }
 
+// ── Equivalencias entre marcas ────────────────────────────────────────────────
+/** El mismo dato en el dialecto de cada fabricante — para cambiar de marca. */
+function TablaEquivalencias() {
+  const [q, setQ] = useState('')
+
+  const visibles = useMemo(() => {
+    const term = norm(q.trim())
+    if (!term) return EQUIVALENCIAS
+    return EQUIVALENCIAS.filter(
+      (e) =>
+        norm(e.concepto).includes(term) ||
+        Object.values(e.codigos).some((c) => c && norm(c).includes(term)),
+    )
+  }, [q])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="m-0 max-w-[68ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
+        Para cuando el repuesto es de otra marca. Los guiones no son datos que falten:
+        son equipos que <strong style={{ color: C.ink }}>no piden ese parámetro</strong> —
+        la nota de cada fila explica por qué.
+      </p>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por concepto o por código: corriente, nCr, P-08…"
+          aria-label="Buscar equivalencia"
+          className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
+        />
+      </div>
+
+      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 720 }}>
+          <thead>
+            <tr>
+              <th
+                className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+              >
+                Qué es
+              </th>
+              {COLUMNAS_EQUIVALENCIA.map((col) => (
+                <th
+                  key={col.id}
+                  className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                  style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+                >
+                  {col.titulo}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.length === 0 && (
+              <tr>
+                <td colSpan={COLUMNAS_EQUIVALENCIA.length + 1} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                  Nada con «{q.trim()}».
+                </td>
+              </tr>
+            )}
+            {visibles.map((e) => (
+              <tr
+                key={e.concepto}
+                style={{
+                  background: e.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, transparent)` : undefined,
+                  borderBottom: `1px solid ${C.border}`,
+                }}
+              >
+                <td className="px-3 py-2.5 align-top" style={{ color: C.ink, lineHeight: 1.5, minWidth: 190 }}>
+                  {e.concepto}
+                  {e.dePlaca && (
+                    <span
+                      className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
+                      style={{ color: C.warn, background: `color-mix(in srgb, ${C.warn} 16%, transparent)` }}
+                    >
+                      Placa
+                    </span>
+                  )}
+                  {e.nota && (
+                    <span
+                      className="mt-1.5 block max-w-[62ch] pl-2 text-[12.5px]"
+                      style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}`, lineHeight: 1.5 }}
+                    >
+                      {e.nota}
+                    </span>
+                  )}
+                </td>
+                {COLUMNAS_EQUIVALENCIA.map((col) => {
+                  const cod = e.codigos[col.id]
+                  return (
+                    <td
+                      key={col.id}
+                      className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[13px] font-semibold"
+                      style={{ color: cod ? C.aquaBright : C.inkGhost }}
+                    >
+                      {cod ?? '—'}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Página ────────────────────────────────────────────────────────────────────
 export function VariadoresPage() {
   const navigate = useNavigate()
-  const [abierta, setAbierta] = useState<string | null>(null)
+  // La ficha abierta va en la URL: así se puede compartir el enlace de un equipo
+  // por Telegram y quien lo abra cae directo en su ficha.
+  const [params, setParams] = useSearchParams()
+  const abierta = params.get('ficha')
+  const vista = params.get('vista') === 'equivalencias' ? 'equivalencias' : 'catalogo'
   const [q, setQ] = useState('')
+
+  const abrirFicha = (id: string | null) => {
+    const p = new URLSearchParams(params)
+    if (id) p.set('ficha', id)
+    else p.delete('ficha')
+    setParams(p, { replace: false })
+    window.scrollTo(0, 0)
+  }
+
+  const cambiarVista = (v: 'catalogo' | 'equivalencias') => {
+    const p = new URLSearchParams(params)
+    if (v === 'equivalencias') p.set('vista', v)
+    else p.delete('vista')
+    p.delete('ficha')
+    setParams(p, { replace: true })
+  }
 
   const ficha = abierta ? VARIADORES.find((f) => f.id === abierta) ?? null : null
 
@@ -368,7 +508,37 @@ export function VariadoresPage() {
           </p>
         </header>
 
-        {ficha === null ? (
+        {/* Selector de vista — solo en el catálogo, no dentro de una ficha */}
+        {ficha === null && (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vista">
+            {([
+              ['catalogo', 'Por equipo'],
+              ['equivalencias', 'Equivalencias entre marcas'],
+            ] as const).map(([v, rotulo]) => {
+              const on = vista === v
+              return (
+                <button
+                  key={v}
+                  onClick={() => cambiarVista(v)}
+                  aria-pressed={on}
+                  className="rounded px-3.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  style={{
+                    background: on ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.bgPanel,
+                    border: `1px solid ${on ? C.aqua : C.border}`,
+                    color: C.ink,
+                    fontWeight: on ? 600 : 400,
+                  }}
+                >
+                  {rotulo}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {ficha === null && vista === 'equivalencias' ? (
+          <TablaEquivalencias />
+        ) : ficha === null ? (
           <>
             {/* Buscador */}
             <div className="relative">
@@ -391,7 +561,7 @@ export function VariadoresPage() {
                 return (
                   <button
                     key={f.id}
-                    onClick={() => setAbierta(f.id)}
+                    onClick={() => abrirFicha(f.id)}
                     className="flex flex-col gap-2.5 rounded-lg p-4 text-left outline-none transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)] focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
                     style={{ background: C.surface, border: `1px solid ${C.border}` }}
                   >
@@ -495,7 +665,7 @@ export function VariadoresPage() {
         ) : (
           <>
             <button
-              onClick={() => setAbierta(null)}
+              onClick={() => abrirFicha(null)}
               className="inline-flex w-fit items-center gap-1.5 rounded text-[13.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
               style={{ color: C.aquaBright }}
             >

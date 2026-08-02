@@ -497,6 +497,118 @@ export const MOTORES_CINTAS: MotorCinta[] = [
 /** Datos eléctricos que solo salen de la placa física del motor. */
 export const FALTAN_DE_PLACA = ['Tensión', 'Corriente', 'cos φ', 'Conexión Δ/Y'] as const
 
+// ── Equivalencias entre marcas ────────────────────────────────────────────────
+/**
+ * El mismo dato, en el dialecto de cada fabricante. Es la tabla para el caso real:
+ * se quemó un variador y el repuesto que hay a mano es de otra marca.
+ *
+ * Los huecos (`—`) son información, no falta de datos: **no todos los equipos piden
+ * lo mismo**. El ATV312 no pide potencia del motor, pide corriente. Un partidor suave
+ * no tiene frecuencia porque no sintetiza tensión. Ver la nota de cada fila.
+ */
+export interface EquivalenciaParametro {
+  concepto: string
+  /** Código en cada familia, o `null` si ese equipo no tiene ese parámetro. */
+  codigos: Record<string, string | null>
+  /** Por qué falta en algunos, o en qué se diferencia. */
+  nota?: string
+  dePlaca?: boolean
+}
+
+/** Columnas de la tabla de equivalencias, en orden. */
+export const COLUMNAS_EQUIVALENCIA = [
+  { id: 'atv', titulo: 'Altivar 31/312' },
+  { id: 'danfoss', titulo: 'Danfoss VLT' },
+  { id: 'v20', titulo: 'Sinamics V20' },
+  { id: 'sew', titulo: 'SEW LTE-B+' },
+  { id: 'ats22', titulo: 'Altistart 22' },
+] as const
+
+export const EQUIVALENCIAS: EquivalenciaParametro[] = [
+  {
+    concepto: 'Tensión nominal del motor',
+    dePlaca: true,
+    codigos: { atv: 'UnS', danfoss: '1-22', v20: 'P0304', sew: 'P-07', ats22: null },
+    nota: 'El Altistart no lo pide: no sintetiza tensión, la rampa la hace sobre la red. Su Uln es la tensión de LÍNEA, que es otra cosa. Y ojo en todos: la planta es 380 V, no los 400 V nominales de placa.',
+  },
+  {
+    concepto: 'Corriente nominal del motor',
+    dePlaca: true,
+    codigos: { atv: 'nCr', danfoss: '1-24', v20: 'P0305', sew: 'P-08', ats22: 'In' },
+    nota: 'El dato más crítico: fija la protección térmica en los cinco. Nunca se estima. En el ATS22 dentro del triángulo va dividido por √3.',
+  },
+  {
+    concepto: 'Frecuencia nominal del motor',
+    dePlaca: true,
+    codigos: { atv: 'FrS', danfoss: '1-23', v20: 'P0310', sew: 'P-09', ats22: null },
+    nota: 'Un partidor suave no varía la frecuencia, por eso no la pide.',
+  },
+  {
+    concepto: 'Velocidad nominal del motor',
+    dePlaca: true,
+    codigos: { atv: 'nSP', danfoss: '1-25', v20: 'P0311', sew: 'P-10', ats22: null },
+    nota: 'En el SEW, cargarla distinta de 0 cambia toda la interfaz a rpm y activa la compensación de deslizamiento.',
+  },
+  {
+    concepto: 'Potencia nominal del motor',
+    dePlaca: true,
+    codigos: { atv: null, danfoss: '1-20', v20: 'P0307', sew: null, ats22: null },
+    nota: 'El Altivar y el SEW no la piden: se conforman con corriente, tensión y frecuencia. No es un olvido, es su forma de trabajar.',
+  },
+  {
+    concepto: 'cos φ del motor',
+    dePlaca: true,
+    codigos: { atv: 'COS', danfoss: null, v20: 'P0308', sew: null, ats22: null },
+  },
+  {
+    concepto: 'Rampa de aceleración',
+    codigos: { atv: 'ACC', danfoss: '3-41', v20: 'P1120', sew: 'P-03', ats22: 'ACC' },
+    nota: 'Mismo nombre, distinto significado: en los variadores es rampa de FRECUENCIA; en el Altistart 22 es rampa de TENSIÓN. No copiar el valor de uno a otro.',
+  },
+  {
+    concepto: 'Rampa de deceleración',
+    codigos: { atv: 'dEC', danfoss: '3-42', v20: 'P1121', sew: 'P-04', ats22: 'dEC' },
+  },
+  {
+    concepto: 'Velocidad / frecuencia mínima',
+    codigos: { atv: 'LSP', danfoss: '4-12', v20: 'P1080', sew: 'P-02', ats22: null },
+  },
+  {
+    concepto: 'Velocidad / frecuencia máxima',
+    codigos: { atv: 'HSP', danfoss: '4-14', v20: 'P1082', sew: 'P-01', ats22: null },
+  },
+  {
+    concepto: 'Límite de intensidad',
+    codigos: { atv: 'ItH', danfoss: '4-18', v20: null, sew: null, ats22: 'ILt' },
+    nota: 'En el SEW no hay parámetro aparte: el propio P-08 hace de nivel de sobrecarga.',
+  },
+  {
+    concepto: 'Protección térmica del motor',
+    codigos: { atv: 'ItH', danfoss: '1-90', v20: 'P0610', sew: 'P-08', ats22: 'tHP + ItH' },
+    nota: 'Dos trampas distintas. En el Altistart son DOS parámetros: tHP fija la clase y ItH es el interruptor maestro — con ItH apagado, tHP no hace nada. En el Siemens, P0610 = 0 significa «solo aviso, sin reacción»: el variador avisa y sigue andando. Vale revisar cómo quedó cargado.',
+  },
+  {
+    concepto: 'Fuente de mando (selector / botonera)',
+    codigos: { atv: 'tCC + tCt', danfoss: '5-10…5-13', v20: 'P0700', sew: 'P-12', ats22: 'LI2' },
+    nota: 'El bloque que no está en ninguna placa. En el Altivar, tCt decide si la cinta arranca sola al volver la luz.',
+  },
+  {
+    concepto: 'Autoajuste al motor',
+    codigos: { atv: 'tUn', danfoss: '1-29 (AMA)', v20: null, sew: null, ats22: null },
+    nota: 'Correr SIEMPRE después de cargar los datos de placa, nunca antes.',
+  },
+  {
+    concepto: 'Acceso al menú avanzado',
+    codigos: { atv: null, danfoss: null, v20: null, sew: 'P-14', ats22: 'LAC' },
+    nota: 'La trampa compartida de SEW y Altistart: si no se habilita, la mitad de los parámetros ni aparecen y parece que el equipo no los tuviera.',
+  },
+  {
+    concepto: 'Copiar configuración a otro equipo',
+    codigos: { atv: null, danfoss: '0-50 / 0-51', v20: null, sew: null, ats22: null },
+    nota: 'Solo Danfoss lo resuelve con la consola LCP, y únicamente entre equipos de la MISMA serie.',
+  },
+]
+
 /** Total de parámetros catalogados — para el contador del hub. */
 export const TOTAL_PARAMETROS = VARIADORES.reduce(
   (acc, f) => acc + Object.values(f.menus ?? {}).reduce((n, filas) => n + filas.length, 0),
