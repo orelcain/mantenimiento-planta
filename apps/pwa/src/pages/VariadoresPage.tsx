@@ -22,7 +22,7 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
 import { getIncidents, resolveIncident } from '@/services/incidents'
@@ -222,9 +222,12 @@ type AbrirFicha = (
 function NavegadorParametros({
   ficha,
   destino,
+  onComparar,
 }: {
   ficha: FichaVariador
   destino?: DestinoParametro | null
+  /** Salta a la comparación entre marcas de ese código. */
+  onComparar: (codigo: string) => void
 }) {
   const claves = useMemo(() => Object.keys(ficha.menus ?? {}), [ficha])
   const [menu, setMenu] = useState(claves[0] ?? '')
@@ -420,16 +423,6 @@ function NavegadorParametros({
                   )}
                 </td>
                 <td className="px-3 py-3 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
-                  {marcado && (
-                    <span
-                      className="mb-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold"
-                      style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
-                    >
-                      <Search className="h-3 w-3" aria-hidden />
-                      Es este
-                    </span>
-                  )}
-                  {marcado && <br />}
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
@@ -438,6 +431,23 @@ function NavegadorParametros({
                     >
                       Placa
                     </span>
+                  )}
+                  {/* Si el parámetro tiene equivalente en otras marcas, se llega
+                      desde acá: parado en la ficha es donde surge la pregunta. */}
+                  {equivalenciaDe(r.codigo) && (
+                    <button
+                      onClick={() => onComparar(r.codigo)}
+                      className={`ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium align-middle ${FOCO}`}
+                      style={{
+                        color: C.aquaBright,
+                        background: tinte.suave(C.aqua),
+                        border: `1px solid ${tinte.borde(C.aqua)}`,
+                      }}
+                      title={`Ver ${r.codigo} en las otras marcas`}
+                    >
+                      <ArrowLeftRight className="h-3 w-3" aria-hidden />
+                      Otras marcas
+                    </button>
                   )}
                   {r.nota && (
                     <span
@@ -1268,10 +1278,26 @@ function RecetasPorEquipo({
  *   · ¿cuál es el equivalente acá? — la fila de equivalencias del concepto,
  *     para pasar de «tengo nCr en el manual del Altivar» a «en este SEW es P-08»
  */
-function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
-  const [q, setQ] = useState('')
+function BuscadorParametros({
+  onAbrirFicha,
+  comparar,
+}: {
+  onAbrirFicha: AbrirFicha
+  /** Código que viene por ?comparar= desde la ficha de un equipo. */
+  comparar?: string | null
+}) {
+  const [q, setQ] = useState(comparar ?? '')
   /** Concepto elegido a mano desde un resultado; manda sobre el detectado. */
   const [elegida, setElegida] = useState<EquivalenciaParametro | null>(null)
+
+  // Llegar por ?comparar= deja la búsqueda ya hecha: se ve la comparación arriba
+  // y abajo dónde vive ese código, sin tener que teclearlo de nuevo.
+  useEffect(() => {
+    if (comparar) {
+      setQ(comparar)
+      setElegida(null)
+    }
+  }, [comparar])
 
   const hallazgos = useMemo(() => buscarParametro(q), [q])
   /** Si lo buscado es un código o concepto conocido, su fila de equivalencias. */
@@ -1677,7 +1703,26 @@ export function VariadoresPage() {
     p.delete('ficha')
     p.delete('p')
     p.delete('menu')
+    p.delete('comparar')
     setParams(p, { replace: true })
+  }
+
+  /**
+   * Desde la ficha, saltar a la comparación entre marcas de ese parámetro.
+   *
+   * Es push, no replace: la pregunta «¿y en la otra marca?» se hace estando en
+   * la ficha, y con atrás se vuelve al parámetro donde se estaba.
+   */
+  const compararMarcas = (codigo: string) => {
+    const p = new URLSearchParams(params)
+    p.set('vista', 'parametro')
+    p.set('comparar', codigo)
+    p.delete('ficha')
+    p.delete('p')
+    p.delete('menu')
+    p.delete('posicion')
+    setParams(p)
+    window.scrollTo(0, 0)
   }
 
   const ficha = abierta ? VARIADORES.find((f) => f.id === abierta) ?? null : null
@@ -1762,7 +1807,7 @@ export function VariadoresPage() {
         )}
 
         {ficha === null && vista === 'parametro' ? (
-          <BuscadorParametros onAbrirFicha={abrirFicha} />
+          <BuscadorParametros onAbrirFicha={abrirFicha} comparar={params.get('comparar')} />
         ) : ficha === null && vista === 'equivalencias' ? (
           <TablaEquivalencias onAbrirFicha={abrirFicha} />
         ) : ficha === null && vista === 'recetas' ? (
@@ -1998,7 +2043,7 @@ export function VariadoresPage() {
                 ) : seccion === 'fallas' && ficha.fallas ? (
                   <ListaFallas fallas={ficha.fallas} />
                 ) : (
-                  <NavegadorParametros ficha={ficha} destino={destino} />
+                  <NavegadorParametros ficha={ficha} destino={destino} onComparar={compararMarcas} />
                 )}
 
                 <div
