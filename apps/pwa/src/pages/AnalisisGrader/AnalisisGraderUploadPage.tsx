@@ -26,7 +26,6 @@ import { deleteDailySummary } from '@/services/grader/graderDailySummary.service
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
-import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
 import type {
   ParsedMatrixData,
   UploadedMatrixFile,
@@ -441,11 +440,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
   return (
     <div className="space-y-3">
-      {/* Calendario histórico */}
-      <div data-grader-calendar>
-        <GraderHistoricalCalendar />
-      </div>
-
+      {/* El calendario histórico se retiró: lo reemplazó la matriz de turnos
+          del Wizard (PR #349). Este bloque ya era inalcanzable — el Wizard es
+          el único que monta esta página y siempre con `compact`. */}
       {/* Zona de carga */}
       <div>
         <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">

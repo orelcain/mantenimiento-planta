@@ -12,7 +12,7 @@ import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresh
 import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
-import { fmtSecPanoramic, type SlxMonthlyStats } from './GraderHistoricalCalendar'
+import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',

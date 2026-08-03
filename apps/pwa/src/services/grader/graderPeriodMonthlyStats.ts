@@ -26,6 +26,28 @@ import {
 } from '@/services/grader/shoplogixMaintenance'
 import { deserializeStateAggregates } from '@/services/grader/shoplogixStateAggregates'
 
+/**
+ * Formatea segundos en forma compacta ("6h 18m"). Vivia en
+ * `GraderHistoricalCalendar`; se mudo aca al retirar ese componente, porque
+ * `GraderMonthlyStatsPanel` lo necesita y no tiene por que arrastrar un modulo
+ * de 5.700 lineas para usar 8.
+ */
+export function fmtSecPanoramic(sec: number): string {
+  if (sec <= 0) return '0s'
+  if (sec < 60) return `${Math.round(sec)}s`
+  const m = Math.floor(sec / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`
+}
+
+/**
+ * Alias historico del tipo. `GraderMonthlyStatsPanel` y el Wizard lo importaban
+ * desde el calendario; se conserva el nombre para no tocar esos consumidores.
+ */
+export type SlxMonthlyStats = PeriodMonthlyStats
+
 export interface PeriodMonthlyStats {
   totalCycles: number
   /** 0-100, promedio entre turnos. */
@@ -47,6 +69,15 @@ export interface PeriodMonthlyStats {
   turnosWithData: number
   dayShiftsWithData: number
   nightShiftsWithData: number
+  /**
+   * Desglose por turno NUMERADO (Yal y la Chonchi nueva). Son subconjuntos de
+   * day/nightShiftsWithData: el panel los muestra aparte porque "2 turnos de
+   * dia" no dice si fueron dos T1 o un T1 y un T2. Se cuentan por shiftId
+   * exacto — un nombre que Shoplogix no emita queda simplemente en 0.
+   */
+  t1ShiftsWithData: number
+  t2ShiftsWithData: number
+  t3ShiftsWithData: number
   daysWithData: number
   bestShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
   worstShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
@@ -68,6 +99,7 @@ export function computePeriodMonthlyStats(
   const days = new Set<string>()
   let dayShifts = 0
   let nightShifts = 0
+  let t1 = 0, t2 = 0, t3 = 0
   let best: PeriodMonthlyStats['bestShift'] = null
   let worst: PeriodMonthlyStats['worstShift'] = null
 
@@ -78,6 +110,9 @@ export function computePeriodMonthlyStats(
     totalUptimeSec += s.uptimeSec
     days.add(s.dateKey)
     if (s.meta.isDayLike) dayShifts++; else nightShifts++
+    if (s.shiftId === 'Turno 1') t1++
+    else if (s.shiftId === 'Turno 2') t2++
+    else if (s.shiftId === 'Turno 3') t3++
 
     const pct = s.uptimePct ?? 0
     sumUptimePct += pct
@@ -131,6 +166,9 @@ export function computePeriodMonthlyStats(
     turnosWithData: ranked.length,
     dayShiftsWithData: dayShifts,
     nightShiftsWithData: nightShifts,
+    t1ShiftsWithData: t1,
+    t2ShiftsWithData: t2,
+    t3ShiftsWithData: t3,
     daysWithData: days.size,
     bestShift: best,
     worstShift: worst,
