@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-03 - claude - Retirado GraderHistoricalCalendar (5.756 lineas) del bundle
+
+- Cierra el pendiente que dejo #349: el calendario ya no se montaba en el Wizard, pero seguia entrando al bundle por imports estaticos. Ahora se borro el archivo.
+- Hallazgo al revisar antes de borrar: `AnalisisGraderUploadPage` SI lo montaba (`<GraderHistoricalCalendar />`, linea 446), pero en una rama inalcanzable — el Wizard es su unico consumidor y siempre pasa `compact`, que retorna antes en la linea 386. Codigo muerto en runtime, peso vivo en el bundle.
+- Lo que exportaba y habia que mudar antes de borrar: `fmtSecPanoramic` y el tipo `SlxMonthlyStats` (los usan `GraderMonthlyStatsPanel` y el Wizard) → pasan a `graderPeriodMonthlyStats.ts`, su nuevo dueno, con `SlxMonthlyStats` como alias del tipo nuevo para no tocar consumidores. Se agregaron los contadores `t1/t2/t3ShiftsWithData` que el panel usa y que mi tipo no tenia.
+- Efecto colateral detectado y cubierto: el calendario era el UNICO emisor de `graderSelectionStore.setSelectedHistorical`, que consume `AnalisisGraderGatesConfigPage` para calibrar el peso medio. Sin reemplazo esa pagina caia siempre a su fallback (summary mas reciente de 60 dias) en silencio → ahora lo emite `GraderShiftPeriodContainer` al seleccionar un turno.
+- Medicion: el chunk `AnalisisGraderWizardPage` pasa de **481 kB** (lo que sirve prod hoy, medido por curl al bundle publicado) a **344 kB** — **-137 kB, -28%**.
+- Archivos: borrado `components/grader/GraderHistoricalCalendar.tsx`; tocados `services/grader/graderPeriodMonthlyStats.ts`, `components/grader/{GraderMonthlyStatsPanel,GraderShiftPeriodContainer}.tsx`, `pages/AnalisisGrader/{AnalisisGraderUploadPage,AnalisisGraderWizardPage}.tsx`.
+- Verificacion: tsc y eslint limpios (el warning de `lineId` en UploadPage es PREEXISTENTE — verificado con stash contra main); 530 tests verdes en la suite grader; `vite build` OK.
+- Estado: EN REVISION — PR abierto.
+- Sigue: uso real en prod. `graderSelectionStore` quedo con un solo emisor nuevo — si la matriz cambia de forma, revisar que GatesConfigPage siga recibiendo la seleccion.
+
 ## 2026-08-03 - claude - Matriz de turnos reemplaza al calendario mensual del Analisis Grader
 
 - Problema raiz (planteado por Orel): el calendario usa el DIA como contenedor, asi que un turno que cruza medianoche se partia en dos fragmentos (`salida` + `madrugada`), con 4 `CardKind` solo para tapar el corte. El contenedor pasa a ser el TURNO: una fila por shiftId presente, una columna por dia, cada turno UNA celda anclada al dia en que arranca. Toggle Matriz/Lista (nunca ambas; bajo 700 px fuerza Lista), tooltip flotante al hover, panel del turno seleccionado con boton "Ver turno" (mismo destino que el "Cargar" del calendario), navegacion de mes y stats mensuales portadas (`computePeriodMonthlyStats`).

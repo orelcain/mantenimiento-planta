@@ -14,6 +14,7 @@ import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import type { PlantLineId } from '@/config/plantLines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { computePeriodMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
+import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 
 export interface GraderShiftPeriodContainerProps {
   plantLineId?: PlantLineId
@@ -38,6 +39,11 @@ export function GraderShiftPeriodContainer({
   plantLineId, month, onMonthChange, onSummariesLoaded, onMonthStatsLoaded, onSelectShift, onOpenShift, className,
 }: GraderShiftPeriodContainerProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  // El calendario retirado era el UNICO emisor de esta seleccion, y
+  // `AnalisisGraderGatesConfigPage` la consume para calibrar el peso medio.
+  // Sin esto esa pagina caia siempre a su fallback (el summary mas reciente de
+  // 60 dias) sin que nadie lo notara.
+  const setSelectedHistorical = useGraderSelectionStore(st => st.setSelectedHistorical)
 
   const { loading, error, shifts, rows, days, byKey, slxDegraded } = useGraderShiftPeriod({
     year: month.getFullYear(),
@@ -62,7 +68,9 @@ export function GraderShiftPeriodContainer({
       loading={loading} error={error} slxDegraded={slxDegraded}
       selectedKey={selectedKey}
       onSelect={(s) => {
-        setSelectedKey(prev => (prev === s.key ? null : s.key))
+        const next = selectedKey === s.key ? null : s.key
+        setSelectedKey(next)
+        setSelectedHistorical(next ? (s.graderSummary ?? null) : null)
         onSelectShift?.(s)
       }}
       onOpenShift={onOpenShift}
