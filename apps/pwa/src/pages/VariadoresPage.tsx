@@ -22,9 +22,20 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2 } from 'lucide-react'
+import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
+import { getIncidents, resolveIncident } from '@/services/incidents'
+import {
+  registrarCambio,
+  resumenCambios,
+  RANGOS_TIEMPO,
+  ETIQUETA_MODO,
+  type ModoConfiguracion,
+  type RangoTiempoId,
+  type ResumenCambios,
+} from '@/services/variadoresCambios'
+import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText } from '@/components/learning/primitives'
 import {
@@ -530,6 +541,272 @@ function ChipSap({ codigo }: { codigo?: string }) {
 }
 
 /**
+ * Lo que el módulo demuestra. Aparece solo cuando hay cambios registrados: un
+ * panel de ceros no dice nada y ocupa la pantalla que el técnico necesita.
+ */
+function PanelEvidencia() {
+  const [r, setR] = useState<ResumenCambios | null>(null)
+  useEffect(() => {
+    let vivo = true
+    resumenCambios().then((x) => { if (vivo) setR(x) })
+    return () => { vivo = false }
+  }, [])
+  if (!r || r.total === 0) return null
+
+  const ahorro = r.minutosClonado !== null && r.minutosManual !== null
+    ? r.minutosManual - r.minutosClonado
+    : null
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+      <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold" style={{ color: C.ink }}>
+        <TrendingUp className="h-4 w-4" style={{ color: C.ok }} />
+        Lo que llevamos medido
+      </span>
+      <div className="grid gap-px overflow-hidden rounded" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', background: C.border, border: `1px solid ${C.border}` }}>
+        {[
+          ['Cambios registrados', String(r.total), null],
+          ['Mediana de intervención', `${r.medianaMinutos} min`, null],
+          ['Clonando', r.minutosClonado !== null ? `${r.minutosClonado} min` : '—', `${r.clonados} cambios`],
+          ['A mano', r.minutosManual !== null ? `${r.minutosManual} min` : '—', `${r.manuales} cambios`],
+        ].map(([rot, val, pie]) => (
+          <div key={rot as string} className="flex flex-col gap-0.5 px-3 py-2.5" style={{ background: C.surface }}>
+            <span className="text-[11.5px]" style={{ color: C.inkMid }}>{rot}</span>
+            <span className="font-mono text-[19px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
+            {pie && <span className="text-[11px]" style={{ color: C.inkLo }}>{pie}</span>}
+          </div>
+        ))}
+      </div>
+      {ahorro !== null && ahorro > 0 && (
+        <span className="text-[12.5px]" style={{ color: C.inkMid }}>
+          Clonar ahorra <strong style={{ color: C.ok }}>{ahorro} min</strong> por cambio frente a
+          cargar a mano — el número que justifica tener el repuesto del mismo modelo en bodega.
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Registrar el cambio de un variador — el paso que convierte el catálogo en evidencia.
+ *
+ * CIERRA una incidencia existente en vez de crear una nueva: en la vida real
+ * alguien ya levantó «la cinta no arranca» antes de que llegara el técnico, y
+ * crear otra haría que los KPIs contaran el mismo evento dos veces.
+ *
+ * No hay puente entre el slug del Centro de Aprendizaje y el equipmentId de
+ * Firestore, así que no se filtra por equipo: se listan las incidencias
+ * abiertas y el técnico elige la suya. Inventar un mapeo que no se puede
+ * verificar sería peor que pedir un toque más.
+ */
+function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
+  const { isAuthenticated, user } = useAuthStore()
+  const [abierto, setAbierto] = useState(false)
+  const [incidencias, setIncidencias] = useState<Incident[] | null>(null)
+  const [elegida, setElegida] = useState<string | null>(null)
+  const [modo, setModo] = useState<ModoConfiguracion | null>(null)
+  const [rango, setRango] = useState<RangoTiempoId | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [listo, setListo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fam = VARIADORES.find((f) => f.id === posicion.variadorId)
+
+  const abrir = async () => {
+    setAbierto(true)
+    if (incidencias) return
+    try {
+      // Abiertas = todo lo que aún no se resolvió ni cerró.
+      const todas = await Promise.all(
+        (['pendiente', 'confirmada', 'en_proceso'] as const).map((st) =>
+          getIncidents({ status: st, limit: 25 }),
+        ),
+      )
+      setIncidencias(todas.flat())
+    } catch {
+      // Vacío + error a la vez diría «no hay incidencias», que es distinto de
+      // «no las pude leer». El mensaje de error manda.
+      setIncidencias([])
+      setError('No se pudieron cargar las incidencias abiertas. Revisa la conexión o tus permisos.')
+    }
+  }
+
+  const guardar = async () => {
+    if (!elegida || !modo || !rango || guardando) return
+    const inc = incidencias?.find((i) => i.id === elegida)
+    const r = RANGOS_TIEMPO.find((x) => x.id === rango)
+    if (!inc || !r) return
+    setGuardando(true)
+    setError(null)
+    try {
+      const resolucion =
+        `Cambio de variador en ${posicion.equipo}. ` +
+        `${fam?.nombre ?? 'Variador'} — ${ETIQUETA_MODO[modo].toLowerCase()}. ` +
+        `Duración de la intervención: ${r.label}.`
+      await resolveIncident(inc.id, resolucion, undefined, user?.id, user?.nombre)
+      await registrarCambio({
+        incidentId: inc.id,
+        incidentTitulo: inc.titulo,
+        posicionId: posicion.id,
+        posicionEquipo: posicion.equipo,
+        variadorId: posicion.variadorId ?? '',
+        variadorNombre: fam?.nombre ?? '',
+        modo,
+        rango,
+        minutosTrabajo: r.minutos,
+        creadoPor: user?.id ?? '',
+        creadoPorNombre: user?.nombre ?? undefined,
+      })
+      setListo(true)
+    } catch {
+      setError('No se pudo registrar. Revisa la conexión o tus permisos.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  if (!isAuthenticated) return null
+
+  if (listo) {
+    return (
+      <div
+        className="mt-3 flex flex-col gap-1.5 rounded-lg px-4 py-3"
+        style={{ background: `color-mix(in srgb, ${C.ok} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.ok} 40%, transparent)` }}
+      >
+        <span className="text-[13.5px] font-semibold" style={{ color: C.ok }}>Registrado ✓</span>
+        <span className="text-[12.5px]" style={{ color: C.inkMid }}>
+          La incidencia quedó resuelta y el cambio anotado.
+          {posicion.valores.some((v) => v.estado === 'pendiente') &&
+            ' Si tienes la placa a la vista, es el momento de completar los datos que faltan arriba.'}
+        </span>
+      </div>
+    )
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        onClick={abrir}
+        className="mt-3 inline-flex w-fit items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+        style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
+      >
+        <ClipboardCheck className="h-3.5 w-3.5" />
+        Registré este cambio
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-3 rounded-lg px-4 py-3" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
+      <div className="flex flex-col gap-1.5">
+        <MetaText>¿Qué incidencia resolvió este cambio?</MetaText>
+        {incidencias === null ? (
+          <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: C.inkMid }}>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando incidencias abiertas…
+          </span>
+        ) : incidencias.length === 0 && !error ? (
+          <span className="text-[12.5px]" style={{ color: C.warn }}>
+            No hay incidencias abiertas. El cambio se registra cerrando una existente,
+            así los KPIs no cuentan el mismo evento dos veces — si esta falla no está
+            levantada, créala primero desde Incidencias.
+          </span>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {incidencias.slice(0, 8).map((i) => (
+              <button
+                key={i.id}
+                onClick={() => setElegida(i.id)}
+                aria-pressed={elegida === i.id}
+                className="rounded px-2.5 py-1.5 text-left text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                style={{
+                  background: elegida === i.id ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                  border: `1px solid ${elegida === i.id ? C.aqua : C.border}`,
+                  color: C.ink,
+                }}
+              >
+                {i.titulo}
+                {i.descripcion ? (
+                  <span className="mt-0.5 block text-[11.5px]" style={{ color: C.inkMid }}>
+                    {i.descripcion.slice(0, 90)}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {elegida && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <MetaText>¿Cómo lo configuraste?</MetaText>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(ETIQUETA_MODO) as ModoConfiguracion[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setModo(m)}
+                  aria-pressed={modo === m}
+                  className="rounded px-2.5 py-1.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  style={{
+                    background: modo === m ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                    border: `1px solid ${modo === m ? C.aqua : C.border}`,
+                    color: C.ink, fontWeight: modo === m ? 600 : 400,
+                  }}
+                >
+                  {ETIQUETA_MODO[m]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <MetaText>¿Cuánto te tomó?</MetaText>
+            <div className="flex flex-wrap gap-1.5">
+              {RANGOS_TIEMPO.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setRango(r.id)}
+                  aria-pressed={rango === r.id}
+                  className="rounded px-2.5 py-1.5 font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  style={{
+                    background: rango === r.id ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                    border: `1px solid ${rango === r.id ? C.aqua : C.border}`,
+                    color: C.ink, fontWeight: rango === r.id ? 600 : 400,
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {error && <span className="text-[12.5px]" style={{ color: C.crit }}>{error}</span>}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={guardar}
+          disabled={!elegida || !modo || !rango || guardando}
+          className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-semibold outline-none disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ color: C.ok, background: `color-mix(in srgb, ${C.ok} 16%, transparent)` }}
+        >
+          {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          Guardar
+        </button>
+        <button
+          onClick={() => setAbierto(false)}
+          className="rounded px-3 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ color: C.inkMid }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
  * Aportar el valor de UN parámetro desde terreno.
  *
  * No edita el catálogo: registra una propuesta. Los datos viven en el repo y un
@@ -874,6 +1151,7 @@ function RecetasPorEquipo({
                               {p.nota}
                             </span>
                           )}
+                          <RegistrarCambio posicion={p} />
                         </div>
                       </td>
                     </tr>
@@ -884,6 +1162,8 @@ function RecetasPorEquipo({
           </tbody>
         </table>
       </div>
+
+      <PanelEvidencia />
 
       <p className="m-0 text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
         {RESUMEN_RECETAS.posiciones} posiciones · {RESUMEN_RECETAS.confirmados} de{' '}
