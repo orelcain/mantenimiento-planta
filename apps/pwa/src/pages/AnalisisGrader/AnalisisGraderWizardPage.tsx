@@ -861,10 +861,11 @@ export function AnalisisGraderWizardPage() {
         onMonthStatsLoaded={setCalendarSlxStats}
         onSelectShift={(s) => setSelectedDateKey(s.dateKey)}
         onOpenShift={(s) => {
-          // Mismo destino que el botón "Cargar" del calendario retirado.
-          const q = new URLSearchParams({ date: s.dateKey, shift: s.shiftId, autoload: '1' })
-          if (lineId !== DEFAULT_PLANT_LINE_ID) q.set('linea', lineId)
-          navigate(`/analisis-grader?${q.toString()}`)
+          // Ruta CANÓNICA del detalle de turno. Antes apuntaba a
+          // `/analisis-grader?date=…&autoload=1`, que no hacía nada: ya
+          // estamos en esa ruta, así que React Router no remontaba nada.
+          const linea = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(lineId)}` : ''
+          navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
         }}
       />
       </>
