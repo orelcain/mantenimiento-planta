@@ -28,6 +28,8 @@ const lazyWithReload = (fn: () => Promise<any>) =>
 // Code Splitting con autorecarga (todas las páginas, incluida Login: es la
 // primera que pide un usuario deslogueado justo después de un deploy)
 const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
+/** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
+const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
 import { HomeRedirect } from '@/components/HomeRedirect'
 const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
@@ -231,6 +233,18 @@ export function App() {
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
             <Routes>
+              {/* Banco de pruebas de la Matriz de turnos — SOLO en dev.
+                  Vite elimina la rama entera del bundle de producción. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/matriz-turnos"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <MatrizTurnosDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
               {/* Public routes */}
           <Route
             path="/login"
