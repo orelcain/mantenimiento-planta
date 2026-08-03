@@ -20,7 +20,7 @@
  *
  * Los datos y su trazabilidad viven en `@/data/variadores`.
  */
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch } from 'lucide-react'
 import { useAuthStore } from '@/store'
@@ -35,6 +35,7 @@ import {
   TOTAL_FALLAS,
   POSICIONES,
   RESUMEN_RECETAS,
+  buscarFalla,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -529,9 +530,26 @@ function ChipSap({ codigo }: { codigo?: string }) {
  * Cada cinta/equipo con SU variador y SU motor — sin generalizar por familia.
  * Tabla densa: una fila por posición, se expande para ver los valores.
  */
-function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void }) {
+function RecetasPorEquipo({
+  onAbrirFicha,
+  posicionInicial,
+}: {
+  onAbrirFicha: (id: string) => void
+  /** Viene de ?posicion=<id>: abre esa fila ya expandida y la deja a la vista. */
+  posicionInicial?: string | null
+}) {
   const [q, setQ] = useState('')
-  const [abierta, setAbierta] = useState<string | null>(null)
+  const [abierta, setAbierta] = useState<string | null>(posicionInicial ?? null)
+
+  useEffect(() => {
+    if (!posicionInicial) return
+    setAbierta(posicionInicial)
+    // La fila puede quedar bajo el pliegue en una tabla de 17: llevarla a la vista.
+    const t = window.setTimeout(() => {
+      document.getElementById(`pos-${posicionInicial}`)?.scrollIntoView({ block: 'center' })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [posicionInicial])
 
   const visibles = useMemo(() => {
     const term = norm(q.trim())
@@ -611,9 +629,13 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
               return (
                 <Fragment key={p.id}>
                   <tr
+                    id={`pos-${p.id}`}
                     onClick={() => setAbierta(expandida ? null : p.id)}
                     className="cursor-pointer"
-                    style={{ borderBottom: `1px solid ${C.border}` }}
+                    style={{
+                      borderBottom: `1px solid ${C.border}`,
+                      ...(expandida ? { background: `color-mix(in srgb, ${C.aqua} 7%, transparent)` } : {}),
+                    }}
                   >
                     <td
                       className="px-3 py-2.5 align-top sm:sticky sm:left-0 sm:z-[1] sm:min-w-[210px]"
@@ -872,18 +894,24 @@ export function VariadoresPage() {
   const [params, setParams] = useSearchParams()
   const abierta = params.get('ficha')
   const vistaParam = params.get('vista')
-  const vista = vistaParam === 'equivalencias' || vistaParam === 'recetas' ? vistaParam : 'catalogo'
+  // ?posicion=<id> implica la vista de recetas: viene de la ficha de una máquina.
+  const vista = params.get('posicion')
+    ? 'recetas'
+    : vistaParam === 'equivalencias' || vistaParam === 'recetas' ? vistaParam : 'catalogo'
   const [q, setQ] = useState('')
-  const [seccion, setSeccion] = useState<'parametros' | 'fallas'>('parametros')
+  const [seccion, setSeccion] = useState<'parametros' | 'fallas'>(
+    params.get('seccion') === 'fallas' ? 'fallas' : 'parametros',
+  )
 
-  const abrirFicha = (id: string | null) => {
+  const abrirFicha = (id: string | null, sec: 'parametros' | 'fallas' = 'parametros') => {
     const p = new URLSearchParams(params)
     if (id) p.set('ficha', id)
     else p.delete('ficha')
+    p.delete('posicion')
     // Abrir hace push (atrás del celular vuelve al catálogo); cerrar REEMPLAZA,
     // para que atrás no re-abra la ficha recién cerrada.
     setParams(p, { replace: id === null })
-    setSeccion('parametros')
+    setSeccion(sec)
     window.scrollTo(0, 0)
   }
 
@@ -978,7 +1006,7 @@ export function VariadoresPage() {
         {ficha === null && vista === 'equivalencias' ? (
           <TablaEquivalencias />
         ) : ficha === null && vista === 'recetas' ? (
-          <RecetasPorEquipo onAbrirFicha={abrirFicha} />
+          <RecetasPorEquipo onAbrirFicha={abrirFicha} posicionInicial={params.get('posicion')} />
         ) : ficha === null ? (
           <>
             {/* Buscador */}
@@ -994,6 +1022,38 @@ export function VariadoresPage() {
                 style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
               />
             </div>
+
+            {/* Fallas que coinciden con lo buscado — el display no dice la marca */}
+            {(() => {
+              const fallas = buscarFalla(q)
+              if (!fallas.length) return null
+              return (
+                <div className="flex flex-col gap-2">
+                  <MetaText>
+                    {fallas.length} {fallas.length === 1 ? 'código de falla coincide' : 'códigos de falla coinciden'}
+                  </MetaText>
+                  <div className="flex flex-col gap-1.5">
+                    {fallas.slice(0, 6).map((r) => (
+                      <button
+                        key={`${r.fichaId}-${r.falla.codigo}`}
+                        onClick={() => abrirFicha(r.fichaId, 'fallas')}
+                        className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 rounded-lg px-3.5 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                        style={{ background: C.surface, border: `1px solid ${C.border}` }}
+                      >
+                        <span
+                          className="rounded px-1.5 py-0.5 font-mono text-[13px] font-bold"
+                          style={{ color: C.crit, background: `color-mix(in srgb, ${C.crit} 16%, transparent)` }}
+                        >
+                          {r.falla.codigo}
+                        </span>
+                        <span className="text-[13.5px] font-medium" style={{ color: C.ink }}>{r.falla.nombre}</span>
+                        <span className="text-[12.5px]" style={{ color: C.inkMid }}>· {r.fichaNombre}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Familias */}
             <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>

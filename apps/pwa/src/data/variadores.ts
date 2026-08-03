@@ -991,6 +991,40 @@ export const POSICIONES: PosicionReceta[] = [
   },
 ]
 
+/** Una falla encontrada en el catálogo completo, con la familia a la que pertenece. */
+export interface FallaEncontrada {
+  falla: FallaVariador
+  fichaId: string
+  fichaNombre: string
+}
+
+/**
+ * Busca un código de falla en las 8 familias a la vez.
+ * El caso real: el display muestra «O-I» y el técnico no tiene por qué saber
+ * que ese código es de un SEW. Antes había que abrir ficha por ficha.
+ */
+export function buscarFalla(termino: string): FallaEncontrada[] {
+  const t = termino.trim().toLowerCase()
+  if (t.length < 2) return []
+  const out: FallaEncontrada[] = []
+  for (const f of VARIADORES) {
+    for (const falla of f.fallas ?? []) {
+      if (
+        falla.codigo.toLowerCase().includes(t) ||
+        falla.nombre.toLowerCase().includes(t)
+      ) {
+        out.push({ falla, fichaId: f.id, fichaNombre: f.nombre })
+      }
+    }
+  }
+  // Coincidencia exacta de código primero: es lo que se tecleó mirando el display.
+  return out.sort((a, b) => {
+    const ea = a.falla.codigo.toLowerCase() === t ? 0 : 1
+    const eb = b.falla.codigo.toLowerCase() === t ? 0 : 1
+    return ea - eb
+  })
+}
+
 /** Posiciones de una máquina — para la pestaña «Variadores» de su ficha. */
 export const posicionesDeMaquina = (slug: string): PosicionReceta[] =>
   POSICIONES.filter((p) => p.maquinaSlug === slug)

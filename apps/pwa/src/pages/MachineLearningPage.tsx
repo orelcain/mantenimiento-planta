@@ -1718,7 +1718,7 @@ function VariadoresDeEstaMaquina({ posiciones }: { posiciones: PosicionReceta[] 
         return (
           <button
             key={p.id}
-            onClick={() => navigate('/aprendizaje/variadores?vista=recetas')}
+            onClick={() => navigate(`/aprendizaje/variadores?posicion=${encodeURIComponent(p.id)}`)}
             className="dp-part-group"
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', textAlign: 'left', cursor: 'pointer' }}
           >
