@@ -550,13 +550,15 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
       </div>
 
       <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 860 }}>
+        <table className="w-full border-collapse text-[13px] sm:min-w-[860px]">
           <thead>
             <tr>
               {COLS.map((h, k) => (
                 <th
                   key={h}
-                  className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                  className={`whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold${
+                    k > 0 && k < COLS.length - 1 ? ' hidden sm:table-cell' : ''
+                  }`}
                   style={{
                     background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
                     ...(k === 0 ? { position: 'sticky' as const, left: 0, zIndex: 2, borderRight: `1px solid ${C.border}` } : {}),
@@ -588,24 +590,35 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
                     style={{ borderBottom: `1px solid ${C.border}` }}
                   >
                     <td
-                      className="px-3 py-2.5 align-top"
-                      style={{
-                        position: 'sticky', left: 0, zIndex: 1, background: C.surface,
-                        borderRight: `1px solid ${C.border}`, minWidth: 210,
-                      }}
+                      className="px-3 py-2.5 align-top sm:sticky sm:left-0 sm:z-[1] sm:min-w-[210px]"
+                      style={{ background: C.surface, borderRight: `1px solid ${C.border}` }}
                     >
                       <span className="flex items-start gap-1.5">
                         <ChevronRight
                           className="mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform"
                           style={{ color: C.inkLo, transform: expandida ? 'rotate(90deg)' : undefined }}
                         />
-                        <span>
+                        <span className="min-w-0">
                           <span className="block font-medium leading-snug" style={{ color: C.ink }}>{p.equipo}</span>
                           <span className="block text-[11.5px]" style={{ color: C.inkMid }}>{p.zona}</span>
+                          {/* En celular las columnas del medio se ocultan: su contenido reaparece acá. */}
+                          <span className="mt-1.5 flex flex-col gap-0.5 sm:hidden">
+                            <span className="text-[12px]" style={{ color: C.aquaBright }}>
+                              {fam ? fam.nombre : 'Variador por identificar'}
+                            </span>
+                            <span className="font-mono text-[11.5px] leading-snug" style={{ color: C.inkMid }}>
+                              {p.motor}
+                            </span>
+                            {p.sapMotor && (
+                              <span className="font-mono text-[11.5px]" style={{ color: C.inkMid }}>
+                                SAP {p.sapMotor}
+                              </span>
+                            )}
+                          </span>
                         </span>
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 align-top" style={{ color: C.inkMid, minWidth: 160 }}>
+                    <td className="hidden px-3 py-2.5 align-top sm:table-cell" style={{ color: C.inkMid, minWidth: 160 }}>
                       {fam ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
@@ -621,11 +634,11 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
                         <span className="mt-0.5 block text-[11.5px]" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 align-top font-mono text-[12px]" style={{ color: C.inkMid, minWidth: 200 }}>
+                    <td className="hidden px-3 py-2.5 align-top font-mono text-[12px] sm:table-cell" style={{ color: C.inkMid, minWidth: 200 }}>
                       {p.motor}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top"><ChipSap codigo={p.sapMotor} /></td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top"><ChipSap codigo={p.sapVariador} /></td>
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 align-top sm:table-cell"><ChipSap codigo={p.sapMotor} /></td>
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 align-top sm:table-cell"><ChipSap codigo={p.sapVariador} /></td>
                     <td className="whitespace-nowrap px-3 py-2.5 align-top">
                       <span
                         className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11.5px] font-medium tabular-nums"
@@ -644,36 +657,34 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
                     <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                       <td colSpan={COLS.length} className="px-3 py-3" style={{ background: C.bgPanel }}>
                         <div className="flex flex-col gap-2.5">
-                          <div className="overflow-x-auto">
-                            <table className="border-collapse text-[12.5px]">
-                              <tbody>
-                                {p.valores.map((val) => (
-                                  <tr key={val.codigo}>
-                                    <td className="whitespace-nowrap py-1 pr-3 font-mono font-semibold align-top" style={{ color: C.aquaBright }}>
-                                      {val.codigo}
-                                    </td>
-                                    <td className="whitespace-nowrap py-1 pr-3 font-mono tabular-nums align-top" style={{ color: C.ink }}>
-                                      {val.valor}
-                                    </td>
-                                    <td className="whitespace-nowrap py-1 pr-3 align-top">
-                                      <span
-                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
-                                        style={{
-                                          color: COLOR_VALOR[val.estado],
-                                          background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
-                                        }}
-                                      >
-                                        {ROTULO_VALOR[val.estado]}
-                                      </span>
-                                    </td>
-                                    <td className="py-1 align-top" style={{ color: C.inkMid, maxWidth: 460, lineHeight: 1.45 }}>
-                                      {val.nota}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                            {p.valores.map((val) => (
+                              <li key={val.codigo} className="flex flex-col gap-0.5">
+                                <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                  <span className="font-mono text-[12.5px] font-semibold" style={{ color: C.aquaBright }}>
+                                    {val.codigo}
+                                  </span>
+                                  <span className="font-mono text-[12.5px] tabular-nums" style={{ color: C.ink }}>
+                                    {val.valor}
+                                  </span>
+                                  <span
+                                    className="rounded px-1.5 py-0.5 text-[11px]"
+                                    style={{
+                                      color: COLOR_VALOR[val.estado],
+                                      background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
+                                    }}
+                                  >
+                                    {ROTULO_VALOR[val.estado]}
+                                  </span>
+                                </span>
+                                {val.nota && (
+                                  <span className="max-w-[70ch] text-[12px] leading-snug" style={{ color: C.inkMid }}>
+                                    {val.nota}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                           {p.nota && (
                             <span
                               className="block pl-2 text-[12.5px] leading-snug"
