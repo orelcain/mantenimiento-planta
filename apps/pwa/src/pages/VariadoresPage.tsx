@@ -37,7 +37,7 @@ import {
 } from '@/services/variadoresCambios'
 import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
-import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo } from '@/data/variadoresUi'
+import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo, aviso } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
 import {
   VARIADORES,
@@ -52,6 +52,8 @@ import {
   buscarParametro,
   equivalenciaDe,
   compararEquivalencia,
+  traducirReceta,
+  alternativasPara,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -1245,6 +1247,7 @@ function RecetasPorEquipo({
                               {p.nota}
                             </span>
                           )}
+                          <ReemplazoOtraMarca posicion={p} onAbrirFicha={onAbrirFicha} />
                           <RegistrarCambio posicion={p} />
                         </div>
                       </td>
@@ -1265,6 +1268,211 @@ function RecetasPorEquipo({
         levanten; los de motor salen de la hoja «Motores nuevos planta» — confirmar que esa
         columna sea el SAP.
       </p>
+    </div>
+  )
+}
+
+// ── Reemplazo por otra marca ──────────────────────────────────────────────────
+/**
+ * La misma cinta, configurada con el variador que haya en bodega.
+ *
+ * El caso real: se quema el V20 del cuello de cisnes, no hay otro V20 y sí un
+ * ATV312. Sin esto hay que traducir a mano, con la línea parada.
+ *
+ * Se muestran TRES bloques distintos a propósito, porque cambiar de marca no es
+ * renombrar códigos: lo que se traduce, lo que el repuesto pide de más — ahí
+ * está el peligro: si nadie lo carga, la cinta anda igual hasta que arranca sola
+ * o se quema el motor — y lo que el repuesto no pide.
+ */
+function ReemplazoOtraMarca({
+  posicion,
+  onAbrirFicha,
+}: {
+  posicion: PosicionReceta
+  onAbrirFicha: AbrirFicha
+}) {
+  const [destinoId, setDestinoId] = useState<string | null>(null)
+  const alternativas = useMemo(() => alternativasPara(posicion), [posicion])
+  const t = useMemo(
+    () => (destinoId ? traducirReceta(posicion, destinoId) : null),
+    [posicion, destinoId],
+  )
+
+  if (posicion.variadorId === null || alternativas.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg p-3" style={panelEstilo}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] font-semibold" style={{ color: C.ink }}>
+          Si hay que reemplazarlo, voy a poner un:
+        </span>
+        {alternativas.map((f) => {
+          const on = f.id === destinoId
+          return (
+            <button
+              key={f.id}
+              onClick={() => setDestinoId(on ? null : f.id)}
+              aria-pressed={on}
+              className={`rounded px-3 py-2 text-[12px] transition-colors ${FOCO}`}
+              style={{
+                background: on ? tinte.suave(C.aqua) : C.bgPanel,
+                border: `1px solid ${on ? C.aqua : C.border}`,
+                color: on ? C.aquaBright : C.ink,
+                fontWeight: on ? 600 : 400,
+              }}
+            >
+              {f.nombre}
+            </button>
+          )
+        })}
+      </div>
+
+      {t && (
+        <div className="flex flex-col gap-3">
+          {/* Un partidor suave no reemplaza al variador de una cinta. */}
+          {!t.compatible && (
+            <div
+              className="rounded px-3 py-2 text-[13px] leading-snug"
+              style={aviso(C.danger)}
+            >
+              <strong>No sirve para esta cinta.</strong> {t.motivo} Al revés sí se puede: un
+              variador reemplaza a un partidor suave.
+            </div>
+          )}
+
+          {t.compatible && (
+            <>
+              <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
+                <table className="w-full border-collapse text-[13px]" style={{ minWidth: 520 }}>
+                  <thead>
+                    <tr>
+                      {['Qué es', 'Ahora', `En el ${t.destino.nombre}`, 'Valor'].map((h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap px-3 py-2 text-left text-[12px] font-semibold"
+                          style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {t.filas.map((f) => (
+                      <tr key={f.codigoOrigen} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td className="px-3 py-2 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
+                          {f.concepto}
+                          {f.codigoDestino === null && (
+                            <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
+                              El {t.destino.nombre} no lo pide. No es un dato que falte.
+                            </span>
+                          )}
+                          {f.codigoDestino !== null && !f.valorTransferible && (
+                            <span className="mt-1 block text-[12px]" style={{ color: C.warn }}>
+                              Mismo concepto, pero cada marca lo expresa distinto: NO copiar el
+                              valor. Abrir el parámetro y cargarlo en las unidades del repuesto.
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 align-top font-mono" style={{ color: C.inkLo }}>
+                          {f.codigoOrigen}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 align-top font-mono font-semibold">
+                          {f.codigoDestino ? (
+                            <button
+                              onClick={() =>
+                                onAbrirFicha(t.destino.id, 'parametros', { codigo: f.codigoDestino as string })
+                              }
+                              className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                              style={{ color: C.aquaBright }}
+                            >
+                              {f.codigoDestino}
+                            </button>
+                          ) : (
+                            <span style={{ color: C.inkGhost }}>—</span>
+                          )}
+                        </td>
+                        <td
+                          className="whitespace-nowrap px-3 py-2 align-top font-mono tabular-nums"
+                          style={{
+                            color: f.codigoDestino && f.valorTransferible ? C.ink : C.inkGhost,
+                            // Tachado cuando el valor NO se copia: que no se pueda
+                            // leer la fila de corrido y transcribirlo por inercia.
+                            textDecoration: f.codigoDestino && !f.valorTransferible ? 'line-through' : undefined,
+                          }}
+                        >
+                          {f.valor}
+                          <span
+                            className="ml-2 rounded px-2 py-1 text-[11px] font-sans"
+                            style={{
+                              color: COLOR_VALOR[f.estado],
+                              background: tinte.suave(COLOR_VALOR[f.estado]),
+                            }}
+                          >
+                            {ROTULO_VALOR[f.estado]}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* El punto ciego: lo que el repuesto pide y la receta no traía. */}
+              {t.pideAdemas.length > 0 && (
+                <div className="rounded px-3 py-2 text-[13px] leading-relaxed" style={aviso(C.warn)}>
+                  <strong>
+                    El {t.destino.nombre} pide {t.pideAdemas.length}{' '}
+                    {t.pideAdemas.length === 1 ? 'parámetro' : 'parámetros'} que esta receta no
+                    traía
+                  </strong>{' '}
+                  — el equipo anterior no los usaba. Hay que cargarlos igual:
+                  <ul className="mt-2 flex list-none flex-col gap-2 pl-0">
+                    {t.pideAdemas.map((x) => (
+                      <li key={x.codigo}>
+                        <button
+                          onClick={() => onAbrirFicha(t.destino.id, 'parametros', { codigo: x.codigo })}
+                          className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                          style={{ color: C.aquaBright }}
+                        >
+                          {x.codigo}
+                        </button>{' '}
+                        <span style={{ color: C.ink }}>{x.concepto}</span>
+                        {x.menu && (
+                          <span className="ml-2 font-mono text-[11px]" style={{ color: C.inkLo }}>
+                            menú {x.menu.split(' ')[0]}
+                            {x.rango && x.rango !== '—' ? ` · ${x.rango}` : ''}
+                            {x.fabrica && x.fabrica !== '—' ? ` · fábrica ${x.fabrica}` : ''}
+                          </span>
+                        )}
+                        {x.nota && (
+                          <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
+                            {x.nota}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {t.sinTraducir.length > 0 && (
+                <MetaText>
+                  Sin equivalencia conocida, van tal cual:{' '}
+                  <span className="font-mono">
+                    {t.sinTraducir.map((v) => v.codigo).join(' · ')}
+                  </span>
+                </MetaText>
+              )}
+
+              <MetaText>
+                Antes de cargar nada: verificar que el calibre del repuesto aguante la corriente
+                de este motor.
+              </MetaText>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
