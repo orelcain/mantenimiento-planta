@@ -1,30 +1,18 @@
 /**
- * Vista de período del Análisis Grader — Matriz o Lista, nunca las dos.
+ * Vista de período del Análisis Grader — la Matriz turno × día.
  *
- * Un solo hook de datos, dos presentaciones. La Matriz responde "¿cómo viene el
- * mes y dónde está el problema?"; la Lista responde "¿cuáles son y en qué orden?".
- * Mostrarlas juntas obligaba al ojo a elegir cuál mirar y ninguna ganaba, así
- * que se alternan:
- *
- *   - Por defecto: Matriz.
- *   - Bajo ~700 px la Matriz no es honesta (31 columnas no entran), así que la
- *     vista pasa a Lista SOLA. No es una preferencia: es que a ese ancho la
- *     grilla miente.
- *   - Al activar un filtro la pregunta cambia de "cómo viene el mes" a "cuáles
- *     son", y ahí la Lista es la respuesta — se sugiere el cambio sin forzarlo.
+ * Hubo una vista Lista alternativa con toggle. Se retiró a pedido de Orel
+ * (2026-08-03): "no la entiendo, es difícil de entender". Dos formas de leer lo
+ * mismo obligaban a elegir cuál mirar, y la que ganaba siempre era la matriz.
+ * En pantalla angosta la matriz hace scroll horizontal, que es honesto: se ve
+ * menos mes, pero lo que se ve es cierto.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, List, Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Info, ChevronLeft, ChevronRight } from 'lucide-react'
 import { GraderShiftPeriodMatrix } from '@/components/grader/GraderShiftPeriodMatrix'
-import { GraderShiftPeriodList } from '@/components/grader/GraderShiftPeriodList'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { MATRIX_KPIS, DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
-
-/** Bajo este ancho la Matriz deja de ser legible y la vista pasa a Lista. */
-const MATRIX_MIN_WIDTH = 700
-
-export type PeriodViewMode = 'matrix' | 'list'
 
 export interface GraderShiftPeriodViewProps {
   shifts: readonly PeriodShift[]
@@ -51,45 +39,7 @@ export function GraderShiftPeriodView({
   month, onMonthChange, className,
 }: GraderShiftPeriodViewProps) {
   const [kpi, setKpi] = useState<MatrixKpi>(DEFAULT_MATRIX_KPI)
-  const [mode, setMode] = useState<PeriodViewMode>('matrix')
   const [onlyOutOfShift, setOnlyOutOfShift] = useState(false)
-  const [narrow, setNarrow] = useState(false)
-
-  const hostRef = useRef<HTMLDivElement>(null)
-
-  // Ancho del CONTENEDOR, no del viewport: la vista convive con un panel
-  // lateral que se abre y cierra, así que el tamaño de la ventana no dice si
-  // la grilla entra.
-  //
-  // Se mide por tres vías a propósito. `ResizeObserver` es la correcta, pero no
-  // siempre corre: depende del ciclo de layout, y en una pestaña que no se está
-  // pintando (segundo plano, pane oculto) puede no disparar nunca. Sin el
-  // respaldo, la vista se queda en Matriz a 600 px mostrando una grilla que no
-  // entra — que es exactamente lo que se quería evitar.
-  useEffect(() => {
-    const measure = () => {
-      const el = hostRef.current
-      if (!el) return
-      const w = el.getBoundingClientRect().width
-      // 0 = aún sin layout; medir ahí daría un falso "angosto".
-      if (w > 0) setNarrow(w < MATRIX_MIN_WIDTH)
-    }
-
-    measure()                                    // 1. al montar
-    window.addEventListener('resize', measure)   // 2. al cambiar la ventana
-
-    let ro: ResizeObserver | null = null          // 3. al cambiar el contenedor
-    if (hostRef.current && typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(measure)
-      ro.observe(hostRef.current)
-    }
-    return () => {
-      window.removeEventListener('resize', measure)
-      ro?.disconnect()
-    }
-  }, [])
-
-  const effectiveMode: PeriodViewMode = narrow ? 'list' : mode
 
   const visible = useMemo(
     () => (onlyOutOfShift ? shifts.filter(s => s.unscheduled) : shifts),
@@ -126,7 +76,7 @@ export function GraderShiftPeriodView({
   )
 
   return (
-    <div ref={hostRef} className={cn('flex flex-col gap-3', className)}>
+    <div className={cn('flex flex-col gap-3', className)}>
       {/* Una sola fila de filtros, arriba de todo lo que alcanza. */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Navegación de mes. La traía el calendario que esta vista reemplaza:
@@ -214,33 +164,6 @@ export function GraderShiftPeriodView({
             </span>
           </span>
         ) : null}
-
-        <span className="flex-1" />
-
-        {/* El toggle desaparece cuando el ancho ya decidió por nosotros:
-            ofrecer "Matriz" en una pantalla donde no entra sería mentir. */}
-        {!narrow && (
-          <div className="inline-flex rounded-md border border-border overflow-hidden" role="group" aria-label="Vista">
-            <button
-              type="button" onClick={() => setMode('matrix')} aria-pressed={mode === 'matrix'}
-              className={cn('px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
-                mode === 'matrix' ? 'bg-primary text-primary-foreground font-semibold'
-                                  : 'bg-card text-muted-foreground hover:bg-accent')}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" aria-hidden /> Matriz
-            </button>
-            <button
-              type="button" onClick={() => setMode('list')} aria-pressed={mode === 'list'}
-              className={cn('px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
-                mode === 'list' ? 'bg-primary text-primary-foreground font-semibold'
-                                : 'bg-card text-muted-foreground hover:bg-accent')}
-            >
-              <List className="h-3.5 w-3.5" aria-hidden /> Lista
-            </button>
-          </div>
-        )}
       </div>
 
       {error && (
@@ -256,13 +179,6 @@ export function GraderShiftPeriodView({
           Shoplogix no respondió: se muestran solo los turnos con Excel del Grader cargado.
         </div>
       )}
-      {narrow && !loading && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground
-                        inline-flex items-center gap-2">
-          <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          A este ancho el mes completo no entra en la grilla — se muestra la lista.
-        </div>
-      )}
       {onlyOutOfShift && (
         <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Mostrando solo producción <b className="text-foreground">fuera de turno</b>:{' '}
@@ -273,18 +189,12 @@ export function GraderShiftPeriodView({
         </div>
       )}
 
-      {effectiveMode === 'matrix' ? (
-        <GraderShiftPeriodMatrix
-          shifts={visible} rows={visibleRows} days={days} byKey={byKey} kpi={kpi}
-          loading={loading} selectedKey={selectedKey} onSelect={onSelect}
-          onOpenShift={onOpenShift}
-        />
-      ) : (
-        <GraderShiftPeriodList
-          shifts={visible} days={days} kpi={kpi} loading={loading}
-          selectedKey={selectedKey} onSelect={onSelect}
-        />
-      )}
+      <GraderShiftPeriodMatrix
+        shifts={visible} rows={visibleRows} days={days} byKey={byKey} kpi={kpi}
+        loading={loading} selectedKey={selectedKey} onSelect={onSelect}
+        onOpenShift={onOpenShift}
+      />
+
     </div>
   )
 }

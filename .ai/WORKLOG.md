@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-03 - claude - Afinado de la matriz de turnos: 4 fixes de uso real
+
+- Orel probo la vista en prod y reporto 4 cosas. Todas verificadas en el navegador, no solo compiladas.
+- **"Ver turno" no hacia nada** (bug real): navegaba a `/analisis-grader?date=…&shift=…&autoload=1`, pero ya estabamos EN esa ruta → React Router no remontaba nada. Existe una ruta CANONICA de detalle, `/analisis-grader/turno/:dateKey__:shiftId`, que es a donde apunta ahora. Verificado: navega a `/analisis-grader/turno/2026-08-03__Turno%201%20Lunes`.
+- **"Turno 1 Lunes"**: Shoplogix pega el dia de la semana a algunos shiftId. El dia ya se ve en la columna de la matriz, asi que repetirlo confunde ("¿por que Lunes? quitalo"). Nuevo `displayShiftName()` quita SOLO el sufijo de dia; el shiftId crudo se conserva intacto (es la clave de Firestore y lo que se manda a la ruta de detalle). Tambien en el aria-label, que decia una cosa distinta a la pantalla.
+- **Vista Lista retirada** ("no la entiendo... mejor quitemosla y solo con la vista matriz"). Se borro el componente y el toggle. En pantalla angosta la matriz hace scroll horizontal — se ve menos mes, pero lo que se ve es cierto.
+- **Salto de layout al seleccionar un turno**: el panel de abajo pasaba de una linea de placeholder a una fila de datos (que ademas envuelve a 2 en pantallas medianas) y la pagina daba un tironazo. Alto reservado con `min-h`. Medido en el navegador: delta 0 en el panel, en `scrollHeight` y en la posicion de las celdas.
+- Archivos: `services/grader/graderShiftDisplay.ts` (+`displayShiftName`), `components/grader/GraderShiftPeriodMatrix.tsx`, `GraderShiftPeriodView.tsx`, borrado `GraderShiftPeriodList.tsx`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificacion: tsc y eslint limpios; 534 tests verdes (4 nuevos de `displayShiftName`, incluido "solo el SUFIJO" y "nunca devuelve vacio"); los 4 fixes comprobados en el navegador con datos reales.
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel pidio mejorar la exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos tipicos de gerencia) — trabajo aparte, no entra aca.
+
 ## 2026-08-03 - claude - Retirado GraderHistoricalCalendar (5.756 lineas) del bundle
 
 - Cierra el pendiente que dejo #349: el calendario ya no se montaba en el Wizard, pero seguia entrando al bundle por imports estaticos. Ahora se borro el archivo.

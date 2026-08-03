@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 import { Sun, Sunset, Moon, Sunrise, Clock } from 'lucide-react'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { formatShiftWindow } from '@/services/grader/graderShiftPeriod'
-import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { getShiftMeta, displayShiftName } from '@/services/grader/graderShiftDisplay'
 import {
   matrixKpiMeta, matrixKpiValue, formatMatrixKpi, isBelowMatrixTarget,
   type MatrixKpi,
@@ -190,7 +190,7 @@ export function GraderShiftPeriodMatrix({
                               residuo sin turno no ES un turno — mostrar el
                               string interno "Unscheduled" se leía como bug; se
                               nombra por lo que significa y lo que hay que hacer. */}
-                          {isOutOfShift ? 'Sin turno' : shiftId}
+                          {isOutOfShift ? 'Sin turno' : displayShiftName(shiftId)}
                         </span>
                         <span className="block text-[9px] text-muted-foreground font-mono leading-tight">
                           {isOutOfShift ? 'configurar en Shoplogix' : meta.scheduleHint}
@@ -230,7 +230,7 @@ export function GraderShiftPeriodMatrix({
                             setTipPos({ x: r.left + r.width / 2, y: r.top })
                           }}
                           onBlur={() => { setHoverKey(k => (k === s.key ? null : k)); setTipPos(null) }}
-                          aria-label={`${shiftId}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}`}
+                          aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}`}
                           aria-pressed={selected}
                           className={cn(
                             'relative rounded-sm min-h-[40px]',
@@ -340,7 +340,7 @@ export function GraderShiftPeriodMatrix({
             }}
           >
             <div className="font-semibold mb-0.5">
-              {hovered.unscheduled ? 'Sin turno configurado' : hovered.shiftId}
+              {hovered.unscheduled ? 'Sin turno configurado' : displayShiftName(hovered.shiftId)}
               {/* Separador explícito: "Turno 2" + "01/08" pegados se lee "Turno 201/08". */}
               <span className="font-mono font-normal text-muted-foreground ml-1.5">
                 · {hovered.dateKey.slice(8, 10)}/{hovered.dateKey.slice(5, 7)}
@@ -364,12 +364,18 @@ export function GraderShiftPeriodMatrix({
 
         {/* Panel del turno SELECCIONADO — permanente, con el acceso al análisis.
             En tablet (sin hover) es la única superficie de lectura. */}
-        <div className={cn('mt-3 rounded-md border px-3 py-2 text-xs transition-colors',
-          focused ? 'border-primary/40 bg-accent/40' : 'border-dashed border-border')}>
+        <div className={cn(
+          'mt-3 rounded-md border px-3 py-2 text-xs transition-colors',
+          // Alto reservado: sin esto, al seleccionar un turno el panel pasa de
+          // una linea de placeholder a una fila de datos (que ademas envuelve
+          // a 2 en pantallas medianas) y toda la pagina da un salto.
+          'min-h-[3.25rem] flex items-center',
+          focused ? 'border-primary/40 bg-accent/40' : 'border-dashed border-border',
+        )}>
           {focused ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 w-full">
               <span className="font-semibold">
-                {focused.unscheduled ? 'Sin turno configurado' : focused.shiftId}
+                {focused.unscheduled ? 'Sin turno configurado' : displayShiftName(focused.shiftId)}
               </span>
               <span className="font-mono text-muted-foreground">
                 {focused.dateKey.slice(8, 10)}/{focused.dateKey.slice(5, 7)} · {formatShiftWindow(focused)}

@@ -453,3 +453,21 @@ export function isSignificantSlxShift(
 export function isUnscheduledShift(shiftId: string | null | undefined): boolean {
   return shiftId === 'Unscheduled'
 }
+
+/**
+ * Nombre del turno para MOSTRAR en la UI.
+ *
+ * Shoplogix emite algunos shiftId con el día de la semana pegado
+ * ("Turno 1 Lunes", la madrugada del lunes en Chonchi). El día ya se ve en la
+ * columna de la matriz y en la fecha de la lista, así que repetirlo en el
+ * nombre solo confunde — Orel: "¿por qué Lunes? quítalo".
+ *
+ * El shiftId CRUDO se conserva intacto en `PeriodShift.shiftId`: es la clave
+ * de Firestore y lo que se manda a la ruta de detalle. Esto es solo display.
+ */
+const DIA_SEMANA_SUFIJO = /\s+(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s*$/i
+
+export function displayShiftName(shiftId: string): string {
+  const limpio = shiftId.replace(DIA_SEMANA_SUFIJO, '').trim()
+  return limpio.length > 0 ? limpio : shiftId
+}
