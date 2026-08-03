@@ -52,6 +52,17 @@ const HEAVY_ASSET_RE = /\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)$/i
 // al hacer GET de mant.html y muestra "no internet" antes de ejecutar
 // cualquier JS. La precarga ocurre en el evento `install` del SW.
 const SHELL_CACHE = 'mant-shell-v3'
+
+// ─── App Shell de la PWA principal ─────────────────────────────────
+// Para que la app ABRA sin señal: el técnico consulta el catálogo de
+// variadores parado frente a un tablero, donde no siempre hay cobertura.
+// APP_SHELL guarda el index.html; APP_ASSETS los chunks JS/CSS.
+// Los assets llevan hash en el nombre (index-a1b2c3.js), o sea que son
+// inmutables: si cambia el contenido, cambia la URL. Por eso cache-first
+// para ellos es seguro, y network-first para el HTML es obligatorio.
+const APP_SHELL = 'app-shell-v1'
+const APP_ASSETS = 'app-assets-v1'
+const HASHED_ASSET_RE = /\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css)$/
 const SHELL_URLS = [
   './mant.html',
   'https://telegram.org/js/telegram-web-app.js',
@@ -74,6 +85,12 @@ self.addEventListener('install', (event) => {
         if (resp.ok) await cache.put(url, resp.clone())
       } catch (e){ console.warn('[sw] shell precache miss', url, e?.message) }
     }))
+    // El index.html de la app principal: sin esto la PWA no abre sin red.
+    try {
+      const appCache = await caches.open(APP_SHELL)
+      const resp = await fetch('./index.html', { cache: 'reload' })
+      if (resp.ok) await appCache.put('./index.html', resp.clone())
+    } catch (e) { console.warn('[sw] app shell precache miss', e?.message) }
     console.log('[sw] shell precached')
   })())
   self.skipWaiting()  // activar nuevo SW sin esperar a que se cierren clientes
@@ -84,6 +101,8 @@ self.addEventListener('activate', (event) => {
     // Limpiar caches viejas del shell (mantener CACHE_NAME para FCM)
     const keys = await caches.keys()
     await Promise.all(keys.filter(k => k.startsWith('mant-shell-') && k !== SHELL_CACHE).map(k => caches.delete(k)))
+    await Promise.all(keys.filter(k => k.startsWith('app-shell-') && k !== APP_SHELL).map(k => caches.delete(k)))
+    await Promise.all(keys.filter(k => k.startsWith('app-assets-') && k !== APP_ASSETS).map(k => caches.delete(k)))
     await self.clients.claim()
   })())
 })
@@ -184,6 +203,45 @@ self.addEventListener('fetch', (event) => {
       if (fresh) return fresh
       // Sin red ni cache: error 503 explicito
       return new Response('Offline y sin cache', { status: 503, statusText: 'offline-no-cache' })
+    })())
+    return
+  }
+
+  // ── Navegación de la app principal: network-first ──
+  // Con red siempre gana la red (el HTML nunca queda viejo). Sin red se
+  // devuelve el index.html cacheado y el router resuelve la ruta en el
+  // cliente, así cualquier vista ya visitada abre igual.
+  if (request.mode === 'navigate' && url.origin === self.location.origin && !url.pathname.endsWith('/mant.html')) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(request)
+        if (fresh && fresh.ok) {
+          const cache = await caches.open(APP_SHELL)
+          cache.put('./index.html', fresh.clone())
+        }
+        return fresh
+      } catch {
+        const cache = await caches.open(APP_SHELL)
+        const cached = await cache.match('./index.html')
+        if (cached) return cached
+        return new Response('Sin conexión y sin copia local todavía.', {
+          status: 503, statusText: 'offline-no-shell',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        })
+      }
+    })())
+    return
+  }
+
+  // ── Chunks JS/CSS con hash: cache-first (inmutables por nombre) ──
+  if (url.origin === self.location.origin && HASHED_ASSET_RE.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(APP_ASSETS)
+      const cached = await cache.match(request)
+      if (cached) return cached
+      const res = await fetch(request)
+      if (res && res.ok) cache.put(request, res.clone())
+      return res
     })())
     return
   }
