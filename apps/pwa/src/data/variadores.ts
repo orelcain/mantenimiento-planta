@@ -780,9 +780,17 @@ export interface PosicionReceta {
   zona: string
   /** id de la ficha de familia, para saltar al detalle del parámetro. */
   variadorId: string | null
-  /** Cómo identificar la unidad física (rótulo, posición en el tablero). */
+  /** Cómo identificar la unidad física (posición en el tablero, número de rotulado). */
   variadorEtiqueta?: string
   motor: string
+  /**
+   * Código SAP del MOTOR. Los de las cintas salen de la columna de códigos de la
+   * hoja «Motores nuevos planta» (10 dígitos, empiezan en 33) — ⚠ confirmar con
+   * Orel que esa columna sea efectivamente el SAP y no un código interno.
+   */
+  sapMotor?: string
+  /** Código SAP del VARIADOR. Pendiente: aún no se levantaron. */
+  sapVariador?: string
   valores: ValorReceta[]
   nota?: string
 }
@@ -809,8 +817,8 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'La única receta 100 % confirmada — la placa salió del grupo Levantamiento. Confirmar de pasada que el motor siga siendo este (foto de oct-2024).',
   },
   {
-    id: 'baader142-alimentadora', equipo: 'Cinta azul alimentadora Baader 142', zona: 'Salida Marel HG',
-    variadorId: 'atv312', variadorEtiqueta: 'rotulado «CHILLER» — el rótulo miente',
+    id: 'baader142-alimentadora', sapMotor: '3300124071', equipo: 'Cinta azul alimentadora Baader 142', zona: 'Salida Marel HG',
+    variadorId: 'atv312',
     motor: 'Sumitomo RNYM1-1320A-7 · 0,75 kW · 1:7 → 207 rpm salida',
     valores: [
       v('UnS', '380 V', V380),
@@ -822,7 +830,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'cuello-cisnes', equipo: 'Cinta cuello de cisnes', zona: 'Antes del infeed Marel',
+    id: 'cuello-cisnes', sapMotor: '3300124072', equipo: 'Cinta cuello de cisnes', zona: 'Antes del infeed Marel',
     variadorId: 'v20', motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30 → 48,3 rpm salida',
     valores: [
       v('P0304', '380 V', V380),
@@ -835,7 +843,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'transversal-baader', equipo: 'Cinta transversal salida Baader 142', zona: 'Salida Baader 142',
+    id: 'transversal-baader', sapMotor: '3300124073', equipo: 'Cinta transversal salida Baader 142', zona: 'Salida Baader 142',
     variadorId: 'v20', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30 → 48,3 rpm salida',
     valores: [
       v('P0304', '380 V', V380),
@@ -888,7 +896,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'filete-cinta', equipo: 'Cinta filete', zona: 'Tablero de filete',
+    id: 'filete-cinta', sapMotor: '3300124073', equipo: 'Cinta filete', zona: 'Tablero de filete',
     variadorId: 'sew', variadorEtiqueta: 'VARIADOR 1…6 — mapear número ↔ cinta',
     motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
@@ -901,7 +909,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'filete-desperdicio', equipo: 'Cinta desperdicio filete', zona: 'Tablero de filete',
+    id: 'filete-desperdicio', sapMotor: '3300124073', equipo: 'Cinta desperdicio filete', zona: 'Tablero de filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -909,7 +917,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'baader200-desperdicio', equipo: 'Cinta desperdicio Baader 200', zona: 'Tablero de filete',
+    id: 'baader200-desperdicio', sapMotor: '3300124073', equipo: 'Cinta desperdicio Baader 200', zona: 'Tablero de filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -917,7 +925,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'pimponeo', equipo: 'Cinta pimponeo + desperdicio pimponeo (2 cintas, 1 variador)', zona: 'Tablero de filete',
+    id: 'pimponeo', sapMotor: '3300124073', equipo: 'Cinta pimponeo + desperdicio pimponeo (2 cintas, 1 variador)', zona: 'Tablero de filete',
     variadorId: 'sew', motor: '2 × Sumitomo RNYM08-1320B-30 · 0,55 kW c/u',
     valores: [
       v('P-07', '380 V', V380),
@@ -928,7 +936,7 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'La posición más delicada del tablero: ni P-08 ni el guardamotor distinguen cada motor. Si una cinta se traba, el disparo puede llegar tarde.',
   },
   {
-    id: 'curva', equipo: 'Cinta curva', zona: 'Filete',
+    id: 'curva', sapMotor: '3300124073', equipo: 'Cinta curva', zona: 'Filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 ⏳ Orel duda — confirmar modelo',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -944,7 +952,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'z-elevadora-hg', equipo: 'Cinta Z elevadora HG', zona: 'Marel HG',
+    id: 'z-elevadora-hg', sapMotor: '3300124072', equipo: 'Cinta Z elevadora HG', zona: 'Marel HG',
     variadorId: null, variadorEtiqueta: 'variador por identificar',
     motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30',
     valores: [

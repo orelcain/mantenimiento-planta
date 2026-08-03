@@ -20,9 +20,9 @@
  *
  * Los datos y su trazabilidad viven en `@/data/variadores`.
  */
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Search, AlertTriangle, BookOpen } from 'lucide-react'
+import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check } from 'lucide-react'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText } from '@/components/learning/primitives'
 import {
@@ -478,24 +478,52 @@ const ROTULO_VALOR: Record<EstadoValor, string> = {
   sugerido: 'Sugerido',
 }
 
-/** Cada cinta/equipo con SU variador y SU motor — sin generalizar por familia. */
+/** Chip de código SAP con copiar al portapapeles — mismo patrón que Repuestos. */
+function ChipSap({ codigo }: { codigo?: string }) {
+  const [copiado, setCopiado] = useState(false)
+  if (!codigo) return <span className="font-mono text-[12px]" style={{ color: C.inkGhost }}>—</span>
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(codigo)
+        setCopiado(true)
+        window.setTimeout(() => setCopiado(false), 1400)
+      }}
+      title="Código SAP — clic para copiar"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+      style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
+    >
+      {codigo}
+      {copiado ? <Check className="h-3 w-3" style={{ color: C.ok }} /> : <Copy className="h-3 w-3" />}
+    </button>
+  )
+}
+
+/**
+ * Cada cinta/equipo con SU variador y SU motor — sin generalizar por familia.
+ * Tabla densa: una fila por posición, se expande para ver los valores.
+ */
 function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void }) {
   const [q, setQ] = useState('')
+  const [abierta, setAbierta] = useState<string | null>(null)
 
   const visibles = useMemo(() => {
     const term = norm(q.trim())
     if (!term) return POSICIONES
     return POSICIONES.filter((p) =>
-      norm(`${p.equipo} ${p.zona} ${p.motor} ${p.variadorEtiqueta ?? ''}`).includes(term),
+      norm(`${p.equipo} ${p.zona} ${p.motor} ${p.sapMotor ?? ''} ${p.variadorEtiqueta ?? ''}`).includes(term),
     )
   }, [q])
 
+  const COLS = ['Equipo', 'Variador', 'Motor', 'SAP motor', 'SAP variador', 'Seteos']
+
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 max-w-[68ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
+      <p className="m-0 max-w-[70ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
         La ficha del modelo dice qué parámetros existen; <strong style={{ color: C.ink }}>esta
-        vista dice qué valor va en cada cinta con su motor</strong>. Lo ámbar es lo que falta
-        levantar en terreno; lo rojo se deja sugerido hasta verificarlo con la carga real.
+        tabla dice qué valor va en cada cinta con su motor</strong>. Clic en una fila para ver
+        los seteos. Ámbar es lo que falta levantar en terreno; rojo queda sugerido hasta
+        verificarlo con la carga real.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -505,7 +533,7 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar cinta, zona o motor…"
+            placeholder="Buscar cinta, zona, motor o código SAP…"
             aria-label="Buscar posición"
             className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
@@ -521,79 +549,155 @@ function RecetasPorEquipo({ onAbrirFicha }: { onAbrirFicha: (id: string) => void
         </div>
       </div>
 
-      <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
-        {visibles.map((p) => {
-          const fam = p.variadorId ? VARIADORES.find((f) => f.id === p.variadorId) : null
-          return (
-            <div
-              key={p.id}
-              className="flex flex-col gap-2.5 rounded-lg p-4"
-              style={{ background: C.surface, border: `1px solid ${C.border}` }}
-            >
-              <div>
-                <h3 className="m-0 text-[15px] font-semibold leading-tight tracking-[-0.012em]" style={{ color: C.ink }}>
-                  {p.equipo}
-                </h3>
-                <span className="mt-0.5 block text-[12px]" style={{ color: C.inkMid }}>{p.zona}</span>
-              </div>
-
-              <div className="flex flex-col gap-1 text-[12.5px]" style={{ color: C.inkMid }}>
-                <span>
-                  {fam ? (
-                    <button
-                      onClick={() => onAbrirFicha(fam.id)}
-                      className="rounded font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-                      style={{ color: C.aquaBright }}
-                    >
-                      {fam.nombre}
-                    </button>
-                  ) : (
-                    <span style={{ color: C.warn }}>Variador por identificar</span>
-                  )}
-                  {p.variadorEtiqueta && <span style={{ color: C.warn }}> · {p.variadorEtiqueta}</span>}
-                </span>
-                <span>Motor: <span className="font-mono text-[12px]">{p.motor}</span></span>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 border-t pt-2.5" style={{ borderColor: C.border }}>
-                {p.valores.map((val) => {
-                  const color = COLOR_VALOR[val.estado]
-                  return (
-                    <span
-                      key={val.codigo}
-                      title={val.nota ? `${ROTULO_VALOR[val.estado]} — ${val.nota}` : ROTULO_VALOR[val.estado]}
-                      className="inline-flex items-baseline gap-1.5 rounded px-2 py-1 font-mono text-[12px] tabular-nums"
-                      style={{ color: C.ink, background: `color-mix(in srgb, ${color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 45%, transparent)` }}
-                    >
-                      <span className="font-semibold" style={{ color: C.aquaBright }}>{val.codigo}</span>
-                      {val.valor}
-                    </span>
-                  )
-                })}
-              </div>
-
-              {p.nota && (
-                <span
-                  className="block pl-2 text-[12px] leading-snug"
-                  style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
+      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 860 }}>
+          <thead>
+            <tr>
+              {COLS.map((h, k) => (
+                <th
+                  key={h}
+                  className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                  style={{
+                    background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
+                    ...(k === 0 ? { position: 'sticky' as const, left: 0, zIndex: 2, borderRight: `1px solid ${C.border}` } : {}),
+                  }}
                 >
-                  {p.nota}
-                </span>
-              )}
-            </div>
-          )
-        })}
-        {visibles.length === 0 && (
-          <p className="py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
-            Ninguna posición coincide con esa búsqueda.
-          </p>
-        )}
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.length === 0 && (
+              <tr>
+                <td colSpan={COLS.length} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                  Ninguna posición coincide con «{q.trim()}».
+                </td>
+              </tr>
+            )}
+            {visibles.map((p) => {
+              const fam = p.variadorId ? VARIADORES.find((f) => f.id === p.variadorId) : null
+              const conf = p.valores.filter((v) => v.estado === 'confirmado').length
+              const completo = conf === p.valores.length
+              const expandida = abierta === p.id
+              return (
+                <Fragment key={p.id}>
+                  <tr
+                    onClick={() => setAbierta(expandida ? null : p.id)}
+                    className="cursor-pointer"
+                    style={{ borderBottom: `1px solid ${C.border}` }}
+                  >
+                    <td
+                      className="px-3 py-2.5 align-top"
+                      style={{
+                        position: 'sticky', left: 0, zIndex: 1, background: C.surface,
+                        borderRight: `1px solid ${C.border}`, minWidth: 210,
+                      }}
+                    >
+                      <span className="flex items-start gap-1.5">
+                        <ChevronRight
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform"
+                          style={{ color: C.inkLo, transform: expandida ? 'rotate(90deg)' : undefined }}
+                        />
+                        <span>
+                          <span className="block font-medium leading-snug" style={{ color: C.ink }}>{p.equipo}</span>
+                          <span className="block text-[11.5px]" style={{ color: C.inkMid }}>{p.zona}</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 align-top" style={{ color: C.inkMid, minWidth: 160 }}>
+                      {fam ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
+                          className="rounded text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                          style={{ color: C.aquaBright }}
+                        >
+                          {fam.nombre}
+                        </button>
+                      ) : (
+                        <span style={{ color: C.warn }}>Por identificar</span>
+                      )}
+                      {p.variadorEtiqueta && (
+                        <span className="mt-0.5 block text-[11.5px]" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 align-top font-mono text-[12px]" style={{ color: C.inkMid, minWidth: 200 }}>
+                      {p.motor}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top"><ChipSap codigo={p.sapMotor} /></td>
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top"><ChipSap codigo={p.sapVariador} /></td>
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11.5px] font-medium tabular-nums"
+                        style={{
+                          color: completo ? C.ok : C.warn,
+                          background: `color-mix(in srgb, ${completo ? C.ok : C.warn} 16%, transparent)`,
+                        }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: completo ? C.ok : C.warn }} />
+                        {conf}/{p.valores.length}
+                      </span>
+                    </td>
+                  </tr>
+
+                  {expandida && (
+                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td colSpan={COLS.length} className="px-3 py-3" style={{ background: C.bgPanel }}>
+                        <div className="flex flex-col gap-2.5">
+                          <div className="overflow-x-auto">
+                            <table className="border-collapse text-[12.5px]">
+                              <tbody>
+                                {p.valores.map((val) => (
+                                  <tr key={val.codigo}>
+                                    <td className="whitespace-nowrap py-1 pr-3 font-mono font-semibold align-top" style={{ color: C.aquaBright }}>
+                                      {val.codigo}
+                                    </td>
+                                    <td className="whitespace-nowrap py-1 pr-3 font-mono tabular-nums align-top" style={{ color: C.ink }}>
+                                      {val.valor}
+                                    </td>
+                                    <td className="whitespace-nowrap py-1 pr-3 align-top">
+                                      <span
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+                                        style={{
+                                          color: COLOR_VALOR[val.estado],
+                                          background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
+                                        }}
+                                      >
+                                        {ROTULO_VALOR[val.estado]}
+                                      </span>
+                                    </td>
+                                    <td className="py-1 align-top" style={{ color: C.inkMid, maxWidth: 460, lineHeight: 1.45 }}>
+                                      {val.nota}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {p.nota && (
+                            <span
+                              className="block pl-2 text-[12.5px] leading-snug"
+                              style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
+                            >
+                              {p.nota}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
 
       <p className="m-0 text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
         {RESUMEN_RECETAS.posiciones} posiciones · {RESUMEN_RECETAS.confirmados} de{' '}
-        {RESUMEN_RECETAS.total} valores confirmados. Cada placa de motor que llegue por
-        Telegram convierte ámbar en verde.
+        {RESUMEN_RECETAS.total} valores confirmados. Los SAP de variador se agregan cuando se
+        levanten; los de motor salen de la hoja «Motores nuevos planta» — confirmar que esa
+        columna sea el SAP.
       </p>
     </div>
   )
