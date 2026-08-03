@@ -630,6 +630,10 @@ export function computeShiftSummary(
     avgWeightGrams,
     productionRatePerHour,
     topP0Causes,
+    // Config con la que se clasificó `topP0Causes`. Sin esto no hay forma de
+    // saber si el desglose guardado corresponde a las gates de hoy: editar la
+    // config después NO recalcula el turno (ver graderConfigDrift.ts).
+    ...(activeGates.length > 0 ? { gatesUsed: activeGates } : {}),
     calibreDistribution,
     qualityDistribution,
     gateDistribution,

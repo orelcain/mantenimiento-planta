@@ -29,6 +29,8 @@ import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
+import { ConfigDriftBanner } from '@/components/grader/ConfigDriftBanner'
+import { detectConfigDrift } from '@/services/grader/graderConfigDrift'
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -848,8 +850,27 @@ export function AnalisisGraderTurnoPage() {
 
   useEffect(() => { reloadConfigSnapshots() }, [reloadConfigSnapshots])
 
-  // Config inline del turno — gates + config derivados
-  const turnoGates = useMemo<GateAssignment[]>(() => configSnapshots[0]?.gates ?? [], [configSnapshots])
+  // Config inline del turno — gates + config derivados.
+  // `listSnapshots` viene ordenado ascendente: la config VIGENTE es el último,
+  // no el primero (antes se mostraba la config original del turno aunque el
+  // supervisor la hubiera editado después).
+  const latestConfigSnapshot = useMemo(
+    () => (configSnapshots.length > 0 ? configSnapshots[configSnapshots.length - 1] : undefined),
+    [configSnapshots],
+  )
+  const turnoGates = useMemo<GateAssignment[]>(() => latestConfigSnapshot?.gates ?? [], [latestConfigSnapshot])
+
+  // ¿El desglose P0 guardado corresponde a estas gates? El análisis se congela al
+  // guardar el turno y editar la config después no lo recalcula.
+  const configDrift = useMemo(() => {
+    if (!summary || !isClassificationPlant || turnoGates.length === 0) return null
+    return detectConfigDrift({
+      gatesUsed: summary.gatesUsed,
+      currentGates: turnoGates,
+      gate0Records: gate0Pieces,
+      savedCauses: summary.topP0Causes,
+    })
+  }, [summary, isClassificationPlant, turnoGates, gate0Pieces])
   const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
     errorThresholds: {
       photocellPctWarn: turnoThresholdsOverride?.photocellPctWarn ?? 1,
@@ -1640,7 +1661,15 @@ export function AnalisisGraderTurnoPage() {
             </div>
 
             {/* Causas — mobile row 3 (contexto), desktop izquierda abajo */}
-            <div className="lg:col-span-2 lg:row-start-2">
+            <div className="lg:col-span-2 lg:row-start-2 space-y-3">
+              {configDrift && (
+                <ConfigDriftBanner
+                  drift={configDrift}
+                  analyzedAt={summary.updatedAt}
+                  lastConfigChangeAt={latestConfigSnapshot?.at}
+                  lastConfigChangeBy={latestConfigSnapshot?.changedBy?.name}
+                />
+              )}
               <P0CausesPanel
                 byMatrixCause={byMatrixCause}
                 totalP0Pct={summary.pointZeroPct}

@@ -627,6 +627,15 @@ export interface GraderDailySummary {
   productionRatePerHour?: number;
   /** Top causas de P0 con conteo y % */
   topP0Causes?: Array<{ error: string; pieces: number; pct: number }>;
+  /**
+   * Gates activas con las que se clasificó `topP0Causes`. El análisis se congela
+   * al guardar: editar la config después solo deja un snapshot en
+   * `graderShifts/{id}/configHistory` y nada recalcula este doc. Guardarlas acá
+   * permite avisar en la vista del turno cuando el desglose ya no corresponde a
+   * la configuración vigente (`graderConfigDrift.ts`). Ausente en turnos
+   * guardados antes de este campo.
+   */
+  gatesUsed?: GateAssignment[];
   /** Distribución por calibre (gates 1-12) */
   calibreDistribution?: Array<{ calibre: string; pieces: number; pct: number }>;
   /** Distribución por calidad (gates 1-12) */
