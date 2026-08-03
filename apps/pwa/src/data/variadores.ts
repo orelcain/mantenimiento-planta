@@ -955,6 +955,19 @@ export interface EquivalenciaParametro {
   /** Por qué falta en algunos, o en qué se diferencia. */
   nota?: string
   dePlaca?: boolean
+  /**
+   * Sin esto el equipo no queda bien configurado, aunque la cinta ande.
+   * Se usa al cambiar de marca: si el repuesto lo pide y la receta original no
+   * lo traía, hay que avisarlo — es lo que se olvida y después se paga.
+   */
+  imprescindible?: boolean
+  /**
+   * `false` = el concepto es el mismo pero el VALOR no se copia, porque cada
+   * marca lo expresa distinto. Ejemplo real: la protección térmica del Altivar
+   * (`ItH`) son AMPERE y la del Altistart (`tHP`) es una CLASE 10/20/30 —
+   * arrastrar el «10» de una a otra deja el motor sin protección.
+   */
+  valorTransferible?: boolean
 }
 
 /** Columnas de la tabla de equivalencias, en orden. */
@@ -969,24 +982,28 @@ export const COLUMNAS_EQUIVALENCIA = [
 export const EQUIVALENCIAS: EquivalenciaParametro[] = [
   {
     concepto: 'Tensión nominal del motor',
+    imprescindible: true,
     dePlaca: true,
     codigos: { atv: 'UnS', danfoss: '1-22', v20: 'P0304', sew: 'P-07', ats22: null },
     nota: 'El Altistart no lo pide: no sintetiza tensión, la rampa la hace sobre la red. Su Uln es la tensión de LÍNEA, que es otra cosa. Y ojo en todos: la planta es 380 V, no los 400 V nominales de placa.',
   },
   {
     concepto: 'Corriente nominal del motor',
+    imprescindible: true,
     dePlaca: true,
     codigos: { atv: 'nCr', danfoss: '1-24', v20: 'P0305', sew: 'P-08', ats22: 'In' },
     nota: 'El dato más crítico: fija la protección térmica en los cinco. Nunca se estima. En el ATS22 dentro del triángulo va dividido por √3.',
   },
   {
     concepto: 'Frecuencia nominal del motor',
+    imprescindible: true,
     dePlaca: true,
     codigos: { atv: 'FrS', danfoss: '1-23', v20: 'P0310', sew: 'P-09', ats22: null },
     nota: 'Un partidor suave no varía la frecuencia, por eso no la pide.',
   },
   {
     concepto: 'Velocidad nominal del motor',
+    imprescindible: true,
     dePlaca: true,
     codigos: { atv: 'nSP', danfoss: '1-25', v20: 'P0311', sew: 'P-10', ats22: null },
     nota: 'En el SEW, cargarla distinta de 0 cambia toda la interfaz a rpm y activa la compensación de deslizamiento.',
@@ -1026,26 +1043,47 @@ export const EQUIVALENCIAS: EquivalenciaParametro[] = [
   },
   {
     concepto: 'Protección térmica del motor',
+    valorTransferible: false,
+    imprescindible: true,
     codigos: { atv: 'ItH', danfoss: '1-90', v20: 'P0610', sew: 'P-08', ats22: 'tHP + ItH' },
     nota: 'Dos trampas distintas. En el Altistart son DOS parámetros: tHP fija la clase y ItH es el interruptor maestro — con ItH apagado, tHP no hace nada. En el Siemens, P0610 = 0 significa «solo aviso, sin reacción»: el variador avisa y sigue andando. Vale revisar cómo quedó cargado.',
   },
   {
     concepto: 'Fuente de mando (selector / botonera)',
+    valorTransferible: false,
+    imprescindible: true,
     codigos: { atv: 'tCC + tCt', danfoss: '5-10…5-13', v20: 'P0700', sew: 'P-12', ats22: 'LI2' },
     nota: 'El bloque que no está en ninguna placa. En el Altivar, tCt decide si la cinta arranca sola al volver la luz.',
   },
   {
+    concepto: 'Rearranque tras un corte de red',
+    valorTransferible: false,
+    imprescindible: true,
+    codigos: {
+      atv: 'tCt + Atr',
+      danfoss: '14-20 / 14-21',
+      v20: 'P1210 + P1211',
+      sew: 'P-30',
+      ats22: 'LI2 (rUn / Strt)',
+    },
+    nota: 'El ajuste más peligroso del catálogo: decide si la cinta arranca sola cuando vuelve la luz con el selector cerrado. Y el valor de fábrica NO siempre es el seguro: en el Altivar sí (tCt = trn exige un flanco nuevo), pero en el SEW viene en Auto-0, que arranca solo, y en el V20 el P1210 viene en 1. Al cambiar de marca hay que decidirlo a mano, no heredarlo.',
+  },
+  {
     concepto: 'Autoajuste al motor',
+    valorTransferible: false,
+    imprescindible: true,
     codigos: { atv: 'tUn', danfoss: '1-29 (AMA)', v20: null, sew: null, ats22: null },
     nota: 'Correr SIEMPRE después de cargar los datos de placa, nunca antes.',
   },
   {
     concepto: 'Acceso al menú avanzado',
+    valorTransferible: false,
     codigos: { atv: null, danfoss: null, v20: null, sew: 'P-14', ats22: 'LAC' },
     nota: 'La trampa compartida de SEW y Altistart: si no se habilita, la mitad de los parámetros ni aparecen y parece que el equipo no los tuviera.',
   },
   {
     concepto: 'Copiar configuración a otro equipo',
+    valorTransferible: false,
     codigos: { atv: null, danfoss: '0-50 / 0-51', v20: null, sew: null, ats22: null },
     nota: 'Solo Danfoss lo resuelve con la consola LCP, y únicamente entre equipos de la MISMA serie.',
   },
@@ -1413,6 +1451,137 @@ export function compararEquivalencia(e: EquivalenciaParametro): CeldaComparacion
       ubicacion: ubicarParametro(token, FICHAS_POR_COLUMNA[col.id]) ?? undefined,
     }
   })
+}
+
+/** ¿Es un variador (regula velocidad) o un partidor suave (solo arranca y para)? */
+export function esVariador(f: FichaVariador): boolean {
+  return f.tipo.startsWith('VFD')
+}
+
+/** Columna de la tabla de equivalencias a la que pertenece una ficha. */
+export function columnaDeFicha(fichaId: string): string | null {
+  for (const [col, ids] of Object.entries(FICHAS_POR_COLUMNA)) {
+    if (ids.includes(fichaId)) return col
+  }
+  return null
+}
+
+/** El concepto al que corresponde un código de receta («P1120 / P1121» incluido). */
+function conceptoDe(codigo: string): EquivalenciaParametro | null {
+  for (const token of codigo.split(/[\s/+]+/)) {
+    const e = equivalenciaDe(token)
+    if (e) return e
+  }
+  return null
+}
+
+/** Un valor de la receta, ya traducido al dialecto del repuesto. */
+export interface FilaTraducida {
+  concepto: string
+  /** `false` = mismo concepto, pero el valor NO se copia tal cual. */
+  valorTransferible: boolean
+  codigoOrigen: string
+  /** `null` = el repuesto no pide este parámetro. No es un dato que falte. */
+  codigoDestino: string | null
+  valor: string
+  estado: EstadoValor
+  nota?: string
+}
+
+export interface TraduccionReceta {
+  destino: FichaVariador
+  /** `false` = el repuesto no puede hacer el trabajo del original. */
+  compatible: boolean
+  motivo?: string
+  filas: FilaTraducida[]
+  /** Lo que el repuesto pide y la receta original NO traía. El punto ciego. */
+  pideAdemas: {
+    codigo: string
+    concepto: string
+    /** Menú del repuesto donde vive, para saber a dónde ir. */
+    menu?: string
+    /** Rango y valor de fábrica del repuesto. */
+    rango?: string
+    fabrica?: string
+    nota?: string
+  }[]
+  /** Valores de la receta sin equivalencia conocida: se muestran sin traducir. */
+  sinTraducir: ValorReceta[]
+}
+
+/**
+ * Traduce la receta de una posición al dialecto de otra familia.
+ *
+ * Devuelve tres bloques distintos a propósito, porque cambiar de marca no es
+ * renombrar códigos: lo que se traduce, lo que el repuesto pide de más (si nadie
+ * lo carga la cinta anda igual… hasta que arranca sola o se quema el motor) y lo
+ * que el repuesto no pide.
+ */
+export function traducirReceta(pos: PosicionReceta, destinoId: string): TraduccionReceta | null {
+  const destino = VARIADORES.find((f) => f.id === destinoId)
+  if (!destino) return null
+  const col = columnaDeFicha(destinoId)
+  const origen = pos.variadorId ? VARIADORES.find((f) => f.id === pos.variadorId) ?? null : null
+
+  // Un partidor suave arranca y para, pero no regula velocidad: no reemplaza a
+  // un variador de cinta. Al revés sí — un variador hace las dos cosas.
+  const compatible = !(origen !== null && esVariador(origen) && !esVariador(destino))
+
+  const filas: FilaTraducida[] = []
+  const sinTraducir: ValorReceta[] = []
+  const cubiertos = new Set<string>()
+
+  for (const val of pos.valores) {
+    // Un valor puede traer dos códigos («P1120 / P1121» = las dos rampas). Cada
+    // uno es un concepto distinto y se traduce por separado: mostrarlos juntos
+    // haría perder la mitad de la traducción.
+    const tokens = val.codigo.split(/\s*\/\s*/).filter(Boolean)
+    const conceptos = tokens.map((tk) => ({ tk, e: conceptoDe(tk) }))
+    if (!col || conceptos.every((c) => c.e === null)) {
+      sinTraducir.push(val)
+      continue
+    }
+    for (const { tk, e } of conceptos) {
+      if (!e) continue
+      cubiertos.add(e.concepto)
+      filas.push({
+        concepto: e.concepto,
+        valorTransferible: e.valorTransferible !== false,
+        codigoOrigen: tk,
+        codigoDestino: e.codigos[col] ?? null,
+        valor: val.valor,
+        estado: val.estado,
+        nota: val.nota,
+      })
+    }
+  }
+
+  const pideAdemas = col
+    ? EQUIVALENCIAS.filter(
+        (e) => e.imprescindible && e.codigos[col] && !cubiertos.has(e.concepto),
+      ).map((e) => {
+        const cod = e.codigos[col] as string
+        const u = ubicarParametro(cod.split(/[\s/+(]+/)[0] ?? cod, FICHAS_POR_COLUMNA[col])
+        // La nota del repuesto, NO la de la fila de equivalencias: esa habla de
+        // las otras marcas y acá confunde («en el Altistart…» traduciendo a un
+        // Altivar). Si el parámetro no tiene nota, el menú y el rango bastan.
+        return {
+          codigo: cod,
+          concepto: e.concepto,
+          menu: u?.menu,
+          rango: u?.parametro.rango,
+          fabrica: u?.parametro.fabrica,
+          nota: u?.parametro.nota,
+        }
+      })
+    : []
+
+  return { destino, compatible, motivo: compatible ? undefined : `El ${destino.nombre} es un partidor suave: arranca y para, pero no regula velocidad.`, filas, pideAdemas, sinTraducir }
+}
+
+/** Las familias a las que se puede traducir una receta (todas menos la puesta). */
+export function alternativasPara(pos: PosicionReceta): FichaVariador[] {
+  return VARIADORES.filter((f) => f.id !== pos.variadorId && columnaDeFicha(f.id) !== null)
 }
 
 /** Una falla encontrada en el catálogo completo, con la familia a la que pertenece. */
