@@ -374,6 +374,38 @@ export const VARIADORES: FichaVariador[] = [
         p('4-18', 'Límite de intensidad', 'según calibre', 'según calibre'),
         p('4-19', 'Frecuencia salida máx.', '—', '—'),
       ],
+      '0-** Func. / Display': [
+        p('0-01', 'Idioma', '—', '—'),
+        p('0-03', 'Ajustes regionales', 'Internacional / EE.UU.', 'Internacional', false,
+          'Internacional deja 1-23 en 50 Hz; EE.UU. lo pone en 60. Cambiarlo por error deja el motor girando 20 % más rápido.'),
+        p('0-2x', 'Display del LCP', '—', '—', false,
+          'Qué se muestra en las tres líneas de la consola. Poner intensidad y frecuencia ahorra entrar al menú cada vez.'),
+      ],
+      '2-** Frenos': [
+        p('2-00', 'Intensidad de mantenimiento CC', '—', 'según calibre'),
+        p('2-10', 'Función de freno', 'off / resistencia / CA', 'off', false,
+          'Si dispara sobretensión al desacelerar (fallo de bus), acá se habilita la resistencia de frenado.'),
+        p('2-2x', 'Freno mecánico', '—', '—'),
+      ],
+      '6-** E/S analógica': [
+        p('6-1x', 'Entrada analógica 53', '—', '—'),
+        p('6-2x', 'Entrada analógica 54', '—', '—', false,
+          'Es la entrada de corriente: 4-20 mA permite detectar cable cortado, cosa que 0-10 V no.'),
+        p('6-9x', 'Salida analógica 42', '—', '—'),
+      ],
+      '8-** Comunicaciones': [
+        p('8-01', 'Puesto de control', '—', '—', false,
+          'Decide si mandan los bornes o el bus. Mal puesto, el selector del tablero deja de responder.'),
+        p('8-3x', 'Ajustes del puerto FC', '—', '—'),
+      ],
+      '15-** / 16-** Información y lecturas': [
+        p('15-00', 'Horas de funcionamiento', 'h', 'lectura'),
+        p('15-03', 'Arranques', '—', 'lectura'),
+        p('15-46', 'Referencia del variador', '—', 'lectura', false,
+          'Acá está el código comercial del equipo — el que resuelve todos los «según calibre» de esta ficha.'),
+        p('16-1x', 'Estado del motor', 'lectura', 'lectura', false,
+          'Frecuencia, intensidad, par y estado térmico en vivo.'),
+      ],
       '5-1x Mando · entradas digitales': [
         p('5-10', 'Terminal 18 entrada digital', '—', '—', false, 'Borne de marcha en el cableado típico.'),
         p('5-11', 'Terminal 19 entrada digital', '—', '—'),
@@ -426,6 +458,38 @@ export const VARIADORES: FichaVariador[] = [
         p('4-18', 'Límite de intensidad', 'según calibre', 'según calibre'),
         p('4-19', 'Frecuencia de salida máx.', '—', '—'),
       ],
+      '0-** Func. / Display': [
+        p('0-01', 'Idioma', '—', '—'),
+        p('0-03', 'Ajustes regionales', 'Internacional / EE.UU.', 'Internacional', false,
+          'Internacional deja 1-23 en 50 Hz; EE.UU. lo pone en 60. Cambiarlo por error deja el motor girando 20 % más rápido.'),
+        p('0-2x', 'Display del LCP', '—', '—', false,
+          'Qué se muestra en las tres líneas de la consola. Poner intensidad y frecuencia ahorra entrar al menú cada vez.'),
+      ],
+      '2-** Frenos': [
+        p('2-00', 'Intensidad de mantenimiento CC', '—', 'según calibre'),
+        p('2-10', 'Función de freno', 'off / resistencia / CA', 'off', false,
+          'Si dispara sobretensión al desacelerar (fallo de bus), acá se habilita la resistencia de frenado.'),
+        p('2-2x', 'Freno mecánico', '—', '—'),
+      ],
+      '6-** E/S analógica': [
+        p('6-1x', 'Entrada analógica 53', '—', '—'),
+        p('6-2x', 'Entrada analógica 54', '—', '—', false,
+          'Es la entrada de corriente: 4-20 mA permite detectar cable cortado, cosa que 0-10 V no.'),
+        p('6-9x', 'Salida analógica 42', '—', '—'),
+      ],
+      '8-** Comunicaciones': [
+        p('8-01', 'Puesto de control', '—', '—', false,
+          'Decide si mandan los bornes o el bus. Mal puesto, el selector del tablero deja de responder.'),
+        p('8-3x', 'Ajustes del puerto FC', '—', '—'),
+      ],
+      '15-** / 16-** Información y lecturas': [
+        p('15-00', 'Horas de funcionamiento', 'h', 'lectura'),
+        p('15-03', 'Arranques', '—', 'lectura'),
+        p('15-46', 'Referencia del variador', '—', 'lectura', false,
+          'Acá está el código comercial del equipo — el que resuelve todos los «según calibre» de esta ficha.'),
+        p('16-1x', 'Estado del motor', 'lectura', 'lectura', false,
+          'Frecuencia, intensidad, par y estado térmico en vivo.'),
+      ],
       '5-1x Mando · entradas digitales': [
         p('5-10', 'Terminal 18 entrada digital', '—', '—', false, 'Es el borne de marcha en el cableado típico.'),
         p('5-11', 'Terminal 19 entrada digital', '—', '—'),
@@ -464,6 +528,30 @@ export const VARIADORES: FichaVariador[] = [
         p('P1082', 'Frecuencia máxima', '—', '50 Hz'),
         p('P1120', 'Tiempo de aceleración', '—', '10 s'),
         p('P1121', 'Tiempo de deceleración', '—', '10 s'),
+      ],
+      'P00xx Acceso y puesta en marcha': [
+        p('P0003', 'Nivel de acceso de usuario', '1 estándar / 2 extendido / 3 experto', '1', false,
+          'En nivel 1 no se ven la mayoría de los parámetros. Es la misma trampa que el LAC del Altistart y el P-14 del SEW.'),
+        p('P0004', 'Filtro de parámetros', '—', '0'),
+        p('P0700', 'Fuente de las señales de mando', '—', '—'),
+      ],
+      'P08xx-P13xx Control y protección': [
+        p('P0610', 'Reacción ante sobretemperatura del motor', '0 aviso / 1 aviso y disparo', '—', false,
+          'PELIGRO: en 0 el variador AVISA pero sigue andando. Verificar cómo quedó cargado.'),
+        p('P0640', 'Factor de sobrecarga del motor', '%', '150 %'),
+        p('P1300', 'Modo de control', 'V/f lineal · cuadrática · vectorial', 'V/f lineal', false,
+          'Para cintas la V/f lineal es lo normal. La cuadrática es para bombas y ventiladores.'),
+        p('P1310', 'Elevación de tensión constante (boost)', '%', '50 %', false,
+          'Súbelo si la cinta cuesta arrancar con carga.'),
+        p('P1320', 'Boost programable', '%', '—'),
+      ],
+      'P20xx Visualización (solo lectura)': [
+        p('r0021', 'Frecuencia de salida', 'Hz', 'lectura'),
+        p('r0027', 'Corriente de salida', 'A', 'lectura', false,
+          'Compararla con P0305 dice si el motor está forzando.'),
+        p('r0025', 'Tensión de salida', 'V', 'lectura'),
+        p('r0026', 'Tensión del bus DC', 'V', 'lectura'),
+        p('r0947', 'Último fallo', '—', 'lectura'),
       ],
       'P0010+P0970 Reset a fábrica': [
         p('P0010', 'Parámetro de puesta en marcha', '0 / 30', '0', false,
@@ -534,13 +622,43 @@ export const VARIADORES: FichaVariador[] = [
         p('ItH', 'Protección de sobrecarga', '—', 'On', false,
           'Interruptor maestro de la protección térmica: sin esto, tHP no hace nada.'),
       ],
-      'IO Mando · entradas lógicas': [
-        p('LI2', 'Entrada lógica 2', '—', 'rUn · marcha', false,
-          'Borne del selector de marcha. Regleta real: LI1 LI2 LI3 24V Com.'),
-        p('LI3', 'Entrada lógica 3', '—', 'rSt · reset'),
+      'SEt2 · 2º juego de ajustes': [
+        p('In2', 'Int. nominal del motor (2º juego)', 'como In', '—', true,
+          'SEt2 es un segundo conjunto de 5 parámetros con la misma definición que SEt. Sirve cuando el mismo arrancador mueve dos motores distintos o una carga con dos regímenes.'),
+        p('ILt2', 'Limitación de intensidad (2º juego)', 'como ILt', '—'),
+        p('ACC2', 'Tiempo de aceleración (2º juego)', 'como ACC', '—'),
+        p('dEC2', 'Tiempo de deceleración (2º juego)', 'como dEC', '—'),
+        p('t902', 'Tensión inicial (2º juego)', 'como t90', '—'),
+      ],
+      'IO Entradas / salidas lógicas': [
+        p('LI2', 'Entrada lógica 2', 'Strt / rUn / EtF / rSt / FAn / FI / LIL', 'rUn · marcha', false,
+          'Borne del selector de marcha. rUn es para control 2 hilos (selector mantenido); Strt para 3 hilos (pulsadores). Regleta real: LI1 LI2 LI3 24V Com.'),
+        p('LI3', 'Entrada lógica 3', 'Strt / rUn / EtF / rSt / FAn / FI / LIL', 'rSt · reset'),
+        p('LI4', 'Entrada lógica 4', 'ídem', '—'),
+        p('LO1', 'Salida lógica 1', '—', '—'),
+        p('R1', 'Configuración del relé R1', '—', '—'),
+        p('R2', 'Configuración del relé R2', '—', '—'),
         p('PTC', 'PTC1 / PTC2', '—', '—', false,
           'Bornes para el termistor del motor. Si el motor lo tiene, es protección térmica directa — mejor que estimarla por corriente.'),
-        p('R1/R2', 'Relés de salida', '—', '—', false, 'Señalizan al tablero: marcha, fallo, bypass.'),
+      ],
+      'COP Comunicación avanzada': [
+        p('Add', 'Dirección Modbus', '1 a 247', 'oFF', false,
+          'El cambio recién se aplica en el siguiente encendido del control.'),
+        p('tbr', 'Velocidad Modbus', '4,8 / 9,6 / 19,2 kbps', '19,2 kbps'),
+        p('For', 'Formato de comunicación', '—', '—'),
+        p('CtrL', 'Canal de control', 'LCL / dbS', 'LCL · bornero', false,
+          'LCL = manda el bornero (el selector del tablero). dbS = manda Modbus. Si alguien lo deja en dbS, el selector deja de funcionar y parece que el arrancador está muerto.'),
+      ],
+      'SUP Supervisión (solo lectura)': [
+        p('SICL', 'Intensidad del motor', '0 a 999 A', 'lectura', false,
+          'Compararla con In dice si la bomba está forzando, antes de que dispare OLF.'),
+        p('dICL', 'Intensidad de fuga a tierra', '—', 'lectura'),
+        p('LFt', 'Último fallo', '—', 'lectura'),
+        p('rnt', 'Tiempo total de funcionamiento del motor', '—', 'lectura'),
+        p('Stnb', 'Número de arranques', '—', 'lectura'),
+        p('dEFt', 'Número total de fallos', '—', 'lectura'),
+        p('dEF1', 'Histórico de fallos 1', '—', 'lectura', false,
+          'Con LAC en oFF solo se ve dEF1. Con LAC en On se ven dEF1 a dEF9 — nueve fallos de historia en vez de uno.'),
       ],
       'UtIL Utilidades': [
         p('FCS', 'Volver a parámetros de fábrica', '—', '—', false,
@@ -603,7 +721,9 @@ export const VARIADORES: FichaVariador[] = [
         p('P-12', 'Fuente de mando', 'terminal / teclado / fieldbus', 'terminal', false,
           'Es el equivalente al tCC de Schneider: define si manda el selector del tablero o el teclado.'),
         p('P-14', 'Código de acceso al menú extendido', '0 a 9999', '0', false,
-          'Sin esto no se ven los parámetros avanzados — misma trampa que el LAC del Altistart 22.'),
+          'El código es 101 (lo dice el manual). Sin escribirlo, los parámetros P-15 en adelante ni aparecen y parece que el equipo no los tuviera — misma trampa que el LAC del Altistart 22. Se puede cambiar en P-37 para que no lo toque cualquiera.'),
+        p('P-13', 'Registro de fallos', 'últimos 4', '—', false,
+          'Guarda los 4 últimos disparos, el más reciente primero. Es lo primero que hay que mirar cuando alguien dice «se paró sola y volvió».'),
         p('P-15', 'Función de las entradas digitales', '—', '0'),
         p('P-16', 'Formato de la entrada analógica', '0-10 V · 0-20 mA', '0-10 V'),
         p('P-17', 'Frecuencia de conmutación de salida', '2 a 16 kHz', '4 / 8 kHz', false,
@@ -616,6 +736,21 @@ export const VARIADORES: FichaVariador[] = [
         p('P-23', 'Velocidad preseleccionada 4', '−P-01 a P-01', '0,0 Hz'),
         p('P-24', 'Rampa de deceleración rápida', '—', '—'),
         p('P-29', 'Ajuste de la curva V/f', '0 a P-09', '0 Hz'),
+      ],
+      'P-30…P-39 Arranque y protección': [
+        p('P-30', 'Modo de arranque', 'auto / manual tras corte', 'Edge-r', false,
+          'Decide si la cinta rearranca sola al volver la luz. El equivalente del tCt del Altivar: mismo peligro.'),
+        p('P-31', 'Modo de arranque del teclado', '—', '—'),
+        p('P-32', 'Rearranque automático', 'nº de intentos', '0'),
+        p('P-35', 'Escalado de la entrada analógica', '0 a 500 %', '100 %'),
+        p('P-37', 'Código de acceso del usuario', '0 a 9999', '101', false,
+          'Cambiar esto es lo que impide que cualquiera entre al menú extendido con el 101 de fábrica.'),
+        p('P-39', 'Offset de la entrada analógica', '−500 a 500 %', '0 %'),
+      ],
+      'P-40… Monitoreo (solo lectura)': [
+        p('P-40', 'Escalado del valor mostrado', '—', '—'),
+        p('P-00', 'Parámetros de solo lectura', '—', 'lectura', false,
+          'Bloque de monitoreo en tiempo real: corriente, tensión de bus, temperatura y horas. Es diagnóstico sin desarmar nada.'),
       ],
       '↺ Reset a fábrica': [
         p('▲+▼+Stop', 'Reset a fábrica por teclado', 'mantener > 2 s', '—', false,
@@ -1083,6 +1218,61 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'Acá la receta es la posición de las 3 perillas: fotografiar el frente de una unidad andando y esa ES la receta para el respaldo.',
   },
 ]
+
+/** Un parámetro encontrado en el catálogo, sabiendo de qué familia y menú es. */
+export interface ParametroEncontrado {
+  parametro: ParametroVariador
+  fichaId: string
+  fichaNombre: string
+  menu: string
+}
+
+/**
+ * Busca un parámetro en las 8 familias a la vez, por código o por descripción.
+ *
+ * El caso real: el técnico sabe QUÉ quiere ajustar («la corriente del motor»)
+ * o tiene un código a mano de otra marca, pero no sabe dónde vive en el equipo
+ * que tiene enfrente. Antes había que abrir ficha por ficha y menú por menú.
+ */
+export function buscarParametro(termino: string): ParametroEncontrado[] {
+  const t = termino.trim().toLowerCase()
+  if (t.length < 2) return []
+  const out: ParametroEncontrado[] = []
+  for (const f of VARIADORES) {
+    for (const [menu, filas] of Object.entries(f.menus ?? {})) {
+      for (const parametro of filas) {
+        if (
+          parametro.codigo.toLowerCase().includes(t) ||
+          parametro.descripcion.toLowerCase().includes(t)
+        ) {
+          out.push({ parametro, fichaId: f.id, fichaNombre: f.nombre, menu })
+        }
+      }
+    }
+  }
+  // Coincidencia exacta de código primero: es lo que se teclea con el manual
+  // de otra marca en la mano.
+  return out.sort((a, b) => {
+    const ea = a.parametro.codigo.toLowerCase() === t ? 0 : 1
+    const eb = b.parametro.codigo.toLowerCase() === t ? 0 : 1
+    return ea - eb
+  })
+}
+
+/**
+ * Dado un código, devuelve la fila de equivalencias que lo contiene.
+ * Es lo que permite pasar de «tengo nCr» a «en el SEW eso es P-08».
+ */
+export function equivalenciaDe(codigo: string): EquivalenciaParametro | null {
+  const c = codigo.trim().toLowerCase()
+  return (
+    EQUIVALENCIAS.find((e) =>
+      Object.values(e.codigos).some(
+        (v) => v && v.toLowerCase().split(/[\s/+]+/).includes(c),
+      ),
+    ) ?? null
+  )
+}
 
 /** Una falla encontrada en el catálogo completo, con la familia a la que pertenece. */
 export interface FallaEncontrada {
