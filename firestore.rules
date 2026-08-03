@@ -470,6 +470,38 @@ service cloud.firestore {
     // ============================================
     // INCIDENCIAS - Validación de reportes
     // ============================================
+    // ============================================
+    // APORTES AL CATALOGO DE VARIADORES
+    // ============================================
+    // El catalogo vive en el repo (data/variadores.ts), no aca: estos documentos
+    // son PROPUESTAS del terreno (rellenar un valor pendiente de placa, o avisar
+    // que uno publicado no calza con el equipo real). Alguien las revisa y las
+    // incorpora al codigo. Por eso solo se crean y se leen: nunca se editan ni
+    // se borran desde la app.
+    match /variadoresAportes/{aporteId} {
+      allow read: if isActiveUser();
+
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.tipo in ['dato_faltante', 'correccion']
+        && request.resource.data.posicionId is string
+        && request.resource.data.posicionId.size() > 0
+        && request.resource.data.posicionId.size() <= 80
+        && request.resource.data.posicionEquipo is string
+        && request.resource.data.posicionEquipo.size() <= 200
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() > 0
+        && request.resource.data.codigo.size() <= 40
+        && request.resource.data.valor is string
+        && request.resource.data.valor.size() > 0
+        && request.resource.data.valor.size() <= 120
+        && (!('comentario' in request.resource.data) || request.resource.data.comentario.size() <= 500)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      // Se incorporan al codigo por PR, no se editan desde la app.
+      allow update, delete: if false;
+    }
+
     match /incidents/{incidentId} {
       allow read: if isActiveUser();
       

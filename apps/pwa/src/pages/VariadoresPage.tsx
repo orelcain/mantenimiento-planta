@@ -22,8 +22,9 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch } from 'lucide-react'
+import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store'
+import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText } from '@/components/learning/primitives'
 import {
@@ -44,6 +45,8 @@ import {
   type EstadoFicha,
   type FallaVariador,
   type EstadoValor,
+  type PosicionReceta,
+  type ValorReceta,
 } from '@/data/variadores'
 
 /** lowercase + sin acentos, para búsqueda tolerante (mismo criterio que el hub). */
@@ -527,6 +530,120 @@ function ChipSap({ codigo }: { codigo?: string }) {
 }
 
 /**
+ * Aportar el valor de UN parámetro desde terreno.
+ *
+ * No edita el catálogo: registra una propuesta. Los datos viven en el repo y un
+ * valor que fija la protección térmica de un motor no se cambia sin revisión.
+ * Pero el aporte queda visible enseguida, así el siguiente que pase ya lo tiene
+ * aunque todavía no esté oficializado.
+ */
+function AportarValor({
+  posicion,
+  valor,
+  aportes,
+  onAportado,
+}: {
+  posicion: PosicionReceta
+  valor: ValorReceta
+  aportes: AporteVariador[]
+  onAportado: (a: AporteVariador) => void
+}) {
+  const { isAuthenticated, user } = useAuthStore()
+  const [abierto, setAbierto] = useState(false)
+  const [texto, setTexto] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const mios = aportes.filter((a) => a.codigo === valor.codigo)
+  const faltante = valor.estado === 'pendiente'
+
+  const guardar = async () => {
+    const v = texto.trim()
+    if (!v || guardando) return
+    setGuardando(true)
+    setError(null)
+    const aporte = {
+      tipo: (faltante ? 'dato_faltante' : 'correccion') as AporteVariador['tipo'],
+      posicionId: posicion.id,
+      posicionEquipo: posicion.equipo,
+      codigo: valor.codigo,
+      valor: v,
+      valorAnterior: valor.valor,
+      creadoPor: user?.id ?? '',
+      creadoPorNombre: user?.nombre ?? undefined,
+    }
+    try {
+      await crearAporte(aporte)
+      onAportado(aporte as AporteVariador)
+      setTexto('')
+      setAbierto(false)
+    } catch {
+      setError('No se pudo guardar. Revisa la conexión o tus permisos.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <>
+      {mios.map((a, i) => (
+        <span
+          key={a.id ?? i}
+          className="mt-0.5 block text-[12px]"
+          style={{ color: C.ok }}
+        >
+          Aportado desde terreno: <span className="font-mono font-semibold">{a.valor}</span>
+          {a.creadoPorNombre ? ` — ${a.creadoPorNombre}` : ''} · pendiente de incorporar al catálogo
+        </span>
+      ))}
+
+      {isAuthenticated && !abierto && (
+        <button
+          onClick={() => setAbierto(true)}
+          className="mt-1 inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[11.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 12%, transparent)` }}
+        >
+          <Plus className="h-3 w-3" />
+          {faltante ? 'Tengo este dato' : 'No coincide'}
+        </button>
+      )}
+
+      {abierto && (
+        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <input
+            autoFocus
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') guardar(); if (e.key === 'Escape') setAbierto(false) }}
+            placeholder={faltante ? 'Valor de la placa…' : 'Valor real…'}
+            aria-label={`Valor de ${valor.codigo}`}
+            className="rounded px-2 py-1 font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink, width: 130 }}
+          />
+          <button
+            onClick={guardar}
+            disabled={guardando || !texto.trim()}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium outline-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            style={{ color: C.ok, background: `color-mix(in srgb, ${C.ok} 16%, transparent)` }}
+          >
+            {guardando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            Guardar
+          </button>
+          <button
+            onClick={() => { setAbierto(false); setError(null) }}
+            className="rounded px-2 py-1 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            style={{ color: C.inkMid }}
+          >
+            Cancelar
+          </button>
+          {error && <span className="text-[12px]" style={{ color: C.crit }}>{error}</span>}
+        </span>
+      )}
+    </>
+  )
+}
+
+/**
  * Cada cinta/equipo con SU variador y SU motor — sin generalizar por familia.
  * Tabla densa: una fila por posición, se expande para ver los valores.
  */
@@ -540,6 +657,16 @@ function RecetasPorEquipo({
 }) {
   const [q, setQ] = useState('')
   const [abierta, setAbierta] = useState<string | null>(posicionInicial ?? null)
+  // Los aportes se piden solo al expandir: no tiene sentido traer 17 consultas
+  // para una tabla que se mira de reojo.
+  const [aportes, setAportes] = useState<AporteVariador[]>([])
+
+  useEffect(() => {
+    if (!abierta) { setAportes([]); return }
+    let vivo = true
+    aportesDePosicion(abierta).then((a) => { if (vivo) setAportes(a) })
+    return () => { vivo = false }
+  }, [abierta])
 
   useEffect(() => {
     if (!posicionInicial) return
@@ -730,6 +857,12 @@ function RecetasPorEquipo({
                                     {val.nota}
                                   </span>
                                 )}
+                                <AportarValor
+                                  posicion={p}
+                                  valor={val}
+                                  aportes={aportes}
+                                  onAportado={(a) => setAportes((prev) => [a, ...prev])}
+                                />
                               </li>
                             ))}
                           </ul>
