@@ -15,7 +15,8 @@ import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
-import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
+import type { SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
+import { GraderShiftPeriodContainer } from '@/components/grader/GraderShiftPeriodContainer'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
@@ -130,6 +131,8 @@ export function AnalisisGraderWizardPage() {
   // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
+  // Las emite ahora la vista de período (`computePeriodMonthlyStats`); antes
+  // las calculaba el calendario mensual, ya retirado.
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
   // Día seleccionado en el calendario (para el KPI board)
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
@@ -846,14 +849,23 @@ export function AnalisisGraderWizardPage() {
         />
       </div>
 
-      {/* Fila 2: Calendario (izq 50%) | Resumen diario (der 50%) */}
-      <GraderHistoricalCalendar
-        equalColumns
+      {/* Vista de período por TURNO (matriz / lista) — reemplaza al calendario
+          mensual: acá un turno que cruza medianoche ocupa UNA celda en vez de
+          partirse en dos fragmentos (`salida` + `madrugada`). Provee también la
+          navegación de mes y los summaries que el calendario emitía. */}
+      <GraderShiftPeriodContainer
+        plantLineId={lineId}
+        month={calendarMonth}
         onMonthChange={setCalendarMonth}
         onSummariesLoaded={setCalendarSummaries}
-        onSlxMonthStatsLoaded={setCalendarSlxStats}
-        onDateSelect={setSelectedDateKey}
-        plantLineId={lineId}
+        onMonthStatsLoaded={setCalendarSlxStats}
+        onSelectShift={(s) => setSelectedDateKey(s.dateKey)}
+        onOpenShift={(s) => {
+          // Mismo destino que el botón "Cargar" del calendario retirado.
+          const q = new URLSearchParams({ date: s.dateKey, shift: s.shiftId, autoload: '1' })
+          if (lineId !== DEFAULT_PLANT_LINE_ID) q.set('linea', lineId)
+          navigate(`/analisis-grader?${q.toString()}`)
+        }}
       />
       </>
       )}
