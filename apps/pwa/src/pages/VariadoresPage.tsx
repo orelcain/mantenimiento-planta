@@ -37,6 +37,7 @@ import {
 } from '@/services/variadoresCambios'
 import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
+import { FOCO, tinte, panel as panelEstilo } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
 import {
   VARIADORES,
@@ -79,8 +80,8 @@ function EstadoChip({ estado }: { estado: EstadoFicha }) {
   const color = COLOR_ESTADO[estado]
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
-      style={{ color, background: `color-mix(in srgb, ${color} 16%, transparent)` }}
+      className="inline-flex items-center gap-2 rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap"
+      style={{ color, background: tinte.suave(color) }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
       {ETIQUETA_ESTADO[estado]}
@@ -131,7 +132,7 @@ function SimuladorPSR() {
 
   return (
     <div
-      className="flex flex-col gap-5 rounded-md p-5"
+      className="flex flex-col gap-6 rounded-lg p-5"
       style={{ background: '#0f1418', border: '1px solid #2b3238' }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -143,11 +144,11 @@ function SimuladorPSR() {
         </span>
       </div>
 
-      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))' }}>
+      <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))' }}>
         {POTENCIOMETROS_PSR.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-2 text-center">
             <Perilla valor={v(p.id)} min={p.min} max={p.max} />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
+            <span className="font-mono text-[11px] uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
               {p.nombre}
             </span>
             <span className="font-mono text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
@@ -164,7 +165,7 @@ function SimuladorPSR() {
               style={{ accentColor: '#f5a623' }}
               onChange={(e) => setValores((v) => ({ ...v, [p.id]: Number(e.target.value) }))}
             />
-            <span className="font-mono text-[10px]" style={{ color: '#5d6b76' }}>{p.rango}</span>
+            <span className="font-mono text-[11px]" style={{ color: '#5d6b76' }}>{p.rango}</span>
           </div>
         ))}
       </div>
@@ -178,8 +179,8 @@ function SimuladorPSR() {
           ['Escalón de bajada', `${escalonBajadaPSR(v('stop'))} %`],
           ['Corriente nominal', '60 A'],
         ].map(([rotulo, valor]) => (
-          <div key={rotulo} className="flex flex-col gap-0.5 px-3 py-2.5" style={{ background: '#131a20' }}>
-            <dt className="font-mono text-[10px] uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
+          <div key={rotulo} className="flex flex-col gap-1 px-3 py-3" style={{ background: '#131a20' }}>
+            <dt className="font-mono text-[11px] uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
               {rotulo}
             </dt>
             <dd className="m-0 font-mono text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
@@ -233,7 +234,7 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <MetaText>Menú:</MetaText>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {claves.map((k) => {
             const i = k.indexOf(' ')
             const codigo = i > 0 ? k.slice(0, i) : k
@@ -244,15 +245,15 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                 key={k}
                 onClick={() => setMenu(k)}
                 aria-pressed={on}
-                className="rounded px-3 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                className={`rounded px-3 py-2 text-[13px] transition-colors ${FOCO}`}
                 style={{
-                  background: on ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.bgPanel,
+                  background: on ? tinte.suave(C.aqua) : C.bgPanel,
                   border: `1px solid ${on ? C.aqua : C.border}`,
                   color: C.ink,
                   fontWeight: on ? 600 : 400,
                 }}
               >
-                <span className="mr-1.5 font-mono text-xs opacity-85">{codigo}</span>
+                <span className="mr-2 font-mono text-xs opacity-85">{codigo}</span>
                 {nombre}
               </button>
             )
@@ -260,7 +261,7 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
         </div>
       </div>
 
-      <div className="grid items-center gap-2.5 sm:grid-cols-[1fr_auto]">
+      <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
           <input
@@ -269,17 +270,17 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar: nCr, rampa, corriente…"
             aria-label="Buscar parámetro"
-            className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setSoloPlaca((v) => !v)}
             aria-pressed={soloPlaca}
-            className="rounded px-3 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`rounded px-3 py-2 text-[13px] transition-colors ${FOCO}`}
             style={{
-              background: soloPlaca ? `color-mix(in srgb, ${C.warn} 20%, transparent)` : C.bgPanel,
+              background: soloPlaca ? tinte.suave(C.warn) : C.bgPanel,
               border: `1px solid ${soloPlaca ? C.warn : C.border}`,
               color: C.ink,
               fontWeight: soloPlaca ? 600 : 400,
@@ -296,13 +297,13 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
       </div>
 
       <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-        <table className="w-full border-collapse text-[13.5px]" style={{ minWidth: 600 }}>
+        <table className="w-full border-collapse text-[14px]" style={{ minWidth: 600 }}>
           <thead>
             <tr>
               {['Cód.', 'Descripción', 'Rango', 'Fábrica'].map((h, i) => (
                 <th
                   key={h}
-                  className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                  className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
                   style={{
                     background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
                     // Columna fija: en un celular la tabla scrollea y el código no puede perderse de vista.
@@ -326,55 +327,55 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
               <tr
                 key={r.codigo + r.descripcion}
                 style={{
-                  background: r.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, transparent)` : undefined,
+                  background: r.dePlaca ? tinte.fila(C.warn) : undefined,
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
                 <td
-                  className="whitespace-nowrap px-3 py-2.5 align-top font-mono font-semibold"
+                  className="whitespace-nowrap px-3 py-3 align-top font-mono font-semibold"
                   style={{
                     color: C.aquaBright, position: 'sticky', left: 0, zIndex: 1,
                     // Fondo OPACO: mezclar contra surface (no transparent) para que no se vea lo que pasa debajo.
-                    background: r.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, ${C.surface})` : C.surface,
+                    background: r.dePlaca ? tinte.opaco(C.warn, C.surface) : C.surface,
                     borderRight: `1px solid ${C.border}`,
                   }}
                 >
                   {r.codigo}
                   {global && (
-                    <span className="mt-0.5 block font-sans text-[10.5px] font-normal" style={{ color: C.inkLo }}>
+                    <span className="mt-1 block font-sans text-[11px] font-normal" style={{ color: C.inkLo }}>
                       {r.menu.split(' ')[0]}
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
+                <td className="px-3 py-3 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
-                      style={{ color: C.warn, background: `color-mix(in srgb, ${C.warn} 16%, transparent)` }}
+                      className="ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
                     </span>
                   )}
                   {r.nota && (
                     <span
-                      className="mt-1.5 block max-w-[56ch] pl-2 text-[12.5px]"
+                      className="mt-2 block max-w-[56ch] pl-2 text-[13px]"
                       style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}`, lineHeight: 1.5 }}
                     >
                       {r.nota}
                     </span>
                   )}
                   {r.opciones && (
-                    <ul className="mt-2 flex list-none flex-col gap-1.5 pl-0">
+                    <ul className="mt-2 flex list-none flex-col gap-2 pl-0">
                       {r.opciones.map((o) => (
-                        <li key={o.valor} className="text-[12.5px]" style={{ lineHeight: 1.5 }}>
-                          <span className="mr-1.5 font-mono font-semibold" style={{ color: C.aquaBright }}>
+                        <li key={o.valor} className="text-[13px]" style={{ lineHeight: 1.5 }}>
+                          <span className="mr-2 font-mono font-semibold" style={{ color: C.aquaBright }}>
                             {o.valor}
                           </span>
                           <span style={{ color: C.ink }}>{o.que}</span>
                           {o.cuando && <span style={{ color: C.inkMid }}> — {o.cuando}</span>}
                           {o.requiere && (
-                            <span className="ml-1.5 whitespace-nowrap text-[11px]" style={{ color: C.inkLo }}>
+                            <span className="ml-2 whitespace-nowrap text-[11px]" style={{ color: C.inkLo }}>
                               ({o.requiere})
                             </span>
                           )}
@@ -383,10 +384,10 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                     </ul>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
+                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] tabular-nums" style={{ color: C.inkMid }}>
                   {r.rango}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
+                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] tabular-nums" style={{ color: C.inkMid }}>
                   {r.fabrica}
                 </td>
               </tr>
@@ -397,8 +398,8 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
 
       <MetaText>
         <span
-          className="mr-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
-          style={{ color: C.warn, background: `color-mix(in srgb, ${C.warn} 16%, transparent)` }}
+          className="mr-2 inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+          style={{ color: C.warn, background: tinte.suave(C.warn) }}
         >
           Placa
         </span>
@@ -425,7 +426,7 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
   }, [fallas, q])
 
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="flex flex-col gap-4">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
         <input
@@ -434,7 +435,7 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Escribe el código que muestra el display: OLF, O-I, StF…"
           aria-label="Buscar código de falla"
-          className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -448,17 +449,17 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
       {visibles.map((f) => (
         <div
           key={f.codigo}
-          className="flex flex-col gap-2.5 rounded-lg p-4"
-          style={{ background: C.surface, border: `1px solid ${C.border}` }}
+          className="flex flex-col gap-3 rounded-lg p-4"
+          style={panelEstilo}
         >
-          <div className="flex flex-wrap items-baseline gap-2.5">
+          <div className="flex flex-wrap items-baseline gap-3">
             <span
-              className="rounded px-2 py-0.5 font-mono text-[15px] font-bold"
-              style={{ color: C.crit, background: `color-mix(in srgb, ${C.crit} 16%, transparent)` }}
+              className="rounded px-2 py-1 font-mono text-[15px] font-bold"
+              style={{ color: C.crit, background: tinte.suave(C.crit) }}
             >
               {f.codigo}
             </span>
-            <span className="text-[14.5px] font-semibold" style={{ color: C.ink }}>{f.nombre}</span>
+            <span className="text-[14px] font-semibold" style={{ color: C.ink }}>{f.nombre}</span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -509,7 +510,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
   return (
     <span
       className="inline-flex items-center overflow-hidden rounded"
-      style={{ background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
+      style={{ background: tinte.suave(C.aqua) }}
     >
       <button
         onClick={(e) => {
@@ -519,7 +520,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           window.setTimeout(() => setCopiado(false), 1400)
         }}
         title="Copiar el código SAP"
-        className="inline-flex items-center gap-1 px-1.5 py-1 font-mono text-[11.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-[12px] font-medium ${FOCO}`}
         style={{ color: C.aquaBright }}
       >
         {codigo}
@@ -530,8 +531,8 @@ function ChipSap({ codigo }: { codigo?: string }) {
           onClick={(e) => { e.stopPropagation(); navigate(`/repuestos?q=${encodeURIComponent(codigo)}`) }}
           title="Ver stock y ubicación en Repuestos"
           aria-label={`Ver ${codigo} en Repuestos`}
-          className="px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-          style={{ color: C.aquaBright, borderLeft: `1px solid color-mix(in srgb, ${C.aqua} 30%, transparent)` }}
+          className={`px-2 py-1 ${FOCO}`}
+          style={{ color: C.aquaBright, borderLeft: `1px solid ${tinte.borde(C.aqua)}` }}
         >
           <PackageSearch className="h-3.5 w-3.5" />
         </button>
@@ -558,8 +559,8 @@ function PanelEvidencia() {
     : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
-      <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold" style={{ color: C.ink }}>
+    <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
+      <span className="inline-flex items-center gap-2 text-[14px] font-semibold" style={{ color: C.ink }}>
         <TrendingUp className="h-4 w-4" style={{ color: C.ok }} />
         Lo que llevamos medido
       </span>
@@ -570,15 +571,15 @@ function PanelEvidencia() {
           ['Clonando', r.minutosClonado !== null ? `${r.minutosClonado} min` : '—', `${r.clonados} cambios`],
           ['A mano', r.minutosManual !== null ? `${r.minutosManual} min` : '—', `${r.manuales} cambios`],
         ].map(([rot, val, pie]) => (
-          <div key={rot as string} className="flex flex-col gap-0.5 px-3 py-2.5" style={{ background: C.surface }}>
-            <span className="text-[11.5px]" style={{ color: C.inkMid }}>{rot}</span>
-            <span className="font-mono text-[19px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
+          <div key={rot as string} className="flex flex-col gap-1 px-3 py-3" style={{ background: C.surface }}>
+            <span className="text-[12px]" style={{ color: C.inkMid }}>{rot}</span>
+            <span className="font-mono text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
             {pie && <span className="text-[11px]" style={{ color: C.inkLo }}>{pie}</span>}
           </div>
         ))}
       </div>
       {ahorro !== null && ahorro > 0 && (
-        <span className="text-[12.5px]" style={{ color: C.inkMid }}>
+        <span className="text-[13px]" style={{ color: C.inkMid }}>
           Clonar ahorra <strong style={{ color: C.ok }}>{ahorro} min</strong> por cambio frente a
           cargar a mano — el número que justifica tener el repuesto del mismo modelo en bodega.
         </span>
@@ -670,11 +671,11 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
   if (listo) {
     return (
       <div
-        className="mt-3 flex flex-col gap-1.5 rounded-lg px-4 py-3"
-        style={{ background: `color-mix(in srgb, ${C.ok} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${C.ok} 40%, transparent)` }}
+        className="mt-3 flex flex-col gap-2 rounded-lg px-4 py-3"
+        style={{ background: tinte.suave(C.ok), border: `1px solid ${tinte.borde(C.ok)}` }}
       >
-        <span className="text-[13.5px] font-semibold" style={{ color: C.ok }}>Registrado ✓</span>
-        <span className="text-[12.5px]" style={{ color: C.inkMid }}>
+        <span className="text-[14px] font-semibold" style={{ color: C.ok }}>Registrado ✓</span>
+        <span className="text-[13px]" style={{ color: C.inkMid }}>
           La incidencia quedó resuelta y el cambio anotado.
           {posicion.valores.some((v) => v.estado === 'pendiente') &&
             ' Si tienes la placa a la vista, es el momento de completar los datos que faltan arriba.'}
@@ -687,8 +688,8 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
     return (
       <button
         onClick={abrir}
-        className="mt-3 inline-flex w-fit items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-        style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
+        className={`mt-3 inline-flex w-fit items-center gap-2 rounded px-3 py-2 text-[13px] font-medium ${FOCO}`}
+        style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
       >
         <ClipboardCheck className="h-3.5 w-3.5" />
         Registré este cambio
@@ -698,14 +699,14 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
 
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-lg px-4 py-3" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <MetaText>¿Qué incidencia resolvió este cambio?</MetaText>
         {incidencias === null ? (
-          <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: C.inkMid }}>
+          <span className="inline-flex items-center gap-2 text-[13px]" style={{ color: C.inkMid }}>
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando incidencias abiertas…
           </span>
         ) : incidencias.length === 0 && !error ? (
-          <span className="text-[12.5px]" style={{ color: C.warn }}>
+          <span className="text-[13px]" style={{ color: C.warn }}>
             No hay incidencias abiertas. El cambio se registra cerrando una existente,
             así los KPIs no cuentan el mismo evento dos veces — si esta falla no está
             levantada, créala primero desde Incidencias.
@@ -717,16 +718,16 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                 key={i.id}
                 onClick={() => setElegida(i.id)}
                 aria-pressed={elegida === i.id}
-                className="rounded px-2.5 py-1.5 text-left text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                className={`rounded px-3 py-2 text-left text-[13px] ${FOCO}`}
                 style={{
-                  background: elegida === i.id ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                  background: elegida === i.id ? tinte.suave(C.aqua) : C.surface,
                   border: `1px solid ${elegida === i.id ? C.aqua : C.border}`,
                   color: C.ink,
                 }}
               >
                 {i.titulo}
                 {i.descripcion ? (
-                  <span className="mt-0.5 block text-[11.5px]" style={{ color: C.inkMid }}>
+                  <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
                     {i.descripcion.slice(0, 90)}
                   </span>
                 ) : null}
@@ -738,17 +739,17 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
 
       {elegida && (
         <>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <MetaText>¿Cómo lo configuraste?</MetaText>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {(Object.keys(ETIQUETA_MODO) as ModoConfiguracion[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => setModo(m)}
                   aria-pressed={modo === m}
-                  className="rounded px-2.5 py-1.5 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  className={`rounded px-3 py-2 text-[13px] ${FOCO}`}
                   style={{
-                    background: modo === m ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                    background: modo === m ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${modo === m ? C.aqua : C.border}`,
                     color: C.ink, fontWeight: modo === m ? 600 : 400,
                   }}
@@ -759,17 +760,17 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <MetaText>¿Cuánto te tomó?</MetaText>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {RANGOS_TIEMPO.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => setRango(r.id)}
                   aria-pressed={rango === r.id}
-                  className="rounded px-2.5 py-1.5 font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  className={`rounded px-3 py-2 font-mono text-[13px] ${FOCO}`}
                   style={{
-                    background: rango === r.id ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.surface,
+                    background: rango === r.id ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${rango === r.id ? C.aqua : C.border}`,
                     color: C.ink, fontWeight: rango === r.id ? 600 : 400,
                   }}
@@ -782,21 +783,21 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         </>
       )}
 
-      {error && <span className="text-[12.5px]" style={{ color: C.crit }}>{error}</span>}
+      {error && <span className="text-[13px]" style={{ color: C.crit }}>{error}</span>}
 
       <div className="flex flex-wrap gap-2">
         <button
           onClick={guardar}
           disabled={!elegida || !modo || !rango || guardando}
-          className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[13px] font-semibold outline-none disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-          style={{ color: C.ok, background: `color-mix(in srgb, ${C.ok} 16%, transparent)` }}
+          className={`inline-flex items-center gap-2 rounded px-3 py-2 text-[13px] font-semibold disabled:opacity-45 ${FOCO}`}
+          style={{ color: C.ok, background: tinte.suave(C.ok) }}
         >
           {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           Guardar
         </button>
         <button
           onClick={() => setAbierto(false)}
-          className="rounded px-3 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          className={`rounded px-3 py-2 text-[13px] ${FOCO}`}
           style={{ color: C.inkMid }}
         >
           Cancelar
@@ -866,7 +867,7 @@ function AportarValor({
       {mios.map((a, i) => (
         <span
           key={a.id ?? i}
-          className="mt-0.5 block text-[12px]"
+          className="mt-1 block text-[12px]"
           style={{ color: C.ok }}
         >
           Aportado desde terreno: <span className="font-mono font-semibold">{a.valor}</span>
@@ -877,8 +878,8 @@ function AportarValor({
       {isAuthenticated && !abierto && (
         <button
           onClick={() => setAbierto(true)}
-          className="mt-1 inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[11.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-          style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 12%, transparent)` }}
+          className={`mt-1 inline-flex w-fit items-center gap-1 rounded px-2 py-1 text-[12px] ${FOCO}`}
+          style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
         >
           <Plus className="h-3 w-3" />
           {faltante ? 'Tengo este dato' : 'No coincide'}
@@ -886,7 +887,7 @@ function AportarValor({
       )}
 
       {abierto && (
-        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <span className="mt-2 flex flex-wrap items-center gap-2">
           <input
             autoFocus
             value={texto}
@@ -894,21 +895,21 @@ function AportarValor({
             onKeyDown={(e) => { if (e.key === 'Enter') guardar(); if (e.key === 'Escape') setAbierto(false) }}
             placeholder={faltante ? 'Valor de la placa…' : 'Valor real…'}
             aria-label={`Valor de ${valor.codigo}`}
-            className="rounded px-2 py-1 font-mono text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`rounded px-2 py-1 font-mono text-[13px] ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink, width: 130 }}
           />
           <button
             onClick={guardar}
             disabled={guardando || !texto.trim()}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium outline-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-            style={{ color: C.ok, background: `color-mix(in srgb, ${C.ok} 16%, transparent)` }}
+            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium disabled:opacity-50 ${FOCO}`}
+            style={{ color: C.ok, background: tinte.suave(C.ok) }}
           >
             {guardando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
             Guardar
           </button>
           <button
             onClick={() => { setAbierto(false); setError(null) }}
-            className="rounded px-2 py-1 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`rounded px-2 py-1 text-[12px] ${FOCO}`}
             style={{ color: C.inkMid }}
           >
             Cancelar
@@ -967,7 +968,7 @@ function RecetasPorEquipo({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 max-w-[70ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
+      <p className="m-0 max-w-[70ch] text-[14px] leading-relaxed" style={{ color: C.inkMid }}>
         La ficha del modelo dice qué parámetros existen; <strong style={{ color: C.ink }}>esta
         tabla dice qué valor va en cada cinta con su motor</strong>. Clic en una fila para ver
         los seteos. Ámbar es lo que falta levantar en terreno; rojo queda sugerido hasta
@@ -983,13 +984,13 @@ function RecetasPorEquipo({
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cinta, zona, motor o código SAP…"
             aria-label="Buscar posición"
-            className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
         <div className="flex flex-wrap gap-3 text-[12px]" style={{ color: C.inkMid }}>
           {(['confirmado', 'pendiente', 'sugerido'] as const).map((e) => (
-            <span key={e} className="inline-flex items-center gap-1.5">
+            <span key={e} className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full" style={{ background: COLOR_VALOR[e] }} />
               {ROTULO_VALOR[e]}
             </span>
@@ -1004,7 +1005,7 @@ function RecetasPorEquipo({
               {COLS.map((h, k) => (
                 <th
                   key={h}
-                  className={`whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold${
+                  className={`whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold${
                     k > 0 && k < COLS.length - 1 ? ' hidden sm:table-cell' : ''
                   }`}
                   style={{
@@ -1038,31 +1039,31 @@ function RecetasPorEquipo({
                     className="cursor-pointer"
                     style={{
                       borderBottom: `1px solid ${C.border}`,
-                      ...(expandida ? { background: `color-mix(in srgb, ${C.aqua} 7%, transparent)` } : {}),
+                      ...(expandida ? { background: tinte.fila(C.aqua) } : {}),
                     }}
                   >
                     <td
-                      className="px-3 py-2.5 align-top sm:sticky sm:left-0 sm:z-[1] sm:min-w-[210px]"
+                      className="px-3 py-3 align-top sm:sticky sm:left-0 sm:z-[1] sm:min-w-[210px]"
                       style={{ background: C.surface, borderRight: `1px solid ${C.border}` }}
                     >
-                      <span className="flex items-start gap-1.5">
+                      <span className="flex items-start gap-2">
                         <ChevronRight
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform"
+                          className="mt-1 h-3.5 w-3.5 shrink-0 transition-transform"
                           style={{ color: C.inkLo, transform: expandida ? 'rotate(90deg)' : undefined }}
                         />
                         <span className="min-w-0">
                           <span className="block font-medium leading-snug" style={{ color: C.ink }}>{p.equipo}</span>
-                          <span className="block text-[11.5px]" style={{ color: C.inkMid }}>{p.zona}</span>
+                          <span className="block text-[12px]" style={{ color: C.inkMid }}>{p.zona}</span>
                           {/* En celular las columnas del medio se ocultan: su contenido reaparece acá. */}
-                          <span className="mt-1.5 flex flex-col gap-0.5 sm:hidden">
+                          <span className="mt-2 flex flex-col gap-1 sm:hidden">
                             <span className="text-[12px]" style={{ color: C.aquaBright }}>
                               {fam ? fam.nombre : 'Variador por identificar'}
                             </span>
-                            <span className="font-mono text-[11.5px] leading-snug" style={{ color: C.inkMid }}>
+                            <span className="font-mono text-[12px] leading-snug" style={{ color: C.inkMid }}>
                               {p.motor}
                             </span>
                             {p.sapMotor && (
-                              <span className="font-mono text-[11.5px]" style={{ color: C.inkMid }}>
+                              <span className="font-mono text-[12px]" style={{ color: C.inkMid }}>
                                 SAP {p.sapMotor}
                               </span>
                             )}
@@ -1070,11 +1071,11 @@ function RecetasPorEquipo({
                         </span>
                       </span>
                     </td>
-                    <td className="hidden px-3 py-2.5 align-top sm:table-cell" style={{ color: C.inkMid, minWidth: 160 }}>
+                    <td className="hidden px-3 py-3 align-top sm:table-cell" style={{ color: C.inkMid, minWidth: 160 }}>
                       {fam ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
-                          className="rounded text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                          className={`rounded text-left font-medium hover:underline ${FOCO}`}
                           style={{ color: C.aquaBright }}
                         >
                           {fam.nombre}
@@ -1083,17 +1084,17 @@ function RecetasPorEquipo({
                         <span style={{ color: C.warn }}>Por identificar</span>
                       )}
                       {p.variadorEtiqueta && (
-                        <span className="mt-0.5 block text-[11.5px]" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
+                        <span className="mt-1 block text-[12px]" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
                       )}
                     </td>
-                    <td className="hidden px-3 py-2.5 align-top font-mono text-[12px] sm:table-cell" style={{ color: C.inkMid, minWidth: 200 }}>
+                    <td className="hidden px-3 py-3 align-top font-mono text-[12px] sm:table-cell" style={{ color: C.inkMid, minWidth: 200 }}>
                       {p.motor}
                     </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2.5 align-top sm:table-cell"><ChipSap codigo={p.sapMotor} /></td>
-                    <td className="hidden whitespace-nowrap px-3 py-2.5 align-top sm:table-cell"><ChipSap codigo={p.sapVariador} /></td>
-                    <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                    <td className="hidden whitespace-nowrap px-3 py-3 align-top sm:table-cell"><ChipSap codigo={p.sapMotor} /></td>
+                    <td className="hidden whitespace-nowrap px-3 py-3 align-top sm:table-cell"><ChipSap codigo={p.sapVariador} /></td>
+                    <td className="whitespace-nowrap px-3 py-3 align-top">
                       <span
-                        className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11.5px] font-medium tabular-nums"
+                        className="inline-flex items-center gap-2 rounded px-2 py-1 text-[12px] font-medium tabular-nums"
                         style={{
                           color: completo ? C.ok : C.warn,
                           background: `color-mix(in srgb, ${completo ? C.ok : C.warn} 16%, transparent)`,
@@ -1108,19 +1109,19 @@ function RecetasPorEquipo({
                   {expandida && (
                     <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                       <td colSpan={COLS.length} className="px-3 py-3" style={{ background: C.bgPanel }}>
-                        <div className="flex flex-col gap-2.5">
-                          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                        <div className="flex flex-col gap-3">
+                          <ul className="m-0 flex list-none flex-col gap-2 p-0">
                             {p.valores.map((val) => (
-                              <li key={val.codigo} className="flex flex-col gap-0.5">
+                              <li key={val.codigo} className="flex flex-col gap-1">
                                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                  <span className="font-mono text-[12.5px] font-semibold" style={{ color: C.aquaBright }}>
+                                  <span className="font-mono text-[13px] font-semibold" style={{ color: C.aquaBright }}>
                                     {val.codigo}
                                   </span>
-                                  <span className="font-mono text-[12.5px] tabular-nums" style={{ color: C.ink }}>
+                                  <span className="font-mono text-[13px] tabular-nums" style={{ color: C.ink }}>
                                     {val.valor}
                                   </span>
                                   <span
-                                    className="rounded px-1.5 py-0.5 text-[11px]"
+                                    className="rounded px-2 py-1 text-[11px]"
                                     style={{
                                       color: COLOR_VALOR[val.estado],
                                       background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
@@ -1145,7 +1146,7 @@ function RecetasPorEquipo({
                           </ul>
                           {p.nota && (
                             <span
-                              className="block pl-2 text-[12.5px] leading-snug"
+                              className="block pl-2 text-[13px] leading-snug"
                               style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
                             >
                               {p.nota}
@@ -1165,7 +1166,7 @@ function RecetasPorEquipo({
 
       <PanelEvidencia />
 
-      <p className="m-0 text-[12.5px] tabular-nums" style={{ color: C.inkMid }}>
+      <p className="m-0 text-[13px] tabular-nums" style={{ color: C.inkMid }}>
         {RESUMEN_RECETAS.posiciones} posiciones · {RESUMEN_RECETAS.confirmados} de{' '}
         {RESUMEN_RECETAS.total} valores confirmados. Los SAP de variador se agregan cuando se
         levanten; los de motor salen de la hoja «Motores nuevos planta» — confirmar que esa
@@ -1192,7 +1193,7 @@ function TablaEquivalencias() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 max-w-[68ch] text-[13.5px] leading-relaxed" style={{ color: C.inkMid }}>
+      <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed" style={{ color: C.inkMid }}>
         Para cuando el repuesto es de otra marca. Los guiones no son datos que falten:
         son equipos que <strong style={{ color: C.ink }}>no piden ese parámetro</strong> —
         la nota de cada fila explica por qué.
@@ -1206,7 +1207,7 @@ function TablaEquivalencias() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por concepto o por código: corriente, nCr, P-08…"
           aria-label="Buscar equivalencia"
-          className="w-full rounded py-2.5 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1216,7 +1217,7 @@ function TablaEquivalencias() {
           <thead>
             <tr>
               <th
-                className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
                 style={{
                   background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
                   position: 'sticky', left: 0, zIndex: 2, borderRight: `1px solid ${C.border}`,
@@ -1227,7 +1228,7 @@ function TablaEquivalencias() {
               {COLUMNAS_EQUIVALENCIA.map((col) => (
                 <th
                   key={col.id}
-                  className="whitespace-nowrap px-3 py-2.5 text-left text-[12.5px] font-semibold"
+                  className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
                   style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
                 >
                   {col.titulo}
@@ -1247,31 +1248,31 @@ function TablaEquivalencias() {
               <tr
                 key={e.concepto}
                 style={{
-                  background: e.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, transparent)` : undefined,
+                  background: e.dePlaca ? tinte.fila(C.warn) : undefined,
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
                 <td
-                  className="px-3 py-2.5 align-top"
+                  className="px-3 py-3 align-top"
                   style={{
                     color: C.ink, lineHeight: 1.5, minWidth: 190, maxWidth: 240,
                     position: 'sticky', left: 0, zIndex: 1,
-                    background: e.dePlaca ? `color-mix(in srgb, ${C.warn} 7%, ${C.bg})` : C.bg,
+                    background: e.dePlaca ? tinte.opaco(C.warn, C.bg) : C.bg,
                     borderRight: `1px solid ${C.border}`,
                   }}
                 >
                   {e.concepto}
                   {e.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
-                      style={{ color: C.warn, background: `color-mix(in srgb, ${C.warn} 16%, transparent)` }}
+                      className="ml-2 inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
                     </span>
                   )}
                   {e.nota && (
                     <span
-                      className="mt-1.5 block max-w-[62ch] pl-2 text-[12.5px]"
+                      className="mt-2 block max-w-[62ch] pl-2 text-[13px]"
                       style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}`, lineHeight: 1.5 }}
                     >
                       {e.nota}
@@ -1283,7 +1284,7 @@ function TablaEquivalencias() {
                   return (
                     <td
                       key={col.id}
-                      className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[13px] font-semibold"
+                      className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] font-semibold"
                       style={{ color: cod ? C.aquaBright : C.inkGhost }}
                     >
                       {cod ?? '—'}
@@ -1350,10 +1351,10 @@ export function VariadoresPage() {
     <div className="min-h-screen" style={{ background: C.bg }}>
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-7">
         {/* Cabecera */}
-        <header className="flex flex-col gap-2.5">
+        <header className="flex flex-col gap-3">
           <button
             onClick={() => navigate('/aprendizaje')}
-            className="inline-flex w-fit items-center gap-1.5 rounded text-[13.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+            className={`inline-flex w-fit items-center gap-2 rounded text-[14px] font-medium ${FOCO}`}
             style={{ color: C.aquaBright }}
           >
             <ArrowLeft className="h-4 w-4" /> Centro de Aprendizaje
@@ -1364,7 +1365,7 @@ export function VariadoresPage() {
           >
             Variadores y partidores suaves
           </h1>
-          <p className="m-0 max-w-[62ch] text-[15.5px] leading-relaxed" style={{ color: C.inkMid }}>
+          <p className="m-0 max-w-[62ch] text-[15px] leading-relaxed" style={{ color: C.inkMid }}>
             Qué parámetros espera cada modelo y en qué menú están. Para cuando hay que
             reemplazar uno y configurarlo sin buscar el manual.
           </p>
@@ -1372,14 +1373,14 @@ export function VariadoresPage() {
 
         {fichaRota && (
           <div
-            className="flex gap-2.5 rounded-r px-4 py-3 text-[13px]"
+            className="flex gap-3 rounded px-4 py-3 text-[13px]"
             style={{
               color: C.inkMid,
-              background: `color-mix(in srgb, ${C.crit} 9%, transparent)`,
+              background: tinte.fila(C.crit),
               borderLeft: `3px solid ${C.crit}`,
             }}
           >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: C.crit }} />
+            <AlertTriangle className="mt-1 h-4 w-4 shrink-0" style={{ color: C.crit }} />
             <span>
               No existe la ficha «{abierta}» — puede ser un enlace viejo o un error de tipeo.
               Abajo está el catálogo completo.
@@ -1389,7 +1390,7 @@ export function VariadoresPage() {
 
         {/* Selector de vista — solo en el catálogo, no dentro de una ficha */}
         {ficha === null && (
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Vista">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Vista">
             {([
               ['catalogo', 'Por modelo'],
               ['recetas', 'Por cinta / equipo'],
@@ -1401,9 +1402,9 @@ export function VariadoresPage() {
                   key={v}
                   onClick={() => cambiarVista(v)}
                   aria-pressed={on}
-                  className="rounded px-3.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                  className={`rounded px-4 py-2 text-[13px] transition-colors ${FOCO}`}
                   style={{
-                    background: on ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.bgPanel,
+                    background: on ? tinte.suave(C.aqua) : C.bgPanel,
                     border: `1px solid ${on ? C.aqua : C.border}`,
                     color: C.ink,
                     fontWeight: on ? 600 : 400,
@@ -1431,7 +1432,7 @@ export function VariadoresPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar marca, modelo o dónde se usa…"
                 aria-label="Buscar familia de variador"
-                className="w-full rounded-md py-2.5 pl-10 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                className={`w-full rounded-lg py-3 pl-10 pr-3 text-sm ${FOCO}`}
                 style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
               />
             </div>
@@ -1445,22 +1446,22 @@ export function VariadoresPage() {
                   <MetaText>
                     {fallas.length} {fallas.length === 1 ? 'código de falla coincide' : 'códigos de falla coinciden'}
                   </MetaText>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     {fallas.slice(0, 6).map((r) => (
                       <button
                         key={`${r.fichaId}-${r.falla.codigo}`}
                         onClick={() => abrirFicha(r.fichaId, 'fallas')}
-                        className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 rounded-lg px-3.5 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-                        style={{ background: C.surface, border: `1px solid ${C.border}` }}
+                        className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-4 py-3 text-left transition-colors ${FOCO}`}
+                        style={panelEstilo}
                       >
                         <span
-                          className="rounded px-1.5 py-0.5 font-mono text-[13px] font-bold"
-                          style={{ color: C.crit, background: `color-mix(in srgb, ${C.crit} 16%, transparent)` }}
+                          className="rounded px-2 py-1 font-mono text-[13px] font-bold"
+                          style={{ color: C.crit, background: tinte.suave(C.crit) }}
                         >
                           {r.falla.codigo}
                         </span>
-                        <span className="text-[13.5px] font-medium" style={{ color: C.ink }}>{r.falla.nombre}</span>
-                        <span className="text-[12.5px]" style={{ color: C.inkMid }}>· {r.fichaNombre}</span>
+                        <span className="text-[14px] font-medium" style={{ color: C.ink }}>{r.falla.nombre}</span>
+                        <span className="text-[13px]" style={{ color: C.inkMid }}>· {r.fichaNombre}</span>
                       </button>
                     ))}
                   </div>
@@ -1469,28 +1470,28 @@ export function VariadoresPage() {
             })()}
 
             {/* Familias */}
-            <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
               {visibles.map((f) => {
                 const r = resumenFicha(f)
                 return (
                   <button
                     key={f.id}
                     onClick={() => abrirFicha(f.id)}
-                    className="flex flex-col gap-2.5 rounded-lg p-4 text-left outline-none transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)] focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-                    style={{ background: C.surface, border: `1px solid ${C.border}` }}
+                    className={`flex flex-col gap-3 rounded-lg p-4 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)] ${FOCO}`}
+                    style={panelEstilo}
                   >
-                    <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className="block text-base font-semibold leading-tight tracking-[-0.014em]" style={{ color: C.ink }}>
                           {f.nombre}
                         </span>
-                        <span className="mt-0.5 block text-xs" style={{ color: C.inkMid }}>{f.tipo}</span>
+                        <span className="mt-1 block text-xs" style={{ color: C.inkMid }}>{f.tipo}</span>
                       </div>
                       <EstadoChip estado={f.estado} />
                     </div>
                     <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{f.donde}</span>
                     <span
-                      className="mt-0.5 pt-2 text-xs tabular-nums"
+                      className="mt-1 pt-2 text-xs tabular-nums"
                       style={{ color: C.inkMid, borderTop: `1px solid ${C.border}` }}
                     >
                       {f.menus
@@ -1512,20 +1513,20 @@ export function VariadoresPage() {
               <h2 className="m-0 text-lg font-semibold tracking-[-0.014em]" style={{ color: C.ink }}>
                 Motores de las cintas
               </h2>
-              <p className="mb-3.5 mt-1 max-w-[62ch] text-[13.5px]" style={{ color: C.inkMid }}>
+              <p className="mb-4 mt-1 max-w-[62ch] text-[14px]" style={{ color: C.inkMid }}>
                 Cuatro modelos cubren las ocho cintas. Potencia, reducción y rpm salen del código
                 Sumitomo; los datos eléctricos hay que leerlos de la placa.
               </p>
-              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
                 {MOTORES_CINTAS.map((m) => (
                   <div
                     key={m.modelo}
-                    className="flex flex-col gap-2.5 rounded-lg p-4"
-                    style={{ background: C.surface, border: `1px solid ${C.border}` }}
+                    className="flex flex-col gap-3 rounded-lg p-4"
+                    style={panelEstilo}
                   >
                     <h3 className="m-0 font-mono text-sm font-semibold tracking-[-0.01em]" style={{ color: C.aquaBright }}>
                       {m.modelo}
-                      {m.porConfirmar && <span className="ml-1.5" style={{ color: C.warn }}>⏳</span>}
+                      {m.porConfirmar && <span className="ml-2" style={{ color: C.warn }}>⏳</span>}
                     </h3>
                     <dl
                       className="grid grid-cols-3 gap-px overflow-hidden rounded"
@@ -1536,26 +1537,26 @@ export function VariadoresPage() {
                         ['Reducción', m.reduccion],
                         ['RPM salida', m.rpmSalida],
                       ].map(([rot, val]) => (
-                        <div key={rot} className="flex flex-col gap-0.5 px-2.5 py-2" style={{ background: C.surface }}>
-                          <dt className="text-[10.5px]" style={{ color: C.inkMid }}>{rot}</dt>
-                          <dd className="m-0 font-mono text-[14.5px] font-semibold tabular-nums" style={{ color: C.ink }}>
+                        <div key={rot} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
+                          <dt className="text-[11px]" style={{ color: C.inkMid }}>{rot}</dt>
+                          <dd className="m-0 font-mono text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
                             {val}
                           </dd>
                         </div>
                       ))}
                     </dl>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {FALTAN_DE_PLACA.map((f) => (
                         <span
                           key={f}
-                          className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
-                          style={{ color: C.warn, background: `color-mix(in srgb, ${C.warn} 16%, transparent)` }}
+                          className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+                          style={{ color: C.warn, background: tinte.suave(C.warn) }}
                         >
                           {f}
                         </span>
                       ))}
                     </div>
-                    <span className="text-[12.5px] leading-snug" style={{ color: C.inkMid }}>{m.usos}</span>
+                    <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{m.usos}</span>
                   </div>
                 ))}
               </div>
@@ -1563,7 +1564,7 @@ export function VariadoresPage() {
 
             <footer className="mt-4 flex flex-col gap-2 pt-5" style={{ borderTop: `1px solid ${C.border}` }}>
               <h3 className="m-0 text-sm font-semibold" style={{ color: C.ink }}>Estado del contenido</h3>
-              <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13.5px]" style={{ color: C.inkMid }}>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[14px]" style={{ color: C.inkMid }}>
                 <li>
                   Las <strong style={{ color: C.ink }}>{VARIADORES.length} fichas</strong> con manual
                   descargado — {TOTAL_PARAMETROS} parámetros y {TOTAL_FALLAS} códigos de falla con
@@ -1581,22 +1582,22 @@ export function VariadoresPage() {
           <>
             <button
               onClick={() => abrirFicha(null)}
-              className="inline-flex w-fit items-center gap-1.5 rounded text-[13.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+              className={`inline-flex w-fit items-center gap-2 rounded text-[14px] font-medium ${FOCO}`}
               style={{ color: C.aquaBright }}
             >
               <ArrowLeft className="h-4 w-4" /> Volver al catálogo
             </button>
 
-            <div className="overflow-hidden rounded-md" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+            <div className="overflow-hidden rounded-lg" style={panelEstilo}>
               <div
                 className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4"
                 style={{ background: C.bgPanel, borderBottom: `1px solid ${C.border}` }}
               >
                 <div>
-                  <h2 className="m-0 text-[17.5px] font-semibold tracking-[-0.01em]" style={{ color: C.ink }}>
+                  <h2 className="m-0 text-[18px] font-semibold tracking-[-0.01em]" style={{ color: C.ink }}>
                     {ficha.nombre}
                   </h2>
-                  <span className="mt-0.5 block text-[12.5px]" style={{ color: C.inkMid }}>
+                  <span className="mt-1 block text-[13px]" style={{ color: C.inkMid }}>
                     {ficha.tipo} · {ficha.donde}
                   </span>
                 </div>
@@ -1606,21 +1607,21 @@ export function VariadoresPage() {
               <div className="flex flex-col gap-4 p-5">
                 {ficha.aviso && (
                   <div
-                    className="flex gap-2.5 rounded-r px-4 py-3 text-[13px]"
+                    className="flex gap-3 rounded px-4 py-3 text-[13px]"
                     style={{
                       color: C.inkMid,
-                      background: `color-mix(in srgb, ${C.warn} 9%, transparent)`,
+                      background: tinte.fila(C.warn),
                       borderLeft: `3px solid ${C.warn}`,
                     }}
                   >
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: C.warn }} />
+                    <AlertTriangle className="mt-1 h-4 w-4 shrink-0" style={{ color: C.warn }} />
                     <span><strong style={{ color: C.ink }}>Ojo: </strong>{ficha.aviso}</span>
                   </div>
                 )}
 
                 {/* Parámetros / Fallas — solo si la ficha tiene ambas cosas */}
                 {ficha.fallas && ficha.menus && (
-                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Sección de la ficha">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Sección de la ficha">
                     {([
                       ['parametros', 'Parámetros'],
                       ['fallas', `Fallas (${ficha.fallas.length})`],
@@ -1631,9 +1632,9 @@ export function VariadoresPage() {
                           key={s}
                           onClick={() => setSeccion(s)}
                           aria-pressed={on}
-                          className="rounded px-3.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                          className={`rounded px-4 py-2 text-[13px] transition-colors ${FOCO}`}
                           style={{
-                            background: on ? `color-mix(in srgb, ${C.aqua} 20%, transparent)` : C.bgPanel,
+                            background: on ? tinte.suave(C.aqua) : C.bgPanel,
                             border: `1px solid ${on ? C.aqua : C.border}`,
                             color: C.ink,
                             fontWeight: on ? 600 : 400,
@@ -1655,14 +1656,14 @@ export function VariadoresPage() {
                 )}
 
                 <div
-                  className="flex gap-2.5 rounded-r px-4 py-3 text-[12.5px]"
+                  className="flex gap-3 rounded px-4 py-3 text-[13px]"
                   style={{
                     color: C.inkMid,
-                    background: `color-mix(in srgb, ${C.aqua} 8%, transparent)`,
+                    background: tinte.fila(C.aqua),
                     borderLeft: `3px solid ${C.aqua}`,
                   }}
                 >
-                  <BookOpen className="mt-0.5 h-4 w-4 shrink-0" style={{ color: C.aqua }} />
+                  <BookOpen className="mt-1 h-4 w-4 shrink-0" style={{ color: C.aqua }} />
                   <span><strong style={{ color: C.ink }}>Fuente: </strong>{ficha.fuente}</span>
                 </div>
               </div>
