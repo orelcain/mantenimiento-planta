@@ -1274,6 +1274,78 @@ export function equivalenciaDe(codigo: string): EquivalenciaParametro | null {
   )
 }
 
+/** Qué fichas del catálogo cubre cada columna de la tabla de equivalencias. */
+export const FICHAS_POR_COLUMNA: Record<string, string[]> = {
+  atv: ['atv312', 'atv31'],
+  danfoss: ['danfoss-ad', 'danfoss-midi'],
+  v20: ['v20'],
+  sew: ['sew'],
+  ats22: ['ats22'],
+}
+
+/** Dónde vive un parámetro concreto: ficha + menú, para poder saltar hasta él. */
+export interface UbicacionParametro {
+  fichaId: string
+  fichaNombre: string
+  menu: string
+  parametro: ParametroVariador
+}
+
+/** Una marca dentro de una comparación, con el dato real si está catalogado. */
+export interface CeldaComparacion {
+  columna: string
+  titulo: string
+  /** Código en esa marca, o `null` si ese equipo no pide el parámetro. */
+  codigo: string | null
+  /** Presente solo si el código existe en el catálogo (trae rango y fábrica). */
+  ubicacion?: UbicacionParametro
+}
+
+/** Busca un código dentro de las fichas indicadas. Exacto primero, luego prefijo. */
+export function ubicarParametro(codigo: string, fichaIds?: string[]): UbicacionParametro | null {
+  const c = codigo.trim().toLowerCase()
+  if (!c) return null
+  const fichas = fichaIds ? VARIADORES.filter((f) => fichaIds.includes(f.id)) : VARIADORES
+  let aproximado: UbicacionParametro | null = null
+  for (const f of fichas) {
+    for (const [menu, filas] of Object.entries(f.menus ?? {})) {
+      for (const parametro of filas) {
+        const cod = parametro.codigo.toLowerCase()
+        const hit = { fichaId: f.id, fichaNombre: f.nombre, menu, parametro }
+        if (cod === c) return hit
+        if (!aproximado && (cod.startsWith(c) || c.startsWith(cod))) aproximado = hit
+      }
+    }
+  }
+  return aproximado
+}
+
+/**
+ * Resuelve una fila de equivalencias contra el catálogo real.
+ *
+ * La tabla de equivalencias dice que `nCr` es `1-24` en Danfoss, pero no dice
+ * en qué menú vive ni con qué rango — que es lo que hace falta para configurar
+ * el repuesto. Esto ata cada código a su parámetro de verdad, así se puede
+ * comparar rango y valor de fábrica marca por marca, y saltar hasta cualquiera.
+ *
+ * Un código sin ubicación NO es un error: puede ser un parámetro que la ficha
+ * todavía no cataloga (ej. `Uln` del Altistart). La celda lo muestra igual.
+ */
+export function compararEquivalencia(e: EquivalenciaParametro): CeldaComparacion[] {
+  return COLUMNAS_EQUIVALENCIA.map((col) => {
+    const codigo = e.codigos[col.id] ?? null
+    if (!codigo) return { columna: col.id, titulo: col.titulo, codigo: null }
+    // «ACC / dEC» o «1-71 + 1-72»: el primer token es el que se busca.
+    const token = codigo.split(/[\s/+]+/)[0] ?? codigo
+    return {
+      columna: col.id,
+      titulo: col.titulo,
+      codigo,
+      ubicacion: ubicarParametro(token, FICHAS_POR_COLUMNA[col.id]) ?? undefined,
+    }
+  })
+}
+
 /** Una falla encontrada en el catálogo completo, con la familia a la que pertenece. */
 export interface FallaEncontrada {
   falla: FallaVariador

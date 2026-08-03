@@ -51,6 +51,7 @@ import {
   buscarFalla,
   buscarParametro,
   equivalenciaDe,
+  compararEquivalencia,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -61,10 +62,14 @@ import {
   type EstadoValor,
   type PosicionReceta,
   type ValorReceta,
+  type EquivalenciaParametro,
 } from '@/data/variadores'
 
 /** lowercase + sin acentos, para búsqueda tolerante (mismo criterio que el hub). */
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+
+/** Ancla estable de una fila de parámetro. Los códigos traen `-`, `/` y espacios. */
+const idParametro = (codigo: string) => codigo.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
 const ETIQUETA_ESTADO: Record<EstadoFicha, string> = {
   listo: 'Con manual',
@@ -201,11 +206,59 @@ function SimuladorPSR() {
 }
 
 // ── Navegador de parámetros ───────────────────────────────────────────────────
-function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
+/** Un parámetro al que hay que llegar desde fuera (buscador o equivalencias). */
+export interface DestinoParametro {
+  menu?: string
+  codigo: string
+}
+
+/** Abre una ficha; con `destino`, parada directamente en un parámetro. */
+type AbrirFicha = (
+  id: string,
+  seccion?: 'parametros' | 'fallas',
+  destino?: DestinoParametro,
+) => void
+
+function NavegadorParametros({
+  ficha,
+  destino,
+}: {
+  ficha: FichaVariador
+  destino?: DestinoParametro | null
+}) {
   const claves = useMemo(() => Object.keys(ficha.menus ?? {}), [ficha])
   const [menu, setMenu] = useState(claves[0] ?? '')
   const [q, setQ] = useState('')
   const [soloPlaca, setSoloPlaca] = useState(false)
+  /** Código que se viene a buscar: se abre su menú y se deja marcado. */
+  const [resaltado, setResaltado] = useState<string | null>(null)
+
+  // Llegar a la ficha no basta: hay que quedar PARADO en el parámetro. Se abre su
+  // menú, se limpian los filtros que lo esconderían y se deja marcado hasta que
+  // el técnico haga otra cosa — si el resalte se apagara solo, se pierde de vista
+  // justo lo que se vino a ver.
+  useEffect(() => {
+    if (!destino) return
+    const suMenu =
+      destino.menu && claves.includes(destino.menu)
+        ? destino.menu
+        : claves.find((k) =>
+            (ficha.menus?.[k] ?? []).some(
+              (r) => r.codigo.toLowerCase() === destino.codigo.toLowerCase(),
+            ),
+          )
+    if (suMenu) setMenu(suMenu)
+    setQ('')
+    setSoloPlaca(false)
+    setResaltado(destino.codigo)
+    // El scroll espera al render de la tabla con el menú ya cambiado.
+    const t = window.setTimeout(() => {
+      document
+        .getElementById(`param-${idParametro(destino.codigo)}`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 60)
+    return () => window.clearTimeout(t)
+  }, [destino, claves, ficha])
 
   const activo: string = claves.includes(menu) ? menu : (claves[0] ?? '')
   const filas = useMemo(() => ficha.menus?.[activo] ?? [], [ficha, activo])
@@ -245,7 +298,10 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
             return (
               <button
                 key={k}
-                onClick={() => setMenu(k)}
+                onClick={() => {
+                  setMenu(k)
+                  setResaltado(null)
+                }}
                 aria-pressed={on}
                 className={`rounded px-3 py-2 text-[13px] transition-colors ${FOCO}`}
                 style={{
@@ -269,7 +325,10 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
           <input
             type="search"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setResaltado(null)
+            }}
             placeholder="Buscar: nCr, rampa, corriente…"
             aria-label="Buscar parámetro"
             className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
@@ -325,12 +384,21 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                 </td>
               </tr>
             )}
-            {visibles.map((r) => (
+            {visibles.map((r) => {
+              const marcado = resaltado !== null && r.codigo.toLowerCase() === resaltado.toLowerCase()
+              return (
               <tr
                 key={r.codigo + r.descripcion}
+                id={`param-${idParametro(r.codigo)}`}
                 style={{
-                  background: r.dePlaca ? tinte.fila(C.warn) : undefined,
+                  background: marcado
+                    ? tinte.suave(C.aqua)
+                    : r.dePlaca ? tinte.fila(C.warn) : undefined,
                   borderBottom: `1px solid ${C.border}`,
+                  // Marca persistente: el técnico llegó acá buscando ESTA fila.
+                  ...(marcado
+                    ? { outline: `2px solid ${C.aqua}`, outlineOffset: '-2px' }
+                    : {}),
                 }}
               >
                 <td
@@ -338,18 +406,30 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                   style={{
                     color: C.aquaBright, position: 'sticky', left: 0, zIndex: 1,
                     // Fondo OPACO: mezclar contra surface (no transparent) para que no se vea lo que pasa debajo.
-                    background: r.dePlaca ? tinte.opaco(C.warn, C.surface) : C.surface,
+                    background: marcado
+                      ? tinte.opaco(C.aqua, C.surface)
+                      : r.dePlaca ? tinte.opaco(C.warn, C.surface) : C.surface,
                     borderRight: `1px solid ${C.border}`,
                   }}
                 >
                   {r.codigo}
-                  {global && (
+                  {(global || marcado) && (
                     <span className="mt-1 block font-sans text-[11px] font-normal" style={{ color: C.inkLo }}>
                       {r.menu.split(' ')[0]}
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-3 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
+                  {marcado && (
+                    <span
+                      className="mb-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold"
+                      style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
+                    >
+                      <Search className="h-3 w-3" aria-hidden />
+                      Es este
+                    </span>
+                  )}
+                  {marcado && <br />}
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
@@ -393,7 +473,8 @@ function NavegadorParametros({ ficha }: { ficha: FichaVariador }) {
                   {r.fabrica}
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -1187,18 +1268,21 @@ function RecetasPorEquipo({
  *   · ¿cuál es el equivalente acá? — la fila de equivalencias del concepto,
  *     para pasar de «tengo nCr en el manual del Altivar» a «en este SEW es P-08»
  */
-function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => void }) {
+function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
   const [q, setQ] = useState('')
+  /** Concepto elegido a mano desde un resultado; manda sobre el detectado. */
+  const [elegida, setElegida] = useState<EquivalenciaParametro | null>(null)
 
   const hallazgos = useMemo(() => buscarParametro(q), [q])
-  /** Si lo buscado es un código conocido, su fila de equivalencias. */
-  const equiv = useMemo(() => {
+  /** Si lo buscado es un código o concepto conocido, su fila de equivalencias. */
+  const detectada = useMemo(() => {
     if (q.trim().length < 2) return null
     const porCodigo = equivalenciaDe(q)
     if (porCodigo) return porCodigo
     const t = norm(q.trim())
     return EQUIVALENCIAS.find((e) => norm(e.concepto).includes(t)) ?? null
   }, [q])
+  const equiv = elegida ?? detectada
 
   return (
     <div className="flex flex-col gap-4">
@@ -1214,7 +1298,10 @@ function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => vo
         <input
           type="search"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setElegida(null)
+          }}
           placeholder="nCr · P-08 · 1-24 · corriente · rampa · tensión…"
           aria-label="Buscar parámetro en todas las familias"
           className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
@@ -1222,35 +1309,8 @@ function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => vo
         />
       </div>
 
-      {/* Equivalencia del concepto — la respuesta a «¿y en la otra marca?» */}
-      {equiv && (
-        <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
-          <span className="text-[14px] font-semibold" style={{ color: C.ink }}>
-            {equiv.concepto}
-            {equiv.dePlaca && (
-              <span className="ml-2 rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>
-                Dato de placa
-              </span>
-            )}
-          </span>
-          <div className="grid gap-px overflow-hidden rounded" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', background: C.border, border: `1px solid ${C.border}` }}>
-            {COLUMNAS_EQUIVALENCIA.map((col) => {
-              const cod = equiv.codigos[col.id]
-              return (
-                <div key={col.id} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
-                  <span className="text-[11px]" style={{ color: C.inkMid }}>{col.titulo}</span>
-                  <span className="font-mono text-[15px] font-semibold" style={{ color: cod ? C.aquaBright : C.inkGhost }}>
-                    {cod ?? '—'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-          {equiv.nota && (
-            <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{equiv.nota}</span>
-          )}
-        </div>
-      )}
+      {/* Comparación marca a marca — la respuesta a «¿y en la otra marca?» */}
+      {equiv && <PanelComparacion equiv={equiv} onAbrirFicha={onAbrirFicha} />}
 
       {/* Coincidencias concretas, con su menú */}
       {q.trim().length >= 2 && (
@@ -1260,35 +1320,154 @@ function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => vo
               ? 'Ningún parámetro coincide'
               : `${hallazgos.length} ${hallazgos.length === 1 ? 'parámetro' : 'parámetros'} en el catálogo`}
           </MetaText>
-          {hallazgos.slice(0, 25).map((h, i) => (
-            <button
-              key={`${h.fichaId}-${h.menu}-${h.parametro.codigo}-${i}`}
-              onClick={() => onAbrirFicha(h.fichaId)}
-              className={`flex flex-col gap-1 rounded-lg px-4 py-3 text-left ${FOCO}`}
-              style={panelEstilo}
-            >
-              <span className="flex flex-wrap items-baseline gap-2">
-                <span className="font-mono text-[14px] font-semibold" style={{ color: C.aquaBright }}>
-                  {h.parametro.codigo}
-                </span>
-                <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
-                {h.parametro.dePlaca && (
-                  <span className="rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>Placa</span>
+          {hallazgos.slice(0, 25).map((h, i) => {
+            const suEquiv = equivalenciaDe(h.parametro.codigo)
+            return (
+              <div
+                key={`${h.fichaId}-${h.menu}-${h.parametro.codigo}-${i}`}
+                className="flex flex-col gap-2 rounded-lg px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                style={panelEstilo}
+              >
+                <button
+                  onClick={() =>
+                    onAbrirFicha(h.fichaId, 'parametros', { codigo: h.parametro.codigo, menu: h.menu })
+                  }
+                  className={`flex flex-1 flex-col gap-1 rounded text-left ${FOCO}`}
+                >
+                  <span className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-mono text-[14px] font-semibold" style={{ color: C.aquaBright }}>
+                      {h.parametro.codigo}
+                    </span>
+                    <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
+                    {h.parametro.dePlaca && (
+                      <span className="rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>Placa</span>
+                    )}
+                  </span>
+                  <span className="text-[12px]" style={{ color: C.inkMid }}>
+                    {h.fichaNombre} · menú <span className="font-mono">{h.menu}</span>
+                  </span>
+                  {(h.parametro.rango !== '—' || h.parametro.fabrica !== '—') && (
+                    <span className="font-mono text-[12px] tabular-nums" style={{ color: C.inkLo }}>
+                      {h.parametro.rango !== '—' ? h.parametro.rango : ''}
+                      {h.parametro.rango !== '—' && h.parametro.fabrica !== '—' ? '  ·  fábrica ' : ''}
+                      {h.parametro.fabrica !== '—' ? h.parametro.fabrica : ''}
+                    </span>
+                  )}
+                </button>
+                {suEquiv && (
+                  <button
+                    onClick={() => setElegida(suEquiv)}
+                    className={`shrink-0 self-start rounded px-3 py-2 text-[12px] font-medium sm:self-auto ${FOCO}`}
+                    style={{
+                      color: C.aquaBright,
+                      background: tinte.suave(C.aqua),
+                      border: `1px solid ${tinte.borde(C.aqua)}`,
+                    }}
+                  >
+                    Comparar marcas
+                  </button>
                 )}
-              </span>
-              <span className="text-[12px]" style={{ color: C.inkMid }}>
-                {h.fichaNombre} · menú <span className="font-mono">{h.menu}</span>
-              </span>
-              {(h.parametro.rango !== '—' || h.parametro.fabrica !== '—') && (
-                <span className="font-mono text-[12px] tabular-nums" style={{ color: C.inkLo }}>
-                  {h.parametro.rango !== '—' ? h.parametro.rango : ''}
-                  {h.parametro.rango !== '—' && h.parametro.fabrica !== '—' ? '  ·  fábrica ' : ''}
-                  {h.parametro.fabrica !== '—' ? h.parametro.fabrica : ''}
-                </span>
-              )}
-            </button>
-          ))}
+              </div>
+            )
+          })}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * El mismo concepto, marca por marca, resuelto contra el catálogo real.
+ *
+ * La tabla de equivalencias sola dice que `nCr` es `1-24` en Danfoss — pero para
+ * configurar el repuesto hace falta el menú, el rango y el valor de fábrica. Acá
+ * cada marca trae su dato y se puede saltar al parámetro con un toque.
+ */
+function PanelComparacion({
+  equiv,
+  onAbrirFicha,
+}: {
+  equiv: EquivalenciaParametro
+  onAbrirFicha: AbrirFicha
+}) {
+  const celdas = useMemo(() => compararEquivalencia(equiv), [equiv])
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
+      <span className="text-[15px] font-semibold" style={{ color: C.ink }}>
+        {equiv.concepto}
+        {equiv.dePlaca && (
+          <span className="ml-2 rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>
+            Dato de placa
+          </span>
+        )}
+      </span>
+
+      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 560 }}>
+          <thead>
+            <tr>
+              {['Marca', 'Código', 'Menú', 'Rango', 'Fábrica'].map((h) => (
+                <th
+                  key={h}
+                  className="whitespace-nowrap px-3 py-2 text-left text-[12px] font-semibold"
+                  style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {celdas.map((c) => {
+              const u = c.ubicacion
+              return (
+                <tr
+                  key={c.columna}
+                  onClick={
+                    u ? () => onAbrirFicha(u.fichaId, 'parametros', { codigo: u.parametro.codigo, menu: u.menu }) : undefined
+                  }
+                  style={{
+                    borderBottom: `1px solid ${C.border}`,
+                    cursor: u ? 'pointer' : undefined,
+                    // Sin código no es un vacío de datos: ese equipo no pide el parámetro.
+                    opacity: c.codigo ? 1 : 0.55,
+                  }}
+                >
+                  <td className="whitespace-nowrap px-3 py-2 align-top" style={{ color: C.ink }}>
+                    {c.titulo}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-3 py-2 align-top font-mono font-semibold"
+                    style={{ color: c.codigo ? C.aquaBright : C.inkGhost }}
+                  >
+                    {c.codigo ?? '—'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 align-top font-mono text-[12px]" style={{ color: C.inkMid }}>
+                    {u ? u.menu.split(' ')[0] : '—'}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-[12px] tabular-nums" style={{ color: C.inkMid }}>
+                    {u?.parametro.rango ?? '—'}
+                  </td>
+                  <td className="px-3 py-2 align-top font-mono text-[12px] tabular-nums" style={{ color: C.inkMid }}>
+                    {u?.parametro.fabrica ?? '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <MetaText>Toca una marca para ir a ese parámetro en su ficha.</MetaText>
+
+      {equiv.nota && (
+        <span
+          className="max-w-[70ch] pl-2 text-[13px] leading-relaxed"
+          style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
+        >
+          {equiv.nota}
+        </span>
       )}
     </div>
   )
@@ -1296,7 +1475,7 @@ function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => vo
 
 // ── Equivalencias entre marcas ────────────────────────────────────────────────
 /** El mismo dato en el dialecto de cada fabricante — para cambiar de marca. */
-function TablaEquivalencias() {
+function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
   const [q, setQ] = useState('')
 
   const visibles = useMemo(() => {
@@ -1308,6 +1487,12 @@ function TablaEquivalencias() {
         Object.values(e.codigos).some((c) => c && norm(c).includes(term)),
     )
   }, [q])
+
+  // Se resuelve una vez para toda la tabla: cada código sabe a qué ficha y menú va.
+  const celdasPorConcepto = useMemo(
+    () => Object.fromEntries(EQUIVALENCIAS.map((e) => [e.concepto, compararEquivalencia(e)])),
+    [],
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -1397,18 +1582,32 @@ function TablaEquivalencias() {
                     </span>
                   )}
                 </td>
-                {COLUMNAS_EQUIVALENCIA.map((col) => {
-                  const cod = e.codigos[col.id]
-                  return (
-                    <td
-                      key={col.id}
-                      className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] font-semibold"
-                      style={{ color: cod ? C.aquaBright : C.inkGhost }}
-                    >
-                      {cod ?? '—'}
-                    </td>
-                  )
-                })}
+                {(celdasPorConcepto[e.concepto] ?? []).map((c) => (
+                  <td
+                    key={c.columna}
+                    className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] font-semibold"
+                    style={{ color: c.codigo ? C.aquaBright : C.inkGhost }}
+                  >
+                    {/* El código no es solo texto: lleva al parámetro en su ficha. */}
+                    {c.ubicacion ? (
+                      <button
+                        onClick={() =>
+                          onAbrirFicha(c.ubicacion!.fichaId, 'parametros', {
+                            codigo: c.ubicacion!.parametro.codigo,
+                            menu: c.ubicacion!.menu,
+                          })
+                        }
+                        className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                        style={{ color: C.aquaBright }}
+                        title={`Ir a ${c.codigo} · ${c.ubicacion.fichaNombre}`}
+                      >
+                        {c.codigo}
+                      </button>
+                    ) : (
+                      (c.codigo ?? '—')
+                    )}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -1437,11 +1636,24 @@ export function VariadoresPage() {
     params.get('seccion') === 'fallas' ? 'fallas' : 'parametros',
   )
 
-  const abrirFicha = (id: string | null, sec: 'parametros' | 'fallas' = 'parametros') => {
+  const abrirFicha = (
+    id: string | null,
+    sec: 'parametros' | 'fallas' = 'parametros',
+    destino?: DestinoParametro,
+  ) => {
     const p = new URLSearchParams(params)
     if (id) p.set('ficha', id)
     else p.delete('ficha')
     p.delete('posicion')
+    // ?p=<código>&menu=<menú>: el enlace no queda en la ficha, queda EN el parámetro.
+    if (destino) {
+      p.set('p', destino.codigo)
+      if (destino.menu) p.set('menu', destino.menu)
+      else p.delete('menu')
+    } else {
+      p.delete('p')
+      p.delete('menu')
+    }
     // Abrir hace push (atrás del celular vuelve al catálogo); cerrar REEMPLAZA,
     // para que atrás no re-abra la ficha recién cerrada.
     setParams(p, { replace: id === null })
@@ -1449,11 +1661,22 @@ export function VariadoresPage() {
     window.scrollTo(0, 0)
   }
 
+  const codigoDestino = params.get('p')
+  const destino = useMemo<DestinoParametro | null>(
+    () => (codigoDestino ? { codigo: codigoDestino, menu: params.get('menu') ?? undefined } : null),
+    // Se reconstruye con cada cambio de destino para que el navegador reaccione
+    // aunque se salte del mismo buscador a dos parámetros seguidos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [codigoDestino, params.get('menu')],
+  )
+
   const cambiarVista = (v: 'catalogo' | 'equivalencias' | 'recetas' | 'parametro') => {
     const p = new URLSearchParams(params)
     if (v !== 'catalogo') p.set('vista', v)
     else p.delete('vista')
     p.delete('ficha')
+    p.delete('p')
+    p.delete('menu')
     setParams(p, { replace: true })
   }
 
@@ -1541,7 +1764,7 @@ export function VariadoresPage() {
         {ficha === null && vista === 'parametro' ? (
           <BuscadorParametros onAbrirFicha={abrirFicha} />
         ) : ficha === null && vista === 'equivalencias' ? (
-          <TablaEquivalencias />
+          <TablaEquivalencias onAbrirFicha={abrirFicha} />
         ) : ficha === null && vista === 'recetas' ? (
           <RecetasPorEquipo onAbrirFicha={abrirFicha} posicionInicial={params.get('posicion')} />
         ) : ficha === null ? (
@@ -1775,7 +1998,7 @@ export function VariadoresPage() {
                 ) : seccion === 'fallas' && ficha.fallas ? (
                   <ListaFallas fallas={ficha.fallas} />
                 ) : (
-                  <NavegadorParametros ficha={ficha} />
+                  <NavegadorParametros ficha={ficha} destino={destino} />
                 )}
 
                 <div
