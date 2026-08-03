@@ -471,6 +471,36 @@ service cloud.firestore {
     // INCIDENCIAS - Validación de reportes
     // ============================================
     // ============================================
+    // CAMBIOS DE VARIADOR REGISTRADOS
+    // ============================================
+    // Cada doc es el registro de UN cambio: que se instalo, como se configuro
+    // (clonado / a mano / ya venia) y cuanto duro la intervencion. La incidencia
+    // asociada se resuelve aparte, con el servicio de incidencias.
+    // Solo se crean y se leen: son evidencia historica, no se editan.
+    match /variadoresCambios/{cambioId} {
+      allow read: if isActiveUser();
+
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.incidentId is string
+        && request.resource.data.incidentId.size() > 0
+        && request.resource.data.posicionId is string
+        && request.resource.data.posicionId.size() > 0
+        && request.resource.data.posicionId.size() <= 80
+        && request.resource.data.variadorId is string
+        && request.resource.data.variadorId.size() <= 80
+        && request.resource.data.modo in ['clonado', 'manual', 'ya_venia']
+        && request.resource.data.rango in ['lt15', '15-30', '30-60', '1-2h', 'gt2h']
+        && request.resource.data.minutosTrabajo is int
+        && request.resource.data.minutosTrabajo > 0
+        && request.resource.data.minutosTrabajo <= 600
+        && (!('comentario' in request.resource.data) || request.resource.data.comentario.size() <= 500)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // ============================================
     // APORTES AL CATALOGO DE VARIADORES
     // ============================================
     // El catalogo vive en el repo (data/variadores.ts), no aca: estos documentos
