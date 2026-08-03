@@ -37,7 +37,7 @@ import {
 } from '@/services/variadoresCambios'
 import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
-import { FOCO, tinte, panel as panelEstilo } from '@/data/variadoresUi'
+import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
 import {
   VARIADORES,
@@ -49,6 +49,8 @@ import {
   POSICIONES,
   RESUMEN_RECETAS,
   buscarFalla,
+  buscarParametro,
+  equivalenciaDe,
   EQUIVALENCIAS,
   COLUMNAS_EQUIVALENCIA,
   tensionFinalPSR,
@@ -1176,6 +1178,122 @@ function RecetasPorEquipo({
   )
 }
 
+// ── Buscador global de parámetros ─────────────────────────────────────────────
+/**
+ * Un parámetro, en las 8 familias a la vez.
+ *
+ * Responde las dos preguntas que se hacen con el variador enfrente:
+ *   · ¿dónde está? — familia y menú de cada coincidencia
+ *   · ¿cuál es el equivalente acá? — la fila de equivalencias del concepto,
+ *     para pasar de «tengo nCr en el manual del Altivar» a «en este SEW es P-08»
+ */
+function BuscadorParametros({ onAbrirFicha }: { onAbrirFicha: (id: string) => void }) {
+  const [q, setQ] = useState('')
+
+  const hallazgos = useMemo(() => buscarParametro(q), [q])
+  /** Si lo buscado es un código conocido, su fila de equivalencias. */
+  const equiv = useMemo(() => {
+    if (q.trim().length < 2) return null
+    const porCodigo = equivalenciaDe(q)
+    if (porCodigo) return porCodigo
+    const t = norm(q.trim())
+    return EQUIVALENCIAS.find((e) => norm(e.concepto).includes(t)) ?? null
+  }, [q])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="m-0 max-w-[70ch] text-[14px] leading-relaxed" style={{ color: C.inkMid }}>
+        Escribe un código (<span className="font-mono">nCr</span>, <span className="font-mono">P-08</span>,{' '}
+        <span className="font-mono">1-24</span>) o lo que quieres ajustar
+        («corriente», «rampa»). Te dice <strong style={{ color: C.ink }}>en qué equipo y en qué
+        menú vive</strong>, y cómo se llama lo mismo en las otras marcas.
+      </p>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: C.inkLo }} />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="nCr · P-08 · 1-24 · corriente · rampa · tensión…"
+          aria-label="Buscar parámetro en todas las familias"
+          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
+        />
+      </div>
+
+      {/* Equivalencia del concepto — la respuesta a «¿y en la otra marca?» */}
+      {equiv && (
+        <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
+          <span className="text-[14px] font-semibold" style={{ color: C.ink }}>
+            {equiv.concepto}
+            {equiv.dePlaca && (
+              <span className="ml-2 rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>
+                Dato de placa
+              </span>
+            )}
+          </span>
+          <div className="grid gap-px overflow-hidden rounded" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', background: C.border, border: `1px solid ${C.border}` }}>
+            {COLUMNAS_EQUIVALENCIA.map((col) => {
+              const cod = equiv.codigos[col.id]
+              return (
+                <div key={col.id} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
+                  <span className="text-[11px]" style={{ color: C.inkMid }}>{col.titulo}</span>
+                  <span className="font-mono text-[15px] font-semibold" style={{ color: cod ? C.aquaBright : C.inkGhost }}>
+                    {cod ?? '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          {equiv.nota && (
+            <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{equiv.nota}</span>
+          )}
+        </div>
+      )}
+
+      {/* Coincidencias concretas, con su menú */}
+      {q.trim().length >= 2 && (
+        <div className="flex flex-col gap-2">
+          <MetaText>
+            {hallazgos.length === 0
+              ? 'Ningún parámetro coincide'
+              : `${hallazgos.length} ${hallazgos.length === 1 ? 'parámetro' : 'parámetros'} en el catálogo`}
+          </MetaText>
+          {hallazgos.slice(0, 25).map((h, i) => (
+            <button
+              key={`${h.fichaId}-${h.menu}-${h.parametro.codigo}-${i}`}
+              onClick={() => onAbrirFicha(h.fichaId)}
+              className={`flex flex-col gap-1 rounded-lg px-4 py-3 text-left ${FOCO}`}
+              style={panelEstilo}
+            >
+              <span className="flex flex-wrap items-baseline gap-2">
+                <span className="font-mono text-[14px] font-semibold" style={{ color: C.aquaBright }}>
+                  {h.parametro.codigo}
+                </span>
+                <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
+                {h.parametro.dePlaca && (
+                  <span className="rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>Placa</span>
+                )}
+              </span>
+              <span className="text-[12px]" style={{ color: C.inkMid }}>
+                {h.fichaNombre} · menú <span className="font-mono">{h.menu}</span>
+              </span>
+              {(h.parametro.rango !== '—' || h.parametro.fabrica !== '—') && (
+                <span className="font-mono text-[12px] tabular-nums" style={{ color: C.inkLo }}>
+                  {h.parametro.rango !== '—' ? h.parametro.rango : ''}
+                  {h.parametro.rango !== '—' && h.parametro.fabrica !== '—' ? '  ·  fábrica ' : ''}
+                  {h.parametro.fabrica !== '—' ? h.parametro.fabrica : ''}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Equivalencias entre marcas ────────────────────────────────────────────────
 /** El mismo dato en el dialecto de cada fabricante — para cambiar de marca. */
 function TablaEquivalencias() {
@@ -1311,7 +1429,9 @@ export function VariadoresPage() {
   // ?posicion=<id> implica la vista de recetas: viene de la ficha de una máquina.
   const vista = params.get('posicion')
     ? 'recetas'
-    : vistaParam === 'equivalencias' || vistaParam === 'recetas' ? vistaParam : 'catalogo'
+    : vistaParam === 'equivalencias' || vistaParam === 'recetas' || vistaParam === 'parametro'
+      ? vistaParam
+      : 'catalogo'
   const [q, setQ] = useState('')
   const [seccion, setSeccion] = useState<'parametros' | 'fallas'>(
     params.get('seccion') === 'fallas' ? 'fallas' : 'parametros',
@@ -1329,7 +1449,7 @@ export function VariadoresPage() {
     window.scrollTo(0, 0)
   }
 
-  const cambiarVista = (v: 'catalogo' | 'equivalencias' | 'recetas') => {
+  const cambiarVista = (v: 'catalogo' | 'equivalencias' | 'recetas' | 'parametro') => {
     const p = new URLSearchParams(params)
     if (v !== 'catalogo') p.set('vista', v)
     else p.delete('vista')
@@ -1394,6 +1514,7 @@ export function VariadoresPage() {
             {([
               ['catalogo', 'Por modelo'],
               ['recetas', 'Por cinta / equipo'],
+              ['parametro', 'Buscar parámetro'],
               ['equivalencias', 'Equivalencias entre marcas'],
             ] as const).map(([v, rotulo]) => {
               const on = vista === v
@@ -1417,7 +1538,9 @@ export function VariadoresPage() {
           </div>
         )}
 
-        {ficha === null && vista === 'equivalencias' ? (
+        {ficha === null && vista === 'parametro' ? (
+          <BuscadorParametros onAbrirFicha={abrirFicha} />
+        ) : ficha === null && vista === 'equivalencias' ? (
           <TablaEquivalencias />
         ) : ficha === null && vista === 'recetas' ? (
           <RecetasPorEquipo onAbrirFicha={abrirFicha} posicionInicial={params.get('posicion')} />
