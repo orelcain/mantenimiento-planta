@@ -22,7 +22,8 @@
  */
 import { Fragment, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch } from 'lucide-react'
+import { useAuthStore } from '@/store'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText } from '@/components/learning/primitives'
 import {
@@ -478,24 +479,49 @@ const ROTULO_VALOR: Record<EstadoValor, string> = {
   sugerido: 'Sugerido',
 }
 
-/** Chip de código SAP con copiar al portapapeles — mismo patrón que Repuestos. */
+/**
+ * Chip de código SAP: copia al portapapeles y ofrece abrirlo en Repuestos.
+ * La pregunta que sigue a «se quemó» no es qué parámetros lleva — es si hay
+ * repuesto y dónde está. El deep-link ?q=<SAP> ya lo usa MachineLearningPage.
+ */
 function ChipSap({ codigo }: { codigo?: string }) {
+  const navigate = useNavigate()
+  // /repuestos es ruta protegida y esta página es pública: sin sesión el botón
+  // rebotaría a /login. Mejor no ofrecer la acción que no se puede cumplir.
+  const { isAuthenticated } = useAuthStore()
   const [copiado, setCopiado] = useState(false)
   if (!codigo) return <span className="font-mono text-[12px]" style={{ color: C.inkGhost }}>—</span>
   return (
-    <button
-      onClick={() => {
-        navigator.clipboard?.writeText(codigo)
-        setCopiado(true)
-        window.setTimeout(() => setCopiado(false), 1400)
-      }}
-      title="Código SAP — clic para copiar"
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
-      style={{ color: C.aquaBright, background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
+    <span
+      className="inline-flex items-center overflow-hidden rounded"
+      style={{ background: `color-mix(in srgb, ${C.aqua} 14%, transparent)` }}
     >
-      {codigo}
-      {copiado ? <Check className="h-3 w-3" style={{ color: C.ok }} /> : <Copy className="h-3 w-3" />}
-    </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          navigator.clipboard?.writeText(codigo)
+          setCopiado(true)
+          window.setTimeout(() => setCopiado(false), 1400)
+        }}
+        title="Copiar el código SAP"
+        className="inline-flex items-center gap-1 px-1.5 py-1 font-mono text-[11.5px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+        style={{ color: C.aquaBright }}
+      >
+        {codigo}
+        {copiado ? <Check className="h-3 w-3" style={{ color: C.ok }} /> : <Copy className="h-3 w-3" />}
+      </button>
+      {isAuthenticated && (
+        <button
+          onClick={(e) => { e.stopPropagation(); navigate(`/repuestos?q=${encodeURIComponent(codigo)}`) }}
+          title="Ver stock y ubicación en Repuestos"
+          aria-label={`Ver ${codigo} en Repuestos`}
+          className="px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+          style={{ color: C.aquaBright, borderLeft: `1px solid color-mix(in srgb, ${C.aqua} 30%, transparent)` }}
+        >
+          <PackageSearch className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </span>
   )
 }
 

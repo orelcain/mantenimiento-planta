@@ -791,6 +791,12 @@ export interface PosicionReceta {
   sapMotor?: string
   /** Código SAP del VARIADOR. Pendiente: aún no se levantaron. */
   sapVariador?: string
+  /**
+   * Slug de la máquina en el Centro de Aprendizaje, para que su ficha muestre
+   * los variadores que la mueven. Solo se asigna cuando la posición pertenece
+   * inequívocamente a esa máquina — si hay duda, se deja sin slug.
+   */
+  maquinaSlug?: string
   valores: ValorReceta[]
   nota?: string
 }
@@ -817,7 +823,7 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'La única receta 100 % confirmada — la placa salió del grupo Levantamiento. Confirmar de pasada que el motor siga siendo este (foto de oct-2024).',
   },
   {
-    id: 'baader142-alimentadora', sapMotor: '3300124071', equipo: 'Cinta azul alimentadora Baader 142', zona: 'Salida Marel HG',
+    id: 'baader142-alimentadora', maquinaSlug: 'baader-142', sapMotor: '3300124071', equipo: 'Cinta azul alimentadora Baader 142', zona: 'Salida Marel HG',
     variadorId: 'atv312',
     motor: 'Sumitomo RNYM1-1320A-7 · 0,75 kW · 1:7 → 207 rpm salida',
     valores: [
@@ -830,7 +836,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'cuello-cisnes', sapMotor: '3300124072', equipo: 'Cinta cuello de cisnes', zona: 'Antes del infeed Marel',
+    id: 'cuello-cisnes', maquinaSlug: 'marel-hg', sapMotor: '3300124072', equipo: 'Cinta cuello de cisnes', zona: 'Antes del infeed Marel',
     variadorId: 'v20', motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30 → 48,3 rpm salida',
     valores: [
       v('P0304', '380 V', V380),
@@ -843,7 +849,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'transversal-baader', sapMotor: '3300124073', equipo: 'Cinta transversal salida Baader 142', zona: 'Salida Baader 142',
+    id: 'transversal-baader', maquinaSlug: 'baader-142', sapMotor: '3300124073', equipo: 'Cinta transversal salida Baader 142', zona: 'Salida Baader 142',
     variadorId: 'v20', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30 → 48,3 rpm salida',
     valores: [
       v('P0304', '380 V', V380),
@@ -855,7 +861,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'grader-zeta', equipo: 'Cinta zeta (elevadora 2)', zona: 'Grader',
+    id: 'grader-zeta', maquinaSlug: 'grader', equipo: 'Cinta zeta (elevadora 2)', zona: 'Grader',
     variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es — los rótulos del tablero no son confiables',
     motor: 'por levantar',
     valores: [
@@ -869,7 +875,7 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'El tablero tiene 3 AutomationDrive + 1 Midi: identificar qué unidad mueve cada cinta es parte del levantamiento.',
   },
   {
-    id: 'grader-acel-1', equipo: 'Cinta aceleración 1', zona: 'Grader',
+    id: 'grader-acel-1', maquinaSlug: 'grader', equipo: 'Cinta aceleración 1', zona: 'Grader',
     variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es',
     motor: 'por levantar',
     valores: [
@@ -878,7 +884,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'grader-acel-2', equipo: 'Cinta aceleración 2', zona: 'Grader',
+    id: 'grader-acel-2', maquinaSlug: 'grader', equipo: 'Cinta aceleración 2', zona: 'Grader',
     variadorId: 'danfoss-ad', variadorEtiqueta: 'confirmar cuál de los 4 es',
     motor: 'por levantar',
     valores: [
@@ -887,7 +893,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'grader-larga', equipo: 'Cinta larga Grader', zona: 'Grader',
+    id: 'grader-larga', maquinaSlug: 'grader', equipo: 'Cinta larga Grader', zona: 'Grader',
     variadorId: 'danfoss-midi', variadorEtiqueta: 'confirmar si la larga es la del Midi (la unidad chica)',
     motor: 'por levantar',
     valores: [
@@ -896,7 +902,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'filete-cinta', sapMotor: '3300124073', equipo: 'Cinta filete', zona: 'Tablero de filete',
+    id: 'filete-cinta', maquinaSlug: 'marel-filete', sapMotor: '3300124073', equipo: 'Cinta filete', zona: 'Tablero de filete',
     variadorId: 'sew', variadorEtiqueta: 'VARIADOR 1…6 — mapear número ↔ cinta',
     motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
@@ -909,7 +915,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'filete-desperdicio', sapMotor: '3300124073', equipo: 'Cinta desperdicio filete', zona: 'Tablero de filete',
+    id: 'filete-desperdicio', maquinaSlug: 'marel-filete', sapMotor: '3300124073', equipo: 'Cinta desperdicio filete', zona: 'Tablero de filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -917,7 +923,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'baader200-desperdicio', sapMotor: '3300124073', equipo: 'Cinta desperdicio Baader 200', zona: 'Tablero de filete',
+    id: 'baader200-desperdicio', maquinaSlug: 'baader-200', sapMotor: '3300124073', equipo: 'Cinta desperdicio Baader 200', zona: 'Tablero de filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 · 0,55 kW · 1:30',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -925,7 +931,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'pimponeo', sapMotor: '3300124073', equipo: 'Cinta pimponeo + desperdicio pimponeo (2 cintas, 1 variador)', zona: 'Tablero de filete',
+    id: 'pimponeo', maquinaSlug: 'marel-filete', sapMotor: '3300124073', equipo: 'Cinta pimponeo + desperdicio pimponeo (2 cintas, 1 variador)', zona: 'Tablero de filete',
     variadorId: 'sew', motor: '2 × Sumitomo RNYM08-1320B-30 · 0,55 kW c/u',
     valores: [
       v('P-07', '380 V', V380),
@@ -936,7 +942,7 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'La posición más delicada del tablero: ni P-08 ni el guardamotor distinguen cada motor. Si una cinta se traba, el disparo puede llegar tarde.',
   },
   {
-    id: 'curva', sapMotor: '3300124073', equipo: 'Cinta curva', zona: 'Filete',
+    id: 'curva', maquinaSlug: 'marel-filete', sapMotor: '3300124073', equipo: 'Cinta curva', zona: 'Filete',
     variadorId: 'sew', motor: 'Sumitomo RNYM08-1320B-30 ⏳ Orel duda — confirmar modelo',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -944,7 +950,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'gea-alimentacion', equipo: 'Cinta alimentación GEA', zona: 'Filete → GEA',
+    id: 'gea-alimentacion', maquinaSlug: 'termoformadora-gea', equipo: 'Cinta alimentación GEA', zona: 'Filete → GEA',
     variadorId: 'sew', motor: 'Sumitomo RNYMS05-1320C-30 · 0,4 kW ⏳ · 1:30',
     valores: [
       v('P-07', '380 V', V380), v('P-09', '50 Hz', 'confirmado'),
@@ -952,7 +958,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'z-elevadora-hg', sapMotor: '3300124072', equipo: 'Cinta Z elevadora HG', zona: 'Marel HG',
+    id: 'z-elevadora-hg', maquinaSlug: 'marel-hg', sapMotor: '3300124072', equipo: 'Cinta Z elevadora HG', zona: 'Marel HG',
     variadorId: null, variadorEtiqueta: 'variador por identificar',
     motor: 'Sumitomo RNYM1-1320A-30 · 0,75 kW · 1:30',
     valores: [
@@ -974,7 +980,7 @@ export const POSICIONES: PosicionReceta[] = [
     ],
   },
   {
-    id: 'sopladoras', equipo: 'Sopladoras de vacío (4 = 1 por Baader 142 + respaldo)', zona: 'Baader 142',
+    id: 'sopladoras', maquinaSlug: 'baader-142', equipo: 'Sopladoras de vacío (4 = 1 por Baader 142 + respaldo)', zona: 'Baader 142',
     variadorId: 'psr60', motor: 'por levantar — ¿traen termistor? (bornes PTC)',
     valores: [
       v('Start', '— s', 'pendiente', 'Anotar la posición actual de la perilla en las unidades que funcionan bien.'),
@@ -984,6 +990,10 @@ export const POSICIONES: PosicionReceta[] = [
     nota: 'Acá la receta es la posición de las 3 perillas: fotografiar el frente de una unidad andando y esa ES la receta para el respaldo.',
   },
 ]
+
+/** Posiciones de una máquina — para la pestaña «Variadores» de su ficha. */
+export const posicionesDeMaquina = (slug: string): PosicionReceta[] =>
+  POSICIONES.filter((p) => p.maquinaSlug === slug)
 
 /** Conteo para el footer: cuántos valores están confirmados vs el total. */
 export const RESUMEN_RECETAS = POSICIONES.reduce(

@@ -11,7 +11,7 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap, Search, Lock,
+  MonitorPlay, Zap, Search, Lock, Gauge,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -44,13 +44,14 @@ import { QuizView } from '@/components/learning/QuizView'
 import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
 import { QuickRefView } from '@/components/learning/QuickRefView'
 import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
+import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
 import { getQuizBest } from '@/utils/learningProgress'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components'
+type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components' | 'variadores'
 
 /** Pestañas que tienen su editor correspondiente en LearningAdminMachinePage
  * (?tab=...) — el resto (Consulta rápida, Evaluación, Glosario, etc.) no se
@@ -103,6 +104,16 @@ const REPUESTOS_TAB: TabDef = {
   shortLabel: 'Repuestos',
   icon: Wrench,
   description: 'Los repuestos más usados de la máquina, con foto y stock en vivo.',
+}
+
+/** Pestaña "Variadores" — qué variador mueve cada cinta de ESTA máquina y con
+ *  qué seteos. Solo se muestra si el catálogo tiene posiciones para su slug. */
+const VARIADORES_TAB: TabDef = {
+  id: 'variadores',
+  label: 'Variadores',
+  shortLabel: 'Variadores',
+  icon: Gauge,
+  description: 'Qué variador mueve cada cinta de esta máquina, con su motor y sus seteos.',
 }
 
 /** Pestaña "Consulta rápida" — lámina de datos duros para terreno. Solo si la
@@ -321,6 +332,7 @@ export function MachineLearningPage() {
   }
 
   const quickRefGroups = !isCourse ? getQuickRef(machine.slug) : null
+  const posicionesMaquina = isCourse ? [] : posicionesDeMaquina(machine.slug)
   const tabs = isCourse
     ? COURSE_TABS
     : [
@@ -328,6 +340,7 @@ export function MachineLearningPage() {
         ...TABS,
         ...(machine.slug === 'grader' ? [COMPONENTS_TAB] : []),
         ...(commonParts.length > 0 ? [REPUESTOS_TAB] : []),
+        ...(posicionesMaquina.length > 0 ? [VARIADORES_TAB] : []),
         QUIZ_TAB_MACHINE,
       ]
   const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
@@ -342,6 +355,7 @@ export function MachineLearningPage() {
     : id === 'glossary' ? glossary.length
     : id === 'bibliografia' ? bibliografia.length
     : id === 'repuestos' ? commonParts.length
+    : id === 'variadores' ? posicionesMaquina.length
     : id === 'quickref' ? (quickRefGroups?.length ?? 0)
     : 0
   const activeCount = countFor(activeTab)
@@ -494,6 +508,8 @@ export function MachineLearningPage() {
           <BibliografiaView entries={bibliografia} />
         ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
           <CommonPartsList parts={commonParts} />
+        ) : activeTab === 'variadores' && posicionesMaquina.length > 0 ? (
+          <VariadoresDeEstaMaquina posiciones={posicionesMaquina} />
         ) : sectionEnabled ? (
           <p className="dp-empty">Contenido disponible — próximamente cargado desde Firestore.</p>
         ) : (
@@ -1680,5 +1696,49 @@ function EmptySection({
       La sección <b>{tabLabel}</b> de <b>{machineName}</b> aún no tiene contenido publicado.
       El administrador puede agregarlo desde el panel de administración.
     </p>
+  )
+}
+
+
+/**
+ * Los variadores de esta máquina — puente hacia el catálogo.
+ * Antes había que saber que el catálogo existía para encontrarlos; ahora quien
+ * entra por el equipo los ve, y cada fila salta a su receta completa.
+ */
+function VariadoresDeEstaMaquina({ posiciones }: { posiciones: PosicionReceta[] }) {
+  const navigate = useNavigate()
+  return (
+    <div className="dp-parts">
+      <p className="dp-parts-meta">
+        {posiciones.length} posiciones con variador · los seteos y códigos viven en el catálogo
+      </p>
+      {posiciones.map((p) => {
+        const conf = p.valores.filter(v => v.estado === 'confirmado').length
+        const fam = VARIADORES.find(f => f.id === p.variadorId)
+        return (
+          <button
+            key={p.id}
+            onClick={() => navigate('/aprendizaje/variadores?vista=recetas')}
+            className="dp-part-group"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <span style={{ fontWeight: 600 }}>{p.equipo}</span>
+            <span style={{ fontSize: 12.5, opacity: 0.78 }}>
+              {fam ? fam.nombre : 'Variador por identificar'} · {p.motor}
+            </span>
+            <span style={{ fontSize: 12, opacity: 0.62 }}>
+              {conf}/{p.valores.length} seteos confirmados{p.sapMotor ? ` · SAP ${p.sapMotor}` : ''}
+            </span>
+          </button>
+        )
+      })}
+      <button
+        onClick={() => navigate('/aprendizaje/variadores')}
+        className="dp-part-group"
+        style={{ width: '100%', textAlign: 'left', fontWeight: 600, cursor: 'pointer' }}
+      >
+        Ver el catálogo completo de variadores →
+      </button>
+    </div>
   )
 }
