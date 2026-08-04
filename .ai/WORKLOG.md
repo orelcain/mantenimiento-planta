@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-03 - claude - La card de cuota del turno se ve siempre
+
+- Orel: "recuerdo q antes podiamos asignarle a cada turno la cuota... ahora no veo la opcion". No era una regresion: `ShiftQuotaCard` seguia montada en el detalle del turno, pero hacia `return null` cuando NO habia cuota definida Y el usuario no tenia permiso (`allowEdit={isAdmin || isSupervisor}`). Resultado practico: la funcion entera parecia no existir — nadie sabia que habia cuota por turno.
+- Hecho: sin cuota la card SIEMPRE se renderiza. Con permiso, el CTA "Definir cuota" de siempre. Sin permiso, el mismo estado + "La define un supervisor" — se dice que falta y quien puede hacerlo, en vez de ofrecer un boton que seria un callejon sin salida.
+- Regla que deja el caso: **un `return null` por permisos esconde la FUNCIONALIDAD, no solo el control**. Si el usuario no puede actuar, mostrar el estado y quien puede.
+- Archivos: `components/grader/ShiftQuotaCard.tsx` (+ doc de cabecera, que describia el comportamiento viejo), `components/grader/__tests__/ShiftQuotaCard.visibility.test.tsx` (nuevo).
+- Verificacion: tsc y eslint limpios; 4 tests que renderizan el componente real. **Comprobado que los tests pueden fallar**: restaurando el `return null` caen 2 de 4. NO verificado en la app viva — el detalle de turno pide sesion y la del preview se perdio al reiniciar el server.
+- Estado: EN REVISION — PR abierto.
+- Sigue: que Orel confirme que ahora la ve. Pendientes de la sesion: exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos de gerencia) y leyenda ilegible del grafico de Baaders.
+
 ## 2026-08-03 - claude - Afinado de la matriz de turnos: 4 fixes de uso real
 
 - Orel probo la vista en prod y reporto 4 cosas. Todas verificadas en el navegador, no solo compiladas.
