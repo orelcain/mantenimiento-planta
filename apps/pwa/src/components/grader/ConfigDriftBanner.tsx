@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import type { ConfigDriftResult } from '@/services/grader/graderConfigDrift'
@@ -25,6 +25,8 @@ interface Props {
   /** Cuándo y quién hizo la última edición de gates (último snapshot). */
   lastConfigChangeAt?: string
   lastConfigChangeBy?: string
+  /** El recálculo automático está corriendo ahora. */
+  recomputing?: boolean
   className?: string
 }
 
@@ -38,10 +40,29 @@ const fmt = (iso?: string) => {
 const causeLabel = (c: MatrixP0Cause) => MATRIX_P0_CAUSES[c]?.label ?? c
 
 export function ConfigDriftBanner({
-  drift, analyzedAt, lastConfigChangeAt, lastConfigChangeBy, className,
+  drift, analyzedAt, lastConfigChangeAt, lastConfigChangeBy, recomputing, className,
 }: Props) {
   const [open, setOpen] = useState(false)
   if (!drift.stale) return null
+
+  // Mientras el recálculo automático corre, el aviso se reemplaza por su estado:
+  // el desfase se está cerrando solo, no hay nada que el supervisor deba hacer.
+  if (recomputing) {
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3',
+          'dark:bg-amber-950/30 dark:border-amber-700',
+          className,
+        )}
+      >
+        <Loader2 className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400 animate-spin" aria-hidden />
+        <span className="text-[13px] text-amber-900 dark:text-amber-200">
+          Actualizando el desglose con la configuración de gates nueva…
+        </span>
+      </div>
+    )
+  }
 
   const analyzed = fmt(analyzedAt)
   const changed = fmt(lastConfigChangeAt)
@@ -117,8 +138,9 @@ export function ConfigDriftBanner({
                 sale del desglose persistido · </>
             )}
             el % de punto cero no cambia — es el conteo físico de piezas que la máquina mandó a puerta 0.
-            Para que el desglose refleje la configuración actual hay que volver a analizar el turno
-            desde el wizard.
+            Este turno no guardó sus registros de Puerta 0, así que no puede recalcularse solo: para
+            actualizar el desglose hay que volver a subir los Excel desde el wizard. Los turnos
+            cargados de ahora en adelante se actualizan solos al cambiar las gates.
           </p>
         </div>
       )}

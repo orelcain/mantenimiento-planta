@@ -31,6 +31,7 @@ import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScoreca
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ConfigDriftBanner } from '@/components/grader/ConfigDriftBanner'
 import { detectConfigDrift } from '@/services/grader/graderConfigDrift'
+import { recomputeShiftP0Causes } from '@/services/grader/graderGate0Store'
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -871,6 +872,48 @@ export function AnalisisGraderTurnoPage() {
       savedCauses: summary.topP0Causes,
     })
   }, [summary, isClassificationPlant, turnoGates, gate0Pieces])
+
+  // Recálculo automático: si el desglose no corresponde a las gates vigentes y el
+  // turno guardó su input de Puerta 0, se reclasifica y se persiste sin pedir nada.
+  // Cubre todas las vías de cambio de config (panel inline, modal de cambio rápido,
+  // o una edición hecha desde otra sesión) porque depende del resultado, no de
+  // interceptar cada botón. Idempotente: al terminar ya no hay desfase, así que no
+  // vuelve a dispararse. Los turnos sin input guardado siguen mostrando el aviso.
+  const [recomputing, setRecomputing] = useState(false)
+  const recomputeAttemptRef = useRef<string | null>(null)
+
+  const runRecompute = useCallback(async () => {
+    if (!summary || !effectiveSummaryId || turnoGates.length === 0) return
+    setRecomputing(true)
+    try {
+      const res = await recomputeShiftP0Causes(effectiveSummaryId, turnoGates, summary.pointZeroPieces)
+      if (res.ok && res.causes) {
+        // Actualiza en memoria lo que acaba de persistirse — evita releer el doc.
+        setSummary((prev) => (prev
+          ? { ...prev, topP0Causes: res.causes, gatesUsed: turnoGates.filter((g) => g.active) }
+          : prev))
+      }
+    } catch (err) {
+      logger.warn('No se pudo recalcular el desglose P0 del turno', { err: String(err) })
+    } finally {
+      setRecomputing(false)
+    }
+  }, [summary, effectiveSummaryId, turnoGates])
+
+  useEffect(() => {
+    if (!configDrift?.stale || !summary?.gate0RecordsStored || !effectiveSummaryId) return
+    // Solo quien puede escribir el turno lo recalcula (firestore.rules exige
+    // supervisor). Para el resto queda el aviso, sin intentar una escritura que
+    // la regla va a rechazar en cada visita.
+    if (!isSupervisor && !isAdmin) return
+    // Una sola tentativa por (turno × config): si el recálculo falla o no cierra
+    // el desfase, no reintentar en loop.
+    const attemptKey = `${effectiveSummaryId}|${JSON.stringify(turnoGates)}`
+    if (recomputeAttemptRef.current === attemptKey) return
+    recomputeAttemptRef.current = attemptKey
+    void runRecompute()
+  }, [configDrift?.stale, summary?.gate0RecordsStored, effectiveSummaryId, turnoGates, runRecompute, isSupervisor, isAdmin])
+
   const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
     errorThresholds: {
       photocellPctWarn: turnoThresholdsOverride?.photocellPctWarn ?? 1,
@@ -1668,6 +1711,7 @@ export function AnalisisGraderTurnoPage() {
                   analyzedAt={summary.updatedAt}
                   lastConfigChangeAt={latestConfigSnapshot?.at}
                   lastConfigChangeBy={latestConfigSnapshot?.changedBy?.name}
+                  recomputing={recomputing}
                 />
               )}
               <P0CausesPanel
