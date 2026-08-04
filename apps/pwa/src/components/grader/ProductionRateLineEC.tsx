@@ -60,6 +60,13 @@ function bucketMinutesForRange(rangeMin: number): 5 | 15 {
 }
 const GRID_COLOR = '#1e293b'
 
+/**
+ * Tinta de la leyenda. Sube de `#64748b` (el gris del chrome) a `#94a3b8`: la
+ * leyenda es la clave para saber qué línea es cuál, así que tiene que ganarle
+ * al fondo del propio gráfico, donde además pasan líneas punteadas por detrás.
+ */
+const LEGEND_TEXT_COLOR = '#94a3b8'
+
 interface Props {
   machines: UpstreamMachineShift[]
   windowStart?: Date
@@ -539,14 +546,21 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
 
     return {
       backgroundColor: 'transparent',
-      grid:   { left: 0, right: 0, top: 6, bottom: 0, containLabel: true },
+      // `grid.top` DEBE reservar el alto de la leyenda: ECharts no lo hace solo.
+      // Con `top: 6` la leyenda quedaba dibujada ENCIMA del área del gráfico y
+      // las líneas pasaban por detrás de "Baader 1 / Baader 2 / …", que se leían
+      // tachadas. 22 px = alto de la leyenda (9 px de texto + ítem) + aire.
+      grid:   { left: 0, right: 0, top: 22, bottom: 0, containLabel: true },
       legend: {
         show: true,
         top: 0,
         right: 0,
-        textStyle: { color: '#64748b', fontSize: 9 },
+        // Texto más grande y opaco que el resto del chrome: es la clave de
+        // lectura del gráfico, no una etiqueta secundaria.
+        textStyle: { color: LEGEND_TEXT_COLOR, fontSize: 10 },
         itemWidth: 12,
         itemHeight: 8,
+        itemGap: 12,
         data: [
           ...series.map(s => s.name),
           ...(showAvg ? ['Promedio'] : []),
@@ -627,7 +641,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
     <ReactECharts
       ref={echartsRef}
       option={option}
-      style={{ height: 120, width: '100%' }}
+      // 142 y no 120: la leyenda pasó a ocupar sus 22 px propios en vez de
+      // solaparse con el plot, así que se le devuelven al gráfico. Sin esto el
+      // área de datos quedaba en ~98 px y las curvas se aplastaban.
+      style={{ height: 142, width: '100%' }}
       onChartReady={onChartReady}
       onEvents={{
         mousemove: onMouseMove,
