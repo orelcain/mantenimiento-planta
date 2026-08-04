@@ -52,11 +52,13 @@ import {
   savePausesAggregates,
   loadPausesAggregates,
   mergeAnnotationsIntoPauses,
+  updateDailySummary,
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
+import { saveGate0Records } from '@/services/grader/graderGate0Store'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
-import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary } from '@/services/grader/types'
+import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
 
@@ -569,6 +571,25 @@ export function AnalisisGraderWizardPage() {
           dedupeKey: buildDedupeKey(r),
         }))
         await savePieceRecordsBatch(summaryId, firestoreRecs)
+
+        // Guardar el input de Puerta 0 EXACTO que usó computeShiftSummary para
+        // clasificar (el Excel P0 si vino, si no los gate=0 del pieza-a-pieza).
+        // Sin esto no se puede recalcular el desglose al cambiar las gates: la
+        // columna Error solo existe en el Excel P0 y los pieceRecords no la
+        // traen. Ver graderGate0Store.ts.
+        const p0Input: Gate0Record[] = segment.gate0Records.length > 0
+          ? segment.gate0Records
+          : segment.pieceRecords
+            .filter((r) => r.gate === 0)
+            .map((r) => ({ ...r, gate: 0 as const, error: ('error' in r && r.error) || '' }))
+        try {
+          await saveGate0Records(summaryId, p0Input)
+          await updateDailySummary(summaryId, { gate0RecordsStored: true })
+        } catch (err) {
+          // No es fatal: el turno queda guardado igual, solo sin recálculo
+          // automático (el aviso de config desfasada lo dirá).
+          logger.warn('No se pudieron guardar los registros de Puerta 0', { err: String(err) })
+        }
 
         // Pre-computar aggregates por minuto y guardar en sub-collection.
         // Idempotente: se sobrescribe en cada re-upload del mismo turno.
