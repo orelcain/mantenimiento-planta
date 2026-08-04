@@ -233,6 +233,56 @@ function filterCommentsToWindow(rawComments, startMs, endMs) {
 }
 
 /**
+ * ¿Este grupo de turno viene CORTADO por el borde final de la ventana, y ya
+ * existe guardado en su forma completa?
+ *
+ * La ventana de un día va 08:00 → 08:00 del día siguiente. Si un turno arranca
+ * ANTES de las 08:00 (caso real 03-ago: Filete y Yal partieron 07:45), sus
+ * primeros intervals caen dentro de la ventana del día ANTERIOR ya etiquetados
+ * con el nombre del turno del día siguiente. `deriveShiftGroups` los ve como un
+ * turno propio y `shiftDateKeyFromStart` los manda al doc del día siguiente —
+ * que ya contiene el turno ENTERO, escrito por su propia ventana.
+ *
+ * Sin este guard, el re-sync horario de "ayer" (que corre con `forceAll`, y por
+ * eso ni siquiera el freeze lo detiene) pisaba el turno completo del día en
+ * curso con ese fragmento de 15 minutos: Filete quedó con 4 ciclos en vez de
+ * 2.406, y el freeze impedía después que el sync normal lo reparara.
+ *
+ * Regla (las dos condiciones son necesarias):
+ *   1. el grupo termina en el borde de la ventana (⇒ está cortado ahí), y
+ *   2. el doc guardado declara un `scheduledEnd` MÁS ALLÁ del borde (⇒ alguien
+ *      con mejor información — la ventana del día siguiente — ya lo escribió).
+ *
+ * Solo (1) rompería un turno que legítimamente termina a las 08:00: la ventana
+ * del día siguiente arranca justo ahí y no lo vería nunca. Solo (2) bloquearía
+ * las correcciones retroactivas en que Shoplogix acorta un turno de verdad.
+ *
+ * Ante cualquier duda (doc ausente, sin `scheduledEnd`, error de lectura)
+ * devuelve false → se escribe. Nunca deja de guardar un turno por precaución.
+ */
+async function isTruncatedTailOfNextWindow({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, windowEnd, logger }) {
+  if (scheduledEnd.getTime() < windowEnd.getTime()) return false
+
+  try {
+    const snap = await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${shiftId}`).get()
+    if (!snap.exists) return false
+
+    const raw = (snap.data() || {}).scheduledEnd
+    const storedEnd = raw && typeof raw.toDate === 'function' ? raw.toDate()
+      : raw instanceof Date ? raw
+      : typeof raw === 'string' ? new Date(raw)
+      : null
+    if (!storedEnd || Number.isNaN(storedEnd.getTime())) return false
+
+    // Ambos en wall-clock-as-UTC (lo guardado viene de estos mismos intervals).
+    return storedEnd.getTime() > windowEnd.getTime()
+  } catch (err) {
+    logger.warn(`[syncDay][${plantSlug}] truncated-check err (${parentShiftDateKey} ${shiftId}): ${err.message}`)
+    return false
+  }
+}
+
+/**
  * Deriva el `dateKey` calendario (YYYY-MM-DD) al que pertenece un turno,
  * a partir de su `scheduledStart` real (wall-clock-as-UTC).
  *
@@ -553,12 +603,27 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
   const allShiftResults = []
   const frozenSkipped = []
+  const truncatedSkipped = []
+  const windowEnd = parseShoplogixTime(window.end)
 
   // 3. Por cada turno: filtrar intervals + normalize + escribir
   for (const group of shiftGroups) {
     // dateKey del doc = día calendario donde ARRANCA el turno (ver nota extensa
     // más abajo, junto al armado del doc de máquina).
     const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+
+    // Cola cortada por el borde de la ventana, con el turno completo ya guardado
+    // por la ventana del día siguiente → no degradarlo. OJO: va ANTES del check
+    // de freeze y NO respeta `forceAll` — el re-sync de días pasados corre
+    // justamente con forceAll, y es el que provocaba el pisotón.
+    if (await isTruncatedTailOfNextWindow({
+      db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
+      scheduledEnd: group.scheduledEnd, windowEnd, logger,
+    })) {
+      truncatedSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
+      allShiftResults.push({ shiftId: group.shiftId, skipped: 'truncated-tail' })
+      continue
+    }
 
     // Turno cerrado y ya capturado en su forma final → no reescribir.
     // OJO escalas de tiempo: `group.scheduledEnd` viene en wall-clock-as-UTC
@@ -822,12 +887,16 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   if (frozenSkipped.length > 0) {
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${frozenSkipped.length} turno(s) congelados, sin reescribir: ${frozenSkipped.join(', ')}`)
   }
+  if (truncatedSkipped.length > 0) {
+    logger.info(`[shoplogix-syncDay][${plantSlug}] ${truncatedSkipped.length} cola(s) cortadas en el borde de la ventana, sin pisar el turno completo: ${truncatedSkipped.join(', ')}`)
+  }
 
   return {
     plantSlug, dateKey,
     shiftGroups: shiftGroups.map(g => g.shiftId),
     results: allShiftResults,
     frozenSkipped: frozenSkipped.length,
+    truncatedSkipped: truncatedSkipped.length,
   }
 }
 
@@ -951,6 +1020,7 @@ module.exports = {
   currentShiftKey,
   currentDateKey,
   isShiftAlreadyFrozen,
+  isTruncatedTailOfNextWindow,
   syncDay,
   syncShift,
 }
