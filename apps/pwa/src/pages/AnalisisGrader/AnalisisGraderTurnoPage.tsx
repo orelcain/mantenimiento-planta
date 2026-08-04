@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -80,12 +80,93 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 
+/**
+ * ¿El dataURL corresponde a un gráfico ya pintado?
+ * Un canvas de ECharts sin renderizar devuelve null o un PNG casi vacío; el
+ * timeline real pesa cientos de KB en base64.
+ */
+function isRenderedChart(dataUrl: string | null): boolean {
+  return !!dataUrl && dataUrl.startsWith('data:image/png') && dataUrl.length > 20_000
+}
+
+/** Espera a que `check()` sea true, sondeando cada 60 ms hasta `timeoutMs`. */
+async function waitUntil(check: () => boolean, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (check()) return true
+    await new Promise(r => setTimeout(r, 60))
+  }
+  return check()
+}
+
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
 function parseShiftId(raw: string | undefined): [string, string] {
   if (!raw) return ['', '']
   const idx = raw.indexOf('__')
   if (idx === -1) return [raw, '']
   return [raw.slice(0, idx), raw.slice(idx + 2)]
+}
+
+/**
+ * Vistas del detalle de turno.
+ *
+ * Antes esto era un scroll único de ~20 bloques: el supervisor que venía a ver
+ * un cambio de compuerta pasaba por el timeline, la línea upstream y la
+ * composición del turno antes de llegar. Agrupadas por lo que se viene a hacer,
+ * y montando solo la vista abierta (los charts pesados dejan de renderizarse
+ * todos de una).
+ */
+const ALL_TURNO_VIEWS = ['resumen', 'timeline', 'gates', 'linea'] as const
+type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
+
+const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
+  resumen:  'Resumen',
+  timeline: 'Timeline',
+  gates:    'Gates',
+  linea:    'Línea',
+}
+
+/** Barra de vistas del turno. */
+function TurnoViewTabs({
+  views,
+  active,
+  onChange,
+  gatesBadge,
+}: {
+  views: TurnoView[]
+  active: TurnoView
+  onChange: (v: TurnoView) => void
+  gatesBadge?: number
+}) {
+  return (
+    <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist" data-no-swipe>
+      {views.map(view => {
+        const isActive = view === active
+        return (
+          <button
+            key={view}
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(view)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-2 -mb-px text-sm border-b-2 transition-colors ${
+              isActive
+                ? 'border-primary text-primary font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {TURNO_VIEW_LABEL[view]}
+            {view === 'gates' && !!gatesBadge && (
+              <span className={`text-[10px] tabular-nums px-1.5 rounded-full ${
+                isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/15'
+              }`}>
+                {gatesBadge}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 /**
@@ -296,6 +377,49 @@ export function AnalisisGraderTurnoPage() {
   // su Excel viene del Marelec pero las "gates" son solo las que alimentan
   // las 3 Baaders y no hay clasificación por calidad.
   const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
+
+  const availableViews = useMemo<TurnoView[]>(
+    // Yal no clasifica: sus gates físicas no tienen calibre+calidad y todos
+    // los bloques de la pestaña serían tarjetas vacías.
+    () => (isClassificationPlant ? [...ALL_TURNO_VIEWS] : ALL_TURNO_VIEWS.filter(v => v !== 'gates')),
+    [isClassificationPlant],
+  )
+
+  /**
+   * Vista activa del detalle.
+   *
+   * Es estado LOCAL, no `setSearchParams`, por una razón medida: `MainLayout`
+   * monta el `<Outlet/>` dentro de un `<Suspense key={location.key}>`, y
+   * `location.key` cambia con cualquier navegación — también con una que solo
+   * toca el query string. Cambiar la vista vía router remontaba la página
+   * entera en cada clic (verificado: 1 → 3 → 5 montajes), lo que rehace todas
+   * las lecturas de Firestore y, de paso, dejaba el `chartImageRef` del PDF
+   * apuntando a una instancia muerta.
+   *
+   * Se lee `?vista=` al montar para que un link directo caiga donde toca, y se
+   * refleja con `history.replaceState` — actualiza la barra de direcciones sin
+   * generar navegación, así que no dispara el remonte.
+   *
+   * El parámetro se llama `vista` y NO `tab`: `AnalisisGraderGatesConfigPage`
+   * (montada dentro de la pestaña Gates) ya usa `?tab=` para sus sub-pestañas.
+   */
+  const [activeView, setActiveViewState] = useState<TurnoView>(() => {
+    const v = searchParams.get('vista')
+    return (ALL_TURNO_VIEWS as readonly string[]).includes(v ?? '') ? (v as TurnoView) : 'resumen'
+  })
+
+  // Si la planta no ofrece la vista (Yal no tiene Gates), caer a Resumen.
+  useEffect(() => {
+    if (!availableViews.includes(activeView)) setActiveViewState('resumen')
+  }, [availableViews, activeView])
+
+  const setActiveView = useCallback((view: TurnoView) => {
+    setActiveViewState(view)
+    const url = new URL(window.location.href)
+    if (view === 'resumen') url.searchParams.delete('vista')
+    else url.searchParams.set('vista', view)
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
 
   // Schedule efectivo de la planta — FALLBACK cuando aún no hay datos Shoplogix
   // del turno. La fuente de verdad de horarios son los scheduledStart/End del
@@ -1031,15 +1155,40 @@ export function AnalisisGraderTurnoPage() {
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
+    const viewBefore = activeView
     try {
-      const chartImageDataUrl = chartImageRef.current?.() ?? null
+      /*
+       * El gráfico del PDF lo publica ShiftTimelineView en `chartImageRef` — y
+       * lo borra al desmontarse. Con el detalle en pestañas, pedir el PDF desde
+       * Resumen dejaba el ref en null y el PDF salía sin timeline, en silencio.
+       * Saltamos un instante a la vista Timeline para montarlo.
+       *
+       * Ojo con la condición de espera: el ref se registra en el PRIMER render
+       * de ShiftTimelineView, cuando ECharts todavía no tiene instancia y
+       * getDataURL devuelve null. Esperar "a que el ref exista" daba por listo
+       * un gráfico sin pintar → PDF de 32 KB sin imagen. Hay que sondear el
+       * dataURL real hasta que venga con contenido.
+       */
+      let chartImageDataUrl = chartImageRef.current?.() ?? null
+      if (!isRenderedChart(chartImageDataUrl)) {
+        setActiveView('timeline')
+        await waitUntil(() => {
+          chartImageDataUrl = chartImageRef.current?.() ?? null
+          return isRenderedChart(chartImageDataUrl)
+        }, 6000)
+      }
+      if (!isRenderedChart(chartImageDataUrl)) {
+        logger.warn('M17: PDF sin gráfico — el timeline no alcanzó a renderizar')
+        chartImageDataUrl = null
+      }
       await exportTurnToPDF({ summary, pauses, tagLabels, chartImageDataUrl, upstreamSnapshot: upstreamLine.snapshot })
     } catch (err) {
       logger.error('M17: PDF export error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setPdfExporting(false)
+      if (viewBefore !== 'timeline') setActiveView(viewBefore)
     }
-  }, [summary, pauses, pdfExporting, tagLabels, upstreamLine.snapshot])
+  }, [summary, pauses, pdfExporting, tagLabels, upstreamLine.snapshot, activeView, setActiveView])
 
   const untaggedPauses = useMemo(
     () => pauses.filter(p => !resolveEffectiveTag(p)),
@@ -1633,6 +1782,15 @@ export function AnalisisGraderTurnoPage() {
           Desktop (grid 3-col 2 filas): Scorecard + Causas izq (2 cols apilados), Acciones der (col 3 × 2 filas) */}
       {summary && shiftWindow && (
         <>
+          <TurnoViewTabs
+            views={availableViews}
+            active={activeView}
+            onChange={setActiveView}
+            gatesBadge={configSnapshots.length}
+          />
+
+          {/* ════════ RESUMEN ════════ */}
+          {activeView === 'resumen' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Scorecard + Marel HG capture — mobile row 1 */}
             <div className="lg:col-span-2 lg:row-start-1 space-y-4">
@@ -1729,11 +1887,34 @@ export function AnalisisGraderTurnoPage() {
               />
             </div>
           </div>
+          )}
 
-          {/* Config de gates del turno — posición B (antes del timeline, visible sin scroll).
-              Solo en plantas que clasifican (Chonchi). Yal no clasifica → las gates
-              del Excel son solo las que alimentan las 3 Baaders. */}
-          {isClassificationPlant && configSnapshots.length > 0 && (
+          {/* ════════ GATES ════════
+              Los seis bloques de compuertas quedan juntos y en orden narrativo:
+              config vigente → distribución → impacto del cambio → evolución →
+              historial → ajustes del turno. Antes estaban repartidos a lo largo
+              de toda la página, separados por diez bloques de otra cosa. */}
+          {activeView === 'gates' && (
+            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-sky-500/10 border border-sky-500/30 text-sm">
+              <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-sky-600 dark:text-sky-400" />
+              <p className="text-muted-foreground flex-1">
+                Acá se ajusta <span className="font-medium text-foreground">este turno</span>. La
+                línea física, los umbrales base y los rangos de calibre valen para todos los turnos
+                y se editan en{' '}
+                <button
+                  onClick={() => navigate(`/analisis-grader/config?linea=${plantLineCfg.id}`)}
+                  className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2 hover:text-sky-600"
+                >
+                  Configuración del Grader
+                </button>.
+              </p>
+            </div>
+          )}
+
+          {/* Config de gates vigente en el turno. Solo en plantas que clasifican
+              (Chonchi). Yal no clasifica → las gates del Excel son solo las que
+              alimentan las 3 Baaders. */}
+          {activeView === 'gates' && isClassificationPlant && configSnapshots.length > 0 && (
             <ShiftConfigPanel
               shiftDocId={shiftDocId}
               shiftDoc={shiftDoc}
@@ -1745,7 +1926,8 @@ export function AnalisisGraderTurnoPage() {
             />
           )}
 
-          {/* Timeline — full width */}
+          {/* ════════ TIMELINE ════════ */}
+          {activeView === 'timeline' && (
           <ShiftTimelineView
             timelineBuckets={enrichedTimelineBuckets}
             shiftDoc={shiftDoc}
@@ -1767,16 +1949,18 @@ export function AnalisisGraderTurnoPage() {
             upstreamSnapshot={upstreamLine.snapshot}
             onUploadClick={isAdmin ? () => navigate(wizardUrlForTurno) : undefined}
           />
+          )}
 
           {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
-          {gate0Pieces.length >= 5 && (
+          {activeView === 'timeline' && gate0Pieces.length >= 5 && (
             <PieceScatterChart gate0Pieces={gate0Pieces} />
           )}
 
-          {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
-          {/* Va INMEDIATAMENTE después del timeline Grader para máxima cercanía visual */}
+          {/* ════════ LÍNEA (upstream Shoplogix) ════════
+              Evisceradoras Baader 142: lo que alimenta al Grader. Junto con su
+              correlación contra las pausas del Grader y el scatter. */}
           {/* Barra Shoplogix: contador de staleness + botón refresh */}
-          {(upstreamLine.snapshot || upstreamLine.loading) && (
+          {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
               <span
                 className="text-[11px] text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
@@ -1805,6 +1989,7 @@ export function AnalisisGraderTurnoPage() {
               </div>
             </div>
           )}
+          {activeView === 'linea' && (<>
           <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
             loading={upstreamLine.loading}
@@ -1850,12 +2035,12 @@ export function AnalisisGraderTurnoPage() {
               criticalThreshold={criticalThreshold}
             />
           )}
+          </>)}
 
-          {/* Bloques específicos de Chonchi: distribución por gate, impacto de
-              cambios mid-turno, evolución de gates. Yal no aplica — sus 3-4
-              gates físicas no clasifican y los charts asumen 12 gates con
-              calibre+calidad asignados. */}
-          {isClassificationPlant && summary.gateDistribution && summary.gateDistribution.length > 0 && (
+          {/* Distribución por gate, impacto de cambios mid-turno y evolución.
+              Yal no aplica — sus 3-4 gates físicas no clasifican y los charts
+              asumen 12 gates con calibre+calidad asignados. */}
+          {activeView === 'gates' && isClassificationPlant && summary.gateDistribution && summary.gateDistribution.length > 0 && (
             <GateBreakdownCard
               gateDistribution={summary.gateDistribution}
               configSnapshots={configSnapshots}
@@ -1867,31 +2052,34 @@ export function AnalisisGraderTurnoPage() {
             />
           )}
 
-          {isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+          {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateChangeImpactCard
               timelineBuckets={enrichedTimelineBuckets}
               configSnapshots={configSnapshots}
             />
           )}
 
-          {isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+          {activeView === 'gates' && isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateEvolutionChart
               timelineBuckets={enrichedTimelineBuckets}
               configSnapshots={configSnapshots}
             />
           )}
 
-          {/* Composición del turno (lotes + calidad + producto + conservación) */}
+          {/* Composición del turno (lotes + calidad + producto + conservación).
+              Va en Resumen, bajo los KPI: es el "de qué estuvo hecho el turno". */}
+          {activeView === 'resumen' && (
           <ShiftBreakdownsCard
             lotsInShift={summary.lotsInShift}
             calidadBreakdown={summary.calidadBreakdown}
             productoBreakdown={summary.productoBreakdown}
             conservacionBreakdown={summary.conservacionBreakdown}
           />
+          )}
 
           {/* Historial de cambios de configuración del turno — solo Chonchi
               (gates con calibre+calidad). Yal no clasifica → no aplica. */}
-          {isClassificationPlant && (
+          {activeView === 'gates' && isClassificationPlant && (
             <ConfigChangeHistory
               shiftDocId={shiftDocId}
               snapshots={configSnapshots}
@@ -1905,7 +2093,7 @@ export function AnalisisGraderTurnoPage() {
               clasificación, calibres, asignación calidad — todos conceptos
               que no aplican a Yal. La IA Yal-específica está pendiente
               (banner amber arriba avisa al usuario). */}
-          {isClassificationPlant && (
+          {activeView === 'resumen' && isClassificationPlant && (
             <Card>
               <CardContent className="py-3 px-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -1931,14 +2119,14 @@ export function AnalisisGraderTurnoPage() {
               </CardContent>
             </Card>
           )}
-          {isClassificationPlant && aiOutput && <AIOutputPanel output={aiOutput} />}
+          {activeView === 'resumen' && isClassificationPlant && aiOutput && <AIOutputPanel output={aiOutput} />}
 
           {/* Nota: el contador de cambios de config (FASE 27) ya vive en
               el badge del panel ConfigChangeHistory de arriba — eliminado
               para evitar duplicación con conteos divergentes. */}
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
-          {summary && isAdmin && (
+          {activeView === 'resumen' && summary && isAdmin && (
             <div className="rounded-lg border border-border bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground" />
@@ -2009,10 +2197,11 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
-          {/* Configuración de este turno — solo Chonchi (12 gates clasificadoras
-              con calibre+calidad, rangos por calibre, umbrales P0). Yal no
-              clasifica → este panel no aplica. */}
-          {isClassificationPlant && (
+          {/* Ajustes de ESTE turno — solo Chonchi (12 gates clasificadoras con
+              calibre+calidad, rangos por calibre override, umbrales P0 del
+              turno). Escribe con shiftDocId: nada de acá sale del turno. Lo
+              global vive en /analisis-grader/config. Yal no clasifica → no aplica. */}
+          {activeView === 'gates' && isClassificationPlant && (
             <Card className="overflow-hidden">
               <button
                 onClick={() => setShowConfigPanel(v => !v)}
@@ -2020,7 +2209,7 @@ export function AnalisisGraderTurnoPage() {
               >
                 <div className="flex items-center gap-2">
                   <Settings2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">Configuración de este turno</span>
+                  <span className="font-medium">Ajustes de este turno</span>
                   {turnoGates.filter(g => g.active).length > 0 && (
                     <Badge variant="outline" className="text-xs font-normal">
                       {turnoGates.filter(g => g.active).length} gates activas
