@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-04 - claude - Resumen ejecutivo del turno (PNG) - formato A del mockup
+
+- La exportacion anterior apilaba todo (timeline, KPIs, pausas, gates, causas, upstream) sin jerarquia ni conclusion: sirve de registro tecnico, no de entregable. Mockup con 3 formatos aprobado por Orel; se construye el A (ejecutivo) y despues el B (PDF completo con este como pagina 1).
+- **graderExecutiveSummary.ts** - logica PURA que responde 4 preguntas EN ORDEN: como fue (verdict), por que (cause+machines), que hizo Mantencion (maintenance), que se necesita (ask). Los dos renderers consumen el mismo modelo, asi que PNG y PDF no pueden contar historias distintas del mismo turno.
+- Decisiones de redaccion que importan: el veredicto NOMBRA la maquina parada (no solo "turno malo"); los KPIs traen su contexto ("39% de 7 h 09 de turno" en vez de "39%"); MTTR bajo se marca OK - es el unico KPI donde menos es mejor, y sin eso un turno malo con buena respuesta se lee como todo malo; sin Excel del Grader lo DICE en vez de imprimir ceros que se leen como "no hubo".
+- **Bug que cazo un test**: el lossDriver no tenia opcion "ninguna" y caia a 'ritmo' por defecto, asi que un turno sano al 95% afirmaba haber corrido bajo el objetivo. Un reporte que inventa una perdida inexistente es peor que uno que no dice nada. Se agrego 'ninguna' + umbrales explicitos.
+- **graderExecutiveSummaryPng.ts** - canvas nativo, NO html2canvas: el DOM real depende del tema, del CSS que soporte el parser y de que el nodo este visible; para algo que se manda a gerencia es demasiada superficie de falla. Dibujo determinista, siempre en claro (se imprime).
+- **pages/dev/ResumenTurnoDevPage** (solo dev, /dev/resumen-turno): dibuja el PNG real con 3 turnos conocidos, sin login. El entregable hay que MIRARLO antes de que salga.
+- Verificacion: tsc y eslint limpios; 15 tests con el turno REAL del 3-ago (Baader 2 en cero). En el navegador: canvas 2480x2094 dibujado, veredicto y pedido correctos, y barrido de pixeles del margen - la unica tinta cerca del borde son los bordes de los recuadros con su antialiasing (3 franjas, a 4-7 px), no texto desbordado.
+- Estado: EN REVISION - PR abierto.
+- Sigue: **formato B** (PDF con este resumen como pagina 1 y el detalle detras) y despues el C (comparativo de periodo, que necesita decidir que periodo compara). Falta enganchar el boton en la vista de turno real.
+
 ## 2026-08-04 - claude - Leyenda del grafico de ritmo: dejaba de estar tapada por las lineas
 
 - Orel: "los puntos de baader 1... baader 2... quedan ocultos". Causa exacta en `ProductionRateLineEC`: `legend.top: 0` con `grid.top: 6` — ECharts NO reserva el alto de la leyenda solo, asi que la leyenda se dibujaba ENCIMA del area del grafico y las lineas (incluidas las punteadas de Promedio y Objetivo) pasaban por detras del texto, que se leia tachado. Con un canvas de 120 px el solape era total.
