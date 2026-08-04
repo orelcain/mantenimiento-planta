@@ -10,7 +10,9 @@
  * pero el Grader no reportó son piezas no contabilizadas (pérdida potencial).
  *
  * - Cuota editable inline desde la propia card (admin/supervisor).
- * - Si no hay cuota y allowEdit → CTA "Definir cuota"; si no, card oculta.
+ * - La card se ve SIEMPRE, con o sin cuota y con o sin permiso: si se oculta,
+ *   la función entera parece no existir. Sin permiso muestra el estado y quién
+ *   puede definirla, pero no el botón.
  * - Color barra: rojo <50%, ámbar 50-89%, verde ≥90%, esmeralda ≥100%.
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -148,9 +150,29 @@ export function ShiftQuotaCard({
     }
   }
 
-  // Sin cuota — CTA si puede editar, ocultar si no
+  // Sin cuota — la card SIEMPRE se muestra (pedido de Orel 2026-08-03: "que la
+  // card de cuota se vea siempre"). Antes se ocultaba cuando el usuario no
+  // podía editar, y el resultado era que la función parecía haber desaparecido
+  // de la app: nadie sabía que existía una cuota por turno.
+  //
+  // Sin permiso NO se ofrece el botón —sería un callejón sin salida— pero sí se
+  // dice qué falta y quién puede hacerlo.
   if (!view) {
-    if (!allowEdit) return null
+    if (!allowEdit) {
+      return (
+        <Card className="border border-dashed border-border">
+          <CardContent className="p-3 flex items-center gap-2 flex-wrap">
+            <Target className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground">
+              Sin cuota definida para este turno.
+            </span>
+            <span className="ml-auto text-[11px] text-muted-foreground/70">
+              La define un supervisor
+            </span>
+          </CardContent>
+        </Card>
+      )
+    }
     if (!editing) {
       return (
         <Card className="border border-dashed border-border">
