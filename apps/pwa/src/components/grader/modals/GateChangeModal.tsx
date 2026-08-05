@@ -4,7 +4,7 @@
  * Flujo: seleccionar gate → editar calibre/calidad → guardar snapshot.
  * Diseñado para uso en planta desde celular: pasos lineales, inputs grandes.
  */
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -13,25 +13,37 @@ import { Loader2, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
-import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { saveConfigSnapshot, getLatestSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { qualityColorTextClass } from '@/services/grader/graderQualityColors'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
-import type { GateAssignment, GraderQuality, CalibreRange, CalibreWeightRange } from '@/services/grader/types'
+import type { GateAssignment, GraderQuality, CalibreRange, CalibreWeightRange, GraderConservation, GraderProduct } from '@/services/grader/types'
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const FALLBACK_CALIBRES: CalibreRange[] = [
   '0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other',
 ]
+const CONSERVATIONS: GraderConservation[] = ['CONGELADO', 'FRESCO', 'OTRO']
+const PRODUCTS: GraderProduct[] = ['HG', 'DESTINO FILETE', 'OTRO']
 
 interface GateChangeModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   shiftDocId: string
-  configSnapshots: GateConfigSnapshot[]
+  /**
+   * Snapshots ya cargados por el contenedor. Si no vienen (o vienen vacíos) el
+   * modal carga el último por su cuenta: hay puntos de entrada que no tienen la
+   * lista a mano y antes obligaban a usar un segundo formulario aparte.
+   */
+  configSnapshots?: GateConfigSnapshot[]
   onSaved: () => void
   plantLineId?: string
+  /** Pre-relleno al abrir (ej. desde una sugerencia de swap de calibres). */
+  initialGate?: number
+  initialCalibre?: string
+  initialQuality?: string
+  initialReason?: string
 }
 
 export function GateChangeModal({
@@ -41,6 +53,10 @@ export function GateChangeModal({
   configSnapshots,
   onSaved,
   plantLineId,
+  initialGate,
+  initialCalibre,
+  initialQuality,
+  initialReason,
 }: GateChangeModalProps) {
   const user = useAuthStore(s => s.user)
   const { toast } = useToast()
@@ -49,9 +65,22 @@ export function GateChangeModal({
   const [newCalibre, setNewCalibre] = useState<CalibreRange | ''>('')
   const [newQuality, setNewQuality] = useState<GraderQuality | ''>('')
   const [newActive, setNewActive] = useState<boolean>(true)
+  const [newConservation, setNewConservation] = useState<GraderConservation | ''>('')
+  const [newProduct, setNewProduct] = useState<GraderProduct | ''>('')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [availableCalibres, setAvailableCalibres] = useState<CalibreRange[]>(FALLBACK_CALIBRES)
+  const [loadedSnapshot, setLoadedSnapshot] = useState<GateConfigSnapshot | null>(null)
+
+  // Fallback de snapshots: solo si el contenedor no los pasó.
+  useEffect(() => {
+    if (!open || (configSnapshots && configSnapshots.length > 0)) return
+    let cancelled = false
+    getLatestSnapshot(shiftDocId)
+      .then(s => { if (!cancelled) setLoadedSnapshot(s) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [open, configSnapshots, shiftDocId])
 
   // Cargar calibres configurados
   useEffect(() => {
@@ -68,27 +97,48 @@ export function GateChangeModal({
 
   // Gates del último snapshot, ordenados
   const currentGates = useMemo<GateAssignment[]>(() => {
-    if (configSnapshots.length === 0) return []
-    const last = configSnapshots[configSnapshots.length - 1]!
+    const last = (configSnapshots && configSnapshots.length > 0)
+      ? configSnapshots[configSnapshots.length - 1]!
+      : loadedSnapshot
+    if (!last) return []
     return [...last.gates].sort((a, b) => a.gateNumber - b.gateNumber)
-  }, [configSnapshots])
+  }, [configSnapshots, loadedSnapshot])
 
   // Cuando se selecciona un gate, pre-rellenar con valores actuales
-  function selectGate(gateNumber: number) {
+  const selectGate = useCallback((gateNumber: number) => {
     const gate = currentGates.find(g => g.gateNumber === gateNumber)
     if (!gate) return
     setSelectedGate(gateNumber)
     setNewCalibre(gate.assignedCalibre)
     setNewQuality(gate.assignedQuality)
     setNewActive(gate.active)
-  }
+    setNewConservation(gate.assignedConservation ?? '')
+    setNewProduct(gate.assignedProduct ?? '')
+  }, [currentGates])
+
+  /*
+   * Pre-relleno desde una sugerencia. Corre cuando ya hay gates cargados: si se
+   * aplicara antes, `selectGate` no encontraría el gate y se perdería.
+   */
+  useEffect(() => {
+    if (!open || currentGates.length === 0 || initialGate == null) return
+    selectGate(initialGate)
+    if (initialCalibre) setNewCalibre(initialCalibre as CalibreRange)
+    if (initialQuality) setNewQuality(initialQuality as GraderQuality)
+    if (initialReason) setReason(initialReason)
+    // Solo al abrir: después manda lo que elija el usuario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentGates.length])
 
   function reset() {
     setSelectedGate(null)
     setNewCalibre('')
     setNewQuality('')
     setNewActive(true)
+    setNewConservation('')
+    setNewProduct('')
     setReason('')
+    setLoadedSnapshot(null)
   }
 
   function handleClose() {
@@ -103,7 +153,9 @@ export function GateChangeModal({
   const hasChanges = selectedGateData && (
     newCalibre !== selectedGateData.assignedCalibre ||
     newQuality !== selectedGateData.assignedQuality ||
-    newActive !== selectedGateData.active
+    newActive !== selectedGateData.active ||
+    newConservation !== (selectedGateData.assignedConservation ?? '') ||
+    newProduct !== (selectedGateData.assignedProduct ?? '')
   )
 
   async function handleSave() {
@@ -112,7 +164,14 @@ export function GateChangeModal({
     try {
       const updatedGates = currentGates.map(g =>
         g.gateNumber === selectedGate
-          ? { ...g, assignedCalibre: newCalibre as CalibreRange, assignedQuality: newQuality as GraderQuality, active: newActive }
+          ? {
+              ...g,
+              assignedCalibre: newCalibre as CalibreRange,
+              assignedQuality: newQuality as GraderQuality,
+              active: newActive,
+              ...(newConservation ? { assignedConservation: newConservation } : {}),
+              ...(newProduct ? { assignedProduct: newProduct } : {}),
+            }
           : g,
       )
       const userName = `${user.nombre ?? ''} ${user.apellido ?? ''}`.trim() || user.email
@@ -242,6 +301,50 @@ export function GateChangeModal({
                       {q}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Conservación y producto — opcionales: casi nunca cambian con
+                  el calibre, así que van en una línea secundaria para no
+                  estorbar el flujo rápido desde el celular en planta. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Conservación</p>
+                  <div className="flex flex-wrap gap-1">
+                    {CONSERVATIONS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setNewConservation(newConservation === c ? '' : c)}
+                        className={cn(
+                          'text-[11px] px-2 py-0.5 rounded-md border transition-colors',
+                          newConservation === c
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border bg-muted hover:bg-accent text-muted-foreground',
+                        )}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Producto</p>
+                  <div className="flex flex-wrap gap-1">
+                    {PRODUCTS.map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setNewProduct(newProduct === p ? '' : p)}
+                        className={cn(
+                          'text-[11px] px-2 py-0.5 rounded-md border transition-colors',
+                          newProduct === p
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border bg-muted hover:bg-accent text-muted-foreground',
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

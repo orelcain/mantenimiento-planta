@@ -72,7 +72,6 @@ import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
-import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
@@ -1661,14 +1660,10 @@ export function AnalisisGraderTurnoPage() {
         />
       )}
 
-      {/* Tiempos del DÍA completo (todos los turnos) — se muestra una sola vez,
-          fuera de las ramas condicionales de abajo (con/sin Excel), para no
-          duplicar la lectura ni el render. */}
-      <DayTimeSummaryBar
-        dateKey={dateKey}
-        plantSlug={plantLineCfg.plantSlug}
-        enabled={plantLineCfg.shoplogixEnabled}
-      />
+      {/* Los tiempos del DÍA completo (todos sus turnos) se movieron al landing,
+          junto al board de KPIs que ya usa el día como unidad: acá sumaban las
+          horas de todos los turnos contra un turno de 8 h y convivían dos
+          escalas distintas en la misma pantalla. */}
 
       {/* Estados */}
       {loading && (

@@ -24,6 +24,7 @@ import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
+import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
 import { getPlantLineConfig, getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
@@ -138,6 +139,13 @@ export function AnalisisGraderWizardPage() {
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
   // Día seleccionado en el calendario (para el KPI board)
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
+  /* Día por defecto de la barra de tiempos: hoy, hasta que se elija un turno en
+     la matriz. En hora local — la planta razona en días de calendario chilenos,
+     no en UTC. */
+  const todayDateKey = useMemo(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
   // Se incrementa al registrar/borrar un paro de etapa: el OEE del área los
   // suma y vive en otra card, así que necesita releerlos.
   const [parosVersion, setParosVersion] = useState(0)
@@ -858,6 +866,16 @@ export function AnalisisGraderWizardPage() {
             enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
             selectedDateKey={selectedDateKey}
             currentMonth={calendarMonth}
+          />
+          {/* Tiempos del DÍA completo (todos sus turnos). Vive acá, junto al
+              board que ya tiene el día como unidad, y no en el detalle de un
+              turno: ahí sumaba las horas de todos los turnos del día contra un
+              turno de 8 h, y quedaban dos escalas distintas en la misma
+              pantalla ("55 h detenidas" en un turno de 8 h). */}
+          <DayTimeSummaryBar
+            dateKey={selectedDateKey ?? todayDateKey}
+            plantSlug={lineConfig.plantSlug}
+            enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
           />
         </div>
 
