@@ -11,7 +11,7 @@
  * El componente vive en el detalle del turno, debajo del timeline. Las marcas
  * verticales 🔧 del timeline corresponden 1:1 con las filas de esta tabla.
  *
- * Incluye un QuickGateChangeButton en el header para registrar nuevos cambios
+ * Incluye un botón de cambio de gate en el header para registrar nuevos cambios
  * sin tener que volver al calendario.
  */
 
@@ -19,7 +19,7 @@ import { useMemo } from 'react'
 import { Wrench, Sparkles, User, Clock, AlertTriangle, TrendingDown, TrendingUp, Minus, Hourglass } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { QuickGateChangeButton } from './QuickGateChangeButton'
+import { GateChangeTrigger } from './GateChangeTrigger'
 import {
   computeSegmentVerdicts,
   verdictColor,
@@ -255,8 +255,9 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
             </Badge>
           )}
         </CardTitle>
-        <QuickGateChangeButton
+        <GateChangeTrigger
           shiftDocId={shiftDocId}
+          configSnapshots={snapshots}
           variant="compact"
           onSaved={onChange}
           allowEdit={allowEdit}
