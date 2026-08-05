@@ -25,6 +25,7 @@ import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
 import { PersistentFailureLimiter } from '@/lib/rate-limit'
 import { APP_VERSION } from '@/constants/version'
+import { formatBuildLabel } from '@/constants/buildInfo'
 
 // Max 5 FALLOS de login/registro cada 2 minutos. Persistente en localStorage:
 // recargar la página no resetea el lockout (el RateLimiter anterior era en
@@ -189,7 +190,9 @@ export function LoginPage() {
               : 'Registra tu cuenta con el código de invitación'}
           </CardDescription>
           <div className="mt-2">
-            <span className="text-xs text-muted-foreground">v{APP_VERSION}</span>
+            <span className="text-xs text-muted-foreground" title={`build ${formatBuildLabel()}`}>
+              v{APP_VERSION}
+            </span>
           </div>
         </CardHeader>
 
