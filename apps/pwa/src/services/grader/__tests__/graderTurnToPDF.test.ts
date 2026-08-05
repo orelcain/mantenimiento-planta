@@ -31,6 +31,12 @@ const {
   const mockAddPage      = vi.fn()
   const mockSetPage      = vi.fn()
   const mockAddImage     = vi.fn()
+  // La pagina ejecutiva (pag. 1) dibuja formas, no solo texto: sin estos
+  // metodos el mock revienta con "doc.setLineWidth is not a function".
+  const mockSetLineWidth = vi.fn()
+  const mockSetFillColor = vi.fn()
+  const mockRect         = vi.fn()
+  const mockSplitText    = vi.fn((t: string) => [t])
 
   const mockDoc = {
     save: mockSave,
@@ -40,6 +46,10 @@ const {
     setFont: mockSetFont,
     setDrawColor: mockSetDrawColor,
     setTextColor: mockSetTextColor,
+    setLineWidth: mockSetLineWidth,
+    setFillColor: mockSetFillColor,
+    rect: mockRect,
+    splitTextToSize: mockSplitText,
     addPage: mockAddPage,
     setPage: mockSetPage,
     addImage: mockAddImage,
