@@ -7,6 +7,39 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.0.0] - 2026-08-04
+Cierre de 39 mejoras acumuladas desde la v3.99.6 (23/07). No hay cambios incompatibles:
+el salto de MAJOR marca el hito de las dos semanas, no una ruptura.
+
+### Agregado — Catálogo de variadores
+- **8 fichas** (SEW, ATS22, V20, Altivar, Fr1 y familia) con **~300 parámetros en 61 menús**, verificados uno a uno contra los 12 manuales oficiales.
+- **Buscador global** que cruza marcas y **lleva** al parámetro, en vez de solo listarlo.
+- **«La misma cinta con otro variador»**: traduce la receta al repuesto, avisa lo que el repuesto pide de más y tacha los valores que no se copian.
+- Recetas por cinta/equipo, reset a fábrica, fila de rearranque y deep-link a la cinta.
+- Conectado con Repuestos y con las fichas de equipo; datos aportables desde terreno sin tocar código.
+
+### Agregado — Grader / Análisis de Turno
+- **Matriz de turnos** en reemplazo del calendario mensual (−137 kB); el Unscheduled siempre queda atribuido a un turno.
+- **Detalle del turno en 4 pestañas** (Resumen, Timeline, Gates, Línea): solo se monta la vista abierta. La config global del Grader pasa a `/analisis-grader/config`, solo admin.
+- **Resumen ejecutivo del turno como PNG**: veredicto que nombra la máquina parada, KPIs con su contexto y MTTR leído como bueno cuando es bajo.
+- **Desglose de Puerta 0** con input propio, recálculo aislado y aviso cuando no corresponde a las gates actuales.
+
+### Agregado — PWA
+- **La app abre sin señal**: app shell y chunks en caché.
+
+### Corregido — Shoplogix / turnos
+- Un turno que cruza medianoche se cuenta como **un** turno, con el día y el nombre que dice Shoplogix.
+- El re-sync de ayer dejaba de pisar el turno del día en curso.
+- El detalle del turno dejaba de repetirse, de sobreestimar la pérdida y de pedir un Excel que no faltaba.
+
+### Corregido — Centro de Aprendizaje
+- Auditoría de contenido cerrada en 8 equipos: **medios de auditoría verificados contra el manual** en Baader 142, Baader 200, Grader, Marel HG, Marel Filete, Fishken, Enzunchadora y Detector de Metales.
+- Marel Filete es un **M-Weigher WTR**, no un SmartLine: identidad corregida y hardware inexistente retirado.
+- Los overrides del admin ya se leen en las 17 secciones que seguían en seed puro.
+
+### Corregido — Visor 3D
+- Los modelos con texturas embebidas se veían **blancos**: el CSP no permitía `blob:` en `connect-src` y `GLTFLoader` no podía cargar ninguna textura.
+
 ## [3.32.3] - 2026-05-27
 ### Mejorado - Centro de Aprendizaje Baader 200
 - Baader 200 queda integrado al formato estandar de cuatro secciones: Manual, Procedimientos, Flujos y Diagnostico.

@@ -1,8 +1,14 @@
 {
-  "version": "3.99.6",
-  "buildDate": "2026-07-29",
-  "buildTimestamp": 1785376311092,
+  "version": "4.0.0",
+  "buildDate": "2026-08-04",
+  "buildTimestamp": 1785890415925,
   "features": [
-    "Fix: HomeRedirect detecta viewport — mobile va a /dashboard (MobileHomeGrid), desktop usa la ruta configurada"
+    "Catálogo de variadores: 8 fichas con ~300 parámetros verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»",
+    "Grader: la matriz de turnos reemplaza al calendario mensual y el detalle del turno queda en 4 pestañas",
+    "Grader: resumen ejecutivo del turno como PNG y desglose de Puerta 0 con input propio",
+    "Centro de Aprendizaje: auditoría de contenido cerrada en 8 equipos (medios verificados contra manual)",
+    "Shoplogix: un turno = un día, el que dice Shoplogix — y el re-sync de ayer ya no pisa el turno en curso",
+    "Visor 3D: los modelos con texturas ya no se ven blancos",
+    "La app abre sin señal (app shell y chunks en caché)"
   ]
 }
