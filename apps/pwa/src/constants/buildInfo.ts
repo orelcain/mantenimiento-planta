@@ -34,3 +34,36 @@ export function formatBuildLabel(): string {
   const mi = String(d.getMinutes()).padStart(2, '0')
   return `${BUILD_SHA} · ${dd}-${mm} ${hh}:${mi}`
 }
+
+/** `05-08` — fecha del build, para donde no cabe más (sidebar colapsado). */
+export function formatBuildDateShort(): string {
+  const d = new Date(BUILD_TIME)
+  if (Number.isNaN(d.getTime())) return BUILD_SHA
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Lo que el sello dice de cara al usuario: **cuándo** se actualizó la app.
+ *
+ * Es la pregunta que se hace quien mira ahí — "¿tengo lo último?" — y la única
+ * que el dato puede responder con verdad. El semver no puede: se sube a mano,
+ * y entre el 23/07 y el 04/08/2026 se quedó 13 días atrás con 39 mejoras
+ * desplegadas, así que un `v4.0.0` a la vista afirmaba algo falso. La versión y
+ * el SHA siguen disponibles en el tooltip, que es donde sirven: soporte y
+ * diagnóstico.
+ *
+ *   "Actualizada hoy 14:25" · "Actualizada ayer 09:12" · "Actualizada el 28-07"
+ */
+export function formatUpdatedLabel(now: Date = new Date()): string {
+  const d = new Date(BUILD_TIME)
+  if (Number.isNaN(d.getTime())) return 'Versión de desarrollo'
+
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const atDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dias = Math.round((atDay(now) - atDay(d)) / 86_400_000)
+
+  if (dias <= 0) return `Actualizada hoy ${hh}:${mi}`
+  if (dias === 1) return `Actualizada ayer ${hh}:${mi}`
+  return `Actualizada el ${formatBuildDateShort()}`
+}
