@@ -29,21 +29,21 @@ export interface PdfDoc {
   addPage(): void
 }
 
-type RGB = readonly [number, number, number]
+export type RGB = readonly [number, number, number]
 
-const INK: RGB = [20, 32, 44]
-const MUTE: RGB = [92, 107, 122]
-const RULE: RGB = [212, 221, 230]
-const BRAND: RGB = [46, 117, 182]
-const OK: RGB = [103, 149, 118]
-const WARN: RGB = [168, 140, 100]
-const BAD: RGB = [176, 112, 109]
-const PANEL: RGB = [244, 247, 250]
+export const INK: RGB = [20, 32, 44]
+export const MUTE: RGB = [92, 107, 122]
+export const RULE: RGB = [212, 221, 230]
+export const BRAND: RGB = [46, 117, 182]
+export const OK: RGB = [103, 149, 118]
+export const WARN: RGB = [168, 140, 100]
+export const BAD: RGB = [176, 112, 109]
+export const PANEL: RGB = [244, 247, 250]
 
 const SEV: Record<ExecutiveSummary['severity'], RGB> = { ok: OK, warn: WARN, critical: BAD }
-const TONE: Record<string, RGB> = { ok: OK, warn: WARN, bad: BAD, neutral: INK }
+export const TONE: Record<string, RGB> = { ok: OK, warn: WARN, bad: BAD, neutral: INK }
 
-const MARGIN = 14
+export const MARGIN = 14
 
 /**
  * Dibuja el resumen ejecutivo y devuelve la `y` donde termina.

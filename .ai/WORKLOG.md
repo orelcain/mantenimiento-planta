@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - Comparativo de periodo (formato C): la hoja que contesta "vamos mejor?"
+
+- Cierra los tres formatos del mockup aprobado. A (#359) y B (#364/#366) explican UN turno; un turno aislado nunca puede demostrar mejora continua. Este toma el mes.
+- **La decision que ordena todo el texto**: separar lo que Mantencion controla (MTTR, averias resueltas, micro absorbidas) de lo que no (cuantas maquinas arrancan el turno). Mezclarlos produce el reporte de siempre — "el mes estuvo malo" — que no dice a quien le toca hacer que.
+- **No inventar tendencias.** Con menos de 4 turnos la hoja dice que no hay tendencia en vez de dibujar una flecha. Las mitades se comparan por MEDIANA, no por media: un solo turno catastrofico al final arrastraba la media y daba "sin tendencia" en un mes que subio de 45% a 80%.
+- **Tabla adaptativa**: hasta 12 turnos va uno por fila; sobre eso agrupa por tipo de turno (que contesta "hay un turno que anda peor?") y DICE que esta agrupando. Nunca se recorta en silencio.
+- **Primitivas de dibujo compartidas** (`graderExecutiveCanvas`): encabezado, veredicto, KPIs, cierre y pie ahora viven una sola vez, y las usan el PNG del turno y el del periodo. El refactor del PNG de turno se probo comparando el canvas fila por fila contra el original: **2.094 filas identicas, 0 diferencias**; la unica variacion es que la hoja crecio 40 px de margen inferior, porque la medicion de los KPIs decia 108 y el dibujo avanzaba 128 (desfase preexistente, ahora corregido).
+- Las pausas NO vienen en el hook del periodo (viven en una subcoleccion y encareceran la matriz, que se abre muchas veces al dia): `graderPeriodReliability` las carga recien cuando alguien pide el comparativo, y saca el conteo por turno llamando a `computeMaintenanceReliability` turno a turno en vez de reimplementar el criterio de que pausa cuenta como averia.
+- **Mirar la hoja encontro 4 bugs que ningun test habria pillado**: el cierre declaraba "disponibilidad resuelta" con 58% de uptime; se rankeaba "mas disponible" un 59% contra un 58%; el titulo decia "Agosto de 2026"; el rango repetia el mes ("1 ago - 5 ago"). Con datos reales de julio de Yal aparecio un quinto: un tipo de turno con UN solo registro al 0% se llevaba la etiqueta "menos disponible" del mes. Todos con test.
+- Banco de pruebas nuevo en **`/dev/resumen-periodo`** (6 casos, una por rama del veredicto) y los botones enchufados tambien a `/dev/matriz-turnos`, para poder verlos sin sesion.
+- Verificacion: tsc y eslint limpios - **781 tests** (27 nuevos) - mutation test: subir `ROW_H` y bajar `HEALTHY_UPTIME_PCT` hacen fallar sus tests. Con **jsPDF real** en el navegador: 1 sola pagina. Los botones se probaron con clic real en `/dev/matriz-turnos`: disparan `resumen-periodo_fixture.png`. **NO verificado**: la carga de pausas desde Firestore, que necesita sesion.
+- Estado: EN REVISION - PR abierto.
+- Sigue: que Orel baje el comparativo de agosto real y confirme que se entiende.
+
 ## 2026-08-05 - claude - Boton del resumen ejecutivo (PNG) en la vista de turno
 
 - Cierra el enganche que quedaba de los formatos A y B: el PNG solo existia en el banco de pruebas. Ahora hay un boton propio junto al de PDF en la barra del detalle de turno.
