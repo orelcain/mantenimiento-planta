@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - El sync captura el arranque anticipado del turno (FASE 2)
+
+- Cierra lo que la fase 1 (#373) solo podia AVISAR: ahora los ciclos de antes de las 08:00 entran en el turno que les corresponde.
+- **Tres cambios en `functions/shoplogix/sync.js`:**
+  1. `fullDayWindow` empieza a las **06:00** en vez de las 08:00 (`WINDOW_START_HOUR`). El turno de dia arranca antes de las 08:00 de forma habitual — Chonchi 07:15, Filete 07:30, Yal 07:45 — y esos minutos caian en la consulta del dia ANTERIOR. **06:00 y no antes**: el nocturno de Chonchi termina 05:00, y arrancar antes metia su cola en el dia siguiente (el mismo problema con el signo cambiado).
+  2. `deriveShiftGroups` separa por **continuidad temporal** ademas de por nombre: un hueco > 8 h entre intervals del mismo turno significa que son turnos de dias distintos. Sin esto, con la ventana ensanchada el "Turno 2" de ayer y el de hoy colapsaban en un grupo de 24 h — que es exactamente el bug que se veia en produccion. La clave del grupo pasa a ser `nombre + dia de inicio`.
+  3. **`isTruncatedHeadOfPrevWindow`**, espejo del guard de cola del PR #354. Hace falta PORQUE la ventana se ensancho: ahora la consulta de un dia ve la cola del nocturno del dia anterior (Yal `Turno 3` iba 00:00->08:00) y ese fragmento apunta al mismo doc que la ventana anterior ya escribio entero. Mismas dos condiciones que el de cola, y por la misma razon: solo una de las dos romperia un turno legitimo.
+- `shoplogixProbe` ahora llama a `fullDayWindow` en vez de replicar la ventana a mano. La copia desfasada ya habia hecho que el debug concluyera "no hay datos" en falso.
+- **Tests: de 104 a 138.** Las cuatro funciones del corazon del sync (`fullDayWindow`, `deriveShiftGroups`, `shiftDateKeyFromStart`, `currentDateKey`) **no tenian ninguno** — se escribieron ANTES de tocar nada, y de los 14 iniciales 12 pasaban (red de seguridad) y 2 fallaban a proposito (los dos cambios). Uno de mis tests estaba mal, no el codigo: `currentDateKey` a las 06:30 de Chile SI devuelve el dia anterior.
+- **Verificacion con la serie REAL** (`serieRealArranqueAnticipado.test.js`): reconstruida a partir de la respuesta del probe, reproduce sus tres conteos exactos (93 Turno 2 / 102 Unscheduled / 93 Turno 1), lo que confirma que representa el dia de verdad. Con ella: el Turno 2 se separa en dos, el de ayer termina 15:00 y deja de absorber, el de hoy arranca 07:15, el nocturno no se parte y el Unscheduled sale como UN bloque 15:00->07:15 igual que en Shoplogix.
+- Mutation test: volver la ventana a 08:00, quitar la separacion por hueco y ponerla en 1 h hacen fallar sus tests respectivos.
+- Estado: EN REVISION - PR abierto. **El deploy de functions es automatico al mergear.**
+- **Sigue, y hay que hacerlo con cuidado:** despues del deploy, correr `shoplogixBackfillRange` de UN dia (05-ago), verificar los docs con la lectura de Firestore, y recien entonces backfillear el resto de los dias contaminados (Filete 12, Yal 6, Chonchi 2). Antes del backfill masivo, snapshot.
+
 ## 2026-08-05 - claude - La ventana del turno la manda Shoplogix, no una tabla del codigo (FASE 1)
 
 - Orel reporto que el turno de hoy corrio desde las 7:15 pero el Analisis lo tomaba desde las 8:00. Investigado contra PRODUCCION (probe de Shoplogix + lectura de Firestore), y result?? ser mas grave: **las piezas no se pierden, se le suman al dia anterior**.

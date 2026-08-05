@@ -6867,13 +6867,10 @@ exports.shoplogixProbe = onRequest(
 
     // Una máquina de Yal para probar params específicos por máquina
     const machineid = (require('./shoplogix/machines').PLANT_MACHINES[plantSlug] || [])[0]?.machineid
-    const start = `${dk.replace(/-/g, '')}T080000.000`
-    const end   = (() => {
-      const [y, m, d] = dk.split('-').map(Number)
-      const next = new Date(Date.UTC(y, m - 1, d + 1))
-      const nextKey = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
-      return `${nextKey.replace(/-/g, '')}T080000.000`
-    })()
+    // La MISMA ventana que usa syncDay, no una copia: con la copia desfasada el
+    // probe consultaba un rango distinto al que el sync escribia y el debug
+    // concluia "no hay datos" en falso.
+    const { start, end } = shoplogixSyncMod.fullDayWindow(dk)
 
     // Lista de candidatos a explorar
     const candidates = [

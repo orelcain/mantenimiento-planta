@@ -178,25 +178,61 @@ async function isShiftAlreadyFrozen({ db, plantSlug, parentShiftDateKey, shiftId
 // ── Helpers de ventana temporal ───────────────────────────────────────────────
 
 /**
+ * Hora en que TERMINA la ventana de consulta de un día (y empieza la del
+ * siguiente). Anclar en 08:00 en lugar de 00:00 mantiene los turnos nocturnos
+ * que cruzan medianoche dentro de la ventana del día al que pertenecen.
+ */
+const WINDOW_ANCHOR_HOUR = 8
+
+/**
+ * Hora en que EMPIEZA la ventana, dos horas antes del ancla.
+ *
+ * Por qué se adelantó (2026-08-05): en estas plantas el turno de día arranca
+ * habitualmente ANTES de las 08:00 — Chonchi 07:15, Filete 07:30, Yal 07:45 —
+ * y con la ventana anclada en 08:00 esos minutos caían dentro de la consulta
+ * del día ANTERIOR. No se perdían: se le SUMABAN a ese doc. En producción,
+ * `2026-08-04_Turno 2` quedó declarado 08:00 → 08:00 (24 h) con 16.398 ciclos
+ * que incluían 45 min del día 5, mientras el turno del 5 nacía a las 08:00 sin
+ * ellos. Era sistemático: 12 de 31 docs de Filete.
+ *
+ * Por qué 06:00 y no antes: el turno nocturno de Chonchi termina a las 05:00
+ * (`2026-08-04_Turno 1`: 21:15 → 05:00). Empezar antes metería su cola en la
+ * consulta del día siguiente y traería el mismo problema con el signo cambiado.
+ * Queda 1 h 15 de margen sobre el arranque más temprano observado.
+ *
+ * Consecuencia buscada: las ventanas de dos días consecutivos SE SOLAPAN entre
+ * 06:00 y 08:00. Por eso `deriveShiftGroups` separa los turnos por continuidad
+ * temporal y los dos guards de borde (`isTruncatedTailOfNextWindow` y
+ * `isTruncatedHeadOfPrevWindow`) evitan que un fragmento pise un doc completo.
+ */
+const WINDOW_START_HOUR = 6
+
+/**
+ * Hueco máximo entre dos intervals del mismo turno para seguir considerándolos
+ * el MISMO turno.
+ *
+ * Shoplogix emite intervals también cuando no hay producción — el bloque
+ * `Unscheduled` del 04-ago traía 102 intervals con 0 ciclos —, así que dentro
+ * de un turno los intervals son contiguos aunque la línea esté parada. 8 h es
+ * holgado para cualquier parada real y muy inferior a la distancia entre dos
+ * turnos del mismo nombre en días consecutivos (16 h 15 en el caso real del
+ * 04→05 de agosto).
+ */
+const SAME_SHIFT_MAX_GAP_MS = 8 * 60 * 60 * 1000
+
+/**
  * Ventana de consulta para el día completo (wall-clock-as-UTC).
- * Ancla en 08:00 en lugar de 00:00: esto asegura que turnos nocturnos que
- * cruzan medianoche (ej. Yal Turno 3: ~22:00→07:45) queden completamente
- * dentro de la ventana del día al que pertenecen, y no aparezcan como
- * remanente espurio en la ventana del día siguiente.
  *
- * Ejemplo para dateKey = "2026-04-28":
- *   window = 08:00 Apr 28 → 08:00 Apr 29
- *   Turno 2 (09:00-22:00 Apr 28) ← dentro ✓
- *   Turno 3 (~22:00 Apr 28 → 07:45 Apr 29) ← dentro ✓
- *
- * Ejemplo para dateKey = "2026-04-29":
- *   window = 08:00 Apr 29 → 08:00 Apr 30
- *   Turno 2 (09:00-22:00 Apr 29) ← dentro ✓ (sin remanente de Apr 28)
+ * Ejemplo para dateKey = "2026-08-05":
+ *   window = 06:00 Ago 5 → 08:00 Ago 6
+ *   Turno 2 (07:15-15:00 Ago 5)          ← dentro ✓ (antes se cortaba en 08:00)
+ *   Turno 1 (~21:15 Ago 5 → 05:00 Ago 6) ← dentro ✓
+ *   Turno 1 del día ANTERIOR (→ 05:00 Ago 5) ← fuera ✓ (termina antes de 06:00)
  */
 function fullDayWindow(dateKey) {
   const [y, m, d] = dateKey.split('-').map(Number)
-  const start = new Date(Date.UTC(y, m - 1, d,     8, 0, 0))
-  const end   = new Date(Date.UTC(y, m - 1, d + 1, 8, 0, 0))
+  const start = new Date(Date.UTC(y, m - 1, d,     WINDOW_START_HOUR, 0, 0))
+  const end   = new Date(Date.UTC(y, m - 1, d + 1, WINDOW_ANCHOR_HOUR, 0, 0))
   return { start: toShoplogixTime(start), end: toShoplogixTime(end) }
 }
 
@@ -230,6 +266,52 @@ function filterCommentsToWindow(rawComments, startMs, endMs) {
     const t = parseShoplogixTime(c.start).getTime()
     return t >= startMs && t <= endMs
   })
+}
+
+/**
+ * ¿Este grupo viene CORTADO por el borde INICIAL de la ventana, y ya existe
+ * guardado entero?
+ *
+ * Es el espejo exacto de `isTruncatedTailOfNextWindow`, y hace falta desde que
+ * la ventana empieza a las 06:00 en vez de las 08:00: ahora la consulta de un
+ * día alcanza a ver la COLA del turno nocturno que arrancó el día anterior y
+ * sigue corriendo (Yal `Turno 3` iba 00:00→08:00). `deriveShiftGroups` la ve
+ * como un turno propio que empieza a las 06:00 y `shiftDateKeyFromStart` la
+ * manda al mismo doc que la ventana anterior ya escribió completo — pisándolo
+ * con un fragmento de dos horas.
+ *
+ * Regla (las dos condiciones son necesarias, igual que en el guard de cola):
+ *   1. el grupo empieza en el borde de la ventana (⇒ está cortado ahí), y
+ *   2. el doc guardado declara un `scheduledStart` ANTERIOR a ese borde (⇒
+ *      alguien con mejor información ya lo escribió entero).
+ *
+ * Solo (1) rompería un turno que legítimamente arranca a las 06:00: la ventana
+ * anterior termina antes y no lo vería nunca. Solo (2) bloquearía las
+ * correcciones en que Shoplogix atrasa el inicio de un turno de verdad.
+ *
+ * Ante cualquier duda (doc ausente, sin `scheduledStart`, error de lectura)
+ * devuelve false → se escribe. Nunca deja de guardar un turno por precaución.
+ */
+async function isTruncatedHeadOfPrevWindow({ db, plantSlug, parentShiftDateKey, shiftId, scheduledStart, windowStart, logger }) {
+  if (scheduledStart.getTime() > windowStart.getTime()) return false
+
+  try {
+    const snap = await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${shiftId}`).get()
+    if (!snap.exists) return false
+
+    const raw = (snap.data() || {}).scheduledStart
+    const storedStart = raw && typeof raw.toDate === 'function' ? raw.toDate()
+      : raw instanceof Date ? raw
+      : typeof raw === 'string' ? new Date(raw)
+      : null
+    if (!storedStart || Number.isNaN(storedStart.getTime())) return false
+
+    // Ambos en wall-clock-as-UTC (lo guardado viene de estos mismos intervals).
+    return storedStart.getTime() < windowStart.getTime()
+  } catch (err) {
+    logger.warn(`[syncDay][${plantSlug}] truncated-head-check err (${parentShiftDateKey} ${shiftId}): ${err.message}`)
+    return false
+  }
 }
 
 /**
@@ -415,36 +497,57 @@ function deriveShiftGroups(machineProductionResponses, plantSlug) {
   const firstWithIntervals = machineProductionResponses.find(r => r?.machineProduction?.length > 0)
   if (!firstWithIntervals) return []
 
-  // 1. Agrupar por el nombre RAW de Shoplogix (el turno tal como viene). CLAVE:
-  //    NO canonizar por interval — el "Turno 2" de Yal va 14:45→00:00 y sus
-  //    intervals de las 22:00+ caerían en el rango "madrugada" y partirían el
-  //    turno en dos. Se agrupa por el turno completo y se canoniza después.
+  // 1. Agrupar por el nombre RAW de Shoplogix (el turno tal como viene) Y por
+  //    CONTINUIDAD TEMPORAL. CLAVE:
+  //
+  //    a) NO canonizar por interval — el "Turno 2" de Yal va 14:45→00:00 y sus
+  //       intervals de las 22:00+ caerían en el rango "madrugada" y partirían
+  //       el turno en dos. Se agrupa por el turno completo y se canoniza después.
+  //
+  //    b) NO agrupar SOLO por nombre — desde que la ventana empieza a las 06:00,
+  //       una misma consulta puede ver el "Turno 2" de ayer Y el de hoy. Con la
+  //       clave puesta solo en el string, los dos colapsaban en un grupo de 24 h
+  //       y el doc de ayer se quedaba con los ciclos de hoy (caso real
+  //       `2026-08-04_Turno 2`). Un hueco grande entre intervals del mismo
+  //       nombre significa que son turnos de días distintos.
   const perShift = {}
   for (const iv of firstWithIntervals.machineProduction) {
     if (!iv.shift) continue          // sin etiqueta = no hay turno, descartable
-    if (!perShift[iv.shift]) {
-      perShift[iv.shift] = { first: iv, last: iv }
+    const runs = perShift[iv.shift] || (perShift[iv.shift] = [])
+    const cur = runs[runs.length - 1]
+    if (!cur) {
+      runs.push({ first: iv, last: iv })
+      continue
+    }
+    const gapMs = parseShoplogixTime(iv.start).getTime() - parseShoplogixTime(cur.last.end).getTime()
+    if (gapMs > SAME_SHIFT_MAX_GAP_MS) {
+      runs.push({ first: iv, last: iv })   // otro turno con el mismo nombre
     } else {
-      perShift[iv.shift].last = iv
+      cur.last = iv
     }
   }
 
-  // 2. Canonizar el nombre de cada grupo por su hora de INICIO. Si dos grupos
-  //    raw colapsan al mismo canónico (raro: "Turno 3" + "Turno 3*"), fusionar.
+  // 2. Canonizar el nombre de cada tramo por su hora de INICIO. Dos tramos que
+  //    colapsan al mismo canónico se fusionan SOLO si son el mismo turno: se
+  //    los distingue por el día en que arrancan, que es lo que decide en qué
+  //    doc terminan (`shiftDateKeyFromStart`).
   const byCanon = {}
-  for (const [rawShiftId, g] of Object.entries(perShift)) {
-    const scheduledStart = parseShoplogixTime(g.first.start)
-    const canon = canonicalShiftName(plantSlug, scheduledStart, rawShiftId)
-    if (!byCanon[canon]) {
-      byCanon[canon] = { first: g.first, last: g.last, rawShiftId }
-    } else {
-      if (parseShoplogixTime(g.first.start).getTime() < parseShoplogixTime(byCanon[canon].first.start).getTime()) byCanon[canon].first = g.first
-      if (parseShoplogixTime(g.last.end).getTime()   > parseShoplogixTime(byCanon[canon].last.end).getTime())   byCanon[canon].last  = g.last
+  for (const [rawShiftId, runs] of Object.entries(perShift)) {
+    for (const g of runs) {
+      const scheduledStart = parseShoplogixTime(g.first.start)
+      const canon = canonicalShiftName(plantSlug, scheduledStart, rawShiftId)
+      const key = `${canon}__${shiftDateKeyFromStart(scheduledStart)}`
+      if (!byCanon[key]) {
+        byCanon[key] = { shiftId: canon, first: g.first, last: g.last, rawShiftId }
+      } else {
+        if (parseShoplogixTime(g.first.start).getTime() < parseShoplogixTime(byCanon[key].first.start).getTime()) byCanon[key].first = g.first
+        if (parseShoplogixTime(g.last.end).getTime()   > parseShoplogixTime(byCanon[key].last.end).getTime())   byCanon[key].last  = g.last
+      }
     }
   }
 
-  return Object.entries(byCanon)
-    .map(([shiftId, { first, last, rawShiftId }]) => ({
+  return Object.values(byCanon)
+    .map(({ shiftId, first, last, rawShiftId }) => ({
       shiftId,
       // rawShiftId != shiftId solo cuando se corrigió una anomalía de Shoplogix.
       rawShiftId,
@@ -605,6 +708,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   const frozenSkipped = []
   const truncatedSkipped = []
   const windowEnd = parseShoplogixTime(window.end)
+  const windowStart = parseShoplogixTime(window.start)
 
   // 3. Por cada turno: filtrar intervals + normalize + escribir
   for (const group of shiftGroups) {
@@ -616,6 +720,15 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // por la ventana del día siguiente → no degradarlo. OJO: va ANTES del check
     // de freeze y NO respeta `forceAll` — el re-sync de días pasados corre
     // justamente con forceAll, y es el que provocaba el pisotón.
+    if (await isTruncatedHeadOfPrevWindow({
+      db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
+      scheduledStart: group.scheduledStart, windowStart, logger,
+    })) {
+      truncatedSkipped.push(`${parentShiftDateKey} ${group.shiftId} (cabeza)`)
+      allShiftResults.push({ shiftId: group.shiftId, skipped: 'truncated-head' })
+      continue
+    }
+
     if (await isTruncatedTailOfNextWindow({
       db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
       scheduledEnd: group.scheduledEnd, windowEnd, logger,
@@ -1021,6 +1134,7 @@ module.exports = {
   currentDateKey,
   isShiftAlreadyFrozen,
   isTruncatedTailOfNextWindow,
+  isTruncatedHeadOfPrevWindow,
   syncDay,
   syncShift,
 }
