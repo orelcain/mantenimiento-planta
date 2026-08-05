@@ -866,7 +866,12 @@ class ErrorBoundary3D extends Component<{ children: ReactNode; onError: (msg: st
     this.state = { hasError: false }
   }
   static getDerivedStateFromError() { return { hasError: true } }
-  componentDidCatch(error: Error, _info: ErrorInfo) { this.props.onError(error.message) }
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    // Sin esto el visor solo muestra un cubo rojo y la causa real (textura que no
+    // carga, GLB corrupto, formato no soportado) se pierde en silencio.
+    logger.error('[Visor3D] fallo al cargar el modelo', error)
+    this.props.onError(error.message)
+  }
   render() {
     if (this.state.hasError) return <mesh><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ef4444" wireframe /></mesh>
     return this.props.children

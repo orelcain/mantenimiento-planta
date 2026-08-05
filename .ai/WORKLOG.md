@@ -13,6 +13,29 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-04 - claude - Resumen ejecutivo del turno (PNG) - formato A del mockup
+
+- La exportacion anterior apilaba todo (timeline, KPIs, pausas, gates, causas, upstream) sin jerarquia ni conclusion: sirve de registro tecnico, no de entregable. Mockup con 3 formatos aprobado por Orel; se construye el A (ejecutivo) y despues el B (PDF completo con este como pagina 1).
+- **graderExecutiveSummary.ts** - logica PURA que responde 4 preguntas EN ORDEN: como fue (verdict), por que (cause+machines), que hizo Mantencion (maintenance), que se necesita (ask). Los dos renderers consumen el mismo modelo, asi que PNG y PDF no pueden contar historias distintas del mismo turno.
+- Decisiones de redaccion que importan: el veredicto NOMBRA la maquina parada (no solo "turno malo"); los KPIs traen su contexto ("39% de 7 h 09 de turno" en vez de "39%"); MTTR bajo se marca OK - es el unico KPI donde menos es mejor, y sin eso un turno malo con buena respuesta se lee como todo malo; sin Excel del Grader lo DICE en vez de imprimir ceros que se leen como "no hubo".
+- **Bug que cazo un test**: el lossDriver no tenia opcion "ninguna" y caia a 'ritmo' por defecto, asi que un turno sano al 95% afirmaba haber corrido bajo el objetivo. Un reporte que inventa una perdida inexistente es peor que uno que no dice nada. Se agrego 'ninguna' + umbrales explicitos.
+- **graderExecutiveSummaryPng.ts** - canvas nativo, NO html2canvas: el DOM real depende del tema, del CSS que soporte el parser y de que el nodo este visible; para algo que se manda a gerencia es demasiada superficie de falla. Dibujo determinista, siempre en claro (se imprime).
+- **pages/dev/ResumenTurnoDevPage** (solo dev, /dev/resumen-turno): dibuja el PNG real con 3 turnos conocidos, sin login. El entregable hay que MIRARLO antes de que salga.
+- Verificacion: tsc y eslint limpios; 15 tests con el turno REAL del 3-ago (Baader 2 en cero). En el navegador: canvas 2480x2094 dibujado, veredicto y pedido correctos, y barrido de pixeles del margen - la unica tinta cerca del borde son los bordes de los recuadros con su antialiasing (3 franjas, a 4-7 px), no texto desbordado.
+- Estado: EN REVISION - PR abierto.
+- Sigue: **formato B** (PDF con este resumen como pagina 1 y el detalle detras) y despues el C (comparativo de periodo, que necesita decidir que periodo compara). Falta enganchar el boton en la vista de turno real.
+
+## 2026-08-04 - claude - Leyenda del grafico de ritmo: dejaba de estar tapada por las lineas
+
+- Orel: "los puntos de baader 1... baader 2... quedan ocultos". Causa exacta en `ProductionRateLineEC`: `legend.top: 0` con `grid.top: 6` — ECharts NO reserva el alto de la leyenda solo, asi que la leyenda se dibujaba ENCIMA del area del grafico y las lineas (incluidas las punteadas de Promedio y Objetivo) pasaban por detras del texto, que se leia tachado. Con un canvas de 120 px el solape era total.
+- Hecho: `grid.top` 6 → 22 (reserva la banda de la leyenda), alto del contenedor 120 → 142 para devolverle al plot lo que la leyenda ahora ocupa, texto de leyenda 9 → 10 px y de `#64748b` a `#94a3b8` (es la clave de lectura del grafico, no chrome secundario), `itemGap: 12`.
+- Geometria verificable sin navegador: area de datos 114 px → 120 px. El grafico NO se achica — gana 6 px Y deja de estar tapado.
+- Revisado si el patron se repetia: `UpstreamMachinesPanel` ya tenia `grid.top: 30` con `legend.top: 0` (correcto) y `StateTimelineEC` no tiene leyenda. El bug era solo de este componente.
+- Archivos: `components/grader/ProductionRateLineEC.tsx`.
+- Verificacion: tsc limpio; los 6 warnings de eslint son PREEXISTENTES (verificado con stash: 6 con y sin el cambio). NO verificado visualmente: el grafico vive en el detalle de turno, que pide sesion.
+- Estado: EN REVISION — PR abierto.
+- Sigue: que Orel confirme que ya se leen. Pendiente mayor: exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos de gerencia).
+
 ## 2026-08-03 - claude - La card de cuota del turno se ve siempre
 
 - Orel: "recuerdo q antes podiamos asignarle a cada turno la cuota... ahora no veo la opcion". No era una regresion: `ShiftQuotaCard` seguia montada en el detalle del turno, pero hacia `return null` cuando NO habia cuota definida Y el usuario no tenia permiso (`allowEdit={isAdmin || isSupervisor}`). Resultado practico: la funcion entera parecia no existir — nadie sabia que habia cuota por turno.
