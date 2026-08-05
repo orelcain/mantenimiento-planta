@@ -25,7 +25,7 @@ import {
   type ReassignmentSeverity,
 } from '@/services/grader/graderGateAssignment'
 import { qualityColorHex } from '@/services/grader/graderQualityColors'
-import { QuickGateChangeButton } from './QuickGateChangeButton'
+import { GateChangeTrigger } from './GateChangeTrigger'
 
 interface GateRow {
   gate: number
@@ -583,8 +583,9 @@ export function GateBreakdownCard({
                           {/* Botón aplicar — solo si hay shiftDocId (solo admin lo ve) */}
                           {shiftDocId && (
                             <div className="shrink-0 self-start">
-                              <QuickGateChangeButton
+                              <GateChangeTrigger
                                 shiftDocId={shiftDocId}
+                                configSnapshots={configSnapshots}
                                 variant="compact"
                                 initialGate={s.fromGate}
                                 initialCalibre={s.toCalibre}

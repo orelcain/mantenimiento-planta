@@ -1135,7 +1135,22 @@ export function MainLayout() {
           }`}
         >
           <Suspense
-            key={location.key}
+            /*
+             * Remonta al cambiar de PÁGINA, no en cualquier navegación.
+             *
+             * El key existe desde f2712b8a para que al saltar entre dos rutas
+             * lazy no quede el contenido de la anterior colgado mientras carga
+             * la nueva. `location.key`, sin embargo, cambia en TODA navegación
+             * — también en una que solo toca el query string. Y varias páginas
+             * usan la URL como estado de UI (`IncidentsPage` con sus 5 filtros,
+             * `GanttPlannerPage`, el detalle de turno): ahí cada filtro tocado
+             * remontaba la página entera y repetía todas las lecturas de
+             * Firestore.
+             *
+             * `location.pathname` conserva el arreglo original (cambiar de
+             * ruta sí remonta) y deja de castigar el cambio de query.
+             */
+            key={location.pathname}
             fallback={
               <div className="flex items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
