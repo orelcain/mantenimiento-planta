@@ -13,6 +13,23 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - La ventana del turno la manda Shoplogix, no una tabla del codigo (FASE 1)
+
+- Orel reporto que el turno de hoy corrio desde las 7:15 pero el Analisis lo tomaba desde las 8:00. Investigado contra PRODUCCION (probe de Shoplogix + lectura de Firestore), y result?? ser mas grave: **las piezas no se pierden, se le suman al dia anterior**.
+- `2026-08-04_Turno 2` esta guardado como 04-ago 08:00 -> **05-ago 08:00** (24 h) con 16.398 ciclos: incluye los 45 min de arranque de HOY. Y el doc de hoy nace a las 08:00 sin ellos.
+- Causa: `fullDayWindow` consulta 08:00 -> 08:00, asi que lo producido antes del ancla cae en la consulta del dia anterior. **No es un evento raro: es sistematico** — Filete 12 de 31 docs (arranca 07:30 todos los dias), Yal 6 (07:45), Chonchi 2 (07:15).
+- **El dato correcto YA estaba guardado**: `officialSchedule` (rollup del whiteboard) dice 07:15->15:00 en los dos docs. El pipeline lo ignoraba.
+- Y el "Programado 09:00-17:15" que mostraba la app **no venia de Shoplogix**: es un literal de `plantLines.ts:144` que en turno EN CURSO le ganaba a Shoplogix. Llevaba dias desactualizado.
+- **Esta fase NO toca el sync ni los datos.** Arregla lo que se AFIRMA sobre ellos: `graderShiftWindow.resolveShiftWindow` resuelve la ventana real y expone `missingHeadMin` (minutos de arranque sin datos) y `earlyStartMin` (arranque anticipado real). Nuevo componente `TurnoVentanaAviso` lo dice en pantalla en vez de dibujar un turno que empieza a las 08:00 como si fuera la realidad.
+- **Dos reglas que costaron una iteracion cada una**, ambas encontradas por tests existentes:
+  1. NO se puede preferir siempre el oficial: en `yal 2026-08-02` el turno produjo desde las 14:00 con el whiteboard declarando 16:15 — arranque anticipado real de 2 h 15 que solo lo observado ve.
+  2. NO se pueden UNIR siempre las dos ventanas: un turno declarado 09:00-17:15 que produjo 09:05-17:02 corrio 09:05-17:02; unir infla la ventana con tiempo muerto y empeora la disponibilidad. La regla final es **manda lo observado salvo que venga contaminado por el borde**, detectado por evidencia contra lo declarado (cabeza en el ancla / cola desbordada), nunca por duracion — un `Unscheduled` real dura 16 h 48 y es legitimo.
+- La matriz de periodo usaba `effective`, que viene CLIPEADO a la ventana de consulta y por eso heredaba el recorte (24 h en el doc de ayer). Ahora las dos superficies usan la MISMA funcion.
+- Verificacion: tsc y eslint limpios (1 warning preexistente, verificado con stash) - **801 tests** (20 nuevos) - mutation test: mover el ancla de 8 a 9 hace caer 2 tests - los 5 casos reales de produccion comprobados en el navegador con los modulos reales - la matriz sobre el fixture de julio no cambia (44 turnos, ninguno sobre 20 h).
+- **NO verificado**: la vista de turno renderizada (pide sesion). Por eso el aviso se extrajo a componente propio, que si tiene test de render.
+- Estado: EN REVISION - PR abierto.
+- **Sigue (FASE 2, el backend)**: ensanchar `fullDayWindow` hacia atras y separar los grupos por dia para que los ciclos de 07:15-08:00 entren en el turno correcto. Toca el CF que corre cada hora, no tiene NINGUN test (`fullDayWindow`, `deriveShiftGroups`, `shiftDateKeyFromStart` y `syncDay` estan sin cubrir) y hay 9 lugares acoplados al ancla 08:00, incluido el guard del PR #354. Ademas queda backfillear los dias ya contaminados.
+
 ## 2026-08-05 - claude - Comparativo de periodo (formato C): la hoja que contesta "vamos mejor?"
 
 - Cierra los tres formatos del mockup aprobado. A (#359) y B (#364/#366) explican UN turno; un turno aislado nunca puede demostrar mejora continua. Este toma el mes.

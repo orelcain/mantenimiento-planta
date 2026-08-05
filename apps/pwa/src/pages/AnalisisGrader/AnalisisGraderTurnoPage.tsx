@@ -27,6 +27,8 @@ import { getShiftDisplayDateKey, getShiftMeta, SLX_NOISE_THRESHOLD } from '@/ser
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
+import { TurnoVentanaAviso } from '@/components/grader/TurnoVentanaAviso'
+import { resolveShiftWindow } from '@/services/grader/graderShiftWindow'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ConfigDriftBanner } from '@/components/grader/ConfigDriftBanner'
@@ -451,40 +453,61 @@ export function AnalisisGraderTurnoPage() {
     return null
   }, [upstreamLine.snapshot, dateKey, MIN_VALID_BOUND_MS])
 
+  /**
+   * Ventana REAL del turno: lo que declara Shoplogix (`officialSchedule`, la
+   * misma ventana que se ve en su pantalla) unido a lo observado en los
+   * intervals, descartando lo que viene recortado por el borde de la consulta
+   * del sync. Ver `graderShiftWindow` para el porqué de cada regla.
+   *
+   * El horario configurado de la planta ya NO compite acá: quedó como último
+   * recurso dentro de `computeEffectiveWindow`. Mientras la tabla decía
+   * 09:00-17:15 y le ganaba a Shoplogix, el análisis mostraba un turno que
+   * llevaba días corriendo 07:15-15:00.
+   */
+  const resolvedWindow = useMemo(() => resolveShiftWindow({
+    declaredStart: upstreamLine.officialRollup?.officialSchedule?.start ?? null,
+    declaredEnd: upstreamLine.officialRollup?.officialSchedule?.end ?? null,
+    observedStart: realShiftBounds?.startAt ?? null,
+    observedEnd: realShiftBounds?.endAt ?? null,
+  }), [upstreamLine.officialRollup, realShiftBounds])
+
   // Ventana efectiva del turno.
   //
-  // OJO con turnos EN CURSO: el scheduledEnd del doc Shoplogix crece con cada
-  // sync (se deriva del último interval) → siempre va ~5-10 min detrás de
-  // `now`. Usar los bounds crudos marcaría "cerrado" un turno vivo. Regla:
-  //   - now dentro de [start, end + 30min de rezago] → turno probablemente
-  //     en curso: preferir la ventana del schedule si también lo ve vivo
-  //     (conoce la hora de fin PLANEADA → progreso útil); si el schedule no
-  //     reconoce el turno, extender el fin real hasta `now`.
-  //   - fuera de ese rango → bounds reales completos mandan (turno cerrado o
-  //     futuro con horario fiel a Shoplogix).
+  // Con ventana declarada por Shoplogix el fin es el PLANEADO y sirve tal cual
+  // para progreso y restante. Sin ella queda el viejo cuidado con los turnos EN
+  // CURSO: el fin observado crece con cada sync (se deriva del último interval),
+  // así que usarlo crudo marcaría "cerrado" un turno vivo.
   const computeEffectiveWindow = useCallback((): ShiftTimeWindow | null => {
     if (!dateKey || !shiftLabel) return null
     const schedTw = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
-    if (!realShiftBounds) return schedTw
+    if (!resolvedWindow.start || !resolvedWindow.end) return schedTw
+
+    const bounds = { startAt: resolvedWindow.start, endAt: resolvedWindow.end }
+
+    // El fin viene del whiteboard: es la hora a la que el turno TERMINA, no la
+    // del último dato recibido. Se usa directo.
+    if (resolvedWindow.origin !== 'observado') {
+      return computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, bounds)
+    }
 
     const nowMs = nowAsWallClockUTC().getTime()
-    const startMs = realShiftBounds.startAt.getTime()
-    const endMs = realShiftBounds.endAt.getTime()
+    const startMs = bounds.startAt.getTime()
+    const endMs = bounds.endAt.getTime()
     const SYNC_LAG_MS = 30 * 60_000
 
     const probablyOngoing = startMs <= nowMs && nowMs <= endMs + SYNC_LAG_MS
     if (probablyOngoing) {
       if (schedTw.status === 'live') return schedTw
       const tw = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, {
-        startAt: realShiftBounds.startAt,
+        startAt: bounds.startAt,
         endAt: new Date(Math.max(endMs, nowMs)),
       })
       // Fin extendido hasta `now` = fin PLANEADO desconocido → progreso y
       // restante no significan nada (darían 100%/0 todo el turno). elapsed sí vale.
       return endMs < nowMs ? { ...tw, progressPct: null, remainingMin: null } : tw
     }
-    return computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, realShiftBounds)
-  }, [dateKey, shiftLabel, plantSchedule, realShiftBounds])
+    return computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule, undefined, bounds)
+  }, [dateKey, shiftLabel, plantSchedule, resolvedWindow])
 
   // Nota: estas llamadas omiten `now` a propósito — el default de
   // computeShiftTimeWindow ya es `nowAsWallClockUTC()`, así la detección de
@@ -1612,6 +1635,17 @@ export function AnalisisGraderTurnoPage() {
         produjoStart={summary?.startAt}
         produjoEnd={summary?.endAt}
         minutosActivos={summary?.durationMinutes ?? null}
+      />
+
+      {/* Dos avisos distintos sobre la ventana: minutos de arranque SIN datos
+          (problema: el total del turno está incompleto) y arranque anticipado
+          real (información: produjo antes de lo declarado, y está contado). */}
+      <TurnoVentanaAviso
+        missingHeadMin={resolvedWindow.missingHeadMin}
+        earlyStartMin={resolvedWindow.earlyStartMin}
+        realStart={resolvedWindow.start}
+        dataStart={realShiftBounds?.startAt ?? null}
+        className="mx-1"
       />
 
       {/* Chip rollup oficial de Shoplogix (horario/especie/% target) — solo
