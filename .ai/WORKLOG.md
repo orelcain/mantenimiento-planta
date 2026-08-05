@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - PDF de turno con el resumen ejecutivo como pagina 1 (formato B)
+
+- Cierra el formato B del mockup. El PDF abria con el timeline minuto a minuto: habia que leer tres paginas para saber si el turno estuvo bien o mal. Ahora la pagina 1 es el resumen ejecutivo (mismo modelo que el PNG del #359) y el detalle arranca en hoja nueva.
+- **graderExecutivePdfPage.ts** - renderiza el ExecutiveSummary en jsPDF. Comparte modelo con el PNG a proposito: si el PNG dice que el turno se perdio por la Baader 2, el PDF no puede decir otra cosa. Se tipa contra una interfaz PdfDoc minima (solo lo que se usa) en vez de contra jsPDF entero.
+- El resumen se arma DENTRO de exportTurnToPDF con lo que ya recibia (summary + pauses + upstreamSnapshot): computeMaintenanceReliability se llama ahi, asi que **no hubo que tocar el llamador**. Se agregaron shiftStart/shiftEnd opcionales para la ventana real.
+- **Secciones vacias**: las 4-7 ya tenian guardas. La que faltaba era la tabla de KPIs, que con totalPieces=0 imprimia "0 pz / 0,00% P0" - eso se lee como "no hubo piezas malas" cuando en realidad NO SE MIDIO. Ahora sin Excel dice "Datos del Grader: sin Excel cargado".
+- **Rompi los tests existentes de graderTurnToPDF** (16): su mock de jsPDF no tenia setLineWidth/setFillColor/rect/splitTextToSize, que la pagina ejecutiva si usa. Arreglado el mock - un mock que no refleja la API usada da verde falso.
+- Verificacion: tsc y eslint limpios; **556 tests** en la suite grader (7 nuevos de la pagina PDF, con doble de jsPDF que registra lo dibujado). **Comprobado que los tests pueden fallar**: rompiendo contentW cae el de "nada se sale del ancho". Con jsPDF REAL en el navegador: la pagina ejecutiva termina en y=203,9 de 297 mm (93 mm libres, 1 sola pagina, 10,7 kB) y el flujo completo corre sin errores de consola.
+- Banco de pruebas: /dev/resumen-turno ahora tiene "Descargar PDF completo" ademas del PNG.
+- Estado: EN REVISION - PR abierto.
+- Sigue: **formato C** (comparativo de periodo) - necesita decidir que periodo compara por defecto. Falta enganchar el boton del PNG en la vista de turno real (el PDF ya usa el boton existente).
+
 ## 2026-08-04 - claude - Resumen ejecutivo del turno (PNG) - formato A del mockup
 
 - La exportacion anterior apilaba todo (timeline, KPIs, pausas, gates, causas, upstream) sin jerarquia ni conclusion: sirve de registro tecnico, no de entregable. Mockup con 3 formatos aprobado por Orel; se construye el A (ejecutivo) y despues el B (PDF completo con este como pagina 1).

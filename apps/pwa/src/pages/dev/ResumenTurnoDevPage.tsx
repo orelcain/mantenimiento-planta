@@ -10,6 +10,7 @@ import {
   buildExecutiveSummary, type BuildExecutiveSummaryInput,
 } from '@/services/grader/graderExecutiveSummary'
 import { exportExecutiveSummaryPng } from '@/services/grader/graderExecutiveSummaryPng'
+import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineShift } from '@/services/shoplogix/types'
 import { cn } from '@/lib/utils'
@@ -137,6 +138,18 @@ export default function ResumenTurnoDevPage() {
             onClick={() => exportExecutiveSummaryPng({ summary: resumen, filenameSuffix: caso })}
           >
             Descargar PNG
+          </button>
+          <button
+            className={btn(false)}
+            onClick={() => exportTurnToPDF({
+              summary: activo.input.summary,
+              pauses: [],
+              upstreamSnapshot: activo.input.upstream ?? null,
+              shiftStart: activo.input.start ?? null,
+              shiftEnd: activo.input.end ?? null,
+            })}
+          >
+            Descargar PDF completo
           </button>
         </div>
 

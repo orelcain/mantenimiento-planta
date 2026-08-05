@@ -14,6 +14,10 @@
  */
 
 import type { GraderDailySummary, Pause } from './types'
+import { buildExecutiveSummary } from '@/services/grader/graderExecutiveSummary'
+import { drawExecutivePdfPage, type PdfDoc } from '@/services/grader/graderExecutivePdfPage'
+import { computeMaintenanceReliability } from '@/services/grader/graderReliability'
+import { displayShiftName } from '@/services/grader/graderShiftDisplay'
 import type { UpstreamLineSnapshot } from '../shoplogix/types'
 import { fmtTime as fmtHHMM, fmtDurationSec as fmtDur } from './graderTimeFormat'
 import { pauseTierLabel } from './graderPauseTiers'
@@ -42,6 +46,12 @@ export async function exportTurnToPDF(params: {
   chartImageDataUrl?: string | null
   /** Snapshot de la línea upstream (Evisceradoras Baader 142). Si se provee, se agrega sección 7. */
   upstreamSnapshot?: UpstreamLineSnapshot | null
+  /**
+   * Ventana REAL del turno, para el resumen ejecutivo. Si no se pasa, la
+   * página 1 cae a los `startAt`/`endAt` del summary del Grader.
+   */
+  shiftStart?: Date | null
+  shiftEnd?: Date | null
 }): Promise<void> {
   const { summary, pauses, tagLabels, chartImageDataUrl, upstreamSnapshot } = params
 
@@ -61,18 +71,42 @@ export async function exportTurnToPDF(params: {
   const dateKey    = summary.dateKey
   const generated  = new Date().toLocaleString('es-CL')
 
-  // ── 1. Encabezado ──────────────────────────────────────────────────────────
-  doc.setFontSize(16)
+  // ── 1. Página ejecutiva ────────────────────────────────────────────────────
+  // Va PRIMERO: antes el PDF abría con el timeline minuto a minuto y había que
+  // leer tres páginas para saber si el turno estuvo bien o mal. Comparte modelo
+  // con el PNG (`buildExecutiveSummary`), así que ambos cuentan lo mismo.
+  const reliability = computeMaintenanceReliability([summary], [{ summary, pauses }])
+  const executive = buildExecutiveSummary({
+    summary,
+    upstream: upstreamSnapshot,
+    shiftLabel: displayShiftName(summary.shiftId),
+    start: params.shiftStart ?? (summary.startAt ? new Date(summary.startAt) : null),
+    end:   params.shiftEnd   ?? (summary.endAt   ? new Date(summary.endAt)   : null),
+    reliability: {
+      mttrMacroSec: reliability.mttrMacroSec,
+      mtbfSec:      reliability.mtbfSec,
+      macroCount:   reliability.eventsCount,
+      microCount:   reliability.microCount,
+      microSec:     reliability.microSec,
+    },
+    uptimePct: upstreamSnapshot ? upstreamSnapshot.lineAvailability * 100 : null,
+  })
+
+  drawExecutivePdfPage(doc as unknown as PdfDoc, executive)
+
+  // El detalle arranca en hoja nueva: la página 1 se entrega sola.
+  doc.addPage()
+  y = 14
+
+  doc.setFontSize(11)
   doc.setFont('helvetica', 'bold')
-  doc.text('Resumen de Turno — Grader', pageW / 2, y, { align: 'center' })
-  y += 7
-
-  doc.setFontSize(10)
+  doc.text(`Detalle del turno — ${shiftLabel} · ${dateKey}`, MARGIN, y)
+  doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
-  doc.text(`${shiftLabel}  |  ${dateKey}  |  Generado: ${generated}`, pageW / 2, y, { align: 'center' })
-  y += 3
-
-  // Línea separadora
+  doc.setTextColor(92, 107, 122)
+  doc.text(`Generado: ${generated}`, pageW - MARGIN, y, { align: 'right' })
+  doc.setTextColor(0, 0, 0)
+  y += 4
   doc.setDrawColor(180)
   doc.line(MARGIN, y, pageW - MARGIN, y)
   y += 6
@@ -105,16 +139,27 @@ export async function exportTurnToPDF(params: {
     : summary.pointZeroPct >= DEFAULT_P0_ALERT_PCT  ? [217, 119, 6]  // ámbar
     : [22, 163, 74]                                                    // verde
 
+  // Las métricas del Grader (piezas, P0, pesos) solo se listan si hay Excel
+  // cargado. Con `totalPieces = 0` la tabla imprimía "0 pz · 0,00% P0", que se
+  // lee como "no hubo piezas malas" cuando en realidad NO SE MIDIÓ — es la
+  // diferencia entre un turno perfecto y un turno sin datos.
+  const hasGraderData = summary.totalPieces > 0
+  const graderRows: Array<[string, string]> = hasGraderData
+    ? [
+        ['P0% (Punto Cero)', `${n(summary.pointZeroPct, 2)}%`],
+        ['Piezas clasificadas (total)', n(summary.totalPieces)],
+        ['Piezas P0', n(summary.pointZeroPieces)],
+        ['Peso clasificado', `${n(summary.totalWeightKg, 1)} kg`],
+        ['Peso promedio', `${n(summary.avgWeightGrams)} g`],
+        ['Throughput', `${n(summary.productionRatePerHour)} pzas/h`],
+      ]
+    : [['Datos del Grader', 'sin Excel cargado']]
+
   autoTable(doc, {
     startY: y,
     head: [['Métrica', 'Valor']],
     body: [
-      ['P0% (Punto Cero)', `${n(summary.pointZeroPct, 2)}%`],
-      ['Piezas clasificadas (total)', n(summary.totalPieces)],
-      ['Piezas P0', n(summary.pointZeroPieces)],
-      ['Peso clasificado', `${n(summary.totalWeightKg, 1)} kg`],
-      ['Peso promedio', `${n(summary.avgWeightGrams)} g`],
-      ['Throughput', `${n(summary.productionRatePerHour)} pzas/h`],
+      ...graderRows,
       ['Duración turno', summary.durationMinutes !== undefined ? fmtDur(summary.durationMinutes * 60) : '—'],
       ['Tiempo muerto total', summary.totalDeadTimeSec !== undefined ? fmtDur(summary.totalDeadTimeSec) : '—'],
       ['Cantidad de pausas', `${summary.pausesCount ?? pauses.length}`],
@@ -122,7 +167,7 @@ export async function exportTurnToPDF(params: {
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 2 },
     headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
-    columnStyles: { 1: { fontStyle: 'bold', textColor: p0Color } },
+    columnStyles: { 1: { fontStyle: 'bold', textColor: hasGraderData ? p0Color : [92, 107, 122] } },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     margin: { left: MARGIN },
     tableWidth: 90,
