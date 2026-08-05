@@ -43,7 +43,7 @@ import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
-import { formatBuildLabel } from '@/constants/buildInfo'
+import { formatBuildLabel, formatBuildDateShort, formatUpdatedLabel } from '@/constants/buildInfo'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
@@ -170,6 +170,9 @@ export function MainLayout() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = useIsAdmin()
+  /* Para soporte: "¿qué versión tienes?" se responde con esto sin ocupar la
+     línea con un número que el usuario no puede interpretar. */
+  const versionTooltip = `v${APP_VERSION} · ${formatBuildLabel()}`
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarPeekOpen, setSidebarPeekOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === '1')
@@ -585,12 +588,16 @@ export function MainLayout() {
             })}
           </nav>
 
-          {/* Version label — el sello de build responde "¿tengo lo último?" aunque
-              nadie haya subido el semver (ver constants/buildInfo.ts). */}
+          {/* El sello dice CUÁNDO se actualizó, no qué número de versión: es la
+              pregunta que se hace quien mira, y la única que el dato responde
+              con verdad (ver constants/buildInfo.ts). Versión y SHA en el
+              tooltip, para soporte. */}
           <div className="px-4 pb-2">
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
-              <span>v{APP_VERSION}</span>
-              <span className="text-[10px] opacity-70 tabular-nums">{formatBuildLabel()}</span>
+            <div
+              className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+              title={versionTooltip}
+            >
+              <span className="tabular-nums">{formatUpdatedLabel()}</span>
               {isAdmin && (
                 <Button
                   size="icon"
@@ -738,9 +745,11 @@ export function MainLayout() {
 
               {/* Version label (mobile) — el toggle de tema vive en la cabecera del drawer */}
               <div className="px-4 pb-2 flex items-center gap-2">
-                <div className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
-                  <span>v{APP_VERSION}</span>
-                  <span className="text-[10px] opacity-70 tabular-nums">{formatBuildLabel()}</span>
+                <div
+                  className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+                  title={versionTooltip}
+                >
+                  <span className="tabular-nums">{formatUpdatedLabel()}</span>
                 </div>
               </div>
 
@@ -861,9 +870,9 @@ export function MainLayout() {
                 <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
               </button>
             )}
-            {/* Version badge — acá no hay espacio para el sello, va en el tooltip. */}
+            {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
-              <span title={`build ${formatBuildLabel()}`}>v{APP_VERSION}</span>
+              <span className="tabular-nums" title={versionTooltip}>{formatBuildDateShort()}</span>
               {isAdmin && (
                 <Button
                   size="icon"
