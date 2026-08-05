@@ -49,6 +49,7 @@ import {
   isUnscheduledShift,
   type ShiftMeta,
 } from '@/services/grader/graderShiftDisplay'
+import { resolveShiftWindow } from '@/services/grader/graderShiftWindow'
 
 /** De dónde salió la ventana horaria que se muestra. Se expone para no mentir. */
 export type ShiftWindowSource =
@@ -170,25 +171,42 @@ export function daysBetweenDateKeys(from: string, to: string): number {
 }
 
 /**
- * Ventana horaria del turno, en orden de preferencia.
+ * Ventana horaria del turno.
  *
- * `effective` es lo que de verdad pasó (primer→último pescado). `official` es
- * el horario del whiteboard. `scheduled` es la ventana de consulta, que CRECE
- * sync a sync mientras el turno está vivo — sirve como piso, no como verdad.
+ * ANTES prefería `effective` (primer→último pescado) sobre todo lo demás, y eso
+ * resultó estar mal: `effective` viene CLIPEADO al rango de la consulta del
+ * sync (`clipStateToWindow` en el normalizer), así que hereda su recorte. En el
+ * doc real `2026-08-04_Turno 2` daba una ventana de 24 h (08:00 → 08:00) para
+ * un turno que Shoplogix declara de 07:15 a 15:00.
+ *
+ * Ahora la resuelve `resolveShiftWindow`, compartida con el Análisis de Turno:
+ * une lo declarado por Shoplogix con lo observado y descarta lo que viene
+ * cortado por el borde. Que sea la MISMA función es el punto — la matriz y el
+ * detalle del turno no pueden mostrar dos ventanas distintas del mismo turno.
  */
 function resolveWindow(
   p: ShoplogixShiftParent | null,
   g: GraderDailySummary | null,
 ): { start: Date | null; end: Date | null; source: ShiftWindowSource } {
   if (p) {
-    if (p.effectiveStart && p.effectiveEnd) {
-      return { start: p.effectiveStart, end: p.effectiveEnd, source: 'effective' }
-    }
-    if (p.officialStart && p.officialEnd) {
-      return { start: p.officialStart, end: p.officialEnd, source: 'official' }
-    }
-    if (p.scheduledStart && p.scheduledEnd) {
-      return { start: p.scheduledStart, end: p.scheduledEnd, source: 'scheduled' }
+    const r = resolveShiftWindow({
+      declaredStart: p.officialStart,
+      declaredEnd: p.officialEnd,
+      // Lo observado: `effective` si está, con `scheduled` de respaldo. Los dos
+      // arrastran el recorte, y por eso van como "observado" y no como verdad.
+      // Solo `effective` cuenta como observación. `scheduled` es el rango que
+      // se consultó, no lo que pasó: va de respaldo, detrás de lo declarado.
+      observedStart: p.effectiveStart,
+      observedEnd: p.effectiveEnd,
+      scheduleStart: p.scheduledStart,
+      scheduleEnd: p.scheduledEnd,
+    })
+    if (r.start && r.end) {
+      const source: ShiftWindowSource =
+        r.origin === 'declarado' ? 'official'
+        : r.origin === 'observado' ? (p.effectiveStart ? 'effective' : 'scheduled')
+        : 'effective'
+      return { start: r.start, end: r.end, source }
     }
   }
   if (g?.startAt && g?.endAt) {
