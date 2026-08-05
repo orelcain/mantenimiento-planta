@@ -125,14 +125,41 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Modelos 3D (lectura pública para QR, escribir autenticados, max 50MB)
-    match /models3d/{allPaths=**} {
+    // Modelos 3D — lectura pública para QR.
+    //
+    // La escritura se parte en dos para que Storage exija LO MISMO que Firestore.
+    // Antes esto era un solo `{allPaths=**}` que dejaba escribir a cualquier
+    // autenticado, mientras `firestore.rules` pide isAdmin() para crear el doc del
+    // modelo. Como `uploadModel3D` sube el archivo ANTES de escribir el doc, un
+    // no-admin dejaba el .glb en el bucket para siempre y el modelo no aparecía en
+    // ninguna parte — ni siquiera se podía borrar desde la app, porque la UI solo
+    // conoce los modelos que tienen doc. Así quedó `models3d/862bb7b2-.../test.glb`
+    // (4,7 MB, 22-05-2026), eliminado a mano el 05-08-2026.
+    //
+    // Ahora un no-admin falla en el primer byte, no después de subir 40 MB.
+
+    // Fotos de anotaciones: las sube cualquier autenticado, igual que la
+    // subcolección `annotations`/`dimensions` en Firestore (wiki-like).
+    // Ruta real: models3d/{modelId}/annotations/{annotationId}/{photoId}.{ext}
+    match /models3d/{modelId}/annotations/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // El archivo del modelo: solo admin, igual que `allow create` del doc.
+    // Ruta real: models3d/{modelId}/{fileName}
+    match /models3d/{modelId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('model/.*')
-            || request.resource.contentType.matches('application/octet-stream')
-            || request.resource.contentType.matches('image/.*'));
+            || request.resource.contentType.matches('application/octet-stream'));
+      // Borrado admin-only: lo usan deleteModel3D y el rollback de uploadModel3D
+      // cuando el doc no se pudo crear (ver services/models3d.ts).
+      allow delete: if isAdmin();
     }
 
     // Imágenes Baader 200 — Manual de Ajustes (lectura pública, subida autenticados, max 10MB)
