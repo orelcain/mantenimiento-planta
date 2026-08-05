@@ -1,7 +1,7 @@
 {
-  "version": "3.99.1",
-  "buildDate": "2026-07-23",
-  "buildTimestamp": 1784790408735,
+  "version": "3.99.6",
+  "buildDate": "2026-07-29",
+  "buildTimestamp": 1785376311092,
   "features": [
     "Fix: HomeRedirect detecta viewport — mobile va a /dashboard (MobileHomeGrid), desktop usa la ruta configurada"
   ]

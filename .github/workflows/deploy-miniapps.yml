@@ -67,9 +67,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: mantenimiento-planta-771a3.firebasestorage.app
           VITE_FIREBASE_MESSAGING_SENDER_ID: "1019421112530"
           VITE_FIREBASE_APP_ID: "1:1019421112530:web:9afd9962e0b53152f8d50b"
-          # AI (Cloud Functions son el canal principal, keys como fallback)
-          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          # Las API keys de IA YA NO se pasan al build — ver deploy.yml.
         run: pnpm build
 
       - name: Install Firebase CLI
@@ -79,8 +77,13 @@ jobs:
         run: npm install -g firebase-tools@15.22.3
 
       - name: Deploy to Firebase Hosting
+        # El service account se pasa por env (NO interpolar `${{ secrets }}` inline:
+        # eso mangla el JSON y rompe la auth). `printf '%s'` preserva el contenido
+        # exacto — mismo patrón que deploy-functions.yml / deploy-firestore-rules.yml.
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          printf '%s' "$SA_JSON" > /tmp/sa.json
           set +e
           out=$(GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only hosting --project mantenimiento-planta-771a3 --non-interactive 2>&1)
           code=$?

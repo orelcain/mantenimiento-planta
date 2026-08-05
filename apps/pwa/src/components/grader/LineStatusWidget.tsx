@@ -8,15 +8,12 @@
  *
  * No bloquea el render: cada señal puede estar en "sin datos" sin romper el widget.
  */
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, Fish, Zap, ArrowRight, Clock } from 'lucide-react'
+import { Activity, Zap, ArrowRight, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { getMarelHgCapture } from '@/services/grader/graderMarelHg.service'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { GraderDailySummary } from '@/services/grader/types'
-import type { MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 
 const P0_COLOR: Record<ReturnType<typeof verdictFromP0Pct>, string> = {
   ok:       'text-emerald-400',
@@ -48,15 +45,6 @@ export function LineStatusWidget({
   todaySummary,
 }: LineStatusWidgetProps) {
   const navigate = useNavigate()
-  const [marelHg, setMarelHg] = useState<MarelHgCapture | null | 'loading'>('loading')
-
-  useEffect(() => {
-    let cancelled = false
-    getMarelHgCapture(shiftDocId)
-      .then(cap => { if (!cancelled) setMarelHg(cap) })
-      .catch(() => { if (!cancelled) setMarelHg(null) })
-    return () => { cancelled = true }
-  }, [shiftDocId])
 
   const shortShift = shiftId.includes('día') ? 'Turno día' : 'Turno noche'
 
@@ -103,30 +91,6 @@ export function LineStatusWidget({
           )}
         </div>
 
-        {/* Marel HG */}
-        <div className="flex flex-col gap-0.5 px-2">
-          <div className="flex items-center gap-1">
-            <Fish className="w-2.5 h-2.5 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Marel HG</span>
-          </div>
-          {marelHg === 'loading' ? (
-            <span className="text-sm font-medium text-muted-foreground/30">…</span>
-          ) : marelHg ? (
-            <>
-              <span className="text-lg font-bold tabular-nums leading-tight text-foreground/80">
-                {marelHg.totalInput.toLocaleString('es-CL')}
-              </span>
-              <span className="text-[10px] text-muted-foreground/50">
-                piezas · {fmtTime(marelHg.capturedAt)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-medium text-muted-foreground/40">—</span>
-              <span className="text-[10px] text-muted-foreground/40">Sin captura aún</span>
-            </>
-          )}
-        </div>
 
         {/* Producción Grader */}
         <div className="flex flex-col gap-0.5 pl-2">

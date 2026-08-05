@@ -1,12 +1,16 @@
 import { cn } from '@/lib/utils'
-import { Badge, Card, CardContent } from '@/components/ui'
-import { Activity, Clock, Radio, FileSpreadsheet, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
-import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { Card, CardContent } from '@/components/ui'
+import { Radio, FileSpreadsheet } from 'lucide-react'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
-import { deriveBaaderRejection, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
+import {
+  estimateManualLine,
+  MANUAL_LINE_LABEL,
+  MANUAL_LINE_TOOLTIP,
+} from '@/services/grader/graderManualLine'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
@@ -48,16 +52,11 @@ interface HeroScorecardProps {
   summary: GraderDailySummary
   shiftWindow: ShiftTimeWindow
   upstreamSnapshot?: UpstreamLineSnapshot | null
-  /**
-   * Captura manual Marel HG. Si está, se calcula rechazo Baader puro.
-   * Si no, se cae a estimación bruta (rechazos + no-controladas Marel mezclados).
-   */
-  marelHgCapture?: MarelHgCapture | null
   /** Timestamp del último sync Shoplogix (para el badge "hace Xs"). */
   upstreamSyncedAt?: Date | null
 }
 
-export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgCapture, upstreamSyncedAt }: HeroScorecardProps) {
+export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstreamSyncedAt }: HeroScorecardProps) {
   const verdict = verdictFromP0Pct(summary.pointZeroPct)
   const style = VERDICT_STYLE[verdict]
   const throughputPerMin = summary.productionRatePerHour
@@ -66,63 +65,28 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
 
   const baaderTotal = upstreamSnapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? 0
 
-  // Si hay captura Marel HG → rechazo Baader puro (Grader − Baader − Marel_no_controladas).
-  // Si no hay captura → estimación bruta (Grader − Baader, mezcla rechazos + no-controladas).
-  const baaderRejectionPure = deriveBaaderRejection({
-    graderTotalPieces: summary.totalPieces,
-    baaderTotalCycles: baaderTotal,
-    marelHgCapture: marelHgCapture ?? null,
+  // Grader − Baader = piezas que NO pasaron por las evisceradoras.
+  //
+  // Antes esto se mostraba como "rechazo": el modelo asumía que por la línea
+  // manual solo volvían los rechazos de las Baader. Desde 2026 la línea manual
+  // PRODUCE, así que el número dejó de significar rechazo — daba 102%, que es
+  // imposible. Con dos incógnitas (manual y rechazo) y un solo dato no se
+  // pueden separar, así que se informa la línea manual y el rechazo se retiró.
+  // Ver `graderManualLine.ts` para el desarrollo completo.
+  const manualLine = estimateManualLine({
+    graderPieces: summary.totalPieces,
+    baaderCycles: baaderTotal,
   })
-  const upstreamDelta = baaderTotal > 0 ? summary.totalPieces - baaderTotal : null
-  const rejectedRaw = upstreamDelta != null && upstreamDelta > 0 ? upstreamDelta : null
-  const rejectedRawPct = rejectedRaw != null && baaderTotal > 0
-    ? ((rejectedRaw / baaderTotal) * 100).toFixed(1)
-    : null
 
-  const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
-    ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
-    : summary.durationMinutes
-      ? `${summary.durationMinutes} min`
-      : '—'
 
-  // Metadata canónica del turno (label, ícono, color) — single source of truth.
-  // Horario real (summary/shiftWindow) → período/ícono por HORA, no por nombre.
-  const shiftMeta = getShiftMeta(summary.shiftId, summary.startAt ?? shiftWindow.startAt)
-  const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
-    : shiftMeta.iconName === 'Sunset' ? Sunset
-    : shiftMeta.iconName === 'Moon' ? Moon
-    : shiftMeta.iconName === 'Sunrise' ? Sunrise
-    : null
 
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
-        <div className="flex items-center gap-2 flex-wrap">
-          {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
-          <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
-          <span className="text-muted-foreground text-sm">· {summary.dateKey}</span>
-          {shiftWindow.status === 'live' && (
-            <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">
-              <Activity className="w-3 h-3 mr-1" />
-              EN VIVO
-            </Badge>
-          )}
-          {shiftWindow.status === 'closed' && (
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-0 border-zinc-600/50 text-zinc-400"
-              title={`Turno cerrado · ${new Date(shiftWindow.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} → ${new Date(shiftWindow.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`}
-            >
-              CERRADO
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          {durationLabel}
-        </div>
-      </div>
+      {/* SIN encabezado propio a propósito.
+          Nombre del turno, fecha, estado y horario ya están en la barra
+          superior de la página y en la línea de tiempos: repetirlos acá hacía
+          que se leyeran TRES veces antes de llegar al primer número. La
+          tarjeta arranca directo en el dato. */}
 
       {/* Hero metric — 3 columnas: verdict P0% · Shoplogix (live) · Grader (manual) */}
       <CardContent className={cn('p-4 grid grid-cols-1 md:grid-cols-[auto_1fr_1fr] gap-4', style.bg)}>
@@ -179,13 +143,14 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
                   <div
                     key={m.machineid}
                     className="text-center cursor-help"
-                    title={`${m.machineName} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
+                    title={`${shortMachineName(m.machineName)} — ${m.totalCycles.toLocaleString('es-CL')} ciclos · ${sharePct.toFixed(0)}% del total · uptime ${uptimePct}%`}
                   >
                     <div className="text-sm font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {m.machineName.replace(/^YAL\s+/, '').replace(/Evisceradora/, 'Ev')}
+                      {/* Mismo nombre que el gráfico y la cascada: "Baader N". */}
+                      {shortMachineName(m.machineName)}
                     </div>
                     <div className="text-[10px] text-muted-foreground/70 tabular-nums">
                       {uptimePct}% uptime
@@ -253,34 +218,62 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
         </div>
       </CardContent>
 
-      {/* Footer — derivado: rechazo Baader (Grader vs Σciclos) cuando ambas fuentes presentes */}
-      {baaderTotal > 0 && upstreamSnapshot && (baaderRejectionPure != null || rejectedRaw != null) && (
-        <div className="px-4 py-1.5 border-t bg-muted flex items-center gap-2 flex-wrap text-[11px]">
-          {baaderRejectionPure != null ? (
-            <span
-              className="text-amber-400 cursor-help"
-              title={`Rechazo Baader puro = Grader_total − ΣBaader_procesadas − Marel_no_controladas (${marelHgCapture!.uncontrolled.toLocaleString('es-CL')}). Asume que rechazos Baader + no-controladas Marel vuelven al Grader vía línea manual.`}
-            >
-              <span className="text-muted-foreground">Rechazo Baader (puro):</span>{' '}
-              <span className="tabular-nums font-semibold">{baaderRejectionPure.rejected.toLocaleString('es-CL')}</span>
-              <span className="text-muted-foreground"> ({baaderRejectionPure.rejectedPctOfBaader.toFixed(1)}%)</span>
+      {/* Footer — desglose Baader vs línea manual (antes: "rechazo estimado") */}
+      {/* Composición de la producción: de dónde salió cada pieza.
+          Antes esto era una línea de texto ("Línea manual (est.): 774") al pie.
+          Como barra apilada, el reparto se ve sin leer un número — y en este
+          turno lo que se ve es que la MITAD salió a mano. Ese es el hecho del
+          turno, y una línea de texto no lo transmitía.
+          Al ocupar el ancho de las dos columnas de arriba, ata visualmente los
+          759 ciclos de Shoplogix con las 1.533 piezas del Grader: la diferencia
+          deja de parecer un descuadre entre fuentes. */}
+      {baaderTotal > 0 && upstreamSnapshot && manualLine != null && (
+        <div className="px-4 py-2 border-t bg-muted space-y-1">
+          <div className="flex items-baseline gap-2 text-[11px]">
+            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
+              Composición
             </span>
-          ) : rejectedRaw != null ? (
-            <span
-              className="text-amber-400 cursor-help"
-              title="Estimación bruta: Grader_total − ΣBaader_procesadas. Incluye rechazos Baader + no-controladas Marel HG (1-7% típico)."
-            >
-              <span className="text-muted-foreground">Rechazo est. (bruto):</span>{' '}
-              <span className="tabular-nums font-semibold">{rejectedRaw.toLocaleString('es-CL')}</span>
-              <span className="text-muted-foreground"> ({rejectedRawPct ?? '—'}%)</span>
+            <span className="ml-auto tabular-nums text-muted-foreground">
+              {manualLine.graderPieces.toLocaleString('es-CL')} pz en total
             </span>
-          ) : null}
-          <span
-            className="ml-auto text-muted-foreground/70 cursor-help"
-            title="Diferencia entre piezas Marelec/Grader y ciclos Baader. Al final del turno deberían converger; si la cobertura Grader es parcial, este número aún no es definitivo."
-          >
-            ⓘ Las cifras Grader y Shoplogix convergen al cerrar el turno
-          </span>
+          </div>
+
+          <div className="flex h-2 rounded-sm overflow-hidden bg-background/60">
+            <div
+              className="h-full bg-sky-500/70 cursor-help"
+              style={{ width: `${100 - manualLine.pctOfGrader}%` }}
+              title={`Procesadas por las Baader: ${manualLine.baaderCycles.toLocaleString('es-CL')} ciclos (Shoplogix).`}
+            />
+            <div
+              className="h-full bg-violet-500/70 cursor-help"
+              style={{ width: `${manualLine.pctOfGrader}%` }}
+              title={MANUAL_LINE_TOOLTIP}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-[2px] bg-sky-500/70" />
+              <span className="text-muted-foreground">Baader</span>
+              <b className="tabular-nums">{manualLine.baaderCycles.toLocaleString('es-CL')}</b>
+            </span>
+            <span className="flex items-center gap-1.5 cursor-help" title={MANUAL_LINE_TOOLTIP}>
+              <span className="w-2 h-2 rounded-[2px] bg-violet-500/70" />
+              <span className="text-muted-foreground">{MANUAL_LINE_LABEL}</span>
+              <b className="tabular-nums text-violet-400">
+                {manualLine.manualPieces.toLocaleString('es-CL')}
+              </b>
+              <span className="text-muted-foreground tabular-nums">
+                ({manualLine.pctOfGrader}%)
+              </span>
+            </span>
+            <span
+              className="ml-auto text-muted-foreground/70 cursor-help"
+              title="La línea manual no está instrumentada en Shoplogix: sus piezas solo aparecen en el Grader. Si el Excel del turno está incompleto, este reparto todavía puede cambiar."
+            >
+              ⓘ estimado desde Grader − Baader
+            </span>
+          </div>
         </div>
       )}
     </Card>

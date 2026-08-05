@@ -9,10 +9,10 @@ import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, 
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
-import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
+import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
-import { fmtSecPanoramic, type SlxMonthlyStats } from './GraderHistoricalCalendar'
+import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -65,7 +65,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
     const maxCausaPct = causasRaw[0]?.pct ?? 1
     const causas = causasRaw.map(c => ({ ...c, barPct: maxCausaPct > 0 ? (c.pct / maxCausaPct) * 100 : 0 }))
 
-    const calendarAgg = aggregateByCalendarDay({ summaries: valid })
+    // Mismo criterio que el calendario: el turno cuenta en el dia que le
+    // asigno Shoplogix, no en el dia fisico en que produjo.
+    const calendarAgg = aggregateByShiftDay({ summaries: valid })
     const uniqueDays  = calendarAgg.size
     const startedDays = new Set(valid.map(s => s.dateKey)).size
 
@@ -143,6 +145,10 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
   const t1Shifts = slxStats?.t1ShiftsWithData ?? stats?.t1Shifts ?? 0
   const t2Shifts = slxStats?.t2ShiftsWithData ?? stats?.t2Shifts ?? 0
   const t3Shifts = slxStats?.t3ShiftsWithData ?? stats?.t3Shifts ?? 0
+  // La grilla T1/T2/T3 solo tiene sentido si la línea usa esa nomenclatura.
+  // Filete emite un único "Turno Dia": con la grilla numerada mostraba 0/0/0
+  // aunque el mes tuviera turnos con producción. Ahí cae a Día/Noche.
+  const useNumberedShiftGrid = t1Shifts + t2Shifts + t3Shifts > 0
 
   return (
     // top-[4.5rem]: el header global es sticky h-14 (56px) con z-30; si el panel
@@ -240,7 +246,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       <Card>
         <CardContent className="py-1.5 px-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
-          {isClassificationPlant ? (
+          {isClassificationPlant || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>

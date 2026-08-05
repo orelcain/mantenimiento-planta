@@ -5,13 +5,13 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay,
+  MonitorPlay, Zap, Search, Lock, Gauge,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -41,12 +41,22 @@ import {
 import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 import { QuizView } from '@/components/learning/QuizView'
+import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
+import { QuickRefView } from '@/components/learning/QuickRefView'
+import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
+import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
+import { getQuizBest } from '@/utils/learningProgress'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = 'Capacitacion / Normativa'
 
 /** Pestanas de maquina (LearningSection) + pestanas extra de curso. */
-type TabId = LearningSection | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos'
+type TabId = LearningSection | 'quickref' | 'casos' | 'quiz' | 'glossary' | 'bibliografia' | 'repuestos' | 'components' | 'variadores'
+
+/** Pestañas que tienen su editor correspondiente en LearningAdminMachinePage
+ * (?tab=...) — el resto (Consulta rápida, Evaluación, Glosario, etc.) no se
+ * edita desde ahí, así que no muestran el botón "Administrar" acá. */
+const ADMIN_EDITABLE_TABS = new Set<TabId>(['manual', 'procedures', 'flows', 'diagnosis', 'components'])
 
 interface TabDef {
   id: TabId
@@ -96,6 +106,47 @@ const REPUESTOS_TAB: TabDef = {
   description: 'Los repuestos más usados de la máquina, con foto y stock en vivo.',
 }
 
+/** Pestaña "Variadores" — qué variador mueve cada cinta de ESTA máquina y con
+ *  qué seteos. Solo se muestra si el catálogo tiene posiciones para su slug. */
+const VARIADORES_TAB: TabDef = {
+  id: 'variadores',
+  label: 'Variadores',
+  shortLabel: 'Variadores',
+  icon: Gauge,
+  description: 'Qué variador mueve cada cinta de esta máquina, con su motor y sus seteos.',
+}
+
+/** Pestaña "Consulta rápida" — lámina de datos duros para terreno. Solo si la
+ *  máquina tiene ficha en learningQuickRef (piloto: Grader). Va PRIMERA. */
+const QUICKREF_TAB: TabDef = {
+  id: 'quickref',
+  label: 'Consulta rápida',
+  shortLabel: 'Rápida',
+  icon: Zap,
+  description: 'Datos clave del equipo: parámetros, rutas del controlador y tolerancias.',
+}
+
+/** Pestaña "Componentes del equipo" — piloto de diagrama de puntos de riesgo/control
+ *  sobre foto real de la máquina. Solo se muestra en las máquinas que tienen contenido
+ *  cargado (hoy: Grader, ver GraderVisualPilot). */
+const COMPONENTS_TAB: TabDef = {
+  id: 'components',
+  label: 'Componentes del equipo',
+  shortLabel: 'Componentes',
+  icon: ImageIcon,
+  description: 'Puntos de riesgo y control señalados sobre fotos reales del equipo.',
+}
+
+/** Pestaña "Evaluación" para máquinas — antes el quiz vivía solo en cursos y
+ *  la autoevaluación quedaba enterrada al pie del manual. */
+const QUIZ_TAB_MACHINE: TabDef = {
+  id: 'quiz',
+  label: 'Evaluación',
+  shortLabel: 'Evaluación',
+  icon: GraduationCap,
+  description: 'Autoevaluación del equipo, con explicación por pregunta.',
+}
+
 /** Set de pestanas para temas de curso (area "Capacitacion / Normativa"). */
 const COURSE_TABS: TabDef[] = [
   {
@@ -142,11 +193,65 @@ const COURSE_TABS: TabDef[] = [
   },
 ]
 
+/**
+ * ScrollTabs — selector de secciones de la máquina/curso: una sola fila subrayada
+ * con scroll horizontal, igual en desktop y en móvil (nunca se envuelve a 2 filas).
+ * Estilo "documentation portal" (subrayado) en vez de píldoras: son varias secciones
+ * de consulta técnica, no un panel de ajustes con opciones excluyentes.
+ */
+function ScrollTabs({
+  tabs,
+  activeTab,
+  onSelect,
+  quizPassed,
+}: {
+  tabs: TabDef[]
+  activeTab: TabId
+  onSelect: (id: TabId) => void
+  quizPassed: boolean
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const scrollBy = (dx: number) => trackRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
+
+  return (
+    <nav className="dp-scroll-tabs" aria-label="Secciones">
+      <button type="button" className="dp-scroll-arrow left" onClick={() => scrollBy(-160)} aria-label="Desplazar a la izquierda">
+        <ChevronLeft style={{ width: 15, height: 15 }} />
+      </button>
+      <div className="dp-scroll-track" ref={trackRef}>
+        {tabs.map(tab => {
+          const TabIcon = tab.icon
+          const evalDone = tab.id === 'quiz' && quizPassed
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              className="dp-scroll-tab"
+              onClick={() => onSelect(tab.id)}
+              aria-current={activeTab === tab.id ? 'true' : undefined}
+            >
+              {evalDone ? <span className="dp-scroll-tab-done">✓</span> : <TabIcon style={{ width: 13, height: 13 }} />}
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div className="dp-scroll-fade" aria-hidden />
+      <button type="button" className="dp-scroll-arrow right" onClick={() => scrollBy(160)} aria-label="Desplazar a la derecha">
+        <ChevronRight style={{ width: 15, height: 15 }} />
+      </button>
+    </nav>
+  )
+}
+
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { isAuthenticated, user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState<TabId>('manual')
+  // Arranca en "Consulta rápida" si la máquina tiene ficha express (uso terreno).
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    slug && hasQuickRef(slug) ? 'quickref' : 'manual',
+  )
   const [procedures, setProcedures] = useState<Procedure[]>([])
   const [manualSections, setManualSections] = useState<ManualSection[]>([])
   const [flows, setFlows] = useState<Flow[]>([])
@@ -157,6 +262,8 @@ export function MachineLearningPage() {
   const [loadingTab, setLoadingTab] = useState(false)
   // Leccion a la que saltar cuando el usuario toca "Leccion N" en el Glosario.
   const [pendingLessonOrder, setPendingLessonOrder] = useState<number | null>(null)
+  // Procedimiento a abrir cuando el usuario toca un link dentro del texto del Manual.
+  const [pendingProcedureId, setPendingProcedureId] = useState<string | null>(null)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
@@ -183,6 +290,9 @@ export function MachineLearningPage() {
       loaders.push(listProcedures(machine.slug).then(list => { if (!cancelled) setProcedures(list) }))
     } else if (activeTab === 'manual') {
       loaders.push(listManualSections(machine.slug).then(list => { if (!cancelled) setManualSections(list) }))
+      // Tambien procedimientos + glosario: el Manual enlaza menciones de ambos en su texto.
+      loaders.push(listProcedures(machine.slug).then(list => { if (!cancelled) setProcedures(list) }))
+      loaders.push(listGlossary(machine.slug).then(list => { if (!cancelled) setGlossary(list) }))
     } else if (activeTab === 'flows') {
       loaders.push(listFlows(machine.slug).then(list => { if (!cancelled) setFlows(list) }))
     } else if (activeTab === 'diagnosis') {
@@ -221,9 +331,18 @@ export function MachineLearningPage() {
     return <Navigate to={machine.customRoute} replace />
   }
 
+  const quickRefGroups = !isCourse ? getQuickRef(machine.slug) : null
+  const posicionesMaquina = isCourse ? [] : posicionesDeMaquina(machine.slug)
   const tabs = isCourse
     ? COURSE_TABS
-    : (commonParts.length > 0 ? [...TABS, REPUESTOS_TAB] : TABS)
+    : [
+        ...(quickRefGroups ? [QUICKREF_TAB] : []),
+        ...TABS,
+        ...(machine.slug === 'grader' ? [COMPONENTS_TAB] : []),
+        ...(commonParts.length > 0 ? [REPUESTOS_TAB] : []),
+        ...(posicionesMaquina.length > 0 ? [VARIADORES_TAB] : []),
+        QUIZ_TAB_MACHINE,
+      ]
   const activeTabData = tabs.find(t => t.id === activeTab) ?? tabs[0]!
   // Conteo de items reales por pestana (casos = flujos + diagnostico)
   const countFor = (id: TabId): number =>
@@ -236,6 +355,8 @@ export function MachineLearningPage() {
     : id === 'glossary' ? glossary.length
     : id === 'bibliografia' ? bibliografia.length
     : id === 'repuestos' ? commonParts.length
+    : id === 'variadores' ? posicionesMaquina.length
+    : id === 'quickref' ? (quickRefGroups?.length ?? 0)
     : 0
   const activeCount = countFor(activeTab)
   const sectionEnabled = activeCount > 0 || (!isCourse && machine.sections[activeTab as LearningSection])
@@ -245,6 +366,10 @@ export function MachineLearningPage() {
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
   const docCode = machine.slug.toUpperCase()
   const activeIndex = tabs.findIndex(t => t.id === activeTab)
+  // Progreso = SOLO evaluación (el material es de consulta periódica; el "% visto"
+  // no aporta). Aprobado si el mejor examen local llegó al umbral.
+  const quizBest = getQuizBest(machine.slug)
+  const quizPassed = quizBest != null && quizBest >= 70
   const contenido = isCourse
     ? 'Curso / Normativa'
     : `${Object.values(machine.sections).filter(Boolean).length} secciones`
@@ -264,46 +389,87 @@ export function MachineLearningPage() {
           <h1 className="dp-title">{machine.name}</h1>
           <p className="dp-sub">{machine.description}</p>
 
-          <div className="dp-meta">
-            <div><span className="dp-lbl">Área</span><span className="dp-val">{isCourse ? (machine.programa ?? machine.area) : machine.area}</span></div>
-            <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
-            <div><span className="dp-lbl">Uso</span><span className="dp-val">{isCourse ? 'Estudio' : 'Consulta en terreno'}</span></div>
-            <div><span className="dp-lbl">Nivel</span><span className="dp-val">{isCourse ? `M${machine.modulo ?? '—'}` : 'Operador → Mant.'}</span></div>
-          </div>
+          {isCourse && (
+            <div className="dp-meta">
+              <div><span className="dp-lbl">Área</span><span className="dp-val">{machine.programa ?? machine.area}</span></div>
+              <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
+              <div><span className="dp-lbl">Uso</span><span className="dp-val">Estudio</span></div>
+              <div><span className="dp-lbl">Nivel</span><span className="dp-val">{`M${machine.modulo ?? '—'}`}</span></div>
+            </div>
+          )}
 
           {!isCourse && machine.hmiRoute && (
             <button className="dp-hmi" onClick={() => navigate(machine.hmiRoute!)}>
               <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
             </button>
           )}
+
+          {/* Estado de evaluación (único progreso que importa: esto es material
+              de consulta periódica, no un curso lineal) */}
+          {quizBest != null && (
+            <div className="dp-progress">
+              <span className={`dp-progress-label ${quizPassed ? 'is-ok' : ''}`}>
+                {quizPassed ? `✓ Evaluación aprobada · ${quizBest}%` : `Evaluación: mejor intento ${quizBest}% — umbral 70%`}
+              </span>
+            </div>
+          )}
         </header>
 
-        {/* Índice / pestañas */}
-        <nav className="dp-toc" aria-label="Secciones" style={{ marginTop: 24 }}>
-          {tabs.map((tab, i) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              aria-current={activeTab === tab.id ? 'true' : undefined}
-            >
-              <b>{String(i + 1).padStart(2, '0')}</b>{tab.label}
-            </button>
-          ))}
-        </nav>
+        <div className="dp-course">
+          <div className="dp-main-col">
+            <ScrollTabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onSelect={setActiveTab}
+              quizPassed={quizPassed}
+            />
 
         {/* Cabecera de sección activa */}
-        <div className="dp-sec-head" style={{ marginTop: 46 }}>
-          <span className="dp-sec-no">{String(activeIndex + 1).padStart(2, '0')}</span>
-          <h2 className="dp-sec-title">{activeTabData.label}</h2>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>
+          <div className="dp-sec-head">
+            <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
+            <h2 className="dp-sec-title">{activeTabData.label}</h2>
+          </div>
+          {isAdmin && ADMIN_EDITABLE_TABS.has(activeTab) && (
+            <button
+              type="button"
+              className="dp-edit"
+              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}
+              title="Administrar esta sección — pedirá confirmar identidad"
+              onClick={() => window.open(`/mantenimiento-planta/aprendizaje/admin/${machine.slug}?tab=${activeTab}`, '_blank', 'noopener,noreferrer')}
+            >
+              <Lock className="h-3 w-3" />
+              Administrar
+            </button>
+          )}
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
 
-        {loadingTab ? (
+        {activeTab === 'quickref' && quickRefGroups ? (
+          <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />
+        ) : loadingTab ? (
           <p className="dp-loading">Cargando…</p>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
-          <ProceduresList procedures={procedures} machineSlug={machine.slug} />
+          <ProceduresList
+            procedures={procedures}
+            machineSlug={machine.slug}
+            jumpToId={pendingProcedureId}
+            onJumpConsumed={() => setPendingProcedureId(null)}
+          />
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
-          <ManualList sections={manualSections} machineSlug={machine.slug} canEdit={isAdmin} isCourse={isCourse} jumpToOrder={pendingLessonOrder} onJumpConsumed={() => setPendingLessonOrder(null)} />
+          <ManualList
+            sections={manualSections}
+            machineSlug={machine.slug}
+            canEdit={isAdmin}
+            isCourse={isCourse}
+            jumpToOrder={pendingLessonOrder}
+            onJumpConsumed={() => setPendingLessonOrder(null)}
+            procedures={procedures}
+            glossary={glossary}
+            onJumpToProcedure={id => { setPendingProcedureId(id); setActiveTab('procedures') }}
+          />
+        ) : activeTab === 'components' ? (
+          <GraderVisualPilot />
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
@@ -332,7 +498,7 @@ export function MachineLearningPage() {
             )}
           </div>
         ) : activeTab === 'quiz' && quiz.length > 0 ? (
-          <QuizView questions={quiz} />
+          <QuizView questions={quiz} machineSlug={machine.slug} />
         ) : activeTab === 'glossary' && glossary.length > 0 ? (
           <GlossaryView
             entries={glossary}
@@ -342,6 +508,8 @@ export function MachineLearningPage() {
           <BibliografiaView entries={bibliografia} />
         ) : activeTab === 'repuestos' && commonParts.length > 0 ? (
           <CommonPartsList parts={commonParts} />
+        ) : activeTab === 'variadores' && posicionesMaquina.length > 0 ? (
+          <VariadoresDeEstaMaquina posiciones={posicionesMaquina} />
         ) : sectionEnabled ? (
           <p className="dp-empty">Contenido disponible — próximamente cargado desde Firestore.</p>
         ) : (
@@ -351,7 +519,9 @@ export function MachineLearningPage() {
           />
         )}
 
-        <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
+            <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -386,8 +556,29 @@ function HmiPracticeButton({ contentId, machineSlug }: { contentId: string; mach
  * cuerpo despliega descripción, ruta de menú, fórmula, los pasos numerados y
  * los criterios de éxito.
  */
-function ProceduresList({ procedures, machineSlug }: { procedures: Procedure[]; machineSlug?: string }) {
+function ProceduresList({
+  procedures,
+  machineSlug,
+  jumpToId = null,
+  onJumpConsumed,
+}: {
+  procedures: Procedure[]
+  machineSlug?: string
+  /** Id de procedimiento a abrir (viene de un link dentro del Manual). */
+  jumpToId?: string | null
+  onJumpConsumed?: () => void
+}) {
   const [openId, setOpenId] = useState<string | null>(procedures[0]?.id ?? null)
+
+  // Salto a un procedimiento concreto desde un link dentro del Manual.
+  useEffect(() => {
+    if (jumpToId == null) return
+    if (procedures.some(p => p.id === jumpToId)) {
+      setOpenId(jumpToId)
+      document.getElementById(`proc-${jumpToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    onJumpConsumed?.()
+  }, [jumpToId, procedures, onJumpConsumed])
 
   return (
     <div className="dp-acc">
@@ -400,7 +591,7 @@ function ProceduresList({ procedures, machineSlug }: { procedures: Procedure[]; 
           machineSlug === 'grader' && hmiPracticeUrl(proc.id) ? 'práctica' : null,
         ].filter(Boolean) as string[]
         return (
-          <div key={proc.id} className="dp-acc-item" data-open={open}>
+          <div key={proc.id} id={`proc-${proc.id}`} className="dp-acc-item" data-open={open}>
             <button type="button" className="dp-acc-head" aria-expanded={open} onClick={() => setOpenId(open ? null : proc.id)}>
               <span className="dp-acc-no">{String(idx + 1).padStart(2, '0')}</span>
               <span>
@@ -493,6 +684,9 @@ function ManualList({
   isCourse = false,
   jumpToOrder = null,
   onJumpConsumed,
+  procedures = [],
+  glossary = [],
+  onJumpToProcedure,
 }: {
   sections: ManualSection[]
   machineSlug: string
@@ -501,10 +695,54 @@ function ManualList({
   /** Orden de leccion a abrir (viene del Glosario). */
   jumpToOrder?: number | null
   onJumpConsumed?: () => void
+  /** Para enlazar menciones de un procedimiento dentro del texto del Manual. */
+  procedures?: Procedure[]
+  /** Para resaltar términos del Glosario dentro del texto del Manual. */
+  glossary?: GlossaryEntry[]
+  onJumpToProcedure?: (id: string) => void
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
+  const [query, setQuery] = useState('')
+  const [criticalMode, setCriticalMode] = useState(false)
+  const [resumeId, setResumeId] = useState<string | null>(null)
   const activeSection = sections.find(section => section.id === activeId) ?? sections[0]
   const activeIndex = Math.max(0, sections.findIndex(section => section.id === activeSection?.id))
+  // El Grader tiene su glosario aparte (GRADER_GLOSSARY, componente propio) en vez de la
+  // colección Firestore genérica — sumarlo acá para poder resaltar sus términos en el Manual.
+  const effectiveGlossary = useMemo<GlossaryEntry[]>(() => {
+    if (machineSlug !== 'grader') return glossary
+    const now = Date.now()
+    return Object.entries(GRADER_GLOSSARY).map(([id, entry], index) => ({
+      id,
+      term: entry.label,
+      definition: entry.description,
+      order: index,
+      createdAt: now,
+      updatedAt: now,
+    }))
+  }, [machineSlug, glossary])
+  const textLinks = useMemo(() => buildTextLinks(procedures, effectiveGlossary), [procedures, effectiveGlossary])
+  const linkify = (text: string) => renderBodyText(text, textLinks, query, onJumpToProcedure ?? (() => {}))
+  const normalizedQuery = normalizeForMatch(query.trim())
+  const filteredSections = normalizedQuery
+    ? sections.filter(sec => {
+        const haystack = [sec.title, sec.content, sec.objetivo, sec.porque].filter(Boolean).join(' \n ')
+        return normalizeForMatch(haystack).includes(normalizedQuery)
+      })
+    : sections
+
+  // Metadata por sección (parseada una vez): iconos del índice + "Todo lo crítico".
+  const sectionMeta = useMemo(
+    () => sections.map(sec => {
+      const b = parseManualContent(sec.content)
+      return { id: sec.id, order: sec.order, title: sec.title, hasSteps: b.steps.length > 0, hasQuiz: !!(sec.quiz && sec.quiz.length > 0), notes: b.notes }
+    }),
+    [sections],
+  )
+  const allNotes = useMemo(
+    () => sectionMeta.flatMap(m => m.notes.map(note => ({ note, sectionId: m.id, sectionOrder: m.order, sectionTitle: m.title }))),
+    [sectionMeta],
+  )
 
   useEffect(() => {
     if (!sections.some(section => section.id === activeId)) {
@@ -520,6 +758,23 @@ function ManualList({
     onJumpConsumed?.()
   }, [jumpToOrder, sections, onJumpConsumed])
 
+  // "Continuar donde quedaste": leer la última sección vista en este dispositivo (no es progreso/métrica, solo conveniencia local).
+  const resumeKey = `dp-manual-last:${machineSlug}`
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(resumeKey) : null
+    if (saved && saved !== sections[0]?.id && sections.some(s => s.id === saved)) {
+      setResumeId(saved)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  useEffect(() => {
+    if (activeSection && typeof window !== 'undefined') {
+      window.localStorage.setItem(resumeKey, activeSection.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection?.id])
+
   if (!activeSection) return null
 
   const blocks = parseManualContent(activeSection.content)
@@ -529,24 +784,74 @@ function ManualList({
     const nextSection = sections[index]
     if (nextSection) setActiveId(nextSection.id)
   }
+  const resumeSection = resumeId ? sections.find(s => s.id === resumeId) : null
 
   return (
     <div className="dp-doc">
       {/* Índice de secciones / lecciones (riel lateral en desktop) */}
       <nav className="dp-index" aria-label={isCourse ? 'Lecciones del curso' : 'Secciones del manual'}>
-        {sections.map(sec => (
+        {sections.length > 6 && (
+          <div className="dp-idx-search">
+            <Search className="h-3.5 w-3.5" aria-hidden />
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={`Buscar ${isCourse ? 'lección' : 'sección'}...`}
+              aria-label={`Buscar ${isCourse ? 'lección' : 'sección'}`}
+            />
+            {query && <span className="dp-idx-count">{filteredSections.length} de {sections.length}</span>}
+          </div>
+        )}
+        {filteredSections.length === 0 && (
+          <p className="dp-idx-empty">Sin resultados para "{query}".</p>
+        )}
+        {filteredSections.map(sec => {
+          const meta = sectionMeta.find(m => m.id === sec.id)
+          return (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => { setActiveId(sec.id); setCriticalMode(false) }}
+              aria-current={!criticalMode && sec.id === activeSection.id ? 'true' : undefined}
+            >
+              <b>{String(sec.order).padStart(2, '0')}</b>
+              {meta?.hasSteps && <span className="dp-idx-kind" title="Tiene pasos">☑</span>}
+              {meta?.hasQuiz && <span className="dp-idx-kind is-quiz" title="Tiene autoevaluación">✓?</span>}
+              {sec.title}
+            </button>
+          )
+        })}
+        {!isCourse && allNotes.length > 0 && (
           <button
-            key={sec.id}
             type="button"
-            onClick={() => setActiveId(sec.id)}
-            aria-current={sec.id === activeSection.id ? 'true' : undefined}
+            className="dp-idx-critical"
+            onClick={() => setCriticalMode(true)}
+            aria-current={criticalMode ? 'true' : undefined}
           >
-            <b>{String(sec.order).padStart(2, '0')}</b>{sec.title}
+            <b>⚠</b>Todo lo crítico ({allNotes.length})
           </button>
-        ))}
+        )}
       </nav>
 
       <div className="dp-doc-body">
+      {resumeSection && !criticalMode && resumeSection.id !== activeSection.id && (
+        <div className="dp-resume">
+          <div className="dp-resume-txt">
+            <span className="dp-lbl">Continuar leyendo</span>
+            <span>Ibas por "{String(resumeSection.order).padStart(2, '0')} · {resumeSection.title}"</span>
+          </div>
+          <div className="dp-resume-actions">
+            <button type="button" onClick={() => setActiveId(resumeSection.id)}>Ir ahí →</button>
+            <button type="button" className="dp-resume-dismiss" onClick={() => setResumeId(null)} aria-label="Descartar">✕</button>
+          </div>
+        </div>
+      )}
+
+      {criticalMode ? (
+        <CriticalNotesView notes={allNotes} onGoToSection={id => { setActiveId(id); setCriticalMode(false) }} />
+      ) : (
+      <>
       {/* Sub-cabecera de la sección activa */}
       <div className="dp-subhead">
         <span className="dp-subno">{String(activeSection.order).padStart(2, '0')}</span>
@@ -563,8 +868,19 @@ function ManualList({
 
       {!isGraderGlossary && blocks.description && (
         <div className="dp-body" style={{ marginTop: 24 }}>
-          <p style={{ whiteSpace: 'pre-wrap' }}>{blocks.description}</p>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{linkify(blocks.description)}</p>
         </div>
+      )}
+
+      {!isGraderGlossary && blocks.steps.length > 0 && (
+        <ol className="dp-proc-ol" style={{ marginTop: 24 }}>
+          {blocks.steps.map((step, index) => (
+            <li key={`${step}-${index}`}>
+              <span className="dp-n" />
+              <div className="dp-c"><span style={{ whiteSpace: 'pre-wrap' }}>{linkify(step)}</span></div>
+            </li>
+          ))}
+        </ol>
       )}
 
       {!isGraderGlossary && activeSection.porque && (
@@ -612,7 +928,39 @@ function ManualList({
           </button>
         </div>
       )}
+      </>
+      )}
       </div>
+    </div>
+  )
+}
+
+/** Vista "Todo lo crítico": todas las Notas operativas (⚠) de todas las secciones del Manual, juntas, con link de vuelta a su sección de origen. */
+function CriticalNotesView({
+  notes,
+  onGoToSection,
+}: {
+  notes: { note: string; sectionId: string; sectionOrder: number; sectionTitle: string }[]
+  onGoToSection: (sectionId: string) => void
+}) {
+  return (
+    <div className="dp-critical">
+      <div className="dp-subhead">
+        <h3>Todo lo crítico</h3>
+      </div>
+      <div className="dp-sec-code">Todas las notas operativas del manual, en un solo lugar.</div>
+      {notes.map((item, index) => (
+        <div className="dp-crit-item" key={index}>
+          <span className="dp-crit-ico" aria-hidden>⚠</span>
+          <div className="dp-crit-txt">
+            <span className="dp-lbl">{item.sectionTitle}</span>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{item.note}</p>
+            <button type="button" onClick={() => onGoToSection(item.sectionId)}>
+              Ver sección {String(item.sectionOrder).padStart(2, '0')} →
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -674,9 +1022,20 @@ interface ManualContentBlocks {
   measurements: string[]
   keyPoints: string[]
   notes: string[]
+  /** Secuencia de acciones marcada explícitamente en el contenido (ver STEP_MARKERS) — se renderiza como lista numerada, no como párrafo. */
+  steps: string[]
   images: { label: string; url: string }[]
   /** Documentos descargables (PDF, planos): "- Etiqueta: /ruta.pdf" */
   documents: { label: string; url: string }[]
+}
+
+/** Líneas-marcador que indican que lo que sigue es una secuencia de pasos, no prosa libre. */
+const STEP_MARKERS = ['Secuencia técnica verificada:', 'Secuencia de ajuste:', 'Rutina verificada:']
+/** Sin tildes, en minúscula — el contenido curado a veces las pierde (ver gotcha de acentos de Codex). */
+const STEP_MARKERS_NORMALIZED = STEP_MARKERS.map(normalizeForMatch)
+
+function normalizeForMatch(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
 /** "Etiqueta: /ruta" → {label, url}. Devuelve url vacia si la linea no trae ruta. */
@@ -691,10 +1050,11 @@ function parseManualContent(content: string): ManualContentBlocks {
     measurements: [],
     keyPoints: [],
     notes: [],
+    steps: [],
     images: [],
     documents: [],
   }
-  type ListKey = 'measurements' | 'keyPoints' | 'notes'
+  type ListKey = 'measurements' | 'keyPoints' | 'notes' | 'steps'
   let current: ListKey | 'images' | 'documents' | 'description' = 'description'
   const description: string[] = []
 
@@ -706,6 +1066,7 @@ function parseManualContent(content: string): ManualContentBlocks {
     if (line === 'Notas operativas:') { current = 'notes'; continue }
     if (line === 'Referencias visuales:') { current = 'images'; continue }
     if (line === 'Documentos:') { current = 'documents'; continue }
+    if (STEP_MARKERS_NORMALIZED.includes(normalizeForMatch(line))) { current = 'steps'; continue }
 
     const value = line.startsWith('- ') ? line.slice(2) : line
     if (current === 'description') {
@@ -721,6 +1082,74 @@ function parseManualContent(content: string): ManualContentBlocks {
 
   blocks.description = description.join('\n')
   return blocks
+}
+
+/** Frase enlazable dentro del texto del Manual: un procedimiento (salta de pestaña) o un término del glosario (tooltip). */
+interface TextLink {
+  phrase: string
+  kind: 'procedure' | 'glossary'
+  id: string
+  definition?: string
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Enlaces detectables en el texto del Manual: título completo de un procedimiento existente, o un término del glosario. Frases más largas primero para no partir una más corta que esté contenida en una más larga. */
+function buildTextLinks(procedures: Procedure[], glossary: GlossaryEntry[]): TextLink[] {
+  const links: TextLink[] = []
+  for (const proc of procedures) {
+    if (proc.title.length >= 10) links.push({ phrase: proc.title, kind: 'procedure', id: proc.id })
+  }
+  for (const entry of glossary) {
+    if (entry.term.length >= 2) links.push({ phrase: entry.term, kind: 'glossary', id: entry.id, definition: entry.definition })
+  }
+  return links.sort((a, b) => b.phrase.length - a.phrase.length)
+}
+
+/** Envuelve las ocurrencias de `links` dentro de `text` en el span/botón correspondiente y, si `query`
+ * no está vacío, resalta además esas coincidencias dentro del texto plano restante (búsqueda tipo Ctrl+F). */
+function renderBodyText(text: string, links: TextLink[], query: string, onJumpToProcedure: (id: string) => void): ReactNode {
+  if (!text) return text
+  const byLower = new Map(links.map(l => [l.phrase.toLowerCase(), l]))
+  const linkPattern = links.map(l => escapeRegExp(l.phrase)).join('|')
+  const rawParts = linkPattern ? text.split(new RegExp(`(${linkPattern})`, 'gi')) : [text]
+  const q = query.trim()
+
+  const highlightPlain = (segment: string, keyPrefix: string): ReactNode => {
+    if (!q) return segment
+    const pieces = segment.split(new RegExp(`(${escapeRegExp(q)})`, 'gi'))
+    if (pieces.length === 1) return segment
+    return pieces.map((piece, i) =>
+      piece.toLowerCase() === q.toLowerCase()
+        ? <mark key={`${keyPrefix}-${i}`} className="dp-hit">{piece}</mark>
+        : piece,
+    )
+  }
+
+  return rawParts.map((part, index) => {
+    const link = byLower.get(part.toLowerCase())
+    if (!link) return <span key={index}>{highlightPlain(part, `p${index}`)}</span>
+    if (link.kind === 'procedure') {
+      return (
+        <button key={index} type="button" className="dp-xlink" onClick={() => onJumpToProcedure(link.id)}>
+          {part}
+        </button>
+      )
+    }
+    return (
+      <span key={index} className="dp-gterm" tabIndex={0}>
+        {part}
+        {link.definition && (
+          <span className="dp-gpop">
+            <b>{link.phrase}</b>
+            <span>{link.definition}</span>
+          </span>
+        )}
+      </span>
+    )
+  })
 }
 
 function ManualBlock({
@@ -743,11 +1172,36 @@ function ManualBlock({
       </div>
     )
   }
-  // Medidas → lista mono con hairlines; puntos clave → lista con guiones
+  // Medidas → fila etiqueta/valor cuando el texto trae "Etiqueta: valor" (más fácil de escanear que la oración completa)
+  if (variant === 'measure') {
+    return (
+      <div className="dp-block">
+        <div className="dp-block-head"><span className="dp-lbl">{title}</span></div>
+        <dl className="dp-specs-rows">
+          {items.map((item, index) => {
+            const match = item.match(/^([^:]{2,50}):\s*(.+)$/)
+            return (
+              <div key={`${item}-${index}`} className="dp-specs-row">
+                {match ? (
+                  <>
+                    <dt>{match[1]}</dt>
+                    <dd>{match[2]}</dd>
+                  </>
+                ) : (
+                  <dd style={{ gridColumn: '1 / -1' }}>{item}</dd>
+                )}
+              </div>
+            )
+          })}
+        </dl>
+      </div>
+    )
+  }
+  // Puntos clave → lista con guiones
   return (
     <div className="dp-block">
       <div className="dp-block-head"><span className="dp-lbl">{title}</span></div>
-      <ul className={variant === 'measure' ? 'dp-list dp-specs' : 'dp-list'}>
+      <ul className="dp-list">
         {items.map((item, index) => (
           <li key={`${item}-${index}`}><span style={{ whiteSpace: 'pre-wrap' }}>{item}</span></li>
         ))}
@@ -1242,5 +1696,49 @@ function EmptySection({
       La sección <b>{tabLabel}</b> de <b>{machineName}</b> aún no tiene contenido publicado.
       El administrador puede agregarlo desde el panel de administración.
     </p>
+  )
+}
+
+
+/**
+ * Los variadores de esta máquina — puente hacia el catálogo.
+ * Antes había que saber que el catálogo existía para encontrarlos; ahora quien
+ * entra por el equipo los ve, y cada fila salta a su receta completa.
+ */
+function VariadoresDeEstaMaquina({ posiciones }: { posiciones: PosicionReceta[] }) {
+  const navigate = useNavigate()
+  return (
+    <div className="dp-parts">
+      <p className="dp-parts-meta">
+        {posiciones.length} posiciones con variador · los seteos y códigos viven en el catálogo
+      </p>
+      {posiciones.map((p) => {
+        const conf = p.valores.filter(v => v.estado === 'confirmado').length
+        const fam = VARIADORES.find(f => f.id === p.variadorId)
+        return (
+          <button
+            key={p.id}
+            onClick={() => navigate(`/aprendizaje/variadores?posicion=${encodeURIComponent(p.id)}`)}
+            className="dp-part-group"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <span style={{ fontWeight: 600 }}>{p.equipo}</span>
+            <span style={{ fontSize: 12.5, opacity: 0.78 }}>
+              {fam ? fam.nombre : 'Variador por identificar'} · {p.motor}
+            </span>
+            <span style={{ fontSize: 12, opacity: 0.62 }}>
+              {conf}/{p.valores.length} seteos confirmados{p.sapMotor ? ` · SAP ${p.sapMotor}` : ''}
+            </span>
+          </button>
+        )
+      })}
+      <button
+        onClick={() => navigate('/aprendizaje/variadores')}
+        className="dp-part-group"
+        style={{ width: '100%', textAlign: 'left', fontWeight: 600, cursor: 'pointer' }}
+      >
+        Ver el catálogo completo de variadores →
+      </button>
+    </div>
   )
 }

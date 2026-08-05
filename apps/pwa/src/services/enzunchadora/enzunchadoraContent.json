@@ -1,0 +1,542 @@
+{
+  "manual": [
+    {
+      "id": "tp6-manual-que-es",
+      "title": "Qué es la TP-6000 y sus 6 unidades",
+      "order": 1,
+      "content": "La Enzunchadora Transpak TP-6000-1 es una flejadora automática de cajas terminadas: sella el fleje por CALOR (no con grapa ni con adhesivo). Está formada por 6 unidades, y casi toda falla de flejado se ubica en una de ellas.\n\nPuntos clave:\n- Cabezal de flejado: la unidad más importante. Corta y sella el fleje de polipropileno (PP).\n- Unidad de bandway (arco): es la pista del arco por donde el fleje avanza y retrocede.\n- Unidad acumuladora: acumula la cantidad de fleje necesaria para que la alimentación al arco sea suave. Si le falta o le sobra fleje, el avance sale irregular.\n- Unidad portabobina: sostiene la bobina de fleje.\n- Unidad de alimentación (feed): hace avanzar y retroceder el fleje.\n- Unidad de control eléctrico: relé de sobrecarga y los temporizadores T1 y T2.\n\nNotas operativas:\n- Si el núcleo de la bobina es de 280 mm, se puede retirar el tambor central para usar núcleo de 200 mm.\n\nFuente: manual de operación TRANSPAK TP-6000-1, pág. 3.",
+      "objetivo": "Nombrar las 6 unidades de la TP-6000 y qué hace cada una, para poder ubicar dónde está el problema cuando el flejado sale mal.",
+      "porque": "casi toda falla de flejado (fleje que no llega, que sale flojo, que no sella) se explica por una de las 6 unidades; sin ese mapa se termina cambiando piezas al azar.",
+      "quiz": [
+        {
+          "question": "¿Cómo sella el fleje la TP-6000?",
+          "options": [
+            "Por calor",
+            "Con adhesivo",
+            "Con grapa metálica",
+            "Por presión en frío"
+          ],
+          "correctIndex": 0,
+          "explanation": "El método de sellado es por calor: un calentador funde el fleje de PP y el cabezal lo sella."
+        },
+        {
+          "question": "¿Para qué sirve la unidad acumuladora?",
+          "options": [
+            "Pesar el paquete",
+            "Acumular la cantidad de fleje necesaria para alimentar el arco de forma suave",
+            "Enfriar el sello",
+            "Guardar bobinas de repuesto"
+          ],
+          "correctIndex": 1,
+          "explanation": "Acumula fleje para que la alimentación al arco sea suave; si le falta o le sobra, el avance y la recogida salen irregulares."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-datos-tecnicos",
+      "title": "Datos técnicos y fleje admitido",
+      "order": 2,
+      "content": "Los límites de la máquina y del consumible. Usar fleje fuera de rango es la causa más común de flejado irregular.\n\nMedidas / tolerancias:\n- Método de sellado: calor\n- Ancho de fleje: 8 mm a 12 mm (3/8\" - 1/2\")\n- Espesor de fleje: 0,55 mm a 0,75 mm (0.022\" - 0.03\")\n- Diámetro de bobina: 200 mm (8\" nominal)\n- Ancho de la máquina: 1430 mm\n- Profundidad: 620 mm\n- Altura de mesa: 810 mm\n- Peso: 220 kg\n- Emisión de ruido: 83 dB(A)\n- Temperatura ambiente admitida: 5 °C a 40 °C\n- Conexión eléctrica monofásica: AC 110V / 220V / 230V / 240V (50/60 Hz), 1PH\n- Conexión eléctrica trifásica: AC 220V / 380V / 400V (50/60 Hz), 3PH\n\nNotas operativas:\n- Para cambiar el ancho de fleje hace falta el kit de conversión, que es opcional: no se ajusta con una perilla.\n\nFuente: manual de operación TRANSPAK TP-6000-1, pág. 4.",
+      "objetivo": "Conocer el rango de fleje que la máquina admite (8-12 mm de ancho, 0,55-0,75 mm de espesor) y sus datos eléctricos, para no forzarla con consumible fuera de especificación.",
+      "porque": "un fleje más grueso o más delgado que el rango obliga a reajustar el mecanismo de avance; si no se hace, el fleje se sale de la pista del arco y la máquina para el turno.",
+      "quiz": [
+        {
+          "question": "¿Qué espesor de fleje admite la TP-6000?",
+          "options": [
+            "0,55 a 0,75 mm",
+            "Cualquiera",
+            "1,0 a 1,5 mm",
+            "0,20 a 0,40 mm"
+          ],
+          "correctIndex": 0,
+          "explanation": "El manual especifica 0,55 mm a 0,75 mm. Fuera de ese rango hay que reajustar el mecanismo de avance y recogida."
+        },
+        {
+          "question": "¿Cuál es el ancho de fleje admitido?",
+          "options": [
+            "20 a 25 mm",
+            "15 a 20 mm",
+            "5 a 7 mm",
+            "8 a 12 mm"
+          ],
+          "correctIndex": 3,
+          "explanation": "De 8 mm a 12 mm. Cambiar de ancho requiere el kit de conversión (opcional)."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-seguridad",
+      "title": "Seguridad: antes, durante y después de operar",
+      "order": 3,
+      "content": "La TP-6000 tiene dos riesgos propios: el ÁREA DEL ARCO (partes en movimiento) y el CALENTADOR (alta temperatura). Ambos están señalizados en la máquina.\n\nPuntos clave:\n- Usar SIEMPRE protección ocular y guantes de seguridad antes de operar.\n- Solo se puede operar con fleje PP (polipropileno). NO usar fleje PET ni cordón de poliéster.\n- No meter las manos ni el cuerpo en el área de trabajo del arco con la máquina en marcha.\n- Cortar la energía antes de abrir la tapa superior.\n- No tocar el calentador: alta temperatura. Cuidado especial al abrir la tapa superior.\n- No alterar ni puentear los enclavamientos de protección.\n- No modificar circuitos ni la máquina sin autorización del fabricante.\n\nMedidas / tolerancias:\n- Peso máximo del paquete: 100 kg\n- Tamaño mínimo del paquete: 100 mm de ancho x 20 mm de alto\n\nNotas operativas:\n- Antes de operar, verificar que la tensión de alimentación sea la correcta.\n- Durante la operación, atender si la máquina emite humo o ruido anormal.\n- Después de operar: desenchufar y retirar la suciedad de la máquina.\n- Todo el aparato eléctrico debe estar correctamente puesto a tierra y cableado según el código eléctrico local.\n- El manual de operación debe permanecer con la máquina en todo momento.\n\nFuente: manual de operación TRANSPAK TP-6000-1, págs. 1-2.",
+      "objetivo": "Aplicar las 3 reglas que no se negocian en esta máquina: EPP puesto, manos fuera del arco en marcha, y energía cortada antes de abrir la tapa.",
+      "porque": "el arco tiene partes en movimiento y el calentador queda caliente incluso con la máquina detenida en pausa (el stop bloqueado mantiene la temperatura a propósito).",
+      "quiz": [
+        {
+          "question": "¿Qué tipo de fleje admite esta máquina?",
+          "options": [
+            "PP o PET indistintamente",
+            "Solo PP (polipropileno)",
+            "Solo PET",
+            "Cordón de poliéster"
+          ],
+          "correctIndex": 1,
+          "explanation": "Solo fleje PP. El manual prohíbe expresamente el fleje PET y el cordón de poliéster."
+        },
+        {
+          "question": "¿Cuál es el peso máximo del paquete a flejar?",
+          "options": [
+            "50 kg",
+            "100 kg",
+            "Sin límite",
+            "200 kg"
+          ],
+          "correctIndex": 1,
+          "explanation": "100 kg. Además el paquete no debe ser menor a 100 mm de ancho por 20 mm de alto."
+        },
+        {
+          "question": "Antes de abrir la tapa superior, ¿qué corresponde hacer?",
+          "options": [
+            "Cortar la energía",
+            "Esperar 10 segundos",
+            "Bajar la tensión de flejado",
+            "Nada, se puede abrir en marcha"
+          ],
+          "correctIndex": 0,
+          "explanation": "Cortar la energía antes de abrir la tapa superior, y tener cuidado con el calentador porque queda a alta temperatura."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-panel-control",
+      "title": "Panel de control: los 6 mandos",
+      "order": 4,
+      "content": "El panel tiene 6 mandos. El más útil y menos conocido es el bloqueo del STOP, que ahorra los 3 minutos de precalentamiento.\n\nPuntos clave:\n- START: inicia el ciclo de flejado. El ciclo se completa solo después de accionar este switch.\n- STOP: detiene por completo la operación; también es el paro de emergencia.\n- F/R (Feed/Reverse): girado en ANTIHORARIO alimenta el fleje alrededor del arco; girado en HORARIO el fleje retrocede y vuelve desde la pista del arco a la caja acumuladora.\n- Interruptor de poder y lámpara piloto: al encender, la lámpara piloto se ilumina indicando que hay energía.\n- Selector AUTO/HAND: en AUTO la máquina fleja sola cuando el paquete se coloca en la mesa y pasa el arco (y sigue flejando si el paquete permanece bajo el arco). En HAND, se posiciona el paquete bajo el arco y se pulsa START para aplicar un fleje.\n- RESET (opcional): existe si la máquina tiene sensor de fleje corto; sirve para resetear cuando el fleje no queda en la posición de sellado (home position).\n\nNotas operativas:\n- Si hay que interrumpir el flejado por un rato corto, dejar el STOP BLOQUEADO: la máquina se detiene pero el calentador mantiene su temperatura, y queda lista para operar de inmediato sin esperar el precalentamiento.\n- En la versión CE, el interruptor de poder traba la puerta frontal: para abrirla hay que apagarlo primero (giro de 90° en antihorario).\n\nFuente: manual de operación TRANSPAK TP-6000-1, págs. 5-6.",
+      "objetivo": "Operar los 6 mandos del panel, distinguir AUTO de HAND y usar el bloqueo del STOP para no perder el precalentamiento en pausas cortas.",
+      "porque": "cada precalentamiento son unos 3 minutos de máquina parada; usar el STOP bloqueado en las pausas cortas recupera ese tiempo turno a turno.",
+      "quiz": [
+        {
+          "question": "En una pausa corta, ¿qué conviene hacer para no perder el precalentamiento del calentador?",
+          "options": [
+            "Dejar el STOP bloqueado",
+            "Apagar el interruptor de poder",
+            "Bajar la temperatura a 1",
+            "Desenchufar la máquina"
+          ],
+          "correctIndex": 0,
+          "explanation": "Con el STOP bloqueado la máquina se detiene pero el calentador mantiene la temperatura, así queda lista sin esperar el precalentamiento."
+        },
+        {
+          "question": "¿Qué hace el switch F/R girado en sentido antihorario?",
+          "options": [
+            "Cambia de AUTO a HAND",
+            "Retrocede el fleje al acumulador",
+            "Apaga el calentador",
+            "Alimenta el fleje alrededor del arco"
+          ],
+          "correctIndex": 3,
+          "explanation": "Antihorario alimenta el fleje alrededor del arco; horario lo retrocede y lo devuelve a la caja acumuladora."
+        },
+        {
+          "question": "¿Cuál es la diferencia entre AUTO y HAND?",
+          "options": [
+            "AUTO es más rápido pero fleja igual",
+            "HAND desactiva el calentador",
+            "No hay diferencia real",
+            "AUTO fleja solo al pasar el paquete; en HAND hay que pulsar START"
+          ],
+          "correctIndex": 3,
+          "explanation": "En AUTO la máquina fleja sola cuando el paquete pasa el arco; en HAND se posiciona el paquete y se pulsa START para aplicar un fleje."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-control-electrico",
+      "title": "Unidad de control eléctrico: relé de sobrecarga y timers T1 / T2",
+      "order": 5,
+      "content": "Los dos temporizadores T1 y T2 son el corazón del ajuste fino de esta máquina: la mayoría de los problemas de \"el fleje no llega\" o \"el fleje sale flojo\" se resuelven acá y no cambiando piezas.\n\nPuntos clave:\n- Relé de sobrecarga: es un dispositivo de protección de corriente. Ante sobrecarga corta la energía automáticamente. Para volver a operación normal hay que accionar el switch magnético.\n- Timer T1: determina el tiempo necesario para la RECOGIDA del fleje (take-up), es decir el tensado.\n- Timer T2: determina el tiempo necesario para la ALIMENTACIÓN del fleje (feed).\n\nMedidas / tolerancias:\n- T1 (take-up) trifásica: aprox. 0,4 segundos\n- T1 (take-up) monofásica: aprox. 0,3 segundos\n- T2 (feed) trifásica: aprox. 0,8 segundos para arco estándar 850x600\n- T2 (feed) monofásica: aprox. 0,7 segundos para arco estándar 850x600\n\nNotas operativas:\n- T1 se fija teniendo en cuenta el tiempo que necesita el paquete más pequeño que se va a flejar; puede requerir ajuste según el tamaño del paquete.\n- Si el tiempo de T2 es demasiado corto, el fleje NO alcanza la posición de sellado. Si el arco no es el estándar, T2 hay que ajustarlo al tamaño del arco.\n\nFuente: manual de operación TRANSPAK TP-6000-1, págs. 7-8.",
+      "objetivo": "Distinguir qué hace cada temporizador (T1 = recogida/tensado, T2 = alimentación) y con qué valor de referencia arrancar, para ajustar por causa y no por prueba y error.",
+      "porque": "confundir T1 con T2 hace perder el turno ajustando el parámetro equivocado: si el fleje no llega al sellado el problema es T2, si sale flojo es T1.",
+      "quiz": [
+        {
+          "question": "El fleje no alcanza la posición de sellado. ¿Qué temporizador hay que revisar?",
+          "options": [
+            "Los dos por igual",
+            "T1, porque controla la recogida",
+            "T2, porque controla la alimentación",
+            "Ninguno, es el calentador"
+          ],
+          "correctIndex": 2,
+          "explanation": "T2 determina el tiempo de alimentación del fleje. Si es demasiado corto, el fleje no llega a la posición de sellado."
+        },
+        {
+          "question": "¿Qué controla el Timer T1?",
+          "options": [
+            "El tiempo de recogida (take-up), o sea el tensado",
+            "El tiempo de alimentación del fleje",
+            "La velocidad de la mesa",
+            "La temperatura del calentador"
+          ],
+          "correctIndex": 0,
+          "explanation": "T1 determina el tiempo necesario para la recogida del fleje (take-up). Su valor típico es 0,3-0,4 s según si es monofásica o trifásica."
+        },
+        {
+          "question": "El relé de sobrecarga cortó la energía. ¿Qué hay que hacer para volver a operación normal?",
+          "options": [
+            "Cambiar el fusible",
+            "Accionar el switch magnético",
+            "Esperar a que se enfríe solo",
+            "Reiniciar el temporizador T2"
+          ],
+          "correctIndex": 1,
+          "explanation": "El relé de sobrecarga corta la energía como protección; para operación normal se debe accionar el switch magnético."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-ajustes",
+      "title": "Ajustes: tensión, temperatura, avance/recogida y acumulador",
+      "order": 6,
+      "content": "Los cuatro ajustes que se hacen en terreno, con sus valores de referencia del manual.\n\nMedidas / tolerancias:\n- Tensión de flejado: perilla con rango 0 a 10. Para caja de cartón, normalmente la posición 4 o 5 es la adecuada.\n- Temperatura del calentador: seleccionar una posición entre 1 y 6. Fijar en la posición 3 o 4.\n- Holgura del mecanismo de avance/recogida: debe ser IGUAL al espesor del fleje que se está usando. De fábrica queda ajustado para fleje de 0,55 a 0,60 mm.\n\nPuntos clave:\n- Temperatura: si está demasiado alta o demasiado baja no se obtiene un sello correcto. Hay que subir o bajar gradualmente la posición hasta lograr el sello óptimo, teniendo en cuenta las condiciones ambientales de la máquina.\n- Mecanismo de avance y recogida: el fleje solo se recoge bien si esta unidad está ajustada con precisión. Si no lo está, el avance y la recogida se vuelven irregulares, el fleje puede quedar sellado antes de apretarse contra el paquete, y puede salirse de la pista del arco al alimentarlo.\n- Limit switches: LS1 detiene la unidad de control y arranca el retroceso del fleje. LS2 dispara el ciclo de alimentación. LS3 controla que la máquina se detenga en la posición de reposo (home position); se ajusta con su contactor de limit switch.\n- Acumulador: la cantidad de fleje viene ajustada de fábrica, pero puede requerir ajuste según la calidad o el espesor real del fleje que se use.\n\nNotas operativas:\n- Si FALTA fleje en la caja acumuladora: aflojar la tuerca y girar el tornillo en ANTIHORARIO.\n- Si SOBRA fleje en la caja acumuladora: aflojar la tuerca y girar el tornillo en HORARIO.\n\nFuente: manual de operación TRANSPAK TP-6000-1, págs. 11-14.",
+      "objetivo": "Ajustar tensión (4-5 para cartón), temperatura (3-4) y la holgura del mecanismo de avance igual al espesor del fleje, y saber hacia dónde girar el tornillo del acumulador.",
+      "porque": "estos cuatro ajustes explican la mayoría de los rechazos de flejado; hacerlos con el valor de referencia del manual evita la ronda de prueba y error que consume el turno.",
+      "quiz": [
+        {
+          "question": "Para una caja de cartón, ¿en qué posición se deja normalmente la perilla de tensión?",
+          "options": [
+            "4 o 5",
+            "0 o 1",
+            "9 o 10",
+            "Siempre en el máximo"
+          ],
+          "correctIndex": 0,
+          "explanation": "El rango es 0 a 10 y para caja de cartón normalmente la posición 4 o 5 es la adecuada."
+        },
+        {
+          "question": "¿Cuánto debe ser la holgura del mecanismo de avance y recogida?",
+          "options": [
+            "El doble del espesor del fleje",
+            "Igual al espesor del fleje que se usa",
+            "Cero siempre",
+            "1 mm fijo"
+          ],
+          "correctIndex": 1,
+          "explanation": "La holgura debe ser igual al espesor del fleje en uso. De fábrica viene ajustada para 0,55-0,60 mm."
+        },
+        {
+          "question": "Falta fleje en la caja acumuladora. ¿Hacia dónde se gira el tornillo de ajuste?",
+          "options": [
+            "No se ajusta, se cambia el resorte",
+            "Antihorario",
+            "Media vuelta en cualquier sentido",
+            "Horario"
+          ],
+          "correctIndex": 1,
+          "explanation": "Si falta fleje se gira en antihorario; si sobra fleje, en horario (previo aflojar la tuerca)."
+        },
+        {
+          "question": "¿En qué posición se fija la temperatura del calentador?",
+          "options": [
+            "Siempre en 6",
+            "3 o 4",
+            "1 o 2",
+            "5 o 6"
+          ],
+          "correctIndex": 1,
+          "explanation": "El rango es 1 a 6 y el manual indica fijarla en la posición 3 o 4, ajustando gradualmente hasta obtener el sello óptimo."
+        }
+      ]
+    },
+    {
+      "id": "tp6-manual-recomendaciones",
+      "title": "Recomendaciones para operar sin fallas",
+      "order": 7,
+      "content": "Seis prácticas del manual que evitan la mayoría de las detenciones evitables.\n\nPuntos clave:\n- Cortar el interruptor de poder cuando se hace mantenimiento o se cambia la bobina de fleje.\n- Si la máquina no se va a usar por un período largo: sacar el fleje de la caja acumuladora y rebobinarlo en el portabobina, para evitar que el fleje se deforme.\n- Para cambiar el ancho de fleje se usa el kit de conversión, que se vende como opcional.\n- Si hay que cambiar el enchufe o el tomacorriente, verificar el sentido de giro del motor.\n- Mantener la máquina siempre limpia, en especial retirando polvo y pelusa de fleje en la zona del cabezal de flejado y del calentador.\n- No usar alargadores (extensiones eléctricas).\n\nFuente: manual de operación TRANSPAK TP-6000-1, pág. 10.",
+      "objetivo": "Incorporar las seis prácticas preventivas del manual, sobre todo la limpieza de pelusa de fleje en cabezal y calentador.",
+      "porque": "la pelusa acumulada en el cabezal y el calentador degrada el sello y ensucia la unidad de alimentación, que es justo una de las causas listadas de avance irregular.",
+      "quiz": [
+        {
+          "question": "La máquina no se usará por un período largo. ¿Qué corresponde hacer con el fleje?",
+          "options": [
+            "Tensarlo al máximo",
+            "Cortarlo y botarlo",
+            "Dejarlo como está",
+            "Sacarlo del acumulador y rebobinarlo en el portabobina"
+          ],
+          "correctIndex": 3,
+          "explanation": "Se saca de la caja acumuladora y se rebobina en el portabobina para evitar que el fleje se deforme."
+        },
+        {
+          "question": "¿Está permitido alimentar la máquina con un alargador?",
+          "options": [
+            "No, el manual lo prohíbe",
+            "Sí, si es de buena calidad",
+            "Solo si es menor a 5 m",
+            "Solo en trifásica"
+          ],
+          "correctIndex": 0,
+          "explanation": "El manual indica expresamente no usar alargadores."
+        }
+      ]
+    }
+  ],
+  "procedures": [
+    {
+      "id": "tp6-proc-cargar-fleje",
+      "title": "Cargar la bobina de fleje PP",
+      "description": "Montaje de la bobina y enhebrado del fleje hasta los rodillos de alimentación. Con la energía CORTADA.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Cortar la energía y montar la bobina",
+          "description": "Asegurarse de que el interruptor de poder esté APAGADO antes de cargar el fleje. Colocar la bobina en el tambor del portabobina respetando el sentido de la flecha indicado en la brida exterior."
+        },
+        {
+          "order": 2,
+          "title": "Fijar la brida exterior",
+          "description": "Después de calzar la bobina, poner la brida exterior sobre ella y apretarla con la manilla de la tuerca del portabobina."
+        },
+        {
+          "order": 3,
+          "title": "Enhebrar por el rodillo guía",
+          "description": "Pasar la punta del fleje por el rodillo guía y luego empujarla por el ángulo guía. En este punto hay que TORCER el fleje de modo que la cara interior quede hacia abajo y la cara exterior toque el rodillo."
+        },
+        {
+          "order": 4,
+          "title": "Cargar el acumulador",
+          "description": "Abrir la puerta de la caja acumuladora. Insertar el fleje en el alimentador del acumulador empujando la palanca hacia abajo. Sacar alrededor de 1 metro de fleje y meterlo en el pasaje angosto de la caja acumuladora."
+        },
+        {
+          "order": 5,
+          "title": "Pasar el fleje entre los rodillos de alimentación",
+          "description": "Girar la manilla del rodillo superior hacia la izquierda mientras se empuja la punta del fleje por debajo de la cubierta. Al girar la manilla, el fleje pasa entre el rodillo superior de alimentación y el rodillo de alimentación."
+        }
+      ]
+    },
+    {
+      "id": "tp6-proc-puesta-en-marcha",
+      "title": "Puesta en marcha y flejado",
+      "description": "Secuencia de arranque, incluido el precalentamiento del calentador.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Encender el interruptor de poder",
+          "description": "La lámpara piloto se ilumina y el fleje se alimenta automáticamente hacia la caja acumuladora. En versión CE, el interruptor traba la puerta frontal: para abrirla hay que apagarlo primero (giro de 90°)."
+        },
+        {
+          "order": 2,
+          "title": "Alimentar el fleje al arco",
+          "description": "Girar el switch F/R en ANTIHORARIO. El fleje se alimenta a la pista del arco. Mantener el giro hasta que el fleje llegue a la posición de sellado. Ahí queda listo para flejar."
+        },
+        {
+          "order": 3,
+          "title": "Esperar el precalentamiento",
+          "description": "Esperar alrededor de 3 minutos hasta que el calentador alcance su temperatura de operación. Si no se espera, el sello no pega."
+        },
+        {
+          "order": 4,
+          "title": "Flejar el paquete",
+          "description": "Colocar el paquete en el CENTRO del cabezal de flejado y pulsar START: el paquete se fleja automáticamente. La operación se repite pulsando START de nuevo. En AUTO, la máquina fleja sola cuando el paquete pasa el arco."
+        },
+        {
+          "order": 5,
+          "title": "Apagar al terminar",
+          "description": "Terminada la operación, apagar el interruptor de poder. Desenchufar y retirar la suciedad de la máquina."
+        }
+      ]
+    },
+    {
+      "id": "tp6-proc-ajustar-tension-temperatura",
+      "title": "Ajustar tensión de flejado y temperatura de sellado",
+      "description": "Los dos ajustes que definen si el fleje queda firme y si el sello pega. Valores de referencia del manual.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Ajustar la tensión con la perilla (rango 0-10)",
+          "description": "Elegir la tensión adecuada al paquete. Para caja de cartón, normalmente la posición 4 o 5 es la correcta. Tensión demasiado alta es una de las causas listadas de fleje sin sellar."
+        },
+        {
+          "order": 2,
+          "title": "Fijar la temperatura del calentador (rango 1-6)",
+          "description": "Dejar la perilla en posición 3 o 4 como punto de partida, considerando las condiciones ambientales de la máquina."
+        },
+        {
+          "order": 3,
+          "title": "Corregir gradualmente hasta el sello óptimo",
+          "description": "Si la temperatura está demasiado alta o demasiado baja no se obtiene un sello correcto. Subir o bajar la posición DE A POCO y volver a probar hasta lograr el sello óptimo. No saltar de un extremo al otro."
+        }
+      ]
+    },
+    {
+      "id": "tp6-proc-ajustar-feed-takeup",
+      "title": "Ajustar el mecanismo de avance y recogida",
+      "description": "Se hace cuando se cambia el espesor del fleje, o cuando el avance y la recogida salen irregulares. La holgura debe quedar igual al espesor del fleje.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Verificar el retorno a home position",
+          "description": "Comprobar que la unidad de control vuelva a su posición de reposo (home position). Insertar el fleje entre el rodillo de alimentación y el rodillo superior de alimentación."
+        },
+        {
+          "order": 2,
+          "title": "Aflojar los 2 pernos del brazo derecho",
+          "description": "Aflojar los 2 pernos que sujetan el brazo de bloque derecho con el eje del brazo de presión. Así el eje del brazo de presión se puede mover fácilmente a mano."
+        },
+        {
+          "order": 3,
+          "title": "Dejar la holgura igual al espesor del fleje",
+          "description": "Ajustar de modo que la holgura entre el resorte del rodillo superior y el gancho del resorte del eje superior sea IGUAL al espesor del fleje que se está usando. De fábrica viene para 0,55-0,60 mm."
+        },
+        {
+          "order": 4,
+          "title": "Apretar los 2 pernos",
+          "description": "Volver a apretar los 2 pernos. Si esta unidad no queda bien ajustada, el fleje puede quedar sellado antes de apretarse contra el paquete y puede salirse de la pista del arco al alimentarlo."
+        }
+      ]
+    },
+    {
+      "id": "tp6-proc-ajustar-acumulador",
+      "title": "Ajustar la cantidad de fleje del acumulador",
+      "description": "Viene ajustado de fábrica, pero puede requerir corrección según la calidad o el espesor real del fleje en uso.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Determinar si falta o sobra fleje",
+          "description": "Observar la cantidad de fleje acumulada en la caja acumuladora. Insuficiente o excesiva cantidad de fleje es una de las causas listadas de avance y recogida incorrectos."
+        },
+        {
+          "order": 2,
+          "title": "Si FALTA fleje: girar en antihorario",
+          "description": "Aflojar la tuerca y girar el tornillo en sentido ANTIHORARIO para aumentar la cantidad de fleje acumulado."
+        },
+        {
+          "order": 3,
+          "title": "Si SOBRA fleje: girar en horario",
+          "description": "Aflojar la tuerca y girar el tornillo en sentido HORARIO para reducir la cantidad de fleje acumulado."
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "tp6-flow-fleje-no-llega-sellado",
+      "title": "El fleje no llega a la posición de sellado",
+      "trigger": "Se alimenta el fleje con el F/R pero no alcanza la posición de sellado, o el ciclo queda incompleto.",
+      "actions": [
+        "Revisar el valor del Timer T2 (alimentación): si es demasiado corto el fleje no llega. Referencia: ~0,8 s en trifásica y ~0,7 s en monofásica para arco estándar 850x600.",
+        "Si el arco no es el estándar 850x600, ajustar T2 al tamaño real del arco.",
+        "Verificar que el fleje no esté torcido en la zona de carga (ver el procedimiento de carga de bobina).",
+        "Revisar que el fleje no se esté saliendo de la pista del arco: si se sale, ajustar el mecanismo de avance y recogida.",
+        "Confirmar que la cantidad de fleje en la caja acumuladora sea la adecuada (ni insuficiente ni excesiva)."
+      ]
+    },
+    {
+      "id": "tp6-flow-sello-no-pega",
+      "title": "El sello no pega (fleje sin sellar)",
+      "trigger": "El fleje se aplica pero la unión se abre: no quedó sellado.",
+      "actions": [
+        "Confirmar que se esperaron los ~3 minutos de precalentamiento del calentador antes de empezar a flejar.",
+        "Revisar la posición de temperatura del calentador: debe estar en 3 o 4; corregir de a poco, no de un extremo al otro.",
+        "Verificar que el fleje llegue completamente al punto de sellado; si no llega, ajustar el limit switch LS-3.",
+        "Revisar el cableado del calentador: un cable interior o exterior cortado, flojo o desconectado da el mismo síntoma.",
+        "Revisar que la perilla de tensión no esté demasiado alta: valor excesivo de tensión es causa listada de fleje sin sellar. También se puede aumentar el tiempo de enfriamiento de la soldadura.",
+        "Confirmar que el fleje sea PP: con PET o cordón de poliéster no sella."
+      ]
+    },
+    {
+      "id": "tp6-flow-fleje-flojo",
+      "title": "El paquete queda con el fleje flojo",
+      "trigger": "El fleje sella pero el paquete queda suelto: la tensión no es la adecuada.",
+      "actions": [
+        "Revisar la posición de la perilla de tensión: para caja de cartón corresponde 4 o 5.",
+        "Revisar el valor del Timer T1 (recogida/tensado): si es demasiado corto el fleje no alcanza a tensarse. Referencia: ~0,4 s trifásica, ~0,3 s monofásica.",
+        "Fijar T1 pensando en el paquete MÁS PEQUEÑO que se va a flejar; ajustarlo si cambia el tamaño de paquete.",
+        "Revisar si el resorte del brazo de ajuste de tensión está cortado o desgastado: en ese caso hay que cambiarlo.",
+        "Revisar si el resorte de la mordaza de tensión está desgastado o desalojado: cambiarlo o reinstalarlo.",
+        "Confirmar que el paquete esté colocado en el CENTRO del cabezal de sellado."
+      ]
+    },
+    {
+      "id": "tp6-flow-no-arranca",
+      "title": "La máquina no arranca",
+      "trigger": "Se acciona el interruptor de poder o el START y la máquina no responde.",
+      "actions": [
+        "Mirar la lámpara piloto: eso separa el problema en dos caminos distintos.",
+        "Si la lámpara NO enciende: revisar que haya suministro eléctrico, que el fusible no esté quemado ni desalojado, y que no haya un cable cortado o desconectado (manual pág. 22, causas 1 a 3).",
+        "Si la lámpara SÍ enciende pero no opera: partir por lo más simple — verificar que el switch de STOP no haya quedado bloqueado. Con el STOP bloqueado la máquina se detiene pero SIGUE energizada y el calentador mantiene su temperatura (manual pág. 5), por eso la lámpara queda encendida.",
+        "Después, en esa misma rama: revisar contacto o falla del switch START o del STOP (puede requerir cambio de switch).",
+        "Revisar que ninguno de los 3 cables esté cortado o desconectado (conector incluido).",
+        "Revisar la correa de los motores: floja o cortada da este síntoma; ajustar o cambiar.",
+        "Si el relé de sobrecarga actuó, accionar el switch magnético para volver a operación normal."
+      ]
+    }
+  ],
+  "diagnosis": [
+    {
+      "id": "tp6-diag-piloto-no-enciende",
+      "title": "La máquina no funciona y la lámpara piloto NO enciende",
+      "symptom": "Al energizar, la lámpara piloto no se ilumina y la máquina no responde.",
+      "possibleCauses": [
+        "No hay suministro eléctrico",
+        "Fusible quemado o desalojado",
+        "Cable cortado o desconectado"
+      ],
+      "solution": "Revisar la fuente de alimentación eléctrica. Revisar la unidad eléctrica (fusible). Revisar el cableado. Ojo: si el STOP quedó bloqueado el síntoma NO es este — la máquina se detiene pero sigue energizada y la lámpara queda ENCENDIDA (manual pág. 5); ese caso está en el diagnóstico de lámpara encendida. Fuente: tabla de troubleshooting del manual, pág. 22, causas 1 a 3."
+    },
+    {
+      "id": "tp6-diag-piloto-enciende-no-opera",
+      "title": "La lámpara piloto enciende pero la máquina no opera",
+      "symptom": "Hay energía (lámpara piloto encendida) pero la máquina no ejecuta el ciclo de flejado.",
+      "possibleCauses": [
+        "El switch de STOP quedó bloqueado",
+        "Mal contacto o falla del switch START o del switch STOP",
+        "Uno de los 3 cables cortado o desconectado",
+        "Correa de los motores floja o cortada"
+      ],
+      "solution": "Empezar por el STOP: el bloqueo del STOP es una función normal para pausas cortas y detiene la máquina manteniendo la temperatura del calentador (manual pág. 5), así que la lámpara sigue encendida — desbloquearlo. Si no es eso, cambiar el switch si tiene mal contacto o está fallado. Revisar cable o conector. Revisar y ajustar o cambiar la correa de los motores. Fuente: tabla de troubleshooting del manual, pág. 22, causas 4 a 7."
+    },
+    {
+      "id": "tp6-diag-avance-recogida-incorrectos",
+      "title": "Avance y recogida del fleje incorrectos",
+      "symptom": "La máquina funciona pero el fleje avanza o se recoge de forma irregular: no llega, se salta, se sale de la pista o queda mal posicionado.",
+      "possibleCauses": [
+        "Dirección de enhebrado del fleje incorrecta en el portabobina",
+        "Carga del fleje incorrecta (fleje torcido en la zona de carga)",
+        "El fleje se mete entre la bobina y la brida del portabobina",
+        "Cantidad de fleje insuficiente o excesiva en el acumulador",
+        "Polvo y residuos de fleje en la unidad de alimentación",
+        "La punta del fleje está partida",
+        "Fleje flojo en la unidad portabobina",
+        "El fleje se sale de la pista del arco",
+        "Mala calidad del fleje",
+        "Paquete mal posicionado sobre la mesa",
+        "La mordaza de tensión no vuelve a su posición original",
+        "Valor del Timer T2 demasiado pequeño"
+      ],
+      "solution": "Recargar el fleje respetando el sentido de enhebrado en el portabobina (ver el procedimiento de carga de bobina, manual P5). Verificar si el fleje está torcido en la zona de carga y recargarlo. Ajustar la cantidad de fleje acumulado (tornillo del acumulador: antihorario si falta, horario si sobra). Revisar y limpiar la unidad de alimentación. Ajustar el resorte de tensión de la cuchilla o cambiar la cuchilla si la punta sale partida. Ajustar o cambiar el resorte del brazo de tensión del freno. Ajustar el mecanismo F/R si el fleje se sale de la pista. Cortar la parte dañada del fleje o cambiar el rollo. Reubicar el paquete en el CENTRO del cabezal de sellado. Cambiar o reinstalar el resorte de la mordaza de tensión. Ajustar el Timer T2. Fuente: tabla de troubleshooting del manual, pág. 22, causas 8 a 19."
+    },
+    {
+      "id": "tp6-diag-fleje-sin-sellar",
+      "title": "Fleje sin sellar",
+      "symptom": "El fleje se aplica al paquete pero la unión no queda sellada: se abre.",
+      "possibleCauses": [
+        "Cable interior o exterior del calentador cortado, flojo o desconectado",
+        "Ajuste de temperatura inadecuado",
+        "El fleje no alcanza completamente el punto de sellado",
+        "Valor de la perilla de tensión demasiado alto"
+      ],
+      "solution": "Revisar el cableado del calentador o cambiar el calentador. Ajustar la temperatura del calentador (rango 1-6, referencia 3 o 4, corrigiendo de a poco). Ajustar el limit switch LS-3 si el fleje no llega completamente al punto de sellado. Ajustar la perilla de tensión o aumentar el tiempo de enfriamiento de la soldadura. Fuente: tabla de troubleshooting del manual, pág. 22, causas 20 a 23."
+    },
+    {
+      "id": "tp6-diag-tension-inadecuada",
+      "title": "Tensión de flejado inadecuada",
+      "symptom": "El fleje queda flojo o con tensión despareja, aunque el sello pegue.",
+      "possibleCauses": [
+        "Resorte del brazo de ajuste de tensión cortado o desgastado",
+        "Resorte de la mordaza de tensión desgastado o desalojado",
+        "Valor del Timer T1 demasiado corto"
+      ],
+      "solution": "Cambiar el resorte del brazo de ajuste de tensión. Cambiar o reinstalar el resorte de la mordaza de tensión. Ajustar el Timer T1 (referencia: ~0,4 s en trifásica, ~0,3 s en monofásica), fijándolo según el paquete más pequeño que se vaya a flejar. Fuente: tabla de troubleshooting del manual, pág. 22, causas 24 a 26."
+    }
+  ]
+}

@@ -13,16 +13,27 @@ import { SpeechTextarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { addParo, getParosByPlantLine, deleteParo } from '@/services/paros'
+import { getPlantLineConfig } from '@/config/plantLines'
 import type { ParoEtapa } from '@/types'
 
 interface ParoEtapaCaptureProps {
   plantLineId: string
   areaLabel?: string
+  /**
+   * Se llama cuando se agrega o borra un paro. El OEE de área depende de estos
+   * minutos y vive en OTRA card: sin este aviso, registrar un paro no movía el
+   * número hasta recargar la página.
+   */
+  onChanged?: () => void
   className?: string
 }
 
-/** Etapas frecuentes del proceso (eviscerado); "Otra" permite texto libre. */
-const ETAPAS = [
+/**
+ * Etapas frecuentes del eviscerado. Las líneas que declaran
+ * `stagesWithoutSensor` en `plantLines.ts` usan las suyas (Filete: la GEA, las
+ * cintas…). "Otra" siempre permite texto libre.
+ */
+const ETAPAS_EVISCERADO = [
   'Bombeo', 'Chiller', 'Desangrador', 'Cinta elevadora', 'Marel',
   'Baader', 'Corte cabeza', 'Grader', 'Etiquetado',
 ]
@@ -51,8 +62,10 @@ function fmtFecha(d: Date): string {
     ' · ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtapaCaptureProps) {
+export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className }: ParoEtapaCaptureProps) {
   const user = useAuthStore((s) => s.user)
+  const lineCfg = getPlantLineConfig(plantLineId)
+  const ETAPAS = lineCfg.stagesWithoutSensor ?? ETAPAS_EVISCERADO
   const isAdmin = user?.rol === 'admin'
 
   const [etapaSel, setEtapaSel] = useState<string>('')
@@ -113,6 +126,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
       setFecha(toLocalInput(new Date()))
       setJustSaved(true); setTimeout(() => setJustSaved(false), 3000)
       await load()
+      onChanged?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo registrar el paro.')
     } finally {
@@ -122,8 +136,8 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
 
   const handleDelete = useCallback(async (id: string) => {
     if (!isAdmin || !window.confirm('¿Eliminar este paro?')) return
-    try { await deleteParo(id); await load() } catch { /* noop */ }
-  }, [isAdmin, load])
+    try { await deleteParo(id); await load(); onChanged?.() } catch { /* noop */ }
+  }, [isAdmin, load, onChanged])
 
   return (
     <Card className={cn('border-rose-500/20', className)}>
@@ -144,6 +158,9 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, className }: ParoEtap
         <div className="space-y-1.5">
           <label className="text-[11px] font-medium text-muted-foreground">Etapa que se detuvo</label>
           <div className="flex flex-wrap gap-1.5">
+            {/* Regla que mantiene defendible el OEE de area: si el paro de la
+                etapa TAMBIEN detuvo la maquina instrumentada, ese tiempo ya lo
+                midio el sensor y va como causa de ese paro, no aca. */}
             {ETAPAS.map((e) => (
               <button key={e} type="button" onClick={() => setEtapaSel(e)}
                 className={cn('px-2.5 py-1 rounded-md border text-xs font-medium transition-colors',

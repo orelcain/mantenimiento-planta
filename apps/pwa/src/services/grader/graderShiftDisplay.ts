@@ -246,6 +246,21 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     isDayLike: true,
     scheduleHint: '07:45–00:00',
   },
+  // Filete emite "Turno Dia" (sin tilde y con D mayúscula). Es el mismo
+  // concepto que "Turno día" pero con OTRO string: sin esta entrada la tabla
+  // caía al FALLBACK y la UI mostraba "?" como nombre del turno.
+  'Turno Dia': {
+    label: 'Turno Día',
+    shortLabel: 'Día',
+    period: 'dia',
+    textColorClass: 'text-amber-600 dark:text-amber-400',
+    bgColorClass: 'bg-amber-500/10',
+    borderColorClass: 'border-amber-500/30',
+    iconName: 'Sun',
+    emoji: '☀',
+    isDayLike: true,
+    scheduleHint: '07:30–15:45',
+  },
   'Turno noche': {
     label: 'Turno noche',
     shortLabel: 'Noche',
@@ -323,9 +338,34 @@ export function getShiftMeta(shiftId: string, scheduledStart?: string | Date | n
   return {
     ...base,
     ...VISUAL_BY_PERIOD[periodFromStartHour(hour)],
+    // El label también tiene que seguir la hora real. Antes solo se corregían
+    // ícono y color, así que un turno que arrancó 01:34 mostraba el ☀ correcto
+    // en el calendario pero el título decía "Turno 1 — Mañana". Se contradecían
+    // entre sí en la misma pantalla.
+    label: `${shiftBaseName(base.label)} — ${periodLabelFromHour(hour)}`,
     // scheduleHint honesto: hora real de inicio (el rango del nombre mentía).
     scheduleHint: `desde ${pad(hour)}:${pad(d.getUTCMinutes())}`,
   }
+}
+
+/** Nombre del turno sin el sufijo de período: "Turno 1 — Mañana" → "Turno 1". */
+function shiftBaseName(label: string): string {
+  const i = label.indexOf(' — ')
+  return i === -1 ? label : label.slice(0, i)
+}
+
+/**
+ * Período legible para el título, a partir de la hora real de inicio.
+ *
+ * Distingue madrugada de noche — para el operador no es lo mismo un turno que
+ * arranca 21:30 que uno que arranca 01:30, aunque a efectos de color ambos
+ * sean "noche".
+ */
+function periodLabelFromHour(hour: number): string {
+  if (hour >= 6 && hour < 12) return 'Mañana'
+  if (hour >= 12 && hour < 19) return 'Tarde'
+  if (hour >= 19) return 'Noche'
+  return 'Madrugada'
 }
 
 /** Atajo: solo el label corto ("T1", "Día", "Noche"). */
@@ -412,4 +452,22 @@ export function isSignificantSlxShift(
  */
 export function isUnscheduledShift(shiftId: string | null | undefined): boolean {
   return shiftId === 'Unscheduled'
+}
+
+/**
+ * Nombre del turno para MOSTRAR en la UI.
+ *
+ * Shoplogix emite algunos shiftId con el día de la semana pegado
+ * ("Turno 1 Lunes", la madrugada del lunes en Chonchi). El día ya se ve en la
+ * columna de la matriz y en la fecha de la lista, así que repetirlo en el
+ * nombre solo confunde — Orel: "¿por qué Lunes? quítalo".
+ *
+ * El shiftId CRUDO se conserva intacto en `PeriodShift.shiftId`: es la clave
+ * de Firestore y lo que se manda a la ruta de detalle. Esto es solo display.
+ */
+const DIA_SEMANA_SUFIJO = /\s+(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s*$/i
+
+export function displayShiftName(shiftId: string): string {
+  const limpio = shiftId.replace(DIA_SEMANA_SUFIJO, '').trim()
+  return limpio.length > 0 ? limpio : shiftId
 }

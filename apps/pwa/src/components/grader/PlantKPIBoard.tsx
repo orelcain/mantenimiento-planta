@@ -13,13 +13,21 @@ import { cn } from '@/lib/utils'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { getPlantLineConfig, getMachineKind, type PlantLineId } from '@/config/plantLines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 interface Props {
   plantSlug: PlantSlug
   graderSummaries: GraderDailySummary[]
   enabled?: boolean
+  /**
+   * Línea/área seleccionada. De acá salen los textos que NO son universales:
+   * cómo se llaman las máquinas y qué alcance tiene el OEE. Sin esto el panel
+   * decía "las 3 Baader" también en Filete, que tiene una sola máquina.
+   */
+  plantLineId?: PlantLineId
   /** Día seleccionado en el calendario ("YYYY-MM-DD"). null = auto-último con actividad. */
   selectedDateKey?: string | null
   /** Mes visible en el calendario (para modo Mes). */
@@ -148,11 +156,18 @@ export function PlantKPIBoard({
   plantSlug,
   graderSummaries,
   enabled = true,
+  plantLineId,
   selectedDateKey = null,
   currentMonth,
 }: Props) {
   const [period, setPeriod] = useState<KpiPeriod>('day')
   const effectiveMonth = currentMonth ?? new Date()
+  const lineCfg     = getPlantLineConfig(plantLineId)
+  const machineKind = getMachineKind(plantLineId)
+  /** Líneas que no clasifican (Yal, Filete) no tienen Calidad: no es un dato faltante. */
+  const classifies  = lineCfg.isClassificationPlant !== false
+  const scopeNote   = lineCfg.kpiScopeNote
+    ?? 'Alcance: las 3 Baader (eviscerado de máquina) + calidad del Grader — no toda el área.'
 
   const { loading, error, kpis } = usePlantKPIsForPeriod(
     plantSlug,
@@ -235,9 +250,7 @@ export function PlantKPIBoard({
           </div>
         </div>
         {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
-        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">
-          Alcance: las 3 Baader (eviscerado de máquina) + calidad del Grader — <b className="font-medium">no toda el área</b>.
-        </p>
+        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
@@ -300,7 +313,7 @@ export function PlantKPIBoard({
                 barColor={kpis.oee !== null
                   ? (kpis.oee >= OEE_GOOD ? 'bg-emerald-500' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-sky-500' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : 'bg-muted'}
-                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (plantSlug === 'yal' ? 'A·P solamente' : 'Sin Q') : undefined}
+                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
               />
               <KPICard
                 label="Disponibilidad"
@@ -335,7 +348,7 @@ export function PlantKPIBoard({
                 barColor={kpis.quality !== null
                   ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-emerald-500' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-amber-500' : 'bg-rose-500')
                   : undefined}
-                note={kpis.quality === null ? (plantSlug === 'yal' ? 'No clasifica' : 'Sin Grader') : undefined}
+                note={kpis.quality === null ? (classifies ? 'Sin Grader' : 'No clasifica') : undefined}
               />
             </div>
 
@@ -412,15 +425,15 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 text-[11px] bg-muted rounded px-2 py-1 border border-border',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
-                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
+                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
                     className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
-                    title={`${m.machineName} — Evisceradora Baader 142 N°${idx + 1}`}
+                    title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}`}
                   >
-                    <span className="hidden sm:inline">{m.machineName}</span>
-                    <span className="sm:hidden">Ev {idx + 1}</span>
+                    <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>
+                    <span className="sm:hidden">{machineKind.short} {idx + 1}</span>
                   </span>
                   <span
                     className={cn('w-10 sm:w-12 tabular-nums', availColor(m.availability))}
@@ -430,7 +443,7 @@ export function PlantKPIBoard({
                   </span>
                   <span
                     className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}
-                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico\n\n⚠ NO comparable entre máquinas: cada una se mide contra su propio target y las 3 Baader no tienen la misma capacidad. Para comparar, usar piezas perdidas.`}
+                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico${kpis.machines.length > 1 ? '\n\n⚠ NO comparable entre máquinas: cada una se mide contra su propio target y no todas tienen la misma capacidad. Para comparar, usar piezas perdidas.' : ''}`}
                   >
                     P {pct(m.performance, 0)}
                   </span>

@@ -20,9 +20,9 @@
     },
     {
       "id": "fk-manual-servicio",
-      "title": "Servicio FishKen: calibración, puertas y conexiones",
+      "title": "Servicio FishKen: calibración, ajuste neumático y conexiones",
       "order": 4,
-      "content": "La sección Servicio FishKen agrupa las tareas de mantenimiento del software.\n\nPuntos clave:\n\n- Calibración: calibración del sistema de pesaje.\n- Ajuste de puertas: habilitar/deshabilitar cada compuerta (casilla Activo + Guardar Cambios).\n- Pruebas de conexión: verifican que la E-Pack esté operativa en 3 grupos — Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.\n\nNotas operativas:\n\n- Deshabilitar una compuerta si presenta problemas de pesaje, hasta resolverla.\n- Fuente: manual Fishken E-Pack S28, pág 19, 25, 27-28."
+      "content": "La sección Servicio FishKen agrupa las tareas de mantenimiento del software.\n\nPuntos clave:\n\n- Calibración: calibración del sistema de pesaje Y habilitar/deshabilitar cada compuerta (la casilla Activo + Guardar Cambios está ACÁ, pág. 24).\n- Ajuste de puertas: regulación NEUMÁTICA de los cilindros (Abrir / Cerrar / Ciclo), págs. 25-26. NO sirve para habilitar ni deshabilitar compuertas.\n- Pruebas de conexión: verifican que la E-Pack esté operativa en 3 grupos — Base de Datos, Tarjetas de Relé y Tarjetas de Pesaje.\n\nNotas operativas:\n\n- Deshabilitar una compuerta si presenta problemas de pesaje, hasta resolverla (se hace en Calibración).\n- ⚠ En \"Ajuste de puertas\" hay 3 controles que accionan TODAS las compuertas a la vez: usarlos con producto cargado lo descarga a la cinta central.\n- Fuente: manual Fishken E-Pack S28, pág 19, 25, 27-28."
     },
     {
       "id": "fk-manual-web-reportes",
@@ -34,29 +34,87 @@
       "id": "fk-manual-compuertas-celdas",
       "title": "Compuertas, celdas de carga y sobrepeso",
       "order": 6,
-      "content": "El corazón de la máquina es la combinatoria de pesos entre compuertas para armar la caja con el menor sobrepeso posible.\n\nPuntos clave:\n\n- Cada compuerta pesa sus piezas en una celda de carga con un rango de peso definido.\n- El algoritmo combina las compuertas cuya suma cae dentro del peso objetivo de la caja.\n- El sobrepeso (y su %) mide cuánto se pasa la caja del peso objetivo: cuanto menor, mejor rendimiento.\n\nNotas operativas:\n\n- Una compuerta con celda fuera de rango o sucia degrada la combinatoria y sube el sobrepeso/rechazo.\n- Fuente: manual Fishken E-Pack S28, pág 6-8."
+      "content": "El corazón de la máquina es la combinatoria de pesos entre compuertas para armar la caja con el menor sobrepeso posible.\n\nPuntos clave:\n\n- Cada compuerta pesa sus piezas en una celda de carga con un rango de peso definido.\n- El algoritmo combina las compuertas cuya suma cae dentro del peso objetivo de la caja.\n- El sobrepeso (y su %) mide cuánto se pasa la caja del peso objetivo: cuanto menor, mejor rendimiento.\n\nNotas operativas:\n\n- Hay DOS algoritmos: el Estándar exige que todas las compuertas habilitadas tengan piezas y busca el menor sobrepeso; el Máximo genera caja apenas puede, priorizando productividad (S28 págs 3 y 33).\n\nMantención semanal de la zona de pesaje (lo que de verdad degrada el pesaje):\n\n- Reapretar los pernos unidos directamente a la celda de carga (Hardware pág 4).\n- Revisar que los soportes de compuertas/capachos no se hayan soltado (Hardware pág 5).\n- Verificar que la bajada lateral no tope contra la zona de pesaje: si toca, afecta directamente el peso calculado (Hardware pág 6).\n- Verificar que los filtros de aire no contengan agua y que la presión esté en ~6 bar / 90 psi (Hardware pág 9).\n\nNotas operativas:\n\n- Si una compuerta queda con residuos o hielo, su cero se corre: usar Zero Manual sin piezas encima (S28 pág 15).\n- Deshabilitar una compuerta sana NO baja el sobrepeso: reduce el pool de combinatoria y lo sube.\n- Fuente: manual Fishken E-Pack S28, págs 3, 6-8, 15 y 33; manual de Hardware, págs 4-6 y 9."
     }
   ],
   "procedures": [
     {
       "id": "fk-proc-iniciar-proceso",
       "title": "Iniciar el proceso",
-      "description": "Arrancar la producción desde el software E-Pack. Fuente: manual Fishken E-Pack S28, pág 9.",
+      "description": "Arrancar la producción desde el software E-Pack. OJO con el Autozero: no cargar piezas antes de que la máquina avise. Fuente: manual Fishken E-Pack S28, págs 9-13 y 15.",
       "steps": [
-        { "order": 1, "title": "Abrir Iniciar Proceso", "description": "En el menú principal del E-Pack, entrar a Iniciar Proceso." },
-        { "order": 2, "title": "Verificar producto y compuertas", "description": "Confirmar el producto configurado y que las compuertas necesarias estén habilitadas (no en rojo)." },
-        { "order": 3, "title": "Iniciar", "description": "Presionar Iniciar Proceso: todas las compuertas se levantan por un tiempo configurable y luego vuelven a su estado original." },
-        { "order": 4, "title": "Vigilar estadísticas", "description": "Seguir cajas producidas/rechazadas, sobrepeso % y productividad en la pantalla." }
+        {
+          "order": 1,
+          "title": "Abrir Iniciar Proceso",
+          "description": "En el menú principal del E-Pack, entrar a Iniciar Proceso."
+        },
+        {
+          "order": 2,
+          "title": "Verificar producto y compuertas",
+          "description": "Confirmar el producto configurado y que las compuertas necesarias estén habilitadas (no en rojo)."
+        },
+        {
+          "order": 3,
+          "title": "Iniciar",
+          "description": "Presionar Iniciar Proceso: todas las compuertas se levantan por un tiempo configurable y luego vuelven a su estado original."
+        },
+        {
+          "order": 4,
+          "title": "⚠ Esperar el Autozero — SIN piezas encima",
+          "description": "Una vez estabilizadas las compuertas, la máquina hace un \"zero\" automático de CADA compuerta. NO cargar producto todavía: si hay una pieza sobre la compuerta, ese peso queda tomado como cero y falsea todo el pesaje de ahí en adelante (pág 10; la pág 15 insiste en lo mismo para el Zero Manual)."
+        },
+        {
+          "order": 5,
+          "title": "Cargar recién cuando el sistema avise",
+          "description": "Terminado el Autozero, el sistema indica que la máquina está habilitada para cargar las piezas en las compuertas. A medida que toma el peso, las casillas de esas compuertas pasan a color VERDE (págs 10-11)."
+        },
+        {
+          "order": 6,
+          "title": "Vigilar estadísticas",
+          "description": "Seguir cajas producidas/rechazadas, sobrepeso % y productividad en la pantalla."
+        },
+        {
+          "order": 7,
+          "title": "Pausar y detener",
+          "description": "Pausar Proceso detiene todo y se retoma con el mismo botón; usarlo solo si es necesario (pág 12). Detener Proceso levanta TODAS las compuertas: hacerlo con la máquina sin piezas encima, o las arroja a la cinta central (pág 13)."
+        }
       ]
     },
     {
       "id": "fk-proc-calibrar",
       "title": "Calibrar el sistema de pesaje",
-      "description": "Mantener el pesaje exacto. Fuente: manual Fishken E-Pack S28, pág 19.",
+      "description": "Calibrar el pesaje compuerta por compuerta. Los DOS pasos (ZERO y patrón) deben completarse en una compuerta antes de pasar a la siguiente. Fuente: manual Fishken E-Pack S28, págs. 20-24.",
       "steps": [
-        { "order": 1, "title": "Abrir Servicio FishKen", "description": "Desde el menú principal, entrar a Servicio FishKen." },
-        { "order": 2, "title": "Calibración", "description": "Ir a la sección Calibración y seguir el procedimiento del sistema de pesaje." },
-        { "order": 3, "title": "Verificar", "description": "Comprobar que las lecturas de las celdas queden dentro del rango esperado." }
+        {
+          "order": 1,
+          "title": "Abrir Servicio FishKen › Calibración",
+          "description": "Desde el menú principal, entrar a Servicio FishKen y luego a Calibración. Es la pantalla que tiene la casilla Activo y el botón Guardar Cambios."
+        },
+        {
+          "order": 2,
+          "title": "Ingresar el peso patrón EN GRAMOS",
+          "description": "Escribir el valor del peso patrón en gramos. Si se ingresa en otra unidad, toda la calibración queda corrida."
+        },
+        {
+          "order": 3,
+          "title": "Elegir el rango de tarjetas",
+          "description": "Seleccionar el rango de tarjetas de pesaje sobre el que se va a calibrar."
+        },
+        {
+          "order": 4,
+          "title": "Por compuerta, SIN peso: \"Obtener ZERO\"",
+          "description": "Con la compuerta vacía (sin ningún peso encima), presionar \"Obtener ZERO\". Este es el primero de los dos pasos obligatorios."
+        },
+        {
+          "order": 5,
+          "title": "Colocar el patrón, esperar estabilización y \"Calibrar\"",
+          "description": "Poner el peso patrón en la compuerta, ESPERAR a que la lectura se estabilice y presionar \"Calibrar\". Recién ahí la compuerta quedó calibrada."
+        },
+        {
+          "order": 6,
+          "title": "⚠ Completar AMBOS pasos antes de pasar a otra compuerta",
+          "description": "El manual es explícito (pág. 24): «se deben completar los dos pasos en una compuerta para pasar a otra, de lo contrario la calibración no será correcta y la máquina presentará problemas de pesaje». No saltar de compuerta a compuerta haciendo solo el ZERO."
+        }
       ]
     },
     {
@@ -64,9 +122,21 @@
       "title": "Habilitar o deshabilitar una compuerta",
       "description": "Sacar de servicio una compuerta con problemas sin parar la máquina. Fuente: manual Fishken E-Pack S28, pág 25.",
       "steps": [
-        { "order": 1, "title": "Abrir Ajuste de puertas", "description": "En Servicio FishKen, ir a Ajuste de puertas." },
-        { "order": 2, "title": "Marcar/desmarcar Activo", "description": "Para deshabilitar una compuerta con problemas de pesaje, desmarcar la casilla Activo (para habilitarla, marcarla)." },
-        { "order": 3, "title": "Guardar Cambios", "description": "Dar clic en Guardar Cambios; la compuerta deshabilitada se muestra en rojo." }
+        {
+          "order": 1,
+          "title": "Abrir Calibración",
+          "description": "En Servicio FishKen, ir a Calibración. ⚠ NO uses \"Ajuste de puertas\": esa pantalla es la regulación neumática de cilindros (Abrir/Cerrar/Ciclo) y sus controles accionan TODAS las compuertas a la vez — con producto cargado lo descargarían a la cinta central."
+        },
+        {
+          "order": 2,
+          "title": "Marcar/desmarcar Activo",
+          "description": "Para deshabilitar una compuerta con problemas de pesaje, desmarcar la casilla Activo (para habilitarla, marcarla)."
+        },
+        {
+          "order": 3,
+          "title": "Guardar Cambios",
+          "description": "Dar clic en Guardar Cambios; la compuerta deshabilitada se muestra en rojo."
+        }
       ]
     },
     {
@@ -74,10 +144,26 @@
       "title": "Pruebas de conexión",
       "description": "Verificar que la E-Pack esté operativa. Fuente: manual Fishken E-Pack S28, pág 27-28.",
       "steps": [
-        { "order": 1, "title": "Abrir Pruebas de conexión", "description": "En Servicio FishKen, ir a Pruebas de conexión." },
-        { "order": 2, "title": "Base de Datos", "description": "Ejecutar la prueba de Base de Datos para corroborar la conexión." },
-        { "order": 3, "title": "Tarjetas de Relé", "description": "Probar las Tarjetas de Relé (NUMATO) que accionan las compuertas." },
-        { "order": 4, "title": "Tarjetas de Pesaje", "description": "Probar las Tarjetas de Pesaje que leen las celdas de carga." }
+        {
+          "order": 1,
+          "title": "Abrir Pruebas de conexión",
+          "description": "En Servicio FishKen, ir a Pruebas de conexión."
+        },
+        {
+          "order": 2,
+          "title": "Base de Datos",
+          "description": "Ejecutar la prueba de Base de Datos para corroborar la conexión."
+        },
+        {
+          "order": 3,
+          "title": "Tarjetas de Relé",
+          "description": "Probar las Tarjetas de Relé (NUMATO) que accionan las compuertas."
+        },
+        {
+          "order": 4,
+          "title": "Tarjetas de Pesaje",
+          "description": "Probar las Tarjetas de Pesaje que leen las celdas de carga."
+        }
       ]
     },
     {
@@ -85,19 +171,43 @@
       "title": "Generar un reporte en FishKen Web",
       "description": "Obtener reportes de producción por especie/calidad/calibre. Fuente: manual FishKen Web, pág 19-21.",
       "steps": [
-        { "order": 1, "title": "Abrir FishKen Web", "description": "Entrar a la aplicación FishKen Web." },
-        { "order": 2, "title": "Elegir el tipo de reporte", "description": "Seleccionar por Especie, Calidad o Calibre, en versión General o Detallado." },
-        { "order": 3, "title": "Filtrar y generar", "description": "Aplicar el rango/orden deseado y generar el reporte." }
+        {
+          "order": 1,
+          "title": "Abrir FishKen Web",
+          "description": "Entrar a la aplicación FishKen Web."
+        },
+        {
+          "order": 2,
+          "title": "Elegir el tipo de reporte",
+          "description": "Seleccionar por Especie, Calidad o Calibre, en versión General o Detallado."
+        },
+        {
+          "order": 3,
+          "title": "Filtrar y generar",
+          "description": "Aplicar el rango/orden deseado y generar el reporte."
+        }
       ]
     },
     {
       "id": "fk-proc-revisar-rechazo",
       "title": "Revisar rechazo y sobrepeso",
-      "description": "Controlar el rendimiento del proceso. Fuente: manual Fishken E-Pack S28, pág 7.",
+      "description": "Controlar el rendimiento del proceso. Fuente: manual Fishken E-Pack S28, págs 3, 7, 15-17, 33 y 37-38.",
       "steps": [
-        { "order": 1, "title": "Ver estadísticas", "description": "En Iniciar Proceso, mirar cajas rechazadas, sobrepeso y % de sobrepeso." },
-        { "order": 2, "title": "Identificar la causa", "description": "Sobrepeso o rechazo alto suele venir de compuertas con pesaje malo o rango de celda incorrecto." },
-        { "order": 3, "title": "Actuar", "description": "Deshabilitar la compuerta problemática o recalibrar; verificar la mejora en las estadísticas." }
+        {
+          "order": 1,
+          "title": "Ver estadísticas",
+          "description": "En Iniciar Proceso, mirar cajas rechazadas, sobrepeso y % de sobrepeso."
+        },
+        {
+          "order": 2,
+          "title": "Identificar la causa",
+          "description": "La causa más frecuente que documenta el manual NO es una compuerta fallada, sino calibres recortados: si las piezas de un calibre 6-9 vienen todas cargadas al 9, matemáticamente no se puede armar la caja (pág 37). Revisar también qué algoritmo está activo (el Máximo prioriza productividad sobre sobrepeso, pág 33), si hay piezas fuera de calibre (aviso anaranjado, pág 16) y si alguna compuerta quedó con el cero corrido por residuos o hielo (pág 15)."
+        },
+        {
+          "order": 3,
+          "title": "Actuar",
+          "description": "Según la causa: habilitar o ajustar Distinto Calibre (págs 37-38); cambiar de algoritmo; Zero Manual sin piezas encima; o recalibrar la compuerta si de verdad pesa mal. ⚠ NO deshabilitar una compuerta sana para bajar el sobrepeso: con menos piezas para combinar el sobrepeso SUBE (págs 3 y 33). Verificar la mejora en las estadísticas."
+        }
       ]
     }
   ],
@@ -110,8 +220,11 @@
         "Confirmar el producto configurado (especie, calibre, orden, caja master).",
         "Verificar que las compuertas necesarias estén habilitadas (sin rojo).",
         "Entrar a Iniciar Proceso y presionar Iniciar.",
+        "⚠ ESPERAR el Autozero automático de cada compuerta, con la máquina SIN piezas encima. Cargar producto antes hace que el cero se tome con ese peso y falsea todo el pesaje.",
+        "Cargar las piezas recién cuando el sistema avise que la máquina está habilitada; las compuertas a las que ya les tomó el peso se ven en verde.",
         "Seguir el sobrepeso % y el rechazo en las estadísticas.",
-        "Fuente: manual Fishken E-Pack S28, pág 9."
+        "Para terminar: Detener Proceso levanta todas las compuertas — hacerlo sin piezas encima o las arroja a la cinta central.",
+        "Fuente: manual Fishken E-Pack S28, págs 9-13."
       ]
     },
     {
@@ -119,10 +232,13 @@
       "title": "¿Qué hago cuando cambio de producto?",
       "trigger": "Se va a correr otra especie/calibre o una nueva orden de trabajo.",
       "actions": [
-        "Cargar la configuración del nuevo producto (nombre, especie, calibre, caja master).",
-        "Revisar el rango de peso por celda y que las compuertas correctas queden habilitadas.",
-        "Reiniciar las estadísticas y arrancar el proceso.",
-        "Fuente: manual Fishken E-Pack S28, pág 7."
+        "El cambio de producto NO se hace en el E-Pack: se hace en FishKen Web › Configuración, que es lo que se envía a la máquina (Web pág 17).",
+        "Ahí elegir Lote, Orden de Trabajo y Producto — los tres vienen de Innova (Marel) y solo se ven los activos — más fecha de elaboración y de vencimiento. Al elegir la orden, el selector de producto se filtra a los códigos asociados a esa orden.",
+        "Si el calibre no existe o su rango de peso está mal, crearlo o corregirlo en FishKen Web › Calibres (rango de pesos en kilogramos, Web pág 12).",
+        "Verificar en el E-Pack que las compuertas correctas queden habilitadas (las deshabilitadas se ven en rojo).",
+        "NO existe un botón de \"reiniciar estadísticas\": las estadísticas se ponen en cero solas al cargar una configuración nueva o al reiniciar la máquina (S28 pág 7).",
+        "Arrancar el proceso y esperar el Autozero antes de cargar piezas.",
+        "Fuente: manual FishKen Web, págs 12 y 17; E-Pack S28, pág 7."
       ]
     },
     {
@@ -130,7 +246,7 @@
       "title": "¿Qué hago cuando una compuerta pesa mal?",
       "trigger": "Una compuerta entrega pesajes erráticos o sube el rechazo/sobrepeso.",
       "actions": [
-        "Ir a Servicio FishKen › Ajuste de puertas.",
+        "Ir a Servicio FishKen › Calibración (ahí está la casilla Activo, NO en Ajuste de puertas).",
         "Desmarcar Activo en la compuerta problemática y Guardar Cambios (queda en rojo).",
         "Seguir produciendo con el resto mientras se revisa la celda/mecánica de esa compuerta.",
         "Recalibrar o reparar antes de volver a habilitarla.",
@@ -169,18 +285,20 @@
         "La compuerta fue deshabilitada a propósito (casilla Activo desmarcada).",
         "Se deshabilitó por problemas de pesaje."
       ],
-      "solution": "Es el estado 'deshabilitada'. Para volver a usarla: Servicio FishKen › Ajuste de puertas, marcar Activo y Guardar Cambios (tras resolver el problema de pesaje). Fuente: manual Fishken E-Pack S28, pág 8, 25."
+      "solution": "Es el estado 'deshabilitada'. Para volver a usarla: Servicio FishKen › Calibración, marcar Activo y Guardar Cambios (tras resolver el problema de pesaje). Fuente: manual Fishken E-Pack S28, pág 8, 25."
     },
     {
       "id": "fk-diag-sobrepeso-rechazo",
       "title": "Sobrepeso alto o muchas cajas rechazadas",
       "symptom": "El % de sobrepeso o la cantidad de cajas rechazadas sube por encima de lo normal.",
       "possibleCauses": [
-        "Una o más compuertas con pesaje impreciso.",
-        "Rango de peso por celda mal configurado para el producto.",
-        "Celda de carga sucia o descalibrada."
+        "Calibres recortados: la combinatoria es matemáticamente imposible (p. ej. piezas de calibre 6-9 pero todas cargadas al 9).",
+        "Algoritmo Máximo en uso: prioriza productividad sobre sobrepeso, así que genera caja apenas puede.",
+        "Piezas fuera del calibre configurado (la máquina las avisa con mensaje anaranjado indicando las compuertas).",
+        "Cero corrido por residuos o hielo sobre alguna compuerta.",
+        "Recién al final: una compuerta con pesaje impreciso o celda descalibrada."
       ],
-      "solution": "Identificar la compuerta problemática, deshabilitarla o recalibrar, y verificar el rango de peso del producto. Fuente: manual Fishken E-Pack S28, pág 7-8."
+      "solution": "Atacar en ese orden. (1) Calibres recortados: habilitar o ajustar Distinto Calibre, que permite meter piezas de un calibre distinto al programado para poder cerrar la caja (pág 37-38), y atender el mensaje de cambio de pieza que la máquina muestra cuando no puede generar caja (pág 17). (2) Revisar qué algoritmo está activo en Servicio FishKen › Selección de Algoritmo: el Estándar busca el menor sobrepeso pero exige todas las compuertas habilitadas con piezas; el Máximo prioriza productividad (pág 33). (3) Piezas fuera de calibre: la máquina las marca en anaranjado (pág 16). (4) Residuos o hielo: Zero Manual, sin piezas encima (pág 15). ⚠ OJO: deshabilitar una compuerta SANA no baja el sobrepeso, lo empeora — reduce el pool de piezas para combinar (págs 3 y 33). Fuente: manual Fishken E-Pack S28, págs 3, 15-17, 33 y 37-38."
     },
     {
       "id": "fk-diag-falla-base-datos",
@@ -196,20 +314,27 @@
       "title": "Las compuertas no accionan (Tarjetas de Relé)",
       "symptom": "Las compuertas no se abren/cierran aunque el software lo ordene.",
       "possibleCauses": [
+        "Presión de aire baja o filtros de aire con agua (el accionamiento de los capachos es NEUMÁTICO).",
+        "Manifold o electroválvulas del lado afectado.",
+        "Fuente de 24 VDC caída (alimenta los relés y da el negativo común a las electroválvulas), o switch ethernet sin su fuente de 5 VDC.",
         "Falla en las Tarjetas de Relé (NUMATO) que accionan las compuertas.",
         "Conexión de la tarjeta de relé interrumpida."
       ],
-      "solution": "Servicio FishKen › Pruebas de conexión › Tarjetas de Relé; revisar cableado/tarjeta NUMATO. Fuente: manual Fishken E-Pack S28, pág 27-28."
+      "solution": "El accionamiento no depende solo de la tarjeta: es neumático + 24 V. Ir de lo barato a lo caro. (1) Presión de aire ~6 bar (0,6 MPa) / 90 psi, valores aproximados, y filtros de aire sin agua — conviene revisarlos semanalmente (Hardware pág 9). (2) Manifold y electroválvulas del lado afectado: el aire va del filtro regulador a una conexión T y de ahí a los DOS manifold que controlan los capachos, así que si falla un solo lado eso orienta el diagnóstico (Diagramas pág 3). (3) Fuente de 24 VDC de relés y electroválvulas, y switch ethernet alimentado por la fuente de 5 VDC — sin switch no hay comunicación con las tarjetas (Diagramas págs 5 y 9). (4) Recién entonces Servicio FishKen › Pruebas de conexión › Tarjetas de Relé y el cableado de la NUMATO. Nota: esas tarjetas también accionan el glaseador y el chute pantalón, así que una falla ahí no se limita a las compuertas. Fuente: Hardware pág 9; Diagramas págs 3, 5 y 9; E-Pack S28 págs 27-29."
     },
     {
       "id": "fk-diag-falla-pesaje",
       "title": "Pesajes ausentes o erráticos (Tarjetas de Pesaje)",
       "symptom": "Una compuerta no entrega peso o el peso salta sin sentido.",
       "possibleCauses": [
+        "Pernos de la celda de carga flojos (el manual pide reapriete semanal).",
+        "Soportes de la compuerta o capacho sueltos por el trabajo normal (revisión semanal).",
+        "La bajada lateral topa contra la zona de pesaje: afecta directamente el peso calculado.",
+        "Residuos o hielo sobre la compuerta: el cero quedó corrido.",
         "Falla en la Tarjeta de Pesaje que lee las celdas de carga.",
         "Celda de carga desconectada o dañada."
       ],
-      "solution": "Servicio FishKen › Pruebas de conexión › Tarjetas de Pesaje; revisar la celda de carga de esa compuerta. Mientras tanto, deshabilitar la compuerta. Fuente: manual Fishken E-Pack S28, pág 27-28."
+      "solution": "Empezar por lo mecánico, que es lo que el manual documenta y lo más frecuente: (1) reapretar los pernos unidos directamente a la celda de carga (Hardware pág 4); (2) revisar que los soportes de compuertas/capachos no se hayan soltado (Hardware pág 5); (3) verificar que la bajada lateral entre la cinta central y la zona de pesaje NO toque en ningún punto la zona de pesaje (Hardware pág 6); (4) si hay residuos o hielo, hacer Zero Manual con la compuerta sin piezas (S28 pág 15). Recién después: Servicio FishKen › Pruebas de conexión › Tarjetas de Pesaje y la celda de esa compuerta (celdas Flintec PC7, Modbus a 12 VDC, Diagramas pág 8). Mientras tanto se puede deshabilitar esa compuerta — acá sí corresponde, porque está fallada. Fuente: Hardware págs 4-6; E-Pack S28 pág 15 y 27-29; Diagramas pág 8."
     },
     {
       "id": "fk-diag-celda-rango",
@@ -219,7 +344,7 @@
         "Rango de peso de la celda mal ajustado para el producto.",
         "Celda descalibrada."
       ],
-      "solution": "Revisar el rango de peso por celda en los datos fijos y recalibrar desde Servicio FishKen › Calibración. Fuente: manual Fishken E-Pack S28, pág 8, 19."
+      "solution": "Separar dos cosas distintas. (1) El RANGO DE CALIBRE del producto no se edita en el E-Pack: los \"datos fijos de la máquina\" que se ven ahí (rango de peso por celda, margen de error, versión del software) son SOLO VISUALIZACIÓN (S28 pág 8), y la máquina pesa únicamente las piezas del rango de calibre enviado por configuración desde el sitio web (S28 pág 16). Corregirlo en FishKen Web › Calibres (rango en kilogramos, Web pág 12) y reenviarlo desde FishKen Web › Configuración (Web pág 17). (2) Si lo que está mal es el pesaje en sí, eso sí es recalibrar: Servicio FishKen › Calibración. Fuente: E-Pack S28 págs 8 y 16; FishKen Web págs 12 y 17."
     }
   ]
 }

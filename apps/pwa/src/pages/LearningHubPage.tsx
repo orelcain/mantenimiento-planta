@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -36,6 +36,7 @@ import {
   type SymptomHit,
 } from '@/services/learningContent'
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
+import { getQuizBest, QUIZ_PASS_PCT } from '@/utils/learningProgress'
 import { LC as C } from '@/data/learningTheme'
 import { MetaText, StatusTag } from '@/components/learning/primitives'
 
@@ -74,6 +75,15 @@ const SPECIAL_MODULES: SpecialModule[] = [
     icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', tint: '#5a7d9e', stats: 'ciclo 90 s · 10 válvulas',
     // Oculto del hub mientras se rediseña (decisión Orel 2026-07-19); admins lo ven con etiqueta.
     inDevelopment: true,
+  },
+  {
+    id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
+    description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
+    icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
+    // Literal como sus hermanos: importar @/data/variadores metería el catálogo entero
+    // (~30 KB de parámetros y fallas) en el chunk del hub y anularía el lazy() de la ruta.
+    // Actualizar al tocar variadores.ts (los conteos viven en TOTAL_PARAMETROS/TOTAL_FALLAS).
+    stats: '8 familias · 164 parámetros · 46 fallas',
   },
 ]
 
@@ -535,6 +545,10 @@ function MachineCard({
       }))
   const enabledCount = badges.filter(b => b.enabled).length
   const isNew = ready && meta?.lastUpdatedAt != null && (Date.now() - meta.lastUpdatedAt) < NEW_WINDOW_MS
+  // Estado de evaluación local (lo único que "progresa": el material es de
+  // consulta periódica, no un curso lineal con % de avance).
+  const quizBest = getQuizBest(machine.slug)
+  const quizPassed = quizBest != null && quizBest >= QUIZ_PASS_PCT
 
   // Color de identidad de la máquina (vive en el strip + icono, no tiñe la card)
   const accent = machine.color
@@ -554,18 +568,16 @@ function MachineCard({
         className="group w-full text-left rounded-lg overflow-hidden flex flex-col transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
         style={{ background: C.surface, border: `1px solid ${C.border}`, opacity: ready ? 1 : 0.72 }}
       >
-        {/* Strip superior — identidad de la máquina + fill = progreso de secciones */}
-        <div className="h-1 w-full" style={{ background: `${accent}26` }}>
-          <div className="h-full transition-[width] duration-500 ease-out"
-            style={{ width: `${(enabledCount / 4) * 100}%`, background: accent }} />
+        {/* Thumbnail de identidad — banda de color con el ícono grande (estilo plataforma de cursos) */}
+        <div
+          className="h-[72px] w-full flex items-center justify-center flex-shrink-0"
+          style={{ background: quizPassed ? C.okSoft : `${accent}1f`, borderBottom: `1px solid ${C.border}` }}
+        >
+          <Icon style={{ color: quizPassed ? C.ok : accent, width: 30, height: 30 }} />
         </div>
 
         <div className="p-4 flex flex-col flex-1">
           <div className="flex items-start gap-3 pr-8">
-            <div className="flex items-center justify-center w-11 h-11 rounded-lg flex-shrink-0"
-              style={{ background: `${accent}1a`, border: `1px solid ${accent}33` }}>
-              <Icon style={{ color: accent, width: 22, height: 22 }} />
-            </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-semibold leading-tight" style={{ color: C.ink }}>{machine.name}</h3>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -586,6 +598,20 @@ function MachineCard({
           {ready && countLine && (
             <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
               <MetaText>{countLine}</MetaText>
+            </div>
+          )}
+
+          {/* Estado de evaluación local — lo único que "progresa" en material de consulta */}
+          {ready && quizBest != null && (
+            <div className="mt-3">
+              <span
+                className="text-[11px] font-mono tabular-nums"
+                style={{ color: quizPassed ? C.ok : C.inkMid }}
+              >
+                {quizPassed
+                  ? `✓ Evaluación aprobada · ${quizBest}%`
+                  : `Evaluación: mejor intento ${quizBest}%`}
+              </span>
             </div>
           )}
         </div>

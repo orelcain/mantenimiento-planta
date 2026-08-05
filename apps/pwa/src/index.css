@@ -83,6 +83,22 @@
   --lc-warn: #a16207;
   --lc-crit: #dc2626;
   --lc-star: #b7791f;
+
+  /* Rampa secuencial de la matriz de turnos — 4 pasos del hue de marca
+     (#2E75B6). Codifica MAGNITUD (ciclos / piezas / uptime), nunca estado:
+     el estado va aparte, en forma (esquina + punto), para que se lea aunque
+     el color no se distinga.
+     Derivada en OKLCH y validada con el validador ordinal, no elegida a ojo:
+     luminosidad monótona, ΔL ≥ 0.06 entre pasos, y el paso más claro a 2.07:1
+     del card (por debajo de 2:1 se confundía con el fondo vacío).
+     Son 4 y no 5 a propósito: con 5, el paso del medio caía justo donde ni la
+     tinta clara ni la oscura llegan a 4.5:1 y el número encima era ilegible.
+     Cada paso trae la tinta que le corresponde. */
+  --shift-ramp-1: #91abc5;  --shift-ramp-1-ink: #14202c;  /* 6.94:1 */
+  --shift-ramp-2: #6b95bf;  --shift-ramp-2-ink: #14202c;  /* 5.25:1 */
+  --shift-ramp-3: #1367ac;  --shift-ramp-3-ink: #e6eef6;  /* 5.03:1 */
+  --shift-ramp-4: #00509b;  --shift-ramp-4-ink: #e6eef6;  /* 6.84:1 */
+  --shift-empty: rgba(49, 64, 80, 0.07);
 }
 .dark {
   color-scheme: dark;
@@ -126,6 +142,16 @@
   --lc-warn: #cf9636;
   --lc-crit: #d95757;
   --lc-star: #d9ab4e;
+
+  /* Rampa de la matriz en oscuro: NO es el claro invertido — se re-derivó y
+     re-validó contra el card oscuro (#16242f). El anclaje se da vuelta porque
+     sobre fondo oscuro "más" tiene que ser MÁS luminoso, no menos.
+     Paso más tenue a 2.15:1 del card; cada paso con su tinta ≥4.5:1. */
+  --shift-ramp-1: #41586f;  --shift-ramp-1-ink: #e6eef6;  /* 6.29:1 */
+  --shift-ramp-2: #446a90;  --shift-ramp-2-ink: #e6eef6;  /* 4.83:1 */
+  --shift-ramp-3: #4b8fd2;  --shift-ramp-3-ink: #14202c;  /* 4.84:1 */
+  --shift-ramp-4: #53a3f0;  --shift-ramp-4-ink: #14202c;  /* 6.18:1 */
+  --shift-empty: rgba(157, 176, 194, 0.06);
 }
 
 @layer base {

@@ -17,6 +17,8 @@ const {
   normalizeComments,
   normalizeState,
   normalizeShift,
+  normalizeInterval,
+  aggregateScrapReasons,
 } = require('../normalizer')
 
 // ── clipStateToWindow ────────────────────────────────────────────────────────
@@ -199,4 +201,62 @@ test('normalizeShift: comments se normalizan y dedupean entre summary y producti
   })
   assert.strictEqual(shift.comments.length, 1, 'no debe duplicar el mismo comentario de summary+production')
   assert.strictEqual(shift.comments[0].reasonValue, 'FALTA MMPP')
+})
+
+// ── Campos del sensor que antes se descartaban (Filete / Baader 200) ─────────
+// El sensor manda por intervalo `rate`, `uptimeCycles`, `scheduledCycles` y
+// `scrapReasons`; el normalizer se quedaba solo con cycles/expectedCycles.
+// En Filete no hay Grader, así que `scrapReasons` es el ÚNICO origen posible
+// de un factor Calidad — por eso se fija su contrato acá.
+
+/** UUID real de la Baader 200 de Línea 1 (Filete) — ver docs/SHOPLOGIX_API.md. */
+const BAADER_200_ID = '3c0581da-9f19-49f0-aa15-b1596ae94dbd'
+
+test('normalizeInterval: guarda la cadencia OBJETIVO del sensor y null si no viene', () => {
+  const start = new Date('2026-07-28T12:00:00.000Z')
+  // Caso real: objetivo 20 pz/min con la máquina PARADA (cycles 0). Si esto se
+  // interpretara como velocidad real, el gráfico mostraría 20 pz/min sin producción.
+  const parada = normalizeInterval({ cycles: 0, expectedCycles: 100, totalDuration: 300000, rate: 20 }, start, 15)
+  assert.strictEqual(parada.targetRate, 20)
+  assert.strictEqual(parada.cycles, 0, 'la velocidad real es cycles/duración, no targetRate')
+  const sinRate = normalizeInterval({ cycles: 100, expectedCycles: 100, totalDuration: 300000 }, start, 15)
+  assert.strictEqual(sinRate.targetRate, null, 'sin dato del sensor => null, nunca 0 (0 sería objetivo cero)')
+})
+
+test('aggregateScrapReasons: suma por causa, ordena por cantidad y tolera formas distintas', () => {
+  const out = aggregateScrapReasons([
+    { scrapReasons: [{ reason: 'CORTE MALO', quantity: 3 }] },
+    { scrapReasons: [{ reason: 'CORTE MALO', quantity: 2 }, { name: 'PIEL', count: 9 }] },
+    { scrapReasons: [] },
+    { },
+  ])
+  assert.deepStrictEqual(out, [{ reason: 'PIEL', qty: 9 }, { reason: 'CORTE MALO', qty: 5 }])
+})
+
+test('aggregateScrapReasons: sin scrap reconocible devuelve lista vacía (no inventa cantidades)', () => {
+  assert.deepStrictEqual(aggregateScrapReasons([{ scrapReasons: [{ reason: 'X', quantity: 0 }] }, { scrapReasons: [null] }]), [])
+  assert.deepStrictEqual(aggregateScrapReasons(undefined), [])
+})
+
+test('normalizeShift: totaliza uptimeCycles/scheduledCycles y el scrap del sensor', () => {
+  const shift = normalizeShift({
+    production: baseProduction({
+      machineId: BAADER_200_ID, machineName: 'Linea 1', productionUnits: 'Filetes',
+      machineProduction: [
+        { start: '20260728T120000.000', cycles: 10, expectedCycles: 25, total: 10, expectedTotal: 25, totalDuration: 300000, rate: 2, uptimeCycles: 10, scheduledCycles: 10, scrapReasons: [{ reason: 'CORTE MALO', quantity: 2 }] },
+        { start: '20260728T120500.000', cycles: 5,  expectedCycles: 25, total: 15, expectedTotal: 50, totalDuration: 300000, rate: 1, uptimeCycles: 4,  scheduledCycles: 5,  scrapReasons: [] },
+      ],
+    }),
+    summary: baseSummary({ machineId: BAADER_200_ID, machineName: 'Linea 1' }),
+    dateKey: '2026-07-28', shiftId: 'Turno Dia',
+    shiftStartAt: new Date('2026-07-28T11:30:00.000Z'), shiftEndAt: new Date('2026-07-28T19:45:00.000Z'),
+    scheduleSource: 'intervals',
+  })
+  assert.strictEqual(shift.uptimeCycles, 14)
+  assert.strictEqual(shift.scheduledCycles, 15)
+  assert.strictEqual(shift.scrapTotal, 2)
+  assert.deepStrictEqual(shift.scrapByReason, [{ reason: 'CORTE MALO', qty: 2 }])
+  assert.strictEqual(shift.intervals[0].targetRate, 2)
+  assert.strictEqual(shift.productionUnit, 'Filetes')
+  assert.strictEqual(shift.machineType, 'baader_200', 'la Baader 200 debe reconocerse, no caer en "other"')
 })

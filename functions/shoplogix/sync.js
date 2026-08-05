@@ -27,7 +27,7 @@ const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours } =
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
-const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
+const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal', 'filete'])
 
 /**
  * Gracia tras el cierre de un turno antes de considerarlo "congelado".
@@ -233,6 +233,56 @@ function filterCommentsToWindow(rawComments, startMs, endMs) {
 }
 
 /**
+ * ¿Este grupo de turno viene CORTADO por el borde final de la ventana, y ya
+ * existe guardado en su forma completa?
+ *
+ * La ventana de un día va 08:00 → 08:00 del día siguiente. Si un turno arranca
+ * ANTES de las 08:00 (caso real 03-ago: Filete y Yal partieron 07:45), sus
+ * primeros intervals caen dentro de la ventana del día ANTERIOR ya etiquetados
+ * con el nombre del turno del día siguiente. `deriveShiftGroups` los ve como un
+ * turno propio y `shiftDateKeyFromStart` los manda al doc del día siguiente —
+ * que ya contiene el turno ENTERO, escrito por su propia ventana.
+ *
+ * Sin este guard, el re-sync horario de "ayer" (que corre con `forceAll`, y por
+ * eso ni siquiera el freeze lo detiene) pisaba el turno completo del día en
+ * curso con ese fragmento de 15 minutos: Filete quedó con 4 ciclos en vez de
+ * 2.406, y el freeze impedía después que el sync normal lo reparara.
+ *
+ * Regla (las dos condiciones son necesarias):
+ *   1. el grupo termina en el borde de la ventana (⇒ está cortado ahí), y
+ *   2. el doc guardado declara un `scheduledEnd` MÁS ALLÁ del borde (⇒ alguien
+ *      con mejor información — la ventana del día siguiente — ya lo escribió).
+ *
+ * Solo (1) rompería un turno que legítimamente termina a las 08:00: la ventana
+ * del día siguiente arranca justo ahí y no lo vería nunca. Solo (2) bloquearía
+ * las correcciones retroactivas en que Shoplogix acorta un turno de verdad.
+ *
+ * Ante cualquier duda (doc ausente, sin `scheduledEnd`, error de lectura)
+ * devuelve false → se escribe. Nunca deja de guardar un turno por precaución.
+ */
+async function isTruncatedTailOfNextWindow({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, windowEnd, logger }) {
+  if (scheduledEnd.getTime() < windowEnd.getTime()) return false
+
+  try {
+    const snap = await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${shiftId}`).get()
+    if (!snap.exists) return false
+
+    const raw = (snap.data() || {}).scheduledEnd
+    const storedEnd = raw && typeof raw.toDate === 'function' ? raw.toDate()
+      : raw instanceof Date ? raw
+      : typeof raw === 'string' ? new Date(raw)
+      : null
+    if (!storedEnd || Number.isNaN(storedEnd.getTime())) return false
+
+    // Ambos en wall-clock-as-UTC (lo guardado viene de estos mismos intervals).
+    return storedEnd.getTime() > windowEnd.getTime()
+  } catch (err) {
+    logger.warn(`[syncDay][${plantSlug}] truncated-check err (${parentShiftDateKey} ${shiftId}): ${err.message}`)
+    return false
+  }
+}
+
+/**
  * Deriva el `dateKey` calendario (YYYY-MM-DD) al que pertenece un turno,
  * a partir de su `scheduledStart` real (wall-clock-as-UTC).
  *
@@ -336,6 +386,28 @@ async function fetchOfficialRollup({ query, plantSlug, at, logger = console }) {
     logger.warn(`[syncDay][${plantSlug}] rollup oficial no disponible (no bloquea): ${err.message}`)
     return null
   }
+}
+
+/**
+ * ¿El horario oficial del rollup es coherente con la ventana real del turno?
+ *
+ * El rollup a veces entrega una plantilla con fechas de OTRO día (visto en
+ * prod: officialEnd 2026-08-01 para un turno del 22-07, o corrido +1 día).
+ * Guardar eso corrompe `officialSchedule` y cualquier cosa que lo consuma
+ * (brief de fin de turno, chips de la UI). Regla: start y end oficiales deben
+ * caer a ≤12h de sus pares derivados de intervals — margen de sobra para
+ * horas extra o turnos cortados, pero mata los saltos de día/semana.
+ *
+ * Ambas fechas vienen en la misma escala (wall-clock-as-UTC), comparables
+ * entre sí sin conversión.
+ */
+function isOfficialScheduleSane({ officialStart, officialEnd, scheduledStart, scheduledEnd }) {
+  const MAX_DRIFT_MS = 12 * 3600_000
+  if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return false
+  if (!(officialEnd   instanceof Date) || isNaN(officialEnd.getTime()))   return false
+  if (officialEnd.getTime() <= officialStart.getTime()) return false
+  return Math.abs(officialStart.getTime() - scheduledStart.getTime()) <= MAX_DRIFT_MS
+      && Math.abs(officialEnd.getTime()   - scheduledEnd.getTime())   <= MAX_DRIFT_MS
 }
 
 function deriveShiftGroups(machineProductionResponses, plantSlug) {
@@ -531,12 +603,27 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
   const allShiftResults = []
   const frozenSkipped = []
+  const truncatedSkipped = []
+  const windowEnd = parseShoplogixTime(window.end)
 
   // 3. Por cada turno: filtrar intervals + normalize + escribir
   for (const group of shiftGroups) {
     // dateKey del doc = día calendario donde ARRANCA el turno (ver nota extensa
     // más abajo, junto al armado del doc de máquina).
     const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+
+    // Cola cortada por el borde de la ventana, con el turno completo ya guardado
+    // por la ventana del día siguiente → no degradarlo. OJO: va ANTES del check
+    // de freeze y NO respeta `forceAll` — el re-sync de días pasados corre
+    // justamente con forceAll, y es el que provocaba el pisotón.
+    if (await isTruncatedTailOfNextWindow({
+      db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
+      scheduledEnd: group.scheduledEnd, windowEnd, logger,
+    })) {
+      truncatedSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
+      allShiftResults.push({ shiftId: group.shiftId, skipped: 'truncated-tail' })
+      continue
+    }
 
     // Turno cerrado y ya capturado en su forma final → no reescribir.
     // OJO escalas de tiempo: `group.scheduledEnd` viene en wall-clock-as-UTC
@@ -765,9 +852,26 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // consulta; ver fetchOfficialRollup). additivo — nunca reemplaza
     // scheduledStart/End derivados de intervals reales.
     if (officialRollup && officialRollup.shiftLabel === group.shiftId) {
-      parentDoc.officialSchedule = {
-        start: officialRollup.officialStart,
-        end:   officialRollup.officialEnd,
+      // Horario oficial solo si pasa el sanity-check (ver isOfficialScheduleSane):
+      // el rollup a veces trae plantillas con fechas de otro día y guardarlas
+      // corrompe el doc. Targets/especie no muestran esa corrupción → siguen
+      // guardándose siempre.
+      if (isOfficialScheduleSane({
+        officialStart:  officialRollup.officialStart,
+        officialEnd:    officialRollup.officialEnd,
+        scheduledStart: group.scheduledStart,
+        scheduledEnd:   group.scheduledEnd,
+      })) {
+        parentDoc.officialSchedule = {
+          start: officialRollup.officialStart,
+          end:   officialRollup.officialEnd,
+        }
+      } else {
+        logger.warn(
+          `[syncDay][${plantSlug}] officialSchedule del rollup descartado por incoherente ` +
+          `(${toShoplogixTime(officialRollup.officialStart)}→${toShoplogixTime(officialRollup.officialEnd)} ` +
+          `vs turno ${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`,
+        )
       }
       parentDoc.officialTargetsByMachineId = Object.fromEntries(officialRollup.targetsByMachineId)
       parentDoc.currentJob = officialRollup.currentJob
@@ -783,12 +887,16 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   if (frozenSkipped.length > 0) {
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${frozenSkipped.length} turno(s) congelados, sin reescribir: ${frozenSkipped.join(', ')}`)
   }
+  if (truncatedSkipped.length > 0) {
+    logger.info(`[shoplogix-syncDay][${plantSlug}] ${truncatedSkipped.length} cola(s) cortadas en el borde de la ventana, sin pisar el turno completo: ${truncatedSkipped.join(', ')}`)
+  }
 
   return {
     plantSlug, dateKey,
     shiftGroups: shiftGroups.map(g => g.shiftId),
     results: allShiftResults,
     frozenSkipped: frozenSkipped.length,
+    truncatedSkipped: truncatedSkipped.length,
   }
 }
 
@@ -907,10 +1015,12 @@ module.exports = {
   fullDayWindow,
   deriveShiftGroups,
   fetchOfficialRollup,
+  isOfficialScheduleSane,
   shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
   isShiftAlreadyFrozen,
+  isTruncatedTailOfNextWindow,
   syncDay,
   syncShift,
 }

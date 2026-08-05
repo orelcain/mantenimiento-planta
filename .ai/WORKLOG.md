@@ -13,6 +13,357 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-04 - claude - Resumen ejecutivo del turno (PNG) - formato A del mockup
+
+- La exportacion anterior apilaba todo (timeline, KPIs, pausas, gates, causas, upstream) sin jerarquia ni conclusion: sirve de registro tecnico, no de entregable. Mockup con 3 formatos aprobado por Orel; se construye el A (ejecutivo) y despues el B (PDF completo con este como pagina 1).
+- **graderExecutiveSummary.ts** - logica PURA que responde 4 preguntas EN ORDEN: como fue (verdict), por que (cause+machines), que hizo Mantencion (maintenance), que se necesita (ask). Los dos renderers consumen el mismo modelo, asi que PNG y PDF no pueden contar historias distintas del mismo turno.
+- Decisiones de redaccion que importan: el veredicto NOMBRA la maquina parada (no solo "turno malo"); los KPIs traen su contexto ("39% de 7 h 09 de turno" en vez de "39%"); MTTR bajo se marca OK - es el unico KPI donde menos es mejor, y sin eso un turno malo con buena respuesta se lee como todo malo; sin Excel del Grader lo DICE en vez de imprimir ceros que se leen como "no hubo".
+- **Bug que cazo un test**: el lossDriver no tenia opcion "ninguna" y caia a 'ritmo' por defecto, asi que un turno sano al 95% afirmaba haber corrido bajo el objetivo. Un reporte que inventa una perdida inexistente es peor que uno que no dice nada. Se agrego 'ninguna' + umbrales explicitos.
+- **graderExecutiveSummaryPng.ts** - canvas nativo, NO html2canvas: el DOM real depende del tema, del CSS que soporte el parser y de que el nodo este visible; para algo que se manda a gerencia es demasiada superficie de falla. Dibujo determinista, siempre en claro (se imprime).
+- **pages/dev/ResumenTurnoDevPage** (solo dev, /dev/resumen-turno): dibuja el PNG real con 3 turnos conocidos, sin login. El entregable hay que MIRARLO antes de que salga.
+- Verificacion: tsc y eslint limpios; 15 tests con el turno REAL del 3-ago (Baader 2 en cero). En el navegador: canvas 2480x2094 dibujado, veredicto y pedido correctos, y barrido de pixeles del margen - la unica tinta cerca del borde son los bordes de los recuadros con su antialiasing (3 franjas, a 4-7 px), no texto desbordado.
+- Estado: EN REVISION - PR abierto.
+- Sigue: **formato B** (PDF con este resumen como pagina 1 y el detalle detras) y despues el C (comparativo de periodo, que necesita decidir que periodo compara). Falta enganchar el boton en la vista de turno real.
+
+## 2026-08-04 - claude - Leyenda del grafico de ritmo: dejaba de estar tapada por las lineas
+
+- Orel: "los puntos de baader 1... baader 2... quedan ocultos". Causa exacta en `ProductionRateLineEC`: `legend.top: 0` con `grid.top: 6` — ECharts NO reserva el alto de la leyenda solo, asi que la leyenda se dibujaba ENCIMA del area del grafico y las lineas (incluidas las punteadas de Promedio y Objetivo) pasaban por detras del texto, que se leia tachado. Con un canvas de 120 px el solape era total.
+- Hecho: `grid.top` 6 → 22 (reserva la banda de la leyenda), alto del contenedor 120 → 142 para devolverle al plot lo que la leyenda ahora ocupa, texto de leyenda 9 → 10 px y de `#64748b` a `#94a3b8` (es la clave de lectura del grafico, no chrome secundario), `itemGap: 12`.
+- Geometria verificable sin navegador: area de datos 114 px → 120 px. El grafico NO se achica — gana 6 px Y deja de estar tapado.
+- Revisado si el patron se repetia: `UpstreamMachinesPanel` ya tenia `grid.top: 30` con `legend.top: 0` (correcto) y `StateTimelineEC` no tiene leyenda. El bug era solo de este componente.
+- Archivos: `components/grader/ProductionRateLineEC.tsx`.
+- Verificacion: tsc limpio; los 6 warnings de eslint son PREEXISTENTES (verificado con stash: 6 con y sin el cambio). NO verificado visualmente: el grafico vive en el detalle de turno, que pide sesion.
+- Estado: EN REVISION — PR abierto.
+- Sigue: que Orel confirme que ya se leen. Pendiente mayor: exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos de gerencia).
+
+## 2026-08-03 - claude - La card de cuota del turno se ve siempre
+
+- Orel: "recuerdo q antes podiamos asignarle a cada turno la cuota... ahora no veo la opcion". No era una regresion: `ShiftQuotaCard` seguia montada en el detalle del turno, pero hacia `return null` cuando NO habia cuota definida Y el usuario no tenia permiso (`allowEdit={isAdmin || isSupervisor}`). Resultado practico: la funcion entera parecia no existir — nadie sabia que habia cuota por turno.
+- Hecho: sin cuota la card SIEMPRE se renderiza. Con permiso, el CTA "Definir cuota" de siempre. Sin permiso, el mismo estado + "La define un supervisor" — se dice que falta y quien puede hacerlo, en vez de ofrecer un boton que seria un callejon sin salida.
+- Regla que deja el caso: **un `return null` por permisos esconde la FUNCIONALIDAD, no solo el control**. Si el usuario no puede actuar, mostrar el estado y quien puede.
+- Archivos: `components/grader/ShiftQuotaCard.tsx` (+ doc de cabecera, que describia el comportamiento viejo), `components/grader/__tests__/ShiftQuotaCard.visibility.test.tsx` (nuevo).
+- Verificacion: tsc y eslint limpios; 4 tests que renderizan el componente real. **Comprobado que los tests pueden fallar**: restaurando el `return null` caen 2 de 4. NO verificado en la app viva — el detalle de turno pide sesion y la del preview se perdio al reiniciar el server.
+- Estado: EN REVISION — PR abierto.
+- Sigue: que Orel confirme que ahora la ve. Pendientes de la sesion: exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos de gerencia) y leyenda ilegible del grafico de Baaders.
+
+## 2026-08-03 - claude - Afinado de la matriz de turnos: 4 fixes de uso real
+
+- Orel probo la vista en prod y reporto 4 cosas. Todas verificadas en el navegador, no solo compiladas.
+- **"Ver turno" no hacia nada** (bug real): navegaba a `/analisis-grader?date=…&shift=…&autoload=1`, pero ya estabamos EN esa ruta → React Router no remontaba nada. Existe una ruta CANONICA de detalle, `/analisis-grader/turno/:dateKey__:shiftId`, que es a donde apunta ahora. Verificado: navega a `/analisis-grader/turno/2026-08-03__Turno%201%20Lunes`.
+- **"Turno 1 Lunes"**: Shoplogix pega el dia de la semana a algunos shiftId. El dia ya se ve en la columna de la matriz, asi que repetirlo confunde ("¿por que Lunes? quitalo"). Nuevo `displayShiftName()` quita SOLO el sufijo de dia; el shiftId crudo se conserva intacto (es la clave de Firestore y lo que se manda a la ruta de detalle). Tambien en el aria-label, que decia una cosa distinta a la pantalla.
+- **Vista Lista retirada** ("no la entiendo... mejor quitemosla y solo con la vista matriz"). Se borro el componente y el toggle. En pantalla angosta la matriz hace scroll horizontal — se ve menos mes, pero lo que se ve es cierto.
+- **Salto de layout al seleccionar un turno**: el panel de abajo pasaba de una linea de placeholder a una fila de datos (que ademas envuelve a 2 en pantallas medianas) y la pagina daba un tironazo. Alto reservado con `min-h`. Medido en el navegador: delta 0 en el panel, en `scrollHeight` y en la posicion de las celdas.
+- Archivos: `services/grader/graderShiftDisplay.ts` (+`displayShiftName`), `components/grader/GraderShiftPeriodMatrix.tsx`, `GraderShiftPeriodView.tsx`, borrado `GraderShiftPeriodList.tsx`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificacion: tsc y eslint limpios; 534 tests verdes (4 nuevos de `displayShiftName`, incluido "solo el SUFIJO" y "nunca devuelve vacio"); los 4 fixes comprobados en el navegador con datos reales.
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel pidio mejorar la exportacion PNG/PDF del analisis de turno (resumen ejecutivo + 2 formatos tipicos de gerencia) — trabajo aparte, no entra aca.
+
+## 2026-08-03 - claude - Retirado GraderHistoricalCalendar (5.756 lineas) del bundle
+
+- Cierra el pendiente que dejo #349: el calendario ya no se montaba en el Wizard, pero seguia entrando al bundle por imports estaticos. Ahora se borro el archivo.
+- Hallazgo al revisar antes de borrar: `AnalisisGraderUploadPage` SI lo montaba (`<GraderHistoricalCalendar />`, linea 446), pero en una rama inalcanzable — el Wizard es su unico consumidor y siempre pasa `compact`, que retorna antes en la linea 386. Codigo muerto en runtime, peso vivo en el bundle.
+- Lo que exportaba y habia que mudar antes de borrar: `fmtSecPanoramic` y el tipo `SlxMonthlyStats` (los usan `GraderMonthlyStatsPanel` y el Wizard) → pasan a `graderPeriodMonthlyStats.ts`, su nuevo dueno, con `SlxMonthlyStats` como alias del tipo nuevo para no tocar consumidores. Se agregaron los contadores `t1/t2/t3ShiftsWithData` que el panel usa y que mi tipo no tenia.
+- Efecto colateral detectado y cubierto: el calendario era el UNICO emisor de `graderSelectionStore.setSelectedHistorical`, que consume `AnalisisGraderGatesConfigPage` para calibrar el peso medio. Sin reemplazo esa pagina caia siempre a su fallback (summary mas reciente de 60 dias) en silencio → ahora lo emite `GraderShiftPeriodContainer` al seleccionar un turno.
+- Medicion: el chunk `AnalisisGraderWizardPage` pasa de **481 kB** (lo que sirve prod hoy, medido por curl al bundle publicado) a **344 kB** — **-137 kB, -28%**.
+- Archivos: borrado `components/grader/GraderHistoricalCalendar.tsx`; tocados `services/grader/graderPeriodMonthlyStats.ts`, `components/grader/{GraderMonthlyStatsPanel,GraderShiftPeriodContainer}.tsx`, `pages/AnalisisGrader/{AnalisisGraderUploadPage,AnalisisGraderWizardPage}.tsx`.
+- Verificacion: tsc y eslint limpios (el warning de `lineId` en UploadPage es PREEXISTENTE — verificado con stash contra main); 530 tests verdes en la suite grader; `vite build` OK.
+- Estado: EN REVISION — PR abierto.
+- Sigue: uso real en prod. `graderSelectionStore` quedo con un solo emisor nuevo — si la matriz cambia de forma, revisar que GatesConfigPage siga recibiendo la seleccion.
+
+## 2026-08-03 - claude - Matriz de turnos reemplaza al calendario mensual del Analisis Grader
+
+- Problema raiz (planteado por Orel): el calendario usa el DIA como contenedor, asi que un turno que cruza medianoche se partia en dos fragmentos (`salida` + `madrugada`), con 4 `CardKind` solo para tapar el corte. El contenedor pasa a ser el TURNO: una fila por shiftId presente, una columna por dia, cada turno UNA celda anclada al dia en que arranca. Toggle Matriz/Lista (nunca ambas; bajo 700 px fuerza Lista), tooltip flotante al hover, panel del turno seleccionado con boton "Ver turno" (mismo destino que el "Cargar" del calendario), navegacion de mes y stats mensuales portadas (`computePeriodMonthlyStats`).
+- **Unscheduled**: investigado contra Firestore crudo — NO es un turno, es la ventana 00:00-24:00 donde Shoplogix reporta lo que cae fuera de las ventanas configuradas, pero su subcoleccion trae `intervals[]` con timestamps. Decision de Orel (reafirmada 3 veces): CERO ciclos sin asignar → se atribuyen al turno mas cercano (mismo dia primero; si el dia no tiene turnos, cruza de dia). Auditable en `attributedCycles` → "(+N)" ambar en tooltip/panel; chip informativo "fuera de ventana N %". Verificado en vivo: la madrugada huerfana del 02-ago (293 cic) fue al Turno 1 Lunes del 03 (3.720+293=4.013 exacto). Diagnostico completo y correcciones de Shoplogix en `ARIA_MANTENIMIENTO_PLANTA/docs/INFORME_UNSCHEDULED_SHOPLOGIX.md` (hallazgo gordo: Yal dejo ~126k ciclos fuera de ventana en mayo).
+- Datos: 2 queries/mes (padres con agregados + summaries) + 1 query por bloque Unscheduled (2-3/mes). Un padre = una entrada → el doble conteo por alias (`Turno dia`→`Turno 2`) es imposible por construccion, no mitigado. Rampa secuencial de 4 pasos derivada del azul de marca en OKLCH y validada por script (tokens `--shift-ramp-*` en index.css, claro y oscuro por separado).
+- Bug que solo aparecio validando contra prod: `2026-07-31_Turno 1` de Chonchi tiene dateKey 31-jul pero su produccion real fue 01:34-05:11 del 1-ago — medir el cruce start-vs-end no lo detectaba; ahora los offsets se miden contra el dia de anclaje (`startDayOffset`/`endDayOffset`, marcador ⁺¹ siempre). Ademas: terminar 00:00 en punto NO es cruce (4 de 5 "cruces" de Yal-julio eran eso).
+- Archivos: `services/grader/{graderShiftPeriod,graderShiftMatrixKpi,graderPeriodMonthlyStats,graderUnscheduledAttribution,graderUnscheduledLoad}.ts`, `hooks/useGraderShiftPeriod.ts`, `components/grader/GraderShiftPeriod{Matrix,List,View,Container}.tsx`, `pages/dev/MatrizTurnosDevPage.tsx` (banco de pruebas con fixture real, solo dev), `__tests__/` (4 suites + fixture `shiftPeriod.real.json` con datos de prod), `scripts/{validate-shift-period,export-shift-period-fixture}.js` (solo lectura), `App.tsx`, `index.css`, `AnalisisGraderWizardPage.tsx` (calendario retirado).
+- Verificacion: tsc y eslint limpios; 56 tests de la vista (21 casos escritos + regresion contra 165 turnos reales exportados de Firestore, con test de conservacion: ni un ciclo perdido ni duplicado); grader suite completa 462 verdes (falla preexistente de `graderShoplogixWindows` por .env, tambien en main); verificado EN VIVO en la pagina real con sesion de Orel (tooltip a 8 px de la celda, atribucion 3.720+293, fila "Sin turno" desaparecida).
+- Estado: EN REVISION — PR abierto.
+- Sigue: correcciones de configuracion en Shoplogix segun el informe (ventana T2 de Yal, madrugadas de Chonchi); despues de corregir, `backfill-shoplogix-history.js` para limpiar en origen. `SlxMonthlyStats.perMachineMonth.maintMacro/Micro` depende de que los padres traigan `stateAggregates` (los viejos no). Retirar `GraderHistoricalCalendar` del bundle cuando la matriz se asiente (hoy quedo sin montar pero el archivo sigue).
+
+## 2026-08-02 - claude - Primer turno real de Filete revisado + 2 textos que asumian eviscerado
+
+- Revision del turno del sabado 01-08 (el primero real de Filete) con datos de Firestore y la vista en el navegador. Resultado del TURNO: 180 pz en "Turno Dia" + 60 en Unscheduled = 240 de las 5.000 planificadas (4%), 22 min de uptime sobre una ventana efectiva de 12:57→14:45, velocidad real maxima 7,2 pz/min contra un objetivo de 20, y 16 paros (11 micro). Fue arranque, no produccion.
+- Dato importante para el modelo: **Shoplogix YA acota el turno de Filete** (08:00→14:45, no las 24 h de la semana pasada), asi que el "Turno Dia" dejo de ser un bucket de 24 h. El encuadre automatico igual se activa porque la operacion real ocupa el 26% del turno.
+- **`scrapReasons` volvio VACIO** con produccion real → se descarta la Calidad automatica en Filete. Su OEE se queda en A×R (ya rotulado).
+- 0 de 16 paros trajeron causa del sensor → confirma que el panel de causas dictadas es la unica via. Nadie lo uso todavia (0 anotaciones).
+- Bugs de copy encontrados al revisar (mismo patron de siempre: texto que asume eviscerado): (1) `shortMachineName` renombraba a "Baader N" cualquier maquina terminada en numero, asi que la Baader 200 —que Shoplogix llama "Linea 1"— aparecia como "Baader 1" en la cascada de perdidas, confundiendola con las 142; ahora solo traduce evisceradoras y el resto se muestra tal cual. (2) `DayTimeSummaryBar` decia "las 3 Baader" tambien en Filete; ahora el texto sale de las maquinas de la linea ("la Baader 200" / "las 3 Baader 142").
+- Nota: `endBriefSentAt` se estampa en el claim ANTES de evaluar el umbral de piezas, asi que marca "procesado", no "enviado". El turno de 180 pz quedo marcado pero NO se mando brief (180 < 200) — comportamiento correcto, nombre de campo enganoso.
+- Archivos: `apps/pwa/src/services/grader/{graderMachineNames.ts,__tests__/graderMachineNames.test.ts}`, `apps/pwa/src/components/grader/DayTimeSummaryBar.tsx`.
+- Verificacion: 864 tests verdes (2 nuevos de regresion), tsc y eslint limpios. En el navegador con el turno real: Filete dice "la Baader 200" y "Linea 1"; Yal sigue diciendo "las 3 Baader 142" y "Baader 1/2/3".
+- Estado: EN REVISION — PR abierto.
+- Sigue: cuando haya un turno de verdad (~5.000 pz) revisar el grafico de barras con la maquina corriendo, y que alguien dicte la primera causa en planta.
+
+## 2026-08-01 - claude - El encuadre del eje ahora funciona en TODAS las lineas (y en turno en curso)
+
+- Orel: "ahora si funciona en filete... podemos ponerlo en las demas?". El chip YA aparecia en Yal y Chonchi, pero ahi no hacia nada: el estado era un booleano "ver turno completo" y el encuadre pasaba SIEMPRE por la heuristica, que en esas lineas dice que no hace falta acotar (su turno si esta acotado). O sea el boton era de una sola via.
+- Hecho: el estado pasa a override de 3 valores — `auto` (heuristica) / `produccion` / `turno` — y los explicitos MANDAN. Regla extraida a `resolveFraming` (pura, testeada) y usada por el TurnoPage.
+- Verificado con datos reales en las 3 lineas, leyendo `data-axis-*` (el rango EFECTIVO, no la etiqueta): Yal 15:15–23:00 → 15:30–22:05 · Chonchi arranca acotado 09:00–12:50 · Filete 09:45–16:25 ↔ 08:00–08:00. Y **en el turno EN CURSO de Yal** (17.872 ciclos, sync hace 5 min): 15:15–23:16 ↔ 16:00–23:19, con el borde derecho avanzando con la ultima pieza.
+- Bug adicional encontrado en el camino: el chip mostraba el rango del PROP y el eje dibujaba otro (en turno en curso decia "14:45–00:00" mientras el eje era 15:15–23:09, los bounds del snapshot que crecen con cada sync). Ahora la etiqueta sale de la ventana RESUELTA — un chip que anuncia un rango distinto al dibujado es peor que no tener chip.
+- Archivos: `apps/pwa/src/components/grader/{UpstreamMachinesPanel.tsx,shiftTimelineHelpers.ts,__tests__/resolvePanelWindow.test.ts}`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: 789 tests verdes (4 nuevos de `resolveFraming`, incluido "el usuario puede forzar el encuadre donde la heuristica dice que no"), tsc y eslint limpios.
+- Estado: EN REVISION — PR abierto.
+- Sigue: hoy sabado arranca el proceso normal de Filete (5.000 pz/turno, 2 turnos).
+## 2026-08-01 - claude - Barrido de worktrees y ramas locales: 141 ramas -> 11, 6 worktrees -> 3 (+ PR #324)
+
+- Contexto: el repo habia acumulado 141 ramas locales y 6 worktrees de trabajo ya cerrado. Se barrio en tandas, verificando cada una antes de borrar. Ningun cambio de codigo salvo el PR #324.
+- **Criterio que se uso (y por que el obvio NO sirve):** "el PR esta MERGED" es insuficiente. Como el repo mergea con SQUASH, los commits de la rama no quedan como ancestros de main (`git merge-base --is-ancestor` da falso, y `git cherry` marca todo como ausente por patch-id distinto). El criterio correcto resulto ser: comparar el **SHA local de la rama contra `headRefOid` del PR** (la punta que tenia al mergear, se saca en UNA llamada: `gh pr list --state merged --json headRefName,headRefOid`). Si coinciden, todo su trabajo entro. Si el local es distinto, la rama AVANZO despues del merge y hay commits sin publicar.
+- **Ese criterio evito borrar trabajo en curso:** 4 ramas habian avanzado tras su merge, entre ellas `fix/b142-diagnosis-overrides`, cuyo commit posterior (`3fa043be`, el fix que hace que la 142 lea los diagnosticos del admin) todavia no estaba en main. Con el criterio ingenuo se habria borrado el trabajo en curso de otra sesion.
+- Hecho: (1) 121 ramas con PR mergeado y punta identica a la mergeada; (2) 11 de las 12 que NO tenian PR — 9 del HMI Grader (main tiene `hmi-grader-embed.html` en 2578 lineas vs 1071-2360 de las ramas; sus lineas propias son andamiaje de fases intermedias), `feat/levantamiento-tableros-v1` (0 commits propios) y `feat/analisis-confiabilidad-mantencion` (sus simbolos `MachineKPI`/`PlantKPIs`/`computeMachineKPI`/`aggregateShifts` SI estan en main, hubo refactor a `plantKpiCompute.ts`); (3) worktrees `wt-filete`, `wt-brief-timescale`, `wt-powerbi-button`, `wt-shoplogix-freeze`.
+- **La rama 12 no se borro a ciegas:** `fix/grader-shift-window-tz` (sin PR) tenia 3 casos de test ausentes en main. Se verificaron contra main, PASABAN, y cubrian logica viva (`graderShiftStatus.ts:123`, fallback a la ventana del dia de produccion 08:00→08:00 cuando el shiftId no esta en el schedule). Los tests que main ya tenia para ese branch solo verificaban `closed` con "margen amplio para no depender del huso del runner": nunca fijaban la ventana ni el estado `live`. Se rescataron en el **PR #324 (MERGED)** y recien ahi se borro la rama.
+- Gotchas anotados para la proxima: (a) `git worktree remove` deja atras los archivos no versionados (cache de Vite) y falla si un dev server tiene la carpeta tomada — hubo que matar un Vite en :5173 que seguia vivo 12 h despues del merge; (b) para correr los tests en un worktree hace falta `.env.local` (no esta en git) o 7 archivos fallan al importar con `auth/invalid-api-key` — parece un fallo del cambio y no lo es; (c) si se enlaza `node_modules` al worktree con un junction, **quitar el junction ANTES** del `rm -rf` o se borra el `node_modules` real a traves del enlace.
+- Archivos: solo `.ai/WORKLOG.md`. El PR #324 toco `apps/pwa/src/services/grader/__tests__/graderShiftStatus.test.ts` (+32/-0).
+- Verificacion: PR #324 con tsc y eslint limpios, 788 tests verdes (5 skipped), CI `build pass`. Estado final: 11 ramas locales (4 con trabajo sin publicar, el resto de worktrees activos) y 3 worktrees.
+- Estado: HECHO. Sigue: quedan 4 ramas con trabajo nunca publicado que hay que mirar una por una — `chore/ai-coordination` (docs de cierre de Fase 5), `wip/ctd-oee-2026-06-29`, `feat/enzunchadora-tp6000-aprendizaje` y `feature/aprendizaje-baader142-refuerzo` (estas dos avanzaron tras su merge). No se tocaron.
+
+## 2026-08-01 - claude - El boton de encuadre del eje no hacia nada (bug propio)
+
+- Reporte de Orel: "no hace nada el boton". Tenia razon y el bug era mio.
+- Causa raiz: el panel resuelve su ventana temporal con una prioridad — (1) zoom, (2) bounds del snapshot Shoplogix, (3) prop `shiftWindow`. El encuadre "solo con proceso" viaja por el PROP, o sea la fuente #3, asi que los bounds del snapshot (08:00→08:00, las 24 h de Filete) le ganaban siempre. El chip cambiaba de estado (lo alimenta el prop) y el eje seguia clavado.
+- Por que no lo detecte antes: verifique el TEXTO del chip y el prop, no el eje que realmente dibuja el chart. Como ECharts pinta en canvas, no habia forma de leer el eje desde fuera → ahora el contenedor expone `data-axis-start/end` con el rango EFECTIVO, y con eso la verificacion es real (y automatizable).
+- Fix: la prioridad se extrae a `resolvePanelWindow` (pura y testeada) con el encuadre explicito en el puesto 1b, sobre los bounds del snapshot. El panel la usa, asi que los tests protegen el codigo real y no una copia.
+- Archivos: `apps/pwa/src/components/grader/{UpstreamMachinesPanel.tsx,shiftTimelineHelpers.ts,__tests__/resolvePanelWindow.test.ts (nuevo)}`.
+- Verificacion: 785 tests verdes (5 nuevos de prioridad, incluido "con encuadre activo la ventana acotada GANA a los bounds del snapshot"), tsc y eslint limpios. En el navegador, leyendo `data-axis-*`: el eje pasa de 09:45–16:25 a 08:00–08:00 al togglear — antes se quedaba en 08:00–08:00 siempre.
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel confirma en pantalla. El sabado, Filete con 5.000 pz reales.
+
+> **Compactado el 2026-07-30.** Las entradas anteriores al 2026-07-19 se resumieron en bloques
+> temáticos al final de este archivo (el detalle completo de cada una vive en git:
+> `git log -p .ai/WORKLOG.md`, y en los commits de cada PR). Los pendientes que seguían abiertos
+> se consolidaron en "Pendientes que vienen de atrás" — no se perdió ninguno.
+> El archivo pasó de 143 KB a 36 KB porque estaba duplicando lo que ya dicen los commits.
+
+## 2026-07-30 - claude - Baader 200: 9 medios MEDIOS + 2 menores corregidos, mostrando ambas fuentes planta/OEM (PR #320, MERGED, 43/43 medios cerrados)
+
+- Hecho: cierra los 9 hallazgos MEDIOS de la auditoria del 2026-07-30 para la Baader 200. Criterio: donde habia choque de fuentes (manual de planta sin distinguir especie vs. manual OEM V4 con tablas por especie), se conserva el valor de planta como valor de la medida y se agrega la cota del OEM como nota con pagina (rascadores, guias flotantes, ventrales, punzones x2). Ademas: "avance a" -> "abertura entre cuchillos a" (errata de planta), 1ra Alimentacion separada en 2 cotas (32 mm entrada / 26 mm salida, el rango "32-28" no existia), mando de dorsales reatribuido (20 mm = distancia de control, no carrera; 12 mm entre trinquete y fiador), Trim D/E transcrito desde laminas rasterizadas del manual (sin texto de procedimiento), silleta 1350 mm etiquetada como criterio de planta, sensores de pasillo sin "zona N" inventada.
+- Archivos: `apps/pwa/src/services/baader200Learning.ts`, `apps/pwa/src/services/learningContent.ts`, `apps/pwa/src/data/learningQuickRef.ts`, `scripts/fix-b200-medios-auditoria.js` (nuevo, dry-run por defecto, ya corrido con --confirm: 9 docs de Firestore `baader200-sections` actualizados).
+- Verificacion: `tsc --noEmit` limpio, 780 tests verdes (5 skipped); paridad Firestore <-> fallback verificada con script; verificador-web 3 pasadas (las 2 primeras encontraron superficies sin sincronizar - objetivo/quiz y Consulta rapida - corregidas antes de cerrar).
+- Estado: HECHO. Sigue: nada pendiente de esta tanda; con esto quedan 43 de 43 medios de la auditoria `verificar-contenido-fichas` cerrados.
+
+## 2026-07-30 - claude - Marel Filete: corregida identidad (M-Weigher WTR, no SmartLine) + hardware inexistente eliminado (PR #317, MERGED, 7a tanda de MEDIOS)
+
+- Contexto: Orel confirmo en planta que el equipo de Filete es un **M-Weigher WTR (GR8251)** con indicador M6410, NO una linea SmartLine. Verificado contra `M-WeigherWTR_UM_v1.02_SPA.pdf` (71 pags): "brazo" y "lote" dan 0 coincidencias en el manual.
+- Hecho: identidad reescrita (recorrido real + 9 piezas segun Tabla 1, con nota de que no tiene descarga/brazos/bandejas), tagline corregido, M6410 aclarado como indicador (no bascula), mantenimiento/limpieza/arranque ajustados al manual, calibracion marcada como criterio de planta (no cubierta por el manual del WTR). Se elimino hardware inexistente: unidad de descarga y creacion de lotes, 2 diagnosticos, grupo de Consulta rapida de brazos/cilindros SmartLine, fila de arranque "Steady en M3210".
+- Archivos: `marelFileteContent.json`, `marelFileteLearning.ts`, `learningMachines.ts`, `learningQuickRef.ts`, `scripts/seed-quiz-maquinas.js`.
+- Verificacion: `tsc --noEmit` limpio, 780 tests verdes (5 skipped); verificador-web 2 pasadas (1ra encontro 3 superficies fuera del seed - tagline, Consulta rapida, quiz - corregidas antes de cerrar).
+- Estado: HECHO. Sigue: 5 secciones de manual minadas en Firestore (`learningContent/marel-filete/manual`, ids 100-104) mezclan contenido del WTR con contenido del SmartLine viejo (101, 102, 103) — requiere decision, no se toco. La pregunta 1 del quiz en produccion sigue vieja hasta que se re-siembre Firestore.
+
+## 2026-07-30 - claude - Baader 142 diagnosis: NO se borro (los 10 docs son conocimiento de planta, no basura)
+
+- Contexto: venia como pendiente del PR #312 y de la limpieza de Marel HG de mas abajo, etiquetado como "10 docs muertos". Se pidio limpiarlo. **No se borro nada** — al leer el contenido antes de borrar, la premisa resulto falsa.
+- Hallazgo: los ids son `diag_<timestamp>_<random>`, el formato que genera `saveDiagnosis()` desde el editor admin — no son restos de un seed viejo, los escribio una persona en una sola sesion de 53 min el 21-may-2026. Contienen datos que el seed (34 entradas) no tiene, verificado por grep sobre `baader142Content.json`: bomba de vacio **SB 1100D0** (0 menciones en el seed), **tiempo de recuperacion de vacio vs piezas/min** como variable de ajuste (0 menciones), remision a **codigos SAP** del catalogo (0 menciones), la jerarquia "interruptor 3 = PRINCIPAL SOLUCION", y el E777 desglosado en (a) esporadico = tecnica del operador vs (b) recurrente = muelle de traccion del carro roto, con el porque mecanico. Ademas agrupan por **sintoma observable por el operador**, mientras el seed reproduce la taxonomia del manual: son dos ejes distintos, no duplicados.
+- Colision detectada: otro chat esta resolviendo lo mismo por el camino contrario en la rama `fix/b142-diagnosis-overrides` (cambios sin commitear en el working tree compartido): `listDiagnosis` para B142 pasa a usar `withDiagnosisOverrides` sobre `mergeSeedOverrides`, mas `_deleted:true` para ids `b142-diag-*` y counts de la tarjeta corregidos. Borrar la coleccion habria roto esa feature (mergearia contra vacio); migrar al seed ademas habria dejado cada diagnostico DUPLICADO al mergear.
+- Decision (Orel, 2026-07-30): se descarta el plan de migrar-al-seed-y-borrar; sigue el enfoque de overrides, que arregla la causa (el editor admin escribia a un lugar que nadie leia) y usa el patron ya establecido del repo.
+- Archivos: solo `.ai/MEMORY.md` (seccion de seed vs overrides reescrita con la senal para distinguir contenido humano de basura) y este WORKLOG. Cero cambios de codigo y cero escrituras a Firestore/Storage.
+- Verificacion: snapshot fresco en `_snapshots/learningContent__baader-142__diagnosis__2026-07-30T23-19-06-565Z.json` (10 docs, intactos en produccion).
+- Estado: HECHO (como no-accion deliberada). Sigue: la rama `fix/b142-diagnosis-overrides` termina y mergea; al mergear, revisar que los 10 no queden solapados con entradas equivalentes del seed (ej. esofago largo, A3C, recto retenido) — puede convenir despues consolidar, pero eso es contenido, no limpieza.
+
+## 2026-07-30 - claude - Marel HG: borrados 2 procedimientos huerfanos en Firestore + 6 imagenes en Storage (sin PR, solo datos)
+
+- Contexto: `learningContent/marel-hg/procedures` tenia 2 docs que la app nunca muestra. `listProcedures()` (`services/learningContent.ts:618`) despacha a `listMarelHgProcedures()` (`services/marelHg/marelHgLearning.ts:101`), que devuelve el seed puro de `marelHgContent.json` sin mergear overrides. Usaban ids del esquema viejo (`activar-flippers-entrada-baader`, `modificar-distancia-flipper`) vs `mhg-proc-*` del seed. Mismo patron que el caso hermano `learningContent/baader-142/diagnosis` anotado en el PR #312.
+- Riesgo que lo justificaba: `activar-flippers-entrada-baader` era la version ANTERIOR del procedimiento de flippers, la que la auditoria del 2026-07-30 marco CRITICO por riesgo de lesion — su `description` decia "util para pruebas y despeje de atascos" y arrancaba directo en la clave de Servicio, sin paso de seguridad. La version corregida (seed, `mhg-proc-activar-flippers-entrada-baader`) dice explicito "NO es un metodo para desatascar producto" y suma el paso 1 de LOTO citando el A600. Si alguien cambiaba el dispatch para mergear overrides, reaparecia el texto peligroso.
+- Hecho: (1) borrado REAL de los 2 docs — no `_deleted:true`, porque esa convencion es para tapar docs que el seed si publica, y estos no existen en el seed bajo esos ids; la coleccion quedo en 0 docs. (2) Borradas las 6 imagenes huerfanas de Storage bajo `procedures/activar-flippers-entrada-baader/` y `procedures/modificar-distancia-flipper/`; eran duplicados byte a byte de las del seed (mismos tamanos exactos, subidas 8 min antes). Bajo `procedures/` quedan solo los 6 archivos `mhg-proc-*`.
+- Archivos: ninguno de codigo. Solo datos de PRODUCCION (Firestore + Storage). Respaldos en `_snapshots/` (gitignored): `learningContent__marel-hg__procedures__2026-07-30T22-57-23-398Z.json` (restaurable con `--restore ... --confirm`) y `storage__marel-hg__procedures-huerfanas__2026-07-30/` (6 JPG).
+- Verificacion: `firestore-snapshot.js --dump` de la coleccion ahora responde "esta vacia o no existe"; listado de Storage muestra 6 objetos, todos `mhg-proc-*`; las 3 `imageUrl` del seed responden HTTP 200 (las imagenes que la app si muestra siguen sirviendo); 0 referencias a los ids viejos en `apps/` y ninguna URL del seed apunta a las carpetas borradas.
+- Estado: HECHO. Sigue: nada de este PR.
+- ⚠ CORRECCION (mismo dia, ver entrada de abajo): el caso `learningContent/baader-142/diagnosis` NO es analogo a este y **NO se debe borrar**. Se reviso el contenido y es conocimiento de planta escrito a mano, no basura. Queda en manos de la rama `fix/b142-diagnosis-overrides`.
+
+## 2026-07-30 - claude - Detector de Metales: 3 medios + 2 menores corregidos (PR #314, MERGED, 6a tanda de MEDIOS)
+
+- Contexto: Orel confirmo en planta que el equipo instalado es un Vistus (no un IQ4), lo que desbloquea la auditoria `verificar-contenido-fichas` del 2026-07-30 sobre el manual correcto (`845_BA_Vistus-es_0_20110413.pdf`, 223 pags, citando pagina impresa).
+- Hecho: (1) privilegios reales de Operador (§4.7 pag 23) incluyen aprendizaje rapido, remedio explicito ante rechazo masivo por cambio de producto (§13.3.3 pag 152) — la ficha lo dejaba esperando a un ingeniero; (2) regla de deteccion de alambres corregida (§4.9.4 pag 27): en alambres el Fe se detecta peor que el VA en 2 de 3 orientaciones, al reves de lo que decia la ficha; el dato sobre AISI 304 quedo acotado a bolas de test (pag 131); (3) codigos E010C, W0207 y E010B recategorizados como accionables (remiten a red o muestran detalle en pantalla), no todo el rango E0100-E01xx es Sartorius; menores: la sal como causa de efecto de producto se etiqueto como criterio de planta (no esta en el manual) + citas de pagina unificadas a numeracion impresa.
+- Archivos: `apps/pwa/src/services/detectorMetales/detectorMetalesContent.json`, `apps/pwa/src/services/detectorMetalesLearning.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 8 puntos incluyendo 2 preguntas de quiz respondidas, ambos temas, consola limpia.
+- Estado: HECHO. Sigue: 28 de 43 medios corregidos acumulados.
+
+## 2026-07-30 - claude - Baader 142: 3 medios + 1 menor corregidos (PR #312, MERGED, 5a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 3 hallazgos MEDIOS de la Baader 142 mas 1 menor, cruzados contra `498_142-Manual de Instrucciones-2005-12-E.pdf` citando pagina.
+- Hecho: (1) mapeo X de la tabla "E 8 N X" estaba invertido (el manual pag 41/45 dice 1=SM1 Centraje, 2=SM2 Cuchilla abridora, al reves de la tabla original) — afecta E801-E805, E821-E825, E831-E835, E841-E845, E851-E855, E861-E865; se publica el mapeo confirmado y se deja explicita la contradiccion; (2) E770-E775 (6 codigos) marcados CONDICIONAL: solo existen con el Upgrade Kit (nota pag 42, S22.4.4 pag 87), pendiente confirmar en planta si esta 142 lo tiene; (3) procedimiento del palpador (S12.4 pag 28) se saltaba los dos extremos del orden de conexion con la clavija de tope, reordenado de 7 a 9 pasos; (4) menor: chapaleta medidora de largos "400 mm" -> "400 ±2 mm" (dib. 15) con advertencia de su efecto en la medicion de largos.
+- Archivos: `apps/pwa/src/services/baader142/baader142Content.json`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 4 puntos con las 6 entradas E77x verificadas una por una, ambos temas, sin scroll horizontal en 375px.
+- Estado: HECHO. Sigue: 25 de 43 medios corregidos acumulados; nota aparte (fuera de este PR): `learningContent/baader-142/diagnosis` tiene 10 docs de diagnostico por sintoma que `listDiagnosis` nunca despacha (la ficha usa el seed puro) — contenido distinto y mas rico, snapshot en `_snapshots/learningContent__baader-142__diagnosis__2026-07-30T22-37-54-098Z.json`.
+
+## 2026-07-30 - claude - Grader: 7 medios + 3 menores corregidos (PR #310, MERGED, 4a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS del Grader cruzados contra el manual Marelec MS4/12 y el instructivo "Basculas Grader", citando pagina.
+- Hecho: (1) ±20 g corregido de tolerancia a desviacion estandar (manual pag 6) — el quiz repetia el mismo error; (2) juego vertical en flipper: rodamientos 6005 2RSR, no bujes (pag 25/58) — el quiz daba la respuesta incorrecta como correcta; (3-7) 5 umbrales sin respaldo documental retirados o etiquetados como criterio interno de Mantención ANTARFOOD (P0<2%, ruta redistribuir-gates, slow-mo-flipper con bobina 15-30 Ω inventada, ajuste-eye-sync 50-150 ms, tachometro-cinta gap 1-3 mm); mas 3 menores (motor-tambor: termometro laser en vez de tacto a 60°C; limpieza-fotocelula: baja presion no paño con alcohol; peso patron redactado sin ambiguedad). Los 11 runbooks y sus 6 triggers automaticos (`metric`) quedaron intactos.
+- Archivos: `apps/pwa/src/services/graderLearning.ts`, `apps/pwa/src/services/grader/graderRunbooks.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web PASA en 11 puntos respondiendo las 2 preguntas de quiz corregidas, ambos temas, sin scroll horizontal en 375px.
+- Estado: HECHO. Sigue: 22 de 43 medios corregidos acumulados; quedan medios sin tocar en otros equipos.
+
+## 2026-07-30 - claude - Fishken: 6 medios + restos de quiz/"por que importa" corregidos (PR #308, MERGED, 3a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 6 hallazgos MEDIOS de la Fishken cruzados contra los 4 manuales del equipo (E-Pack S28, Hardware, Diagramas de Conexion, FishKen Web), citando pagina.
+- Hecho: (1) procedimiento de arranque saltaba el Autozero (pag 10), ahora 7 pasos + Pausar/Detener; (2) rango de calibre no se edita en el E-Pack, se corrige en FishKen Web > Calibres; (3) causas de sobrepeso estaban al reves de lo documentado (deshabilitar compuerta SUBE el sobrepeso, no lo baja); (4) "compuertas no accionan" culpaba directo a la tarjeta NUMATO en vez de aire/electrovalvulas/24V primero; (5) "celda sucia" no es causa documentada, se agrego bloque de mantencion semanal con causas mecanicas reales; (6) cambio de producto no se hace en el E-Pack sino en FishKen Web > Configuracion, y no existe boton "reiniciar estadisticas". Ademas se corrigieron restos en `fishkenLearning.ts` (por que importa + quiz seguian atribuyendo sobrepeso a "celda sucia") y en `marelHgLearning.ts` (resto del PR #306: Metodos de clasificacion y Alarmas contradecian el JSON ya corregido).
+- Archivos: `apps/pwa/src/services/fishken/fishkenContent.json`, `apps/pwa/src/services/fishkenLearning.ts`, `apps/pwa/src/services/marelHgLearning.ts`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped), verificador-web en dos pasadas (1a detecto la falla de los `*Learning.ts`, 2a dio PASA en 5 puntos leidos del DOM en ambas fichas, incluyendo responder el quiz).
+- Estado: HECHO. Sigue: 15 de 43 medios corregidos acumulados; quedan medios sin tocar en otros equipos (4a tanda).
+
+## 2026-07-30 - claude - Marel HG: 7 medios + 3 menores corregidos (PR #306, MERGED, 2a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 7 hallazgos MEDIOS de la Marel HG mas 3 menores de las mismas secciones, cruzados contra `785_A600 User Manual_ES.pdf` citando pagina impresa.
+- Hecho: (1) terminar lotes apuntaba a Last Batches (solo historico) en vez de Production > Buffers > Terminate all; (2) metodo de clasificacion se elige por PRODUCTO (pantalla Products), no en el programa; (3) definicion correcta de que es un programa (plantilla de unidades/tara, no metodo/rangos/destinos); (4) pasos inventados en agregar/copiar programa; (5) "eliminar informes" no existe, el unico borrado es Reset (borra todo lo anterior, se agrego advertencia de exportar antes); (6) cambiar de programa con produccion en curso interrumpe lotes abiertos; menores: Main da acceso a 4 pantallas no a todas, alarmas son 3 niveles no 2, 8 citas de pagina unificadas a numeracion impresa.
+- Archivos: `apps/pwa/src/services/marelHg/marelHgContent.json`.
+- Verificacion: tsc limpio, 780 tests verdes (5 skipped, 52 archivos), verificador-web PASA en 11 puntos/ambos temas/sin errores de consola/sin scroll horizontal (888px y 375px).
+- Estado: HECHO. Sigue: quedan ~34 hallazgos MEDIOS de la auditoria sin tocar (2a tanda, 9 de 43 acumulados).
+
+## 2026-07-30 - claude - Enzunchadora: reubica 2 causas de troubleshooting (PR #305, MERGED, 1a tanda de MEDIOS)
+
+- Contexto: siguiendo la auditoria `verificar-contenido-fichas` del 2026-07-30, se corrigen los 2 hallazgos MEDIOS de la Enzunchadora TP-6000 — causas asignadas a la fila equivocada de la tabla de Troubleshooting (manual pag. 22 / PDF pag. 28).
+- Hecho: (1) "STOP bloqueado" pasa de la fila "piloto no enciende" a "piloto enciende, no opera" (con STOP bloqueado la maquina sigue energizada, pag. 5); (2) "enhebrado incorrecto en portabobina" pasa de "piloto enciende, no opera" a "avance/recogida incorrectos". Las 5 entradas de diagnostico ahora cubren las 26 causas del manual sin solapes ni huecos (3+4+12+4+3=26).
+- Archivos: `apps/pwa/src/services/enzunchadora/enzunchadoraContent.json`.
+- Verificacion: tsc limpio, 773 tests verdes (5 skipped), verificacion en navegador (`/aprendizaje/maquina/enzunchadora-n2`) en ambos temas, consola limpia.
+- Estado: HECHO. Sigue: quedan ~42 hallazgos MEDIOS de la auditoria sin tocar (esta fue la 1a tanda, 2 de 43).
+
+## 2026-07-30 - claude - Corrige 9 criticos de la auditoria de contenido (PR #301, MERGED)
+
+- Contexto: la auditoria de contenido (workflow `verificar-contenido-fichas`, 26 agentes) encontro 9 errores criticos en fichas de Centro de Aprendizaje, uno de seguridad (Marel HG). Cada correccion cita la pagina del manual fuente.
+- Hecho: (1) Marel HG - paso 1 de seguridad (cortar energia/aire) antes de activar flippers manualmente; (2) Baader 200 - "4.8+30" (numero de diapositiva pegado) corregido a 4,8 mm; (3) Baader 200 - los 12 mm de "Medidas de Cuchillos" no eran la abertura "b" de Cuchillos Dorsales (real: 5/4/7 mm por especie); (4)-(5) Grader - comandos de capacho/flipper en rangos continuos que se solapaban (tipear 141 activaba el flipper 5 en vez del capacho), corregidos a 3 grupos reales cada uno, quiz ampliado 2→4 preguntas; (6) Detector de Metales - W0001 describia la W0003, separadas las 3 alarmas; (7)-(8) Fishken - calibracion de compuertas incompleta + pantalla equivocada ("Ajuste de puertas" en vez de "Calibracion"); (9) Baader 142 - lubricacion agregada a limpieza diaria/mantenimiento (era solo semanal, el manual la exige cada 8 h).
+- Hallazgo de proceso: el Baader 200 lee su contenido de Firestore (`baader200-sections`, 23 docs) en produccion, no del `.ts` (solo fallback) - se corrigio tambien ahi con snapshot previo.
+- Archivos: `apps/pwa/src/services/{marelHg/marelHgContent.json,baader200Learning.ts,graderLearning.ts,detectorMetales/detectorMetalesContent.json,fishken/fishkenContent.json,baader142/baader142Content.json}`, `apps/pwa/src/data/learningQuickRef.ts`, `.claude/workflows/verificar-contenido-fichas.js`.
+- Verificacion: tsc limpio, 761 tests verdes, verificacion en navegador (DOM real) de las 5 fichas afectadas, Baader 200 re-verificado tras el fix de Firestore, movil 375px sin scroll horizontal, consola limpia.
+- Estado: HECHO. Sigue: ~36 hallazgos MEDIOS del informe sin tocar; 2 preguntas de planta abiertas (detector Vistus/IQ4, Marel Filete SmartLine/M-Weigher); capacho 3 del Grader transcrito "130" tal cual (probable errata) marcado para verificar en maquina.
+
+## 2026-07-30 - claude - Arregla el toggle de brecha (merge de ECharts) + chip de eje autoexplicativo
+
+- Contexto: Orel probo en Filete y reporto dos cosas — "ocultar brecha no funciona" y "el boton operacion real no se que hace".
+- Causa raiz del toggle: `setOption` de ECharts MERGEA por defecto, asi que sacar la serie de brecha del array NO la borra del grafico. Prender funcionaba, apagar no. Fix: la serie existe SIEMPRE en modo barras y lo que cambia son los DATOS (`gapSeriesData` devuelve todos null cuando esta apagada) — el merge si reemplaza datos. Ademas el `stack` de la barra real queda FIJO en vez de alternar entre undefined y un id, que dejaba al merge con una config a medias.
+- Chip del eje: la etiqueta era "operacion real / turno completo", que no dice que recorta ni sobre que. Ahora dice **"eje: solo con proceso · 09:45–16:25"** vs **"eje: turno completo · 08:00–08:00"** — el rango visible va en el propio chip (desktop) y el tooltip aclara que el Gantt y el grafico comparten ese eje.
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`.
+- Verificacion: 780 tests verdes (4 nuevos de `gapSeriesData`, incluido "apagada = mismos puntos en null" y "nunca negativa"), tsc y eslint limpios. En el navegador el chip alterna y el RANGO cambia de verdad: 08:00–08:00 ↔ 09:45–16:25 (evidencia del efecto, no solo del texto).
+- Estado: EN REVISION — PR abierto.
+- Sigue: Orel confirma que la brecha ahora se apaga. El sabado, Filete con 5.000 pz.
+
+## 2026-07-30 - claude - Grafico de pz/min: el encoding depende de la linea (barras 1 maq / lineas 2+)
+
+- Contexto: Orel reviso el grafico en Yal (turno de anoche, 3 Baader) y lo llamo "muy sucio". Tenia razon: 3 series x ~100 tramos son barras de 1-2 px pegadas — una reja. Las barras resolvian Filete (1 maquina, 14 tramos sueltos) y arruinaban Yal.
+- Hecho: `rateChartMode(machineCount)` decide el encoding — **1 maquina → barras, 2+ → lineas** (vuelve al encoding original de Yal/Chonchi, que respondia la pregunta correcta: cual Baader bajo primero y cuanto se separan). Todo lo demas del trabajo anterior se mantiene en los dos modos: eje acotado a la operacion real, objetivo conectado, bandas de "parada con objetivo" y agrupacion a 15 min. El toggle "ver brecha" queda solo con 1 maquina (se apila sobre la barra; en modo linea no hay donde apilar).
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`.
+- Verificacion: 776 tests verdes (3 nuevos de `rateChartMode`), tsc y eslint limpios. En el navegador: Yal SIN toggle de brecha y en "turno completo"; Filete CON toggle y en "operacion real".
+- ⚠ La verificacion VISUAL sigue dependiendo de Orel (el pane de esta sesion no compone frames; ECharts pinta en canvas).
+- Estado: EN REVISION — PR abierto.
+- Sigue: confirmar con captura que Yal volvio a verse limpio. El sabado, Filete con 5.000 pz reales.
+
+## 2026-07-30 - claude - Grafico de pz/min: barras por tramo + eje acotado a la operacion real
+
+- Contexto: Orel mando una captura del grafico en produccion. Dos problemas visibles: el eje cubria 24 h (08:00→08:00) para un turno que produjo 6 h, y el objetivo aparecia como rayitas flotantes sueltas.
+- Diagnostico con datos: el turno del 28-jul tiene **14 tramos con dato sobre 288 posibles**, en dos racimos (09:55 y 14:30-16:10). Una LINEA dibujaba continuidad donde no hubo ni un tramo con produccion.
+- Hecho (mockup aprobado A+B, C como toggle): (1) el eje se acota a la ventana real de produccion cuando el turno no esta acotado en Shoplogix, con chip "operacion real / turno completo" para alternar. El encuadre va a nivel de PANEL porque el Gantt y el grafico comparten eje (van sincronizados) — acotar solo uno los desalinearia. (2) El grafico pasa de linea a BARRAS por tramo: los tramos sin dato quedan huecos, no una linea que baja a cero. (3) El objetivo se conecta entre tramos (`connectNulls`) porque es una consigna, no desaparece. (4) Toggle "ver brecha al objetivo" que apila lo que falto en cada tramo (opcion C, apagada por default: en un turno normal seria ruido). (5) Agrupacion a 15 min cuando el rango visible pasa de 4 h, para que las barras no se apelmacen.
+- Helpers nuevos y testeados: `effectiveProductionWindow` / `shouldFrameOnProduction` (shoplogixNormalizer) y `regroupRates` (ProductionRateLineEC).
+- Archivos: `apps/pwa/src/components/grader/{ProductionRateLineEC.tsx,UpstreamMachinesPanel.tsx,__tests__/productionRateTarget.test.ts}`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`, `apps/pwa/src/services/shoplogix/{shoplogixNormalizer.ts,__tests__/shoplogixNormalizer.test.ts}`.
+- Verificacion: 773 tests verdes (12 nuevos: encuadre con los datos reales del 28-jul, y agrupacion que NO afirma produccion cero donde solo falta el dato), tsc y eslint limpios. En el navegador: Filete arranca en "operacion real", Yal en "turno completo" (su turno SI esta acotado → su eje no se toca), los 2 toggles alternan, y 0 botones anidados tras corregir un `<button>` dentro de `<button>` que React reportaba.
+- ⚠ PENDIENTE de verificacion VISUAL: el pane del navegador de esta sesion no compone frames (ECharts pinta en canvas), asi que las barras, la brecha apilada y las bandas no las pude VER. La logica esta cubierta por tests; Orel manda captura tras el deploy.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado con 5.000 piezas el grafico se ve muy distinto (barras casi llenas) — ahi se valida el encoding de verdad.
+
+## 2026-07-30 - claude - Target de planificacion de Filete (5.000 pz/turno)
+
+- Contexto: produccion definio ~5.000 piezas por turno y 2 turnos en Filete (los horarios no se fijan: los define Shoplogix y la app ya descubre los turnos de los docs).
+- Hecho: `shiftTargetPieces` por linea en `plantLines.ts` (Filete 5.000) con espejo `PLANT_SHIFT_TARGET_PIECES` en `functions/shoplogix/machines.js`. Se usa como REFERENCIA DE CUMPLIMIENTO donde Shoplogix no manda target oficial — el caso de Filete: (a) el brief de fin de turno agrega "🟡 84% de lo planificado (5.000)", rotulado DISTINTO del target del sensor porque son dos numeros diferentes; (b) la vista de turno muestra "1% de 5.000 planificadas" bajo el total de ciclos. Si algun dia llega el target oficial del rollup, ese GANA.
+- Ademas: el label corto de maquina sale del MODELO (`machineShortLabel`: B142/B200/HG/KN) — en Filete la Baader 200 aparecia como "Ev 1" (evisceradora); y con una sola maquina se omite el numero ("B200", no "B200 1").
+- Umbral del brief confirmado contra el dato nuevo: `minPieces` 200 = 4% de 5.000 → un turno real (5.000) manda brief, un turno malo al 10% (500) TAMBIEN (hay que reportarlo), un lote de prueba (59) no.
+- Archivos: `apps/pwa/src/config/plantLines.ts`, `apps/pwa/src/components/grader/ShoplogixOnlyScorecard.tsx`, `apps/pwa/src/services/shoplogix/shoplogixMachines.ts`, `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`, `functions/shoplogix/{machines.js,turnoBrief.js,__tests__/turnoBrief.test.js}`, `functions/index.js`.
+- Verificacion: 93 tests de functions (3 nuevos: usa lo planificado, el oficial le gana, y sin ninguno NO inventa porcentaje) + 761 de la PWA, tsc y eslint limpios. Chip verificado en el navegador con el turno real ("1% de 5.000 planificadas" y "B200" en vez de "Ev 1"); brief renderizado para un turno simulado de 4.200 pz → "🟡 84% de lo planificado (5.000)".
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado, primer turno real → ajustar 5.000 si el pedido cambia, y confirmar como nombra Shoplogix a los 2 turnos.
+
+## 2026-07-30 - claude - Pobla la Enzunchadora TP-6000: 9a y ultima maquina del Centro de Aprendizaje (PR #296)
+
+- Hecho: la Enzunchadora N2 (Transpak TP-6000-1) estaba en 0/4 secciones; la memoria decia que no habia material en OneDrive pero SI existe (`TRANSPAK_TP-6000-1_Manual_operacion_y_repuestos.pdf`, 124 pags) — la busqueda vieja fallaba por buscar "N2" en vez de "TP-6000". Se curo del manual (ingles, PARTE I pags. 1-22, con la tabla de Troubleshooting rasterizada y transcrita): 7 secciones de Manual, 5 Procedimientos, 4 Flujos, 5 Diagnosticos, Consulta rapida (8 grupos, sin "Claves de acceso" porque no hay clave documentada) y 18 preguntas de Evaluacion. Con esto el Centro de Aprendizaje queda completo, 9/9 maquinas. Se corrigio ademas el shuffle de opciones del seed (concentraba correctas en B) por uno deterministico, y se agrego `--only=<slug>` a `seed-quiz-maquinas.js` para no pisar preguntas de otras maquinas ya editadas desde el panel admin.
+- Archivos: `apps/pwa/src/services/enzunchadora/enzunchadoraContent.json` (nuevo), `apps/pwa/src/services/enzunchadoraLearning.ts` (nuevo), `apps/pwa/src/services/learningContent.ts`, `apps/pwa/src/data/{learningMachines.ts,learningQuickRef.ts}`, `scripts/seed-quiz-maquinas.js`.
+- Verificacion: tsc limpio; seed a Firestore con `--only=enzunchadora-n2` (dry-run antes); verificador-web PASA CON RESERVAS contando por numero (8/7/5/4/5, evaluacion "01/18" responde CORRECTO con explicacion); card del hub 4/4 con badge "Nuevo"; buscador por sintoma "fleje"→3 resultados y "sello"→1 (el seed SI entra al indice); movil 375px sin scroll horizontal.
+- Estado: HECHO — PR #296 mergeado (squash+admin), deploy a GitHub Pages disparado automaticamente al mergear.
+- Sigue: buscar "sellado" (literal) no encuentra nada — el indice cubre titulo+sintoma, no el texto completo de la solucion (no bloqueante); falta verificar tema claro/oscuro en esta ficha y las 18 preguntas una por una; falta uso real de un tecnico en terreno.
+
+## 2026-07-30 - claude - Alertas y brief de Filete con umbrales propios
+
+- Hecho: (1) la config de notificaciones pasa a 3 capas en `functions/shoplogix/notifConfig.js` (DEFAULTS -> overrides por planta -> Firestore) con `shiftEnd.minPieces` nuevo: Filete exige 200 piezas y el eviscerado sigue en 50. Motivo REAL: el lote de prueba de 59 piezas del 28-jul disparo un brief de fin de turno como si fuera un turno productivo. (2) El brief muestra la OPERACION REAL (`effectiveStart/End`) cuando la ventana del turno es >=25% mas ancha: decia "Horario real: 08:00 -> 08:00" porque el "Turno Dia" de Filete abarca 24 h; ahora dice "Operacion real: 09:56 -> 16:11". (3) Nueva linea "N paros sin causa anotada (Nm) — anotala en Analisis de Turno", que cruza los paros del sensor con las anotaciones de `paros` (via la misma clave determinística `sensorStopKey`) — el brief es el momento en que alguien todavia se acuerda de lo que paso. (4) `minPieces` editable en el Panel Admin. (5) Copy: "piezas por Baader" -> "por maquina" en briefs/tools, y la tool de produccion de ARIA ahora detecta filete.
+- Archivos: `functions/shoplogix/{notifConfig.js (nuevo),turnoBrief.js,__tests__/{notifConfig.test.js (nuevo),turnoBrief.test.js}}`, `functions/index.js`, PWA: `pages/admin/ShoplogixNotificationsConfigPage.tsx`, `services/shoplogix/shoplogixNotifConfig.service.ts`.
+- Verificacion: 90 tests de functions verdes (5 nuevos de notifConfig + 3 del brief), 761 de la PWA, tsc y eslint limpios. Renderice el brief con los DATOS REALES del 28-jul antes y despues: antes "Horario real: 08:00 -> 08:00" y se enviaba con 59 piezas; ahora con 59 piezas NO se envia (umbral 200) y con un turno real sale "Operacion real: 09:56 -> 16:11" + "1 paro sin causa anotada (23m)".
+- ⚠ PENDIENTE de verificacion visual: el Panel Admin de notificaciones exige re-autenticacion con contraseña, asi que el input nuevo de `minPieces` no lo pude ver en pantalla (el resto se verifico). Orel: mirarlo al entrar.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado, primer turno real de Filete — confirmar que el brief sale con la ventana real y que el umbral de 200 es el adecuado; ver si `scrapReasons` viene poblado (habilitaria OEE completo A*P*Q).
+
+## 2026-07-30 - claude - OEE del AREA: maquina instrumentada + etapas sin sensor (la GEA)
+
+- Hecho: la tarjeta de OEE de linea pasa a ser OEE del AREA y se habilita en toda linea con Shoplogix (antes solo con Grader, asi que Filete no la veia). Calculo extraido a `services/grader/areaOeeCompute.ts` (testeado): `A_area = uptime / (tiempo rastreado por el sensor + paros de etapa)`, R del cuello de botella, y donde no hay Grader el OEE se muestra como **A×R con chip rotulado** en vez de fingir calidad 100%. El pareto ahora reparte el downtime de la maquina POR CAUSA ANOTADA (el pago de la feature anterior) y expone lo que falta anotar en vez de esconderlo.
+- ⚠ Doble conteo resuelto con una REGLA explicita: un paro de etapa solo suma tiempo si NO detuvo la maquina. Si la detuvo, ya esta en el downtime del sensor y va como causa de ese paro (`origen:'shoplogix'`, que `computeAreaOee` excluye del tiempo adicional).
+- Fixes que salieron de mirar datos reales: `MachineKPI` expone `uptimeMin/downtimeMin/setupMin` (antes la base de tiempo se DERIVABA de `downtime/(1-A)` y fallaba sin averias macro); `machineType` se propaga a los KPIs y en la agregacion gana el primer tipo CONOCIDO (los turnos sin produccion quedan congelados en 'other' y borraban el modelo del mes); etapas sin sensor por linea en `plantLines.ts` (Filete: GEA, cintas, enzunchadora — antes ofrecia Bombeo/Chiller/Grader del eviscerado); `getAreaDisplayLabel` para que el titulo no diga "Filete · Filete".
+- Bug de UX encontrado probando: registrar un paro no movia el OEE hasta recargar (la card leia los paros solo al montar). Ahora `ParoEtapaCapture` avisa (`onChanged`) y la card relee.
+- Archivos: `services/grader/{areaOeeCompute.ts (nuevo),plantKpiCompute.ts,__tests__/areaOeeCompute.test.ts (nuevo)}`, `components/grader/{LineOeeCard.tsx,ParoEtapaCapture.tsx}`, `services/shoplogix/shoplogixMachines.ts`, `config/plantLines.ts`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificacion: tsc limpio, eslint sin errores, 761 tests (9 nuevos de `computeAreaOee`, incluido el caso de doble conteo). Punta a punta en produccion con Filete: registre un paro de la GEA de 45 min → OEE maquina 7% vs **OEE area 3%** ("disponibilidad 33% → 14%, base 1h 19m") y pareto "1. GEA (etapa) 45 min · 2. Paros sin causa anotada (maquina) 23 min"; al borrarlo desde la UI volvio a 7% SIN recargar. Produccion quedo limpia (0 paros, 0 maintenanceLog).
+- Estado: EN REVISION — PR abierto.
+- Sigue: #6 (alertas y brief de Filete con umbrales propios). El sabado: primer turno real.
+## 2026-07-30 - claude - Arregla los 2 crones que fallaban por la proteccion de main (PR #292)
+
+- Hecho: causa raiz comun — `main` exige el check "build" con `enforce_admins: true`, ninguna escritura directa entra. `Daily Sync (versions)` fallaba desde el 24-jul (`GH006`): se le quito el `schedule` y `version.ts` ahora se sincroniza solo via `prebuild` y el nuevo `dev` (`sync:version && vite`); el workflow queda de auditoria manual. `Weekly NanoBanana Check` fallaba 3 domingos seguidos (`HTTP 409`): ahora sube a la rama sin proteccion `nanobanana-assets`.
+- Archivos: `.github/workflows/{sync-version.yml,nanobanana-weekly.yml}` (o equivalentes), `apps/pwa/package.json` (script `dev`), `.claude/launch.json` (`autoPort`).
+- Verificacion: sintaxis .py/.yaml OK; sync manual llevo `version.ts` 3.99.1→3.99.6; `pnpm dev` encadena bien; los 2 workflows disparados a mano en `success` (antes fallaban siempre); NanoBanana genero imagen valida (PNG real, HTTP 200) y abrio issue #291. Check "build" del PR: pass.
+- Estado: HECHO — PR #292 mergeado (squash+admin), deploy a GitHub Pages y Firebase Hosting disparado automaticamente al mergear.
+- Sigue: confirmar en el proximo domingo/medianoche que los 2 crones corren solos sin intervencion.
+
+## 2026-07-30 - claude - Grafico velocidad real vs objetivo del sensor
+
+- Hecho: el grafico de tasa (pz/min) de la vista de turno ahora superpone el OBJETIVO por bucket que reporta el sensor (`targetRate`, con `expectedCycles/duracion` de respaldo en docs viejos) como linea punteada, y sombrea los tramos con objetivo vigente y produccion 0 ("parada con objetivo"). Ademas corrige el objetivo NOMINAL: se tomaba del PRIMER bucket con expected>0 — que es parcial y miente (en el turno del 28-jul de la Baader 200 daba 5 pz/min cuando el objetivo real era 20). Ahora es el maximo por bucket, mismo criterio que `targetCpmFromIntervals`.
+- Por que importa: separa "la maquina no da el ritmo" de "la maquina estuvo parada". En el 28-jul la Baader 200 llego a 19,0 contra objetivo 20 → el turno no se perdio por velocidad sino por 20 min parada.
+- Archivos: `apps/pwa/src/components/grader/ProductionRateLineEC.tsx`, `apps/pwa/src/components/grader/__tests__/productionRateTarget.test.ts` (nuevo).
+- Verificacion: tsc limpio, eslint sin errores nuevos, 752 tests verdes — incluidos 6 nuevos que corren `buildRateSeries` con la SERIE REAL del 28-jul y fijan: nominal 20 (no 5), objetivo variable por bucket, el bloque unico de 20 min parado, real != objetivo, y degradacion limpia sin `targetRate` ni `expectedCycles`.
+- ⚠ PENDIENTE de verificacion VISUAL: el panel del navegador dejo de componer frames a mitad de la sesion (ECharts pinta en canvas, no renderiza sin pane visible), asi que el grafico no se pudo ver corriendo. La logica esta cubierta por los tests con datos reales, pero hay que mirarlo con ojos antes de darlo por cerrado.
+- Estado: EN REVISION — PR abierto.
+- Sigue: mirar el grafico en pantalla (Filete 28-jul y un turno de Yal con 3 maquinas, cada una con su propio objetivo 16/19). Pendientes #5 (OEE de area con la GEA manual) y #6 (alertas de Filete).
+
+## 2026-07-30 - claude - Causa de los paros del sensor (dictado) + parametros del sensor
+
+- Hecho: (1) el sync guarda lo que el sensor mandaba y se descartaba — `targetRate` por intervalo (cadencia OBJETIVO, no la real: `expectedCycles = rate x 5min` y hay tramos con rate 20 y cycles 0), `uptimeCycles`/`scheduledCycles`, `scrapByReason`/`scrapTotal` (unica fuente posible de Calidad en Filete) y las unidades; `machineType` de la Baader 200 ya no cae en 'other'. (2) La vista de turno dejo de contar falso en lineas sin turno acotado: el ritmo se mide sobre la ventana REAL de operacion (Filete pasaba de 2 a 9 pz/h) y el copy "Baader 142"/"Evisceradoras" se deriva de `machineType`. (3) NUEVO panel "Causa de los paros": lista los paros que el sensor midio, el tecnico dicta el por que (voz -> `refineText` -> guardar), se clasifica por responsable (mantencion/operacion/externo/planificado) y las de Mantencion pueden ir al historial del equipo.
+- Modelo de datos: las causas van a `paros` con `origen:'shoplogix'` + doc id determinístico `sensorStopKey(...)` (re-anotar CORRIGE, no duplica). Se reusa `paros` en vez de crear coleccion nueva para no tocar `firestore.rules`. ⚠ `LineOeeCard` sumaba todos los `paros` al OEE de area: ahora filtra `origen !== 'shoplogix'`, porque esos minutos ya los descuenta la Disponibilidad del sensor (habria sido doble conteo).
+- Archivos: `functions/shoplogix/{normalizer.js,__tests__/normalizer.test.js}`; PWA: `components/grader/{SensorStopsCausePanel.tsx (nuevo),ShoplogixOnlyScorecard.tsx,UpstreamMachinesPanel.tsx,LineOeeCard.tsx}`, `services/{paros.ts,shoplogix/*}`, `types/index.ts`, `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: tsc limpio, eslint sin errores, 746 tests PWA + 20 de functions verdes. Punta a punta en produccion con el turno real del 28-jul: el panel listo el unico paro real (22,8 min a las 15:45, ≈455 pz al objetivo de 20 pz/min), se guardo la causa, quedo el doc en `paros` con su stopKey y la entrada en `maintenanceLog` (origen `paro_sensor`) — los 2 docs de prueba se borraron despues. En Yal (paros ya clasificados por el sensor) el panel muestra los 5 mas largos con boton "Detallar" y un toggle para el resto.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado, primer turno real de Filete → mirar si `scrapReasons` viene poblado (habilitaria OEE completo A*P*Q sin Grader), validar el objetivo de 20 pz/min y probar el dictado por voz en planta. Pendientes #3 (grafico velocidad real vs objetivo), #5 (OEE de area con la GEA manual) y #6 (alertas de Filete).
+
+## 2026-07-29 - claude - Filete visible en calendario y resumen del mes ("Turno Dia")
+
+- Hecho: con los datos ya sincronizados aparecieron 4 puntos donde el nombre del turno se comparaba contra listas/strings fijos y Filete quedaba invisible: (1) el calendario buscaba solo `Turno 1/2/3` → ahora descubre los turnos REALES del dia desde los docs; (2) `dayScanned` miraba solo claves de Chonchi; (3) el bucket dia/noche usaba una heuristica horaria de Yal que mandaba "Turno Dia" (07:30 local) a la noche → ahora el nombre explicito manda; (4) `SHIFT_META_TABLE` no tenia "Turno Dia" → la UI mostraba "?". Ademas, la grilla T1/T2/T3 del resumen mensual cae a Dia/Noche cuando la linea no usa esa nomenclatura (antes mostraba 0/0/0 con turnos productivos).
+- Archivos: `apps/pwa/src/components/grader/{GraderHistoricalCalendar.tsx,GraderMonthlyStatsPanel.tsx}`, `apps/pwa/src/services/grader/graderShiftDisplay.ts`.
+- Verificacion: `tsc` limpio, 741 tests verdes, eslint sin errores. En preview con datos reales: el 28-jul pasa de "sin proceso" a **D · 59**, y el resumen del mes de "07-28 · ?" + "T1 0 · T2 0 · T3 0" a "07-28 · Dia" + "1 Dia · 0 Noche". Yal (mayo) sin regresion: mantiene sus chips Excel Dia/Noche + SLX T2/T3.
+- Estado: EN REVISION — PR abierto.
+- Sigue: el sabado arranca el proceso normal de Filete; mirar el primer turno real y ajustar `defaultShiftSchedule` con los horarios que emita Shoplogix.
+
+## 2026-07-29 - claude - Filete conectado a Shoplogix (deja de ser "próx.")
+
+- Hecho: la pestaña Filete de Análisis de Turno pasa de deshabilitada a línea viva con datos Shoplogix. Nuevo `plantSlug` **`filete`** (doc `shoplogix/filete`) con la ÚNICA máquina instrumentada del área: la **Baader 200 de Línea 1** (`3c0581da-…`, área Filetes areaid 8181). La GEA de filete no tiene integración todavía y no hay Grader aguas abajo → sin Excel, sin P0%, sin Calidad (el OEE queda en A·P, igual que Yal). De paso se parametrizaron los textos que decían "las 3 Baader"/"Evisceradora" en el KPI board: ahora salen de `machineKind`/`kpiScopeNote` de `plantLines.ts`, así que Filete no hereda copy del Eviscerado.
+- Archivos: `functions/shoplogix/{machines.js,sync.js}` (registry + `ACTIVE_PLANTS`), `functions/index.js` (mapa plant→plantLineId para el deep-link de notificaciones, detección "filete" en ARIA), `functions/scripts/validate-plant-integration.js`; PWA: `config/plantLines.ts`, `services/shoplogix/{shoplogixMachines.ts,types.ts,shoplogixShift.service.ts}`, `components/grader/{PlantKPIBoard.tsx,UpstreamMachinesPanel.tsx}`, `components/settings/ProcessNotificationsPanel.tsx`, `services/aria/{tools/grader.ts,proactiveAlerts.ts}`, `pages/AnalisisGrader/AnalisisGraderWizardPage.tsx`.
+- Verificación: `tsc --noEmit` limpio; eslint sin errores (solo warnings preexistentes); 741 tests PWA verdes; 78 tests de `functions/shoplogix` verdes; preview en `?linea=chonchi-filete` muestra la pestaña habilitada, el alcance correcto y "Sin datos Shoplogix" (esperado: el sync de `filete` recién corre cuando se despliegan las functions). Eviscerado sin regresión.
+- Estado: HECHO — PR #286 mergeado y desplegado (functions + hosting en verde).
+- Datos reales confirmados el mismo dia: el sync escribio `shoplogix/filete/shifts/*` solo, y el backfill 20→28 jul trajo el dia de pruebas de la Baader 200: **2026-07-28 "Turno Dia" = 59 ciclos** (el probe daba 42 en la ventana consultada + 17 Unscheduled). A 17.6% · P 21.1% · Calidad N/A.
+- Aprendizaje clave: **Filete nombra su turno "Turno Dia"** (sin tilde, D mayuscula), distinto de Chonchi (T1/T2) y Yal (T1/T2/T3).
+- Sigue: tras el merge, (1) `shoplogixProbe?plantSlug=filete` para ver qué turnos emite Shoplogix en el área, (2) `shoplogixBackfillRange?plantSlug=filete&from=…&to=…` para poblar histórico, (3) `node functions/scripts/validate-plant-integration.js filete <fecha>`, (4) ajustar `defaultShiftSchedule` de la línea con los horarios reales.
+
+## 2026-07-26 - claude - Snapshot/restore de Firestore + workflow de eval de contenido (PR #284)
+
+- Hecho: cierre de los 2 huecos pendientes del sistema agéntico. `scripts/firestore-snapshot.js` (list/dump/restore con dry-run por defecto) como red de seguridad antes de escrituras masivas a producción. `.claude/workflows/verificar-contenido-fichas.js` escrito para auditar contenido técnico de las 7 fichas contra manuales PDF, aún no ejecutado a propósito.
+- Archivos: `scripts/firestore-snapshot.js`, `.claude/workflows/verificar-contenido-fichas.js`, `.gitignore` (`_snapshots/`).
+- Verificación: 5 pruebas reales contra producción del script de snapshot (list, dump, rechazo de ruta de documento, restore en dry-run, ayuda sin argumentos). El workflow de eval no se corrió (a propósito).
+- Estado: HECHO — PR #284 mergeado y desplegado.
+- Sigue: correr `verificar-contenido-fichas.js` cuando Orel lo pida.
+
+## 2026-07-26 - claude - Sistema agéntico + optimización de contexto
+
+- Hecho: capa de ejecución por costo con 3 subagentes globales en `~/.claude/agents/` (`verificador-web`, `implementador-patron`, `cerrador-pr`, todos model=sonnet) para que verificación en navegador, aplicación de patrones y cierre de PR no corran al precio del modelo del bucle principal. Nueva skill global `mockup-antes-de-construir` que vuelve mecánica la regla de mostrar mockup antes de construir UI. Optimización de contexto: `CLAUDE.md` con regla de costo obligatoria (nunca leer completo `_novedades.json` ~840 KB/210k tokens ni los `_MANIFIESTO.json`, solo grep/jq), lectura obligatoria partida en "siempre" (~20 KB) vs "según la tarea" (~42 KB). Memoria del Centro de Aprendizaje compactada de 68 KB a 15 KB (−78%).
+- Archivos: `~/.claude/agents/*.md` (3 nuevos), `~/.claude/skills/mockup-antes-de-construir/SKILL.md`, `OneDrive\ANTARFOOD\CLAUDE.md`, memoria de Claude. Respaldo en `OneDrive\ANTARFOOD\_BACKUP_MEMORIA_CLAUDE\2026-07-26\`.
+- Verificación: skill activa de inmediato; los 3 agentes requirieron reinicio de sesión para registrarse (confirmado). Ningún cambio en código de la app.
+- Estado: HECHO
+- Sigue: cerrar 2 huecos del checklist agéntico — recuperación (snapshot antes de escrituras masivas a Firestore) y evaluación (verificar contenido de las 9 fichas contra manuales fuente).
+
+## 2026-07-25 - claude - Componentes del equipo: fotos reales con hotspots editables (PRs #278-#283)
+
+- Hecho: "Componentes del equipo" del Grader pasó de ilustración SVG abstracta a 10 fotos reales con puntos numerados clicables y zoom/paneo. #278 primera foto real; #279 galería de 9 fotos más; #280 cada foto con hotspots + zoom/paneo (`ImageLightbox`); #281 migración a Firestore (`learningContent/{slug}/components/{id}`) + editor admin clic-para-agregar/arrastrar-para-mover; #282 botón "Administrar" en cada sección editable; #283 nota del punto activo fija bajo la foto + grid 2 columnas en desktop. Causa raíz del mal posicionamiento inicial: `object-fit:cover` con altura fija recortaba la foto; se resolvió con `aspectRatio` real de cada imagen.
+- Archivos: `apps/pwa/src/components/learning/{GraderVisualPilot.tsx,HotspotDiagram.tsx}`, `apps/pwa/src/pages/{MachineLearningPage.tsx,LearningAdminMachinePage.tsx}`, `apps/pwa/src/services/learningContent.ts`, `apps/pwa/src/styles/learningDossier.css`, `scripts/seed-grader-components.js`, 10 fotos en `apps/pwa/public/learning-assets/grader/`.
+- Verificación: tsc 0 en cada PR; check "build" verde en los 6; verificado en preview y en producción con las 10 fotos y hotspots bien posicionados.
+- Estado: HECHO — 6 PRs mergeados y desplegados.
+- Sigue: Orel debe probar el editor admin en vivo y decidir si marca los 4 candidatos SAP como repuestos comunes del Grader (`3300110019`, `3300103437`, `3300103438`, `3300103452`). Falta extender "Componentes del equipo" a las otras 8 máquinas.
+
 ## 2026-07-22 - claude - Fase 2: Cascada del mes (pestaña default) + Tendencia v3 con modo Comparar
 
 - Hecho: (1) Pestaña "Cascada del mes" en la Vista panorámica (nueva DEFAULT — es la vista de la meta grande): cascada de pérdidas agregada de todos los turnos del mes desde `stateAggregates` del doc padre (0 reads; `cascadeFromMonthAggregates` en lossBuckets inyecta el uptime que los agregados excluyen). Muestra uso real vs uptime clásico lado a lado, techo de máquina, uso real por Baader, piezas máx teóricas del mes y top-10 piezas perdidas por causal con dueño y ×N eventos. Excluye Unscheduled (tiene su chip propio). (2) Tendencia v3: etiquetas de TODOS los días (solo número de día, interval 0 — el "4/7 no sale" era el eje saltando día por medio), marcador gris "sin proceso" al pie en días vacíos, y modo "Comparar" (default) con barras T2|T3 agrupadas + ambos promedios móviles; "Por máquina" solo en foco de un turno (en Comparar serían 6 series). (3) Fix previo verificando en prod: horario de columna de disponibilidad por MODA del mes (no primer turno hallado) y etiquetas sin adjetivos de jornada (T1 "mañana" mentía: su único día de julio es la madrugada renombrada del 8-jul); "~" ámbar cuando el horario sale de ≤2 días.
@@ -62,538 +413,74 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Estado: HECHO — Danilo corrió el login device-code (token OK), PR #250 mergeado con su OK (squash 22:09Z), deploys PWA + rules verdes, y ciclo E2E verificado: orden→agente→export 33 s→refresh ViaApi **Completed** en Power BI Service (22:10:48→22:11:10). Doc de control: estado ok / refreshOk true.
 - Sigue: solo el clic real de Orel en `/admin/powerbi-export` cuando quiera usarlo.
 
-## 2026-07-14 - claude - PWA: recuperación robusta ante "Failed to fetch dynamically imported module" post-deploy
-
-- Origen: usuarios con la app abierta al entrar un deploy ven la pantalla de error del ErrorBoundary. Causa raíz: GitHub Pages sirve con `Cache-Control: max-age=600` y los chunks con hash viejo desaparecen; el `lazyWithReload` viejo solo recargaba 1 vez (si el index seguía cacheado, el 2º fallo tiraba al boundary) y su flag de sessionStorage quedaba seteado tras una recuperación exitosa, así que el siguiente deploy en la misma pestaña caía al boundary SIN reintentar. El parche de auto-reload que había en `componentDidCatch` renderizaba igual la pantalla de error (getDerivedStateFromError pinta antes) y no bustea caché.
-- FIX — nuevo `apps/pwa/src/utils/chunkRecovery.ts` (lógica compartida entre `lazyWithReload` y `ErrorBoundary`): detección de error de chunk (mensajes Chrome/Firefox/Safari + Loading chunk/CSS chunk), contador anti-bucle en sessionStorage con ventana de 5 min (máx 2 intentos automáticos; expira sola → un flag viejo ya no bloquea recuperaciones futuras), guard "in-flight" (varios chunks fallando a la vez consumen 1 solo intento), no reintenta offline. Intento 1 = reload simple; intento 2 (espaciado 1,5 s) = borrar CacheStorage + desregistrar SWs no esenciales + navegar a la BASE con `?r=timestamp` (cache-buster que sí salta el index cacheado del CDN; a la base y no a la ruta actual porque rutas profundas pueden servir 404.html cacheado, mismo criterio que `useAppVersion.reload`).
-- `ErrorBoundary`: ante error de chunk con reintentos disponibles muestra `LoadingScreen` ("Nueva versión detectada, actualizando…") en vez de la pantalla de error (decidido en `getDerivedStateFromError` para que no haya ni un frame de error); agotados los intentos u offline → pantalla de error normal. El botón "Borrar datos locales y reiniciar" ahora SÍ limpia todo: storages + `caches.keys()→delete` + `getRegistrations()→unregister` (todos los SWs; el de FCM se re-registra solo en `main.tsx`) + navegación con cache-buster (vía `getAssetUrl`, ya no hardcodea `/mantenimiento-planta/`).
-- `App.tsx`: `LoginPage` pasó de `lazy()` pelado a `lazyWithReload` (era la ÚNICA página sin protección, y es justo la primera que pide un usuario deslogueado tras un deploy).
-- Verificación: `tsc --noEmit` 0 + `eslint --quiet` 0 (worktree aislado). E2E real con `vite preview` del build de producción retirando el chunk de LoginPage del dist: cadena completa observada (reload → cache-bust a base → pantalla de error tras 2 intentos, sin bucle infinito, contador `{"count":2}`); botón de borrado verificado con marcadores sembrados (localStorage y CacheStorage quedaron limpios, sessionStorage reiniciado); chunk restaurado → login carga normal sin consumir intentos.
-- Archivos: `apps/pwa/src/utils/chunkRecovery.ts` (nuevo), `apps/pwa/src/App.tsx`, `apps/pwa/src/components/ui/ErrorBoundary.tsx`.
-- Estado: EN REVISIÓN — rama `fix/chunk-reload-recovery`, PR abierto pendiente de merge de Orel.
-- Sigue: nada bloqueante. Nota fuera de alcance: `useAppVersion.reload()` duplica la limpieza de caches/SW a mano — candidato a migrar a `clearCachesAndServiceWorkers()` en otro PR.
-
-## 2026-07-08 - claude - Repuestos: "Solicitar a bodega" cierra el círculo (entregar descuenta stock real)
-
-- Origen: tomé el TODO sin dueño de `.ai/TASKS.md` ("Solicitar a bodega end-to-end"). Diagnóstico: la creación de solicitudes (`SolicitarRepuestoModal`+`useSolicitudes.crearSolicitud`) y las notificaciones (`onSolicitudRepuestoCreated` → Telegram+FCM) ya estaban 100% cableadas. El gap real: `avanzarEstado` (pendiente→aprobada→**entregada**) solo hacía `updateDoc({estado})` — nunca tocaba `bodega`. Se podía "entregar" un repuesto sin que su stock bajara nunca, desincronizando los KPIs de Bodega de la realidad.
-- FIX (`RepuestosAreaHub.tsx`): nuevo `handleAvanzarSolicitud` que envuelve `avanzarEstado` — al pasar a "entregada", si el SAP de la solicitud ya tiene registro en `bodega` (`bodegaId`), llama a `registrarMovimiento` (la MISMA función que ya usa la vista manual de Bodega — mismo patrón, misma auditoría en la subcolección `movimientos`) con `tipo:'salida', cantidad: sol.cantidad`. Si el descuento falla → toast de error + **NO avanza el estado** (evita quedar "entregada" sin reflejo real en stock). Si el SAP nunca tuvo bodega configurada → no se inventa un registro nuevo (además de ser semánticamente correcto, evita un rechazo latente de `firestore.rules`: `isValidBodega()` exige `ubicacionBodega` no vacío, que el camino de auto-creación de `registrarMovimiento` no siempre puede garantizar). Toast de éxito (`-N unidades`) cuando el stock sí se descuenta.
-- Verificación: `tsc --noEmit` OK + `eslint` (archivo tocado) OK, ambos sobre `main` en worktree aislado. **No se pudo verificar visualmente en preview** (tope de 5 dev servers por carpeta, todos ocupados por sesiones concurrentes en este mismo repo — no se forzó cerrar ninguno).
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
-- Estado: HECHO — PR #175 mergeado y desplegado (GitHub Actions, 2026-07-08). Pendiente que alguien pruebe en vivo: crear solicitud de un SAP con stock en bodega → aprobar → entregar → confirmar que el stock bajó y quedó el movimiento en el historial.
-
-## 2026-07-08 - claude - ARIA chat PWA: primera capacidad de ESCRITURA (crear/vincular repuesto + editar código de fabricante)
-
-- Origen: tras arreglar ARIA-Telegram (rama separada `fix/aria-repuesto-foto-criterio`, ver ese WORKLOG), Orel pidió llevar la MISMA mejora al chat de la PWA — pero el chat de la PWA (`chatbot.ts`+`aria/tools/*`) era 100% SOLO-LECTURA (ninguna tool escribía nada). Esta sesión le da su PRIMERA capacidad de escritura real.
-- Arquitectura descubierta (Explore agent + lectura directa): el chat YA tenía un patrón de confirmación reutilizable — `PendingAction` (`chatActions.ts`, status collecting→confirming→executing) usado hoy solo por `create_incident`, con UI `PendingActionBar` (`ChatBot.tsx`) y botones Confirmar/Cancelar/Modificar que en el fondo mandan texto plano al mismo `sendMessage` (parseado por regex en `sendChatMessage`). Se extendió ESE mismo patrón en vez de inventar uno nuevo.
-- **Nuevo módulo `apps/pwa/src/services/repuestoActions.ts`**: espeja el trabajo de ARIA-Telegram (mismo modelo de datos: colección plana `repuestos`, `equipos:[nodeIds de hierarchy]`; misma regla dura SAP=10 dígitos exactos, match numérico SOLO por igualdad exacta de `codigoSAP` — nunca por texto libre, para no repetir el falso positivo real que tuvo Telegram con dos cilindros parecidos). Funciones: `buscarSapEnMaestro` (query directa, no depende del cache de la pestaña Repuestos), `buscarEquipoEnJerarquia` (nodos `hierarchy` con `tipoNodo==='equipo'`, cache 5min — **importante**: el `Equipment`/`getEquipments()` que ya usa `chatActions.ts` para incidencias es una colección DISTINTA, la ficha CTD; los repuestos linkean a `hierarchy`, no a `equipment` — usar la función equivocada habría vinculado a nodos que los repuestos no reconocen), `deducirClase`/`parseCodigoFabricante`/`detectRepuestoAction` (mismo criterio que Telegram), `buildRepuestoDraft`/`buildEditDraft`, `executeCreateRepuesto`/`executeVincularRepuesto`/`executeEditRepuesto` (mismo patrón historial+audit_log que `useRepuestoCrud`, como función plana con userId/userName explícitos ya que corre fuera de un componente).
-- **`ultimoRepuesto`** (localStorage por userId, TTL 1h) — equivalente al de Telegram (Firestore) pero client-side, para "ese mismo repuesto"/"al mismo" en `edit_repuesto` sin repetir el SAP.
-- Wiring en `chatbot.ts`: `ActionType` extendido (`create_repuesto`, `edit_repuesto`); detección de intención de repuesto ANTES de la detección de incidencias (triggers más específicos: SAP/"repuesto"/"código de fabricante"); confirmación vía los mismos regex `isConfirm`/`isCancel` ya existentes; `isModify` para estos dos tipos da un mensaje propio (no el de incidencias). `PendingActionBar` se acotó a `create_incident` (sus campos/selector de equipo son específicos de ese flujo) — v1 de repuestos confirma por texto plano "sí/no", igual que ARIA en Telegram.
-- **v1 sin fotos**: el input de fotos del chat sube a `uploadIncidentPhoto` (bucket de incidencias), no a `uploadRepuestoFoto` (necesita el id del doc ya creado) — decisión de alcance explícita, no gap silencioso.
-- **Sin criterio LLM**: con SAP explícito (10 díg) la decisión crear-vs-vincular es 100% determinista (como en Telegram); sin SAP se pide explícitamente en vez de adivinar.
-- **3 bugs reales encontrados y corregidos en dry-run** (con frases plausibles que NO estaban en la conversación real de Telegram, o sea bugs nuevos de este puerto, no heredados): (1) `parseCodigoFabricante` fallaba con "actualiza el código de fabricante DEL SAP X A Y" (SAP mencionado en la misma frase) — el parser original (portado de Telegram) solo cubría la forma declarativa simple; ampliada la lista de conectores + skip de un SAP de 10 dígitos. (2) `extraerEquipoTexto`/extracción de nombre SIN límite de palabra (`\b`) en el regex de preposiciones — "al" matcheaba dentro de "materiAL"/"radiAL"/"industrAL", truncando mal frases con palabras técnicas comunes; reescrito con `\b` + toma la ÚLTIMA preposición (ambas funciones ahora comparten un solo helper `ultimaPosicionInicio`, antes duplicaban el regex roto en dos lugares). (3) caso borde "crea un repuesto para X" (sin nombre real) dejaba el nombre como el artículo suelto "un" en vez de vacío, saltándose el guard de "falta nombre" — blindado.
-- **Rol/seguridad**: NO se tocó `firestore.rules` — la escritura vía chat queda gateada por las MISMAS reglas que ya rigen la creación manual de repuestos (`isTechnician()`: admin/supervisor/tecnico), ningún usuario obtiene un permiso nuevo que no tuviera ya con el formulario manual.
-- Verificación: `tsc --noEmit`=0 y `eslint` limpio en los 5 archivos tocados (repetido 3 veces, tras cada tanda de fixes). Dry-run SOLO-LECTURA contra Firestore real (script temporal, sin escribir nada): detección de intención (8/8 casos, incluye no-falsos-positivos con frases de incidencia), parser de código de fabricante (3/3 frases reales), extracción de equipo/nombre (con y sin palabras tipo RADIAL/INDUSTRIAL), búsqueda real en `hierarchy` (Knuro/bomba de acopio/GA90 resuelven bien sobre 648 nodos equipo), y — cruce entre features — **el cilindro SAP 3300138398 creado por ARIA-Telegram el día anterior es visible y editable desde este mismo camino de la PWA** (confirma que ambas superficies comparten de verdad el maestro). Preview: `aria-pwa-escritura-wt` (puerto 5181) arranca limpio (Firebase/Firestore init OK, Service Worker OK), consola sin errores, llega a `/login` — **NO verificado el flujo autenticado end-to-end en navegador** (la PWA exige login Google/credenciales reales, mismo límite ya documentado en sesiones previas de este chat).
-- Trabajo en git worktree propio (`D:\a\aria-pwa-escritura-wt`, rama `feat/aria-pwa-escritura-repuestos` desde `main`) — el checkout principal tenía WIP ajeno sin commitear (`RepuestosAreaHub.tsx`, columna código-fabricante) de otro agente en paralelo; NO se tocó.
-- Archivos: `apps/pwa/src/services/repuestoActions.ts` (nuevo), `apps/pwa/src/services/chatActions.ts` (M, +2 ActionType), `apps/pwa/src/services/chatbot.ts` (M, detección+confirmación+imports), `apps/pwa/src/components/chat/ChatBot.tsx` (M, guard PendingActionBar), `apps/pwa/src/hooks/useChatBot.ts` (M, mensaje de bienvenida).
-- Estado: EN REVISIÓN → commit `2740cc6b` + **PR #164 ABIERTO** (rama `feat/aria-pwa-escritura-repuestos` → `main`, sin conflictos, +717/-4). Abrir el PR es seguro (no despliega nada); el MERGE sigue pendiente de que Orel pruebe logueado, porque eso SÍ dispara deploy automático vía GitHub Actions a la app que usan técnicos reales (a diferencia de Telegram, que solo lo afecta a él).
-- Sigue: Orel prueba logueado en el preview (5181) o local (test plan en el PR) → si OK, mergear #164. Follow-up opcional: botones Confirmar/Cancelar dedicados para repuestos (hoy solo texto plano) + soporte de fotos (requiere adaptar la subida a `uploadRepuestoFoto`).
-
-## 2026-07-07 - claude - ARIA Telegram: memoria de contexto ("ese mismo repuesto") + editar código de fabricante + fix acento
-
-- Origen: Orel probó el fix anterior EN VIVO → creó bien el cilindro SAP 3300138398 (KNURO N1). Después mandó 2 fotos con "Agrégale estas dos imágenes a ese mismo repuesto de Knuro y agrégale su código de fabricante 999 0566" → ARIA lo ignoró (volvió a "¿creo incidencia?"). Orel: "falta que ARIA siga el contexto de la conversación" + REGLA: es la MISMA ARIA, cada mejora va a Telegram Y al chat de la PWA.
-- Causas (verificadas): (a) el filtro de caption accionable NO matcheaba "Agrégale" por la tilde (é rompía `\bagreg`); (b) ARIA no recuerda el repuesto que acaba de crear → "ese mismo repuesto" no resolvía; (c) no existía capacidad de editar el código de fabricante (escritura sobre repuesto existente).
-- FIX (functions/index.js, +183):
-  - **Memoria `ultimoRepuesto`** (campo de sesión, TTL 60min): se setea al crear/vincular/adjuntar-foto/editar; se inyecta al router (`ultimoRepuestoHint`) y a `ariaDecidirRepuesto` → "ese mismo repuesto"/"al mismo"/"el que creaste" resuelven al último tocado.
-  - **Acción `repuesto_editar`** (código de fabricante hoy): resuelve el SAP objetivo (SAP explícito → ultimoRepuesto), parsea el valor (`ariaParseCodigoFabricante`, salta relleno "q es el" y corta en "al mismo"), confirma, escribe `codigoFabricante` + historial + audit_log (misma forma que la PWA). Puede sumar la última foto de paso.
-  - **Fix acento**: caption se normaliza (NFD + quita `\p{Diacritic}`) antes de detectar intención; CAPTION_ACCION ampliado (pon/actualiza/edita/cambia/codigo).
-  - **Modo "voy sumando fotos"** (`modoAdjuntarA`, TTL 10min): tras adjuntar una foto a un repuesto, las siguientes fotos SIN caption ni SAP propio se ofrecen para el mismo repuesto (con confirmación; guarda: si la foto trae SAP propio es otro ítem).
-- Verificado: `node --check` OK + dry-run SOLO-LECTURA contra maestro real: cilindro 3300138398 EXISTE (y ya tiene codFab "999 0566" — Orel lo puso a mano tras el fallo); "ese mismo repuesto"/"al mismo" (3 frases) → resuelven a 3300138398; parser código fab → "999 0566"/"LOV-13"/"ABC-1234" limpios; "Agrégale..." ahora matchea el caption. Router LLM (elegir repuesto_editar vs repuesto_agregar) no probado en vivo (keys=secrets) — handlers deterministas y seguros.
-- PWA (chat in-app): decisión de Orel = "arrancar" la escritura también en la PWA. HALLAZGO: el chat de la PWA (`chatbot.ts`+`aria/tools/*`) es hoy 100% SOLO-LECTURA (ningún write de dominio) → espejar estas escrituras = darle capacidad de escribir con confirmación (proyecto aparte). PENDIENTE fase siguiente.
-- Archivos: functions/index.js (M).
-- Estado: DESPLEGADO 2026-07-08 (`npx firebase-tools deploy --only functions:telegramWebhook`, "Deploy complete!", a pedido de Orel). PWA = fase siguiente (ver entrada 2026-07-08 arriba — esa sí ya tiene su propio PR/merge).
-
-## 2026-07-07 - claude - ARIA Telegram: fix crear/vincular repuesto por foto (match SAP + criterio LLM)
-
-- Origen: Orel reportó que ARIA no pudo crear un repuesto que le mandó con 2 fotos. Revisé la conversación REAL en Firestore (`telegramAriaSessions/52949422`, 24 turnos) + reproduje con datos del maestro. Caso: cilindro neumático CRDSNU-32-105, **SAP `3300138398` (no existe = nuevo)**, para equipo Knuro. Etiqueta traía 4 códigos: `3300138398`, `CRDSNU-32-105-PPV-A-MQ-A1`, `552791`, `51051200`.
-- **5 fallas encadenadas** (todas verificadas contra Firestore):
-  1. **Falso positivo de match** (raíz): `ariaBuscarCodigoEnMaestro` hacía `_blob.includes()` con un número de fabricante (`552791`) → pegaba con OTRO cilindro (`3300138378` CRDSNU-32-**200**, cuyo textoBreve contiene "552791"). ARIA ofrecía el SAP equivocado.
-  2. **Perdía el SAP corregido**: al confirmar sin repetir dígitos, re-deducía desde la foto con el mismo loop bugueado → recaía en el `...378`.
-  3. **Regex agarraba el número rechazado**: en "no es 3300138378, es 3300138398" tomaba el primer número (`...378`).
-  4. **Lote de fotos fallaba en silencio**: `ariaGroqVisionLote` reventaba entero y lo presentaba como "ninguna matcheó" (no reintentaba ni caía a de-a-una).
-  5. **Caption de la foto ignorado**: "Crea ese repuesto para Knuro" como caption no se enrutaba (solo describía).
-- FIX (functions/index.js, ~261/-85):
-  - **SAP vs código de fabricante**: SAP del maestro = **10 dígitos exactos** (verificado: 3768/3782; el resto legacy 7-8). Helpers `ariaEsCodigoSap`/`ariaSapDeCodigos`. `ariaBuscarCodigoEnMaestro` ahora: número → SOLO igualdad exacta de `codigoSAP` (nunca por texto); alfanumérico (part number con letras) → sí por texto. Fin del falso positivo.
-  - **`ariaDecidirRepuesto`** (criterio LLM + validación determinista): el SAP de la etiqueta manda; "existe" solo si ese SAP está EXACTO en el maestro. Entiende "no es X, es Y" (prefiere el SAP != al pendiente) y "termina en 8398" (elige el código de la foto que termina así). Si NO hay SAP claro → pide criterio al modelo (`ariaGroqChat` JSON) con candidatos parecidos, y **valida su salida contra el maestro** (nunca inventa un existente; ante cualquier fallo → "preguntar", nunca escritura equivocada).
-  - **Handler `repuesto_agregar` reescrito** sobre `ariaDecidirRepuesto`. `ariaNombreRepuestoDesde` arma nombre limpio (sustantivo + part number) en vez de la frase larga.
-  - **Lote robusto**: `ariaGroqVisionLote` cae a análisis de-a-una si el conjunto falla; el handler avisa con honestidad si TODO falló y NO vacía el lote (file_id vivos, reintentable).
-  - **Caption accionable delegado al router**: foto + "créalo como repuesto del Knuro" ahora se resuelve usando la última foto. `ariaHandleFoto` además, si lee un SAP claro que no está en el maestro, propone crearlo como repuesto (antes empujaba a incidencia).
-- Verificación: `node --check` OK. Dry-run SOLO-LECTURA contra maestro real (7662 docs): las 4 variantes de la conversación real ("Crea ese repuesto para Knuro" / "sí confirmo, tipo cilindro, Knuro" / "no es 378, es 398" / "termina en 8398") → **todas resuelven crear_nuevo SAP 3300138398** con nombre "CILINDRO CRDSNU-32-105-PPV-A-MQ-A1", y `552791`→null (falso positivo eliminado). La rama de criterio LLM NO se probó en vivo (las keys son secrets de Firebase, no están en `.env` local) — es fallback guardado por validación determinista.
-- Archivos: functions/index.js (M).
-- Estado: DESPLEGADO. Commit 0c24455b en rama fix/aria-repuesto-foto-criterio; `telegramWebhook` desplegado a mano (SA del repo) → revisión telegramwebhook-00096-pit ACTIVE, boot limpio (STARTUP probe OK), secrets GROQ v3/GEMINI v1/DEEPSEEK v2 enlazados. Falta prueba EN VIVO por Orel: reenviar la foto del cilindro con "créalo como repuesto de Knuro" (esperado: crea SAP 3300138398 en KNURO N1). Re-desplegado junto con el commit siguiente (memoria de contexto) el 2026-07-08.
-
-## 2026-07-07 - claude - UX Análisis de Turno: quitar ruido por duplicación + fix header sticky
-
-- Origen: Orel mostró screenshot del dashboard (Planta Yal) y preguntó si había "mucho ruido". Diagnóstico (workflow 3 lentes + lectura de código): el ruido era REPETICIÓN, no exceso de datos. Los mismos 4 KPIs del mes salían DOS veces — arriba en "Resumen del mes" (`GraderMonthlyStatsPanel`, panel sticky de la col derecha) y otra vez abajo en "Vista panorámica" col 1 "Métricas del mes" (`GraderHistoricalCalendar`): uptime promedio, Ciclos Baader, Turnos T1/T2/T3, Mejor/Peor turno. Además: las cards Mejor/Peor del panel superior quedaban CORTADAS por el header sticky global.
-- FIX (2 movimientos, bajo riesgo, misma fuente de datos → sin tocar lógica de cálculo):
-  1. **Duplicados**: la col 1 de la Vista panorámica pasó de "Métricas del mes" (que repetía arriba) a **"Por Baader · {mes}"** — SOLO lo único que el panel superior no tiene: horas-máquina totales (ancla) + desglose por Evisceradora (uptime% + MTTR macro/micro por máquina). Se quitaron uptime 3xl, mini-KPIs Ciclos/Turnos y las cards Mejor/Peor (todo ya vive arriba). Cols 2 (Top paros) y 3 (Disponibilidad diaria) + tendencias = intactas (son únicas). Quitados imports huérfanos `TrendingUp/TrendingDown`.
-  2. **Bug header**: `GraderMonthlyStatsPanel` fijaba con `lg:sticky lg:top-4` (16px) → quedaba bajo el header global (`<header sticky top-0 z-30 h-14>` = 56px) y sus cards superiores se cortaban. Cambiado a `lg:top-[4.5rem]` (72px = 56px header + 16px gap).
-- DECISIÓN sobre el "mucho rojo": NO se tocó. El semáforo YA es de 3 niveles (verde/ámbar/rojo; `kpiThresholds` warnBelow/critBelow, `graderP0Thresholds` alert/critical). El rojo del screenshot (Disp 51%, Rend 53%) es HONESTO — están genuinamente bajo el corte crítico (70%/75%). Forzar ámbar falsearía el estado real (va contra la meta grande: datos honestos). La reducción de rojo vino sola al quitar el "Peor turno" duplicado.
-- PENDIENTE (jerarquía temporal AHORA/HOY/MES): no se tocó a ciegas — es subjetivo y requiere verlo logueado. Propuesto a Orel para decidir juntos con el preview real.
-- Verificación: tsc limpio · eslint 0 errores (4 warnings preexistentes) · dev server compila sin errores ni logs de consola · app monta (llega al login). Verificación VISUAL logueada pendiente de Orel (la app pide login Google/credenciales; no verificable de forma autónoma).
-- Archivos: apps/pwa/src/components/grader/GraderHistoricalCalendar.tsx + GraderMonthlyStatsPanel.tsx.
-- Estado: EN REVISIÓN → rama fix/ux-analisis-turno-ruido (sin PR aún — esperar visto bueno visual de Orel antes de PR/merge).
-
-## 2026-07-07 - claude - Turnos: Shoplogix = fuente de verdad de horarios (PWA + functions DST)
-
-- Origen: Orel reporta "confusión de horarios y turnos" y "no tenemos registros de días anteriores" (empezaron a pasar pesca el 5-6 jul). Diagnóstico contra Firestore prod: (1) los turnos REALES cambiaron — chonchi ya NO emite "Turno día/noche" desde mayo (emite "Turno 1" 21:30→05:45, "Turno 2" 09:00→17:15 u 08:00→15:15 y "Turno 1 Lunes" madrugada del lunes); Yal ya no tiene T1 y su T3 real es 00:00→~06:55 — pero la app buscaba nombres/horarios hardcodeados; (2) la pesca del 5-jul en Yal corrió 23:00→06:56 SIN turno configurado en Shoplogix → 11.6k ciclos cayeron en "Unscheduled" (que la UI ocultaba) y solo 1.7k en "Turno 2"; (3) chonchi tiene 0 ciclos desde el 25-jun (estados = break/planned downtime ~20h/día): según Shoplogix la Planta Principal NO ha pasado pesca — verificar allá, la app refleja fiel; (4) los días previos al 2-jul están sincronizados pero VACÍOS (plantas paradas), no faltan.
-- FIX (extiende la decisión del PR #157 a todo Análisis de Turno): descubrimiento dinámico de turnos por rango de documentId sobre los docs padre `shoplogix/{plant}/shifts` (`listShiftInfosForDay` con scheduledStart/End reales + ciclos; fallback al sondeo por candidatos para data sin padre) → el mes en el calendario pasa de ~270 reads a 1 query y CUALQUIER nombre nuevo que Shoplogix invente aparece solo; `computeShiftTimeWindow` acepta `realBounds` que MANDAN sobre el schedule (con manejo de turno en curso: scheduledEnd crece con cada sync → tolerancia 30 min y progreso null si el fin planeado es desconocido); `CurrentShiftChip` detecta el turno en curso desde los docs reales de hoy+ayer (schedule = fallback); candidatos chonchi corregidos (día→Turno 2, noche→Turno 1/Turno 1 Lunes) + variantes por prefijo en `subscribeShoplogixShiftAuto`; "Unscheduled" visible como "Sin turno asignado" cuando tiene ≥50 ciclos (navegación + calendario); navegación prev/next ordenada por scheduledStart REAL con dedup Excel↔SLX por solapamiento horario (antes las flechas quedaban invertidas en Yal: el T3 post-mayo es la madrugada de su propio dateKey); `isMidnightShift` → NUNCA desplaza (+1 día era de una convención vieja del CF sin docs vivos — verificado TODO el histórico; cada T3 se mostraba bajo el día equivocado); functions: offset Chile DST-aware con Intl America/Santiago en polling/sync (el -3 fijo perdía la franja 07:00-08:00 wall en invierno = cola de turnos nocturnos), rollover de mes en `currentShiftKey`, probe/validate alineados a `currentDateKey`.
-- Archivos: apps/pwa (shoplogixShift.service, graderShiftStatus, graderShiftDisplay, plantKpiCompute, plantLines, CurrentShiftChip, GraderHistoricalCalendar, AnalisisGraderTurnoPage, useUpstreamLineSnapshot, tests) + functions (polling.js, sync.js, index.js probe, scripts/validate-plant-integration.js).
-- Verificación: tsc limpio · eslint 0 errores (7 warnings preexistentes) · vitest 587 pass (+ suites nuevas realBounds y display) · helpers DST validados con node (jul→UTC-4, ene→UTC-3, cambio de día 08:00 wall) · revisión adversarial multi-agente (hallazgos confirmados corregidos: orden nav, progreso 100% clavado, calendario ciego a nombres nuevos, rollover mes, diagnósticos -3).
-- **RONDA 2 (misma rama, tras contrastar con pantallazos de Shoplogix UI de Orel):** (a) Shoplogix etiquetó RETROACTIVAMENTE el "Turno 3 - 6 Jul" (la madrugada que estaba como Unscheduled del 5) → re-sync local de yal 02/05/06-jul (syncDay con la cookie de Secret Manager; el doc `2026-07-06_Turno 3` ahora existe con 11.117 ciclos, igual que la UI de Shoplogix). (b) El re-sync destapó DOBLE CONTEO preexistente del CF: el grupo "Unscheduled" se filtraba por VENTANA temporal y cuando sus intervals abrazan el día se tragaba los turnos etiquetados de en medio (07-06_Unscheduled llegó a 35.510 = T2+T3 duplicados; 07-02 ya venía así con 8.181 ≈ su propio T2) → fix en sync.js: el grupo Unscheduled filtra por ETIQUETA (`iv.shift === 'Unscheduled'`), los nombrados siguen por ventana. Tras re-sync: Unscheduled 02/05/06-jul = 0/0/1 ciclos y turnos nombrados intactos. (c) HALLAZGO OPERACIONAL: el auto-login ROPC de Shoplogix está ROTO (`invalid_client` — parece que deshabilitaron el grant password); `system/shoplogixToken` no existe y TODO el sync vive del fallback cookie `SHOPLOGIX_COOKIE` — cuando esa cookie expire, el sync muere. Avisar a Orel para plan B (renovar cookie / revisar client_id).
-- **RONDA 3 (misma rama — "que no vuelva a pasar"):** (a) **Re-sync móvil automático** en el wakeup: además de hoy, re-sincroniza AYER cada hora (disparo :00) y hace 2-3 días una vez al día (disparo 12:00 Chile) → el etiquetado retroactivo de Shoplogix se auto-corrige sin intervención; timeout 180→420s, jitter acotado a 30s cuando hay días extra. (b) **Alerta Telegram cuando la auth muere** (AUTH_EXPIRED → mensaje con procedimiento de renovación de cookie, dedupe 6h vía `system/shoplogixAuthAlert`). (c) **Backoff ROPC 6h** en tokenStore (marca `ropc_failed_at` en `system/shoplogixToken`): sin esto, cada wakeup martillaba el identity server con logins condenados al 400. (d) Diagnóstico ROPC verificado: el discovery OIDC AÚN soporta grant `password` y el client sigue siendo `SAAS139` → el client se volvió CONFIDENCIAL (exige client_secret que no tenemos). Salidas: automatizar authorization_code+PKCE scripteando el login form (Fase 2b.1c, no requiere secret) o acceso API oficial vía account manager (Fase 2b.2). Documentado en docs/SHOPLOGIX_DEPLOY.md §Modo Bearer vs Cookie.
-- Estado: EN REVISIÓN → PR #160 (rama fix/turnos-shoplogix-fuente-verdad).
-- Sigue: tras merge, DEPLOY MANUAL de functions (`npx firebase-tools@latest deploy --only functions:shoplogixSyncWakeup,functions:shoplogixSyncHttp,functions:shoplogixSyncNow,functions:shoplogixBackfillRange,functions:shoplogixProbe` con GOOGLE_APPLICATION_CREDENTIALS) · Orel: verificar en Shoplogix por qué las Baaders de Planta Principal marcan 0 ciclos desde el 25-jun si ya están pasando pesca · pedir en planta que configuren en Shoplogix el turno nocturno de domingo en Yal (para que la pesca dominical no caiga a "Unscheduled").
-
-## 2026-07-06 - claude - ARIA Telegram: fotos de repuestos → CREAR/VINCULAR en el maestro + fix visión Gemini (403 referer)
-
-- Origen: Orel mandó fotos de un aceite del compresor GA90 de acopio y ARIA le dijo que no podía hacer nada con ellas. Dos causas encontradas: (a) ARIA solo sabía ADJUNTAR fotos a repuestos YA existentes (match por SAP); (b) **la restricción por referrers de la API key (hardening 2026-07-05, ver entrada anterior) dejó CIEGA la visión de ARIA**: Gemini server-side (sin header Referer) devuelve 403 "referer <empty> blocked" → `ariaGroqVision` cae al catch "no pude analizar la foto" y el fallback Groq→Gemini + `geminiProxy` del chat in-app también quedaron rotos.
-- FIX visión/fallback: las functions mandan `Referer: https://orelcain.github.io/mantenimiento-planta/` (constante `GEMINI_KEY_REFERER`) en las 2 llamadas a generativelanguage (geminiProxy + `_ariaGeminiChat`). Verificado directo: sin referer 403, con referer 200. Es la misma key del proyecto usada por su server legítimo — no debilita la restricción para terceros con la key robada del JS (el referer les sigue faltando en uso casual).
-- FEATURE: nueva acción del router `repuesto_agregar` (+ campo `equipo` en el JSON del router). Flujo: foto → visión guarda `ultimaFoto` en la sesión (fileId+descripcion+codigos OCR, TTL 30 min) → "agrégalo como repuesto del [equipo]" → busca el equipo en `hierarchy` (cache 10 min, matching por términos con stopwords, solo `tipoNodo=='equipo'`) → borrador con confirmación. Dos caminos: (1) código OCR YA en el maestro → pending `repuesto_ligar` (arrayUnion equipos/equiposCodigos, mismo par de campos que `linkRepuestoEquipo` de la PWA, + foto opcional); (2) no existe → pending `repuesto_nuevo` → `ariaCrearRepuestoNuevo()`: doc con la MISMA forma que `useRepuestoCrud.createRepuesto` + `clase` deducida (aceite→lubricante etc.) + `tieneSap` + `plantId:'chonchi'` (regla multi-planta) + docId=SAP si hay (`.create()` anti-pisada) + foto a Storage `repuestos/{id}/` + subcolección `historial` (campo creacion) + entrada `audit_log` (`userId: telegram:<id>`) + invalidación del cache del maestro. Avisa de PARECIDOS por nombre antes de crear (anti-duplicados). Equipo no encontrado → pide el nombre como figura en la app, sin crear nada.
-- Guard nuevo en la confirmación determinista: "no, agrégalo como repuesto del X" con borrador pendiente ya NO se come como "cancelar" (frases con "como repuesto/al maestro/vincul" van al router); "sí, agrégala" sigue siendo determinista.
-- Extras: hint en foto sin match ("¿Es un repuesto? decime agrégalo como repuesto del [equipo]"), hint en lote para las sin match, capacidades del router actualizadas.
-- Verificación (dry-run local, patrón de siempre: `exports.telegramWebhook` invocado con updates simulados, Telegram interceptado, Firestore/Storage/LLM REALES, docs de prueba borrados/revertidos): crear nuevo end-to-end OK (doc 9912345678 con foto+historial+audit+plantId, borrado) · vincular existente OK (3100027400 → COMPRESOR AIRE PLANTA, revertido) · equipo inexistente OK · foto entrante con visión Gemini REAL OK (describe la imagen, guarda ultimaFoto, ofrece el camino repuesto) · confirmación determinista 0.5s OK.
-- HALLAZGO ABIERTO para Orel: `DEEPSEEK_API_KEY` responde **402 Insufficient Balance** — el 3er eslabón de la cadena no tiene saldo; con Groq agotado y (hasta este fix) Gemini roto, ARIA quedaba sin cerebro. Cargar saldo o aceptar 2 eslabones.
-- **CASO REAL DEL 05-JUL RESUELTO A MANO (post-deploy)**: las 2 fotos del aceite seguían en `fotoBatch` de la sesión de Orel (file_ids vigentes). La etiqueta (foto 2) confirmó SAP `3100027408` "ACEITE ATLAS COPCO GRÃÂ° ALIMENTICIO" — **el mojibake viene impreso desde SAP** (etiqueta física idéntica), por eso ni ARIA ni la búsqueda lo encontraban por "GA90". Y el "compresor GA90 de acopio" SÍ existe: es `hierarchy/720004366` **COMPRESOR AIRE N2** (ACOPIO > SISTEMA BOMBEO PECES N2) — lo delata el asset del levantamiento `MOTOR Atlas Copco GA-90` que apunta a ese nodo. Hecho: 2 fotos subidas a `repuestos/3100027408/` + `fotosReales`, vínculo `equipos`/`equiposCodigos` → 720004366, alias buscables en repuesto ("Aceite Atlas Copco GA90 alimenticio" + nombresComunes) y nodo ("COMPRESOR ATLAS COPCO GA90 (ACOPIO)"), hecho global en `ariaKnowledge/hechos`, sesión limpiada (fotoBatch + borrador stale de tuercas), audit_log, y mensaje de cierre de ARIA enviado al chat de Orel. Verificado en Firestore.
-- **RONDA 2 (mismo PR, tras revisar el flujo real post-deploy)**: 2 peticiones fallidas más de Orel con causa en el código. (a) "Es una foto extra… va en el repuesto SAP 3300104630" → ARIA mandaba a la app: el router ahora cubre "agrégale esta foto al SAP XXXX" (match EXACTO por codigoSAP — no por blob, que daría falso positivo con códigos de equipo vinculados — → pending `adjuntar_foto_repuesto` directo; SAP existente sin foto → pide la foto en vez de caer al alta; SAP tipeado inexistente → se usa como código del material nuevo). (b) Foto de golillas 5/8 mostró JSON CRUDO: la visión truncaba el JSON (maxTokens 1000) y el catch degradaba a texto plano perdiendo el SAP 3300027869 ya leído → budget 1600 + rescate por regex de descripcion/codigos/falla (verificado con el JSON truncado real). La petición original se cumplió A MANO: 2ª foto Lovato adjuntada a 3300104630 (2 fotos en ficha), borrador colgado limpiado, ARIA avisó; la foto de las golillas no es recuperable (solo se guarda `ultimaFoto`) → Orel la reenvía.
-- Archivos: functions/index.js.
-- Estado: EN REVISIÓN → PR #149. Deploy manual HECHO: telegramWebhook + ariaDailyBrief + geminiProxy (2026-07-06) + redeploy telegramWebhook (ronda 2).
-
-## 2026-07-06 - claude - PWA: el visor de imágenes no se podía CERRAR en móvil — v3.84.1
-
-- Origen: Orel en móvil — "hago click en las imágenes de un repuesto, se ven bien pero no me deja salir". CAUSA RAÍZ: `RepuestoPhotosModal` abre `ImageLightbox` estando un **Dialog modal de Radix** abierto; Radix deja `<body>` con `pointer-events: none` mientras el modal vive, y el lightbox (que NO estaba portaleado y no re-habilitaba pointer-events) se veía encima pero **ningún tap le llegaba**. En desktop nadie lo notó porque Esc sí funciona (teclado no depende de pointer-events); en móvil no hay Esc → atrapado.
-- FIX en `ImageLightbox` (arregla TODOS los usos, 8 consumidores): (1) `createPortal(…, document.body)` — inmune además a ancestros con transform/overflow; (2) `style={{ pointerEvents: 'auto' }}` en la raíz — anula el `none` heredado del lock de Radix; (3) barra superior con `paddingTop: max(0.75rem, env(safe-area-inset-top))` — la X no queda bajo el notch/barra de estado en PWA instalada (mismo remedio que ya usaba mant.html en su lightbox).
-- FIX en `RepuestoPhotosModal`: `onInteractOutside`/`onEscapeKeyDown` con `preventDefault` mientras el lightbox esté abierto — sin esto, al re-habilitar los taps, tocar el lightbox contaba como "interacción afuera" del Dialog y cerraba el modal de fotos por debajo (y Esc cerraba ambos a la vez).
-- Versión: 3.84.1 (version.ts + package.json + version.json — package.json editado SIN BOM esta vez, lección del hotfix #151).
-- Archivos: apps/pwa/src/components/ui/ImageLightbox.tsx, apps/pwa/src/components/repuestos/RepuestoPhotosModal.tsx, apps/pwa/src/constants/version.ts, apps/pwa/package.json, apps/pwa/public/version.json.
-- Verificación: `npx tsc --noEmit` OK + `npx eslint` (2 archivos) OK. Prueba táctil real la hace Orel en su celular (abrir Fotos de un repuesto → tocar imagen → X cierra). Trabajado en worktree `D:\a\wt-lightbox-fix` (otra sesión estaba activa en el checkout principal — anti-colisión).
-- Estado: EN REVISIÓN → PR → merge → deploy GitHub Actions.
-
-## 2026-07-06 - claude - PWA: nombres comunes editables desde el panel de detalle (fix móvil) — v3.84.0
-
-- Origen: Orel quiso ponerle nombre común a la parada de emergencia del desangrador (SAP 3300104630) desde el celular y la opción no existía: la ÚNICA edición de `nombresComunes` era la columna "Apodos" de la tabla del hub, que es `hidden lg:table-cell` (solo ≥1024px). En móvil ni se ve ni hay alternativa.
-- FIX: campo "Nombres comunes" en `RepuestoDetailPanel` (el panel que se abre al tocar una fila, disponible en TODOS los tamaños): muestra los apodos y, con lápiz (solo admin, prop `onSaveApodos`), input inline con el mismo patrón editable que "Ubicación" (Enter/Escape, Guardar/Cancelar, spinner). Se resetea al cambiar de repuesto (`useEffect` por `sap`).
-- Hub: `saveApodos` refactorizado → `persistApodos(row, arr)` compartido (mismas escrituras: `crudUpdate` por cada source + `refreshCatalog` + toasts); la tabla lo usa igual que antes y el panel recibe `onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}`.
-- Versión: 3.84.0 (version.ts + package.json + version.json sincronizados).
-- Archivos: apps/pwa/src/components/repuestos/RepuestoDetailPanel.tsx, apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx, apps/pwa/src/constants/version.ts, apps/pwa/package.json, apps/pwa/public/version.json.
-- Verificación: `npx tsc --noEmit` OK + `npx eslint` (2 archivos) OK + preview local levanta sin errores de consola (la vista con datos exige login Google → la prueba funcional del campo la hace Orel desde el móvil, que es justo su caso de uso).
-- Estado: EN REVISIÓN → PR → merge → deploy GitHub Actions. (Nota: esta entrada va en rama aparte de la de ARIA/PR #149, que tiene su propia entrada.)
-
-## 2026-07-05 - claude - Seguridad: cierre de lecturas anónimas (PR #146) + proveedor anónimo OFF
-
-- Hecho: cerrado el trade-off que quedó abierto en el PR #145 (las 8 colecciones del catálogo —incl. `users` con PII— y todo Storage eran legibles por cualquier sesión anónima). Hallazgo clave: el flujo REAL de la Mini App mant.html YA usaba custom token (initData → mintTelegramAuthToken → signInWithCustomToken) en prod; el ÚNICO `signInAnonymously` del repo estaba en el modo preview (`?preview=1`, herramienta de admin).
-- Cambios (PR #146, mergeado 5dbd5321): (1) mant.html preview ya no usa anónimo — acepta `#token=<custom token>` en el fragment (igual que la PWA standalone) o sesión persistida, con error claro si no hay sesión; el botón "🔗 URL preview" ahora mintea token con el initData actual y copia la URL con `#token=…` (~1h). (2) `firestore.rules`: `isCatalogReader()` → `isNotAnonymous()` (v1.4.0). (3) `storage.rules`: lectura global exige no-anónimo (se mantienen públicos deliberados models3d y baader200-images).
-- Post-merge: proveedor ANÓNIMO DESHABILITADO en Firebase Auth vía Identity Toolkit Admin API v2 con la SA (PATCH 200; signUp anónimo ahora da ADMIN_ONLY_OPERATION). Reversible en consola si hiciera falta.
-- Archivos: apps/pwa/public/mant.html, firestore.rules, storage.rules.
-- Verificación end-to-end real: sesión anónima REST → 403 en repuestos/users/hierarchy y Storage list; flujo custom token (initData forjado con el bot token local, HMAC validado por la función de prod) → 200 en las 8 colecciones del catálogo + Storage; sin auth → 403. Preview local en navegador: sin token → error claro; con token → app carga, `isAnonymous:false`. Prod verificado en ambos hosts (web.app y GitHub Pages) sirviendo el mant.html nuevo. Usuario de prueba tg_990001112223 borrado (doc + Auth). Deploy Pages falló 1 vez por flakiness de GitHub ("try again later") → rerun OK.
-- HALLAZGO: la API key web ya está RESTRINGIDA por referrers (bloqueó localhost:5877, permite localhost:5173 y los hosts de prod) → el punto 1 de la auditoría 2026-07-05 (el único que quedaba manual de Orel) parece CERRADO.
-- Estado: HECHO (desplegado + verificado).
-- Sigue: nada pendiente de la auditoría 2026-07-05; opcional revisar si la alerta secret-scanning #1 de GitHub se puede cerrar ahora que la key está restringida.
-
-## 2026-07-05 - claude - ARIA Telegram - MODO LOTE de fotos (varias fotos en una sola pasada)
-
-- Origen: Orel mando varias fotos pidiendo lista de SAP + agregar como referencia a sus repuestos, pero se procesaban una por una (conversacion completa por foto: vision + confirmar) - lento y consume mas tokens que lo necesario.
-- FIX: fotos mandadas como ALBUM de Telegram (message.media_group_id presente) se encolan en silencio en `telegramAriaSessions.fotoBatch` (cap 8, TTL 20min) en vez de analizarse al toque - solo un ack breve en la primera foto del grupo ("van N... decime hazme la lista"). Fotos SUELTAS (sin media_group_id) siguen el flujo instantaneo de siempre, sin cambios.
-- Nueva accion del router `fotos_lote`: cuando el usuario pide la lista/resumen/que agregue "las fotos" (plural) o dice "listo" - dispara `ariaGroqVisionLote()`, UNA sola llamada a Gemini con TODAS las imagenes del lote a la vez (en vez de N llamadas separadas), pide un JSON array indexado 1..N. Cada resultado se matchea contra el maestro (mismo `ariaBuscarCodigoEnMaestro` de siempre) - arma UNA lista consolidada (SAP+nombre si matchea, o "sin match"/"sin codigo") y UNA sola confirmacion para adjuntar TODAS las que matchearon.
-- Nuevo pending kind `adjuntar_fotos_lote` (array de {fileId, codigoSAP, nombreRepuesto}) - al confirmar, `Promise.allSettled` adjunta todas en paralelo (reusa `ariaAdjuntarFotoARepuesto`), reporta ok/fallidas.
-- HALLAZGO Y FIX GENERAL (no especifico del lote): el router estaba fallando "Failed to generate JSON... max completion tokens reached" con gpt-oss-120b bajo el system prompt grande de hoy (persona+router+app+hechos) - subido maxTokens del router de 300 a 700 (gpt-oss-120b tambien gasta presupuesto "pensando" antes del JSON, igual que Gemini/DeepSeek). Sin esto, CUALQUIER consulta con contexto largo podia fallar silenciosamente y caer a una respuesta charla generica/alucinada.
-- HALLAZGO Y FIX: el router no tenia forma de saber que habia fotos en el lote esperando - "hazme la lista" se clasificaba mal como charla generica (alucino una lista de modulos de la app en vez de fotos). Agregado `fotoBatchHint` (mismo patron que `pendingHint`) inyectado en el prompt del router cuando `fotoBatchCount > 0`.
-- Verificacion end-to-end con datos reales: album de 3 fotos (2 con SAP reales del maestro - 3300031966 CONECTOR TEE 10MM y 3100000109 SOLUCION PH 4.01 - y 1 sin codigo) -> encoladas en silencio (solo ack en la 1a) -> "hazme la lista" ruteo correcto a fotos_lote, UNA llamada Gemini, lista consolidada correcta -> "si, agregalas" adjunto las 2 en paralelo, verificado en Firestore (1 escritura exacta por item, sin duplicados), revertido tras la prueba.
-- Estado: EN REVISION -> PR. Post-merge: deploy telegramWebhook.
-
-## 2026-07-04 - claude - Seguridad: parche echarts CVE-2026-45249 (XSS)
-
-- Contexto: Dependabot alert #178 (moderada, abierta desde 2026-07-01) llevaba toda la sesion pendiente en cada PR de este repo. Revisada a pedido de Orel.
-- CVE-2026-45249 / GHSA-fgmj-fm8m-jvvx: XSS en Apache ECharts < 6.1.0, en el tooltip de series tipo "Lines" cuando no se especifica tooltip.formatter y series.data[i].name trae HTML crudo (se renderiza via innerHTML). Severidad media (CVSS 6.1).
-- Verificado que el codebase NO usa series tipo "Lines" actualmente (sin matches de type:'lines' en apps/pwa/src) - riesgo practico bajo hoy, pero se parcha igual.
-- Fix: package.json ya pedia "^6.0.0" (rango correcto); solo el lockfile tenia fijado 6.0.0 (vulnerable). `pnpm update echarts@6.1.0 --filter @mantenimiento/pwa` actualizo package.json a ^6.1.0 y el lockfile a la version parchada.
-- Verificacion: tsc --noEmit limpio, `vite build` completo sin errores (chunk de echarts bundlea normal, ~1.14MB sin cambios de tamaño relevantes).
-- Estado: EN REVISION -> PR. Frontend puro, deploy via GitHub Actions al mergear a main.
-
-## 2026-07-04 - claude - Chatbot IA de la PWA (in-app) - mismo arreglo de deprecaciones + bug estructural encontrado
-
-- Contexto: al revisar la actualizacion de modelos de ARIA-Telegram, se reviso tambien el chatbot IN-APP de la PWA (aiAgents.ts + ai.ts, distinto sistema, usado por ChatBot.tsx via useChatBot.ts) - resultado: encontrado MAS roto de lo esperado, no solo modelos viejos.
-- BUG ESTRUCTURAL (mas grave que la deprecacion): el `status` de los 4 agentes se inicializaba como `XXX_API_KEY ? 'online' : 'disabled'`, pero esas constantes estan hardcodeadas vacias a proposito ("BLOQUEADO: usar Cloud Function") desde que las keys se movieron al servidor. Un mecanismo de rescate via Firestore (settings/ariaAgents.providerKeys) solo tenia guardada la key de deepseek -> gemini-flash, qwen-qwq y llama-versatile arrancaban SIEMPRE 'disabled' y `isAgentAvailable()` (que gatea toda invocacion, automatica o manual) los rechazaba. Efectivamente los 4 agentes del chat in-app estaban caidos (deepseek-r1 sobrevivia por la entrada suelta en Firestore, pero con la key invalida que se arreglo hoy en el otro PR). FIX: los 4 agentes arrancan 'online' directo (las keys reales SIEMPRE viven en el servidor); se elimino la logica muerta de "reenable si hasKey" en applyAgentsConfig - la unica fuente de verdad para disabled queda `config.disabledAgents` (admin) o un 402 real via markAgentError.
-- MODELOS ACTUALIZADOS (mismo research de deprecaciones de Groq que en ARIA-Telegram): llama-versatile: llama-3.3-70b-versatile -> openai/gpt-oss-120b. deepseek-r1: deepseek-reasoner (alias legacy, se apaga 24-jul) -> deepseek-v4-flash. gemini-flash: gemini-2.5-flash -> gemini-3.5-flash. qwen-qwq: qwen-qwq-32b (YA DECOMISIONADO por Groq, confirmado con fuente oficial) -> qwen/qwen3.6-27b (se salto qwen3-32b porque ese TAMBIEN se apaga 17-jul).
-- BUG ADICIONAL cazado: `callGemini`/`callGeminiStream` en ai.ts tenian el modelo HARDCODEADO ('gemini-2.5-flash') ignorando `agent.model` por completo - actualizar el agente no habria tenido ningun efecto. Agregado parametro `model` opcional, pasado desde aiAgents.ts.
-- BUG ADICIONAL cazado: el streaming de Groq/DeepSeek en `callAgentStream` intentaba pegarle DIRECTO al proveedor desde el browser con `PROVIDER_KEYS` (nunca poblado para groq, solo deepseek via Firestore) - streaming de Groq nunca pudo haber funcionado. FIX: mismo patron que Gemini (que ya degradaba con gracia a no-streaming): ahora reusa el `callAgent` no-streaming via el proxy seguro y entrega todo en un solo onChunk. Se evito doble-conteo de uso (recordAgentUsage) retornando directo desde esa rama.
-- BUG ADICIONAL cazado: qwen/qwen3.6-27b devuelve su razonamiento inline como `<think>...</think>` en el mismo texto (a diferencia de deepseek/gemini que lo separan en un campo aparte) - sin filtro se veria crudo en el chat. Agregado `stripThinkTags()` aplicado en ambos paths (callAgent y el fallback de callAgentStream).
-- Verificacion: tsc --noEmit limpio, eslint limpio en los 2 archivos tocados. Los 4 modelos nuevos probados EN VIVO contra las APIs reales (Groq/Gemini/DeepSeek) - los 4 responden 200 con contenido valido. Regex de stripThinkTags probado unitariamente contra la respuesta real capturada de qwen3.6 (limpia correctamente, no afecta texto sin tags). UI completa (ChatBot.tsx en el navegador) NO verificada end-to-end porque la PWA exige login Google (gotcha ya documentado en memoria de sesiones previas).
-- Estado: EN REVISION -> PR. Frontend puro (apps/pwa) - el deploy va por GitHub Actions al mergear a main, NO requiere `firebase deploy` manual de functions.
-
-## 2026-07-04 - claude - ARIA - actualizacion de modelos (deprecaciones Groq) + 3er proveedor
-
-- Origen: preocupacion de Orel por la cuota diaria de Groq agotandose. Investigacion con fuentes oficiales (console.groq.com/docs/deprecations, /rate-limits) revelo algo mas grave: llama-4-scout (el modelo de VISION que ARIA ya usaba) se apaga el 17-jul-2026 (llama-4-maverick, el otro modelo con vision de Groq, YA murio en marzo); llama-3.3-70b-versatile Y llama-3.1-8b-instant se apagan el 16-ago-2026. Groq se queda SIN NINGUN modelo de vision gratis tras el 17-jul - su reemplazo sugerido (gpt-oss-120b) es solo texto.
-- FIX VISION: ariaGroqVision migrado de Groq a Gemini 3.5-flash (multimodal nativo, gratis 1500 req/dia, sin fecha de baja anunciada). _ariaGeminiChat generalizado para aceptar content como array de parts (texto + inlineData) y parametro model.
-- FIX TEXTO PRIMARIO: ARIA_MODEL = openai/gpt-oss-120b (sucesor recomendado por el propio Groq del 70B que se apaga; mismo tope 1K req/dia pero DOBLE de tokens/dia - 200K vs 100K - y benchmarks a la par de o4-mini).
-- CADENA FINAL (3 proveedores, ninguno repetido): Groq gpt-oss-120b -> Gemini 3.5-flash (gratis) -> DeepSeek deepseek-v4-flash (paga centavos, ultimo recurso). Se SACO Groq 8B-instant del medio (decision de Orel: calidad insuficiente, confirmada por la respuesta imprecisa que dio en la sesion anterior).
-- Nuevas funciones: _ariaDeepSeekChat (misma key secret que deepseekProxy, modelo deepseek-v4-flash). Secret DEEPSEEK_API_KEY sumado a telegramWebhook + ariaDailyBrief.
-- HALLAZGO CRITICO: la key ya guardada en el secret DEEPSEEK_API_KEY de Firebase estaba INVALIDA (401 Authentication Fails) - probablemente rotada hace tiempo. Encontrada una key FUNCIONAL distinta en settings/ariaAgents.providerKeys.deepseek (Firestore) - probablemente la misma que usaria el agente deepseek-r1 del chatbot interno de la PWA, que llevaria tiempo fallando en silencio con la key del secret. Intente actualizar el secret con firebase functions:secrets:set pero el Service Account NO tiene el permiso IAM secretmanager.versions.add (403) - requiere que Orel lo corra el mismo con su sesion (tiene los permisos), o le de el rol de IAM al SA. Comando dejado listo para Orel en el PR.
-- Hallazgo tecnico (ambos providers): tanto DeepSeek v4-flash como Gemini 3.5-flash tienen modo "pensamiento" activado por defecto (reasoning_content / thoughtSignature) que consume parte del presupuesto de tokens ANTES de la respuesta final - con budgets chicos (300-500 tokens) el JSON puede llegar truncado. Subido el budget de vision a 1000 tokens (confirmado sin truncar). Router/composer (300/600) probados OK en los casos de prueba, pero es un patron a vigilar.
-- Verificacion end-to-end con Groq real: primario gpt-oss-120b respondio bien (verificado). Fallback a Gemini forzando 429 de Groq: respondio bien (texto completo, natural). Fallback a DeepSeek (forzando 429 en Groq+Gemini): fallo por la key invalida ANTES del fix - no re-verificado el fallback DeepSeek end-to-end porque la correccion del secret la debe correr Orel (queda pendiente validarlo una vez el actualice el secret). Vision con Gemini + match SAP real + escritura en fotosReales: verificado end-to-end con el mismo caso real (SAP 3300031966), revertido tras la prueba.
-- Estado: EN REVISION -> PR. Post-merge: deploy telegramWebhook + ariaDailyBrief. PENDIENTE (Orel): correr el comando de secreto DeepSeek para activar ese ultimo escalon.
-
-## 2026-07-04 · claude · ARIA vision con OCR + adjuntar foto a repuesto del maestro
-
-- Origen: Orel mostro screenshot real — foto de un conector con SAP "3300031966" impreso en la etiqueta; ARIA lo describio pero IGNORO el codigo, y al preguntarle "que codigo detectas?" respondio "revise la foto de nuevo, no veo ninguno" (FALSO — no tiene acceso a re-examinar la imagen en el chat de seguimiento, solo al texto guardado en history).
-- FIX 1 OCR: `ariaGroqVision` ahora pide JSON {descripcion, codigos[], falla} — instruccion explicita de leer etiquetas/tags (SAP 8-10 digitos, part numbers). Antes solo pedia describir el equipo/falla, nunca leer texto.
-- FIX 2 honestidad: instruccion en ARIA_PERSONA — nunca decir que "revisaste de nuevo" una foto ya analizada (no hay re-acceso a la imagen); responder en base al analisis guardado en history, u ofrecer que reenvien la foto.
-- FIX 3 (feature nueva): `ariaBuscarCodigoEnMaestro` matchea el/los codigos detectados contra `repuestos` (SAP exacto por digitos, o texto libre). Si hay match → nuevo pending `kind:'adjuntar_foto_repuesto'` → confirmar sube la foto a Storage (carpeta `repuestos/`, antes hardcodeaba `incidents/` — corregido con parametro `carpeta` en `uploadPhotoToStorage`) y hace `arrayUnion` en `fotosReales` del repuesto real. Si no hay match → sigue el flujo de incidencia de antes (con nota del codigo visible sin coincidencia, si aplica).
-- BUG real cazado en el dry-run: `FieldValue.serverTimestamp()` NO se puede usar dentro de un elemento de `arrayUnion` (Firestore lo rechaza) — cambiado a `new Date()`, igual patron que los otros usos de fotosReales/imagenesManual en el codigo existente.
-- Verificacion end-to-end con el MISMO SAP real del caso reportado (3300031966, "CONECTOR TEE 10MM", ya en el maestro): foto generada con PIL replicando la etiqueta → vision detecto conector+codigo+match real → confirmar escribio fotosReales de verdad (verificado leyendo el doc, luego revertido a []) → storage path correcto `repuestos/{id}/...`. Camino sin match (foto de falla sin codigo) verificado sigue creando incidencia normal.
-- Limitacion conocida (no arreglada, documentada): bajo fallback al modelo 8B (cuota Groq 70B agotada durante el test), la respuesta a "que codigo viste?" en el chat de seguimiento fue imprecisa (dijo que no detecto el codigo, pese a estar en el history) — ya NO alucina "revise de nuevo", pero el modelo chico no siempre recupera bien el dato del historial. Con el modelo 70B (cuota normal) deberia responder mejor; queda como limitacion de calidad del fallback, no de arquitectura.
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
-
-## 2026-07-04 · claude · ARIA APRENDE — hechos globales + lagunas + fallback de modelos
-
-- Vision de Orel: ARIA no debe decir "no tengo informacion" y quedarse ahi — debe poder APRENDER.
-- HECHOS GLOBALES: "aprende: X" (SOLO admin; atajo DETERMINISTA por prefijo, el 8B lo ruteaba mal) → `ariaKnowledge/hechos` (cap 60) → inyectado en router+composer para TODOS los usuarios. "recuerda que X" (nota personal) tambien determinista. Verificado: enseñar → usar el hecho en la respuesta siguiente (con razonamiento encima).
-- LAGUNAS: cuando la respuesta contiene "no encontre/no tengo/etc" (heuristica, excluyendo acciones de control) → log en `ariaGaps` (pregunta+accion+respuesta). Accion `lagunas`: "que no has sabido responder?" → lista para decidir que enseñarle.
-- Composer: si los datos no alcanzan → decir QUE dato falta + (admin) ofrecer "aprende: ..." / (tecnico) sugerir pedirselo a Orel.
-- REPUESTOS enriquecidos: cantidadPorMaquina + stock bodega SIEMPRE (o "sin registro en bodega") + valorUnitario + ubicacionEnPlanta + nota explicativa.
-- FALLBACK DE MODELOS (hallazgo: cuota Groq diaria AGOTADA en pleno test, 98k/100k TPD): cadena Groq 70B → Groq 8B-instant (cuota separada) → Gemini 2.5 flash (secret GEMINI_API_KEY sumado a telegramWebhook y ariaDailyBrief). ARIA no queda muda. Fallback 8B validado en vivo; Gemini queda validado por codigo (espejo de geminiProxy).
-- Limpieza: hecho de prueba INVENTADO borrado de ariaKnowledge/hechos + lagunas/sesion/usuario de test.
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + ariaDailyBrief.
-
-## 2026-07-04 · claude · ARIA Telegram — respuestas FORMATEADAS (markdown→HTML Telegram)
-
-- Pedido de Orel: respuestas con formato (las listas salian como parrafo plano).
-- `ariaFormatTelegram(text)`: markdown liviano → HTML de Telegram A PRUEBA DE BALAS (escapa TODO el HTML primero, despues convierte **negrita**→<b>, `codigo`→<code>, "- "→"• "); formato mal cerrado queda literal, nunca rompe sendMessage (validado con test unitario: XSS escapado, markdown roto inofensivo).
-- Persona + router: instrucciones de formato (negritas en nombres clave, viñetas en enumeraciones, `code` para SAP/tags). Aplica a: respuestas del chat, brief matinal (prompt + envio scheduled), borradores de incidencia (crear/cerrar en negrita), vision (titulo <b>).
-- TTS: se limpian los marcadores de markdown antes de sintetizar (la voz no lee "asterisco").
-- Verificacion: unit test del conversor OK (3 casos) + dry-run: borrador con <b> OK, lista de modulos con nombres en negrita OK.
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + ariaDailyBrief (usa el conversor en el envio).
-
-## 2026-07-04 · claude · ARIA = PIVOTE de la app (mapa de modulos con conciencia de rol)
-
-- Vision de Orel: ARIA es el centro/pivote — debe saber de TODO lo de la PWA y omitir los modulos ocultos/en desarrollo.
-- Catalogo: `scripts/sync-aria-app-modules.js` parsea ALL_NAV_ITEMS de MainLayout.tsx (flag inDevelopment) + descripciones curadas → doc `ariaKnowledge/appModules` (21 modulos: 11 produccion, 10 desarrollo). RE-CORRER el script cuando cambien los modulos del sidebar.
-- Functions: `ariaGetAppModules` (cache 10min) + `ariaAppKnowledgeBlock(esAdmin)` inyectado en router y composer. `ariaUsuarioAutorizado` ahora devuelve {ok, rol}; rol admin → ve modulos en desarrollo (marcados como tal); no-admin → NO se listan/linkean; si pregunta por uno: "en desarrollo, pronto disponible" + ofrecer los datos por chat.
-- Verificacion dry-run: tecnico+repuestos → link correcto OK · tecnico+gantt(oculto) → sin link oculto, ofrece datos y redirige a modulo de produccion OK · admin → lista los 10 en desarrollo OK.
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
-
-## 2026-07-04 · claude · ARIA Telegram TANDA B — voz de respuesta + vision + graficos
-
-- VOZ DE RESPUESTA: nota de voz entrante → ademas del texto, ARIA responde con NOTA DE VOZ propia. `ariaTts` (Google Cloud TTS es-US-Neural2-A, OGG_OPUS, limpia emojis, max 850 chars) + `ariaGetGcpToken` (metadata server en GCF, JWT manual con GOOGLE_APPLICATION_CREDENTIALS en local) + `sendTelegramVoice` (multipart sendVoice). API texttospeech ya estaba habilitada en el proyecto (sintesis validada standalone: 19KB OGG).
-- VISION: foto en privado (autorizados) → `ariaHandleFoto`: descarga la mayor resolucion → `ariaGroqVision` (Groq meta-llama/llama-4-scout-17b-16e-instruct, validado standalone) describe equipo/falla → borrador de incidencia con `fotoFileId` → al confirmar, `ariaCrearIncidencia` sube la foto a Storage (uploadPhotoToStorage) y la cuelga en `fotos`. Grupos siguen con tgHandlePhoto clasico.
-- GRAFICOS: accion `grafico` (grader|incidencias) → QuickChart (line piezas+microdetenciones / bar incidencias 14 dias) → sendTelegramPhoto. Validado: URL renderiza PNG 90KB con datos reales. Nota: QuickChart es servicio externo; solo van conteos agregados, sin datos sensibles.
-- `tgHandleAriaChat` ahora retorna el texto de respuesta (lo usa el TTS del webhook).
-- Verificacion: dry-run graficos OK (routing directo y por seguimiento) · vision standalone OK · TTS standalone OK · sintaxis OK. Voz end-to-end y foto end-to-end quedan para prueba en vivo de Orel (requieren updates reales de Telegram).
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook.
-
-## 2026-07-04 · claude · ARIA Telegram TANDA A — whitelist + memoria + cerrar incidencias + alertas DM
-
-- SEGURIDAD (lo importante): whitelist `telegramAriaUsers/{telegramUserId}` — antes CUALQUIER usuario de Telegram en privado podia leer datos de planta y crear incidencias. No autorizado → mensaje cortes + aviso UNA vez al admin (ARIA_ADMIN_CHAT_ID=52949422) con el id listo para habilitar. Gate en texto y voz.
-- CONFIRMACION DETERMINISTA: con accion pendiente, "si/dale/confirmo/creala..." (≤40 chars) va DIRECTO a confirmar sin pasar por el LLM (el router se confundia con "si, creala" y re-armaba el borrador). Negaciones → cancelar. LLM fuera de la ruta critica.
-- Cerrar incidencias: accion `incidencia_cerrar` (busca en abiertas por referencia; 1 match → confirmacion → status resuelta + resolucion "via ARIA"; multiples → lista para elegir).
-- Memoria larga: acciones `recordar`/`olvidar` → array `notas` (max 20) en la sesion; se inyecta en router y composer ("que equipo es mi prioritario?" → "Baader 200" OK).
-- Alertas DM: acciones `alertas_activar/desactivar` (flag `alertas`); `onIncidentCreated` ahora tambien DM a suscritos en criticas/altas (salta al reportante). Refactor: `ariaLoadSession` (1 lectura: turns+pending+notas), pending generalizado con `kind` crear|cerrar.
-- Verificacion dry-run: rechazo no-autorizado + aviso admin OK · recordar OK · alertas OK · crear+confirmar (0.4s determinista) OK · cerrar+confirmar OK · nota recordada OK. Datos de prueba borrados.
-- Estado: EN REVISION → PR. Post-merge: deploy telegramWebhook + onIncidentCreated; seed telegramAriaUsers/52949422 autorizado + alertas:true.
-
-## 2026-07-04 · claude · ARIA Telegram — crear incidencias con confirmacion
-
-- Hecho: primera ESCRITURA de ARIA, con puerta de confirmacion obligatoria. Router: acciones `incidencia_crear` (borrador con descripcion+prioridad deducida → `pendingIncident` en la sesion, TTL 10 min), `confirmar` (crea doc en `incidents` con la MISMA forma que tgHandleIncidencia → dispara onIncidentCreated normal) y `cancelar`. CLAVE: el router recibe el ESTADO (hay/no hay borrador pendiente) inyectado en el system prompt — sin eso un "si dale" re-extraia reportes del historial incluso cancelados. `tgHandleAriaChat` ahora recibe `telegramUserId`.
-- Verificacion: dry-run — borrador critica desde "se solto la correa..., es urgente" OK; cancelar OK; "si dale" tras cancelar RE-PROPONE el borrador (pide confirmacion de nuevo, no crea directo — aceptado como UX valida); crear tras "si, confirmo" creo incidencia real (borrada tras la prueba junto con la sesion de test).
-- Estado: EN REVISION (rama feat/aria-telegram-crear-incidencias → PR). Post-merge: deploy telegramWebhook.
-- Sigue: verificar brief 7AM de manana; posible siguiente: adjuntar foto a incidencia via ARIA, cerrar/comentar incidencias con confirmacion.
-
-## 2026-07-04 · claude · ARIA Telegram — brief matinal 7AM + brief a demanda
-
-- Hecho: `ariaComponerBrief()` (junta turno/kpi/gantt/stock-bajo/preventivos/grader/solicitudes en paralelo → Groq redacta brief ~16 lineas con persona ARIA, fallback datos crudos) + `exports.ariaDailyBrief` onSchedule 07:00 America/Santiago → envia a chats con `briefDiario==true` en `telegramAriaSessions`. Router: acciones `brief` (a demanda), `brief_activar`/`brief_desactivar` (toggle conversacional del flag, unica escritura y es config del propio chat). FIX: `ariaSaveTurns` ahora set con merge:true para no pisar flags.
-- Verificacion: dry-run local — brief completo con datos reales (5 gantt atrasadas, 1 preventivo vencido, stock bajo, grader 14.019 piezas) en 5.7s; activar/desactivar OK incluyendo "mejor desactivalo" resuelto por contexto. Doc de prueba borrado.
-- Nota: Orel YA usa ARIA en vivo (chat 52949422, 24 turnos). Tras el deploy se suscribe su chat al brief (briefDiario=true).
-- Estado: EN REVISION (rama feat/aria-telegram-brief-matinal → PR). Post-merge: deploy telegramWebhook + ariaDailyBrief (funcion NUEVA).
-
-## 2026-07-04 · claude · ARIA Telegram — 6 fuentes de datos nuevas
-
-- Hecho: ampliado el router/recolectores de ARIA en `telegramWebhook`: `historial` (maintenanceLog, filtro por texto), `grader` (graderDailySummaries ultimos 2: piezas/peso/compuertas/microdetenciones), `gantt` (ganttTasks con cache 10min: abiertas/ATRASADAS/proximas, fallback si el filtro no calza), `stockbajo` (bodega stockActual<=stockMinimo cruzado con maestro), `solicitudes` (solicitudes_repuestos), `preventivos` (preventiveTasks activos con estado VENCIDA/al dia). Helper `ariaToDate` (Timestamp|string|Date) + `ariaFmtFecha`.
-- FIX legacy: `ariaDataTurno` (y el tgHandleTurno original) consultaban `preventive_tasks` que NO existe — la coleccion real es `preventiveTasks` con campo `proximaEjecucion` (string o Timestamp); ahora los preventivos del turno cuentan bien.
-- FIX router: para gantt el LLM ponia "atrasadas" como filtro de texto → 0 matches; ahora el filtro cae a todas las tareas si no calza y el spec del router lo prohibe.
-- Verificacion: dry-run local (Telegram interceptado, Firestore+Groq reales): capacidades OK, historial 3 registros reales OK, grader 08-05 (14.019 piezas) OK, gantt 5 atrasadas reales OK, stock bajo 62 items OK, preventivos 1 vencido OK. Doc de prueba borrado.
-- Estado: EN REVISION (rama feat/aria-telegram-mas-fuentes → PR). Post-merge: deploy `functions:telegramWebhook`.
-
-## 2026-07-04 · claude · ARIA chat natural en Telegram (voz incluida)
-
-- Hecho: capa conversacional de ARIA en `telegramWebhook` (functions/index.js, seccion "ARIA — CHAT NATURAL"). Texto libre o nota de voz en chat PRIVADO → router de intenciones (Groq llama-3.3-70b, JSON) → recolectores de datos SOLO LECTURA (kpi/turno/estado/sensores/equipo/repuestos) → respuesta natural compuesta por Groq con persona ARIA. Memoria conversacional corta en `telegramAriaSessions/{chatId}` (12 turnos). Voz: `message.voice` → downloadTelegramFile → Groq Whisper large-v3-turbo (patron de whisperProxy).
-- IMPORTANTE: `ariaDataRepuestos` lee el MAESTRO `repuestos` (+stock `bodega`) con cache warm 10 min — los handlers legacy `tgHandleRepuesto`/`tgHandleRepuestosMaquina` leen `machines/*/repuestos` (colecciones YA BORRADAS en Fase 5) y estan rotos silenciosamente; quedan desconectados como estaban, reemplazados en la practica por ARIA.
-- Webhook: + secrets ['GROQ_API_KEY'] + timeoutSeconds 120. Grupos: sin cambios (texto libre sigue ignorado; comandos/Mini App igual).
-- Verificacion: `node --check` OK + dry-run local invocando `exports.telegramWebhook` con updates simulados (fetch de Telegram interceptado; Firestore y Groq REALES): persona OK, turno con datos reales OK, busqueda Baader en maestro OK, rechazo de escritura OK (0.8–4.1s). Doc de prueba `telegramAriaSessions/999000111` borrado. Voz NO probada localmente (requiere update real de Telegram) → probar con el primer audio de Orel.
-- Estado: EN REVISION (rama feat/aria-telegram-chat-natural → PR). Tras merge: deploy manual `npx firebase-tools deploy --only functions:telegramWebhook`.
-- Sigue: fase escritura con confirmacion (crear incidencia por voz); brief matinal 7AM a Telegram (reutilizar avisos proactivos).
-
-## 2026-06-21 · claude · CTD órdenes de trabajo — Camino B (PR #98, DESPLEGADO + reglas)
-
-- **PR #98 MERGEADO** (`d1120891`): 4.ª dimensión de gestión de activos = **órdenes de trabajo**.
-  - Tipo `WorkOrder` + colección plana **`workOrders`** (1 doc por OT, `equipmentId`).
-  - **`firestore.rules`: regla nueva `workOrders`** (read activeUser / create+update technician / delete admin, patrón `maintenanceLog`). **DESPLEGADA** vía `deploy-firestore-rules.yml` al mergear (run success). Aprobado por Orel (Camino B).
-  - `services/workOrders.ts`: `getWorkOrders` / `createWorkOrder` / `updateWorkOrder`.
-  - Pestaña **"Trabajos"** en el expediente: alta (título/tipo/prioridad/asignado/fecha/descripción) + lista con badges estado/prioridad + acciones Tomar/Cerrar/Cancelar (cierre fija `fechaCierre`). Gated por `canEditEquipment`.
-- Verificación: tsc + eslint limpios; CI verde; PWA + reglas desplegadas OK.
-- Estado: HECHO / DESPLEGADO.
-- Sigue (opcional): integrar OT abiertas/vencidas en la Agenda y KPIs de programa; costo acumulado por activo (TCO); notificaciones.
-
-## 2026-06-21 · claude · CTD gestión de activos v1 (PR #97, DESPLEGADO)
-
-- **PR #97 MERGEADO** (`3929719d`): 3 dimensiones de gestión de activos, todo lectura sobre datos existentes:
-  - **Ciclo de vida** (pestaña Información): antigüedad (`fechaInstalacion`), vida útil, % de vida consumida (barra+semáforo) y fecha estimada de reemplazo.
-  - **Confiabilidad** (Información): n.º de fallas, MTTR, MTBF, disponibilidad calculados de las incidencias correctivas del equipo (helper `confiabilidad()`).
-  - **Pestaña "Recursos"**: repuestos del equipo (maestro N:M, nuevo hook `useRepuestosDeEquipo` → `repuestos` where `equipos array-contains nodeId`) + documentos heredados (`useManualesDeEquipos`).
-- Archivos: `pages/CentroTecnicoDocumentalPage.tsx`, `hooks/repuestos/useRepuestosDeEquipo.ts` (nuevo).
-- Verificación: tsc + eslint limpios; CI verde. Sin reglas → solo redeploy PWA.
-- Estado: HECHO / DESPLEGADO.
-- Sigue: **Órdenes de trabajo (Camino B)** — Orel aprobó colección `workOrders` nueva (necesita `firestore.rules`); en curso.
-
-## 2026-06-21 · claude · CTD: traer de Equipos + repasada de flujo (PR #95 + #96, DESPLEGADO)
-
-- **PR #95 MERGEADO** (`c201da6f`): trae de Equipos al expediente del CTD →
-  (1) **anotar fotos** (botón lápiz en cada foto → `PhotoAnnotationEditor`; al guardar reemplaza o agrega como nueva);
-  (2) **vista Tarjetas** (3er modo Lista/Tarjetas/Agenda, grid con foto; paginación aplica a Lista y Tarjetas);
-  (3) **copiar códigos** del set filtrado al portapapeles.
-- **PR #96 MERGEADO** (`69ce703d`): repasada técnica+visual del flujo →
-  KPIs ahora **clicables = filtros** (se quitó la fila de chips NFPA duplicada); Estado pasó de chips a `select`
-  (barra única Vista/Estado/Sección/Línea/Tipo/Orden/Densidad); encabezado con menú **"Datos"** (Exportar/Plantilla/
-  Importar placa); Agenda con CTA **"Registrar →"** en vencidas; **debounce** 250 ms en búsqueda; dedupe `proxMs`;
-  **refactor**: extraídos `CtdEquipoRow` + `CtdEquipoCard`.
-- Archivos: `pages/CentroTecnicoDocumentalPage.tsx` (+ usa `components/PhotoAnnotationEditor`).
-- Verificación: `tsc --noEmit` + `eslint` limpios por commit; CI verde. Sin reglas nuevas → solo redeploy PWA.
-- Estado: HECHO / DESPLEGADO.
-- Sigue (opcional): extraer `useCtdEquipos` (lógica) si el componente sigue creciendo; cargar placa del piloto.
-
-## 2026-06-21 · claude · CTD "programa vivo" (PR #94, DESPLEGADO)
-
-- **PR #94 MERGEADO** (`7388c4a6`) — el CTD pasa de catálogo a programa NFPA 70B que maneja el ciclo:
-  1. **Cerrar el ciclo de inspección** (`FichaTecnicaNFPA70B.handleAddEntry`): al registrar un evento de tipo inspección/termografía/medición/preventivo/predictivo, la severidad → condición observada (verde/amarillo/rojo = 1/2/3) y se reprograma `proximaInspeccion` = fecha + `intervaloInspeccionDias`(criticidad × condición). Antes solo guardaba la entrada sin avanzar la próxima.
-  2. **Agenda de inspecciones** (CTD): toggle Lista/Agenda; agrupa los equipos filtrados por ventana (Vencidas/30/60/90/+90/Sin fecha), ordenadas por fecha.
-  3. **Carga masiva de placa por Excel**: `services/equipmentFichaExcel.ts` (`descargarPlantillaPlaca`/`importarPlacaExcel`, match por Código, MERGEA solo celdas con valor) + botones Plantilla/Importar en el encabezado (canEditEquipment).
-  4. **Reporte PDF por equipo**: `services/equipmentReportPdf.ts` (jsPDF + jspdf-autotable) con datos generales + placa + programa de inspección + historial (maintenanceLog + incidencias); botón "PDF" en el expediente. El CTD ahora carga también el `maintenanceLog` del equipo abierto.
-- Archivos: `components/equipment/FichaTecnicaNFPA70B.tsx`, `pages/CentroTecnicoDocumentalPage.tsx`, `services/equipmentFichaExcel.ts` (nuevo), `services/equipmentReportPdf.ts` (nuevo).
-- Verificación: `tsc --noEmit` + `eslint` limpios en cada commit; CI build verde en #94. Sin reglas Firestore nuevas → solo redeploy PWA. Navegador NO verificable (login Google) → Orel prueba en vivo.
-- Estado: HECHO / DESPLEGADO.
-- Sigue: probar en vivo (registrar inspección reprograma; agenda; importar placa; PDF). Pendientes previos siguen (placa del piloto; ~45 equipos sin `tipo`).
-
-## 2026-06-21 · claude · CTD → expediente autosuficiente (PR #92 + #93, DESPLEGADO)
-
-- **PR #92 MERGEADO** (`b919dbd1`): portada CTD `/centro-tecnico-documental` (KPIs + buscador + v3c próxima-inspección auto criticidad×condición + export Excel). Solo redeploy PWA.
-- **PR #93 MERGEADO** (`67e04316`) — el CTD pasa de portada a **expediente AUTOSUFICIENTE**:
-  - CTD movido al grupo **Aprendizaje** (decisión Orel; no se cambió el landing/HomeRedirect).
-  - **Expediente en sitio**: el click abre el equipo dentro del CTD (panel con pestañas Info/Ficha NFPA 70B/Tablero/Fotos/Notas/QR; reusa `FichaTecnicaNFPA70B` + `TableroExpediente`). Estado en URL `?eq=&tab=` (deep-link/atrás), Esc, scroll-lock. **Ya NO salta a `/equipment`.**
-  - Migrado de Equipos: **favoritos** + **notas** (hooks `useEquipmentFavorites`/`useEquipmentNotes` que comparten la misma clave localStorage que EquipmentPage → única fuente de verdad), **editar datos básicos** (`EquipmentForm` extraído a `components/equipment/EquipmentForm.tsx`, reusado en ambos lados), **fotos** subir/borrar.
-  - Filtros: estado · **Sección→Línea** (cascada, de `hierarchyPath` niveles 2/3) · **Tipo**; orden (criticidad/próxima/ficha/sección-línea/nombre); paginación (50); vista compacta; "completar ficha" rápido (el % abre la Ficha).
-  - **Nuevo campo `Equipment.tipo`** (+ `validation.ts` + editable en `EquipmentForm` con datalist + columna Excel + visible en Info).
-- Datos: `scripts/backfill-equipment-tipo.js` (dry-run por defecto, `--write`) **EJECUTADO en prod** → 508/553 equipos con `tipo` (~45 sin match: Baader/Knuro/climatización/tableros abreviados → fijar a mano).
-- Archivos: `pages/CentroTecnicoDocumentalPage.tsx`, `components/equipment/EquipmentForm.tsx` (extraído), `hooks/useEquipmentFavorites.ts`, `hooks/useEquipmentNotes.ts`, `components/layout/MainLayout.tsx`, `types/index.ts`, `lib/validation.ts`, `scripts/backfill-equipment-tipo.js`, `pages/EquipmentPage.tsx` (usa el form extraído).
-- Verificación: `tsc --noEmit` + `eslint` limpios en cada commit; CI build verde en #93. Navegador NO verificable (login Google) → Orel prueba en vivo. Sin reglas Firestore nuevas → solo redeploy PWA.
-- Estado: HECHO / DESPLEGADO.
-- Sigue: cargar placa real del piloto (motor 720004608 + bomba 720004607); fijar `tipo` a los ~45 sin match; (opcional) "CTD como puerta principal" quedó descartado por ahora.
-
-## 2026-06-20 · claude · Reconciliación tableros + PR #91 (CTD integrado, SIN deploy)
-
-- ⚠️ **Para el otro agente**: tu merge `3682d389` trajo la versión **SUELTA** de tableros (`/tableros` + `TablerosPage.tsx`). Yo la **realineé después** (tab "Tablero" en el expediente del equipo, se borró el módulo suelto). Reconcilié haciendo `merge feat/levantamiento-tableros-v1` sobre esta rama (commit `71bac189`): **gana la versión tab**; `TablerosPage.tsx` borrada, `TableroExpediente.tsx` + tab en `EquipmentPage`. NO vuelvas a mergear la versión suelta.
-- Hecho: ambas ramas pusheadas a origin; **PR [#91](https://github.com/orelcain/mantenimiento-planta/pull/91)** abierto (`feat/centro-tecnico-documental-v1` → main) con CTD v1–v3b + tableros realineado. **NO mergeado, NO desplegado** (solo el merge a main despliega). Al mergear se despliegan las reglas `maintenanceLog` + `tableros`.
-- Verificación: `tsc --noEmit` limpio (CTD v3b + tableros juntos); preview en vivo (tab "Tablero" monta en el expediente).
-- Estado: EN REVISIÓN (PR #91, sin merge).
-- Sigue: revisar+mergear PR #91 (Orel) → despliega reglas; luego levantar tablero piloto. PENDIENTES de sync aparte (no tocados): `chore/ai-coordination` (8 commits sin push: Fase 5 + ARIA TTS/voz), `main` local (1 commit suelto + stash, desfasada de origin/main), `export-twin-data.js` (script personal sin trackear).
-
-## 2026-06-20 · claude · Tableros — REALINEADO: del módulo suelto al expediente del equipo
-
-- Feedback de Orel: *"todo debería estar centralizado desde el Centro Técnico Documental, ¿no?"*. Correcto — el spec (`docs/PLAN_CENTRO_TECNICO_DOCUMENTAL.md`) dice que el CTD **NO es módulo aparte, enriquece Equipos**, y que el centro documental "está ~70% construido pero **disperso**, falta consolidarlo". Mi `/tableros` suelto era justo lo disperso que el CTD quiere evitar.
-- Decisión (Orel): el **tablero ES un equipo** y su levantamiento/unifilar vive como **sección del expediente del equipo**, no como módulo.
-- Hecho: quitado el módulo suelto (ruta `/tableros` en App.tsx, nav "Tableros" + import Zap en MainLayout, borrado `pages/TablerosPage.tsx`). Nuevo `components/equipment/TableroExpediente.tsx` (sección lectura/edición + circuitos + Excel) montado como **tab "Tablero"** en el detalle de equipo (`EquipmentPage.tsx`, junto a "Ficha NFPA 70B"). Servicio reescrito: doc `tableros/{equipmentId}` (1:1), `getTableroByEquipment` + `saveTableroForEquipment` (alta = Revisión 0 as-found; edición opcional agrega revisión "cambio"). `types/tableros.ts` + `equipmentId`. **NO se tocó `FichaTecnicaNFPA70B.tsx`** (lo trabaja otro agente) — solo se sumó un tab hermano.
-- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sesión admin)**: abrí un equipo → tab "Tablero" monta el expediente con empty-state + Levantar/Plantilla/Importar + "se guardará como Revisión 0 (as-found)". Lectura da `permission-denied` (regla `tableros` sin desplegar — esperado). Nota: tras borrar `TablerosPage.tsx` Vite tira `Failed to reload TablerosPage.tsx` por HMR (ruido del dev server, no afecta build/tsc).
-- Estado: EN REVISIÓN (rama sin push/merge; commit `046df802`).
-- Sigue: PR+merge → desplegar reglas; levantar tablero piloto; **filtro "Tableros" en Equipos** (ver todos); fotos a Storage; `cargaNombre`→`cargaNodeId`.
-
-## 2026-06-20 · claude · Tableros / Unifilares (NFPA 70B) v1 — levantamiento (Excel + form PWA)
-
-- Pedido de Orel: cubrir **unifilares de tableros desde la PWA**. Decisión: **"primero el dato" (Fase 0)** — levantamiento estructurado antes de dibujar. El levantamiento inicial se guarda como **Revisión 0 (as-found)** → nace el histórico de cambios que hoy no existe. Spec/protocolo en OneDrive: `ARIA_MANTENIMIENTO_PLANTA/docs/LEVANTAMIENTO_TABLEROS.md`. (Fluyo NO es la herramienta del unifilar: es para arquitectura de software, sin símbolos eléctricos.)
-- Hecho: colección `tableros` (circuitos+revisiones como arrays en el doc, <1MB de sobra). **Ambas vías de captura**: **Excel** (descargar plantilla + importar, SheetJS ya estaba en deps) y **form nativo** en `/tableros` (lista + stats + formulario + editor de circuitos + condición 1·2·3 NFPA 70B).
-- Archivos (rama `feat/levantamiento-tableros-v1`, commit `91ad1367`): `apps/pwa/src/types/tableros.ts`, `apps/pwa/src/services/tableros.ts`, `apps/pwa/src/services/tablerosExcel.ts`, `apps/pwa/src/pages/TablerosPage.tsx`, `apps/pwa/src/App.tsx` (ruta `/tableros` lazy), `apps/pwa/src/components/layout/MainLayout.tsx` (nav "Tableros", grupo Equipamiento, `inDevelopment` igual que Equipos), `firestore.rules` (colección `tableros`: read activeUser / create+update technician / delete admin).
-- Verificación: **`tsc --noEmit` limpio (0 errores)**. **Preview en vivo (sirve D:, sesión admin)**: `/tableros` monta, header/stats/empty-state OK, "Plantilla Excel" genera sin throw, form "Nuevo levantamiento" abre y renderiza completo. ⚠️ Lecturas/escrituras dan `permission-denied` porque la **regla `tableros` aún NO está desplegada** en el proyecto vivo (esperado).
-- Estado: EN REVISIÓN (rama sin push/merge). Diff aislado a 7 archivos (no se tocó `.ai/` en el commit de código; este worklog va aparte).
-- Sigue: PR+merge → **desplegar `firestore.rules`** (`deploy-firestore-rules.yml` al mergear, o `firebase deploy --only firestore:rules`) → recién entonces lee/escribe. Luego: levantar tablero piloto (CCM motor 720004608 / bomba 720004607), fotos a Storage (no cableado en v1), enlazar `cargaNombre`→`cargaNodeId` de `hierarchy`, y el render del unifilar sobre el dato.
-
-## 2026-06-20 · claude · Pulido repuestos: ubicación en fila + composición por clase (+ validación solicitar)
-
-- Pedido de Orel (3 mejoras del módulo):
-  1. **Ubicación de bodega en la fila** de Áreas (`RepuestosAreaHub`): nueva línea con `MapPin` + `ubicacionBodega` bajo el stock (y en el subtítulo móvil) → el técnico ve DÓNDE está el repuesto sin abrir la ficha. Verificado en vivo: BUJE INOX 3300133492 → C-31.
-  2. **Composición por clase en el header**: `catalogStats.clases` (desglose por `clase` del alcance) + línea de chips clickeables que aplican el filtro de clase. Verificado: Repuesto 5557·Insumo 1494·Refrigeración 154·Químico 127·Herramienta 107·Lubricante 2.
-  3. **Solicitar a bodega end-to-end**: revisado — el flujo ya estaba COMPLETO y cableado (`useSolicitudes` crear/listar/avanzar + `SolicitarRepuestoModal` + `SolicitudesPanel` con avance Pendiente→Aprobada→Entregada + badge pendientes). Verificado en vivo: panel abre y lista (1 entregada en prod). Sin cambios de código.
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx` (import MapPin/MaterialClase, ubicación en fila, claseCount en catalogStats, línea de composición).
-- Verificación: tsc limpio, eslint 0 errores, build success, **preview en vivo** (sirve D:).
-- Estado: HECHO (en `chore/ai-coordination`, pendiente PR+deploy).
-
-## 2026-06-20 · claude · Fase 5 — retirada de features legacy (machines/plantAssets) + scripts de borrado
-
-- Decisión de Orel (2 preguntas): retirar el tab "Categorías" (CategoryManager) y la capa "Equipos SAP" del editor de mapa, para liberar `machines` y `plantAssets`.
-- Verificación de lectores vivos contra código actual: `machines`←`useMachines`→`MachineProvider`(raíz, **contexto sin consumidores reales**)+`CategoryManager`(Settings); `plantAssets`←`usePlantAssets`→`PanelCapasYZonas`(único lector); `insumos`/`repuestosBaader200` sin lectores.
-- Código retirado: quitado `MachineProvider` de `App.tsx` (era peso muerto: cargaba `machines` en cada arranque, nadie leía el contexto); quitado tab "Categorías"+`<CategoryManager/>` de `SettingsPage`; quitada la sección "Equipos SAP" de `PanelCapasYZonas`. Borrados 5 archivos: `MachineContext.tsx`, `useMachines.ts`, `useLinkMachine.ts`(ya muerto), `CategoryManager.tsx`, `usePlantAssets.ts`. (NO se tocó `useMachineCategories`/`machineCategories` — lo usa aún `CategorySelector`, fuera de scope.)
-- Scripts nuevos (solo-lectura / con gate): `scripts/normalizacion/10-backup-fase5.js` (backup eficiente) y `11-delete-legacy.js` (dry-run por defecto; `--write` exige backup fase5-*).
-- **Backup hecho** (`backups/fase5-2026-06-20T17-25-56/`): insumos 3552 · machines 36(+6 padres fantasma) · machines/*/repuestos 5578 (incl. huérfanas sin-asignar/multivac/SW2RNI) · plantAssets 134 · repuestosBaader200 0 · hierarchy/*/repuestos 3. ≈9.300 docs.
-- Verificación código: `tsc --noEmit` limpio, `eslint` archivos tocados limpio, `pnpm build` success. **Verificado en preview en vivo (sirve D:): app monta sin crashear tras quitar provider raíz; Settings ya sin tab "Categorías".**
-- Estado: EN REVISIÓN. Orden: PR+merge+deploy del código → recién entonces `11-delete-legacy.js --write` (para que producción no lea colecciones borradas). **Borrado de datos PENDIENTE hasta deploy.**
-
-## 2026-06-20 · claude · Dependabot: resueltas las 23 alertas (bumps + overrides)
-
-- Pedido de Orel: mitigar las vulnerabilidades dependabot del repo. Inventario real vía `gh api .../dependabot/alerts` = **23 abiertas** (10 high / 9 med / 4 low) en 4 paquetes: dompurify ×8, protobufjs ×6, @grpc/grpc-js ×6, react-router ×3.
-- Fixes (bumps directos + overrides para transitivas):
-  - **dompurify** (directa, PWA): `^3.4.0`→`^3.4.11` (resuelve 3.4.11).
-  - **react-router-dom** (directa, PWA): `^7.12.0`→`^7.15.1` (resuelve 7.18.0).
-  - **protobufjs** (transitiva): override raíz `>=8.0.2`→`>=8.6.0` y functions `>=7.5.8`→`>=8.6.0` (resuelve 8.6.4).
-  - **@grpc/grpc-js** (transitiva): nuevo override `>=1.14.4` en raíz y functions (resuelve 1.14.4).
-  - Extra detectado al regenerar functions: **form-data <2.5.6** (high, fuera de la lista dependabot) → `npm audit fix --package-lock-only`.
-- Archivos: `package.json` (overrides pnpm), `apps/pwa/package.json`, `functions/package.json`, `pnpm-lock.yaml`, `functions/package-lock.json`.
-- Verificación: pnpm install OK (sin ERR_SSL); lockfile con versiones parcheadas confirmadas; `pnpm exec tsc --noEmit` limpio; `eslint . --max-warnings 30` = 0 errores / 23 warnings preexistentes; `pnpm build` = success; functions `npm audit` = **0 vulnerabilidades**.
-- **DEPLOY: PR #79 mergeado → "Deploy PWA" + "Deploy Firebase Functions" = success.** Las 23 quedaron FIXED en dependabot.
-- **2ª pasada (mismo día):** al re-escanear el árbol nuevo, dependabot destapó 6 alertas distintas (antes no reportadas) en `pnpm-lock.yaml`: form-data (high)→`>=2.5.6` (4.0.6), ws (high)→`>=8.21.0`, vite (high+med, devDep directa)→`^6.4.3`, js-yaml (med)→`>=4.2.0`, @babel/core (low)→`>=7.29.6` (8.0.1). vite bump directo; resto overrides pnpm. tsc+eslint+build OK.
-- Estado: HECHO (1ª pasada LIVE). 2ª pasada en `chore/ai-coordination` → PR #80.
-- Sigue: confirmar que las 6 cierran al mergear; Fase 5 deletes legacy.
-
-## 2026-06-20 · claude · Mejoras UX sidebar/buscador/favoritos + DEPLOY (PR #78)
-
-- Pedido de Orel (varias mejoras UX): (1) **buscador unificado** — había 2 inputs atados al mismo `repQuery` (header=global, fila-de-filtros=acotado al scope, confuso); se quitó el de la fila de filtros. (2) **Sidebar ancho ajustable** por drag del borde derecho (persistido en `repuestos-area-sidebar-width`). (3) **Botón "contraer todo"** en header del sidebar (icono ChevronsDownUp → `collapseAllNodes`). (4) **Recuerda expansión** del árbol entre recargas (`repuestos-open-nodes` + efecto en AreaSidebar que re-expande/carga los nodos restaurados). (5) **Favoritos drag-and-drop** (HTML5 dataTransfer + grip) reemplaza las flechas ↑↓ (`reorderEquipInList`).
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`, `apps/pwa/src/components/repuestos/AreaSidebar.tsx`.
-- Verificado en preview (en vivo): 1 buscador; resize 288→408px persiste tras reload; contraer-todo colapsa; DnD reordena (EVISCERADORA↔posición) y restaura; expansión recordada tras reload. tsc+eslint+CI build limpios.
-- **DEPLOY: PR #78 mergeado → "Deploy PWA" = success.** Live en producción.
-
-## 2026-06-19 · claude · DEPLOY a producción (PR #77 → main)
-
-- Mergeado `chore/ai-coordination` → `main` vía PR #77 (build CI pass; mergeable CLEAN). Sincronizada main (2 commits: daily-sync version.ts + nanobanana) antes del merge. `pnpm build` local = exit 0.
-- Deploy disparado y **COMPLETADO con éxito**: workflow "Deploy PWA" = success, "Deploy Firestore Rules" = success. Todo el trabajo de la sesión está LIVE: chatbot→maestro, foco SAP, tarjetas KPI pro, carga rápida, retiro de Mapas/insumos/import-UI, limpieza de ~26 archivos legacy. La bodega ya estaba poblada (import a Firestore, independiente del deploy de código).
-- Pendientes abiertos (no bloquean): 12 SAP del Excel fuera del maestro (5 son materiales reales: AUTOMATICO 2P 6A, FOCO LED 100W, CUCHILLO FROSTS 351P, PATA REGULADORA D65, EMPAQUETADURA SILICONA); 22 vulnerabilidades dependabot en el repo; Fase 5 deletes de colecciones legacy (insumos ya libre; machines/plantAssets aún con lectores).
-- Estado: DEPLOY HECHO. Módulo de repuestos en producción con datos reales.
-
-## 2026-06-19 · claude · Cotejo Excel↔app + IMPORT único de stock/ubicación a bodega
-
-- Cotejo máquina-por-máquina (`scripts/cotejo-excel-maestro.js`, solo-lectura) de `INVENTARIO/Maestro_Repuestos_Completo_v3.xlsx` vs maestro: **100% de los SAP del Excel están en la app** (Baader142→EVISCERADORA BAADER 142, Baader200→B200, Grader→GRADER, Garibaldi→ENZUNCHADORA N1, Knuro→KNURO N1, M.Eviscerado→**MAREL HG**, M.Filete→MAREL FILETE, GEA→TERMOFORMADORA GEA, Fishken→CINTA FISHKEN; Det.Metales/Videojet sin SAP). Mapeo correcto. (Aclaración: MAREL HG = máquina de eviscerado Marel, distinta del GRADER; en un test previo confundí ambos.)
-- HALLAZGO: el stock+ubicación SÍ existía en los Excel y NUNCA se había importado a `bodega` (estaba vacía: 0 stock, 0 ubic). Fuente elegida: `STOCK ALMACENES.xlsx` (centro AI04/Chonchi, actualizado 2026-06-19) hojas "inventario 2026" (SAP/cantidad/ubicación/equipo) + "Clasificacion" (ubicación fallback).
-- IMPORT ÚNICO aplicado: `scripts/import-stock-bodega.js --write` (dry-run primero; backup de bodega en `backups/bodega-pre-import-*.json`). Resultado: **bodega 189 → 2.170 docs · 1.627 con stock · 1.938 con ubicación**. Solo SAP del maestro (13 fuera-de-maestro omitidos); idempotente; preserva min/unidad de los 186 ya configurados. Verificado en Firestore (BUJE INOX 3300133492 = stock 10, ubic C-31, = Excel) y EN VIVO en la app (ficha muestra DISPONIBLE 10 / UBICACIÓN C-31 / equipo GRADER; KPI "Stock disponible" pasó de 0 a 2.108 / 97%).
-- HECHO (pedido por Orel): import ÚNICO → de aquí en más se gestiona en la app. **Retirada la opción de importar Excel de la UI**: borrado `pages/repuestos/ImportRepuestosModal.tsx` (era huérfano desde que se borró el Dashboard legacy; ya no estaba montado). El resto de usos de `xlsx` en src son exportaciones o la feature aparte de Análisis Grader — se conservan.
-- Archivos: `scripts/cotejo-excel-maestro.js`, `scripts/import-stock-bodega.js` (nuevos). Datos: colección `bodega` poblada (no es git).
-- Estado: cotejo + import HECHOS y verificados. Sigue: retirar UI de import Excel; opcional listar los 13 SAP fuera-de-maestro.
-
-## 2026-06-18 · claude · Rediseño tarjetas KPI de stock (look profesional)
-
-- Pedido de Orel: tarjetas de stock más profesionales. Rediseñado `KpiCard` en `RepuestosAreaHub`: de borde-izquierdo plano a tarjeta con **chip de ícono** (Package/PackageCheck/PackageMinus/PackageX) con tinte + ring por estado, número grande tracking-tight, label, hint, y gradiente sutil de fondo por tono (primary/emerald/amber/red). Mapa `KPI_TONE`. Las 4 tarjetas (Repuestos con SAP / Stock disponible / Stock bajo / Sin stock) pasan `icon`+`tone` en vez de `accent`+`bar`.
-- Verificado en preview (build limpio, PLANTA CHONCHI): 753 con SAP / 187 sin stock, tarjetas con íconos y tintes correctos. tsc=0, eslint=0. (Hubo un TypeError `glow` TRANSITORIO de HMR por el rename intermedio; build limpio sin error.)
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
-- Estado: HECHO. Pendiente opcional: aplicar el mismo estilo a la tarjeta de stock de la ficha (Disponible/Mín/Máx) para coherencia.
-
-## 2026-06-18 · claude · Carga rápida de stock + ubicación (poblar datos)
-
-- Problema raíz detectado en tests: el flujo está completo pero los DATOS están vacíos (0/189 con stock, 0 ubicaciones). Poblar abriendo 188 fichas una por una es inviable.
-- Hecho: nuevo `components/repuestos/CargaRapidaModal.tsx` — modal de carga ítem por ítem: una fila por material con-SAP con inputs inline (stock · pasillo · estante · nivel), guardado on-blur o Enter (Enter salta a la fila siguiente). Filtro "Solo faltantes" (default) + buscador. Cap de render a 150 filas (los configurados/en-bodega primero) para performance; el resto se acota con el buscador. Reusa `saveStock` de useBodega (upsert en `bodega/{sap}`, preserva stockMinimo/unidad). Enganchado en `BodegaView` (StockTab): botón "Carga rápida" (ámbar, junto a Lote/Config) + estado `showCargaRapida`.
-- Verificado en preview (build limpio): botón abre el modal, lista 150 filas + nota "Mostrando 150 de 3777", filtro/buscador OK. Guardado probado end-to-end: escribir pasillo "ZZTEST" + Enter → "1 guardado"; confirmado en Firestore (`bodega/3300100657` pasillo=ZZTEST, mín/unidad preservados) y **revertido** con script admin. Sin errores de consola. tsc=0, eslint=0.
-- Nota: el `onBlur` real (usuario hace clic/tab fuera) guarda; en el test el evento blur sintético no gatilla el onBlur de React, por eso se verificó vía Enter (mismo saveRow).
-- Archivos: `components/repuestos/CargaRapidaModal.tsx` (nuevo), `pages/repuestos/BodegaView.tsx` (botón+estado+render+import).
-- Estado: HECHO. Ahora Orel puede poblar stock+ubicación rápido → "ubicable" pasa de promesa a realidad cuando cargue los datos.
-
-## 2026-06-18 · claude · Foco SAP por defecto en pestaña Áreas
-
-- Pregunta de Orel: por qué Áreas muestra ~7.441 si el foco son los SAP. Correcto: el hub mostraba el maestro completo (con + sin SAP) con "Repuestos totales" de cabecera, diluyendo el foco.
-- Hecho en `RepuestosAreaHub`: estado `repSoloSap` (default ON). Se separó `filteredBase` (todos los filtros menos SAP) de `filteredRep` (aplica el foco SAP) + `despieceOcultos` (cuenta el despiece sin SAP oculto). Interruptor "Solo con SAP" en la barra de filtros (muestra "+N despiece" cuando oculta). KPI grande: "Repuestos totales" → **"Repuestos con SAP"** (hint "+N despiece sin SAP"). El despiece sin SAP (capa de identificación) queda a un clic.
-- Verificado en preview (build limpio): "casquillo" con foco ON → 73 con-SAP, 0 despiece visible, toggle "+88 despiece"; al apagar → total 161 (suma los 88). tsc=0, eslint=0. (Durante los edits hubo un ReferenceError `filteredRep` TRANSITORIO de HMR por el rename intermedio; desaparece en build limpio, código actual correcto.)
-- Sobre la pestaña **Bodega**: se justifica — es la vista SAP-only (su hook: "Solo repuestos con código SAP") = inventario/reposición; hoy está vacía de datos (0 con stock) pero conceptualmente es la cara de stock. Se mantiene.
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosAreaHub.tsx`.
-- Estado: HECHO.
-
-## 2026-06-18 · claude · Review UX "buscar repuesto" + limpieza menor
-
-- Review como usuario (código + datos): el flujo buscar→encontrar→ubicar está COMPLETO. Fila de resultados: foto, SAP (copiar), nombre, badge de clase, tipo, equipo (N:M con +N), stock con semáforo. Ficha (`RepuestoDetailPanel`): "Dónde se usa · N equipos" (todos los N:M), manuales heredados, stock disp/mín/máx, **Bodega + Ubicación editable inline** (pasillo/estante/nivel), movimientos. Diseño sólido; lo que falta es DATO, no código.
-- Datos verificados (solo-lectura): `bodega`=189 con **0 ubicaciones registradas** (1 con pasillo) → "ubicable" físico aún no existe como dato (captura pendiente de Orel). `repuestos.tipo` 59% poblado con categorías útiles (TORNILLERÍA/SOPORTE/CASQUILLO/EJE…) → NO es ruido, se conserva. Fotos: solo 64/7657.
-- Limpieza menor (in-scope, segura): borrado `ImageGallery.tsx` (huérfano, cero imports; quita un consumidor de MachineContext), corregido comentario obsoleto de `useBodega` (decía que leía `machines/{id}/repuestos`; lee el maestro), reemplazado `pages/repuestos/README.md` (era guía de migración obsoleta con archivos borrados) por uno breve y actual.
-- NO tocado a propósito: refactor de `MachineProvider`/`CategoryManager` (último lector de `machines`) — vive en Settings, fuera del módulo de repuestos; su cleanup es separado y con riesgo en otra feature.
-- Verificación: `tsc`=0, `eslint`=0. Preview: módulo OK en /repuestos.
-- Archivos: `useBodega.ts` (comentario), `pages/repuestos/README.md` (reescrito), `ImageGallery.tsx` (borrado).
-- Estado: HECHO. Módulo de repuestos funcionalmente completo y limpio. Lo pendiente es captura de datos (ubicaciones bodega + fotos) y, aparte, Fase 5 deletes + cleanup de CategoryManager/machines.
-
-## 2026-06-18 · claude · Retiro de página /insumos (redundante con el maestro)
-
-- Decisión de Orel: retirar `/insumos`. Datos (solo-lectura): `insumos`=3552, 294 con stockFisico (del import Excel), **0 con metadata de conteo** (stockContadoEn/Por/historial) → el editor de stock de la página NUNCA se usó; última actualización 2026-06-11 = la migración (no actividad de usuario). La página leía la colección legacy `insumos` (respaldo congelado) y permitía editar stock que el maestro NO ve (dead-end). Insumos ya unificados en el maestro (buscables en Repuestos/Bodega).
-- Hecho: quitada ruta `/insumos` + lazy import (App.tsx), enlace del home móvil (MobileHomeGrid) y del editor de sidebar (SidebarEditorPage). Borrados `pages/insumos/InsumosPage.tsx`, `components/insumos/InsumoDetailModal.tsx`, `types/insumos.ts` (huérfanos).
-- **`insumos` ya NO tiene lectores vivos en el código** (verificado por grep) → colección LIBRE para borrar en Fase 5 (con backup). NOTA: puede quedar algún enlace `/insumos` en un sidebar guardado en Firestore (dato, no código) → quedaría como link muerto que redirige al default; inofensivo.
-- Verificación: `tsc`=0, `eslint`=0 (App/MobileHomeGrid/SidebarEditorPage). Preview: navegar a `/insumos` ya no monta la página (redirige al default, sin crash); `/repuestos` sigue OK (Áreas+Bodega, búsqueda). Persisten los avisos HMR de Vite por archivos borrados (cosméticos, se limpian al reiniciar el dev server).
-- Archivos: `App.tsx`, `components/home/MobileHomeGrid.tsx`, `pages/SidebarEditorPage.tsx` (M) + 3 borrados.
-- Estado: HECHO. Bloqueos Fase 5 restantes: `machines` (MachineProvider/CategoryManager), `plantAssets` (MapaPlantaPage).
-
-## 2026-06-17 · claude · Test funcional en vivo + retiro de pestaña Mapas
-
-- Test funcional (preview logueado, código de D: confirmado servido): búsqueda Áreas ("sumitomo"→4 N:M), ficha (Dónde se usa + Solicitar), **Solicitar end-to-end** (crear→reglas OK→lista→avance Pendiente→Aprobada; dato de prueba borrado con script admin), Bodega (188/3777 + alertas), **chatbot ARIA** ("guantes"→29 insumos con SAP, antes invisibles). Sin errores de consola.
-- Decisión de Orel: **retirar la pestaña Mapas**. Datos (solo-lectura): `plantAssets`=134 (61 copias `asset-720*` vacías), **0 marcadores en mapas** (el feature nunca se usó), specs/fotos ya migrados al maestro; `plantMaps`=3 (Chonchi/Yal/Acopio). → No es duplicado borrable: era el backing del editor de pines, pero está vacío.
-- Hecho: `RepuestosPage` ahora 2 pestañas (Áreas + Bodega; quitado tab/type/import/contenido `bases` y el icono `Map`). Borrados `pages/repuestos/CatalogoBases.tsx`, `components/repuestos/MapasViewer.tsx`, `components/repuestos/AssetDetailModal.tsx`, `hooks/repuestos/usePlantMaps.ts` (huérfanos tras quitar la pestaña).
-- IMPORTANTE: `plantAssets` AÚN lo lee `MapaPlantaPage`/`components/map/leaflet-editable/PanelCapasYZonas.tsx` (feature SEPARADA del mapa leaflet). Retirar la pestaña Mapas NO libera la colección; su borrado depende de decidir qué pasa con esa otra página. `usePlantAssets` se conserva por eso.
-- Verificación: `tsc`=0, `eslint`=0. En preview (HMR + reload): módulo carga, 2 pestañas, búsqueda "baader rodamiento"→25 resultados correctos. Nota: Vite deja errores de consola "Failed to reload CatalogoBases/MapasViewer/AssetDetailModal" (recuerda los archivos borrados) + un "Map requires new" transitorio del que React se recuperó — ambos se limpian al reiniciar el dev server, no son runtime reales.
-- Archivos: `apps/pwa/src/pages/repuestos/RepuestosPage.tsx` (M) + 4 borrados.
-- Estado: HECHO. Sigue: decidir `/insumos`; y por separado, qué hacer con `MapaPlantaPage` (último lector de `plantAssets`).
-
-## 2026-06-17 · claude · Chatbot ARIA in-app → maestro unificado
-
-- Hecho: reescrito `fetchRepuestosSummary` en `apps/pwa/src/services/chatbot.ts`. Antes iteraba `machines` + `machines/*/repuestos` (datos pre-migración: sin insumos/herramientas/químicos, sin N:M). Ahora hace 3 queries planas en paralelo: `repuestos` (maestro), `hierarchy` (nombres de equipo + nodos tipo equipo), `bodega` (stock+ubicación por SAP). Conserva detección de equipo (sobre nodos `hierarchy`, ignora COMPONENT_WORDS), fuzzy + sinónimos (helpers in-file reusados). Salida con clase, stock real de bodega, ubicación, equipos N:M y marca de despiece (sin-SAP no pedible). Quitado import muerto `Machine, Repuesto`.
-- Mejora de robustez: cuando la búsqueda con scope de equipo da 0 (la detección codiciosa consume términos que también son descriptores del material — "aceite hidraulico", "sello mecanico", porque los nombres de equipos de planta contienen esas palabras), cae a **búsqueda flexible GLOBAL** rankeada por nº de términos que matchean + stock. Antes esos casos devolvían 0.
-- Verificación: `tsc --noEmit` = 0, `eslint src/services/chatbot.ts` = 0. Capa de datos verificada con `scripts/normalizacion/98-verify-chatbot-maestro.js` (solo-lectura, replica el matching sobre Firestore real): "sumitomo"→4 motorreductores; "guantes"→insumos (antes invisibles); "rodamiento"→132 (repuesto+herramienta); "baader casquillo"→135 (SAP+despiece); "aceite hidraulico"→ACEITE HD HIDRAULICO 32 (químico) vía fallback; "sello mecanico"→SELLO MECANICO 32MM vía fallback. NO verificado en navegador (el preview corre desde OneDrive, no desde D:; requiere login Google).
-- Nota: `aria/tools/repuestos.ts` (tool del orquestador) ya leía del cache del maestro (`getGlobalRepuestosCache`), su comentario de cabecera está obsoleto pero el código es correcto. Detectado mojibake en datos fuente (ej. "elÃ¡stico" = doble-encoding UTF-8 en Firestore) — problema de datos preexistente, afecta búsqueda, anotar para limpieza futura.
-- Archivos: `apps/pwa/src/services/chatbot.ts` (M), `scripts/normalizacion/98-verify-chatbot-maestro.js` (nuevo).
-- Estado: HECHO. Con esto `machines` ya no tiene lectores de datos en el chatbot/tools; solo queda `useMachines`/MachineProvider/CategoryManager antes de poder borrar la colección.
-- Sigue: (Fase 5) migrar/retirar MachineProvider+CategoryManager → libera `machines`; Mapas+editor → libera `plantAssets`; decidir `/insumos`.
-
-## 2026-06-17 · claude · Fase 5 limpieza — borrado de código legacy muerto (parte 1)
-
-- Hecho: eliminado código legacy muerto del módulo repuestos (era el primer paso seguro de Fase 5, verificable con tsc/eslint). 23 archivos borrados en cascada de huérfanos (cada nivel re-verificado con `tsc`): `pages/repuestos/Dashboard.tsx` (hub legacy, NO ruteado) + su export en `pages/index.ts`; cluster `EquipmentNavigator`/`MachineAccordionNav`/`DuplicatesModal` y sus deps únicas (`EquipmentCard`, `MachineManager`, `ManualSearchModal`, `MachineSelector`, `RelocateRepuestoModal`, `BulkRelocateModal`, `useDuplicateScanner`, `services/mergeRepuestos`); lectores legacy de `machines/*/repuestos` huérfanos (`useRepuestos`, `useRepuestosCounts`, `RepuestoDetailModal`, `LinkMachineModal`, `MachineHierarchySelector`, `AssetDetailPanel`, `MachineManualPanel`, `useEquipmentRepuestos`, `services/repuestos.ts`); + 2 huérfanos sin commitear (`useInsumosSearch.ts`, `InsumoDetailPanel.tsx`).
-- Radiografía del maestro (script nuevo solo-lectura `scripts/normalizacion/99-stats-maestro.js`): 7.657 docs · 3.777 con SAP · 188 con stock en bodega (núcleo: los 188 tienen SAP **y** equipo) · solo 64 con foto real · clase: repuesto 5.773/insumo 1.494/refrig 154/quimico 127/herram 107/lubric 2.
-- **HALLAZGO: el borrado de colecciones legacy está BLOQUEADO por lectores vivos** (la lista de "dead code" de la memoria estaba desactualizada). Mapa de bloqueos:
-  - `machines` ← `services/chatbot.ts` (fetchRepuestosSummary, líneas ~1326/1402/1545/1568) + `useMachines` vía `MachineProvider` (raíz de App.tsx) y `CategoryManager` (SettingsPage). **Prerequisito: migrar chatbot al maestro + retirar/migrar MachineProvider/CategoryManager.**
-  - `plantAssets` ← `usePlantAssets` usado por `CatalogoBases` (tab Mapas, vivo) y `PanelCapasYZonas` (editor de mapa, vivo). **Prerequisito: leer motores/bombas del maestro (clase motor/bomba).**
-  - `insumos` ← página `/insumos` (`InsumosPage`, ruteada en App.tsx + enlazada en home móvil y sidebar). **Prerequisito: decisión de producto — retirar la página o repuntarla al maestro filtrado por clase.**
-  - Nota: las rutas de Storage `machines/{id}/manuales|infografias|repuestos/...` en `useStorage`/`pdfCache`/`usePlantStorage` son de Storage, NO de Firestore — no bloquean el borrado de la colección.
-- Archivos: 21 borrados trackeados + `pages/index.ts` (M) + `scripts/normalizacion/99-stats-maestro.js` (nuevo).
-- Verificación: `npx tsc --noEmit` = 0 y `npx eslint src --quiet` = 0 tras cada nivel de borrado. UI en vivo NO verificada (la PWA exige login Google + vive en D:; pendiente que Orel confirme en preview que el módulo renderiza igual).
-- Estado: HECHO (limpieza de código). Borrado de colecciones: PENDIENTE/BLOQUEADO (ver mapa).
-- Sigue: orden correcto de Fase 5 = (1) chatbot→maestro, (2) Mapas/editor→maestro, (3) decidir `/insumos`; recién entonces backup + dry-run + borrado de `machines`/`plantAssets`/`insumos`/huérfanas. Segundo nivel de código muerto a barrer luego (CategoryManager/useMachines/MachineContext si quedan sin uso tras migrar).
-
-## 2026-06-12 · claude · Normalización repuestos (Fases 0–6) + rework UI + coordinación
-
-- Hecho: migración a maestro SAP único `repuestos` (~7.657 docs; insumos+repuestos+herramientas unificados). Jerarquía tipada (`tipoNodo`), `manuales` N:M, rescate de manuales/historial/tags. Rework UI: tier SAP-first, filtro de clase, badges, ficha con manuales heredados + "dónde se usa" N:M, flujos asignar-SAP y asignar-equipo, Bodega abre en "configurados". Eliminado panel duplicado de insumos. Montada esta carpeta `.ai/` de coordinación.
-- Archivos: `scripts/normalizacion/00..09`, `apps/pwa/src/{types/repuestos.ts, hooks/repuestos/*, pages/repuestos/*, components/repuestos/RepuestoDetailPanel.tsx}`.
-- Verificación: `tsc --noEmit` + `eslint` limpios en cada incremento; verificado en preview (búsqueda, ficha, manuales heredados, asignar-equipo, Bodega).
-- Estado: datos HECHO; UI HECHO (incrementos 1–7). Trabajo directo en working tree (aún sin ramas/PR; los scripts de migración ya se aplicaron a Firestore).
-- Sigue: ver `TASKS.md` (solicitar-a-bodega, chatbot al maestro, Mapas, Fase 5 limpieza). De aquí en adelante, todo por rama + PR (flujo estricto).
-
-## 2026-07-14 · claude · Sync Telegram controlado desde el panel admin (PWA↔agente PC)
-
-- Hecho: card "Sincronización Telegram" en el hub admin (`/admin/sync-telegram`): botón "Sincronizar ahora", periodicidad (manual/diaria HH:MM/cada 4h) y estado en vivo (onSnapshot) del agente del PC (heartbeat, última corrida, ítems nuevos, errores). Doc de control `telegramSync/chonchi` (multi-planta ready). El ejecutor es `_SYNC_TELEGRAM/agente_sync.py` en el PC de Orel (Task Scheduler c/15 min): Telethon incremental por topic → organiza a carpetas de equipo (OneDrive) → cura pistas → `_novedades.json`.
-- Archivos: `apps/pwa/src/pages/admin/TelegramSyncPage.tsx` (nuevo), `apps/pwa/src/services/telegramSyncConfig.service.ts` (nuevo), `App.tsx` (ruta), `AdminPanelPage.tsx` (card), `firestore.rules` (regla `telegramSync/{plantId}`: solo admin; campos de estado solo Admin SDK).
-- Verificación: tsc+eslint 0; agente probado end-to-end real (orden simulada → pipeline → estado ok en Firestore); PWA bota en preview worktree (5199) hasta login. Falta: click-through de Orel logueado + **deploy manual de rules** tras merge (deploy.yml NO las incluye).
-- Estado: EN REVISIÓN (PR).
-
-## 2026-07-15 · claude · Historial de corridas Sync Telegram + multi-grupo (agente PC)
-
-- Hecho: (PWA) card "Historial de sincronizaciones" en `/admin/sync-telegram`: últimas 10 corridas en vivo (ok/error, ítems, motivo, quién la pidió) con detalle expandible por grupo/tema (subcolección `telegramSync/chonchi/corridas`, regla read admin / write false — solo Admin SDK). (PC, fuera del repo) descargador reescrito MULTI-GRUPO (4 grupos nuevos aprobados por Orel: Manuales e info mantencion, Levantamiento equipos planta, Registros temperaturas, Registros consumos), fix de fresh-ingest del organizador (ruteo tema→equipo con creación de carpetas nuevas) y agente que sube el historial.
-- Archivos: `TelegramSyncPage.tsx`, `telegramSyncConfig.service.ts`, `firestore.rules`.
-- Verificación: tsc+eslint 0; preview worktree bota a login sin errores de consola. Post-merge: deploy manual de rules.
-- Estado: EN REVISIÓN (PR).
-
-## 2026-07-15 · claude · Sync Telegram: layout responsive en desktop
-
-- Hecho: `/admin/sync-telegram` pasa de columna angosta (max-w-2xl) a `max-w-6xl` con grid 2 columnas en lg+ (controles izquierda, historial derecha); móvil intacto (1 columna).
-- Archivos: `TelegramSyncPage.tsx` (solo layout).
-- Verificación: tsc+eslint 0; preview worktree bota sin errores de consola.
-
-## 2026-07-18 · claude (Sonnet 5, loop autónomo) · Barrido de pendientes: 13 PRs + diagnósticos + limpieza
-
-- Hecho: ejecución completa del plan `ARIA_MANTENIMIENTO_PLANTA\docs\PLAN_LOOP_PENDIENTES_2026-07-18.md` (autorizado por Orel para mergear sin confirmación por-PR). Mergeados y desplegados a producción: #198 (recuperación chunks post-deploy), #186 (doc HMI nav), #185 (líneas de cadencia timeline), #212 (catálogo Enzunchadora), #180→#235(ex-181)→#236(ex-184) (cadena de optimización Firestore, −76% writes), #172 (recorte contexto Groq), #161 (ARIA día completo + function-calling), #67 (fix redirect móvil), #238 (fix serverid→serverId). 9 PRs de la cola original + #67/#238 nuevos = 11 merges reales.
-- Triage sin mergear: #69 (seguridad, 20 commits) verificado ítem por ítem contra código real — 3/14 resuelto, 3 parcial, 8 abierto; comentado, sigue DRAFT (requiere rotar credenciales). #68 (HMI SIMATIC, 615 commits atrás) y #36 (manhwa, 1307 atrás) comentados con recomendación, sin tocar código.
-- Diagnósticos de solo lectura: tema claro confirmado resuelto (WCAG 53/54 verde); índice `shoplogixShiftDelayChecks` confirmado READY + alerta "Sin piezas" procesando (407 done, 0 atascados); gating Unscheduled del push "Proceso iniciado" ya resuelto por #224 (0 fantasmas nuevos); Baader Chonchi en 0 ciclos = pausa pre-temporada real (NO falla OPC) — informe en `docs\DIAGNOSTICO_BAADER_CICLOS_2026-07-18.md`.
-- Limpieza: 15 worktrees stale borrados (gotcha: `git branch --merged` da falso negativo con squash-merge, usar `gh pr view --json state`). Dry-run de datos (nada ejecutado) en `docs\LIMPIEZA_DATOS_DRYRUN_2026-07-18.md`: 3 summaries fantasma 2025-07 confirmados, `plantId` ausente en 15 docs, 45 states feb con reason en español que no matchea `isPlannedDT` (Shoplogix cambió de idioma), 2/3 Baader Chonchi sin `machineCapacity`.
-- Export Power BI refrescado (`/kpis-powerbi`): `fact_mantenciones`/`fact_incidencias` sin crecimiento (3/12, igual que hace 9 días).
-- Épica E6+E7 (duración/downtime en captura + turno correcto): spec ejecutable ya existía completo en `docs\SPECS_EJECUTABLES_ANALISIS_TURNO_2026-07.md` — decisión consciente de NO implementarla en este loop (tamaño real, toca IA de captura en producción), queda lista para sesión dedicada.
-- Verificación: cada merge con build+tsc(+tests cuando existían) antes de push, CI verde, deploy vigilado hasta `completed/success`, prod verificado en browser (consola sin errores) tras cada deploy.
-- Estado: loop CERRADO. Informe completo en `ARIA_MANTENIMIENTO_PLANTA\docs\INFORME_LOOP_PENDIENTES_2026-07-18.md`.
+---
+
+# Historial resumido (anterior al 2026-07-19)
+
+Bloques temáticos. Cada uno resume varias entradas; el detalle está en git.
+
+## 2026-07-04 → 2026-07-18 · ARIA, seguridad, turnos y sync de Telegram
+
+- **ARIA Telegram nació casi completa en una sola tanda (04-jul)**: chat natural con voz, 6 fuentes
+  de datos nuevas, brief matinal 7AM + a demanda, crear incidencias con confirmación, whitelist +
+  memoria + cerrar incidencias + alertas DM, voz de respuesta + visión + gráficos, respuestas
+  formateadas (markdown→HTML de Telegram), "ARIA aprende" (hechos globales + lagunas + fallback de
+  modelos) y ARIA como pivote de la app (mapa de módulos con conciencia de rol).
+- **ARIA + repuestos por foto (06 al 07-jul)**: visión con OCR, adjuntar foto a un repuesto del
+  maestro, crear/vincular repuesto desde foto (match SAP + criterio LLM), modo lote de fotos, y
+  memoria de contexto para entender "ese mismo repuesto".
+- **ARIA chat de la PWA (08-jul)**: primera capacidad de ESCRITURA — crear/vincular repuesto y
+  editar código de fabricante desde el chat in-app.
+- **Modelos**: actualización por deprecaciones de Groq + un 3er proveedor de respaldo.
+- **Seguridad**: cierre de lecturas anónimas (PR #146) y proveedor anónimo apagado; parche de
+  echarts por CVE-2026-45249 (XSS).
+- **Turnos**: Shoplogix pasa a ser la fuente de verdad de horarios (PWA + manejo de DST en functions).
+- **Repuestos**: "Solicitar a bodega" cierra el círculo (entregar descuenta stock real) y los nombres
+  comunes se editan desde el panel de detalle.
+- **PWA**: recuperación robusta ante "Failed to fetch dynamically imported module" post-deploy, y fix
+  del visor de imágenes que no se podía cerrar en móvil.
+- **Sync Telegram→OneDrive**: controlado desde el panel admin (PWA ↔ agente del PC), con historial de
+  corridas, multi-grupo y layout responsive.
+- **Barrido autónomo (18-jul, Sonnet 5 en loop)**: 13 PRs de pendientes + diagnósticos + limpieza.
+
+## 2026-06-17 → 2026-06-21 · Centro Técnico Documental, tableros y cierre de la normalización
+
+- **CTD en 5 pasos**: expediente autosuficiente (#92+#93) → "programa vivo" (#94) → traer de Equipos
+  y repasada de flujo (#95+#96) → gestión de activos v1 (#97) → órdenes de trabajo, Camino B (#98).
+- **Tableros / Unifilares (NFPA 70B)**: levantamiento con Excel + formulario en la PWA, realineado de
+  "módulo suelto" a parte del expediente del equipo, y reconciliación en PR #91.
+- **Dependabot**: las 23 alertas resueltas (bumps + overrides).
+- **Fase 5 de limpieza — CERRADA el 2026-06-20**: retirada de features legacy (`machines` /
+  `plantAssets`) con sus scripts de borrado, barrido de código muerto, chatbot ARIA in-app apuntando
+  al maestro unificado, y retiro de `/insumos` y de la pestaña Mapas. El borrado **se ejecutó**:
+  `11-delete-legacy.js --write` borró 9.303 docs (backup en `backups/fase5-2026-06-20T17-25-56/`) y
+  se verificó en vivo que `insumos`/`machines`/`plantAssets`/`repuestosBaader200`/`hierarchy/*/repuestos`
+  quedaran en **0**, con maestro (7657) / bodega (2170) / hierarchy (702) intactos.
+  Pendiente menor que quedó suelto: `EquipoPlacementTool` en `PlantaLeafletEditable.tsx` quedó inerte
+  (su trigger se fue con el panel "Equipos SAP") → limpiar como código muerto junto con los campos
+  `equipoToPlaceId` del store.
+- **Repuestos**: pulido (ubicación en la fila, composición por clase), mejoras de sidebar/buscador/
+  favoritos (#78), rediseño de las tarjetas KPI de stock, carga rápida de stock+ubicación, cotejo
+  Excel↔app con import único a bodega, y foco SAP por defecto en la pestaña Áreas.
+- **Deploy a producción** (#77).
+
+## 2026-06-12 · Arranque
+
+Normalización del maestro de repuestos (Fases 0-6) + rework de UI + coordinación multi-agente.
+Desde acá el flujo pasó a ser estricto: **todo por rama + PR**.
+
+---
+
+# Pendientes que vienen de atrás
+
+Estos seguían abiertos cuando se compactó el historial (2026-07-30):
+
+- **Tablero piloto sin levantar**: CCM motor `720004608` / bomba `720004607` — falta cargar su placa
+  real. Viene arrastrándose desde el 20-jun.
+- **~45 equipos sin `tipo`** asignado en el CTD.
+- **`useAppVersion.reload()` duplica a mano** la limpieza de caches y service workers → candidato a
+  usar `clearCachesAndServiceWorkers()` en vez de repetir la lógica.
+- Opcional: revisar si la alerta de secret-scanning #1 de GitHub se puede cerrar, ahora que la key
+  quedó restringida.
+- Opcional: botones Confirmar/Cancelar dedicados para repuestos en el chat ARIA de la PWA (hoy es
+  solo texto plano) + soporte de fotos.

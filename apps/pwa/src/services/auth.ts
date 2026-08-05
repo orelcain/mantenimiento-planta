@@ -17,8 +17,6 @@ import {
   setDoc,
   updateDoc,
   collection,
-  query,
-  where,
   getDocs,
   serverTimestamp,
   increment,
@@ -289,49 +287,42 @@ export async function getTechnicians(): Promise<User[]> {
   )
 }
 
-// Validar código de invitación
+// Validar código de invitación — vía Cloud Function (validateInviteCodeProxy).
+// Corre ANTES de crear la cuenta (el caller aún no tiene sesión de Firebase),
+// así que NO puede ser una lectura directa de Firestore: desde que el login
+// anónimo se deshabilitó (2026-07-05), la regla `isNotAnonymous()` de
+// inviteCodes rechazaba esta query con 403 real — el signup con código de
+// invitación quedó roto en silencio para cualquier visitante nuevo genuino.
 export async function validateInviteCode(code: string): Promise<InviteCode | null> {
-  const q = query(
-    collection(db, 'inviteCodes'),
-    where('code', '==', code.toUpperCase()),
-    where('activo', '==', true)
-  )
-  
-  const snapshot = await getDocs(q)
-  
-  if (snapshot.empty) {
-    return null
+  const { httpsCallable, getFunctions } = await import('firebase/functions')
+  const { default: app } = await import('./firebase')
+  const proxy = httpsCallable(getFunctions(app), 'validateInviteCodeProxy')
+  const result = await proxy({ code: code.toUpperCase() })
+  const data = result.data as {
+    valid: boolean
+    id?: string
+    code?: string
+    rol?: UserRole
+    usosMaximos?: number
+    usosActuales?: number
+    activo?: boolean
+    createdBy?: string
+    createdAt?: string | null
+    expiresAt?: string | null
   }
+  if (!data.valid || !data.id) return null
 
-  const docSnap = snapshot.docs[0]
-  if (!docSnap) {
-    return null
+  return {
+    id: data.id,
+    code: data.code ?? code.toUpperCase(),
+    rol: data.rol as UserRole,
+    usosMaximos: data.usosMaximos ?? 0,
+    usosActuales: data.usosActuales ?? 0,
+    activo: data.activo ?? true,
+    createdBy: data.createdBy ?? '',
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
   }
-  
-  const data = docSnap.data()
-  const invite: InviteCode = {
-    id: docSnap.id,
-    code: data.code,
-    rol: data.rol,
-    usosMaximos: data.usosMaximos,
-    usosActuales: data.usosActuales,
-    activo: data.activo,
-    createdBy: data.createdBy,
-    createdAt: data.createdAt?.toDate() || new Date(),
-    expiresAt: data.expiresAt?.toDate(),
-  }
-
-  // Verificar si no ha expirado
-  if (invite.expiresAt && invite.expiresAt < new Date()) {
-    return null
-  }
-
-  // Verificar si no ha alcanzado el máximo de usos
-  if (invite.usosActuales >= invite.usosMaximos) {
-    return null
-  }
-
-  return invite
 }
 
 // Crear código de invitación

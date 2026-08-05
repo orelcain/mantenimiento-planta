@@ -12,7 +12,7 @@
  * `computeOfficialCompliance` — mismo número en ambos lados.
  */
 import { Badge } from '@/components/ui'
-import { Clock, Fish, Target } from 'lucide-react'
+import { Fish, Target } from 'lucide-react'
 import type { ShoplogixOfficialRollup } from '@/services/shoplogix/shoplogixShift.service'
 import { computeOfficialCompliance, type MachineKPI } from '@/services/grader/plantKpiCompute'
 
@@ -23,13 +23,6 @@ interface TurnoOficialChipProps {
   className?: string
 }
 
-/** Igual convención que `fmtHora` en functions/shoplogix/turnoBrief.js: las
- *  horas de Shoplogix se guardan wall-clock-as-UTC, así que se leen con
- *  getUTCHours/Minutes — NUNCA con la zona horaria del navegador. */
-function fmtHoraUTC(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
-}
 
 const LEVEL_STYLES: Record<'ok' | 'warn' | 'critical', string> = {
   ok:       'border-emerald-500/40 text-emerald-400',
@@ -46,16 +39,11 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
 
   return (
     <div className={`flex items-center gap-1.5 flex-wrap ${className ?? ''}`}>
-      {officialSchedule && (
-        <Badge
-          variant="outline"
-          className="text-[10px] px-1.5 py-0 gap-1 border-sky-500/40 text-sky-400"
-          title="Horario oficial del turno (rollup de Shoplogix)"
-        >
-          <Clock className="w-3 h-3" />
-          {fmtHoraUTC(officialSchedule.start)}–{fmtHoraUTC(officialSchedule.end)}
-        </Badge>
-      )}
+      {/* El horario oficial NO se muestra acá: ya está en la línea de tiempos
+          del turno, etiquetado como "Programado" y junto al horario real. Verlo
+          dos veces en la misma pantalla obligaba a compararlos para descubrir
+          que eran el mismo número. Este chip se queda con lo suyo: especie en
+          curso y cumplimiento del target oficial. */}
       {currentJob?.name && (
         <Badge
           variant="outline"

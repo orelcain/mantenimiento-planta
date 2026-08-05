@@ -37,8 +37,15 @@ function requireAdminKey(req, res) {
     res.status(503).json({ error: 'ADMIN_KEY_NOT_CONFIGURED', message: 'Configurar ADMIN_SETUP_KEY en FUNCTIONS_ENV' })
     return false
   }
-  const got = req.get('x-admin-key') || req.query.key
-  if (got !== expected) {
+  const got = String(req.get('x-admin-key') || req.query.key || '')
+  // Comparación en tiempo constante (mismo criterio que mintTelegramAuthToken):
+  // timingSafeEqual exige buffers del mismo largo, así que igualamos con un pad
+  // que garantiza el rechazo (nunca compara igual) cuando el largo no calza.
+  const gotBuf = Buffer.from(got)
+  const expectedBuf = Buffer.from(expected)
+  const lengthOk = gotBuf.length === expectedBuf.length
+  const safeGot = lengthOk ? gotBuf : Buffer.alloc(expectedBuf.length)
+  if (!lengthOk || !timingSafeEqual(safeGot, expectedBuf)) {
     res.status(403).json({ error: 'FORBIDDEN' })
     return false
   }
@@ -1193,6 +1200,93 @@ exports.geminiProxy = onCall(
   }
 )
 
+// ==================== GEMINI VISION PROXY ====================
+// Análisis de fotos (ChatBot.tsx → ai.ts:callGeminiVision) — el cliente
+// descarga las imágenes de Storage y las manda en base64 (no requiere la
+// key), este proxy es quien tiene la GEMINI_API_KEY real. Antes la key vivía
+// en el bundle del cliente (VITE_GEMINI_API_KEY); quedó en blanco en un
+// hardening previo y la feature de análisis de fotos quedó rota en silencio
+// — este proxy la repara completando la migración a Cloud Functions.
+exports.geminiVisionProxy = onCall(
+  {
+    secrets: ['GEMINI_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 10,
+    timeoutSeconds: 60,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la IA')
+    }
+
+    const { imageParts, prompt, model, temperature, max_tokens, thinkingBudget } = request.data
+
+    if (!Array.isArray(imageParts) || imageParts.length === 0) {
+      throw new Error('Se requiere al menos una imagen')
+    }
+    if (imageParts.length > 3) {
+      throw new Error('Máximo 3 imágenes por análisis')
+    }
+    for (const p of imageParts) {
+      if (!p || typeof p.mimeType !== 'string' || typeof p.data !== 'string' || p.data.length > 8_000_000) {
+        throw new Error('Imagen inválida o demasiado grande')
+      }
+    }
+    if (typeof prompt !== 'string' || prompt.length === 0 || prompt.length > 4000) {
+      throw new Error('Prompt inválido')
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      logger.error('GEMINI_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio Gemini no configurado')
+    }
+
+    const geminiModel = model || 'gemini-2.5-flash'
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
+
+    const generationConfig = {
+      temperature: temperature ?? 0.3,
+      maxOutputTokens: max_tokens || 1024,
+    }
+    if (thinkingBudget && thinkingBudget > 0) {
+      generationConfig.thinkingConfig = { thinkingBudget }
+    }
+
+    const body = {
+      contents: [{
+        parts: [
+          ...imageParts.map(p => ({ inlineData: { mimeType: p.mimeType, data: p.data } })),
+          { text: prompt },
+        ],
+      }],
+      generationConfig,
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Referer: GEMINI_KEY_REFERER },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Gemini Vision API error', { status: response.status, body: errorText })
+        throw upstreamHttpsError('Gemini', response.status)
+      }
+
+      const data = await response.json()
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      return { content: text, usage: data.usageMetadata }
+    } catch (error) {
+      if (error instanceof HttpsError) throw error
+      logger.error('Gemini Vision proxy error:', error)
+      throw new HttpsError('internal', 'Gemini Vision: error interno del proxy')
+    }
+  }
+)
+
 // ==================== DEEPSEEK PROXY ====================
 
 exports.deepseekProxy = onCall(
@@ -1431,12 +1525,29 @@ exports.purgeSensorReadingsManual = onCall(
  * El embed llama esta función HTTP con los datos DM para cachearlos
  * en Firestore, y así checkClimaPortoAlert los puede leer.
  */
+// Sin auth A PROPÓSITO: lo llama el navegador de CUALQUIER visitante del embed
+// público (ver comentario arriba) — un secreto embebido en ese HTML estático
+// sería extraíble con "ver código fuente" y no protegería nada real. La
+// mitigación aplicable es validar estrictamente la FORMA del payload (tipos +
+// topes de tamaño) para que un curl malicioso no pueda inyectar objetos
+// arbitrarios/gigantes al doc cacheado — no evita spoofear el estado (impacto
+// bajo: solo cambia lo que se MUESTRA en el widget de clima, no autoriza nada).
+function isPlainBoolOrUndef(v) { return v === undefined || typeof v === 'boolean' }
+function isShortStringOrNull(v) { return v === null || v === undefined || (typeof v === 'string' && v.length <= 500) }
+
 exports.cacheDmStatus = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
     const d = req.body
-    if (!d || typeof d.found !== 'boolean') return res.status(400).json({ error: 'invalid payload' })
+    const valid = d && typeof d.found === 'boolean'
+      && isPlainBoolOrUndef(d.restriccionBahia)
+      && isPlainBoolOrUndef(d.navesMenores)
+      && isPlainBoolOrUndef(d.navesMayores)
+      && (d.numRestricciones === undefined || (typeof d.numRestricciones === 'number' && Number.isFinite(d.numRestricciones)))
+      && isShortStringOrNull(d.estado)
+      && (d.meteo === undefined || d.meteo === null || (typeof d.meteo === 'object' && JSON.stringify(d.meteo).length <= 2000))
+    if (!valid) return res.status(400).json({ error: 'invalid payload' })
     try {
       await db.collection('cache').doc('dmStatus').set({
         found:            d.found,
@@ -1861,10 +1972,12 @@ exports.checkClimaPortoAlert = onSchedule(
   async () => { await _runClimaCheck('scheduler') }
 )
 
-// Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler)
+// Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler).
+// Herramienta manual de admin — ningún cliente la llama automáticamente.
 exports.runClimaPortoCheck = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, timeoutSeconds: 30, memory: '256MiB' },
   async (req, res) => {
+    if (!requireAdminKey(req, res)) return
     const result = await _runClimaCheck('http')
     res.json({ ok: !result?.error, ...result })
   }
@@ -2988,6 +3101,74 @@ async function ariaTts(text) {
   const d = await r.json()
   return Buffer.from(d.audioContent, 'base64')
 }
+
+// ==================== GOOGLE TTS PROXY (voz de ARIA en la PWA) ====================
+// El navegador llamaba a texttospeech.googleapis.com directo con
+// VITE_GOOGLE_TTS_API_KEY en la query string (?key=...) — visible en
+// DevTools/Network y en el historial. Reusa el MISMO mecanismo que ya
+// funciona en prod para las notas de voz de Telegram (ariaGetGcpToken(): el
+// token OAuth de la propia service account de la Cloud Function, SIN
+// ninguna API key) en vez de crear un secreto nuevo.
+// Espejo server-side de ARIA_VOICE_OPTIONS en apps/pwa/src/lib/ariaVoice.ts
+// (sin el prefijo "gcloud:", que el cliente ya recorta antes de llamar).
+// Actualizar ambas listas juntas si Orel cura una voz nueva.
+const TTS_ALLOWED_VOICES = new Set(['es-US-Chirp-HD-F', 'es-US-Neural2-A'])
+
+exports.googleTtsProxy = onCall(
+  { enforceAppCheck: false, maxInstances: 10, timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la voz de ARIA')
+    }
+    const { action } = request.data || {}
+    const token = await ariaGetGcpToken()
+
+    if (action === 'voices') {
+      const r = await fetch('https://texttospeech.googleapis.com/v1/voices', {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(4000),
+      })
+      if (!r.ok) throw new HttpsError('internal', `TTS voices ${r.status}`)
+      const d = await r.json()
+      return { voices: d.voices || [] }
+    }
+
+    if (action === 'synthesize') {
+      const { text, voiceName, rate } = request.data
+      if (typeof text !== 'string' || text.length === 0 || text.length > 2000) {
+        throw new Error('Texto inválido')
+      }
+      // Allowlist: solo las voces curadas de ARIA_VOICE_OPTIONS (no cualquier
+      // voz del catálogo Google) — evita abusar el proxy como TTS genérico gratis.
+      if (typeof voiceName !== 'string' || !TTS_ALLOWED_VOICES.has(voiceName)) {
+        throw new Error('Voz no permitida')
+      }
+      const languageMatch = voiceName.match(/^([a-z]{2}-[A-Z]{2})/)
+      const languageCode = (languageMatch && languageMatch[1]) || 'es-US'
+      const speakingRate = Math.max(0.5, Math.min(2, Number(rate) || 1))
+
+      const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text },
+          voice: { languageCode, name: voiceName },
+          audioConfig: { audioEncoding: 'MP3', speakingRate },
+        }),
+      })
+      if (!r.ok) {
+        const errText = await r.text().catch(() => '')
+        logger.error('googleTtsProxy synthesize error', { status: r.status, body: errText })
+        throw upstreamHttpsError('GoogleTTS', r.status)
+      }
+      const d = await r.json()
+      if (!d.audioContent) throw new HttpsError('internal', 'TTS: respuesta vacía')
+      return { audioContent: d.audioContent }
+    }
+
+    throw new Error(`action inválida: ${action}`)
+  }
+)
 
 /** Envía una nota de voz a Telegram (multipart) */
 async function sendTelegramVoice(chatId, buffer, opts = {}) {
@@ -4118,7 +4299,7 @@ async function ariaDataGrader() {
 
 // ---- produccion: turno EN VIVO desde Shoplogix (paridad con la PWA) ----
 // Lee shoplogix/{plant}/shifts/{dk}_{shiftId}/machines (Admin SDK) y reporta
-// piezas (=ciclos), estado/uptime por Baader, averías y causas de detención.
+// piezas (=ciclos), estado/uptime por máquina, averías y causas de detención.
 // Réplica server-side de los tools shift.live/shift.stops de la PWA.
 const SLX_CANDS = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
 const SLX_MAINT_EXCLUDED = new Set(['FALTA MMPP', 'CONTRASTACION', 'CAMBIO LOTE/MMPP', 'AJUSTE OPERADOR'])
@@ -4142,8 +4323,11 @@ function slxUptimeFromStates(states) {
 }
 
 async function ariaDataProduccionVivo(consulta) {
-  const plantSlug = /\byal\b/i.test(consulta || '') ? 'yal' : 'chonchi'
-  const plantLbl = plantSlug === 'yal' ? 'Planta Yal' : 'Planta Principal (Chonchi)'
+  const q = consulta || ''
+  const plantSlug = /\byal\b/i.test(q) ? 'yal' : /\bfilete/i.test(q) ? 'filete' : 'chonchi'
+  const plantLbl = plantSlug === 'yal' ? 'Planta Yal'
+    : plantSlug === 'filete' ? 'Filete · Línea 1 (Chonchi)'
+    : 'Planta Principal (Chonchi)'
   const dk = slxTodayKeyChile()
   const loaded = (await Promise.all(SLX_CANDS.map(async (sid) => {
     try {
@@ -4405,7 +4589,7 @@ const ARIA_ROUTER_SPEC =
   '- "equipo": ficha de un equipo — poné el nombre o código en "consulta"\n' +
   '- "repuestos": buscar repuestos/insumos/materiales — poné el término o código SAP en "consulta"\n' +
   '- "historial": historial/bitácora de intervenciones de mantención (inspecciones, capturas rápidas) — término opcional en "consulta" (equipo, área, técnico)\n' +
-  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina Baader, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá la planta en "consulta" (yal/chonchi).\n' +
+  '- "produccion": producción EN VIVO del turno EN CURSO desde Shoplogix — piezas totales y por máquina, uptime, POR QUÉ está detenida cada máquina, averías y causas de parada. Usá esto para "cuántas piezas llevamos", "cómo va el turno/la producción ahora", "por qué está detenida la línea", "qué fallas/averías", "en vivo". Detectá el área en "consulta" (yal / chonchi / filete).\n' +
   '- "grader": resumen de los últimos turnos CERRADOS del Grader (Excel: piezas, peso, compuertas, P0%, microdetenciones). Para el turno EN CURSO usá "produccion", no "grader".\n' +
   '- "gantt": tareas planificadas del Gantt (abiertas, atrasadas, próximas a vencer) — "consulta" SOLO si nombran un proyecto/responsable/equipo específico; NO pongas palabras de estado como "atrasadas" o "pendientes"\n' +
   '- "stockbajo": repuestos en o bajo su stock mínimo en bodega\n' +
@@ -5401,11 +5585,18 @@ exports.telegramWebhook = onRequest(
     return
   }
 
-  // Anti-spoofing: si TELEGRAM_WEBHOOK_SECRET está configurado, exigir que el
-  // header coincida (Telegram lo envía cuando se registró setWebhook con
-  // secret_token). Condicional para no romper el bot si aún no se re-registró.
+  // Anti-spoofing: exige que el header secret_token coincida (Telegram lo
+  // envía cuando se registró setWebhook con secret_token — ya registrado en
+  // prod, verificado 2026-07-05). FAIL-CLOSED: si el env TELEGRAM_WEBHOOK_SECRET
+  // se perdiera en un deploy (ej. FUNCTIONS_ENV mal escrito), el webhook debe
+  // rechazar TODO en vez de quedar abierto en silencio.
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  if (webhookSecret && req.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
+  if (!webhookSecret) {
+    logger.error('telegramWebhook: TELEGRAM_WEBHOOK_SECRET no configurado — rechazando por seguridad (fail-closed)')
+    res.status(503).send('webhook not configured')
+    return
+  }
+  if (req.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
     logger.warn('telegramWebhook: secret_token inválido o ausente — rechazado')
     res.status(401).send('unauthorized')
     return
@@ -6280,6 +6471,65 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
 })
 
 /**
+ * Valida un código de invitación ANTES de crear la cuenta (signUpWithInviteCode
+ * en auth.ts llama esto primero, luego createUserWithEmailAndPassword). A
+ * propósito SIN _assertAdminCaller/auth: el caller todavía no tiene sesión de
+ * Firebase (es justo el momento pre-signup). Usa Admin SDK → bypasa
+ * firestore.rules, así que la regla de `inviteCodes` puede cerrarse a
+ * admin-only sin romper este flujo (antes exigía isNotAnonymous(), lo cual
+ * es imposible de cumplir pre-signup → 403 real confirmado por curl sin
+ * auth — el signup con código de invitación estaba roto en silencio desde
+ * que se deshabilitó el login anónimo el 2026-07-05).
+ */
+exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (request) => {
+  const code = String(request.data?.code ?? '').trim().toUpperCase()
+  if (!code || code.length > 40) return { valid: false }
+
+  const snap = await db.collection('inviteCodes')
+    .where('code', '==', code)
+    .where('activo', '==', true)
+    .limit(1)
+    .get()
+  if (snap.empty) return { valid: false }
+
+  const doc = snap.docs[0]
+  const d = doc.data()
+  const expiresAt = d.expiresAt && typeof d.expiresAt.toDate === 'function' ? d.expiresAt.toDate() : null
+  if (expiresAt && expiresAt < new Date()) return { valid: false }
+  if (typeof d.usosActuales === 'number' && typeof d.usosMaximos === 'number' && d.usosActuales >= d.usosMaximos) {
+    return { valid: false }
+  }
+
+  return {
+    valid: true,
+    id: doc.id,
+    code: d.code,
+    rol: d.rol,
+    usosMaximos: d.usosMaximos,
+    usosActuales: d.usosActuales,
+    activo: d.activo,
+    createdBy: d.createdBy ?? null,
+    createdAt: d.createdAt && typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toISOString() : null,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+  }
+})
+
+// Password de OTA (ArduinoOTA) de los ESP32 de sensores — antes vivía en
+// VITE_OTA_PASSWORD, horneada en el bundle público de la PWA y visible en
+// la ruta /sensors SIN ni siquiera exigir rol admin. Ahora solo se entrega
+// bajo demanda a un caller admin verificado server-side (mismo patrón que
+// las credenciales de Shoplogix). NO usa Secret Manager (`secrets:`) — como
+// ADMIN_SETUP_KEY/TELEGRAM_WEBHOOK_SECRET, viene de FUNCTIONS_ENV (GitHub
+// secret) → functions/.env en cada deploy; agregar OTA_PASSWORD=... ahí.
+exports.getOtaPasswordProxy = onCall(
+  { region: 'us-central1' },
+  async (request) => {
+    await _assertAdminCaller(request)
+    return { password: process.env.OTA_PASSWORD || '' }
+  }
+)
+
+/**
  * Trigger manual de sync Shoplogix — llamado desde el botón "Actualizar ahora"
  * en la PWA. Autentica el usuario, sincroniza el turno solicitado (o el actual)
  * y escribe a Firestore. El onSnapshot del hook useUpstreamLineSnapshot
@@ -6757,10 +7007,18 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
     if (config.shiftStart.enabled) {
       const scheduledStart = data.scheduledStart?.toDate?.() || new Date()
       const gracePeriodMs  = (config.shiftStart.gracePeriodMinutes || 20) * 60 * 1000
-      const checkAt        = new Date(scheduledStart.getTime() + gracePeriodMs)
+      // `scheduledStart` está en wall-clock-as-UTC pero el cron compara checkAt
+      // contra UTC real → convertir acá, al crear el check, para que venza a la
+      // hora Chile correcta (sin esto vencía ~4h antes; misma clase de bug que
+      // el brief de fin de turno, ver checkShiftEndBriefs).
+      const scheduledStartReal = new Date(
+        scheduledStart.getTime() + shoplogixPolling.chileUtcOffsetHours(new Date()) * 3600_000,
+      )
+      const checkAt        = new Date(scheduledStartReal.getTime() + gracePeriodMs)
       await db.collection('shoplogixShiftDelayChecks').doc(`${plant}_${shiftDoc}`).set({
         plant, shiftDoc, shiftId, plantLabel,
-        scheduledStart, // F3: base para "demoró N min" del mensaje de recuperación
+        scheduledStart, // F3: base para "demoró N min" (wall-clock-as-UTC, legado)
+        scheduledStartReal, // misma hora en UTC real — comparable con `now` del cron
         checkAt,
         done: false,
         alerted: false,
@@ -6773,7 +7031,7 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
 
 
 // ── Sistema de notificaciones Shoplogix ───────────────────────────────────────
-// Detecta primera pieza por Baader, hitos de piezas, detenciones y retrasos de
+// Detecta primera pieza por máquina, hitos de piezas, detenciones y retrasos de
 // inicio de turno. Configurable por planta desde Panel Admin.
 // Colecciones:
 //   notificationConfig/{plantSlug}      — config por planta
@@ -6782,38 +7040,80 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
 
 const SHOPLOGIX_PLANT_LABEL = { chonchi: 'Chonchi', yal: 'Yal', filete: 'Filete' }
 
-const SHOPLOGIX_NOTIF_DEFAULTS = {
-  // telegramDest: 'bot' = solo DM del admin con @antarfood_mant_bot (rodaje),
-  // 'grupo' = grupo Telegram (topic General), 'ambos' = los dos.
-  channels:      { push: true, telegram: false, telegramDest: 'bot' },
-  shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
-  // Brief de FIN de turno (piezas por Baader, total vs target, uptime, paros,
-  // calidad Grader). delayMinutes = margen tras el fin para que el último sync
-  // (cada 5 min) alcance a dejar la data completa antes de redactar.
-  shiftEnd:      { enabled: true, delayMinutes: 10 },
-  firstPiece:    { enabled: true },
-  pieceInterval: { enabled: false, every: 1000 },
-  // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es
-  // ruido operacional (y las "Micro Detencion" tienen su propio toggle aparte).
-  events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false },
+/**
+ * plantSlug (doc de `shoplogix/{plant}`) → `PlantLineId` de la PWA
+ * (`apps/pwa/src/config/plantLines.ts`). Se usa para armar el deep-link de las
+ * notificaciones: sin esto, un evento de Filete abría la pestaña de Eviscerado.
+ */
+const SHOPLOGIX_PLANT_LINE_ID = {
+  chonchi: 'chonchi-eviscerado',
+  yal:     'yal-eviscerado',
+  filete:  'chonchi-filete',
 }
+
+// Config de notificaciones por planta (defaults + overrides por línea +
+// Firestore). Vive en su propio módulo para poder testear la resolución.
+const notifConfigMod = require('./shoplogix/notifConfig')
+const shoplogixMachinesMod = require('./shoplogix/machines')
+const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
 async function getShoplogixNotifConfig(plantSlug) {
   try {
     const snap = await db.collection('notificationConfig').doc(plantSlug).get()
-    if (!snap.exists) return SHOPLOGIX_NOTIF_DEFAULTS
-    const d = snap.data()
-    return {
-      channels:      { ...SHOPLOGIX_NOTIF_DEFAULTS.channels,      ...(d.channels      || {}) },
-      shiftStart:    { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftStart,    ...(d.shiftStart    || {}) },
-      shiftEnd:      { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftEnd,      ...(d.shiftEnd      || {}) },
-      firstPiece:    { ...SHOPLOGIX_NOTIF_DEFAULTS.firstPiece,    ...(d.firstPiece    || {}) },
-      pieceInterval: { ...SHOPLOGIX_NOTIF_DEFAULTS.pieceInterval, ...(d.pieceInterval || {}) },
-      events:        { ...SHOPLOGIX_NOTIF_DEFAULTS.events,        ...(d.events        || {}) },
-    }
+    return notifConfigMod.resolveNotifConfig(plantSlug, snap.exists ? snap.data() : null)
   } catch (e) {
     logger.error('[shoplogix-notif] getShoplogixNotifConfig error', e)
-    return SHOPLOGIX_NOTIF_DEFAULTS
+    return notifConfigMod.resolveNotifConfig(plantSlug, null)
+  }
+}
+
+/**
+ * Cuenta los paros que el sensor midió y todavía no tienen causa anotada.
+ *
+ * Las causas viven en `paros` con `origen: 'shoplogix'` y doc id determinístico
+ * `slx__{plantSlug}__{dateKey}__{shiftId}__{machineid}__{startMs}` (ver
+ * `sensorStopKey` en la PWA). Acá se reconstruye ese id para cada paro del turno
+ * y se mira cuáles faltan.
+ *
+ * Ante cualquier error devuelve null: el brief se manda igual sin esta línea.
+ */
+async function contarParosSinCausa({ plant, dateKey, shiftId, machines, stoppageMinMinutes }) {
+  try {
+    const lineaId = SHOPLOGIX_PLANT_LINE_ID[plant]
+    if (!lineaId) return null
+
+    const minSec = Math.max(0, (stoppageMinMinutes ?? 3) * 60)
+    const shiftKey = String(shiftId).replace(/[^\w-]+/g, '-')
+    const esperados = []
+    for (const m of machines || []) {
+      for (const st of m.states || []) {
+        if (st?.type !== 'downtime' && st?.type !== 'setup') continue
+        if ((st.durationSec || 0) < minSec) continue
+        const startMs = st.startAt?.toDate?.()?.getTime?.() ?? new Date(st.startAt).getTime()
+        if (!Number.isFinite(startMs)) continue
+        esperados.push({
+          key: `slx__${plant}__${dateKey}__${shiftKey}__${m.machineid || m.machineId || ''}__${startMs}`,
+          minutes: (st.durationSec || 0) / 60,
+        })
+      }
+    }
+    if (esperados.length === 0) return { count: 0, minutes: 0 }
+
+    const snap = await db.collection('paros')
+      .where('plantLineId', '==', lineaId)
+      .where('shiftId', '==', shiftId)
+      .get()
+    const anotados = new Set()
+    snap.forEach((d) => { const k = d.data()?.stopKey; if (k) anotados.add(k) })
+
+    const faltan = esperados.filter((e) => !anotados.has(e.key))
+    return {
+      count: faltan.length,
+      minutes: Math.round(faltan.reduce((a, e) => a + e.minutes, 0)),
+    }
+  } catch (e) {
+    logger.warn('[checkShiftEndBriefs] no se pudieron contar los paros sin causa:', e.message)
+    return null
   }
 }
 
@@ -6852,7 +7152,7 @@ async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data
   const shiftDoc   = String(data.shiftDoc || '')
   const dateKey    = shiftDoc.slice(0, 10)
   const shiftLabel = shiftDoc.slice(11)
-  const lineaId    = data.plant === 'yal' ? 'yal-eviscerado' : 'chonchi-eviscerado'
+  const lineaId    = SHOPLOGIX_PLANT_LINE_ID[data.plant] || 'chonchi-eviscerado'
   const url = dateKey && shiftLabel
     ? `analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftLabel)}?linea=${lineaId}`
     : 'analisis-grader'
@@ -7059,7 +7359,15 @@ exports.checkShiftStartDelays = onSchedule(
       // recalcular restando el margen de gracia, pero si tampoco hay config
       // disponible el fallback es checkAt (subestima el delay, nunca lo inventa
       // de más). Nunca bloquea el flujo: es solo el número que se muestra.
-      const scheduledStart = data.scheduledStart?.toDate?.() || checkAt
+      // Para "demoró N min" se necesita la partida en UTC REAL (comparable con
+      // `now`). `scheduledStartReal` existe en checks nuevos; en docs legado
+      // `scheduledStart` está en wall-clock-as-UTC y restarlo de `now` inflaba
+      // el delay ~+4h (offset Chile) → convertir al vuelo.
+      const legacyStart = data.scheduledStart?.toDate?.()
+      const scheduledStart = data.scheduledStartReal?.toDate?.()
+        || (legacyStart
+          ? new Date(legacyStart.getTime() + shoplogixPolling.chileUtcOffsetHours(now) * 3600_000)
+          : checkAt)
       try {
         const config = await getShoplogixNotifConfig(plant)
         if (!config.shiftStart.enabled) {
@@ -7144,7 +7452,7 @@ exports.checkShiftStartDelays = onSchedule(
 )
 
 // ── checkShiftEndBriefs ───────────────────────────────────────────────────────
-// Cron cada 5 minutos. Brief de FIN de turno a Telegram/push: piezas por Baader,
+// Cron cada 5 minutos. Brief de FIN de turno a Telegram/push: piezas por máquina,
 // total vs target oficial, uptime, paros y calidad Grader si hay Excel.
 //
 // Diseño SIN colección de checks (a diferencia del delay-check de inicio): el
@@ -7197,7 +7505,18 @@ exports.checkShiftEndBriefs = onSchedule(
 
           config = config ?? await getShoplogixNotifConfig(plant)
           if (!config.shiftEnd.enabled) continue
-          const fireAt = new Date(end.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
+          // OJO escalas de tiempo: `end` viene en wall-clock-as-UTC (hora Chile
+          // "disfrazada" de UTC, como todo lo derivado de intervals), pero `now`
+          // es UTC REAL. Sin la conversión, `now` alcanza el valor del cierre
+          // ~4h ANTES de que en Chile sea esa hora → el brief salía a mitad de
+          // turno (p.ej. 13:25 para un turno que cierra 17:15) con cifras
+          // parciales, y checkShiftReconciliation mandaba la "corrección"
+          // después. Mismo bug de escalas que el freeze del 19-07 (sync.js,
+          // scheduledEndReal).
+          const endReal = new Date(
+            end.getTime() + shoplogixPolling.chileUtcOffsetHours(now) * 3600_000,
+          )
+          const fireAt = new Date(endReal.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
           if (now < fireAt) continue
 
           // Idempotencia: solo la corrida que logra estampar endBriefSentAt envía.
@@ -7217,6 +7536,9 @@ exports.checkShiftEndBriefs = onSchedule(
             const machines = machinesSnap.docs.map((m) => {
               const x = m.data()
               return {
+                // machineid hace falta para reconstruir la clave de la anotación
+                // de causa de cada paro (ver contarParosSinCausa).
+                machineid: x.machineid || m.id,
                 machineName: x.machineName || m.id,
                 totalCycles: x.totalCycles || 0,
                 shiftRuntime: x.shiftRuntime || 0,
@@ -7224,10 +7546,14 @@ exports.checkShiftEndBriefs = onSchedule(
               }
             }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
 
-            // Turnos sin producción real (bucket de ruido): marcar y no molestar.
+            // Turnos sin producción real (bucket de ruido o lote de prueba):
+            // marcar y no molestar. El umbral es POR PLANTA — 50 piezas es nada
+            // en el eviscerado pero es un lote de prueba entero en Filete (caso
+            // real 2026-07-28: 59 piezas dispararon un brief).
             const total = machines.reduce((a, m) => a + m.totalCycles, 0)
-            if (total < 50) {
-              logger.info('[checkShiftEndBriefs] turno sin producción — sin brief', { plant, doc: docSnap.id, total })
+            const minPieces = config.shiftEnd?.minPieces ?? 50
+            if (total < minPieces) {
+              logger.info('[checkShiftEndBriefs] turno sin producción — sin brief', { plant, doc: docSnap.id, total, minPieces })
               continue
             }
 
@@ -7259,6 +7585,22 @@ exports.checkShiftEndBriefs = onSchedule(
             const realSchedule = data.scheduledStart?.toDate?.() && data.scheduledEnd?.toDate?.()
               ? { start: data.scheduledStart.toDate(), end: data.scheduledEnd.toDate() }
               : null
+            // Ventana de la primera a la última pieza. En líneas cuyo turno no
+            // está acotado en Shoplogix (Filete: "Turno Dia" = 24 h) es la única
+            // que informa algo; el composer decide cuál mostrar.
+            const effectiveSchedule = data.effectiveStart?.toDate?.() && data.effectiveEnd?.toDate?.()
+              ? { start: data.effectiveStart.toDate(), end: data.effectiveEnd.toDate() }
+              : null
+
+            // Paros que el sensor midió y siguen sin causa anotada. El brief es
+            // el momento en que alguien todavía se acuerda de lo que pasó.
+            const stopsWithoutCause = await contarParosSinCausa({
+              plant,
+              dateKey: data.dateKey ?? dk,
+              shiftId,
+              machines,
+              stoppageMinMinutes: config.events?.stoppageMinMinutes ?? 3,
+            })
             const msg = turnoBriefMod.componerBriefFinTurno({
               plantLabel,
               shiftId,
@@ -7268,6 +7610,9 @@ exports.checkShiftEndBriefs = onSchedule(
               currentJob: data.currentJob ?? null,
               grader,
               realSchedule,
+              effectiveSchedule,
+              stopsWithoutCause,
+              plannedTargetPieces: shoplogixMachinesMod.PLANT_SHIFT_TARGET_PIECES[plant] ?? null,
             })
             const eligibleIds = await getShoplogixEligibleUsers(plant)
             await dispatchShoplogixNotif(
@@ -7593,10 +7938,12 @@ exports.animeEstrenosDiarios = onSchedule(
   }
 );
 
+// Disparo manual del chequeo de estrenos — herramienta de admin, ningún cliente la llama.
 exports.animeEstrenosManual = onRequest(
   { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+    if (!requireAdminKey(req, res)) return;
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
     await _runAnimeEstrenos(token);

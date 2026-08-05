@@ -47,9 +47,11 @@ import ReactECharts from 'echarts-for-react'
 import { animate, stagger } from 'animejs'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import { machineTypeLabel, lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
+import { resolvePanelWindow } from './shiftTimelineHelpers'
 import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { LossCascadeCard } from './LossCascadeCard'
@@ -58,6 +60,7 @@ import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 import { softenAccentHex } from '@/lib/softenColor'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -84,6 +87,17 @@ interface Props {
    * máquina al expandirla. Default 'chonchi' si no se provee.
    */
   plantSlug?: PlantSlug
+  /** true = el eje está acotado a la operación real (turno sin acotar en Shoplogix). */
+  framedOnProduction?: boolean
+  /** Alterna entre operación real y turno completo. Ausente = sin datos para acotar. */
+  onToggleFraming?: () => void
+  /**
+   * Piezas totales del Grader en el turno. Se usa en la cascada para descontar
+   * la línea manual de la pérdida: lo que la planta produjo a mano no es
+   * pérdida de máquina. Sin Excel del Grader queda null y la cascada informa
+   * la pérdida bruta, como antes.
+   */
+  graderTotalPieces?: number | null
   /**
    * Fuente de los datos: 'firestore' (real), 'demo' (sintético DEV), 'none'.
    * Se muestra badge "DEMO" cuando es demo. La detección de desfase SLX
@@ -860,10 +874,12 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
           <span className={cn('w-2 h-2 rounded-full shrink-0', accent.dot)} />
           <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <span className="font-medium text-sm truncate">{shift.machineName}</span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
-            Baader 142
-          </Badge>
+          <span className="font-medium text-sm truncate">{shortMachineName(shift.machineName)}</span>
+          {machineTypeLabel(shift.machineType) && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
+              {machineTypeLabel(shift.machineType)}
+            </Badge>
+          )}
           {microAlert && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-900/70 bg-amber-950/50 text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
               <AlertTriangle className="w-3 h-3" /> Atención
@@ -1101,9 +1117,16 @@ export function UpstreamMachinesPanel({
   pauses = [],
   plantSlug = 'chonchi',
   dataSource = 'none',
+  framedOnProduction = false,
+  onToggleFraming,
+  graderTotalPieces = null,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
+  // Capa opcional del gráfico de tasa: cuánto faltó para el objetivo en cada
+  // tramo. Apagada por default — en un turno normal casi todo está cerca del
+  // objetivo y el sombreado sería ruido.
+  const [showRateGap, setShowRateGap] = useState(false)
 
   const isStale = useMemo(() => isStaleSync(syncedAt), [syncedAt])
 
@@ -1119,31 +1142,28 @@ export function UpstreamMachinesPanel({
   //      como "islas" de datos dentro del eje SLX completo.
   //   3. Prop `shiftWindow` legacy — fallback cuando no hay snapshot SLX
   //      (turno sin datos upstream o pre-suscripción).
+  //
+  //   ⚠ EXCEPCIÓN (`framedOnProduction`): cuando el eje está acotado a las horas
+  //   con proceso, ese encuadre viaja por `shiftWindow` y tiene que GANARLE al
+  //   punto 2. Sin esta excepción el chip cambiaba de estado pero el eje seguía
+  //   saliendo de los bounds del snapshot — el botón no hacía nada visible.
   const timelineSync = useTimelineSyncOptional()
   const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
-    // 1. Context (zoom del Grader sincronizado)
-    if (timelineSync?.range) {
-      return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
-    }
-    // 2. SLX bounds — preferido cuando hay snapshot. Usamos shiftStart/End
-    // (rango real con datos, crece conforme avanza el turno) en vez de
-    // scheduledStart/End (planeado, deja huecos vacíos cuando el turno aún
-    // no termina o las máquinas pararon antes).
+    // La prioridad vive en `resolvePanelWindow` (testeada): el orden ya se
+    // rompió una vez y dejó el botón de encuadre sin efecto.
     const slxMachine = snapshot?.machines[0]
-    if (slxMachine) {
-      const s = slxMachine.shiftStart
-      const e = slxMachine.shiftEnd
-      if (s && e && !isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
-    }
-    // 3. Prop legacy (fallback sin snapshot)
-    if (shiftWindow?.startAt && shiftWindow?.endAt) {
-      const s = new Date(shiftWindow.startAt)
-      const e = new Date(shiftWindow.endAt)
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
-    }
-    // 4. Cada máquina usa su propio shiftStart/End downstream
-    return [undefined, undefined]
-  }, [timelineSync?.range, snapshot, shiftWindow?.startAt, shiftWindow?.endAt])
+    const snapshotBounds = slxMachine?.shiftStart && slxMachine?.shiftEnd
+      && !isNaN(slxMachine.shiftStart.getTime()) && !isNaN(slxMachine.shiftEnd.getTime())
+      ? { start: slxMachine.shiftStart, end: slxMachine.shiftEnd }
+      : null
+    const r = resolvePanelWindow({
+      zoom: timelineSync?.range ?? null,
+      framedOnProduction,
+      shiftWindow: shiftWindow ?? null,
+      snapshotBounds,
+    })
+    return r ? [r.start, r.end] : [undefined, undefined]
+  }, [timelineSync?.range, snapshot, shiftWindow, framedOnProduction])
 
   // ¿Hay zoom activo? Source of truth: context.range. null = no zoom (vista
   // completa del turno alineada al Grader). Cualquier valor = zoom activo.
@@ -1226,6 +1246,26 @@ export function UpstreamMachinesPanel({
 
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
 
+  /**
+   * Rango que está dibujando el eje, en texto ("09:56–16:11"). Se muestra en el
+   * chip para que se entienda qué recorta el botón sin abrir el tooltip.
+   */
+  const axisRangeLabel = useMemo(() => {
+    // Sale de la ventana RESUELTA (la que dibuja el chart), no del prop: en un
+    // turno en curso el prop decía "14:45–00:00" mientras el eje mostraba
+    // 15:15–23:09 (los bounds del snapshot, que crecen con cada sync). Un chip
+    // que anuncia un rango distinto al dibujado es peor que no tener chip.
+    if (!windowStart || !windowEnd) return ''
+    const a = windowStart.getTime()
+    const b = windowEnd.getTime()
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return ''
+    return `${fmtTime(a)}–${fmtTime(b)}`
+  }, [windowStart, windowEnd])
+
+  // Modelo de las máquinas del turno, derivado de los datos: en Filete la
+  // máquina es una Baader 200 y el header decía "Baader 142" igual.
+  const lineLabel = snapshot ? lineMachinesLabel(snapshot.machines) : ''
+
   const toggleMachine = (id: string) => {
     setExpandedMachines(prev => {
       const next = new Set(prev)
@@ -1255,8 +1295,10 @@ export function UpstreamMachinesPanel({
                 badges al lado. La denominación "Evisceradoras" es redundante:
                 un Baader 142 es ya implícitamente una evisceradora. */}
             <span className="font-medium text-sm truncate text-left">
-              <span className="hidden sm:inline">Línea upstream Baader 142</span>
-              <span className="sm:hidden">Línea Baader 142</span>
+              <span className="hidden sm:inline">
+                {lineLabel ? `Línea upstream ${lineLabel}` : 'Línea upstream'}
+              </span>
+              <span className="sm:hidden">{lineLabel ? `Línea ${lineLabel}` : 'Línea'}</span>
             </span>
             {snapshot && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400 shrink-0">
@@ -1273,6 +1315,40 @@ export function UpstreamMachinesPanel({
               </Badge>
             )}
           </button>
+
+          {/* Encuadre del eje. Va FUERA del botón colapsable: un <button> dentro
+              de otro <button> es HTML inválido (React lo reporta como
+              validateDOMNesting) y el click quedaba ambiguo. */}
+          {onToggleFraming && (
+            <button
+              type="button"
+              onClick={onToggleFraming}
+              title={
+                `Qué rango de tiempo dibujan el Gantt y el gráfico de tasa (comparten eje).
+
+` +
+                (framedOnProduction
+                  ? `Ahora: SOLO las horas con producción${axisRangeLabel ? ` (${axisRangeLabel})` : ''}. ` +
+                    `En un turno en curso el borde derecho avanza con la última pieza. ` +
+                    `Click para ver el turno completo, incluidas las horas sin proceso.`
+                  : `Ahora: el turno completo${axisRangeLabel ? ` (${axisRangeLabel})` : ''}, con horas sin proceso incluidas. ` +
+                    `Click para acotarlo a las horas con producción.`)
+              }
+              className={cn(
+                'text-[10px] px-1.5 py-0.5 rounded border shrink-0 transition-colors',
+                framedOnProduction
+                  ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+            >
+              {/* La etiqueta dice QUÉ está mostrando el eje, no un nombre abstracto:
+                  "operación real" no se entendía sin abrir el tooltip. */}
+              eje: {framedOnProduction ? 'solo con proceso' : 'turno completo'}
+              {axisRangeLabel && (
+                <span className="hidden md:inline text-muted-foreground/80"> · {axisRangeLabel}</span>
+              )}
+            </button>
+          )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
@@ -1383,8 +1459,8 @@ export function UpstreamMachinesPanel({
               <div className="text-xs text-muted-foreground py-3 space-y-1">
                 <p>📡 <strong className="text-foreground">Sin datos Shoplogix para este turno.</strong></p>
                 <p className="text-muted-foreground">
-                  {plantSlug === 'yal'
-                    ? 'La integración Shoplogix Yal aún no está conectada a Firestore. Cuando esté lista, mostrará el estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'
+                  {plantSlug === 'filete'
+                    ? 'Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, paros y micro-detenciones de la línea.'
                     : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'}
                 </p>
               </div>
@@ -1395,26 +1471,55 @@ export function UpstreamMachinesPanel({
                 qué máquina bajó primero y cuánto difiere del promedio. */}
             {snapshot && snapshot.machines.length > 0 && (
               <div className="mb-3 pb-3 border-b border-border/60">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Tasa de producción por máquina · pz/min
-                </p>
+                <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Tasa de producción por máquina · pz/min
+                  </p>
+                  {/* Solo con UNA máquina: la brecha se apila sobre la barra, y
+                      con varias el gráfico usa líneas (no hay dónde apilar). */}
+                  {snapshot.machines.length === 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRateGap((v) => !v)}
+                    title="Apila sobre cada barra lo que faltó para llegar al objetivo de ese tramo."
+                    className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded border transition-colors',
+                      showRateGap
+                        ? 'border-rose-500/45 bg-rose-500/12 text-rose-700 dark:text-rose-300'
+                        : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    {showRateGap ? 'ocultar brecha' : 'ver brecha al objetivo'}
+                  </button>
+                  )}
+                </div>
                 {slxWindowMismatch && (
                   <p className="text-[10px] text-rose-400/70 mb-1">
                     ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
                   </p>
                 )}
+                {/* data-axis-* expone el rango EFECTIVO que dibuja el chart.
+                    ECharts pinta en canvas, asi que sin esto no hay forma de
+                    verificar el eje desde fuera (ni a ojo ni automatizado). */}
+                <div
+                  data-testid="rate-chart-axis"
+                  data-axis-start={chartWindowStart ? chartWindowStart.toISOString() : ''}
+                  data-axis-end={chartWindowEnd ? chartWindowEnd.toISOString() : ''}
+                >
                 <ProductionRateLineEC
                   machines={snapshot.machines}
                   windowStart={chartWindowStart}
                   windowEnd={chartWindowEnd}
+                  showGap={showRateGap}
                 />
+                </div>
               </div>
             )}
 
             {/* Cascada de pérdidas del turno — quién limitó la producción y
                 cuántas piezas costó cada causal. Ver LossCascadeCard. */}
             {snapshot && snapshot.machines.length > 0 && (
-              <LossCascadeCard machines={snapshot.machines} />
+              <LossCascadeCard machines={snapshot.machines} graderTotalPieces={graderTotalPieces} />
             )}
 
             {snapshot && snapshot.machines.length > 0 && (

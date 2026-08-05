@@ -19,7 +19,7 @@ describe('TurnoOficialChip', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('caso real: horario + especie + % cumplimiento (chonchi Turno 1 COHO)', () => {
+  it('caso real: especie + % cumplimiento (chonchi Turno 1 COHO)', () => {
     render(
       <TurnoOficialChip
         rollup={{
@@ -34,24 +34,28 @@ describe('TurnoOficialChip', () => {
         ]}
       />,
     )
-    expect(screen.getByText('21:30–05:45')).toBeTruthy()
     expect(screen.getByText('COHO')).toBeTruthy()
     expect(screen.getByText('99% del target oficial')).toBeTruthy()
+    // El horario oficial NO va acá: vive en la línea de tiempos del turno,
+    // etiquetado como "Programado". Verlo dos veces en la misma pantalla
+    // obligaba a compararlos para descubrir que eran el mismo número.
+    expect(screen.queryByText('21:30–05:45')).toBeNull()
   })
 
-  it('sin targets (solo horario/especie) → no muestra badge de % ', () => {
+  it('sin targets → no muestra badge de %', () => {
     render(
       <TurnoOficialChip
         rollup={{
           officialSchedule: { start: wall(9, 0), end: wall(17, 15) },
-          currentJob: null,
+          currentJob: { name: 'SALMON', jobMaxRunRate: null, productionQuantityExpected: null },
           officialTargetsByMachineId: null,
         }}
         machines={[]}
       />,
     )
-    expect(screen.getByText('09:00–17:15')).toBeTruthy()
+    expect(screen.getByText('SALMON')).toBeTruthy()
     expect(screen.queryByText(/del target oficial/)).toBeNull()
+    expect(screen.queryByText('09:00–17:15')).toBeNull()
   })
 
   it('cumplimiento bajo (20%) usa el nivel critical', () => {

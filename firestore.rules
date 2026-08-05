@@ -71,6 +71,20 @@ service cloud.firestore {
     function isValidEmail(email) {
       return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
+
+    // Papelera (moveToTrash en auditLog.ts) — antes create solo pedía tamaño,
+    // sin exigir forma ni autoría (create sin ninguna validación de contenido).
+    // deletedBy == uid: anti-spoofing, mismo criterio que audit_log/stockAuditLog.
+    function isValidTrashEntry() {
+      let d = request.resource.data;
+      return d.originalCollection is string && d.originalCollection.size() > 0
+        && d.originalId is string && d.originalId.size() > 0
+        && d.documentLabel is string
+        && d.data is map
+        && d.deletedBy is string && d.deletedBy == request.auth.uid
+        && d.deletedAt != null
+        && d.expiresAt != null;
+    }
     
     // Validar string no vacío
     function isNonEmptyString(value, minLen, maxLen) {
@@ -278,7 +292,9 @@ service cloud.firestore {
 
     function isValidAriaAction() {
       let d = request.resource.data;
-      return d.userId is string && d.userId.size() > 0
+      // userId == request.auth.uid: anti-spoofing (antes solo exigía size()>0,
+      // permitiendo registrar acciones "a nombre de" otro usuario real).
+      return d.userId is string && d.userId == request.auth.uid
         && d.actionType is string && d.actionType.size() > 0
         && d.description is string && d.description.size() > 0
         && d.success is bool
@@ -289,6 +305,9 @@ service cloud.firestore {
 
     function isValidAriaKnowledge() {
       let d = request.resource.data;
+      // createdBy == uid del que llama, o el sentinel 'system' (aprendizaje
+      // automático desde incidencias, ver ariaLearning.ts:606) — antes solo
+      // exigía size()>0, permitiendo atribuir conocimiento a un uid ajeno real.
       return d.type in ['faq', 'solution', 'procedure', 'fact']
         && d.question is string && d.question.size() >= 1 && d.question.size() <= 2000
         && d.answer is string && d.answer.size() >= 1 && d.answer.size() <= 5000
@@ -296,7 +315,8 @@ service cloud.firestore {
         && d.confidence is number && d.confidence >= 0 && d.confidence <= 100
         && d.usageCount is int && d.usageCount >= 0
         && d.source in ['feedback', 'interaction', 'manual']
-        && d.createdBy is string && d.createdBy.size() > 0
+        && d.createdBy is string
+        && (d.createdBy == request.auth.uid || d.createdBy == 'system')
         && (!('equipmentId' in d) || d.equipmentId is string)
         && (!('equipmentName' in d) || d.equipmentName is string);
     }
@@ -450,6 +470,68 @@ service cloud.firestore {
     // ============================================
     // INCIDENCIAS - Validación de reportes
     // ============================================
+    // ============================================
+    // CAMBIOS DE VARIADOR REGISTRADOS
+    // ============================================
+    // Cada doc es el registro de UN cambio: que se instalo, como se configuro
+    // (clonado / a mano / ya venia) y cuanto duro la intervencion. La incidencia
+    // asociada se resuelve aparte, con el servicio de incidencias.
+    // Solo se crean y se leen: son evidencia historica, no se editan.
+    match /variadoresCambios/{cambioId} {
+      allow read: if isActiveUser();
+
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.incidentId is string
+        && request.resource.data.incidentId.size() > 0
+        && request.resource.data.posicionId is string
+        && request.resource.data.posicionId.size() > 0
+        && request.resource.data.posicionId.size() <= 80
+        && request.resource.data.variadorId is string
+        && request.resource.data.variadorId.size() <= 80
+        && request.resource.data.modo in ['clonado', 'manual', 'ya_venia']
+        && request.resource.data.rango in ['lt15', '15-30', '30-60', '1-2h', 'gt2h']
+        && request.resource.data.minutosTrabajo is int
+        && request.resource.data.minutosTrabajo > 0
+        && request.resource.data.minutosTrabajo <= 600
+        && (!('comentario' in request.resource.data) || request.resource.data.comentario.size() <= 500)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // APORTES AL CATALOGO DE VARIADORES
+    // ============================================
+    // El catalogo vive en el repo (data/variadores.ts), no aca: estos documentos
+    // son PROPUESTAS del terreno (rellenar un valor pendiente de placa, o avisar
+    // que uno publicado no calza con el equipo real). Alguien las revisa y las
+    // incorpora al codigo. Por eso solo se crean y se leen: nunca se editan ni
+    // se borran desde la app.
+    match /variadoresAportes/{aporteId} {
+      allow read: if isActiveUser();
+
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.tipo in ['dato_faltante', 'correccion']
+        && request.resource.data.posicionId is string
+        && request.resource.data.posicionId.size() > 0
+        && request.resource.data.posicionId.size() <= 80
+        && request.resource.data.posicionEquipo is string
+        && request.resource.data.posicionEquipo.size() <= 200
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() > 0
+        && request.resource.data.codigo.size() <= 40
+        && request.resource.data.valor is string
+        && request.resource.data.valor.size() > 0
+        && request.resource.data.valor.size() <= 120
+        && (!('comentario' in request.resource.data) || request.resource.data.comentario.size() <= 500)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      // Se incorporan al codigo por PR, no se editan desde la app.
+      allow update, delete: if false;
+    }
+
     match /incidents/{incidentId} {
       allow read: if isActiveUser();
       
@@ -861,7 +943,7 @@ service cloud.firestore {
     // ============================================
     match /trash/{trashId} {
       allow read: if isSupervisor();
-      allow create: if isNotAnonymous() && isValidDocSize();
+      allow create: if isNotAnonymous() && isValidDocSize() && isValidTrashEntry();
       allow update, delete: if isAdmin();
     }
 
@@ -914,10 +996,14 @@ service cloud.firestore {
       allow read, write: if isAdmin() || request.auth.uid == userId;
     }
 
-    // ARIA – Collective learning entries (escrito principalmente por admin SDK / Cloud Functions)
+    // ARIA – Collective learning entries. SIN escritor en el cliente hoy
+    // (verificado: ningún código de apps/pwa/src escribe a esta colección —
+    // "ariaLearning.ts" en realidad escribe a `ariaKnowledge`). Solo admin
+    // SDK/Cloud Functions la pueblan (bypassa rules) → create cerrada del
+    // todo, antes aceptaba cualquier doc <1MB sin ninguna validación de forma.
     match /ariaLearning/{docId} {
       allow read: if isNotAnonymous();
-      allow create: if isNotAnonymous() && isValidDocSize();
+      allow create: if false;
       allow update, delete: if isAdmin();
     }
 
@@ -1290,7 +1376,13 @@ service cloud.firestore {
 
     // ANÁLISIS GRADER - Tokens públicos (compartir turno sin login, 7 días)
     match /graderPublicTokens/{tokenId} {
-      allow read: if true;
+      // Lectura pública A PROPÓSITO (QR sin login), pero acotada a tokens NO
+      // vencidos — antes la expiración solo se chequeaba en el cliente y un
+      // doc "expirado" seguía siendo legible/listable por reglas hasta borrado
+      // manual. expiresAt se guarda como ISO string (graderPublicToken.service.ts)
+      // → timestamp.value() lo compara contra el reloj del servidor.
+      allow read: if resource.data.expiresAt is string
+        && timestamp.value(resource.data.expiresAt) > request.time;
       allow create: if isSupervisor()
         && request.resource.data.token is string
         && request.resource.data.summaryId is string
@@ -1344,7 +1436,11 @@ service cloud.firestore {
     // CÓDIGOS DE INVITACIÓN
     // ============================================
     match /inviteCodes/{codeId} {
-      allow read: if isNotAnonymous();
+      // Antes isNotAnonymous() = cualquier usuario real podía LISTAR todos los
+      // códigos (incl. rol=admin). La validación pre-signup ya no depende de
+      // este read (pasa por validateInviteCodeProxy, Admin SDK) → puede
+      // cerrarse a admin-only sin romper nada.
+      allow read: if isAdmin();
       allow create: if isAdmin() && isValidInviteCode();
       // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
       allow update: if isAdmin()

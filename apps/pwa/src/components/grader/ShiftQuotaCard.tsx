@@ -10,7 +10,9 @@
  * pero el Grader no reportó son piezas no contabilizadas (pérdida potencial).
  *
  * - Cuota editable inline desde la propia card (admin/supervisor).
- * - Si no hay cuota y allowEdit → CTA "Definir cuota"; si no, card oculta.
+ * - La card se ve SIEMPRE, con o sin cuota y con o sin permiso: si se oculta,
+ *   la función entera parece no existir. Sin permiso muestra el estado y quién
+ *   puede definirla, pero no el botón.
  * - Color barra: rojo <50%, ámbar 50-89%, verde ≥90%, esmeralda ≥100%.
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -148,9 +150,29 @@ export function ShiftQuotaCard({
     }
   }
 
-  // Sin cuota — CTA si puede editar, ocultar si no
+  // Sin cuota — la card SIEMPRE se muestra (pedido de Orel 2026-08-03: "que la
+  // card de cuota se vea siempre"). Antes se ocultaba cuando el usuario no
+  // podía editar, y el resultado era que la función parecía haber desaparecido
+  // de la app: nadie sabía que existía una cuota por turno.
+  //
+  // Sin permiso NO se ofrece el botón —sería un callejón sin salida— pero sí se
+  // dice qué falta y quién puede hacerlo.
   if (!view) {
-    if (!allowEdit) return null
+    if (!allowEdit) {
+      return (
+        <Card className="border border-dashed border-border">
+          <CardContent className="p-3 flex items-center gap-2 flex-wrap">
+            <Target className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground">
+              Sin cuota definida para este turno.
+            </span>
+            <span className="ml-auto text-[11px] text-muted-foreground/70">
+              La define un supervisor
+            </span>
+          </CardContent>
+        </Card>
+      )
+    }
     if (!editing) {
       return (
         <Card className="border border-dashed border-border">
@@ -294,18 +316,22 @@ export function ShiftQuotaCard({
               )}
             </div>
 
-            {/* Bandera de discrepancia — piezas no contabilizadas vs Shoplogix */}
-            {discrepancy && (
+            {/* Bandera de discrepancia — SOLO cuando faltan piezas.
+                Antes también saltaba al revés (Grader > Baader) y marcaba en
+                ámbar "774 piezas extra vs Shoplogix · 102,0% delta", con un
+                tooltip que describía el caso contrario. Esa diferencia es la
+                línea manual: ni anomalía ni sorpresa, y ya se explica en la
+                producción del turno. Repetirla acá como alarma hacía dudar de
+                un dato que está bien. */}
+            {discrepancy && discrepancy.missing > 0 && (
               <div
                 className="flex items-start gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5"
-                title="Shoplogix reporta más ciclos en las Baaders que piezas pesadas en el Grader. Como todas las piezas deben pasar por el Grader, la diferencia podría ser: Excel parcial, fallas de registro Marelec, o pérdidas físicas."
+                title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
                 <div className="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
                   <span className="font-semibold tabular-nums">
-                    {discrepancy.missing > 0
-                      ? `${Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar`
-                      : `${Math.round(Math.abs(discrepancy.missing)).toLocaleString('es-CL')} piezas extra vs Shoplogix`}
+                    {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
                   </span>
                   <span className="text-amber-400/70"> · </span>
                   <span className="tabular-nums">{discrepancy.pct.toFixed(1)}% delta</span>

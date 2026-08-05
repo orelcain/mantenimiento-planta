@@ -2,107 +2,229 @@
   "manual": [
     {
       "id": "mf-manual-que-es",
-      "title": "Qué es la línea SmartLine",
+      "title": "Qué es la M-Weigher WTR",
       "order": 1,
-      "content": "La Marel Filete usa una línea SmartLine: un sistema dinámico de pesaje y clasificación que recibe el producto, lo pesa pieza a pieza y lo distribuye en lotes por peso o cantidad. Está disponible en tres modelos, con vía individual o doble y distintas anchuras/longitudes de cinta.\n\nPuntos clave:\n\n- Consta de tres módulos principales: alimentación, unidad de báscula MW (pesaje dinámico) y unidad de descarga.\n- El software A600 calcula cuándo un lote alcanza su objetivo de peso o de número de piezas y ordena la descarga.\n- El rendimiento máximo depende de un flujo de producto uniforme e individualizado en la alimentación.\n\nNotas operativas:\n\n- Es equipo Marel de clasificación/pesaje de la línea de fileteado; el control es el mismo software A600 de la familia.\n- Fuente: manual SmartLine (Marel), pág 3, 6, 9-12."
+      "content": "El equipo de Filete es una M-Weigher WTR (GR8251), un PESADOR DINÁMICO en línea: recibe el producto, lo pesa pieza a pieza en movimiento y lo entrega al proceso siguiente. NO clasifica ni arma lotes — eso ocurre aguas abajo.\n\nCómo funciona (manual WTR §1.2):\n\n1. El material entra por la plataforma de alimentación, de preferencia desde una cinta transportadora.\n2. Un sensor de productos al principio de la plataforma de pesaje detecta la pieza con un haz de luz a lo largo de la cinta.\n3. Un codificador en el motor registra la velocidad de la cinta.\n4. Con la velocidad de cinta y el peso sobre la plataforma se calcula el PESO INTEGRADO.\n5. El módulo de pesaje electrónico (MWS2) procesa el peso y lo transfiere al indicador (HMI), que está en la porcionadora o Robobatcher.\n6. La pieza sale por la plataforma de salida y pasa al proceso siguiente.\n\nPiezas principales (Tabla 1 del manual WTR):\n\n- 1 Plataforma de alimentación · 2 Plataforma(s) de pesaje · 3 Plataforma de salida · 4 Sensores de productos · 5 Motor · 6 Celda de carga · 7 Módulo de pesaje electrónico MWS2 · 8 Armario eléctrico · 9 Indicador M6410.\n\nNotas operativas:\n\n- ⚠ Esta máquina NO tiene unidad de descarga, brazos de puerta neumáticos ni bandejas de lotes: el loteo y el reparto por destino ocurren aguas abajo, en la porcionadora o Robobatcher que recibe el peso. Si buscás esos componentes acá, no existen.\n- Uso previsto: pesaje de productos de la industria de pescado, carne y aves.\n- Fuente: manual M-Weigher WTR (Marel), §1.2 y §1.3, págs impresas 4-5."
     },
     {
       "id": "mf-manual-seguridad",
       "title": "Seguridad",
       "order": 2,
-      "content": "Toda persona que use, instale o limpie la SmartLine debe conocer las instrucciones de seguridad; su incumplimiento anula la garantía y puede causar daños o lesiones graves.\n\nPuntos clave:\n\n- Desconectar la alimentación eléctrica para trabajar en el equipo: interruptor de red del armario eléctrico en OFF y bloquearlo con candado (LOTO).\n- Toda instalación/reparación eléctrica la realiza un electricista autorizado según normativa.\n\nNotas operativas:\n\n- Nunca trabajar en piezas móviles de la máquina.\n- Operar sin las protecciones/tapas suministradas es mal uso y riesgo para las personas.\n- Fuente: manual SmartLine (Marel), pág 4."
+      "content": "Toda persona que use, instale o limpie la M-Weigher WTR debe conocer las instrucciones de seguridad; su incumplimiento anula la garantía y puede causar daños o lesiones graves.\n\nPuntos clave:\n\n- Para trabajar sobre el equipo: interruptor de red del armario eléctrico en OFF y bloqueado.\n- Toda instalación o reparación eléctrica la realiza un electricista autorizado según normativa.\n- Nunca trabajar sobre piezas móviles de la máquina.\n- Operar sin las protecciones y tapas suministradas es mal uso y riesgo para las personas.\n\nNotas operativas:\n\n- Ojo con el matiz: para la LIMPIEZA el manual da el candado como OPCIONAL (basta apagar la máquina). El bloqueo con candado es exigible para intervención y mantenimiento sobre piezas móviles.\n- Antes de limpiar la pantalla principal, pulsar la parada de emergencia para que la máquina no arranque sola.\n- Fuente: manual M-Weigher WTR (Marel), instrucciones de seguridad (pág impresa 8) y §8.2.1 (pág impresa 56)."
     },
     {
       "id": "mf-manual-alimentacion",
-      "title": "Módulo de alimentación",
+      "title": "Alimentación y flujo de producto",
       "order": 3,
-      "content": "La alimentación es una cartera de cintas transportadoras en línea recta (vía individual o doble) que entrega un flujo continuo de producto separado de manera uniforme e individualizado a la báscula dinámica.\n\nPuntos clave:\n\n- El proceso de separación se completa en dos o tres pasos.\n- El rendimiento máximo del sistema solo se logra con un flujo de producto óptimo (separado y parejo).\n\nNotas operativas:\n\n- Un flujo mal separado o con piezas pegadas baja el rendimiento y ensucia el pesaje.\n- Fuente: manual SmartLine (Marel), pág 10."
+      "content": "El producto entra a la M-Weigher WTR por la plataforma de alimentación, de preferencia desde una cinta transportadora aguas arriba.\n\nPuntos clave:\n\n- El pesaje es dinámico e integrado: se calcula combinando el peso sobre la plataforma con la velocidad de cinta que entrega el codificador del motor.\n- Por eso cada pieza tiene que pasar SOLA y separada: si entran dos piezas juntas a la plataforma de pesaje, el peso que se calcula no corresponde a ninguna de las dos.\n- El sensor de productos detecta la pieza con un haz de luz a lo largo de la cinta; ese haz define dónde empieza y termina cada pesada.\n\nNotas operativas:\n\n- Un flujo mal separado o con piezas pegadas ensucia el pesaje y baja el rendimiento.\n- La separación del producto se resuelve aguas arriba: esta máquina no tiene módulo separador propio.\n- Fuente: manual M-Weigher WTR (Marel), §1.2, pág impresa 4."
     },
     {
       "id": "mf-manual-bascula-mw",
       "title": "Unidad de báscula MW (pesaje dinámico)",
       "order": 4,
-      "content": "La unidad de báscula MW pesa cada pieza en movimiento con sensores de celda de carga sobre varias plataformas y transfiere el peso a la HMI de la unidad de descarga.\n\nMedidas / tolerancias:\n\n- MW1000: aplicaciones de alta velocidad y espacio reducido; la alimentación es crítica por ser corta.\n- MW1450: modelo predeterminado.\n- MW1900: para artículos de longitud superior a 700 mm.\n\nPuntos clave:\n\n- El pesaje es dinámico (pieza en movimiento), por eso la limpieza y el flujo parejo importan tanto.\n\nNotas operativas:\n\n- Suciedad sobre las plataformas de pesaje o celdas desestabiliza la lectura.\n- Fuente: manual SmartLine (Marel), pág 11."
-    },
-    {
-      "id": "mf-manual-descarga",
-      "title": "Unidad de descarga y creación de lotes",
-      "order": 5,
-      "content": "En la descarga, brazos de puerta neumáticos dirigen el flujo hacia las canaletas y bandejas, donde el material se recoge en lotes de un peso o tamaño determinado.\n\nPuntos clave:\n\n- El software A600 decide cuándo un lote alcanzó su objetivo (peso o número de piezas) y da la instrucción de descarga.\n- La descarga puede alimentar una cinta de cajas opcional.\n\nNotas operativas:\n\n- Un brazo neumático lento o desajustado desvía piezas al destino equivocado.\n- Fuente: manual SmartLine (Marel), pág 12."
+      "content": "La unidad de pesaje pesa cada pieza EN MOVIMIENTO: la celda de carga mide el peso sobre la plataforma, el codificador del motor aporta la velocidad de cinta, y con esos dos datos el módulo MWS2 calcula el peso integrado y lo transfiere al indicador M6410.\n\nMedidas / tolerancias:\n\n- Anchuras disponibles de la báscula: 250, 300, 350 y 450 mm.\n- Configuración individual o doble: en las listas de piezas, S = individual y D = doble (S250 = unidad individual de 250 mm; D250 = doble de 250 mm).\n- El haz de luz del sensor de productos se ajusta entre 5 y 10 mm por encima de la cinta, según el producto.\n\nPuntos clave:\n\n- El pesaje es dinámico (pieza en movimiento), por eso la limpieza y el flujo parejo importan tanto.\n- El M6410 es el INDICADOR (la HMI), no la báscula: la báscula es la unidad de pesaje con su celda de carga y su módulo MWS2.\n\nNotas operativas:\n\n- Suciedad sobre las plataformas de pesaje o la celda desestabiliza la lectura.\n- La medida exacta de esta máquina (ancho y si es individual o doble) hay que leerla de su placa: el manual cubre toda la familia.\n- Fuente: manual M-Weigher WTR (Marel), §1.3 y §7.4, págs impresas 5 y 49."
     },
     {
       "id": "mf-manual-limpieza-mantenimiento",
       "title": "Limpieza y mantenimiento",
-      "order": 6,
-      "content": "La limpieza es central en la SmartLine: al ser pesaje dinámico, la suciedad afecta directamente la exactitud y el rendimiento.\n\nPuntos clave:\n\n- Limpiar las cintas y las plataformas de pesaje según el plan, con la máquina asegurada.\n- El mantenimiento cubre cintas, brazos neumáticos de descarga y sensores.\n\nNotas operativas:\n\n- Antes de limpiar o intervenir: cortar energía y bloquear con candado (LOTO); no usar la máquina sin protecciones.\n- Fuente: manual SmartLine (Marel), pág 4, y capítulos de limpieza/mantenimiento."
+      "order": 5,
+      "content": "La limpieza es central en la M-Weigher WTR: al ser pesaje dinámico, la suciedad afecta directamente la exactitud.\n\nRestricciones que el manual fija (§8.1):\n\n- NO aplicar chorros de agua a alta presión (superior a 25 bar) sobre los indicadores (pantallas del controlador), el sensor de producto, la celda de carga, los armarios eléctricos ni los motores. Para esas piezas: agua a BAJA presión (agua de grifo) o limpieza a mano, y verter agua para enjuagar.\n- El CLORO desintegra las cintas y puede producir manchas de óxido en el acero inoxidable.\n- Las soluciones básicas potentes (pH > 13) corroen las piezas de aluminio, como los cilindros de aire.\n- No usar agua para limpiar el armario eléctrico: sus componentes nunca deben quedar húmedos.\n\nPuntos clave:\n\n- Es muy importante limpiar a fondo la unidad después de CADA jornada de uso.\n- La limpieza es un proceso de 8 pasos: preparación, enjuagado del entorno, enjuagado de la máquina, enjabonado, lavado, desinfección, montaje posterior a la desinfección e inspección final.\n- Colgar las cintas para que se sequen: si no se secan entre turnos se desarrollan bacterias. Si no se puede, rotar con una segunda cinta.\n\nNotas operativas:\n\n- Preparación: apagar la máquina; el manual da el candado como OPCIONAL (“opcionalmente, bloquee el interruptor con un candado para mayor seguridad”).\n- Antes de limpiar la pantalla principal, pulsar la parada de emergencia para que la máquina no arranque sola.\n- Cuidado con la contaminación cruzada al sustituir cintas: una superficie limpia que toca una sucia se contamina.\n- Fuente: manual M-Weigher WTR (Marel), §8.1 y §8.2, págs impresas 51 y 56-61."
     }
   ],
   "procedures": [
     {
       "id": "mf-proc-arranque",
-      "title": "Arranque de la línea",
-      "description": "Poner en marcha la SmartLine para producción. Fuente: manual SmartLine (Marel).",
+      "title": "Arranque",
+      "description": "Poner en marcha la M-Weigher WTR. Fuente: manual M-Weigher WTR (Marel), §8.2.10.3, pág impresa 61.",
       "steps": [
-        { "order": 1, "title": "Verificar seguridad", "description": "Confirmar que las protecciones/tapas estén puestas y que nadie trabaje en piezas móviles." },
-        { "order": 2, "title": "Energizar", "description": "Poner el interruptor de red del armario en ON (quitar el candado de bloqueo)." },
-        { "order": 3, "title": "Seleccionar producto", "description": "Cargar el producto/programa correcto en la HMI (A600)." },
-        { "order": 4, "title": "Verificar flujo", "description": "Arrancar la alimentación y comprobar que el producto llegue separado y parejo a la báscula." }
+        {
+          "order": 1,
+          "title": "Verificar seguridad",
+          "description": "Confirmar que las protecciones y tapas estén puestas y que nadie esté trabajando sobre piezas móviles."
+        },
+        {
+          "order": 2,
+          "title": "⚠ NO ciclar el interruptor de red como rutina",
+          "description": "El interruptor de la red se deja en ON: el manual pide devolverlo a encendido “para mantener la corriente eléctrica constante y evitar la condensación de humedad en la unidad”. Apagarlo y bloquearlo queda reservado para intervención o mantenimiento, no para cada arranque ni para cada limpieza."
+        },
+        {
+          "order": 3,
+          "title": "Seleccionar producto en el M6410",
+          "description": "Cargar el producto/programa correcto desde el indicador M6410 (pantalla Producción)."
+        },
+        {
+          "order": 4,
+          "title": "Verificar flujo",
+          "description": "Arrancar la alimentación y comprobar que el producto llegue separado y parejo a la plataforma de pesaje: el peso integrado depende de que cada pieza pase sola."
+        }
       ]
     },
     {
       "id": "mf-proc-limpieza",
       "title": "Limpieza de cintas y plataformas de pesaje",
-      "description": "Mantener la exactitud del pesaje dinámico. Fuente: manual SmartLine (Marel), pág 4.",
+      "description": "Mantener la exactitud del pesaje dinámico. Fuente: manual M-Weigher WTR (Marel), §8.2, págs impresas 56-61.",
       "steps": [
-        { "order": 1, "title": "Asegurar la máquina", "description": "Cortar la alimentación eléctrica (interruptor de red en OFF) y bloquear con candado (LOTO)." },
-        { "order": 2, "title": "Limpiar cintas", "description": "Limpiar las cintas de alimentación y descarga según el plan de limpieza." },
-        { "order": 3, "title": "Limpiar plataformas de pesaje", "description": "Limpiar las plataformas de la báscula MW, evitando dejar residuos que desestabilicen la lectura." },
-        { "order": 4, "title": "Reponer protecciones", "description": "Volver a colocar todas las protecciones/tapas antes de reenergizar." }
+        {
+          "order": 1,
+          "title": "Preparar la máquina",
+          "description": "Apagar la máquina para protegerla. El manual da el candado como OPCIONAL (“opcionalmente, bloquee el interruptor con un candado para mayor seguridad”), no como requisito."
+        },
+        {
+          "order": 2,
+          "title": "Abrir la unidad de pesaje",
+          "description": "Abrir la cubierta lateral, bajar las guías de retorno y bajar la cubierta de seguridad, para poder levantar la cinta y limpiar debajo."
+        },
+        {
+          "order": 3,
+          "title": "Enjuagar, enjabonar y lavar",
+          "description": "Enjuagar el entorno y la máquina, espumar asegurando que la espuma llegue a rincones y zonas difíciles, dejarla actuar según el fabricante, y lavar con cepillo y chorro de agua."
+        },
+        {
+          "order": 4,
+          "title": "⚠ Respetar las zonas de baja presión",
+          "description": "NO usar alta presión (superior a 25 bar) sobre indicadores/pantallas, sensor de producto, celda de carga, armarios eléctricos ni motores: ahí va agua a baja presión o limpieza a mano. Sin cloro (desintegra las cintas y mancha el inox) y sin soluciones de pH > 13 (corroen el aluminio de los cilindros de aire)."
+        },
+        {
+          "order": 5,
+          "title": "Desinfectar y secar",
+          "description": "Desinfectar con producto homologado para plantas de alimentos, montar tras la desinfección y colgar las cintas para que sequen. Si no secan entre turnos, rotar con una segunda cinta."
+        },
+        {
+          "order": 6,
+          "title": "Inspección final",
+          "description": "Revisar que todo quede montado y que las protecciones estén puestas antes de reenergizar."
+        }
       ]
     },
     {
       "id": "mf-proc-seleccionar-producto",
       "title": "Seleccionar / cambiar producto",
-      "description": "Configurar la línea para otra especie/calibre. Fuente: manual SmartLine (Marel).",
+      "description": "Configurar la máquina para otra especie/calibre. Fuente: manual M-Weigher WTR (Marel), §5.1, pág impresa 24, más material de campo del equipo.",
       "steps": [
-        { "order": 1, "title": "Abrir la HMI", "description": "En la HMI (software A600) abrir la selección de producto/programa." },
-        { "order": 2, "title": "Elegir el producto", "description": "Seleccionar el producto con su objetivo de lote (peso o número de piezas)." },
-        { "order": 3, "title": "Verificar la descarga", "description": "Confirmar que las canaletas/bandejas de destino correspondan al nuevo producto." }
+        {
+          "order": 1,
+          "title": "Abrir la HMI",
+          "description": "En el indicador M6410, la pantalla Producción es la pantalla operativa principal para monitorear el proceso; desde ahí se llega a la configuración."
+        },
+        {
+          "order": 2,
+          "title": "Elegir el producto",
+          "description": "Seleccionar el producto que corresponde a la corrida."
+        },
+        {
+          "order": 3,
+          "title": "Verificar el pesaje",
+          "description": "Comprobar que la báscula quede estable y en cero antes de producir. OJO: el objetivo de lote y el destino NO se configuran acá. Esta máquina solo pesa; el loteo lo hace el equipo de aguas abajo que recibe el peso."
+        }
       ]
     },
     {
       "id": "mf-proc-ajustar-alimentacion",
       "title": "Ajustar el flujo de alimentación",
-      "description": "Lograr un flujo separado y parejo para el máximo rendimiento. Fuente: manual SmartLine (Marel), pág 10.",
+      "description": "Lograr un flujo separado y parejo, que es condición del pesaje dinámico. Fuente: manual M-Weigher WTR (Marel), §1.2, pág impresa 4.",
       "steps": [
-        { "order": 1, "title": "Observar la entrada", "description": "Ver cómo llega el producto a la báscula: debe estar separado e individualizado." },
-        { "order": 2, "title": "Corregir la carga aguas arriba", "description": "Ajustar la alimentación para que no lleguen piezas pegadas ni en bloque." },
-        { "order": 3, "title": "Verificar rendimiento", "description": "Comprobar que suba el rendimiento y baje el rechazo con el flujo parejo." }
+        {
+          "order": 1,
+          "title": "Observar la entrada",
+          "description": "Ver cómo llega el producto a la báscula: debe estar separado e individualizado."
+        },
+        {
+          "order": 2,
+          "title": "Corregir la carga aguas arriba",
+          "description": "Ajustar la alimentación para que no lleguen piezas pegadas ni en bloque."
+        },
+        {
+          "order": 3,
+          "title": "Verificar rendimiento",
+          "description": "Comprobar que suba el rendimiento y baje el rechazo con el flujo parejo."
+        }
       ]
     },
     {
       "id": "mf-proc-mantenimiento",
-      "title": "Mantenimiento de cintas y descarga",
-      "description": "Conservar cintas, brazos neumáticos y sensores. Fuente: manual SmartLine (Marel).",
+      "title": "Mantenimiento preventivo",
+      "description": "Programa de mantenimiento del M-Weigher WTR. Fuente: manual M-Weigher WTR (Marel), Tabla 5 (§7.1) y §7.4, págs impresas 45 y 49.",
       "steps": [
-        { "order": 1, "title": "Asegurar (LOTO)", "description": "Cortar energía y bloquear con candado antes de intervenir." },
-        { "order": 2, "title": "Revisar cintas", "description": "Inspeccionar tensión, desgaste y limpieza de las cintas." },
-        { "order": 3, "title": "Revisar brazos neumáticos", "description": "Comprobar el accionamiento de los brazos de puerta de la descarga." },
-        { "order": 4, "title": "Revisar sensores", "description": "Verificar sensores de celda de carga y su limpieza." }
+        {
+          "order": 1,
+          "title": "Asegurar antes de intervenir",
+          "description": "Cortar energía y bloquear antes de trabajar sobre piezas móviles."
+        },
+        {
+          "order": 2,
+          "title": "Cada turno",
+          "description": "Comprobar si hay eslabones rotos en la cinta modular de plástico."
+        },
+        {
+          "order": 3,
+          "title": "Diario",
+          "description": "Comprobar que las cintas estén limpias y sin partículas de suciedad (sustituirlas si hace falta) y que las unidades de pesaje funcionen correctamente."
+        },
+        {
+          "order": 4,
+          "title": "Sensor de productos (lo que SÍ es rutina)",
+          "description": "Mantener limpios el transmisor, el receptor y TODA el área entre ambos: si se acumula suciedad se obstruye el haz de luz. Si se sustituye el sensor hay que reajustar el haz a 5-10 mm por encima de la cinta según el producto, para que algo de suciedad en la cinta no lo interrumpa. El sensor tiene indicador de estabilidad (verde), indicador de operación (naranja), selector L/D y ajustador de sensibilidad."
+        },
+        {
+          "order": 5,
+          "title": "Semanal",
+          "description": "Verificar el estado general de las cintas."
+        },
+        {
+          "order": 6,
+          "title": "Mensual",
+          "description": "Comprobar las paradas de emergencia, las ruedas dentadas, la tensión de la cinta y los soportes; retirar y lavar las cintas modulares de plástico. Abrir el armario eléctrico y revisar si tiene residuos o suciedad."
+        },
+        {
+          "order": 7,
+          "title": "⚠ Cada seis meses — NO es tarea de planta",
+          "description": "La inspección de la(s) CELDA(S) DE CARGA y del sistema eléctrico es mantenimiento semestral realizado por el personal de servicio técnico de Marel. No es una revisión rutinaria del técnico de turno."
+        }
+      ]
+    },
+    {
+      "id": "mf-proc-calibracion-dinamica-basculas",
+      "title": "Calibración dinámica de básculas (Service → Scales)",
+      "description": "Calibrar la báscula dinámica (unidad de pesaje MW / módulo MWS2) DESDE el indicador M6410, cuando la desviación estándar supera lo tolerable. Ojo con el nombre: el M6410 es el indicador (la HMI), no la báscula — el propio paso 2 lo delata, porque el tipo de báscula que lista es \"MWS2-FT\". ⚠ PROCEDENCIA: estos pasos NO salen del manual (el manual del M-Weigher WTR documenta las pantallas Producción / Limpieza / Avanzado / Servicio del M6410, pág impresa 24, pero no cubre calibración: la palabra no aparece en sus 71 páginas). Vienen del video y los pantallazos del propio equipo, o sea material de campo verificado en la máquina. El umbral de desviación estándar menor a 5 gramos es criterio de planta, no especificación del fabricante.",
+      "steps": [
+        {
+          "order": 1,
+          "title": "Entrar a Service",
+          "description": "Desde la pantalla principal (\"STOPPED - PRODUCTION\"), toca el ícono de configuración/servicio para abrir el menú: CAN Network, I/O Tester, Motor Drives, Scales, y a la derecha Devices / Monitoring / System Setup.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-filete%2Fprocedures%2Fmf-proc-calibracion-dinamica-basculas%2Fstep-1.jpg?alt=media&token=ae34abf9-488d-4fe6-997d-4099f3666ec5"
+        },
+        {
+          "order": 2,
+          "title": "Abrir \"Scales\"",
+          "description": "En Scales aparece la tabla de básculas (Label, Type — ej. MWS2-FT, Weight, Zero, Stable, Tare) y los botones inferiores: Weight Curve, Weight Test, Configuration, Calibrate, Edit known scales.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-filete%2Fprocedures%2Fmf-proc-calibracion-dinamica-basculas%2Fstep-2.jpg?alt=media&token=1d3fef56-c6a9-44b2-af74-1a690462c91a"
+        },
+        {
+          "order": 3,
+          "title": "Elegir \"Dynamic Calibration\"",
+          "description": "Dentro de Calibrate/Weight Test se selecciona \"Dynamic Calibration\" del menú lateral (Sample, Quality, Dynamic Calibration). La tabla muestra Status, Weight y Quality por muestra.",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-filete%2Fprocedures%2Fmf-proc-calibracion-dinamica-basculas%2Fstep-3.jpg?alt=media&token=6a8c877f-5e59-417a-b352-45d48ead7ed3"
+        },
+        {
+          "order": 4,
+          "title": "Correr el test y guardar",
+          "description": "Define \"Sample Weight\" y \"Offset\", presiona \"Start Test\" y verifica que los indicadores Stable / Zero / Sensor / Running queden en verde/estables. Revisa Average, Standard deviation (debe ser menor a 5 gramos), Minimum y Maximum. Si el \"New dynamic factor\" calculado es razonable, presiona \"Save Calibration\".",
+          "imageUrl": "https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/learningContent%2Fmarel-filete%2Fprocedures%2Fmf-proc-calibracion-dinamica-basculas%2Fstep-4.jpg?alt=media&token=ff5d8a9f-f85d-40dc-9075-bfdc5272ddec"
+        }
       ]
     }
   ],
   "flows": [
     {
       "id": "mf-flow-arrancar",
-      "title": "¿Qué hago para arrancar la línea?",
-      "trigger": "Se va a iniciar la producción en la SmartLine.",
+      "title": "¿Qué hago para arrancar?",
+      "trigger": "Se va a iniciar la producción en la M-Weigher WTR.",
       "actions": [
         "Verificar protecciones puestas y personal fuera de piezas móviles.",
-        "Energizar (interruptor de red en ON, sin candado).",
-        "Seleccionar el producto/programa en la HMI (A600).",
-        "Arrancar la alimentación y comprobar flujo separado y parejo.",
-        "Fuente: manual SmartLine (Marel)."
+        "⚠ NO ciclar el interruptor de red: se deja en ON entre turnos, para mantener corriente constante y evitar condensación de humedad dentro de la unidad. El OFF con candado es para intervención, no para arrancar.",
+        "Seleccionar el producto en el indicador M6410 (pantalla Producción).",
+        "Arrancar la alimentación y comprobar que el producto llegue separado y parejo: cada pieza tiene que pasar sola por la plataforma de pesaje.",
+        "Fuente: manual M-Weigher WTR (Marel), §5.1 y §8.2.10.3, págs impresas 24 y 61."
       ]
     },
     {
@@ -110,10 +232,10 @@
       "title": "¿Qué hago cuando cambio de producto?",
       "trigger": "Se corre otra especie/calibre o cambia el objetivo de lote.",
       "actions": [
-        "Seleccionar el nuevo producto/programa en la HMI.",
-        "Confirmar el objetivo de lote (peso o número de piezas).",
-        "Verificar que las canaletas/bandejas de destino sean las correctas.",
-        "Fuente: manual SmartLine (Marel)."
+        "Seleccionar el nuevo producto en el indicador M6410.",
+        "Verificar que la báscula quede estable y en cero antes de reanudar.",
+        "⚠ Acá NO se configura objetivo de lote ni destino: esta máquina solo pesa. El loteo y el reparto por destino se configuran en el equipo de aguas abajo (porcionadora o Robobatcher) que recibe el peso.",
+        "Fuente: manual M-Weigher WTR (Marel), §1.2 y §5.1, págs impresas 4 y 24."
       ]
     },
     {
@@ -121,10 +243,13 @@
       "title": "¿Qué hago para limpiar con seguridad?",
       "trigger": "Toca limpieza de fin de turno o entre productos.",
       "actions": [
-        "Poner el interruptor de red del armario en OFF y bloquear con candado (LOTO).",
-        "Limpiar cintas y plataformas de pesaje sin dejar residuos.",
+        "Apagar la máquina para protegerla (el manual da el candado como opcional para limpieza).",
+        "Abrir la cubierta lateral, bajar las guías de retorno y la cubierta de seguridad para poder limpiar bajo la cinta.",
+        "⚠ Agua a BAJA presión o limpieza a mano en indicadores/pantallas, sensor de producto, celda de carga, armarios eléctricos y motores: por encima de 25 bar se dañan. Nada de cloro (desintegra las cintas) ni soluciones de pH > 13 (corroen el aluminio).",
+        "Enjuagar, espumar, lavar, desinfectar, montar e inspeccionar: la limpieza es un proceso de 8 pasos.",
+        "Colgar las cintas para que sequen; si no secan entre turnos, rotar con una segunda cinta.",
         "Reponer todas las protecciones antes de reenergizar.",
-        "Fuente: manual SmartLine (Marel), pág 4."
+        "Fuente: manual M-Weigher WTR (Marel), §8.1 y §8.2, págs impresas 51 y 56-61."
       ]
     },
     {
@@ -132,10 +257,11 @@
       "title": "¿Qué hago cuando baja el rendimiento?",
       "trigger": "La línea produce menos de lo esperado o rechaza mucho.",
       "actions": [
-        "Revisar el flujo de alimentación: el producto debe llegar separado e individualizado.",
-        "Verificar la limpieza de las plataformas de pesaje (suciedad = pesaje inestable).",
-        "Comprobar que los brazos de descarga dirijan al destino correcto.",
-        "Fuente: manual SmartLine (Marel), pág 10-12."
+        "Revisar el flujo de alimentación: el producto debe llegar separado e individualizado, una pieza por vez.",
+        "Verificar la limpieza de la plataforma de pesaje y del sensor de productos: transmisor, receptor y el área entre ambos deben estar limpios o se obstruye el haz de luz.",
+        "Comprobar que el haz del sensor esté a 5-10 mm por encima de la cinta según el producto.",
+        "Revisar la cinta: eslabones rotos, tensión y estado general.",
+        "Fuente: manual M-Weigher WTR (Marel), §1.2 y §7.4, págs impresas 4 y 49."
       ]
     }
   ],
@@ -148,38 +274,20 @@
         "Producto que llega pegado o en bloque, no individualizado.",
         "Alimentación mal ajustada aguas arriba."
       ],
-      "solution": "Ajustar la alimentación para lograr un flujo separado y parejo hacia la báscula. El rendimiento máximo solo se logra con flujo óptimo. Fuente: manual SmartLine (Marel), pág 10."
+      "solution": "Ajustar la alimentación aguas arriba para lograr un flujo separado y parejo hacia la plataforma de pesaje: el peso integrado se calcula por pieza, así que dos piezas juntas dan una pesada que no corresponde a ninguna. Esta máquina no tiene separador propio, la separación se resuelve antes. Fuente: manual M-Weigher WTR (Marel), §1.2, pág impresa 4."
     },
     {
       "id": "mf-diag-pesaje-inestable",
       "title": "Pesaje inestable en la báscula MW",
       "symptom": "Los pesos saltan o hay muchos rechazos por peso fuera de rango.",
       "possibleCauses": [
-        "Suciedad sobre las plataformas de pesaje o celdas de carga.",
-        "Flujo de producto no individualizado (dos piezas en una plataforma)."
+        "Suciedad sobre la plataforma de pesaje o la celda de carga.",
+        "Sensor de productos sucio: transmisor, receptor o el área entre ambos con suciedad que obstruye el haz de luz.",
+        "Haz de luz mal ajustado en altura (debe quedar 5-10 mm sobre la cinta según el producto).",
+        "Flujo no individualizado: dos piezas sobre la plataforma a la vez.",
+        "Eslabones rotos o tensión incorrecta en la cinta modular."
       ],
-      "solution": "Limpiar las plataformas de pesaje (con LOTO) y asegurar que el producto llegue separado. Fuente: manual SmartLine (Marel), pág 11."
-    },
-    {
-      "id": "mf-diag-descarga-destino",
-      "title": "El producto se descarga al destino equivocado",
-      "symptom": "Piezas que caen en la canaleta/bandeja que no corresponde.",
-      "possibleCauses": [
-        "Brazo de puerta neumático lento, desajustado o sin presión.",
-        "Objetivo de lote o asignación de destino mal configurado."
-      ],
-      "solution": "Revisar el accionamiento de los brazos neumáticos de descarga y la configuración de destinos en la HMI (A600). Fuente: manual SmartLine (Marel), pág 12."
-    },
-    {
-      "id": "mf-diag-lote-no-cierra",
-      "title": "El lote no alcanza el objetivo",
-      "symptom": "Los lotes no cierran o quedan fuera del peso/cantidad objetivo.",
-      "possibleCauses": [
-        "Objetivo de lote mal configurado para el producto.",
-        "Rechazo alto que impide completar el lote.",
-        "Pesaje impreciso que descarta piezas válidas."
-      ],
-      "solution": "Verificar el objetivo de lote del producto y resolver primero el pesaje/flujo. Fuente: manual SmartLine (Marel), pág 12."
+      "solution": "Limpiar la plataforma de pesaje y el sensor de productos (transmisor, receptor y el área entre ambos), verificar el ajuste del haz a 5-10 mm sobre la cinta según el producto, y asegurar que el producto llegue separado. Revisar también eslabones y tensión de la cinta. ⚠ Si se sospecha de la celda de carga: su inspección es mantenimiento SEMESTRAL del servicio técnico de Marel, no una revisión de turno. Fuente: manual M-Weigher WTR (Marel), §7.1 y §7.4, págs impresas 45 y 49."
     },
     {
       "id": "mf-diag-seguridad",
@@ -188,7 +296,7 @@
       "possibleCauses": [
         "Intervención con la máquina energizada = riesgo grave."
       ],
-      "solution": "Poner el interruptor de red del armario en OFF, bloquear con candado y no trabajar en piezas móviles ni sin protecciones. Reparaciones eléctricas solo por electricista autorizado. Fuente: manual SmartLine (Marel), pág 4."
+      "solution": "Para intervenir sobre piezas móviles: interruptor de red del armario en OFF, bloqueado, sin trabajar sin protecciones. Reparaciones eléctricas solo por electricista autorizado. Matiz importante: para la LIMPIEZA el manual pide apagar la máquina y da el candado como OPCIONAL, y para limpiar la pantalla principal pide pulsar la parada de emergencia. Fuera de esos casos, el interruptor de red se deja en ON para evitar condensación de humedad dentro de la unidad. Fuente: manual M-Weigher WTR (Marel), instrucciones de seguridad (pág impresa 8), §8.2.1 (pág 56) y §8.2.10.3 (pág 61)."
     }
   ]
 }

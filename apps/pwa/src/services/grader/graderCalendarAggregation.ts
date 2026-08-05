@@ -75,6 +75,14 @@ export interface CalendarDayContribution {
    * gana — criterio determinista para que el render sea estable.
    */
   isPrimary: boolean
+  /**
+   * Solo lo setea `aggregateByShiftDay`: el turno siguió produciendo después de
+   * medianoche. La celda lo marca con “→” para no perder esa señal al dibujar
+   * el turno entero en un solo día.
+   */
+  crossesMidnight?: boolean
+  /** Piezas que ocurrieron después de medianoche. 0 si no cruzó. */
+  piecesAfterMidnight?: number
 }
 
 /** Agregado de un día calendario completo (puede recibir aportes de varios turnos). */
@@ -178,6 +186,101 @@ export function aggregateByCalendarDay(
   // El "principal" es donde tuvo más piezas — usado por el calendario para
   // decidir qué chip pintar prominente vs secundario.
   markPrimaryAndComputePct(result)
+
+  return result
+}
+
+// ── Atribución por DÍA DE TURNO (la que manda en el calendario) ──────────────
+
+/**
+ * Reagrupa por el día que Shoplogix le asignó al turno, no por el día físico.
+ *
+ * Regla del módulo: **Shoplogix manda con la asignación del día**. Un turno que
+ * corre 21:30 → 05:45 es UN turno del día que arrancó, aunque la mayor parte de
+ * la producción ocurra después de medianoche. `aggregateByCalendarDay` lo parte
+ * en dos celdas (por diseño, para responder "qué pasó físicamente el día X");
+ * esta lo devuelve entero a su turno.
+ *
+ * No se pierde la señal del cruce: la contribución resultante trae
+ * `crossesMidnight` y `piecesAfterMidnight`, con lo que la celda dibuja la marca
+ * “→” y el tooltip puede decir cuánto ocurrió de madrugada.
+ *
+ * Función pura. Conserva totales: lo que aporta cada summary es exactamente lo
+ * que aportaba repartido.
+ */
+export function aggregateByShiftDay(
+  input: CalendarAggregationInput,
+): Map<string, CalendarDayAggregate> {
+  const byPhysicalDay = aggregateByCalendarDay(input)
+  const result = new Map<string, CalendarDayAggregate>()
+
+  const getOrCreate = (dateKey: string): CalendarDayAggregate => {
+    let agg = result.get(dateKey)
+    if (!agg) {
+      agg = {
+        dateKey,
+        totalPieces: 0,
+        pointZeroPieces: 0,
+        pointZeroPct: 0,
+        activeMinutes: 0,
+        contributingShifts: [],
+      }
+      result.set(dateKey, agg)
+    }
+    return agg
+  }
+
+  // Juntar los fragmentos de cada summary en una sola contribución.
+  const bySummary = new Map<string, CalendarDayContribution[]>()
+  for (const agg of byPhysicalDay.values()) {
+    for (const c of agg.contributingShifts) {
+      const arr = bySummary.get(c.summaryId) ?? []
+      arr.push(c)
+      bySummary.set(c.summaryId, arr)
+    }
+  }
+
+  for (const contribs of bySummary.values()) {
+    const first = contribs[0]!
+    const shiftDateKey = first.shiftDateKey
+    // Todo lo que cayó en un día calendario POSTERIOR al del turno ocurrió de
+    // madrugada. Es lo que justifica la marca “→” en la celda.
+    const afterMidnight = contribs.filter((c) => c.dateKey > shiftDateKey)
+    const piecesAfterMidnight = afterMidnight.reduce((s, c) => s + c.pieces, 0)
+
+    const merged: CalendarDayContribution = {
+      dateKey: shiftDateKey,
+      summaryId: first.summaryId,
+      shiftDateKey,
+      shiftId: first.shiftId,
+      pieces: contribs.reduce((s, c) => s + c.pieces, 0),
+      pointZeroPieces: contribs.reduce((s, c) => s + c.pointZeroPieces, 0),
+      weightKg: contribs.some((c) => c.weightKg != null)
+        ? r(contribs.reduce((s, c) => s + (c.weightKg ?? 0), 0), 2)
+        : undefined,
+      activeMinutes: contribs.reduce((s, c) => s + c.activeMinutes, 0),
+      source: first.source,
+      pctOfShift: 100,
+      isPrimary: true,
+      crossesMidnight: afterMidnight.length > 0,
+      piecesAfterMidnight,
+    }
+
+    const agg = getOrCreate(shiftDateKey)
+    agg.totalPieces += merged.pieces
+    agg.pointZeroPieces += merged.pointZeroPieces
+    if (merged.weightKg != null) {
+      agg.totalWeightKg = r((agg.totalWeightKg ?? 0) + merged.weightKg, 2)
+    }
+    agg.activeMinutes += merged.activeMinutes
+    agg.contributingShifts.push(merged)
+  }
+
+  for (const agg of result.values()) {
+    agg.pointZeroPct = agg.totalPieces > 0
+      ? r(agg.pointZeroPieces / agg.totalPieces * 100, 2)
+      : 0
+  }
 
   return result
 }
@@ -502,7 +605,11 @@ export function buildShiftChipDescriptors(
 
     for (const c of contribs) {
       let direction: ChipDirection = 'same'
-      if (crosses) {
+      if (c.crossesMidnight) {
+        // Atribución por día de turno: hay una sola contribución, pero el turno
+        // se fue a la madrugada. 'exits' hace que la celda dibuje “→”.
+        direction = 'exits'
+      } else if (crosses) {
         // El turno aporta a 2 días → cada chip es 'enters' o 'exits' según
         // si su dateKey calendario es posterior o el mismo que el shiftDateKey.
         direction = c.dateKey > c.shiftDateKey ? 'enters' : 'exits'

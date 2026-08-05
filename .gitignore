@@ -85,6 +85,9 @@ _claude_ai_upload/
 # Traspaso de sesión (skill traspaso-limpio) — artefacto temporal, no versionar
 /traspaso.md
 
+# Snapshots de Firestore (scripts/firestore-snapshot.js) — DATOS DE PRODUCCIÓN, nunca versionar
+_snapshots/
+
 # Fotos locales de los motores Sumitomo (seed) — se suben a Storage, no al repo
 /scripts/sumitomo-photos/*
 !/scripts/sumitomo-photos/README.md
@@ -98,3 +101,6 @@ __pycache__/
 
 # Reportes de migración con data de planta (no versionar)
 scripts/normalizacion/*-report.json
+
+# Artefacto del bundle para scripts Node (ver scripts/build-grader-core.js)
+scripts/_grader-core.cjs

@@ -7,8 +7,25 @@
  *
  * Sincroniza con TimelineSyncContext: zoom + axisPointer cross-chart.
  *
+ * ENCODING SEGÚN LA LÍNEA (`rateChartMode`):
+ *
+ *   1 máquina  → BARRAS por tramo. Un proceso intermitente no tiene flujo
+ *     continuo: el turno del 2026-07-28 de la Baader 200 tuvo 14 tramos con dato
+ *     sobre 288 posibles, en dos racimos separados por 4,5 h. Una línea dibujaba
+ *     continuidad donde no hubo ni un tramo con producción.
+ *
+ *   2+ máquinas → LÍNEAS. Acá la pregunta es otra: cuál de las Baader bajó
+ *     primero y cuánto se separan entre sí. Con 3 series × ~100 tramos las barras
+ *     quedan de 1-2 px pegadas (una reja ilegible, verificado en Yal) mientras la
+ *     línea muestra la divergencia de un vistazo.
+ *
  * Datos de entrada: `machines[].intervals` (buckets de 5 min con `cycles`).
- * Rate = cycles / duracion_min del intervalo.
+ * Rate real = cycles / duracion_min del intervalo.
+ *
+ * Encima se dibuja el OBJETIVO por bucket que reporta el sensor (`targetRate`,
+ * con `expectedCycles/duración` como respaldo en docs viejos) y se sombrean los
+ * tramos donde el objetivo estaba corriendo y la producción fue 0 — que es la
+ * lectura que importa: si el turno se perdió por ritmo o por máquina parada.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
@@ -17,6 +34,7 @@ import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
 const MACHINE_COLORS = [
@@ -26,34 +44,60 @@ const MACHINE_COLORS = [
   { line: 'rgba(251,191,36,0.9)',  area: 'rgba(251,191,36,0.06)'  },  // amber-400 (más)
 ]
 const AVG_COLOR  = { line: 'rgba(251,191,36,0.95)', area: 'rgba(251,191,36,0.12)' }  // amber
+/** Objetivo del sensor — violeta, el mismo tono que ya usaba la línea de meta. */
+const TARGET_COLOR = 'rgba(139,92,246,0.75)'
+const OBJETIVO_LABEL = 'Objetivo'
+/** Brecha al objetivo — rojo suave (semántico −50% croma del design system). */
+const GAP_COLOR = 'rgba(176,112,109,0.42)'
+const GAP_LABEL = 'Faltó'
+
+/**
+ * Ancho de tramo (min) según el rango visible: con más de 4 h a la vista, los
+ * tramos de 5 min quedan de 1-2 px y se apelmazan, así que se agrupan a 15.
+ */
+function bucketMinutesForRange(rangeMin: number): 5 | 15 {
+  return rangeMin > 4 * 60 ? 15 : 5
+}
 const GRID_COLOR = '#1e293b'
+
+/**
+ * Tinta de la leyenda. Sube de `#64748b` (el gris del chrome) a `#94a3b8`: la
+ * leyenda es la clave para saber qué línea es cuál, así que tiene que ganarle
+ * al fondo del propio gráfico, donde además pasan líneas punteadas por detrás.
+ */
+const LEGEND_TEXT_COLOR = '#94a3b8'
 
 interface Props {
   machines: UpstreamMachineShift[]
   windowStart?: Date
   windowEnd?: Date
+  /**
+   * Muestra apilada la BRECHA al objetivo (lo que faltó en cada tramo).
+   * Apagado por default: en un turno normal casi todo está cerca del objetivo y
+   * el sombreado sería ruido; se prende cuando se quiere cuantificar la pérdida.
+   */
+  showGap?: boolean
 }
 
-// ── Helper: toma nombre de máquina y devuelve etiqueta corta ─────────────────
-function shortMachineName(name: string): string {
-  // "Baader 142 / 1" → "B1" | "Evisceradora 1" → "E1" | fallback: primeras 4 chars
-  const mSlash = name.match(/\/\s*(\d+)$/)
-  if (mSlash) return `B${mSlash[1]}`
-  const mNum = name.match(/(\d+)$/)
-  if (mNum) return `M${mNum[1]}`
-  return name.slice(0, 4)
-}
 
 /** Compila series de tasa pz/min unificando todos los buckets de tiempo. */
-function buildRateSeries(machines: UpstreamMachineShift[]): {
+export function buildRateSeries(machines: UpstreamMachineShift[]): {
   timeAxis: number[]
   series: { name: string; data: (number | null)[] }[]
   avgSeries: { name: string; data: (number | null)[] }
+  /** Objetivo por bucket (promedio de las máquinas con objetivo en ese bucket). */
+  targetSeries: (number | null)[]
+  /** Objetivo nominal = máximo por bucket. Ver por qué el máximo, más abajo. */
   expectedRate: number
+  /** Tramos [desde, hasta] con objetivo vigente y producción 0. */
+  stoppedWithTarget: [number, number][]
   showAvg: boolean
 } {
   if (machines.length === 0) {
-    return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0, showAvg: false }
+    return {
+      timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] },
+      targetSeries: [], expectedRate: 0, stoppedWithTarget: [], showAvg: false,
+    }
   }
 
   // Snap a grilla de 5 min: diferentes máquinas pueden tener buckets en :56/:01/:06
@@ -116,15 +160,48 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
   })
 
-  // Expected rate: primer bucket con expectedCycles > 0
-  let expectedRate = 0
-  for (const m of filteredMachines) {
-    const iv = m.intervals.find((x) => x.expectedCycles > 0)
-    if (iv) {
+  // ── Objetivo por bucket ────────────────────────────────────────────────────
+  // `targetRate` es la cadencia OBJETIVO que reporta el sensor (NO la real). En
+  // docs previos a sourceVersion 4 no existe: se cae a expectedCycles/duración,
+  // que da lo mismo (el sensor calcula uno desde el otro).
+  const machineTargets: Map<number, number>[] = filteredMachines.map((m) => {
+    const map = new Map<number, number>()
+    for (const iv of m.intervals) {
       const durationMin = Math.max(1, (iv.endAt.getTime() - iv.startAt.getTime()) / 60_000)
-      expectedRate = iv.expectedCycles / durationMin
-      break
+      const t = iv.targetRate ?? (iv.expectedCycles > 0 ? iv.expectedCycles / durationMin : null)
+      if (t == null || t <= 0) continue
+      const key = snap(iv.startAt.getTime())
+      if (!map.has(key)) map.set(key, t)
     }
+    return map
+  })
+
+  const targetSeries = timeAxis.map((ts) => {
+    const vals = machineTargets.map((t) => t.get(ts)).filter((v): v is number => v !== undefined)
+    if (vals.length === 0) return null
+    return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
+  })
+
+  // Objetivo NOMINAL = máximo de los objetivos por bucket, no el primero.
+  // Los buckets de arranque/cierre son PARCIALES y el sensor escala el objetivo
+  // al tiempo activo, así que el primero miente: en el turno del 28-jul de la
+  // Baader 200 valía 5 pz/min cuando el objetivo real era 20 (mismo criterio que
+  // `targetCpmFromIntervals` en plantKpiCompute).
+  const expectedRate = targetSeries.reduce<number>((mx, v) => (v != null && v > mx ? v : mx), 0)
+
+  // Tramos con objetivo vigente y producción 0 — buckets contiguos se fusionan
+  // para que el sombreado sea un bloque y no una reja de rayitas.
+  const stoppedWithTarget: [number, number][] = []
+  const BUCKET_SPAN = BUCKET_MS
+  for (let i = 0; i < timeAxis.length; i++) {
+    const ts = timeAxis[i]!
+    const target = targetSeries[i]
+    if (target == null || target <= 0) continue
+    const reales = machineRates.map((r) => r.get(ts)).filter((v): v is number => v !== undefined)
+    if (reales.length === 0 || reales.some((v) => v > 0)) continue
+    const last = stoppedWithTarget[stoppedWithTarget.length - 1]
+    if (last && last[1] >= ts) { last[1] = ts + BUCKET_SPAN }
+    else stoppedWithTarget.push([ts, ts + BUCKET_SPAN])
   }
 
   // Promedio solo tiene sentido cuando ≥2 máquinas tienen datos —
@@ -136,18 +213,89 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     timeAxis,
     series,
     avgSeries: { name: 'Promedio', data: avgData },
+    targetSeries,
     expectedRate,
+    stoppedWithTarget,
     showAvg: machinesWithData >= 2,
   }
 }
 
-export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props) {
+/**
+ * Datos de la serie de BRECHA (lo que faltó para el objetivo en cada tramo).
+ *
+ * Cuando la capa está apagada devuelve la misma cantidad de puntos pero todos en
+ * null, en vez de una serie vacía. Es a propósito: `setOption` de ECharts MERGEA
+ * por defecto, así que sacar una serie del array NO la borra del gráfico — la
+ * capa se prendía y no se podía apagar. Manteniendo la serie con datos vacíos, el
+ * merge sí reemplaza los datos y la capa desaparece de verdad.
+ */
+export function gapSeriesData(
+  axis: number[],
+  real: (number | null)[],
+  target: (number | null)[],
+  showGap: boolean,
+): [number, number | null][] {
+  return axis.map((ts, ti) => {
+    if (!showGap) return [ts, null]
+    const r = real[ti]
+    const t = target[ti]
+    // Sin dato real no hay brecha que mostrar (el tramo no existe), y sin
+    // objetivo tampoco: nadie esperaba producción ahí.
+    if (r == null || t == null || t <= 0) return [ts, null]
+    return [ts, Math.max(0, Math.round((t - r) * 10) / 10)]
+  })
+}
+
+/**
+ * Encoding del gráfico según cuántas máquinas tiene la línea.
+ *
+ * No es preferencia estética: responde a preguntas distintas. Con una máquina
+ * interesa "¿en qué tramos produjo y cuánto le faltó al objetivo?" (barras); con
+ * varias, "¿cuál bajó primero y cuánto se separan?" (líneas).
+ */
+export function rateChartMode(machineCount: number): 'bar' | 'line' {
+  return machineCount <= 1 ? 'bar' : 'line'
+}
+
+/**
+ * Reagrupa una serie de tasas (pz/min) a tramos más anchos.
+ *
+ * Las tasas se PROMEDIAN entre los sub-tramos CON dato, no se divide por el
+ * tramo completo: si de 3 sub-tramos de 5 min solo 1 tiene dato, dividir por 15
+ * afirmaría que en los otros 10 min la máquina produjo cero, cuando lo que pasa
+ * es que no hay dato. Un tramo sin ningún sub-tramo con dato queda null (hueco).
+ */
+export function regroupRates(
+  timeAxis: number[],
+  values: (number | null)[],
+  groupMs: number,
+): { timeAxis: number[]; values: (number | null)[] } {
+  if (timeAxis.length === 0 || groupMs <= 0) return { timeAxis, values }
+  const acc = new Map<number, { sum: number; n: number }>()
+  for (let i = 0; i < timeAxis.length; i++) {
+    const key = Math.floor(timeAxis[i]! / groupMs) * groupMs
+    const v = values[i]
+    const cur = acc.get(key) ?? { sum: 0, n: 0 }
+    if (v != null) { cur.sum += v; cur.n += 1 }
+    acc.set(key, cur)
+  }
+  const keys = [...acc.keys()].sort((a, b) => a - b)
+  return {
+    timeAxis: keys,
+    values: keys.map((k) => {
+      const a = acc.get(k)!
+      return a.n > 0 ? Math.round((a.sum / a.n) * 10) / 10 : null
+    }),
+  }
+}
+
+export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap = false }: Props) {
   const echartsRef = useRef<any>(null)
   const myHoverId  = useId()
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
-  const { timeAxis, series, avgSeries, expectedRate, showAvg } = useMemo(
+  const { timeAxis, series, avgSeries, targetSeries, expectedRate, stoppedWithTarget, showAvg } = useMemo(
     () => buildRateSeries(machines),
     [machines],
   )
@@ -242,20 +390,35 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
   }, [series, expectedRate])
 
   const option = useMemo(() => {
+    // Ancho de barra en px: el tramo real (5 o 15 min) proyectado al eje, con un
+    // mínimo de 2 px para que un tramo aislado siga siendo visible.
+    const mode = rateChartMode(series.length)
+    const rangeMin = (rangeEnd.getTime() - rangeStart.getTime()) / 60_000
+    const bucketMin = bucketMinutesForRange(rangeMin)
+    const barPx = Math.max(2, Math.min(22, Math.round((bucketMin / Math.max(rangeMin, 1)) * 560)))
+
+    // Con rangos largos los tramos de 5 min quedan de 1-2 px: se agrupan a 15.
+    const groupMs = bucketMin * 60_000
+    const regrouped = bucketMin === 5
+      ? { timeAxis, series: series.map(s => s.data), target: targetSeries }
+      : (() => {
+          const first = regroupRates(timeAxis, series[0]?.data ?? [], groupMs)
+          return {
+            timeAxis: first.timeAxis,
+            series: series.map(s => regroupRates(timeAxis, s.data, groupMs).values),
+            target: regroupRates(timeAxis, targetSeries, groupMs).values,
+          }
+        })()
+    const axis = regrouped.timeAxis
+
     const machineSeries = series.map((s, i) => {
       const col = MACHINE_COLORS[i % MACHINE_COLORS.length]!
-      return {
-        name:        s.name,
-        type:        'line' as const,
-        data:        timeAxis.map((ts, ti) => [ts, s.data[ti]] as [number, number | null]),
-        smooth:      0.3,
-        connectNulls: false,
-        symbol:      'circle',
-        symbolSize:  4,
-        lineStyle:   { color: col.line, width: 1.5 },
-        itemStyle:   { color: col.line },
-        areaStyle:   { color: col.area },
-        emphasis:    { lineStyle: { width: 2.5 } },
+      const data = axis.map((ts, ti) => [ts, regrouped.series[i]?.[ti] ?? null] as [number, number | null])
+      // Los tramos SIN dato quedan como hueco (null) en los dos modos: "no hubo
+      // dato" y "produjo cero" son cosas distintas.
+      const comun = {
+        name: s.name,
+        data,
         // Solo en la primera serie (una vez por chart) — mismo tramo resaltado
         // que en los Gantts Baader (StateTimelineEC), vía TimelineSyncContext.
         markArea: i === 0 && highlightRanges.length > 0 ? {
@@ -264,7 +427,87 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
           data: highlightRanges.map((r) => ([{ xAxis: r.startMs }, { xAxis: r.endMs }])),
         } : undefined,
       }
+
+      if (mode === 'line') {
+        return {
+          ...comun,
+          type:        'line' as const,
+          smooth:      0.3,
+          connectNulls: false,
+          symbol:      'circle',
+          symbolSize:  4,
+          lineStyle:   { color: col.line, width: 1.5 },
+          itemStyle:   { color: col.line },
+          areaStyle:   { color: col.area },
+          emphasis:    { lineStyle: { width: 2.5 } },
+        }
+      }
+
+      return {
+        ...comun,
+        type:        'bar' as const,
+        // Stack FIJO: cambiarlo entre undefined y un id según el toggle dejaba al
+        // merge de ECharts con una configuración a medias. Apilar una sola barra
+        // con la brecha vacía se ve idéntico a no apilar.
+        stack:       `pz-${s.name}`,
+        barWidth:    barPx,
+        barGap:      '10%',
+        barCategoryGap: '0%',
+        itemStyle:   { color: col.line, borderRadius: [1, 1, 0, 0] as [number, number, number, number] },
+        emphasis:    { itemStyle: { color: col.line } },
+      }
     })
+
+    // Brecha al objetivo, apilada encima de cada barra: lo que faltó en ese tramo.
+    // Solo con showGap; se calcula por máquina para que apile con su propia barra.
+    // La brecha se apila sobre la barra: en modo línea no tiene dónde apilarse.
+    // La serie existe SIEMPRE en modo barras (ver `gapSeriesData`): con el toggle
+    // apagado va con datos vacíos, no se saca del array.
+    const gapSeries = mode === 'bar'
+      ? series.map((s, i) => ({
+          name:     i === 0 ? GAP_LABEL : `${GAP_LABEL} ${s.name}`,
+          type:     'bar' as const,
+          stack:    `pz-${s.name}`,
+          barWidth: barPx,
+          data:     gapSeriesData(axis, regrouped.series[i] ?? [], regrouped.target, showGap),
+          itemStyle: { color: GAP_COLOR },
+          emphasis:  { itemStyle: { color: GAP_COLOR } },
+          tooltip:   { valueFormatter: (v: number) => `${v} pz/min sin producir` },
+        }))
+      : []
+
+    // Objetivo del sensor: línea punteada violeta, sin área y detrás de todo.
+    // Va como serie propia (no como markLine horizontal) porque el objetivo NO
+    // es constante: el sensor lo escala en los buckets parciales.
+    const targetHasData = regrouped.target.some((v) => v != null && v > 0)
+    const targetS = targetHasData ? {
+      name:        OBJETIVO_LABEL,
+      type:        'line' as const,
+      data:        axis.map((ts, ti) => [ts, regrouped.target[ti]] as [number, number | null]),
+      step:        'end' as const,
+      // El objetivo es una CONSIGNA: no desaparece entre tramos. Sin conectar,
+      // los tramos aislados se dibujaban como rayitas flotantes sueltas.
+      connectNulls: true,
+      symbol:      'none',
+      lineStyle:   { color: TARGET_COLOR, width: 1.4, type: 'dashed' as const },
+      itemStyle:   { color: TARGET_COLOR },
+      z:           0,
+      // Tramos con objetivo corriendo y producción 0: el sombreado dice de un
+      // vistazo que la pérdida fue por máquina parada, no por ritmo lento.
+      markArea: stoppedWithTarget.length > 0 ? {
+        silent: true,
+        itemStyle: {
+          color: 'rgba(176,112,109,0.16)',
+          borderWidth: 1,
+          borderColor: 'rgba(176,112,109,0.45)',
+          borderType: 'dashed' as const,
+        },
+        data: stoppedWithTarget.map(([from, to]) => ([
+          { xAxis: from, name: 'parada con objetivo' },
+          { xAxis: to },
+        ])),
+      } : undefined,
+    } : null
 
     // Promedio: línea punteada sin área fill — queda visualmente detrás de las
     // líneas individuales (que son sólidas con área). Así B1/B2/B3 nunca quedan
@@ -272,7 +515,9 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     const avgS = showAvg ? {
       name:        'Promedio',
       type:        'line' as const,
-      data:        timeAxis.map((ts, ti) => [ts, avgSeries.data[ti]] as [number, number | null]),
+      data:        (bucketMin === 5
+        ? timeAxis.map((ts, ti) => [ts, avgSeries.data[ti]] as [number, number | null])
+        : (() => { const g = regroupRates(timeAxis, avgSeries.data, groupMs); return g.timeAxis.map((ts, ti) => [ts, g.values[ti]] as [number, number | null]) })()),
       smooth:      0.3,
       connectNulls: false,
       symbol:      'diamond',
@@ -290,7 +535,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
           lineStyle: { color: 'rgba(139,92,246,0.6)', type: 'dashed', width: 1 },
           label: {
             show: true,
-            formatter: `${expectedRate.toFixed(0)} pz/m`,
+            formatter: `objetivo ${expectedRate.toFixed(0)} pz/m`,
             color: 'rgba(139,92,246,0.9)',
             fontSize: 9,
             position: 'end',
@@ -301,15 +546,27 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
 
     return {
       backgroundColor: 'transparent',
-      grid:   { left: 0, right: 0, top: 6, bottom: 0, containLabel: true },
+      // `grid.top` DEBE reservar el alto de la leyenda: ECharts no lo hace solo.
+      // Con `top: 6` la leyenda quedaba dibujada ENCIMA del área del gráfico y
+      // las líneas pasaban por detrás de "Baader 1 / Baader 2 / …", que se leían
+      // tachadas. 22 px = alto de la leyenda (9 px de texto + ítem) + aire.
+      grid:   { left: 0, right: 0, top: 22, bottom: 0, containLabel: true },
       legend: {
         show: true,
         top: 0,
         right: 0,
-        textStyle: { color: '#64748b', fontSize: 9 },
+        // Texto más grande y opaco que el resto del chrome: es la clave de
+        // lectura del gráfico, no una etiqueta secundaria.
+        textStyle: { color: LEGEND_TEXT_COLOR, fontSize: 10 },
         itemWidth: 12,
         itemHeight: 8,
-        data: [...series.map(s => s.name), ...(showAvg ? ['Promedio'] : [])],
+        itemGap: 12,
+        data: [
+          ...series.map(s => s.name),
+          ...(showAvg ? ['Promedio'] : []),
+          ...(targetHasData ? [OBJETIVO_LABEL] : []),
+          ...(showGap && mode === 'bar' && gapSeries.length > 0 ? [GAP_LABEL] : []),
+        ],
       },
       xAxis: {
         type: 'time' as const,
@@ -368,9 +625,15 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         zoomOnMouseWheel: 'ctrl',
         moveOnMouseWheel: false,
       }] : [],
-      series: avgS ? [...machineSeries, avgS] : machineSeries,
+      // El objetivo va PRIMERO para quedar detrás de las líneas reales.
+      series: [
+        ...(targetS ? [targetS] : []),
+        ...machineSeries,
+        ...gapSeries,
+        ...(avgS ? [avgS] : []),
+      ],
     }
-  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges, showGap])
 
   if (timeAxis.length < 2) return null
 
@@ -378,7 +641,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     <ReactECharts
       ref={echartsRef}
       option={option}
-      style={{ height: 120, width: '100%' }}
+      // 142 y no 120: la leyenda pasó a ocupar sus 22 px propios en vez de
+      // solaparse con el plot, así que se le devuelven al gráfico. Sin esto el
+      // área de datos quedaba en ~98 px y las curvas se aplastaban.
+      style={{ height: 142, width: '100%' }}
       onChartReady={onChartReady}
       onEvents={{
         mousemove: onMouseMove,

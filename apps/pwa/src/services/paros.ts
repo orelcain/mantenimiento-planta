@@ -37,8 +37,68 @@ function mapParo(id: string, data: Record<string, unknown>): ParoEtapa {
     fecha: toDate(data.fecha),
     tecnico: data.tecnico as string | undefined,
     shiftId: data.shiftId as string | undefined,
+    origen: (data.origen as ParoEtapa['origen']) ?? 'manual',
+    stopKey: data.stopKey as string | undefined,
+    machineid: data.machineid as string | undefined,
+    categoria: data.categoria as ParoEtapa['categoria'],
     createdAt: toDate(data.createdAt),
   }
+}
+
+/**
+ * Id determinístico de un paro detectado por el sensor. Sirve de doc id, así
+ * que re-anotar el mismo paro SOBREESCRIBE en vez de duplicar.
+ * Firestore no acepta '/' en un doc id; los espacios del shiftId se normalizan.
+ */
+export function sensorStopKey(args: {
+  plantSlug: string
+  dateKey: string
+  shiftId: string
+  machineid: string
+  startAt: Date
+}): string {
+  const shift = args.shiftId.replace(/[^\w-]+/g, '-')
+  return `slx__${args.plantSlug}__${args.dateKey}__${shift}__${args.machineid}__${args.startAt.getTime()}`
+}
+
+/**
+ * Anota la CAUSA de un paro que el sensor ya midió.
+ *
+ * Se guarda en `paros` (misma colección que los paros de etapa manuales) con
+ * `origen: 'shoplogix'`, porque el objeto es el mismo: un paro con su causa.
+ * Lo que cambia es quién lo midió — y ese flag es lo que evita que el OEE de
+ * área vuelva a descontar minutos que la Disponibilidad del sensor ya descontó.
+ */
+export async function annotateSensorStop(args: {
+  plantLineId: string
+  plantSlug: string
+  dateKey: string
+  shiftId: string
+  machineid: string
+  machineName: string
+  startAt: Date
+  durationMin: number
+  causa: string
+  categoria: NonNullable<ParoEtapa['categoria']>
+  tecnico?: string
+}): Promise<string> {
+  const stopKey = sensorStopKey(args)
+  const payload: Record<string, unknown> = {
+    plantLineId: args.plantLineId,
+    etapa: args.machineName,
+    duracionMin: args.durationMin,
+    causa: args.causa,
+    categoria: args.categoria,
+    fecha: Timestamp.fromDate(args.startAt),
+    shiftId: args.shiftId,
+    origen: 'shoplogix',
+    stopKey,
+    machineid: args.machineid,
+    createdAt: serverTimestamp(),
+  }
+  if (args.tecnico) payload.tecnico = args.tecnico
+  await setDoc(doc(db, COLLECTION, stopKey), payload)
+  return stopKey
 }
 
 // Paros de una línea/área (where simple sobre plantLineId → índice de campo único auto).

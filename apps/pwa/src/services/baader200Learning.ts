@@ -14,6 +14,10 @@ import {
 } from '@/services/firestoreTracked'
 import { db } from './firebase'
 
+// ⚠ Este archivo es SOLO FALLBACK: la Baader 200 lee su contenido de la colección Firestore
+// `baader200-sections`. Corregir acá NO cambia lo que se ve en pantalla — hay que escribir a
+// Firestore (ver `scripts/fix-b200-medios-auditoria.js`). Se mantiene sincronizado igual para
+// que el fallback no contradiga a producción si alguna vez se usa.
 const SECTIONS_COL = 'baader200-sections'
 const CONFIG_COL   = 'baader200-config'
 const HISTORY_COL  = 'baader200-history'
@@ -186,7 +190,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       { text: 'La presión del resorte se ajusta con la tuerca Fig 6.' },
     ],
     measurements: [
-      { name: 'Distancia referencia catálogo', value: '32-28', unit: 'mm', note: 'En la práctica generalmente es menos' },
+      { name: 'Distancia referencia catálogo', value: '32', unit: 'mm', note: 'El rango “32-28” no existe en ninguna fuente: son dos cotas distintas. V4 del fabricante: 32 mm entre chapaletas a la ENTRADA (tornillo de tope pos. 3, pág 2) y 26 mm en la ZONA DE SALIDA (biela de mando pos. 5, con el rodillo en el punto más alto de la leva, pág 6).' },
     ],
     notes: [
       'No ajustar siempre a la medida del catálogo — usar la medida que corresponda a las condiciones reales.',
@@ -249,7 +253,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     type: 'ajuste',
     description: 'Ajuste y calibración de los cuchillos ventrales usando cruz patrón y medida de referencia.',
     steps: [
-      { text: 'Ajustar la medida "a" de 5mm de avance de los cuchillos ventrales.' },
+      { text: 'Ajustar la medida "a" de 5mm de ABERTURA ENTRE los cuchillos ventrales, con los bujes apretadores pos 8-9 (5 mm salmón · 4 mm trucha · 7 mm pescado blanco, V4 del fabricante págs 9-10). No es un “avance”: es la distancia entre ambos cuchillos.' },
       { text: 'Tomar medida de referencia de 177.5mm a la cara interna del cuchillo izquierdo (con medida patrón o reglilla).' },
       { text: 'Colocar cruz patrón para la regulación y calibración del cuchillo. Realizar con cobos de sujeción pos 8-9 derecho.' },
       { text: 'Avanzar la silleta hasta que quede en el centro de los cuchillos ventrales.' },
@@ -257,7 +261,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       { text: 'Los pernos de fijación pos 1-2 solo se mueven en etapa de mantención anual para el alineamiento de los cuchillos entre sí.', important: true },
     ],
     measurements: [
-      { name: 'Avance cuchillos ventrales "a"', value: '5', unit: 'mm' },
+      { name: 'Abertura entre cuchillos ventrales "a"', value: '5', unit: 'mm', note: 'Distancia ENTRE ambos cuchillos ventrales (bujes apretadores pos 8-9), no un “avance” — la palabra vino de una errata del manual de planta (“5 m/m de aventura”). V4 del fabricante págs 9-10: 5 mm salmón, trucha asalmonada, salmón japonés, bacalao japonés, perca y yellowtail · 4 mm trucha · 7 mm abadejo de Alaska, bacalao del pacífico, colín y añón.' },
       { name: 'Referencia cara interna cuchillo izquierdo', value: '177.5', unit: 'mm' },
     ],
     notes: [
@@ -274,12 +278,12 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     steps: [
       { text: 'Realizar este ajuste SIEMPRE después del ajuste de cuchillos ventrales.', important: true },
       { text: 'Las guías flotantes deben solapar los cuchillos ventrales en la cara interior.' },
-      { text: 'La abertura de las guías flotantes no debe ser más de 4.8mm. Ajustar con pernos parker M6 (dos de cada lado en los soportes de los cojinetes).' },
+      { text: 'La abertura de las guías flotantes (cota “e”) es 4.8mm según el manual de planta; el V4 del fabricante la da POR ESPECIE (pág 23): 6,5 mm salmón · 4,8 mm trucha · 8 mm pescado blanco. Ajustar con pernos parker M6 (dos de cada lado en los soportes de los cojinetes).' },
       { text: 'Regular la altura: 5mm por debajo de las guías de la 2da alimentación.' },
       { text: 'Todos estos ajustes deben realizarse con la silleta en posición de reposo de la máquina.', important: true },
     ],
     measurements: [
-      { name: 'Abertura máxima guías flotantes', value: '4.8', unit: 'mm' },
+      { name: 'Abertura guías flotantes “e”', value: '4.8', unit: 'mm', note: 'Valor de planta, sin distinguir especie. V4 del fabricante pág 23: 6,5 mm salmón · 4,8 mm trucha · 8 mm pescado blanco — el 4,8 coincide con la columna TRUCHA, no con salmón. Exige además 0,5-1,0 mm entre la parte delantera de las chapas guía y las cuchillas dorsales.' },
       { name: 'Altura vs guías 2da alimentación', value: '5', unit: 'mm', note: 'Por debajo' },
     ],
     notes: [
@@ -293,17 +297,20 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     title: 'Cuchillos Dorsales',
     order: 6,
     type: 'ajuste',
-    description: 'Ajuste de la distancia de abertura de los cuchillos dorsales usando cruz patrón.',
+    description: 'Ajuste de la distancia de abertura "b" de los cuchillos dorsales usando cruz patrón. La abertura "b" DEPENDE DE LA ESPECIE.',
     steps: [
       { text: 'Colocar la máquina en posición de reposo.' },
       { text: 'Colocar una cruz patrón entre los cuchillos ventrales para alineamiento entre ventrales y dorsales.' },
-      { text: 'Ajustar la distancia de abertura "b" con los cubos sujetadores pos 3.' },
+      { text: 'Ajustar la distancia de abertura "b" con los cubos sujetadores pos 3, al valor que corresponda a la especie que se está procesando.', important: true },
     ],
     measurements: [
-      { name: 'Distancia entre ventrales y dorsales', value: '12', unit: 'mm' },
+      { name: 'Abertura "b" — salmón', value: '5', unit: 'mm', note: 'Con los cubos sujetadores pos 3' },
+      { name: 'Abertura "b" — trucha', value: '4', unit: 'mm', note: 'Con los cubos sujetadores pos 3' },
+      { name: 'Abertura "b" — pescado blanco', value: '7', unit: 'mm', note: 'Con los cubos sujetadores pos 3' },
     ],
     notes: [
       'La cruz patrón asegura que los cuchillos ventrales y dorsales queden exactamente alineados entre sí.',
+      'NO CONFUNDIR con los 12 mm: esa es la separación entre cuchillos ventrales y dorsales, se ajusta con los pernos topes pos 4-5 y vive en la sección "Medidas de Cuchillos". Son dos cotas y dos ajustadores distintos.',
     ],
     images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-09.jpg', caption: 'Cuchillos dorsales — Abertura y alineamiento' }],
   },
@@ -333,14 +340,14 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     type: 'ajuste',
     description: 'Ajuste del levante de los cuchillos dorsales al paso de la silleta.',
     steps: [
-      { text: 'Los cuchillos dorsales deben levantar 20mm al paso de la silleta.' },
-      { text: 'Esta altura la da la palanca del trinquete. Ajustar con pernos pos 11 de manera que quede a 12mm de la entalla.' },
+      { text: 'Control: la distancia entre las cuchillas ventrales y las dorsales es de 20 mm, medida con el rodillo en el punto más alto de la leva y el trinquete en la 4ª entalla. No es una carrera de levante de 20 mm.' },
+      { text: 'Esta altura la da la palanca del trinquete. Tras soltar los tornillos pos 11, ajustar la distancia de 12 mm entre el TRINQUETE (pos 12) y el FIADOR (pos 13) — no “a 12 mm de la entalla”. Hacerlo con la silleta desplazada a 940 mm y el trinquete levantado a la 4ª entalla desde la izquierda.' },
       { text: 'Si no se produce el levantamiento, verificar primero la posición del trinquete.', important: true },
       { text: 'Posterior a eso verificar el bulón con gollete del mando dorsales en el conjunto del carter de las levas.' },
     ],
     measurements: [
-      { name: 'Levante de cuchillos dorsales al paso silleta', value: '20', unit: 'mm' },
-      { name: 'Distancia pernos pos 11 a la entalla', value: '12', unit: 'mm' },
+      { name: 'Levante de cuchillos dorsales al paso silleta', value: '20', unit: 'mm', note: '⚠ MAL ATRIBUIDO. No es una carrera de levante: según el V4 del fabricante pág 19, los 20 mm son una distancia de CONTROL entre las cuchillas ventrales y las dorsales, válida solo con el rodillo en el punto más alto de la leva y el trinquete en la 4ª entalla del fiador.' },
+      { name: 'Distancia trinquete-fiador (tornillos pos 11)', value: '12', unit: 'mm', note: '⚠ MAL ATRIBUIDO antes como “pernos pos 11 a la entalla”. V4 del fabricante pág 17: son 12 mm entre el TRINQUETE (dib. 23, pos. 12) y el FIADOR (pos. 13), ajustables tras soltar los tornillos pos. 11. Condiciones del ajuste (pág 18): silleta a 940 mm y trinquete levantado a la 4ª entalla desde la izquierda.' },
     ],
     notes: [
       'Si no hay levantamiento: 1ro verificar trinquete, 2do verificar bulón con gollete en carter de levas.',
@@ -387,14 +394,14 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { text: 'La separación entre cuchillos debe ser 8mm.' },
       { text: 'Regular la altura de trabajo con la biela de mando Fig A pos 2, con la silleta en medio de los cuchillos.' },
       { text: 'Si uno está más alto o bajo que el otro, regular con las bielas de mando de cada cuchillo individualmente.' },
-      { text: 'Fijar pernos topes de seguridad a 0.5mm y reapretar.' },
+      { text: 'Fijar pernos topes de seguridad a 0.5mm y reapretar. (V4 del fabricante pág 27: los tornillos de tope superiores pos. 5 van a 0,3 mm del tope pos. 6.)' },
       { text: 'Cuchillos más altos de lo normal → gay ping en el filete a lo largo del esquelon.', important: true },
       { text: 'Cuchillos más bajos → corta la espina del flanco y los cuchillos rascadores no cumplen función.', important: true },
     ],
     measurements: [
       { name: 'Caída antes de llegada silleta', value: '7', unit: 'mm' },
       { name: 'Altura mínima vs ranura guía espinas inferiores', value: '1', unit: 'mm' },
-      { name: 'Distancia punta diente vs cuchilla (altura trabajo)', value: '3-4', unit: 'mm' },
+      { name: 'Distancia punta diente vs cuchilla (altura trabajo)', value: '3-4', unit: 'mm', note: 'Valor de planta. V4 del fabricante pág 28: al pasar una silleta por las cuchillas de punta, la distancia al talón o al flanco del PRIMER diente es 1-1,5 mm, y a los OTROS dientes 0,5-1 mm; la distancia entre ambas cuchillas de punta es 8 mm. No es cosmético: punzones altos producen gay ping y bajos cortan la espina del flanco.' },
       { name: 'Separación entre cuchillos', value: '8', unit: 'mm' },
       { name: 'Topes de seguridad', value: '0.5', unit: 'mm' },
     ],
@@ -416,7 +423,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { text: 'Ajustar con los topes de seguridad de los rodillos de cada leva. Solo se puede realizar en esa posición.' },
     ],
     measurements: [
-      { name: 'Posición silleta para ajuste', value: '1350', unit: 'mm', note: 'Aprox.' },
+      { name: 'Posición silleta para ajuste', value: '1350', unit: 'mm', note: 'Aprox. Criterio de planta: ninguna otra fuente lo respalda y no encaja con la escala de posiciones del fabricante (895/900/940/50/30/10 mm). Para rascadores el V4 del fabricante pág 33 no da cota sino criterio: desplazar las silletas hasta que una quede con los dientes de transporte entre las puntas de las cuchillas rascadoras.' },
     ],
     notes: [
       'Este ajuste SOLO se puede realizar con la silleta en posición 1350mm.',
@@ -436,8 +443,8 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { text: 'Como referencia para la abertura: tomar la abertura de las guías superiores de espinas entre el contradiente y el primer diente.' },
     ],
     measurements: [
-      { name: 'Altura de trabajo vs base del diente', value: '3', unit: 'mm' },
-      { name: 'Abertura cuchillos rascadores', value: '17-18', unit: 'mm' },
+      { name: 'Altura de trabajo vs base del diente', value: '3', unit: 'mm', note: '⚠ SENTIDO INVERTIDO ENTRE FUENTES. Planta: 3 mm SOBRE la base del diente. El V4 del fabricante da las dos cotas de altura del rascador POR DEBAJO de su referencia: filo cortante a 1,5 mm aprox. por debajo del contradiente de la silleta (pág 34, biela de mando pos. 5 preajustada a 145 mm) y punta a 3 mm por debajo de la guía de silletas (pág 39, tornillo de tope pos. 11). Definir contra qué referencia se mide antes de ajustar.' },
+      { name: 'Abertura cuchillos rascadores “g”', value: '17-18', unit: 'mm', note: 'Valor de planta, sin distinguir especie. V4 del fabricante pág 37, cota “g” entre los filos: 14 mm salmón, salmón japonés, perca y trucha asalmonada · 18 mm yellowtail, máquina combinada yellowtail/perca y salmón de Noruega · 22 mm bacalao japonés. Para salmón el OEM pide 14 mm.' },
     ],
     notes: [],
     images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-16.jpg', caption: 'Altura de trabajo cuchillos rascadores' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-17.jpg', caption: 'Abertura cuchillos rascadores' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-18.jpg', caption: 'Principio de corte cuchillos rascadores' }],
@@ -499,10 +506,10 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { text: '2. Parada de emergencia.', important: true },
       { text: '3. Límite de carrera corte de cola.', important: true },
       { text: '4. Sensor de seguridad guía dorsal.', important: true },
-      { text: '5. Sensor de seguridad pasillo (zona 5).', important: true },
-      { text: '6. Sensor de seguridad pasillo (zona 6).', important: true },
-      { text: '7. Sensor de seguridad pasillo (zona 7).', important: true },
-      { text: '8. Sensor de seguridad pasillo (zona 8).', important: true },
+      { text: '5. Sensor de seguridad de pasillo (uno de los cuatro; el manual no asigna zona por número).', important: true },
+      { text: '6. Sensor de seguridad de pasillo.', important: true },
+      { text: '7. Sensor de seguridad de pasillo.', important: true },
+      { text: '8. Sensor de seguridad de pasillo.', important: true },
       { text: '9. Interruptor principal.', important: true },
     ],
     measurements: [],
@@ -592,7 +599,10 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     type: 'troubleshooting',
     description: 'Ajuste normal y rápido para Trim D y Trim E según condición de la materia prima.',
     steps: [
-      { text: 'Realizar ajuste normal para condición estándar de materia prima.' },
+      { text: 'Las páginas 28 y 29 del manual de planta son LÁMINAS: traen el despiece y las cotas, pero ninguna línea de texto que describa el procedimiento. Los pasos que figuraban antes acá no salían de ninguna fuente y se retiraron.' },
+      { text: 'Cotas que SÍ muestra la lámina de Trim D (pág 28), leídas del dibujo: una configuración con 1 mm y 5 mm, y otra con 0-2,5 mm y 0-1 mm. La lámina no rotula cuál corresponde al ajuste normal y cuál al rápido.' },
+      { text: 'Cotas de la lámina de Trim E (pág 29): una configuración con 1 mm y 2 mm, y otra con 2 mm y 5 mm. Mismo caso: sin rótulo de cuál es cuál.' },
+      { text: 'El “ajuste rápido” que SÍ está documentado en el V4 del fabricante (págs 41-42) es otra cosa: la palanca del ajuste rápido de la contrabancada de corte, con su medida de 70 mm y tuerca de seguridad M10.', important: true },
       { text: 'Para ajuste rápido: adaptar según condición específica de la materia prima en el momento.' },
     ],
     measurements: [],
@@ -613,15 +623,16 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
       { text: 'Verificar separación entre cuchillos ventrales y dorsales: máximo 12mm.' },
       { text: 'Verificar presión de resortes de guías flotantes, o si alguno está quebrado.' },
       { text: 'Verificar accionamiento de la leva del mando dorsal: que no esté levantando antes de lo normal.' },
-      { text: 'Para el caso de aleta anal: agregar abertura de la guía flotante en relación a los cuchillos ventrales como referencia 4.8mm + 30.' },
+      { text: 'Para el caso de aleta anal: agregar abertura de la guía flotante en relación a los cuchillos ventrales, como referencia 4,8 mm aprox. (±).' },
     ],
     measurements: [
       { name: 'Diámetro cuchillos ventrales (objetivo)', value: '~200', unit: 'mm' },
       { name: 'Separación ventrales vs dorsales (máximo)', value: '12', unit: 'mm' },
-      { name: 'Referencia abertura guía flotante (aleta anal)', value: '4.8+30', unit: 'mm' },
+      { name: 'Referencia abertura guía flotante (aleta anal)', value: '4.8', unit: 'mm', note: 'Aprox. (±). Es el MÁXIMO de la guía flotante, no sumar nada.' },
     ],
     notes: [
       'Los cuchillos ventrales de mayor diámetro deben estar instalados (más cercano a 200mm).',
+      'La abertura de las guías flotantes NUNCA debe pasar de 4,8 mm: es el máximo del manual y no se le suma ningún valor.',
     ],
     images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-30.jpg', caption: 'Gay ping zona cola / aleta anal' }],
   },

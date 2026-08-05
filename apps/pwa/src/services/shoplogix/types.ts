@@ -22,6 +22,17 @@ export interface ShoplogixProductionInterval {
   total: number;               // acumulado real
   expectedTotal: number;       // acumulado esperado
   totalDuration: number;       // ms (300000 = 5 min)
+  /** Inicio del intervalo ("20260728T120000.000"). Lo manda la API real. */
+  start?: ShoplogixTimestamp;
+  /** Turno al que Shoplogix atribuye el intervalo ("Turno Dia", "Unscheduled"). */
+  shift?: string;
+  /** Cadencia OBJETIVO del intervalo en pz/min (NO la real). No viene en todos. */
+  rate?: number;
+  /** Piezas dentro del uptime / dentro del turno programado. Opcionales igual que `rate`. */
+  uptimeCycles?: number;
+  scheduledCycles?: number;
+  /** Rechazo por causa. Nunca observado poblado — ver aggregateScrapReasons en el sync. */
+  scrapReasons?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -108,7 +119,7 @@ export interface ShoplogixSummaryResponse {
 export interface UpstreamMachineInfo {
   machineid: string;           // UUID Shoplogix
   name: string;                // "Evisceradora 1"
-  type: 'baader_142' | 'marel_hg' | 'knuro' | 'other';
+  type: 'baader_142' | 'baader_200' | 'marel_hg' | 'knuro' | 'other';
   role: 'upstream' | 'inline';
   order: number;               // orden en pipeline: Marel(0) → B1,2,3(1) → Grader(2)
 }
@@ -123,6 +134,15 @@ export interface UpstreamProductionInterval {
   expectedTotal: number;
   ratio: number;               // cycles / expectedCycles (0..1+)
   color: 'green' | 'yellow' | 'red' | 'gray';  // según threshold
+  /**
+   * Cadencia OBJETIVO del intervalo en pz/min según Shoplogix.
+   *
+   * ⚠ NO es la velocidad real: esa se deriva de `cycles`. Verificado con el
+   * turno del 28-jul de la Baader 200 (`expectedCycles = targetRate × 5 min`,
+   * e intervalos con targetRate 20 y cycles 0). null en docs con
+   * sourceVersion < 4 o cuando el sensor no lo reporta.
+   */
+  targetRate: number | null;
 }
 
 /** Estado/paro en timeline Gantt. */
@@ -194,6 +214,21 @@ export interface UpstreamMachineShift {
   expectedRuntime: number;
   runtimeVariance: number;
   /**
+   * Piezas contadas por el sensor DENTRO del uptime y DENTRO del turno
+   * programado. Permiten un Rendimiento honesto (contra el tiempo que la
+   * máquina realmente corrió vs contra el turno completo). 0 en docs con
+   * sourceVersion < 4.
+   */
+  uptimeCycles?: number;
+  scheduledCycles?: number;
+  /**
+   * Rechazo reportado por el sensor, agregado por causa. En Filete es la única
+   * fuente posible de CALIDAD (no hay Grader). Lista vacía = sin rechazo
+   * reportado; ⚠ nunca se ha visto poblado, validar con un turno real.
+   */
+  scrapByReason?: Array<{ reason: string; qty: number }>;
+  scrapTotal?: number;
+  /**
    * % del turno en estado Uptime, calculado por nosotros desde los states:
    *   Σ duración(state.type === 'uptime') / (shiftEnd − shiftStart)
    * Es el número que tiene sentido para operadores ("la máquina produjo X%
@@ -255,6 +290,16 @@ export interface UpstreamLineSnapshot {
   // KPIs de la línea (suma/promedio de las 3)
   lineThroughputActual: number;     // cycles/hora promedio
   lineThroughputExpected: number;
+  /**
+   * Horas usadas como denominador del throughput y de dónde salen:
+   *   'effective' = de la primera a la última pieza (ventana real de operación)
+   *   'shift'     = la ventana del turno (fallback si no hubo producción)
+   * Importa cuando el turno no está acotado en Shoplogix: en Filete el turno
+   * "Turno Dia" abarca 24 h, así que dividir por la ventana del turno daba
+   * 2 pz/h para un turno que realmente corrió 6,25 h.
+   */
+  lineWindowHours: number;
+  lineWindowSource: 'effective' | 'shift';
   lineAvailability: number;         // promedio actualRuntime (0..1)
   machinesProducing: number;        // cuántas de las 3 están actualmente en Uptime
 }

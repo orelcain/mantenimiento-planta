@@ -22,7 +22,7 @@ const admin = require('firebase-admin')
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
-const VALID_PLANTS = ['yal', 'chonchi']
+const VALID_PLANTS = ['yal', 'chonchi', 'filete']
 const plantSlug = process.argv[2]
 if (!VALID_PLANTS.includes(plantSlug)) {
   console.error(`Uso: node scripts/validate-plant-integration.js <${VALID_PLANTS.join('|')}> [YYYY-MM-DD]`)

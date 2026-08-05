@@ -70,15 +70,6 @@ export interface MissionLog {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// KEYS DE PROVIDERS (solo se usan si Cloud Functions no están disponibles)
-// SECURITY: las keys no se envían al browser en producción si VITE_*
-// no están configuradas. Preferir siempre Cloud Functions.
-// ═══════════════════════════════════════════════════════════════════════
-
-const GROQ_API_KEY = ''   // BLOQUEADO: usar Cloud Function groqProxy
-const DEEPSEEK_API_KEY = '' // BLOQUEADO: usar Cloud Function deepseekProxy
-
-// ═══════════════════════════════════════════════════════════════════════
 // REGISTRO DE AGENTES
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -249,146 +240,8 @@ export function recordAgentUsage(id: string, tokens: number) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// LLAMADAS GENÉRICAS POR PROVIDER (formato OpenAI-compatible)
-// ═══════════════════════════════════════════════════════════════════════
-
-function parseRetryAfter(response: Response): number {
-  const header = response.headers.get('Retry-After') || response.headers.get('retry-after')
-  if (!header) return 60_000
-  const secs = Number(header)
-  if (!isNaN(secs)) return Math.max(secs * 1000, 5_000)
-  return 60_000
-}
-
-/**
- * Llamada OpenAI-compatible (Groq, DeepSeek, etc.)
- */
-async function callOpenAICompatible(
-  apiUrl: string,
-  apiKey: string,
-  model: string,
-  messages: Array<{ role: string; content: string }>,
-  opts: { temperature?: number; max_tokens?: number },
-  providerName: string,
-): Promise<{ content: string; tokens: number }> {
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.max_tokens || 2048,
-    }),
-  })
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), providerName)
-    }
-    if (response.status === 402) {
-      throw new Error(`${providerName} sin saldo: 402 Payment Required. Recarga tu cuenta de ${providerName}.`)
-    }
-    const errText = await response.text().catch(() => '')
-    throw new Error(`${providerName} API error: ${response.status} ${errText.slice(0, 200)}`)
-  }
-
-  const data = await response.json()
-  return {
-    content: data.choices?.[0]?.message?.content || '',
-    tokens: data.usage?.total_tokens || 0,
-  }
-}
-
-/**
- * Streaming OpenAI-compatible (Groq, DeepSeek)
- */
-async function streamOpenAICompatible(
-  apiUrl: string,
-  apiKey: string,
-  model: string,
-  messages: Array<{ role: string; content: string }>,
-  onChunk: (text: string) => void,
-  opts: { temperature?: number; max_tokens?: number },
-  providerName: string,
-): Promise<{ content: string; tokens: number }> {
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.max_tokens || 2048,
-      stream: true,
-    }),
-  })
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), providerName)
-    }
-    if (response.status === 402) {
-      throw new Error(`${providerName} sin saldo: 402 Payment Required. Recarga tu cuenta de ${providerName}.`)
-    }
-    throw new Error(`${providerName} stream error: ${response.status}`)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No readable stream')
-
-  const decoder = new TextDecoder()
-  let fullContent = ''
-  let buffer = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed === 'data: [DONE]') continue
-      if (!trimmed.startsWith('data: ')) continue
-      try {
-        const json = JSON.parse(trimmed.slice(6))
-        // DeepSeek R1 devuelve reasoning_content + content
-        const delta = json.choices?.[0]?.delta?.content
-        if (delta) {
-          fullContent += delta
-          onChunk(fullContent)
-        }
-      } catch { /* skip */ }
-    }
-  }
-  return { content: fullContent, tokens: 0 }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 // CALL AGENT — Función unificada para llamar a cualquier agente
 // ═══════════════════════════════════════════════════════════════════════
-
-const PROVIDER_URLS: Record<string, string> = {
-  groq: 'https://api.groq.com/openai/v1/chat/completions',
-  deepseek: 'https://api.deepseek.com/chat/completions',
-}
-
-const PROVIDER_KEYS: Record<string, string> = {
-  groq: GROQ_API_KEY,
-  deepseek: DEEPSEEK_API_KEY,
-}
-
-/** Permite actualizar keys en runtime (desde config Firestore) */
-export function updateProviderKey(provider: string, key: string) {
-  if (key) PROVIDER_KEYS[provider] = key
-}
 
 /**
  * Algunos modelos de razonamiento (ej. Qwen 3.6) devuelven su "pensamiento"
@@ -438,11 +291,7 @@ export async function callAgent(
       const data = cfResult.data as { content: string; tokens?: number }
       result = { content: stripThinkTags(data.content || ''), tokens: data.tokens || 0 }
     } else {
-      const url = PROVIDER_URLS[agent.provider]
-      const key = PROVIDER_KEYS[agent.provider]
-      if (!url || !key) throw new Error(`Provider ${agent.provider} no configurado`)
-      result = await callOpenAICompatible(url, key, agent.model, messages, opts, agent.name)
-      result = { ...result, content: stripThinkTags(result.content) }
+      throw new Error(`Provider ${agent.provider} no soportado`)
     }
 
     recordAgentUsage(agentId, result.tokens)
@@ -500,10 +349,7 @@ export async function callAgentStream(
       onChunk(proxyResult.content)
       return proxyResult
     } else {
-      const url = PROVIDER_URLS[agent.provider]
-      const key = PROVIDER_KEYS[agent.provider]
-      if (!url || !key) throw new Error(`Provider ${agent.provider} sin key`)
-      result = await streamOpenAICompatible(url, key, agent.model, messages, onChunk, opts, agent.name)
+      throw new Error(`Provider ${agent.provider} no soportado`)
     }
 
     recordAgentUsage(agentId, result.tokens)
@@ -638,8 +484,6 @@ export interface AgentsConfig {
   disabledAgents: string[]
   /** Prioridades custom: agentId → priority override */
   priorityOverrides: Record<string, number>
-  /** API keys guardadas por admin (provider → key) — para deploys sin env vars */
-  providerKeys?: Record<string, string>
   updatedAt?: unknown
   updatedBy?: string
 }
@@ -680,15 +524,6 @@ export async function saveAgentsConfig(config: AgentsConfig, userId: string) {
 }
 
 function applyAgentsConfig(config: AgentsConfig) {
-  // Aplicar API keys guardadas en Firestore (overrides env vars vacías)
-  if (config.providerKeys) {
-    for (const [provider, key] of Object.entries(config.providerKeys)) {
-      if (key) {
-        PROVIDER_KEYS[provider] = key
-      }
-    }
-  }
-
   for (const agent of agents.values()) {
     // Check disabled — las keys reales viven siempre en el servidor (Cloud
     // Functions secrets), así que la única fuente de verdad para "disabled"

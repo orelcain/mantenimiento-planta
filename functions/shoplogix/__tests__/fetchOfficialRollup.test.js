@@ -72,3 +72,46 @@ test('sin jobs[] en la respuesta, currentJob queda null (no revienta)', async ()
   assert.strictEqual(result.currentJob, null)
   assert.strictEqual(result.shiftLabel, 'Turno 3')
 })
+
+// ── isOfficialScheduleSane — guarda contra plantillas del rollup con fechas de otro día ──
+const { isOfficialScheduleSane } = require('../sync')
+const D = (s) => new Date(s)
+
+test('sane: horario oficial coincide con la ventana derivada', () => {
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: D('2026-07-22T14:45:00Z'), officialEnd: D('2026-07-23T00:00:00Z'),
+    scheduledStart: D('2026-07-22T14:45:00Z'), scheduledEnd: D('2026-07-23T00:00:00Z'),
+  }), true)
+})
+
+test('sane: tolera drift razonable (turno cortado 2h antes / hora extra)', () => {
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: D('2026-07-22T09:00:00Z'), officialEnd: D('2026-07-22T17:15:00Z'),
+    scheduledStart: D('2026-07-22T09:05:00Z'), scheduledEnd: D('2026-07-22T15:10:00Z'),
+  }), true)
+})
+
+test('corrupto: end saltó a otra semana (caso real chonchi 22-07 → 01-08)', () => {
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: D('2026-07-22T21:30:00Z'), officialEnd: D('2026-08-01T05:45:00Z'),
+    scheduledStart: D('2026-07-22T21:30:00Z'), scheduledEnd: D('2026-07-23T05:45:00Z'),
+  }), false)
+})
+
+test('corrupto: end corrido +1 día (caso real chonchi 16-07)', () => {
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: D('2026-07-16T09:00:00Z'), officialEnd: D('2026-07-17T17:15:00Z'),
+    scheduledStart: D('2026-07-16T09:00:00Z'), scheduledEnd: D('2026-07-16T17:15:00Z'),
+  }), false)
+})
+
+test('corrupto: fechas inválidas o end <= start', () => {
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: new Date('x'), officialEnd: D('2026-07-16T17:15:00Z'),
+    scheduledStart: D('2026-07-16T09:00:00Z'), scheduledEnd: D('2026-07-16T17:15:00Z'),
+  }), false)
+  assert.strictEqual(isOfficialScheduleSane({
+    officialStart: D('2026-07-16T17:15:00Z'), officialEnd: D('2026-07-16T09:00:00Z'),
+    scheduledStart: D('2026-07-16T09:00:00Z'), scheduledEnd: D('2026-07-16T17:15:00Z'),
+  }), false)
+})

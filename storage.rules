@@ -1,6 +1,12 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Rol del usuario (cross-service: lee el doc de Firestore del caller).
+    // Solo se usa donde el path es explícitamente admin-only (ver /maps/).
+    function isAdmin() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol == 'admin';
+    }
     // Lectura SOLO autenticados NO anónimos (la Mini App de Telegram usa
     // custom token de mintTelegramAuthToken; anónimos cerrados 2026-07-05).
     // Excepciones públicas deliberadas más abajo: models3d, baader200-images.
@@ -78,9 +84,12 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
     
-    // Planos de planta (solo admin) - subcarpetas por ubicación
+    // Planos de planta (solo admin) - subcarpetas por ubicación.
+    // El comentario ya decía "solo admin" pero la regla no lo exigía (cualquier
+    // autenticado podía escribir) — corregido para que coincida con el intent:
+    // solo MapsAdminPage.tsx (ruta /admin) sube acá.
     match /maps/{locationId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if isAdmin()
         && request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }

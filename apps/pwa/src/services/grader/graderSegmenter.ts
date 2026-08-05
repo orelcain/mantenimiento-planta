@@ -94,7 +94,12 @@ export function assignShiftAndDate(
   const d = new Date(ts)
   if (isNaN(d.getTime())) return { shiftId: 'Sin turno', sessionDate: ts.slice(0, 10) }
 
-  const minutesOfDay = d.getHours() * 60 + d.getMinutes()
+  // CONVENCIÓN wall-clock-as-UTC: el parser guarda "21:30 de planta" como
+  // "…T21:30:00.000Z" (ver graderExcelParser.toWallClockIso). Hay que leerlo
+  // con getUTC*: con getHours() el navegador aplica el offset local (Chile
+  // UTC-4/-3) y las 21:30 se leían como 17:30 → un turno noche 21:30–05:45
+  // se partía en 3 pedazos repartidos en 2 días (ver test de regresión).
+  const minutesOfDay = d.getUTCHours() * 60 + d.getUTCMinutes()
 
   for (const shift of schedule) {
     const start = shift.startHour * 60 + shift.startMinute
@@ -112,15 +117,98 @@ export function assignShiftAndDate(
         // Parte vespertina (antes de medianoche) → misma fecha del registro
         return { shiftId: shift.shiftId, sessionDate: ts.slice(0, 10) }
       } else if (minutesOfDay < end) {
-        // Parte madrugada (después de medianoche) → fecha del día anterior
+        // Parte madrugada (después de medianoche) → fecha del día anterior.
+        // setUTCDate (no setDate): mezclar mutación local con toISOString()
+        // devolvía el día equivocado y mandaba la madrugada a un día aparte.
         const prev = new Date(d)
-        prev.setDate(prev.getDate() - 1)
+        prev.setUTCDate(prev.getUTCDate() - 1)
         return { shiftId: shift.shiftId, sessionDate: prev.toISOString().slice(0, 10) }
       }
     }
   }
 
   return { shiftId: 'Sin turno', sessionDate: ts.slice(0, 10) }
+}
+
+// ── Ventanas reales de Shoplogix ──────────────────────────────────────────────
+
+/**
+ * Turno REAL de Shoplogix: una ventana concreta con fecha y hora, no un patrón
+ * horario. Shoplogix es la fuente de verdad tanto del horario como del DÍA al
+ * que pertenece el turno (`sessionDate` = su `dateKey`).
+ *
+ * Por qué ventanas concretas y no un schedule: los horarios los define
+ * Shoplogix y CAMBIAN día a día (el T2 de Chonchi ha arrancado 09:00 y 08:00;
+ * el "Turno 1 Lunes" solo existe los lunes). Un patrón hora-del-día no puede
+ * representar eso; una ventana con timestamps sí.
+ */
+export interface ShoplogixShiftWindow {
+  /** dateKey del turno según Shoplogix — manda para la asignación del día. */
+  sessionDate: string
+  shiftId: string
+  /** ms de inicio (inclusive), convención wall-clock-as-UTC. */
+  startMs: number
+  /** ms de fin (exclusivo). */
+  endMs: number
+}
+
+/**
+ * Cuánto puede pasarse un turno de su horario programado y seguir siendo el
+ * mismo turno.
+ *
+ * La línea sigue produciendo unos minutos después del cierre: verificado sobre
+ * los datos reales de feb-2026, hay piezas hasta 05:48 con el T1 cerrando
+ * 05:45, y hasta 17:27 con el T2 cerrando 17:15. Sin tolerancia esas colas
+ * formaban turnos residuales de 3 minutos — tarjetas basura en el calendario
+ * por 1.065 piezas (0,34% del total).
+ */
+export const SHIFT_WINDOW_TOLERANCE_MS = 60 * 60 * 1000
+
+/**
+ * Ubica un timestamp dentro de las ventanas reales de Shoplogix.
+ *
+ * 1. Si alguna ventana lo CONTIENE, gana esa. Si varias lo contienen (p.ej.
+ *    'Turno 1' 21:30–05:45 y 'Turno 1 Lunes' 00:00–07:00 se solapan la
+ *    madrugada del lunes), gana la de arranque MÁS TARDÍO: es la más
+ *    específica para ese instante.
+ * 2. Si ninguna lo contiene, se pega a la ventana más cercana dentro de
+ *    `toleranceMs` — el turno se pasó de su horario, que es lo que ocurre en
+ *    planta. Empate → la de arranque más tardío.
+ *
+ * Ambos criterios son deterministas: el mismo Excel produce siempre el mismo
+ * corte, sin importar el orden del array.
+ *
+ * Devuelve null si el registro queda fuera de toda tolerancia — el caller
+ * decide el fallback (schedule declarado de la planta).
+ */
+export function assignFromShoplogixWindows(
+  ts: string,
+  windows: readonly ShoplogixShiftWindow[],
+  toleranceMs: number = SHIFT_WINDOW_TOLERANCE_MS,
+): { shiftId: string; sessionDate: string } | null {
+  const t = Date.parse(ts)
+  if (isNaN(t)) return null
+
+  let inside: ShoplogixShiftWindow | null = null
+  let nearest: ShoplogixShiftWindow | null = null
+  let nearestGap = Infinity
+
+  for (const w of windows) {
+    if (t >= w.startMs && t < w.endMs) {
+      if (!inside || w.startMs > inside.startMs) inside = w
+      continue
+    }
+    if (inside) continue // ya hay una que lo contiene: no hace falta medir
+    const gap = t < w.startMs ? w.startMs - t : t - w.endMs + 1
+    if (gap > toleranceMs) continue
+    if (gap < nearestGap || (gap === nearestGap && nearest && w.startMs > nearest.startMs)) {
+      nearest = w
+      nearestGap = gap
+    }
+  }
+
+  const best = inside ?? nearest
+  return best ? { shiftId: best.shiftId, sessionDate: best.sessionDate } : null
 }
 
 // ── Segmentación ──────────────────────────────────────────────────────────────
@@ -146,6 +234,7 @@ export function segmentByDayAndShift(
   pieceRecords: PieceRecord[],
   gate0Records: Gate0Record[],
   schedule: GraderShiftSchedule[] = DEFAULT_SHIFT_SCHEDULE,
+  shoplogixWindows?: readonly ShoplogixShiftWindow[],
 ): Map<SegmentKey, ShiftSegment> {
   const map = new Map<SegmentKey, ShiftSegment>()
 
@@ -157,15 +246,23 @@ export function segmentByDayAndShift(
     return map.get(key)!
   }
 
+  // Shoplogix manda: si el registro cae en un turno sincronizado, ese turno y
+  // ese día ganan. Solo si no hay turno sincronizado que lo contenga se cae al
+  // schedule declarado de la planta.
+  const assign = (ts: string) =>
+    (shoplogixWindows && shoplogixWindows.length > 0
+      ? assignFromShoplogixWindows(ts, shoplogixWindows)
+      : null) ?? assignShiftAndDate(ts, schedule)
+
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = assign(rec.ts)
     getOrCreate(sessionDate, shiftId).pieceRecords.push(rec)
   }
 
   for (const rec of gate0Records) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = assign(rec.ts)
     getOrCreate(sessionDate, shiftId).gate0Records.push(rec)
   }
 
@@ -533,6 +630,10 @@ export function computeShiftSummary(
     avgWeightGrams,
     productionRatePerHour,
     topP0Causes,
+    // Config con la que se clasificó `topP0Causes`. Sin esto no hay forma de
+    // saber si el desglose guardado corresponde a las gates de hoy: editar la
+    // config después NO recalcula el turno (ver graderConfigDrift.ts).
+    ...(activeGates.length > 0 ? { gatesUsed: activeGates } : {}),
     calibreDistribution,
     qualityDistribution,
     gateDistribution,
@@ -548,7 +649,14 @@ export function computeShiftSummary(
 
 // ── Helpers de presentación ───────────────────────────────────────────────────
 
-/** Ordena los segmentos por fecha + turno (día → noche) */
+/**
+ * Ordena los segmentos por fecha + turno (día → noche).
+ *
+ * Los turnos reales de Shoplogix (Turno 1, Turno 2, 'Turno 1 Lunes') no están
+ * en la tabla de orden: caían todos en el mismo rango y quedaban en el orden
+ * arbitrario del Map. Se desempatan alfabéticamente para que el listado del
+ * wizard sea estable entre cargas.
+ */
 export function sortedSegmentEntries(
   map: Map<string, ShiftSegment>,
 ): Array<[string, ShiftSegment]> {
@@ -559,7 +667,10 @@ export function sortedSegmentEntries(
   }
   return Array.from(map.entries()).sort(([, a], [, b]) => {
     if (a.sessionDate !== b.sessionDate) return a.sessionDate < b.sessionDate ? -1 : 1
-    return (shiftOrder[a.shiftId] ?? 9) - (shiftOrder[b.shiftId] ?? 9)
+    const oa = shiftOrder[a.shiftId] ?? 9
+    const ob = shiftOrder[b.shiftId] ?? 9
+    if (oa !== ob) return oa - ob
+    return a.shiftId.localeCompare(b.shiftId, 'es')
   })
 }
 

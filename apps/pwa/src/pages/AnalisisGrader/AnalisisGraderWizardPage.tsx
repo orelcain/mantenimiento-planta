@@ -15,7 +15,8 @@ import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
-import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
+import type { SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
+import { GraderShiftPeriodContainer } from '@/components/grader/GraderShiftPeriodContainer'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
@@ -23,7 +24,7 @@ import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
-import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
+import { getPlantLineConfig, getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
@@ -37,7 +38,10 @@ import {
   sortedSegmentEntries,
   dedupePieceRecords,
   dedupeGate0Records,
+  type ShoplogixShiftWindow,
 } from '@/services/grader/graderSegmenter'
+import { loadShoplogixShiftWindows } from '@/services/grader/graderShoplogixWindows'
+import { normalizeShiftSchedule, DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import {
   saveDailySummaryBatch,
   fetchExistingSummaryIds,
@@ -48,11 +52,13 @@ import {
   savePausesAggregates,
   loadPausesAggregates,
   mergeAnnotationsIntoPauses,
+  updateDailySummary,
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
+import { saveGate0Records } from '@/services/grader/graderGate0Store'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
-import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary } from '@/services/grader/types'
+import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary, Gate0Record } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
 
@@ -88,6 +94,13 @@ export function AnalisisGraderWizardPage() {
 
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
+  // Turnos REALES de Shoplogix para los días que toca el Excel. Shoplogix manda
+  // sobre el horario y sobre el día del turno; el schedule declarado de la
+  // planta queda como fallback para días sin sincronizar.
+  const [slxWindows, setSlxWindows] = useState<ShoplogixShiftWindow[]>([])
+  const [shiftSchedule, setShiftSchedule] = useState(
+    lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE,
+  )
   // Panel "Cargar Excel del Grader" — colapsable. Por defecto cerrado en mobile
   // si ya hay summaries (no es la acción primaria), abierto si está vacío.
   const [uploadPanelExpanded, setUploadPanelExpanded] = useState(true)
@@ -120,9 +133,14 @@ export function AnalisisGraderWizardPage() {
   // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
+  // Las emite ahora la vista de período (`computePeriodMonthlyStats`); antes
+  // las calculaba el calendario mensual, ya retirado.
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
   // Día seleccionado en el calendario (para el KPI board)
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
+  // Se incrementa al registrar/borrar un paro de etapa: el OEE del área los
+  // suma y vive en otra card, así que necesita releerlos.
+  const [parosVersion, setParosVersion] = useState(0)
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -167,6 +185,36 @@ export function AnalisisGraderWizardPage() {
   // dejaba a los Excels de un solo turno SIN forma de guardar — el wizard
   // mostraba el dashboard pero nunca persistía nada en Firestore. Ahora
   // exponemos siempre que haya ≥1 segmento, y el banner se adapta al copy.
+  // Fallback de horarios: el schedule declarado de la planta (o el guardado en
+  // Firestore). Solo se usa para registros que no caen en ningún turno
+  // sincronizado de Shoplogix.
+  useEffect(() => {
+    let cancelled = false
+    const base = lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
+    getModuleRanges(lineId)
+      .then((cfg) => {
+        if (cancelled) return
+        setShiftSchedule(normalizeShiftSchedule(cfg?.shiftSchedule, base))
+      })
+      .catch(() => { if (!cancelled) setShiftSchedule(base) })
+    return () => { cancelled = true }
+  }, [lineId, lineConfig.defaultShiftSchedule])
+
+  // Traer los turnos reales de Shoplogix para los días que cubre el Excel.
+  useEffect(() => {
+    if (!parsedData) { setSlxWindows([]); return }
+    const dateKeys = new Set<string>()
+    for (const r of parsedData.pieceRecords) if (r.ts) dateKeys.add(r.ts.slice(0, 10))
+    for (const r of parsedData.gate0Records) if (r.ts) dateKeys.add(r.ts.slice(0, 10))
+    if (dateKeys.size === 0) { setSlxWindows([]); return }
+
+    let cancelled = false
+    loadShoplogixShiftWindows(Array.from(dateKeys), lineConfig.plantSlug)
+      .then((w) => { if (!cancelled) setSlxWindows(w) })
+      .catch(() => { if (!cancelled) setSlxWindows([]) })
+    return () => { cancelled = true }
+  }, [parsedData, lineConfig.plantSlug])
+
   const multiDayInfo = useMemo(() => {
     if (!parsedData) return null
     const totalRecords = parsedData.pieceRecords.length + parsedData.gate0Records.length
@@ -174,13 +222,16 @@ export function AnalisisGraderWizardPage() {
     // Dedupe por si el archivo viene con registros repetidos internamente
     const pieceUnique = dedupePieceRecords(parsedData.pieceRecords).unique
     const gate0Unique = dedupeGate0Records(parsedData.gate0Records).unique
-    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique)
+    // Antes esto se llamaba SIN horario: siempre cortaba con día 07-19 /
+    // noche 19-07, ignorando la config de la planta y a Shoplogix, así que un
+    // turno real (T1 21:30-05:45) nunca calzaba con su tarjeta.
+    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique, shiftSchedule, slxWindows)
     const entries = sortedSegmentEntries(segmentMap)
     if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     const isP0Only = parsedData.pieceRecords.length === 0
     return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
-  }, [parsedData])
+  }, [parsedData, shiftSchedule, slxWindows])
 
   // Consultar Firestore: cuántos de los turnos detectados ya existen
   useEffect(() => {
@@ -521,6 +572,25 @@ export function AnalisisGraderWizardPage() {
         }))
         await savePieceRecordsBatch(summaryId, firestoreRecs)
 
+        // Guardar el input de Puerta 0 EXACTO que usó computeShiftSummary para
+        // clasificar (el Excel P0 si vino, si no los gate=0 del pieza-a-pieza).
+        // Sin esto no se puede recalcular el desglose al cambiar las gates: la
+        // columna Error solo existe en el Excel P0 y los pieceRecords no la
+        // traen. Ver graderGate0Store.ts.
+        const p0Input: Gate0Record[] = segment.gate0Records.length > 0
+          ? segment.gate0Records
+          : segment.pieceRecords
+            .filter((r) => r.gate === 0)
+            .map((r) => ({ ...r, gate: 0 as const, error: ('error' in r && r.error) || '' }))
+        try {
+          await saveGate0Records(summaryId, p0Input)
+          await updateDailySummary(summaryId, { gate0RecordsStored: true })
+        } catch (err) {
+          // No es fatal: el turno queda guardado igual, solo sin recálculo
+          // automático (el aviso de config desfasada lo dirá).
+          logger.warn('No se pudieron guardar los registros de Puerta 0', { err: String(err) })
+        }
+
         // Pre-computar aggregates por minuto y guardar en sub-collection.
         // Idempotente: se sobrescribe en cada re-upload del mismo turno.
         const aggregates = computeTimelineAggregates(segment.pieceRecords, segment.gate0Records)
@@ -724,7 +794,7 @@ export function AnalisisGraderWizardPage() {
           <QuickInterventionCapture
             plantLineId={lineId}
             areaNodeId={lineConfig.areaNodeId}
-            areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+            areaLabel={getAreaDisplayLabel(lineId)}
           />
         </div>
       )}
@@ -783,6 +853,7 @@ export function AnalisisGraderWizardPage() {
           )}
           <PlantKPIBoard
             plantSlug={lineConfig.plantSlug}
+            plantLineId={lineId}
             graderSummaries={calendarSummaries}
             enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
             selectedDateKey={selectedDateKey}
@@ -799,14 +870,24 @@ export function AnalisisGraderWizardPage() {
         />
       </div>
 
-      {/* Fila 2: Calendario (izq 50%) | Resumen diario (der 50%) */}
-      <GraderHistoricalCalendar
-        equalColumns
+      {/* Vista de período por TURNO (matriz / lista) — reemplaza al calendario
+          mensual: acá un turno que cruza medianoche ocupa UNA celda en vez de
+          partirse en dos fragmentos (`salida` + `madrugada`). Provee también la
+          navegación de mes y los summaries que el calendario emitía. */}
+      <GraderShiftPeriodContainer
+        plantLineId={lineId}
+        month={calendarMonth}
         onMonthChange={setCalendarMonth}
         onSummariesLoaded={setCalendarSummaries}
-        onSlxMonthStatsLoaded={setCalendarSlxStats}
-        onDateSelect={setSelectedDateKey}
-        plantLineId={lineId}
+        onMonthStatsLoaded={setCalendarSlxStats}
+        onSelectShift={(s) => setSelectedDateKey(s.dateKey)}
+        onOpenShift={(s) => {
+          // Ruta CANÓNICA del detalle de turno. Antes apuntaba a
+          // `/analisis-grader?date=…&autoload=1`, que no hacía nada: ya
+          // estamos en esa ruta, así que React Router no remontaba nada.
+          const linea = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(lineId)}` : ''
+          navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
+        }}
       />
       </>
       )}
@@ -839,15 +920,18 @@ export function AnalisisGraderWizardPage() {
         </div>
       )}
 
-      {/* OEE de Línea estimado (Fase C) — combina Baader (Shoplogix) + paros de
-          etapa (manual) + calidad Grader. Solo en líneas con Baader+Grader. */}
-      {lineConfig.hasGraderData && (
+      {/* OEE del ÁREA estimado (Fase C) — combina la máquina instrumentada
+          (Shoplogix) + los paros de las etapas sin sensor (manual) + calidad del
+          Grader donde existe. Aplica a toda línea con datos Shoplogix: en Filete
+          es justamente donde hace falta, porque la GEA no está integrada. */}
+      {lineConfig.shoplogixEnabled && !lineConfig.comingSoon && (
         <LineOeeCard
           plantLineId={lineId}
           plantSlug={lineConfig.plantSlug}
           graderSummaries={calendarSummaries}
           currentMonth={calendarMonth}
-          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+          areaLabel={getAreaDisplayLabel(lineId)}
+          refreshKey={parosVersion}
         />
       )}
 
@@ -856,7 +940,8 @@ export function AnalisisGraderWizardPage() {
       {!lineConfig.comingSoon && (
         <ParoEtapaCapture
           plantLineId={lineId}
-          areaLabel={`${lineConfig.label} · ${lineConfig.areaLabel}`}
+          onChanged={() => setParosVersion((v) => v + 1)}
+          areaLabel={getAreaDisplayLabel(lineId)}
         />
       )}
     </div>

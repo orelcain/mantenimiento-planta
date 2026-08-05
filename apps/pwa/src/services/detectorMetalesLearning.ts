@@ -45,7 +45,7 @@ const stamp = { createdAt: DETECTOR_CONTENT_UPDATED_AT, updatedAt: DETECTOR_CONT
 const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz?: RawQuiz[] }> = {
   'det-manual-familia-vistus': {
     objetivo: 'Al terminar vas a poder explicar cómo el Vistus detecta metal —un campo electromagnético que la partícula altera— y reconocer qué configuración de la familia Vistus tenés en la línea.',
-    porque: 'saber que detecta Fe, no ferrosos e inoxidables (y que el AISI 304 es el más difícil) fija la expectativa correcta: si algo pasa sin detectarse, muchas veces es un inoxidable no magnético, no una falla del equipo.',
+    porque: 'saber qué detecta y qué le cuesta fija la expectativa correcta: si algo pasa sin detectarse, muchas veces no es una falla del equipo. En BOLAS DE TEST el inox no magnético (AISI 304 / V2A) es el más difícil; en ALAMBRES depende de la orientación (ahí el hierro es el que se detecta mal en 2 de 3 posiciones); y lo más difícil de todo son las piezas no homogéneas, tipo virutas.',
     quiz: [
       {
         question: '¿Qué hace que el detector dispare un mensaje de detección?',
@@ -54,10 +54,10 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
         explanation: 'El Vistus genera un campo electromagnético alterno; el metal que atraviesa la abertura altera el campo y dispara la detección.',
       },
       {
-        question: '¿Cuál es el metal más difícil de detectar?',
+        question: 'En las BOLAS DE TEST, ¿cuál es el metal más difícil de detectar?',
         options: ['Hierro (Fe)', 'Aluminio', 'Acero inoxidable no magnético (AISI 304 / V2A)', 'Latón'],
         correctIndex: 2,
-        explanation: 'El acero inox no magnético (AISI 304 / V2A) es el más difícil. Si la bola de test de V2A pasa el control, las demás también.',
+        explanation: 'En bolas de test, el acero inox no magnético (AISI 304 / V2A) es el más difícil: si la bola de V2A pasa el control, las demás también. Ojo que esto NO es una regla general: en alambres la detectabilidad depende de la orientación y ahí el hierro es el que sale mal en 2 de 3 posiciones (manual §4.9.4), y lo más difícil de detectar son las piezas no homogéneas como las virutas.',
       },
     ],
   },
@@ -105,7 +105,7 @@ const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz
         question: 'Producto húmedo y salado, empaquetado en film metálico. ¿Qué esperás?',
         options: ['Ningún efecto de producto', 'Efecto de producto fuerte, que exige un buen aprendizaje', 'Que no se pueda inspeccionar nunca', 'Que detecte mejor'],
         correctIndex: 1,
-        explanation: 'Productos húmedos/salados o con film metálico o tintas conductoras acentúan el efecto de producto; hay que aprenderlo bien o habrá falsos rechazos.',
+        explanation: 'El manual documenta tres causas de efecto de producto: producto húmedo, envoltorio conductor (film metálico) y tinta conductora en el envase. La sal es criterio de planta, no del manual, pero apunta en el mismo sentido. En cualquiera de esos casos hay que aprender bien el efecto o habrá falsos rechazos.',
       },
     ],
   },

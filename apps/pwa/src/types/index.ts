@@ -171,7 +171,9 @@ export interface MaintenanceLogEntry {
   plantLineId?: string  // ej. 'acopio-general' — línea/área del módulo Análisis
   areaNodeId?: string   // nodo de jerarquía 'area' (cuando esté linkeado)
   shiftId?: string      // turno en que se registró (best-effort: 'Turno día'/'Turno noche')
-  origen?: 'captura_rapida' | 'ficha_nfpa' | 'incidencia' // de dónde nació la entrada
+  // De dónde nació la entrada. 'paro_sensor' = causa dictada sobre un paro que
+  // detectó Shoplogix (panel "Causa de los paros" del Análisis de Turno).
+  origen?: 'captura_rapida' | 'ficha_nfpa' | 'incidencia' | 'paro_sensor'
   // ── Trazabilidad SAP ── Si falta `sapOrden` ⇒ "SAP pendiente" (falta crear la OT en SAP).
   sapAviso?: string     // N° de aviso SAP
   sapOrden?: string     // N° de orden de trabajo (OT) SAP
@@ -191,6 +193,22 @@ export interface ParoEtapa {
   fecha: Date
   tecnico?: string
   shiftId?: string      // turno (best-effort)
+  /**
+   * Quién detectó el paro. 'manual' (default, histórico) = lo capturó una
+   * persona porque la etapa no está instrumentada. 'shoplogix' = el sensor ya
+   * lo midió y acá solo se le agregó la CAUSA.
+   *
+   * ⚠ Los `origen: 'shoplogix'` NO son minutos extra de paro: esos minutos ya
+   * están en la Disponibilidad del sensor. Sumarlos al OEE de área los contaría
+   * dos veces (ver el filtro en LineOeeCard).
+   */
+  origen?: 'manual' | 'shoplogix'
+  /** Id determinístico del paro del sensor que esta anotación explica. */
+  stopKey?: string
+  /** Máquina del sensor (solo en anotaciones de paros del sensor). */
+  machineid?: string
+  /** Clasificación de la causa, para el pareto por responsable del paro. */
+  categoria?: 'mantencion' | 'operacion' | 'externo' | 'planificado'
   createdAt: Date
 }
 

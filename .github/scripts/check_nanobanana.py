@@ -52,42 +52,79 @@ def try_generate(model: str) -> bytes | None:
     return None
 
 
+API = "https://api.github.com"
+
+# La imagen NO va a `main`: esa rama exige el status check "build" con enforce_admins,
+# así que cualquier escritura directa (git push o Contents API) es rechazada — la Contents API
+# devolvía HTTP 409 Conflict y este workflow falló los 3 domingos seguidos (12, 19 y 26-jul).
+# Se sube a una rama dedicada SIN protección, que sirve igual para embeber la imagen en el issue.
+ASSETS_BRANCH = "nanobanana-assets"
+
+HEADERS = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github+json",
+}
+
+
+def _fallar_con_detalle(r, contexto: str):
+    """raise_for_status() a secas esconde el motivo; GitHub lo explica en el body."""
+    if r.status_code >= 400:
+        print(f"  ✗ {contexto}: HTTP {r.status_code} — {r.text[:400]}")
+        r.raise_for_status()
+
+
+def asegurar_rama_de_assets():
+    """Crea la rama de assets si no existe todavía, partiendo de main."""
+    r = requests.get(f"{API}/repos/{GITHUB_REPO}/git/ref/heads/{ASSETS_BRANCH}", headers=HEADERS)
+    if r.status_code == 200:
+        return
+    if r.status_code != 404:
+        _fallar_con_detalle(r, f"consultando la rama {ASSETS_BRANCH}")
+
+    print(f"  La rama {ASSETS_BRANCH} no existe: creándola desde main…")
+    r = requests.get(f"{API}/repos/{GITHUB_REPO}/git/ref/heads/main", headers=HEADERS)
+    _fallar_con_detalle(r, "obteniendo el sha de main")
+    sha_main = r.json()["object"]["sha"]
+
+    r = requests.post(
+        f"{API}/repos/{GITHUB_REPO}/git/refs",
+        headers=HEADERS,
+        json={"ref": f"refs/heads/{ASSETS_BRANCH}", "sha": sha_main},
+    )
+    _fallar_con_detalle(r, f"creando la rama {ASSETS_BRANCH}")
+
+
 def upload_image_to_repo(image_bytes: bytes) -> str:
-    """Sube la imagen al repo via GitHub API y retorna la URL raw."""
+    """Sube la imagen a la rama de assets y retorna su URL raw."""
+    asegurar_rama_de_assets()
+
     path = ".github/nanobanana/success.png"
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
-    # Verificar si ya existe (para obtener el sha)
+    url = f"{API}/repos/{GITHUB_REPO}/contents/{path}"
+
+    # El sha del archivo se pide EN esa rama: si se omite el ?ref, GitHub responde con el de
+    # main y el PUT falla con 409 por sha desactualizado.
     sha = None
-    r = requests.get(url, headers=headers)
+    r = requests.get(url, headers=HEADERS, params={"ref": ASSETS_BRANCH})
     if r.status_code == 200:
         sha = r.json().get("sha")
 
     payload = {
         "message": "chore: nanobanana weekly check - image generation working!",
         "content": base64.b64encode(image_bytes).decode(),
+        "branch": ASSETS_BRANCH,
     }
     if sha:
         payload["sha"] = sha
 
-    r = requests.put(url, headers=headers, json=payload)
-    r.raise_for_status()
-    branch = r.json()["content"]["download_url"].split("/raw/")[1].split("/")[0]
-    raw_url = (
-        f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{path}"
-    )
-    return raw_url
+    r = requests.put(url, headers=HEADERS, json=payload)
+    _fallar_con_detalle(r, "subiendo la imagen")
+
+    return f"https://raw.githubusercontent.com/{GITHUB_REPO}/{ASSETS_BRANCH}/{path}"
 
 
 def create_github_issue(model: str, image_url: str):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
+    url = f"{API}/repos/{GITHUB_REPO}/issues"
+    headers = HEADERS
     body = (
         f"## 🎉 NanoBanana ya funciona!\n\n"
         f"El modelo **`{model}`** ya genera imágenes vía API key gratuita.\n\n"
@@ -102,7 +139,7 @@ def create_github_issue(model: str, image_url: str):
         "labels": [],
     }
     r = requests.post(url, headers=headers, json=payload)
-    r.raise_for_status()
+    _fallar_con_detalle(r, "creando el issue")
     print(f"Issue creado: {r.json()['html_url']}")
 
 

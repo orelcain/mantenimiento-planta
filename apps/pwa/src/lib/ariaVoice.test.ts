@@ -6,6 +6,25 @@ vi.mock('@/services/ariaThinkingTracker', () => ({
   getAriaConfig: vi.fn().mockResolvedValue({ voiceURI: undefined, speechRate: 1 }),
 }))
 
+// La síntesis ya NO llama a texttospeech.googleapis.com directo con una API
+// key en el cliente — pasa por googleTtsProxy (Cloud Function callable). El
+// mock reemplaza httpsCallable en vez de fetch global. vi.hoisted() porque
+// vi.mock() se eleva sobre todo el archivo (incl. imports) y no puede cerrar
+// sobre un `const` normal declarado más abajo (TDZ).
+const { ttsCallableMock } = vi.hoisted(() => {
+  const b64Local = (s: string): string => Buffer.from(s).toString('base64')
+  return {
+    ttsCallableMock: vi.fn(async (data: { text: string }) => ({
+      data: { audioContent: b64Local('audio'), _sent: data },
+    })),
+  }
+})
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(() => ({})),
+  httpsCallable: vi.fn(() => ttsCallableMock),
+}))
+vi.mock('@/services/firebase', () => ({ default: {} }))
+
 import { speakWith, stopSpeaking, onSpeakingChange } from './ariaVoice'
 
 // ── Fakes de navegador (happy-dom no reproduce audio real) ──────────
@@ -25,23 +44,15 @@ class FakeAudio {
   pause(): void { this.paused = true }
 }
 
-const b64 = (s: string): string => Buffer.from(s).toString('base64')
 const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
-
-let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   FakeAudio.instances = []
   vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio)
   vi.stubGlobal('URL', { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} })
-  // Google TTS: cada llamada (= una frase) devuelve audio. Guarda los cuerpos para inspeccionar.
-  fetchMock = vi.fn(async (_url: string, init?: { body?: string }) => ({
-    ok: true,
-    json: async () => ({ audioContent: b64('audio'), _sent: init?.body }),
-  }))
-  vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
+  ttsCallableMock.mockClear()
 })
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('speakWith — reproducción por frases (Google)', () => {
   const tres = 'Primera frase larga de prueba aquí. Segunda frase larga de prueba aquí. Tercera frase larga de prueba aquí.'
@@ -54,12 +65,12 @@ describe('speakWith — reproducción por frases (Google)', () => {
     for (let i = 0; i < 20 && onend.mock.calls.length === 0; i++) await flush()
     off()
 
-    expect(fetchMock.mock.calls.length).toBe(3)   // una síntesis por frase, no una sola gigante
+    expect(ttsCallableMock.mock.calls.length).toBe(3) // una síntesis por frase, no una sola gigante
     expect(FakeAudio.instances.length).toBe(3)    // un audio por frase
     // la 1ª petición lleva SOLO la 1ª frase (prueba el troceo + el orden)
-    const body0 = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string)
-    expect(body0.input.text).toContain('Primera frase')
-    expect(body0.input.text).not.toContain('Segunda frase')
+    const call0 = ttsCallableMock.mock.calls[0]![0] as { text: string }
+    expect(call0.text).toContain('Primera frase')
+    expect(call0.text).not.toContain('Segunda frase')
     expect(onend).toHaveBeenCalledTimes(1)
     expect(speaking.includes(true)).toBe(true)    // avisó "hablando" al sonar la 1ª
     expect(speaking[speaking.length - 1]).toBe(false) // y termina en "no hablando"

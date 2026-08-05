@@ -69,6 +69,14 @@ import {
   listMarelFileteFlows,
   listMarelFileteDiagnosis,
 } from './marelFileteLearning'
+import {
+  ENZUNCHADORA_CONTENT_UPDATED_AT,
+  getEnzunchadoraContentCounts,
+  listEnzunchadoraManualSections,
+  listEnzunchadoraProcedures,
+  listEnzunchadoraFlows,
+  listEnzunchadoraDiagnosis,
+} from './enzunchadoraLearning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -121,6 +129,31 @@ export interface ManualSection {
   porque?: string
   /** Autoevaluación corta (1-3 preguntas) al pie de la sección. */
   quiz?: SectionQuizItem[]
+}
+
+/** Punto numerado sobre una foto real de "Componentes del equipo" — toca para ver la nota. */
+export interface ComponentHotspotPoint {
+  id: string
+  /** Posición horizontal, 0-100 (%) sobre la foto completa (sin recorte). */
+  x: number
+  /** Posición vertical, 0-100 (%) sobre la foto completa (sin recorte). */
+  y: number
+  label: string
+  description: string
+}
+
+/** Una foto real con sus puntos, dentro de la pestaña "Componentes del equipo". */
+export interface ComponentPhoto {
+  id: string
+  /** Nombre de archivo dentro de `public/learning-assets/{machineSlug}/`. */
+  file: string
+  title: string
+  /** Ancho/alto real de la foto (evita recorte/letterbox al posicionar los puntos). */
+  aspectRatio: number
+  order: number
+  points: ComponentHotspotPoint[]
+  createdAt: number
+  updatedAt: number
 }
 
 export interface Flow {
@@ -184,7 +217,7 @@ export interface BibliographyEntry {
   updatedAt: number
 }
 
-export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz' | 'glossary' | 'bibliografia'
+export type LearningSectionKey = 'manual' | 'procedures' | 'flows' | 'diagnosis' | 'quiz' | 'glossary' | 'bibliografia' | 'components'
 
 // ─────────────────────────────────────────────────────────────
 // PATHS HELPERS
@@ -207,6 +240,7 @@ const DETECTOR_LEARNING_SLUG = 'detector-metales'
 const MAREL_HG_LEARNING_SLUG = 'marel-hg'
 const FISHKEN_LEARNING_SLUG = 'fishken'
 const MAREL_FILETE_LEARNING_SLUG = 'marel-filete'
+const ENZUNCHADORA_LEARNING_SLUG = 'enzunchadora-n2'
 type StoredOverride<T> = T & { _deleted?: boolean }
 
 async function listStoredProcedures(machineSlug: string): Promise<StoredOverride<Procedure>[]> {
@@ -350,11 +384,11 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
     ],
   },
   'cuchillos-ventrales': {
-    objetivo: 'Calibrar los cuchillos ventrales con la cruz patrón: avance «a» de 5 mm y referencia de 177.5 mm a la cara interna del cuchillo izquierdo.',
+    objetivo: 'Calibrar los cuchillos ventrales con la cruz patrón: abertura «a» ENTRE ambos cuchillos de 5 mm y referencia de 177.5 mm a la cara interna del cuchillo izquierdo.',
     porque: 'los pernos de fijación pos 1-2 (alineamiento entre cuchillos) SOLO se tocan en la mantención anual; moverlos en un ajuste de turno descalibra el alineamiento fino.',
     quiz: [
       { question: '¿Cuándo se mueven los pernos de fijación pos 1-2 de los cuchillos ventrales?', options: ['Cada turno', 'Solo en la mantención anual', 'Al cambiar de especie', 'Nunca'], correctIndex: 1, explanation: 'Los pernos de fijación pos 1-2 solo se mueven en la mantención anual, para el alineamiento de los cuchillos entre sí.' },
-      { question: '¿Cuál es el avance «a» de los cuchillos ventrales?', options: ['5 mm', '12 mm', '177.5 mm', '20 mm'], correctIndex: 0, explanation: 'El avance «a» es 5 mm; la referencia a la cara interna del cuchillo izquierdo es 177.5 mm.' },
+      { question: 'La medida «a» de los cuchillos ventrales, ¿qué es y cuánto vale para salmón?', options: ['La abertura ENTRE ambos cuchillos: 5 mm', 'El avance del cuchillo: 5 mm', 'La abertura entre ambos: 12 mm', 'La referencia al cuchillo izquierdo: 177.5 mm'], correctIndex: 0, explanation: 'La «a» es la distancia ENTRE ambos cuchillos ventrales, que se ajusta con los bujes apretadores pos 8-9 — no es un “avance” (esa palabra vino de una errata del manual de planta). Para salmón son 5 mm; el fabricante da 4 mm para trucha y 7 mm para pescado blanco.' },
     ],
   },
   'guias-flotantes': {
@@ -380,7 +414,7 @@ const B200_MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string;
     ],
   },
   'mando-cuchillos-dorsales': {
-    objetivo: 'Ajustar el levante de 20 mm de los cuchillos dorsales al paso de la silleta y seguir la secuencia de diagnóstico si no levantan.',
+    objetivo: 'Ajustar el mando de los cuchillos dorsales y seguir la secuencia de diagnóstico si no levantan. OJO con las dos cotas: los 20 mm son una distancia de CONTROL entre ventrales y dorsales (no una carrera de levante) y los 12 mm son entre trinquete y fiador.',
     porque: 'si no levantan, el orden de revisión es primero el trinquete y después el bulón con gollete; saltarse el orden hace perder tiempo.',
     quiz: [
       { question: 'Los cuchillos dorsales no levantan al paso de la silleta. ¿Qué se revisa PRIMERO?', options: ['El bulón con gollete', 'La posición del trinquete', 'Los resortes', 'La leva'], correctIndex: 1, explanation: 'Primero se verifica la posición del trinquete; después, el bulón con gollete del mando dorsales en el carter de las levas. El levante debe ser 20 mm.' },
@@ -577,13 +611,21 @@ async function getGraderContentCounts(): Promise<MachineContentCounts> {
 // PROCEDURES
 // ─────────────────────────────────────────────────────────────
 
+/** Mergea el seed de procedimientos con los overrides de Firestore (editor admin).
+ *  Ver `seedIdPrefix` para el porqué de esto. */
+async function withProcedureOverrides(slug: string, base: Procedure[]): Promise<Procedure[]> {
+  const stored = await listStoredProcedures(slug)
+  return mergeSeedOverrides(base, stored)
+}
+
 export async function listProcedures(machineSlug: string): Promise<Procedure[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Procedures()
-  if (machineSlug === B142_LEARNING_SLUG) return listB142Procedures()
-  if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorProcedures()
-  if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgProcedures()
-  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenProcedures()
-  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteProcedures()
+  if (machineSlug === B142_LEARNING_SLUG) return withProcedureOverrides(B142_LEARNING_SLUG, listB142Procedures())
+  if (machineSlug === DETECTOR_LEARNING_SLUG) return withProcedureOverrides(DETECTOR_LEARNING_SLUG, listDetectorProcedures())
+  if (machineSlug === MAREL_HG_LEARNING_SLUG) return withProcedureOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgProcedures())
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return withProcedureOverrides(FISHKEN_LEARNING_SLUG, listFishkenProcedures())
+  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withProcedureOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteProcedures())
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return withProcedureOverrides(ENZUNCHADORA_LEARNING_SLUG, listEnzunchadoraProcedures())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderProcedures()
 
   return listStoredProcedures(machineSlug)
@@ -614,6 +656,48 @@ export async function saveProcedure(
   )
 }
 
+/** Base del id de seed de las 6 máquinas con seed JSON versionado. Sus ids siguen
+ *  el patrón `<base>-<sección>-<slug>`, ej. `mhg-proc-preparar-produccion`.
+ *  Grader y B200 usan otro esquema y se manejan con sus ramas explícitas. */
+const SEED_ID_BASE: Record<string, string> = {
+  [B142_LEARNING_SLUG]: 'b142',
+  [DETECTOR_LEARNING_SLUG]: 'det',
+  [MAREL_HG_LEARNING_SLUG]: 'mhg',
+  [FISHKEN_LEARNING_SLUG]: 'fk',
+  [MAREL_FILETE_LEARNING_SLUG]: 'mf',
+  [ENZUNCHADORA_LEARNING_SLUG]: 'tp6',
+}
+
+const SEED_SECTION_TAG: Partial<Record<LearningSectionKey, string>> = {
+  procedures: 'proc',
+  flows: 'flow',
+  diagnosis: 'diag',
+}
+
+/** Prefijo de los ids que vienen del seed (no de Firestore) para una máquina y
+ *  sección. Borrar uno de esos NO puede ser un delete real: el seed lo repondría
+ *  en el próximo merge. Se marca `_deleted` y `mergeSeedOverrides` lo filtra. Los
+ *  ítems creados desde el admin (`sec_*`, `diag_*`…) sí se borran de verdad. */
+function seedIdPrefix(machineSlug: string, section: LearningSectionKey): string | null {
+  const base = SEED_ID_BASE[machineSlug]
+  const tag = SEED_SECTION_TAG[section]
+  return base && tag ? `${base}-${tag}-` : null
+}
+
+/** Borra un ítem respetando el seed: soft-delete si el id viene del seed. */
+async function deleteSeedAware(
+  machineSlug: string,
+  section: LearningSectionKey,
+  id: string
+): Promise<void> {
+  const prefix = seedIdPrefix(machineSlug, section)
+  if (prefix && id.startsWith(prefix)) {
+    await setDoc(sectionDoc(machineSlug, section, id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
+  await deleteDoc(sectionDoc(machineSlug, section, id))
+}
+
 export async function deleteProcedure(machineSlug: string, id: string): Promise<void> {
   if (machineSlug === GRADER_LEARNING_SLUG && id.startsWith('grader-procedure-')) {
     await setDoc(sectionDoc(machineSlug, 'procedures', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
@@ -623,7 +707,7 @@ export async function deleteProcedure(machineSlug: string, id: string): Promise<
     await setDoc(sectionDoc(machineSlug, 'procedures', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
   }
-  await deleteDoc(sectionDoc(machineSlug, 'procedures', id))
+  await deleteSeedAware(machineSlug, 'procedures', id)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -648,6 +732,7 @@ export async function listManualSections(machineSlug: string): Promise<ManualSec
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return withManualOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgManualSections())
   if (machineSlug === FISHKEN_LEARNING_SLUG) return withManualOverrides(FISHKEN_LEARNING_SLUG, listFishkenManualSections())
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withManualOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteManualSections())
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return withManualOverrides(ENZUNCHADORA_LEARNING_SLUG, listEnzunchadoraManualSections())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderManualSections()
 
   return listStoredManualSections(machineSlug)
@@ -677,6 +762,7 @@ const SEED_MANUAL_PREFIX: Record<string, string> = {
   [MAREL_HG_LEARNING_SLUG]: 'mhg-manual-',
   [MAREL_FILETE_LEARNING_SLUG]: 'mf-manual-',
   [FISHKEN_LEARNING_SLUG]: 'fk-manual-',
+  [ENZUNCHADORA_LEARNING_SLUG]: 'tp6-manual-',
 }
 
 export async function deleteManualSection(machineSlug: string, id: string): Promise<void> {
@@ -689,16 +775,50 @@ export async function deleteManualSection(machineSlug: string, id: string): Prom
 }
 
 // ─────────────────────────────────────────────────────────────
+// COMPONENTES DEL EQUIPO (fotos reales + hotspots)
+// ─────────────────────────────────────────────────────────────
+
+export async function listComponentPhotos(machineSlug: string): Promise<ComponentPhoto[]> {
+  const q = query(sectionCollection(machineSlug, 'components'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as ComponentPhoto), id: d.id }))
+}
+
+export async function saveComponentPhoto(
+  machineSlug: string,
+  photo: Omit<ComponentPhoto, 'createdAt' | 'updatedAt'> & { createdAt?: number }
+): Promise<void> {
+  const now = Date.now()
+  await setDoc(sectionDoc(machineSlug, 'components', photo.id), {
+    ...photo,
+    createdAt: photo.createdAt || now,
+    updatedAt: now,
+  })
+}
+
+export async function deleteComponentPhoto(machineSlug: string, id: string): Promise<void> {
+  await deleteDoc(sectionDoc(machineSlug, 'components', id))
+}
+
+// ─────────────────────────────────────────────────────────────
 // FLOWS
 // ─────────────────────────────────────────────────────────────
 
+/** Mergea el seed de flujos con los overrides de Firestore (editor admin).
+ *  Ver `seedIdPrefix` para el porqué de esto. */
+async function withFlowOverrides(slug: string, base: Flow[]): Promise<Flow[]> {
+  const stored = await listStoredFlows(slug)
+  return mergeSeedOverrides(base, stored)
+}
+
 export async function listFlows(machineSlug: string): Promise<Flow[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Flows()
-  if (machineSlug === B142_LEARNING_SLUG) return listB142Flows()
-  if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorFlows()
-  if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgFlows()
-  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenFlows()
-  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteFlows()
+  if (machineSlug === B142_LEARNING_SLUG) return withFlowOverrides(B142_LEARNING_SLUG, listB142Flows())
+  if (machineSlug === DETECTOR_LEARNING_SLUG) return withFlowOverrides(DETECTOR_LEARNING_SLUG, listDetectorFlows())
+  if (machineSlug === MAREL_HG_LEARNING_SLUG) return withFlowOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgFlows())
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return withFlowOverrides(FISHKEN_LEARNING_SLUG, listFishkenFlows())
+  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withFlowOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteFlows())
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return withFlowOverrides(ENZUNCHADORA_LEARNING_SLUG, listEnzunchadoraFlows())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderFlows()
 
   return listStoredFlows(machineSlug)
@@ -726,20 +846,30 @@ export async function deleteFlow(machineSlug: string, id: string): Promise<void>
     await setDoc(sectionDoc(machineSlug, 'flows', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
   }
-  await deleteDoc(sectionDoc(machineSlug, 'flows', id))
+  await deleteSeedAware(machineSlug, 'flows', id)
 }
 
 // ─────────────────────────────────────────────────────────────
 // DIAGNOSIS
 // ─────────────────────────────────────────────────────────────
 
+/** Mergea el seed de diagnóstico de una máquina con sus overrides de Firestore
+ *  (lo que se edita desde el editor admin). Sin esto el editor escribe a
+ *  Firestore pero nadie lo lee nunca: la edición queda invisible en la ficha.
+ *  Mismo patrón que `withManualOverrides` para la sección manual. */
+async function withDiagnosisOverrides(slug: string, base: DiagnosisEntry[]): Promise<DiagnosisEntry[]> {
+  const stored = await listStoredDiagnosis(slug)
+  return mergeSeedOverrides(base, stored)
+}
+
 export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry[]> {
   if (machineSlug === B200_LEARNING_SLUG) return listB200Diagnosis()
-  if (machineSlug === B142_LEARNING_SLUG) return listB142Diagnosis()
-  if (machineSlug === DETECTOR_LEARNING_SLUG) return listDetectorDiagnosis()
-  if (machineSlug === MAREL_HG_LEARNING_SLUG) return listMarelHgDiagnosis()
-  if (machineSlug === FISHKEN_LEARNING_SLUG) return listFishkenDiagnosis()
-  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return listMarelFileteDiagnosis()
+  if (machineSlug === B142_LEARNING_SLUG) return withDiagnosisOverrides(B142_LEARNING_SLUG, listB142Diagnosis())
+  if (machineSlug === DETECTOR_LEARNING_SLUG) return withDiagnosisOverrides(DETECTOR_LEARNING_SLUG, listDetectorDiagnosis())
+  if (machineSlug === MAREL_HG_LEARNING_SLUG) return withDiagnosisOverrides(MAREL_HG_LEARNING_SLUG, listMarelHgDiagnosis())
+  if (machineSlug === FISHKEN_LEARNING_SLUG) return withDiagnosisOverrides(FISHKEN_LEARNING_SLUG, listFishkenDiagnosis())
+  if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return withDiagnosisOverrides(MAREL_FILETE_LEARNING_SLUG, listMarelFileteDiagnosis())
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return withDiagnosisOverrides(ENZUNCHADORA_LEARNING_SLUG, listEnzunchadoraDiagnosis())
   if (machineSlug === GRADER_LEARNING_SLUG) return listGraderDiagnosis()
 
   return listStoredDiagnosis(machineSlug)
@@ -767,7 +897,7 @@ export async function deleteDiagnosis(machineSlug: string, id: string): Promise<
     await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
     return
   }
-  await deleteDoc(sectionDoc(machineSlug, 'diagnosis', id))
+  await deleteSeedAware(machineSlug, 'diagnosis', id)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -829,16 +959,38 @@ export interface MachineContentCounts {
   quiz?: number
 }
 
+/** Counts de la 142 con la sección diagnosis ya mergeada con Firestore (el resto
+ *  sigue viniendo del seed). Si no, el contador de la tarjeta mostraría el 34 del
+ *  seed mientras la pestaña lista otra cantidad. Devuelve también el updatedAt más
+ *  reciente para que el badge "Nuevo" reaccione a lo editado por el admin. */
+async function getB142CountsAndStamp(): Promise<{
+  counts: MachineContentCounts
+  lastUpdatedAt: number
+}> {
+  const base = getB142ContentCounts()
+  try {
+    const diagnosis = await listDiagnosis(B142_LEARNING_SLUG)
+    const newest = diagnosis.reduce(
+      (max, d) => Math.max(max, d.updatedAt || 0),
+      B142_CONTENT_UPDATED_AT
+    )
+    return { counts: { ...base, diagnosis: diagnosis.length }, lastUpdatedAt: newest }
+  } catch {
+    return { counts: base, lastUpdatedAt: B142_CONTENT_UPDATED_AT }
+  }
+}
+
 /** Obtiene conteo de items por seccion para una maquina */
 export async function getMachineContentCounts(
   machineSlug: string
 ): Promise<MachineContentCounts> {
   if (machineSlug === B200_LEARNING_SLUG) return getB200ContentCounts()
-  if (machineSlug === B142_LEARNING_SLUG) return getB142ContentCounts()
+  if (machineSlug === B142_LEARNING_SLUG) return getB142CountsAndStamp().then(r => r.counts)
   if (machineSlug === DETECTOR_LEARNING_SLUG) return getDetectorContentCounts()
   if (machineSlug === MAREL_HG_LEARNING_SLUG) return getMarelHgContentCounts()
   if (machineSlug === FISHKEN_LEARNING_SLUG) return getFishkenContentCounts()
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) return getMarelFileteContentCounts()
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) return getEnzunchadoraContentCounts()
   if (machineSlug === GRADER_LEARNING_SLUG) return getGraderContentCounts()
 
   const [manual, procedures, flows, diagnosis, quiz] = await Promise.all([
@@ -872,7 +1024,8 @@ export async function getMachineContentMeta(
     return { ...counts, lastUpdatedAt: B200_CONTENT_UPDATED_AT }
   }
   if (machineSlug === B142_LEARNING_SLUG) {
-    return { ...getB142ContentCounts(), lastUpdatedAt: B142_CONTENT_UPDATED_AT }
+    const { counts, lastUpdatedAt } = await getB142CountsAndStamp()
+    return { ...counts, lastUpdatedAt }
   }
   if (machineSlug === DETECTOR_LEARNING_SLUG) {
     return { ...getDetectorContentCounts(), lastUpdatedAt: DETECTOR_CONTENT_UPDATED_AT }
@@ -885,6 +1038,9 @@ export async function getMachineContentMeta(
   }
   if (machineSlug === MAREL_FILETE_LEARNING_SLUG) {
     return { ...getMarelFileteContentCounts(), lastUpdatedAt: MAREL_FILETE_CONTENT_UPDATED_AT }
+  }
+  if (machineSlug === ENZUNCHADORA_LEARNING_SLUG) {
+    return { ...getEnzunchadoraContentCounts(), lastUpdatedAt: ENZUNCHADORA_CONTENT_UPDATED_AT }
   }
   if (machineSlug === GRADER_LEARNING_SLUG) {
     const counts = await getGraderContentCounts()

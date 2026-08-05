@@ -154,6 +154,9 @@ function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
     expectedTotal:  Number(raw.expectedTotal ?? 0),
     ratio:          Number(raw.ratio ?? 0),
     color:          (raw.color as UpstreamProductionInterval['color']) ?? 'gray',
+    // Docs anteriores a sourceVersion 4 no lo tienen: null, no 0 (0 sería
+    // "objetivo cero", una afirmación distinta a "no sé").
+    targetRate:     Number.isFinite(Number(raw.targetRate)) ? Number(raw.targetRate) : null,
   }
 }
 
@@ -392,6 +395,15 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     intervals,
     states,
     threshold:           Number(raw.threshold ?? 15),
+    uptimeCycles:        Number(raw.uptimeCycles ?? 0),
+    scheduledCycles:     Number(raw.scheduledCycles ?? 0),
+    scrapByReason:       Array.isArray(raw.scrapByReason)
+      ? (raw.scrapByReason as FirestoreData[]).map(x => ({
+          reason: String(x.reason ?? ''),
+          qty:    Number(x.qty ?? 0),
+        }))
+      : [],
+    scrapTotal:          Number(raw.scrapTotal ?? 0),
     productionUnit:      String(raw.productionUnit ?? ''),
     comments:            Array.isArray(raw.comments)
       ? raw.comments
@@ -667,6 +679,18 @@ const SHIFT_CANDIDATES_BY_PLANT: Record<PlantSlug, Record<string, string[]>> = {
     'Turno día':   ['Turno día', 'Turno 1', 'Turno 1*', 'Turno 2', 'Turno 2*'],
     'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*'],
     'Turno 1':     ['Turno 1', 'Turno 1*'],
+    'Turno 2':     ['Turno 2', 'Turno 2*'],
+    'Turno 3':     ['Turno 3', 'Turno 3*'],
+  },
+  filete: {
+    // Filete (área 8181, una sola máquina: la Baader 200 de Línea 1). Todavía
+    // no sabemos qué nombres de turno emite Shoplogix acá — no hay Grader Excel
+    // que etiquete día/noche, así que se aceptan ambas familias y el listener
+    // se queda con el primer candidato que tenga producción real.
+    'Turno día':   ['Turno día', 'Turno 1', 'Turno 1*', 'Turno 2', 'Turno 2*'],
+    'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*'],
+    'Turno 1':       ['Turno 1', 'Turno 1*'],
+    'Turno 1 Lunes': ['Turno 1 Lunes'],
     'Turno 2':     ['Turno 2', 'Turno 2*'],
     'Turno 3':     ['Turno 3', 'Turno 3*'],
   },

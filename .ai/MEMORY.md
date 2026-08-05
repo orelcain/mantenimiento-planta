@@ -34,7 +34,7 @@ cuantificar/demostrar/optimizar ese valor, replantearlo para que sí lo haga. Me
 - `hierarchy` (702 nodos) = jerarquía SAP, fuente de verdad de equipos/áreas. Campo `tipoNodo` ('area'|'equipo').
 - `bodega` (≈188) = stock por SAP (overlay en runtime; no se guarda en el doc del material).
 - `manuales` (colección plana N:M) = PDFs por equipo; un material hereda los de sus `equipos`.
-- LEGACY a eliminar (Fase 5 limpieza, con backup): `machines`, `plantAssets`, `insumos` (ya absorbido), subcolecciones huérfanas, `repuestosBaader200`.
+- LEGACY **ELIMINADO** (Fase 5, 2026-06-20, backup `backups/fase5-2026-06-20T17-25-56/`): `machines`, `plantAssets`, `insumos`, `repuestosBaader200`, subcolecciones huérfanas y `hierarchy/*/repuestos` → todas en 0. Maestro/bodega/hierarchy intactos.
 - Scripts de migración idempotentes (dry-run primero): `scripts/normalizacion/00..09`. Backup en `backups/normalizacion-2026-06-10T23-53-21/`.
 
 ## UI repuestos (apps/pwa/src/pages/repuestos, hooks/repuestos)
@@ -85,6 +85,45 @@ decide cuando la segunda planta sea real.
   inspección = criticidad × condición (Tabla 9.2.2). Piloto: motor `720004608` + bomba `720004607` (NH₃)
   — verificar que existen como registros `equipment`.
 
+## Contenido de fichas (/aprendizaje): seed vs overrides de Firestore
+
+- **Varios dispatch por equipo devuelven el seed PURO y NO mergean overrides de Firestore.** Ej.:
+  `listProcedures()` (`services/learningContent.ts:618`) → `listMarelHgProcedures()`
+  (`services/marelHg/marelHgLearning.ts:101`), que mapea `marelHgContent.json` y estampa
+  `createdBy: 'marel-hg-seed'` sin leer la base. Donde pasa eso, corregir contenido = editar el
+  **JSON del seed**; escribir en `learningContent/<equipo>/<sub>` NO se ve en la app.
+- **El patrón correcto es `mergeSeedOverrides` (`learningContent.ts:273`)**, ya usado por manual,
+  flows y otras secciones: seed como base + lo editado en Firestore encima. Un dispatch que devuelve
+  el seed pelado es un **bug**, no un diseño: significa que el **editor admin escribe a un lugar
+  que nadie lee**, y la edición queda invisible. Al encontrar uno así, la primera opción es
+  arreglar el dispatch — no borrar lo que quedó del otro lado.
+- **⚠ Antes de "limpiar" una colección de `learningContent`, LEER lo que hay adentro.** No todo lo
+  que el dispatch ignora es basura:
+  - `marel-hg/procedures` (2 docs) **sí** era basura: ids del esquema viejo e imágenes duplicadas
+    byte a byte del seed → **borrado el 2026-07-30** (ver WORKLOG).
+  - `baader-142/diagnosis` (10 docs) **NO**: es conocimiento de planta escrito a mano en una sesión
+    del 21-may-2026 (ids `diag_<ts>_<rand>` = generados por `saveDiagnosis` desde el editor), con
+    datos que el seed no tiene — bomba **SB 1100D0**, vacío −0,4 Bar y tiempo de recuperación vs
+    piezas/min, remisión a códigos SAP, y el E777 desglosado en esporádico (técnica del operador)
+    vs recurrente (muelle de tracción del carro roto). Además agrupa por **síntoma que el operador
+    ve**, mientras el seed sigue la taxonomía del manual. **NO borrar**: se está arreglando el
+    dispatch para que se vean (rama `fix/b142-diagnosis-overrides`).
+  - Señal para distinguir: ids con formato `diag_/proc_<timestamp>_<random>` = escritos por una
+    persona desde la app. Ids con el prefijo del seed (`b142-diag-*`, `mhg-proc-*`) = del seed.
+- **Convención de borrado, cuál aplica:** `_deleted:true` es para tapar un doc **que el seed sí
+  publica**. Un doc huérfano (id que no existe en el seed) **y que además no aporta contenido
+  único** se borra de verdad. Siempre `node scripts/firestore-snapshot.js --dump <col>` antes.
+- Las imágenes de pasos viven en Storage bajo `learningContent/<equipo>/procedures/<id-del-seed>/step-N.jpg`.
+  Al renombrar ids del seed, las carpetas viejas quedan huérfanas en Storage y hay que limpiarlas aparte
+  (Firestore y Storage no se borran juntos).
+
 ## Pendientes mayores
 
-Ver `TASKS.md`. Resumen: solicitar-a-bodega end-to-end, chatbot ARIA in-app → leer el maestro (hoy lee `machines/*/repuestos` viejo), Mapas (`CatalogoBases`) → maestro, Fase 5 limpieza de colecciones legacy.
+Ver `TASKS.md`. Resumen: solicitar-a-bodega end-to-end.
+
+Los otros tres que figuraban acá ya están cerrados (verificado contra el código y la base el 2026-08-01):
+**Fase 5** se ejecutó el 2026-06-20 (ver arriba, colecciones legacy en 0); el **chatbot ARIA** ya no lee
+`machines/*/repuestos` — no queda ninguna lectura de la colección `machines` en `apps/pwa/src`, solo un
+comentario histórico en `services/aria/tools/repuestos.ts`; y **Mapas (`CatalogoBases`)** ya no existe en
+el código. Pendiente menor que sí sigue vivo: `EquipoPlacementTool` + `equipoToPlaceId` inertes en
+`PlantaLeafletEditable.tsx`.

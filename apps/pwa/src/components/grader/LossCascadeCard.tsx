@@ -28,6 +28,12 @@
  */
 
 import { useMemo, useState, useEffect } from 'react'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
+import {
+  estimateManualLine,
+  MANUAL_LINE_LABEL,
+  MANUAL_LINE_TOOLTIP,
+} from '@/services/grader/graderManualLine'
 import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cascadeFromStates, classifyLossState, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
@@ -54,7 +60,19 @@ const BUCKET_COLOR: Record<string, string> = {
  *  deja" en vez de recordarse cerrada/abierta solo dentro de este turno). */
 const EXPANDED_KEY = 'graderLossCascadeExpanded'
 
-export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[] }) {
+export function LossCascadeCard({
+  machines,
+  graderTotalPieces,
+}: {
+  machines: UpstreamMachineShift[]
+  /**
+   * Piezas totales que contó el Grader en el turno. Sirve para descontar la
+   * línea manual de la pérdida: sin esto, las piezas que la planta SÍ produjo
+   * a mano se cuentan como pérdida de máquina. Opcional — sin Excel del Grader
+   * la cascada sigue funcionando en bruto, como antes.
+   */
+  graderTotalPieces?: number | null
+}) {
   const [expanded, setExpanded] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true
     const stored = window.localStorage.getItem(EXPANDED_KEY)
@@ -76,7 +94,6 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
    *  necesario acá para poder volver a filtrar states CRUDOS por causal. */
   const stateCauseLabel = (s: { name: string; reason: string }) =>
     s.reason || (s.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
-  const shortMachineName = (name: string) => name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
 
   // Filtrar por grupo (o por causal+máquina específica) RESALTA en los 3
   // Gantts + el chart de velocidad upstream — "demostrar" cómo se comportaron
@@ -150,13 +167,25 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
     const piezasReales = sum(x => x.m.totalCycles)
     const piezasMax = Math.round(sum(x => x.cascade.techoSec * x.cadencePzSec))
 
+    // Línea manual: piezas que la planta SÍ produjo, pero fuera de las Baader.
+    //
+    // La cascada mide capacidad de MÁQUINA, así que la pérdida bruta
+    // (máx − ciclos Baader) está bien como está. Lo que faltaba es decir que
+    // parte de esa pérdida se recuperó a mano: en el turno del 31-jul, 774 de
+    // las 3.282 piezas "perdidas" salieron igual por la línea manual. Sin
+    // descontarlas, el informe sobreestima la pérdida ~30% y hace ver el turno
+    // peor de lo que fue.
+    const manual = graderTotalPieces != null
+      ? estimateManualLine({ graderPieces: graderTotalPieces, baaderCycles: piezasReales })
+      : null
+
     // Piezas perdidas POR CAUSAL: duración de la causal en cada máquina × la
     // cadencia de esa máquina. Agrupadas por (bucket, reason) entre máquinas,
     // pero conservando QUÉ Baader(s) aportó cada causal (pedido Orel: "AJUSTE
     // MANTENIMIENTO ¿en qué Baader fue?" — antes se perdía al sumar entre las 3).
     const lossByCause = new Map<string, { bucket: LossBucket; label: string; sec: number; piezas: number; count: number; machines: Set<string> }>()
     for (const x of perMachine) {
-      const shortName = x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+      const shortName = shortMachineName(x.m.machineName)
       for (const item of x.cascade.items) {
         const label = item.reason || (item.name.toLowerCase().includes('micro') ? 'Micro detenciones' : 'Sin causal anotada')
         const key = `${item.bucket}__${label}`
@@ -174,20 +203,33 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
 
     const perMachineOut = perMachine.map((x) => ({
       machineid: x.m.machineid,
-      name: x.m.machineName.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+      // Mismo nombre que la leyenda del gráfico. Antes acá se abreviaba a
+      // "Ev 1" y en el gráfico a "M1": la misma máquina con dos nombres en la
+      // misma pantalla, y ninguno de los dos es como se le dice en planta.
+      name: shortMachineName(x.m.machineName),
       cascade: x.cascade,
+      piezas: x.m.totalCycles,
+      // Cadencia sobre el tiempo EN PROCESO, no sobre el turno completo: una
+      // máquina detenida mostraría 0,3 pz/min y parecería lenta en vez de
+      // parada. Son dos problemas distintos y se arreglan distinto.
+      pzMin: x.cadencePzSec * 60,
     }))
 
-    return { totals, usoReal, piezasReales, piezasMax, causes, perMachine: perMachineOut }
-  }, [machines])
+    return { totals, usoReal, piezasReales, piezasMax, causes, perMachine: perMachineOut, manual }
+  }, [machines, graderTotalPieces])
 
   if (!data || data.totals.techoSec <= 0) return null
 
-  const { totals, usoReal, piezasReales, piezasMax, causes, perMachine } = data
+  const { totals, usoReal, piezasReales, piezasMax, causes, perMachine, manual } = data
   const turnoSec = totals.techoSec + totals.planificadoSec
   const pctOfTecho = (sec: number) => (totals.techoSec > 0 ? (sec / totals.techoSec) * 100 : 0)
   const pctOfTurno = (sec: number) => (turnoSec > 0 ? (sec / turnoSec) * 100 : 0)
   const piezasPerdidas = Math.max(0, piezasMax - piezasReales)
+  // Pérdida NETA: lo que no se recuperó por ningún lado. La bruta sigue siendo
+  // la pérdida de capacidad de máquina (que es lo que mide esta cascada); la
+  // neta es lo que realmente le faltó a la planta al final del turno.
+  const recuperadas = manual ? Math.min(manual.manualPieces, piezasPerdidas) : 0
+  const piezasPerdidasNetas = Math.max(0, piezasPerdidas - recuperadas)
   // Uptime clásico derivado de las MISMAS horas de la cascada (no de un
   // shiftRuntime promedio aparte) para que toda la aritmética del panel
   // se pueda verificar a mano, sumando 100% sobre el turno.
@@ -415,6 +457,19 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
                             ? `${fmtHm(m.cascade.produccionSec)} de ${fmtHm(m.cascade.techoSec)} de techo`
                             : `${fmtHm(sec)} · ${pctOfOwnDenom.toFixed(0)}% de ${activeBucket === 'planificado' ? 'su turno' : 'su techo'}`}
                         </div>
+                        {/* Piezas y cadencia real de la máquina. Sin esto, dos
+                            máquinas con el mismo % de uso se veían iguales
+                            aunque una produjera el triple que la otra. */}
+                        {activeBucket == null && m.piezas > 0 && (
+                          <div
+                            className="mt-0.5 text-[9px] tabular-nums text-foreground/70"
+                            title={`${m.piezas.toLocaleString('es-CL')} piezas en ${fmtHm(m.cascade.produccionSec)} de proceso. La cadencia se mide solo sobre el tiempo en proceso: si contara las horas paradas, una máquina detenida parecería lenta en vez de parada.`}
+                          >
+                            {m.piezas.toLocaleString('es-CL')} pz
+                            <span className="text-muted-foreground"> · </span>
+                            <span className="font-medium">{m.pzMin.toFixed(1)} pz/min</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -467,6 +522,25 @@ export function LossCascadeCard({ machines }: { machines: UpstreamMachineShift[]
                   ? `Piezas perdidas por causal · ${piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico`
                   : 'Eventos del grupo · con su costo en piezas'}
               </p>
+              {/* La pérdida de arriba es de capacidad de MÁQUINA. Parte de esa
+                  producción la planta la recuperó a mano, y decirlo cambia la
+                  lectura del turno: sin esta línea el informe sobreestima la
+                  pérdida (31-jul: 3.282 "perdidas" cuando 774 salieron igual). */}
+              {filter === 'all' && recuperadas > 0 && (
+                <div
+                  className="mb-1.5 flex items-center gap-2 text-[11px] rounded px-2 py-1 bg-violet-500/10 border border-violet-500/25 cursor-help"
+                  title={`${MANUAL_LINE_LABEL}: la planta procesó ${manual!.manualPieces.toLocaleString('es-CL')} piezas por fuera de las Baader. ${MANUAL_LINE_TOOLTIP}`}
+                >
+                  <span className="w-2 h-2 rounded-sm shrink-0 bg-violet-500/70" />
+                  <span className="truncate text-violet-300">Recuperadas por la línea manual</span>
+                  <span className="ml-auto shrink-0 tabular-nums text-violet-300">
+                    −{recuperadas.toLocaleString('es-CL')} pz
+                  </span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    → pérdida neta <b className="text-foreground/90">{piezasPerdidasNetas.toLocaleString('es-CL')}</b>
+                  </span>
+                </div>
+              )}
               <div className="space-y-0.5">
                 {techoCauses.map((c) => {
                   const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]

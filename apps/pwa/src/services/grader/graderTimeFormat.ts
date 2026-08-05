@@ -121,3 +121,28 @@ export function fmtRelativeTime(thenMs: number, nowMs: number = Date.now()): str
   const deltaDay = Math.floor(deltaHr / 24)
   return `hace ${deltaDay} d`
 }
+
+// ── Parseo ────────────────────────────────────────────────────────────────────
+
+/**
+ * Parsea un timestamp del módulo a epoch ms respetando la convención
+ * wall-clock-as-planta.
+ *
+ * Por qué existe: no todos los timestamps del módulo llevan sufijo `Z`. Los
+ * `tsMin` de los TimelineBucket son `ts.slice(0, 16)` → `"2026-08-01T01:34"`,
+ * sin zona. `Date.parse` de una fecha-hora SIN offset la interpreta como hora
+ * LOCAL (lo dice el estándar), así que en Chile (UTC-4) esos minutos se corrían
+ * 4 horas — el mismo error que rompía el corte de turnos.
+ *
+ * Acá se fuerza a leerlos como wall-clock: si el string no trae zona, se le
+ * agrega `Z` para que el reloj del Excel llegue intacto.
+ */
+export function parseWallClockMs(ts: string | null | undefined): number {
+  if (!ts) return NaN
+  const s = ts.trim()
+  // Ya trae zona explícita (Z o ±HH:MM) → se respeta tal cual.
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(s)) return Date.parse(s)
+  // `YYYY-MM-DDTHH:MM` o `…:SS(.mmm)` sin zona → wall-clock de planta.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) return Date.parse(`${s}Z`)
+  return Date.parse(s)
+}

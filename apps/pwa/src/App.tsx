@@ -28,6 +28,10 @@ const lazyWithReload = (fn: () => Promise<any>) =>
 // Code Splitting con autorecarga (todas las páginas, incluida Login: es la
 // primera que pide un usuario deslogueado justo después de un deploy)
 const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
+/** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
+const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
+/** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
+const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
 const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
 import { HomeRedirect } from '@/components/HomeRedirect'
 const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
@@ -78,6 +82,7 @@ const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGra
 const GraderQuickChangePage = lazyWithReload(() => import('@/pages/AnalisisGrader/GraderQuickChangePage').then((mod) => ({ default: mod.GraderQuickChangePage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
+const AnalisisGraderConfigPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderConfigPage').then((mod) => ({ default: mod.AnalisisGraderConfigPage })))
 
 // Redirect legacy `/analisis-grader/detalle?date=X&shift=Y` → `/analisis-grader/turno/:id`
 // Conservado para no romper links externos existentes tras la eliminación de DetallePage (2.118.0).
@@ -100,6 +105,7 @@ const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then(
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
 const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
+const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').then((mod) => ({ default: mod.VariadoresPage })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
@@ -230,6 +236,28 @@ export function App() {
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
             <Routes>
+              {/* Banco de pruebas de la Matriz de turnos — SOLO en dev.
+                  Vite elimina la rama entera del bundle de producción. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/resumen-turno"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <ResumenTurnoDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/matriz-turnos"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <MatrizTurnosDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
               {/* Public routes */}
           <Route
             path="/login"
@@ -354,6 +382,14 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <HmiBombeoS2PublicPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/variadores"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <VariadoresPage />
                 </Suspense>
               }
             />
@@ -641,6 +677,13 @@ export function App() {
             <Route path="analisis-grader/turno/:shiftId" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderTurnoPage />
+              </Suspense>
+            } />
+            {/* Config GLOBAL del Grader (línea física, umbrales, rangos):
+                aplica a todos los turnos → ruta propia, solo admin. */}
+            <Route path="analisis-grader/config" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderConfigPage />
               </Suspense>
             } />
             <Route path="analisis-grader/quick-change" element={

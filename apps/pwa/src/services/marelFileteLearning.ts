@@ -1,7 +1,8 @@
 /**
  * marelFileteLearning — contenido del Centro de Aprendizaje para la Marel Filete
- * (línea de fileteado / porcionado). Fuente: manual del usuario de la línea
- * SmartLine (pesaje dinámico + clasificación + descarga, software A600), ES.
+ * (línea de fileteado / porcionado). El equipo instalado es una M-Weigher WTR
+ * (GR8251) con indicador M6410: un pesador dinámico en línea que NO clasifica ni
+ * arma lotes — eso ocurre aguas abajo. Fuente: manual del usuario M-Weigher WTR, ES.
  *
  * Vive como seed JSON (`marelFilete/marelFileteContent.json`, curado y versionado
  * en el repo) y este módulo lo adapta a los tipos de `learningContent`. Mismo
@@ -32,50 +33,46 @@ interface MarelFileteSeed {
 const data = seed as MarelFileteSeed
 const stamp = { createdAt: MAREL_FILETE_CONTENT_UPDATED_AT, updatedAt: MAREL_FILETE_CONTENT_UPDATED_AT }
 
-/** Capa didáctica (objetivo · porqué · autoevaluación) sobre el manual SmartLine curado. */
+/** Capa didáctica (objetivo · porqué · autoevaluación) sobre el manual M-Weigher WTR curado. */
 const MANUAL_DIDACTIC: Record<string, { objetivo?: string; porque?: string; quiz?: RawQuiz[] }> = {
   'mf-manual-que-es': {
-    objetivo: 'Explicar el recorrido de la SmartLine —alimentación → báscula MW (pesaje dinámico) → descarga en lotes— y que el rendimiento depende de un flujo individualizado.',
-    porque: 'el cuello de botella de la SmartLine casi siempre es la alimentación: si el producto no llega separado y parejo, no hay software que recupere el rendimiento.',
+    objetivo: 'Explicar el recorrido de la M-Weigher WTR —alimentación → plataforma de pesaje → salida— y que lo único que hace es pesar cada pieza en movimiento.',
+    porque: 'confundirla con un clasificador manda al técnico a buscar brazos, canaletas y bandejas que esta máquina no tiene. Lo que sí depende de ella es la exactitud del peso, y eso se juega en el flujo y la limpieza.',
     quiz: [
-      { question: '¿Cuáles son los tres módulos principales de la SmartLine?', options: ['Motor, cinta y tablero', 'Alimentación, báscula MW y descarga', 'Entrada, salida y PLC', 'Pesaje, corte y empaque'], correctIndex: 1, explanation: 'La SmartLine consta de alimentación, unidad de báscula MW (pesaje dinámico) y unidad de descarga.' },
-      { question: '¿De qué depende el rendimiento máximo?', options: ['De la velocidad del motor', 'De un flujo de producto uniforme e individualizado en la alimentación', 'Del tamaño de la caja', 'Del clima'], correctIndex: 1, explanation: 'El rendimiento máximo solo se logra con un flujo de producto óptimo: separado y parejo en la alimentación.' },
+      { question: '¿Qué hace la M-Weigher WTR con el producto después de pesarlo?', options: ['Lo clasifica por calibre', 'Lo arma en lotes por peso', 'Lo entrega por la plataforma de salida al proceso siguiente', 'Lo descarta si está fuera de rango'], correctIndex: 2, explanation: 'La M-Weigher WTR solo pesa: el artículo sale por la plataforma de salida y pasa al proceso siguiente. El peso se transfiere al indicador de la porcionadora o Robobatcher, que es donde ocurre el loteo.' },
+      { question: '¿Por qué cada pieza tiene que pasar sola por la plataforma de pesaje?', options: ['Por higiene', 'Porque el peso se calcula por pieza combinando peso y velocidad de cinta', 'Para no romper la cinta', 'Para que quepa'], correctIndex: 1, explanation: 'El pesaje es dinámico e integrado: se combina el peso sobre la plataforma con la velocidad de cinta del codificador. Si entran dos piezas juntas, la pesada no corresponde a ninguna de las dos.' },
     ],
   },
   'mf-manual-seguridad': {
-    objetivo: 'Aplicar el bloqueo LOTO (interruptor de red en OFF + candado) antes de intervenir la SmartLine y no trabajar nunca sobre piezas móviles.',
-    porque: 'es pesaje dinámico con cintas y brazos neumáticos en movimiento; sin LOTO, una puesta en marcha inesperada durante el mantenimiento lesiona. Además, operar sin protecciones anula la garantía.',
+    objetivo: 'Distinguir cuándo corresponde cortar y bloquear energía (intervención sobre piezas móviles) y cuándo el manual pide algo distinto (limpieza).',
+    porque: 'aplicar el criterio equivocado tiene costo en los dos sentidos: intervenir energizado lesiona, pero apagar el interruptor de red como rutina genera condensación de humedad dentro de la unidad.',
     quiz: [
-      { question: 'Antes de trabajar en el equipo, ¿qué corresponde?', options: ['Bajar la velocidad', 'Interruptor de red en OFF y bloquear con candado (LOTO)', 'Avisar por radio', 'Sacar una tapa'], correctIndex: 1, explanation: 'Se desconecta la alimentación: interruptor de red del armario en OFF y se bloquea con candado (LOTO). Las reparaciones eléctricas las hace un electricista autorizado.' },
+      { question: 'Para la LIMPIEZA diaria, ¿qué pide el manual?', options: ['LOTO completo obligatorio', 'Apagar la máquina; el candado es opcional', 'Nada, se limpia en marcha', 'Solo avisar por radio'], correctIndex: 1, explanation: 'Para limpieza el manual pide apagar la máquina y da el candado como OPCIONAL ("opcionalmente, bloquee el interruptor con un candado para mayor seguridad"). El bloqueo es exigible para intervención sobre piezas móviles.' },
+      { question: 'Entre turnos, ¿el interruptor de red se deja en OFF?', options: ['Sí, siempre', 'No: se deja en ON para mantener corriente constante y evitar condensación', 'Da lo mismo', 'Solo los lunes'], correctIndex: 1, explanation: 'El manual pide devolver el interruptor de red a encendido para mantener la corriente eléctrica constante y evitar la condensación de humedad en la unidad. El OFF con candado queda para intervención o mantenimiento.' },
     ],
   },
   'mf-manual-alimentacion': {
-    objetivo: 'Entender que la alimentación separa el producto en 2-3 pasos para entregarlo individualizado a la báscula, y que de eso depende el rendimiento.',
-    porque: 'un flujo mal separado o con piezas pegadas baja el rendimiento y ensucia el pesaje; la mayoría de los problemas de la SmartLine se resuelven arreglando la alimentación.',
+    objetivo: 'Entender que el producto debe llegar separado e individualizado a la plataforma de pesaje, y que esa separación se resuelve aguas arriba.',
+    porque: 'el pesaje se calcula por pieza: si llegan dos juntas la pesada no sirve. Y esta máquina no tiene módulo separador propio, así que el problema y su arreglo están antes de ella.',
     quiz: [
-      { question: '¿Qué efecto tiene un flujo con piezas pegadas o mal separado?', options: ['Ninguno', 'Baja el rendimiento y ensucia el pesaje', 'Mejora la exactitud', 'Acelera la descarga'], correctIndex: 1, explanation: 'Un flujo mal separado o con piezas pegadas baja el rendimiento y ensucia el pesaje; la separación se completa en 2-3 pasos.' },
+      { question: '¿Qué efecto tiene un flujo con piezas pegadas?', options: ['Ninguno', 'La pesada no corresponde a ninguna de las dos piezas', 'Mejora la exactitud', 'Acelera la salida'], correctIndex: 1, explanation: 'El peso integrado se calcula por pieza; con dos piezas juntas sobre la plataforma el resultado no corresponde a ninguna. La separación se resuelve aguas arriba: la WTR no tiene separador propio.' },
     ],
   },
   'mf-manual-bascula-mw': {
-    objetivo: 'Saber que la MW pesa cada pieza en movimiento con celdas de carga y elegir el modelo (MW1000/1450/1900) según la aplicación.',
-    porque: 'al ser pesaje dinámico, la suciedad sobre las plataformas o celdas desestabiliza la lectura; por eso la limpieza y el flujo parejo pesan tanto en la exactitud.',
+    objetivo: 'Distinguir la báscula (unidad de pesaje: plataforma + celda de carga + módulo MWS2) del indicador M6410, que es la HMI.',
+    porque: 'llamar "báscula M6410" al indicador manda a buscar el problema de pesaje en la pantalla en vez de en la celda, el MWS2 o el sensor de productos.',
     quiz: [
-      { question: '¿Qué modelo MW es el predeterminado?', options: ['MW1000', 'MW1450', 'MW1900', 'MW700'], correctIndex: 1, explanation: 'El MW1450 es el predeterminado; el MW1000 es para alta velocidad/espacio reducido y el MW1900 para piezas de más de 700 mm.' },
-      { question: '¿Por qué importa tanto la limpieza en la báscula MW?', options: ['Por estética', 'Porque el pesaje es dinámico y la suciedad desestabiliza la lectura', 'Por la garantía', 'No importa'], correctIndex: 1, explanation: 'El pesaje es dinámico (pieza en movimiento); la suciedad sobre las plataformas o celdas desestabiliza la lectura.' },
-    ],
-  },
-  'mf-manual-descarga': {
-    objetivo: 'Entender que brazos neumáticos dirigen el flujo a canaletas/bandejas y que el A600 decide cuándo el lote alcanzó su objetivo de peso o número de piezas.',
-    porque: 'un brazo neumático lento o desajustado desvía piezas al destino equivocado y mezcla lotes; es una causa típica de reclamos de peso o cantidad.',
-    quiz: [
-      { question: '¿Quién decide cuándo un lote alcanzó su objetivo?', options: ['El operador a ojo', 'El software A600 (por peso o número de piezas)', 'El brazo neumático', 'La cinta de cajas'], correctIndex: 1, explanation: 'El software A600 decide cuándo el lote alcanzó su objetivo (peso o número de piezas) y da la instrucción de descarga.' },
+      { question: '¿Qué es el M6410?', options: ['La báscula', 'La celda de carga', 'El indicador (HMI)', 'El motor'], correctIndex: 2, explanation: 'El M6410 es el indicador, o sea la HMI. La báscula es la unidad de pesaje: plataforma, celda de carga y módulo de pesaje electrónico MWS2.' },
+      { question: '¿Por qué importa tanto la limpieza en la unidad de pesaje?', options: ['Por estética', 'Porque el pesaje es dinámico y la suciedad desestabiliza la lectura', 'Por la garantía', 'No importa'], correctIndex: 1, explanation: 'El pesaje es dinámico (pieza en movimiento); la suciedad sobre la plataforma o la celda desestabiliza la lectura, y la suciedad en el sensor de productos obstruye el haz de luz.' },
     ],
   },
   'mf-manual-limpieza-mantenimiento': {
-    objetivo: 'Ejecutar la limpieza y el mantenimiento (cintas, plataformas, brazos, sensores) con la máquina asegurada (LOTO), sabiendo que en pesaje dinámico la suciedad afecta la exactitud.',
-    porque: 'en una báscula dinámica la limpieza no es cosmética: la suciedad afecta directamente la exactitud y el rendimiento. Saltarla se paga en sobrepeso y rechazo.',
+    objetivo: 'Limpiar respetando las zonas que no aguantan alta presión y saber qué tarea es de planta y cuál es del servicio Marel.',
+    porque: 'un chorro de más de 25 bar sobre el sensor, la celda o la pantalla daña justo lo que sostiene la exactitud del pesaje; y buscar la falla en la celda de carga es perder el turno, porque su inspección es semestral y la hace Marel.',
     quiz: [
-      { question: '¿Por qué la limpieza es central en la SmartLine?', options: ['Por inspección sanitaria solamente', 'Porque al ser pesaje dinámico la suciedad afecta la exactitud y el rendimiento', 'Para que se vea bien', 'No es importante'], correctIndex: 1, explanation: 'Al ser pesaje dinámico, la suciedad afecta directamente la exactitud y el rendimiento; se limpia con la máquina asegurada (LOTO).' },
+      { question: '¿Dónde NO se puede usar agua a alta presión?', options: ['En ningún lado', 'En indicadores, sensor de producto, celda de carga, armarios y motores', 'Solo en el piso', 'En las cintas'], correctIndex: 1, explanation: 'Los chorros por encima de 25 bar dañan los mecanismos delicados: en indicadores, sensor de producto, celda de carga, armarios eléctricos y motores va agua a baja presión o limpieza a mano.' },
+      { question: 'La inspección de la celda de carga, ¿con qué frecuencia y quién?', options: ['Diaria, el operador', 'Semanal, mantención', 'Cada seis meses, el servicio técnico de Marel', 'Nunca'], correctIndex: 2, explanation: 'La inspección de la(s) celda(s) de carga y del sistema eléctrico es mantenimiento semestral realizado por personal de servicio técnico de Marel. Lo que sí es rutina de planta es el sensor de productos.' },
+      { question: '¿Qué le hace el cloro a la máquina?', options: ['Nada', 'Desintegra las cintas y puede manchar de óxido el inox', 'La protege', 'Solo huele feo'], correctIndex: 1, explanation: 'El cloro desintegra las cintas y puede producir manchas de óxido en el acero inoxidable. Las soluciones básicas potentes (pH > 13) corroen las piezas de aluminio como los cilindros de aire.' },
     ],
   },
 }

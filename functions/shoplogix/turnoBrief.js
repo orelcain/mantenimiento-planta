@@ -10,7 +10,7 @@
  *    target del turno (campos officialSchedule/currentJob/officialTargets del
  *    doc padre, capturados del rollup de Shoplogix — solo existen para el
  *    turno vigente al momento del sync; si faltan, el brief degrada con "—").
- *  - FIN de turno: qué pasó — piezas por Baader y total, % de cumplimiento vs
+ *  - FIN de turno: qué pasó — piezas por máquina y total, % de cumplimiento vs
  *    target oficial, uptime promedio, paros macro/micro con minutos, y calidad
  *    P0% del Grader cuando hay Excel cargado (Planta Principal en temporada).
  */
@@ -102,14 +102,33 @@ function componerBriefInicioTurno({ plantLabel, shiftId, officialSchedule, curre
  *   intervals (scheduledStart/End del doc padre), NO la plantilla oficial de Shoplogix.
  *   El brief de inicio muestra "Horario oficial" (plantilla fija); acá mostramos el
  *   horario REAL en que el turno efectivamente corrió, para no confundir ambos.
+ * @param {{start: Date, end: Date}|null} [p.effectiveSchedule] — de la primera a la
+ *   última pieza (`effectiveStart/End` del doc padre). Se usa cuando el turno NO está
+ *   acotado en Shoplogix: en Filete "Turno Dia" abarca 24 h y el brief decía
+ *   "Horario real: 08:00 → 08:00", que no informa nada.
+ * @param {number|null} [p.plannedTargetPieces] — piezas que planta pide por turno
+ *   (target de PLANIFICACIÓN). Solo se usa si Shoplogix no mandó target oficial, y
+ *   se rotula distinto: son dos cosas diferentes y confundirlas haría discutir el
+ *   número equivocado en la reunión.
+ * @param {{count: number, minutes: number}|null} [p.stopsWithoutCause] — paros que el
+ *   sensor midió y siguen sin causa anotada. El brief es el momento en que alguien
+ *   todavía se acuerda de lo que pasó: nombrarlos es lo que hace que se anoten.
  * @returns {string} HTML para Telegram
  */
-function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader, realSchedule }) {
+function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader, realSchedule, effectiveSchedule, stopsWithoutCause, plannedTargetPieces }) {
   const ms = machines || []
   const total = ms.reduce((a, m) => a + (m.totalCycles || 0), 0)
 
   const lineas = [`🏁 <b>Fin de turno · ${plantLabel}</b>`, `${shiftId} · ${dateKey}`]
-  if (realSchedule?.start && realSchedule?.end) {
+  // Si la ventana del turno es mucho más ancha que la operación real, el turno
+  // no está acotado en Shoplogix y mostrarla engaña ("08:00 → 08:00").
+  const durMin = (w) => (w?.start && w?.end ? (w.end.getTime() - w.start.getTime()) / 60_000 : 0)
+  const efeMin = durMin(effectiveSchedule)
+  const progMin = durMin(realSchedule)
+  const usarEfectiva = efeMin > 0 && (progMin <= 0 || efeMin < progMin * 0.75)
+  if (usarEfectiva) {
+    lineas.push(`🕐 Operación real: ${fmtHora(effectiveSchedule.start)} → ${fmtHora(effectiveSchedule.end)}`)
+  } else if (realSchedule?.start && realSchedule?.end) {
     lineas.push(`🕐 Horario real: ${fmtHora(realSchedule.start)} → ${fmtHora(realSchedule.end)}`)
   }
 
@@ -120,10 +139,15 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
   }
   let totalLinea = `📦 Total: <b>${fmtNum(total)}</b> piezas`
   const targetTotal = Object.values(officialTargets || {}).reduce((a, b) => a + (b || 0), 0)
-  if (targetTotal > 0) {
-    const pct = (total / targetTotal) * 100
+  const planificado = Number(plannedTargetPieces) > 0 ? Number(plannedTargetPieces) : 0
+  // El target OFICIAL de Shoplogix manda; el planificado es el respaldo para las
+  // áreas donde el rollup no llega (Filete). Se rotulan distinto a propósito.
+  const refTotal = targetTotal > 0 ? targetTotal : planificado
+  if (refTotal > 0) {
+    const pct = (total / refTotal) * 100
     const emoji = pct >= 95 ? '✅' : pct >= 75 ? '🟡' : '🔴'
-    totalLinea += ` · ${emoji} ${pct.toFixed(0)}% del target (${fmtNum(targetTotal)})`
+    const etiqueta = targetTotal > 0 ? 'del target' : 'de lo planificado'
+    totalLinea += ` · ${emoji} ${pct.toFixed(0)}% ${etiqueta} (${fmtNum(refTotal)})`
   }
   lineas.push(totalLinea)
   if (currentJob?.name) lineas.push(`🐟 Especie: ${currentJob.name}`)
@@ -149,6 +173,14 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
     lineas.push(partes.join(' · '))
   } else {
     lineas.push('✅ Sin paros registrados')
+  }
+  if (stopsWithoutCause && stopsWithoutCause.count > 0) {
+    const n = stopsWithoutCause.count
+    lineas.push(
+      `📝 <b>${n}</b> paro${n === 1 ? '' : 's'} sin causa anotada` +
+      (stopsWithoutCause.minutes > 0 ? ` (${fmtDur(stopsWithoutCause.minutes * 60)})` : '') +
+      ' — anotala en Análisis de Turno',
+    )
   }
 
   // Calidad del Grader (solo cuando hay Excel cargado — Planta Principal)

@@ -5,7 +5,9 @@
  *   - Umbrales P0% (alerta + crítico) — usados en el timeline de todos los turnos
  *   - Rangos de peso por calibre — tabla de gramos por banda
  *
- * Se abre desde el header del landing con un botón ⚙️.
+ * Se abre desde la página de configuración del Grader
+ * (`/analisis-grader/config`, solo admin), que entra directo a una sección
+ * vía `defaultTab`.
  * Carga desde Firestore al abrirse y guarda con merge al confirmar.
  */
 
@@ -32,7 +34,7 @@ import type { GraderPauseTag } from '@/services/grader/graderPauseTags'
 import { cn } from '@/lib/utils'
 import { PhysicalLineSection } from './PhysicalLineSection'
 
-type SettingsTab = 'umbrales' | 'rangos' | 'tags' | 'detector' | 'fisica'
+export type SettingsTab = 'umbrales' | 'rangos' | 'tags' | 'detector' | 'fisica'
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'umbrales', label: 'Umbrales P0%' },
@@ -50,14 +52,22 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   plantLineId?: string
+  /** Sección en la que abre. Permite entrar directo desde la página de config. */
+  defaultTab?: SettingsTab
 }
 
-export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) {
+export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTab }: Props) {
   const user = useAuthStore(s => s.user)
   const isAdmin = useIsAdmin()
   const { toast } = useToast()
 
   const [tab, setTab] = useState<SettingsTab>('umbrales')
+
+  // Al abrir desde la página de config se entra directo a la sección pedida.
+  useEffect(() => {
+    if (open && defaultTab) setTab(defaultTab)
+  }, [open, defaultTab])
+
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 

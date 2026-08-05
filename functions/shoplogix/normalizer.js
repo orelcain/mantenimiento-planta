@@ -10,9 +10,11 @@
  */
 
 const { parseShoplogixTime } = require('./time')
-const { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS } = require('./machines')
+const { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS, CHONCHI_FILETE } = require('./machines')
 
-const ALL_MACHINES = [...CHONCHI_EVISCERADORAS, ...YAL_EVISCERADORAS]
+// Olvidar una planta acá NO rompe el sync: solo hace que sus docs queden con
+// machineType 'other' (le pasó a la Baader 200 de Filete en su primer día).
+const ALL_MACHINES = [...CHONCHI_EVISCERADORAS, ...YAL_EVISCERADORAS, ...CHONCHI_FILETE]
 
 function findMachineInfo(machineid) {
   return ALL_MACHINES.find(m => m.machineid === machineid)
@@ -39,7 +41,49 @@ function normalizeInterval(raw, startAt, threshold) {
     expectedTotal: raw.expectedTotal || 0,
     ratio,
     color: colorFromRatio(ratio, hadExpected, threshold),
+    // Cadencia OBJETIVO del intervalo en pz/min, según Shoplogix.
+    //
+    // ⚠ NO es la velocidad real (esa es cycles/duración). Verificado contra el
+    // turno del 2026-07-28 de la Baader 200: en los 14 intervalos con dato se
+    // cumple `expectedCycles = targetRate × 5 min` exacto, y hay intervalos con
+    // targetRate 20 y cycles 0 — máquina parada con objetivo 20 pz/min. El
+    // valor baja en intervalos parciales porque Shoplogix escala el objetivo al
+    // tiempo activo del intervalo.
+    //
+    // Sirve para leer el objetivo por tramo sin re-derivarlo de expectedCycles.
+    // null cuando el sensor no lo reporta (nunca 0: eso sería objetivo cero).
+    targetRate: Number.isFinite(raw.rate) ? raw.rate : null,
   }
+}
+
+/**
+ * Agrega el scrap (rechazo) que el sensor reporta POR INTERVALO en
+ * `scrapReasons` y que hasta ahora se descartaba entero.
+ *
+ * Importa especialmente en Filete: no hay Grader aguas abajo, así que este es
+ * el único origen posible de un factor CALIDAD para su OEE.
+ *
+ * ⚠ La forma exacta de cada entrada NO está verificada con datos reales: en
+ * todos los turnos observados (incluido el día de pruebas de la Baader 200)
+ * `scrapReasons` vino vacío. Por eso se aceptan varios nombres de campo y, si
+ * no se reconoce nada, el resultado es simplemente una lista vacía — nunca un
+ * número inventado. Revisar contra un turno real con rechazo antes de mostrar
+ * este dato como Calidad.
+ */
+function aggregateScrapReasons(rawIntervals) {
+  const acc = new Map()
+  for (const raw of rawIntervals || []) {
+    for (const sr of raw?.scrapReasons || []) {
+      if (!sr) continue
+      const reason = String(sr.reason ?? sr.name ?? sr.description ?? '').trim() || '(sin causa)'
+      const qty = Number(sr.quantity ?? sr.cycles ?? sr.count ?? sr.qty ?? sr.value ?? 0)
+      if (!Number.isFinite(qty) || qty <= 0) continue
+      acc.set(reason, (acc.get(reason) || 0) + qty)
+    }
+  }
+  return [...acc.entries()]
+    .map(([reason, qty]) => ({ reason, qty }))
+    .sort((a, b) => b.qty - a.qty)
 }
 
 function mapStateType(rawType) {
@@ -171,6 +215,20 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
 
   const totalCycles = intervals.reduce((a, x) => a + x.cycles, 0)
   const expectedTotalCycles = intervals.reduce((a, x) => a + x.expectedCycles, 0)
+
+  // Piezas SEGÚN EL PROPIO SENSOR, separadas por denominador. Shoplogix las
+  // manda por intervalo y se descartaban; no son derivables de lo que
+  // guardábamos, y son la diferencia entre "rendimiento contra el tiempo que la
+  // máquina corrió" (uptime) y "contra el turno completo" (scheduled).
+  const rawIntervals = production.machineProduction || []
+  const sumRaw = (field) => rawIntervals.reduce((a, r) => {
+    const v = Number(r?.[field])
+    return a + (Number.isFinite(v) ? v : 0)
+  }, 0)
+  const uptimeCycles    = sumRaw('uptimeCycles')
+  const scheduledCycles = sumRaw('scheduledCycles')
+  const scrapByReason   = aggregateScrapReasons(rawIntervals)
+  const scrapTotal      = scrapByReason.reduce((a, x) => a + x.qty, 0)
   const last = intervals[intervals.length - 1]
   const totalPieces = last?.total ?? 0
   const expectedTotalPieces = last?.expectedTotal ?? 0
@@ -244,16 +302,27 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     intervals,
     states,
     threshold,
+    uptimeCycles,
+    scheduledCycles,
+    scrapByReason,
+    scrapTotal,
+    // Contadores de línea del sensor. En Chonchi/Filete vienen vacíos hoy; se
+    // guardan solo si traen algo para no engordar el doc con strings vacíos.
+    ...(production.finishedGoodUnits ? { finishedGoodUnits: String(production.finishedGoodUnits) } : {}),
+    ...(production.inventoryUnits    ? { inventoryUnits:    String(production.inventoryUnits) }    : {}),
+    ...(production.lineUnits         ? { lineUnits:         String(production.lineUnits) }         : {}),
     productionUnit: summary.productionUnits || production.productionUnits || '',
     comments: normalizeComments([...(summary.comments || []), ...(production.comments || [])]),
     source: 'shoplogix',
-    sourceVersion: 3,
+    // 4 = agrega targetRate por intervalo + uptimeCycles/scheduledCycles/scrap
+    sourceVersion: 4,
     syncedAt: syncedAt || new Date(),
   }
 }
 
 module.exports = {
   colorFromRatio,
+  aggregateScrapReasons,
   normalizeInterval,
   normalizeState,
   clipStateToWindow,

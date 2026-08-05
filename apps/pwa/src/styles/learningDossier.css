@@ -14,12 +14,19 @@
   --dp-ink-faint: #979d9a;
   --dp-rule:      #e0e2df;
   --dp-rule-hard: #c4c8c3;
-  --dp-accent:    #275874;
+  /* Acento = azul de marca AquaChile (rampa primary-600 #2a6aa6 para texto
+     sobre papel claro; azulClaro #9DC3E6 en oscuro). Antes petróleo #275874. */
+  --dp-accent:    #2a6aa6;
   --dp-warn:      #9c4a22;
   --dp-ok:        #38614c;
-  --dp-cond: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --dp-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
-  --dp-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif;
+  --dp-accent-soft: rgba(46, 117, 182, 0.10);
+  --dp-warn-soft:   rgba(156, 74, 34, 0.10);
+  --dp-ok-soft:     rgba(56, 97, 76, 0.10);
+  /* Tipografía unificada con la app (design system): IBM Plex Sans / Mono,
+     ya cargadas vía @fontsource en main.tsx. */
+  --dp-cond: "IBM Plex Sans", system-ui, sans-serif;
+  --dp-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --dp-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   background: var(--dp-paper);
   color: var(--dp-ink);
@@ -34,9 +41,12 @@
   --dp-ink-faint: #626c72;
   --dp-rule:      #232a2f;
   --dp-rule-hard: #363f45;
-  --dp-accent:    #7aacc7;
+  --dp-accent:    #9DC3E6;
   --dp-warn:      #d5885a;
   --dp-ok:        #63b58e;
+  --dp-accent-soft: rgba(157, 195, 230, 0.13);
+  --dp-warn-soft:   rgba(213, 136, 90, 0.13);
+  --dp-ok-soft:     rgba(99, 181, 142, 0.13);
 }
 
 /* Utilidades */
@@ -57,7 +67,7 @@
 .dossier .dp-eyebrow { font-family: var(--dp-mono); font-size: 11px; letter-spacing: .14em; color: var(--dp-ink-soft); }
 .dossier .dp-eyebrow b { color: var(--dp-accent); font-weight: 600; }
 .dossier .dp-eyebrow .sep { color: var(--dp-ink-faint); margin: 0 8px; }
-.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; text-transform: uppercase; font-size: clamp(33px, 6.5vw, 56px); line-height: 1.0; letter-spacing: .005em; margin: 20px 0 16px; text-wrap: balance; color: var(--dp-ink); }
+.dossier .dp-title { font-family: var(--dp-cond); font-weight: 700; font-size: clamp(26px, 4.5vw, 40px); line-height: 1.1; letter-spacing: -0.01em; margin: 18px 0 14px; text-wrap: balance; color: var(--dp-ink); }
 .dossier .dp-sub { font-size: 15px; color: var(--dp-ink-soft); max-width: 54ch; margin: 0; }
 
 .dossier .dp-meta { display: flex; flex-wrap: wrap; gap: 22px 44px; padding: 20px 0; margin-top: 30px; border-top: 1px solid var(--dp-rule); border-bottom: 1px solid var(--dp-rule); }
@@ -67,40 +77,60 @@
 .dossier .dp-hmi { margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; }
 .dossier .dp-hmi:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
-/* Tabs / índice */
-.dossier .dp-toc { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
-.dossier .dp-toc button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .02em; color: var(--dp-ink-soft); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: baseline; gap: 7px; }
-.dossier .dp-toc button b { color: var(--dp-ink-faint); }
-.dossier .dp-toc button:hover { color: var(--dp-ink); }
-.dossier .dp-toc button[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); }
-.dossier .dp-toc button[aria-current="true"] b { color: var(--dp-accent); }
+/* Selector de secciones de la máquina/curso — una sola fila subrayada con scroll
+   horizontal, igual en desktop y móvil (nunca se envuelve a 2 filas). Estilo
+   "documentation portal": subrayado, no píldoras — ver memoria de diseño del
+   Centro de Aprendizaje para el porqué (setproduct.com/blog/tabs-ui-design). */
+.dossier .dp-scroll-tabs { position: relative; display: flex; align-items: center; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-scroll-track { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.dossier .dp-scroll-track::-webkit-scrollbar { display: none; }
+.dossier .dp-scroll-tab { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-mono); font-size: 12px; letter-spacing: .01em; color: var(--dp-ink-faint); background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: color .15s ease, border-color .15s ease; }
+.dossier .dp-scroll-tab:hover { color: var(--dp-ink); }
+.dossier .dp-scroll-tab[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); font-weight: 600; }
+.dossier .dp-scroll-tab-done { color: var(--dp-ok); font-weight: 700; }
+.dossier .dp-scroll-fade { position: absolute; top: 0; right: 26px; bottom: 1px; width: 30px; background: linear-gradient(to right, transparent, var(--dp-paper)); pointer-events: none; }
+.dossier .dp-scroll-arrow { flex-shrink: 0; display: none; align-items: center; justify-content: center; width: 26px; height: 34px; background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; }
+.dossier .dp-scroll-arrow:hover { color: var(--dp-ink); }
+@media (min-width: 700px) {
+  /* Las flechas ayudan a quien usa mouse sin gesto horizontal; en touch el deslizar alcanza. */
+  .dossier .dp-scroll-arrow { display: flex; }
+}
 
-/* Cabecera de sección de contenido */
-.dossier .dp-sec-head { display: flex; align-items: baseline; gap: 14px; }
-.dossier .dp-sec-no { font-family: var(--dp-mono); font-size: 13px; font-weight: 600; color: var(--dp-accent); letter-spacing: .05em; }
-.dossier .dp-sec-no::before { content: "§ "; color: var(--dp-ink-faint); }
-.dossier .dp-sec-title { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(20px, 4vw, 27px); letter-spacing: .01em; margin: 0; line-height: 1.05; color: var(--dp-ink); }
+/* Progreso del curso en la portada */
+.dossier .dp-progress { display: flex; align-items: center; gap: 12px; margin-top: 18px; max-width: 420px; }
+.dossier .dp-progress-track { position: relative; flex: 1; height: 6px; border-radius: 999px; background: var(--dp-accent-soft); overflow: hidden; }
+.dossier .dp-progress-track > span { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--dp-accent); transition: width .5s ease; }
+.dossier .dp-progress-track.is-ok > span { background: var(--dp-ok); }
+.dossier .dp-progress-label { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-soft); white-space: nowrap; }
+.dossier .dp-progress-label.is-ok { color: var(--dp-ok); font-weight: 600; }
+
+.dossier .dp-course { display: block; }
+
+/* Cabecera de sección de contenido — eyebrow + título con barra de acento */
+.dossier .dp-sec-head { display: block; border-left: 3px solid var(--dp-accent); padding-left: 14px; }
+.dossier .dp-sec-no { display: block; font-family: var(--dp-mono); font-size: 11px; font-weight: 600; color: var(--dp-accent); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px; }
+.dossier .dp-sec-title { font-weight: 700; font-size: clamp(19px, 3.4vw, 24px); letter-spacing: 0; margin: 0; line-height: 1.15; color: var(--dp-ink); }
 .dossier .dp-sec-code { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .1em; color: var(--dp-ink-faint); text-transform: uppercase; margin-top: 12px; }
 
 /* Bloques de manual: objetivo, cuerpo, porqué, aviso, medidas, notas */
-.dossier .dp-objetivo { max-width: 66ch; margin: 22px 0; padding-left: 18px; border-left: 2px solid var(--dp-accent); }
+.dossier .dp-objetivo { max-width: 74ch; margin: 22px 0; padding-left: 18px; border-left: 2px solid var(--dp-accent); }
 .dossier .dp-objetivo .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 6px; }
 .dossier .dp-objetivo p { margin: 0; font-size: 15px; }
 
 /* "El porqué" — por qué importa la sección */
-.dossier .dp-porque { max-width: 66ch; font-size: 14px; color: var(--dp-ink-soft); margin: 20px 0; }
+.dossier .dp-porque { max-width: 74ch; font-size: 14px; color: var(--dp-ink-soft); margin: 20px 0; }
 .dossier .dp-porque .dp-lbl { color: var(--dp-ink-soft); }
 
 /* Autoevaluación al pie de una sección de manual (reusa dp-quiz-opt/fb) */
-.dossier .dp-selfquiz { max-width: 66ch; margin: 44px 0 0; padding-top: 26px; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-selfquiz { max-width: 74ch; margin: 44px 0 0; padding-top: 26px; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-selfquiz > .dp-lbl { color: var(--dp-ink-faint); display: block; margin-bottom: 18px; }
 .dossier .dp-selfquiz .dp-sq-item + .dp-sq-item { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-selfquiz .dp-q { font-size: 15px; font-weight: 600; color: var(--dp-ink); margin: 0 0 14px; line-height: 1.4; }
 
-.dossier .dp-body { max-width: 66ch; }
+.dossier .dp-body { max-width: 74ch; }
 .dossier .dp-body p { margin: 0 0 15px; }
 
-.dossier .dp-block { max-width: 66ch; margin: 26px 0; }
+.dossier .dp-block { max-width: 74ch; margin: 26px 0; }
 .dossier .dp-block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .dossier .dp-block-head .dp-lbl { color: var(--dp-ink-soft); }
 .dossier .dp-list { list-style: none; margin: 0; padding: 0; }
@@ -110,17 +140,19 @@
 .dossier .dp-block b { color: var(--dp-ink); font-weight: 600; }
 
 /* Aviso / nota operativa */
-.dossier .dp-aviso { max-width: 66ch; margin: 24px 0; padding-left: 18px; border-left: 2px solid var(--dp-warn); }
+.dossier .dp-aviso { max-width: 74ch; margin: 24px 0; padding-left: 18px; border-left: 2px solid var(--dp-warn); }
 .dossier .dp-aviso .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 6px; }
 .dossier .dp-aviso p, .dossier .dp-aviso li { font-size: 14px; color: var(--dp-ink-soft); }
 
-/* Medidas / especificaciones — tabla o lista mono */
-.dossier .dp-specs li { grid-template-columns: 1fr; }
-.dossier .dp-specs li::before { content: ""; }
-.dossier .dp-specs li { border-bottom: 1px solid var(--dp-rule); padding: 9px 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); }
+/* Medidas / especificaciones — fila etiqueta → valor (escaneable, mismo lenguaje que Consulta rápida) */
+.dossier .dp-specs-rows { margin: 0; }
+.dossier .dp-specs-row { display: grid; grid-template-columns: minmax(96px, 42%) 1fr; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--dp-rule); align-items: baseline; }
+.dossier .dp-specs-row:last-child { border-bottom: 0; }
+.dossier .dp-specs-row dt { margin: 0; font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-specs-row dd { margin: 0; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); font-weight: 600; overflow-wrap: anywhere; }
 
 /* Procedimientos — pasos con hairline, mono */
-.dossier .dp-proc { max-width: 66ch; margin: 6px 0 30px; }
+.dossier .dp-proc { max-width: 74ch; margin: 6px 0 30px; }
 .dossier .dp-proc-ol { list-style: none; counter-reset: st; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-proc-ol li { counter-increment: st; display: grid; grid-template-columns: 38px 1fr; padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-proc-ol li .dp-n { font-family: var(--dp-mono); font-weight: 600; color: var(--dp-ink-faint); font-size: 13px; }
@@ -137,10 +169,10 @@
 .dossier .dp-diag .dp-sol { font-size: 13.5px; color: var(--dp-ink-soft); margin-top: 5px; }
 .dossier .dp-diag .dp-sol .dp-lbl { color: var(--dp-ok); margin-right: 7px; }
 
-.dossier .dp-marg { max-width: 66ch; padding-left: 16px; border-left: 2px solid var(--dp-rule-hard); margin: 22px 0; font-size: 13px; color: var(--dp-ink-soft); }
+.dossier .dp-marg { max-width: 74ch; padding-left: 16px; border-left: 2px solid var(--dp-rule-hard); margin: 22px 0; font-size: 13px; color: var(--dp-ink-soft); }
 .dossier .dp-marg .dp-lbl { display: block; margin-bottom: 4px; }
 
-.dossier .dp-empty { max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 20px 0; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-empty { max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 20px 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-empty b { color: var(--dp-ink); font-weight: 600; }
 
 .dossier .dp-loading { font-family: var(--dp-mono); font-size: 13px; letter-spacing: .04em; color: var(--dp-ink-faint); padding: 40px 0; }
@@ -170,8 +202,57 @@
   .dossier .dp-doc .dp-index button[aria-current="true"] { border-left-color: var(--dp-accent); }
 }
 
+/* Buscador dentro del índice (manuales largos, 7+ secciones) */
+.dossier .dp-idx-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--dp-rule-hard); border-radius: 8px; padding: 7px 10px; margin: 0 0 12px; color: var(--dp-ink-faint); width: 100%; }
+.dossier .dp-idx-search input { border: 0; background: none; outline: none; font-family: var(--dp-mono); font-size: 12px; color: var(--dp-ink); width: 100%; }
+.dossier .dp-idx-search input::placeholder { color: var(--dp-ink-faint); }
+.dossier .dp-idx-count { font-family: var(--dp-mono); font-size: 10px; color: var(--dp-ink-faint); white-space: nowrap; }
+.dossier .dp-idx-empty { font-size: 12.5px; color: var(--dp-ink-faint); padding: 8px 0; }
+
+/* Link a un procedimiento mencionado dentro del texto del Manual */
+.dossier .dp-xlink { display: inline; font: inherit; color: var(--dp-accent); background: none; border: 0; padding: 0; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; cursor: pointer; font-weight: 600; }
+.dossier .dp-xlink:hover { color: var(--dp-ink); }
+
+/* Término del Glosario resaltado dentro del texto del Manual, con definición al pasar el mouse/foco */
+.dossier .dp-gterm { position: relative; color: var(--dp-ink); text-decoration: underline; text-decoration-style: dotted; text-decoration-color: var(--dp-ok); text-underline-offset: 3px; font-weight: 600; cursor: help; }
+.dossier .dp-gpop { display: none; position: absolute; bottom: 130%; left: 0; width: 240px; background: var(--dp-paper); border: 1px solid var(--dp-rule-hard); border-radius: 10px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 5; white-space: normal; }
+.dossier .dp-gterm:hover .dp-gpop, .dossier .dp-gterm:focus .dp-gpop { display: block; }
+.dossier .dp-gpop b { display: block; font-family: var(--dp-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--dp-ok); margin-bottom: 5px; }
+.dossier .dp-gpop span { font-size: 12px; color: var(--dp-ink-soft); line-height: 1.5; }
+
+/* Resaltado de la búsqueda del índice dentro del cuerpo de la sección activa */
+.dossier .dp-hit { background: color-mix(in srgb, var(--dp-accent) 30%, transparent); color: var(--dp-ink); border-radius: 3px; padding: 0 1px; }
+
+/* Iconos de tipo de contenido en el índice (pasos / autoevaluación) */
+.dossier .dp-idx-kind { font-family: var(--dp-mono); font-size: 10px; color: var(--dp-accent); flex-shrink: 0; }
+.dossier .dp-idx-kind.is-quiz { color: var(--dp-ok); }
+
+/* Botón "Todo lo crítico" al pie del índice */
+.dossier .dp-idx-critical { display: flex !important; align-items: baseline; gap: 8px; margin-top: 10px; padding-top: 14px !important; border-top: 1px solid var(--dp-rule); color: var(--dp-warn) !important; }
+.dossier .dp-idx-critical b { color: var(--dp-warn) !important; }
+.dossier .dp-idx-critical[aria-current="true"] { color: var(--dp-ink) !important; }
+
+/* Banner "Continuar donde quedaste" */
+.dossier .dp-resume { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--dp-accent); background: var(--dp-accent-soft); border-radius: 12px; padding: 12px 16px; margin-bottom: 26px; }
+.dossier .dp-resume-txt { display: flex; flex-direction: column; gap: 3px; }
+.dossier .dp-resume-txt span:last-child { font-size: 13px; color: var(--dp-ink); }
+.dossier .dp-resume-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.dossier .dp-resume-actions button:first-child { font-family: var(--dp-mono); font-size: 12px; color: var(--dp-paper); background: var(--dp-accent); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.dossier .dp-resume-dismiss { background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; font-size: 15px; padding: 0 4px; }
+
+
+/* Vista "Todo lo crítico" */
+.dossier .dp-critical .dp-crit-item { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--dp-rule); max-width: 74ch; }
+.dossier .dp-critical .dp-crit-item:first-of-type { padding-top: 26px; }
+.dossier .dp-critical .dp-crit-item:last-child { border-bottom: 0; }
+.dossier .dp-crit-ico { color: var(--dp-warn); flex-shrink: 0; font-size: 15px; margin-top: 1px; }
+.dossier .dp-crit-txt .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 5px; }
+.dossier .dp-crit-txt p { font-size: 13.5px; color: var(--dp-ink); margin: 0 0 8px; line-height: 1.55; }
+.dossier .dp-crit-txt button { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-accent); background: none; border: 0; padding: 0; cursor: pointer; }
+.dossier .dp-crit-txt button:hover { color: var(--dp-ink); }
+
 /* Navegación anterior / siguiente */
-.dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 74ch; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-nav button { font-family: var(--dp-mono); font-size: 12px; letter-spacing: .03em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 4px 0; }
 .dossier .dp-nav button:hover:not(:disabled) { color: var(--dp-accent); }
 .dossier .dp-nav button:disabled { color: var(--dp-ink-faint); opacity: .5; cursor: default; }
@@ -180,24 +261,24 @@
 /* Cabecera de sub-sección (sección de manual / bloque de casos) */
 .dossier .dp-subhead { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 4px; }
 .dossier .dp-subhead .dp-subno { font-family: var(--dp-mono); font-size: 12px; font-weight: 600; color: var(--dp-ink-faint); }
-.dossier .dp-subhead h3 { font-family: var(--dp-cond); text-transform: uppercase; font-weight: 700; font-size: clamp(17px, 3vw, 22px); letter-spacing: .01em; margin: 0; line-height: 1.1; color: var(--dp-ink); }
+.dossier .dp-subhead h3 { font-family: var(--dp-cond); font-weight: 600; font-size: clamp(16px, 2.8vw, 20px); letter-spacing: 0; margin: 0; line-height: 1.25; color: var(--dp-ink); }
 .dossier .dp-subhead + .dp-sec-code { margin-top: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--dp-rule); }
 
 /* Documentos descargables */
-.dossier .dp-docs { max-width: 66ch; margin: 22px 0; border-top: 1px solid var(--dp-rule); }
+.dossier .dp-docs { max-width: 74ch; margin: 22px 0; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-docs a { display: flex; align-items: baseline; gap: 10px; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); text-decoration: none; padding: 11px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-docs a::before { content: "↳"; color: var(--dp-accent); }
 .dossier .dp-docs a:hover { color: var(--dp-accent); }
 
 /* Figuras / referencias visuales */
-.dossier .dp-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; max-width: 66ch; margin: 22px 0; }
+.dossier .dp-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; max-width: 74ch; margin: 22px 0; }
 .dossier .dp-fig { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .dossier .dp-fig img { width: 100%; height: 200px; object-fit: contain; background: #fff; border: 1px solid var(--dp-rule); padding: 6px; filter: grayscale(18%); transition: filter .2s; }
 .dossier .dp-fig:hover img { filter: grayscale(0); }
 .dossier .dp-fig-empty { width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--dp-paper); border: 1px solid var(--dp-rule); color: var(--dp-ink-faint); }
 .dossier .dp-fig figcaption { display: flex; justify-content: space-between; gap: 8px; font-family: var(--dp-mono); font-size: 11px; color: var(--dp-ink-soft); margin-top: 7px; letter-spacing: .02em; }
 .dossier .dp-fig figcaption .dp-fig-zoom { color: var(--dp-accent); }
-.dossier .dp-fig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 66ch; margin: 8px 0 0; }
+.dossier .dp-fig-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 74ch; margin: 8px 0 0; }
 .dossier .dp-edit { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 1px 0; white-space: nowrap; }
 .dossier .dp-edit:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
@@ -220,7 +301,7 @@
 .dossier .dp-path .dp-caret { color: var(--dp-ink-faint); }
 
 /* Fórmula */
-.dossier .dp-formula { max-width: 66ch; margin: 18px 0; padding-left: 16px; border-left: 2px solid var(--dp-accent); }
+.dossier .dp-formula { max-width: 74ch; margin: 18px 0; padding-left: 16px; border-left: 2px solid var(--dp-accent); }
 .dossier .dp-formula .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 8px; }
 .dossier .dp-formula .dp-expr { font-family: var(--dp-mono); font-size: 14px; color: var(--dp-ink); margin: 0 0 12px; word-break: break-word; }
 .dossier .dp-formula dl { margin: 0; display: grid; gap: 5px; }
@@ -232,7 +313,7 @@
 .dossier .dp-proc-ol li .dp-c img { display: block; max-height: 220px; margin-top: 10px; border: 1px solid var(--dp-rule); background: #fff; padding: 4px; }
 
 /* Criterios de éxito */
-.dossier .dp-crit { max-width: 66ch; margin: 20px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
+.dossier .dp-crit { max-width: 74ch; margin: 20px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
 .dossier .dp-crit .dp-lbl { color: var(--dp-ok); display: block; margin-bottom: 8px; }
 .dossier .dp-crit ul { list-style: none; margin: 0; padding: 0; }
 .dossier .dp-crit li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; font-size: 13.5px; color: var(--dp-ink-soft); padding: 3px 0; }
@@ -249,9 +330,9 @@
 .dossier .dp-diag .dp-sol { margin-top: 12px; }
 
 /* Flujo de reacción (casos): disparador y cierre */
-.dossier .dp-flow-trigger { max-width: 66ch; margin: 2px 0 16px; padding-left: 16px; border-left: 2px solid var(--dp-warn); }
+.dossier .dp-flow-trigger { max-width: 74ch; margin: 2px 0 16px; padding-left: 16px; border-left: 2px solid var(--dp-warn); }
 .dossier .dp-flow-trigger .dp-lbl { color: var(--dp-warn); display: block; margin-bottom: 5px; }
-.dossier .dp-flow-end { max-width: 66ch; margin: 16px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
+.dossier .dp-flow-end { max-width: 74ch; margin: 16px 0 0; padding-left: 16px; border-left: 2px solid var(--dp-ok); }
 .dossier .dp-flow-end .dp-lbl { color: var(--dp-ok); display: block; margin-bottom: 5px; }
 .dossier .dp-flow-trigger p, .dossier .dp-flow-end p { margin: 0; font-size: 14px; color: var(--dp-ink-soft); }
 
@@ -278,13 +359,13 @@
 .dossier .dp-part-link:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
 /* Buscador (glosario) */
-.dossier .dp-search { display: block; width: 100%; max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); background: none; border: 0; border-bottom: 1px solid var(--dp-rule-hard); padding: 10px 2px; outline: none; margin-bottom: 6px; }
+.dossier .dp-search { display: block; width: 100%; max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink); background: none; border: 0; border-bottom: 1px solid var(--dp-rule-hard); padding: 10px 2px; outline: none; margin-bottom: 6px; }
 .dossier .dp-search::placeholder { color: var(--dp-ink-faint); }
 .dossier .dp-search:focus { border-bottom-color: var(--dp-accent); }
-.dossier .dp-noresult { max-width: 66ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 24px 0; }
+.dossier .dp-noresult { max-width: 74ch; font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-faint); padding: 24px 0; }
 
 /* Glosario */
-.dossier .dp-gloss { max-width: 66ch; list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-gloss { max-width: 74ch; list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-gloss > li { padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-gloss .dp-term { font-weight: 600; color: var(--dp-ink); font-size: 14.5px; }
 .dossier .dp-gloss .dp-alt { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-left: 8px; text-transform: uppercase; letter-spacing: .04em; }
@@ -293,7 +374,7 @@
 .dossier .dp-gloss .dp-lesson:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
 /* Bibliografía */
-.dossier .dp-biblio { max-width: 66ch; list-style: none; margin: 6px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); counter-reset: bib; }
+.dossier .dp-biblio { max-width: 74ch; list-style: none; margin: 6px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); counter-reset: bib; }
 .dossier .dp-biblio li { counter-increment: bib; display: grid; grid-template-columns: 34px 1fr; padding: 15px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-biblio li .dp-bibno { font-family: var(--dp-mono); color: var(--dp-ink-faint); font-size: 13px; }
 .dossier .dp-biblio li .dp-bibno::before { content: counter(bib, decimal-leading-zero); }
@@ -302,7 +383,7 @@
 .dossier .dp-biblio a:hover { text-decoration: underline; }
 
 /* Autoevaluación / examen */
-.dossier .dp-quiz { max-width: 66ch; }
+.dossier .dp-quiz { max-width: 74ch; }
 .dossier .dp-quiz-progress { display: flex; align-items: center; gap: 12px; font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-faint); margin-bottom: 26px; }
 .dossier .dp-quiz-bar { position: relative; flex: 1; height: 2px; background: var(--dp-rule); }
 .dossier .dp-quiz-bar > span { position: absolute; inset: 0 auto 0 0; background: var(--dp-accent); transition: width .4s ease; }
@@ -314,10 +395,12 @@
 .dossier .dp-quiz-opt .dp-k { font-family: var(--dp-mono); font-weight: 600; font-size: 12px; color: var(--dp-ink-faint); flex-shrink: 0; }
 .dossier .dp-quiz-opt .dp-otext { font-size: 14px; color: var(--dp-ink-soft); }
 .dossier .dp-quiz-opt:hover:not(:disabled) .dp-otext { color: var(--dp-ink); }
+.dossier .dp-quiz-opt[data-state="correct"] { background: var(--dp-ok-soft); }
 .dossier .dp-quiz-opt[data-state="correct"] .dp-k, .dossier .dp-quiz-opt[data-state="correct"] .dp-otext { color: var(--dp-ok); }
+.dossier .dp-quiz-opt[data-state="wrong"] { background: var(--dp-warn-soft); }
 .dossier .dp-quiz-opt[data-state="wrong"] .dp-k, .dossier .dp-quiz-opt[data-state="wrong"] .dp-otext { color: var(--dp-warn); }
-.dossier .dp-quiz-fb { max-width: 66ch; margin-top: 18px; padding-left: 16px; border-left: 2px solid var(--dp-ok); font-size: 13.5px; color: var(--dp-ink-soft); }
-.dossier .dp-quiz-fb.is-wrong { border-left-color: var(--dp-warn); }
+.dossier .dp-quiz-fb { max-width: 74ch; margin-top: 18px; padding: 12px 16px; border-left: 2px solid var(--dp-ok); background: var(--dp-ok-soft); font-size: 13.5px; color: var(--dp-ink-soft); }
+.dossier .dp-quiz-fb.is-wrong { border-left-color: var(--dp-warn); background: var(--dp-warn-soft); }
 .dossier .dp-quiz-fb .dp-lbl { display: block; margin-bottom: 5px; color: var(--dp-ok); }
 .dossier .dp-quiz-fb.is-wrong .dp-lbl { color: var(--dp-warn); }
 .dossier .dp-quiz-next { font-family: var(--dp-mono); font-size: 12.5px; letter-spacing: .03em; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; margin-top: 22px; }
@@ -325,7 +408,7 @@
 .dossier .dp-quiz-score { font-family: var(--dp-cond); font-weight: 700; font-size: clamp(40px, 9vw, 60px); line-height: 1; color: var(--dp-ink); margin: 0; letter-spacing: .01em; }
 .dossier .dp-quiz-pct { font-family: var(--dp-mono); font-size: 13px; margin-top: 8px; }
 .dossier .dp-quiz-msg { font-size: 14px; color: var(--dp-ink-soft); margin-top: 6px; max-width: 48ch; }
-.dossier .dp-quiz-review { max-width: 66ch; list-style: none; margin: 34px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
+.dossier .dp-quiz-review { max-width: 74ch; list-style: none; margin: 34px 0 0; padding: 0; border-top: 1px solid var(--dp-rule-hard); }
 .dossier .dp-quiz-review li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--dp-rule); }
 .dossier .dp-quiz-review .dp-mark { font-family: var(--dp-mono); font-weight: 700; font-size: 13px; }
 .dossier .dp-quiz-review .dp-mark.ok { color: var(--dp-ok); }
@@ -333,5 +416,94 @@
 .dossier .dp-quiz-review .dp-rq { font-size: 13.5px; font-weight: 600; color: var(--dp-ink); }
 .dossier .dp-quiz-review .dp-ra { font-size: 12.5px; color: var(--dp-ink-soft); margin-top: 4px; }
 .dossier .dp-quiz-review .dp-ra b { color: var(--dp-ok); font-weight: 600; }
+
+/* Resultado en anillo — acompaña al puntaje grande, no lo reemplaza. */
+.dossier .dp-quiz-ring { display: flex; align-items: center; gap: 22px; margin: 10px 0 4px; }
+.dossier .dp-quiz-ring svg { flex-shrink: 0; }
+.dossier .dp-quiz-ring-num { font-family: var(--dp-mono); font-size: 20px; font-weight: 600; }
+.dossier .dp-quiz-ring-thr { font-family: var(--dp-mono); font-size: 10.5px; color: var(--dp-ink-faint); margin-top: 4px; }
+
+/* Diagrama con puntos de referencia (hotspots) — despiece de equipo con notas al tocar. */
+.dossier .dp-hotspot { max-width: 1000px; margin: 22px 0; }
+.dossier .dp-hotspot-stage { position: relative; border: 1px solid var(--dp-rule-hard); background: var(--dp-paper); min-height: 220px; overflow: hidden; }
+.dossier .dp-hotspot-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (min-width: 700px) {
+  .dossier .dp-hotspot-stage { min-height: 360px; }
+}
+/* En desktop la foto real con `aspectRatio` puede crecer demasiado (una foto en
+   retrato a 1000px de ancho pasa de 1300px de alto) — capar el ancho del stage
+   cuando trae una foto real (no la ilustración plana original, que sí usa el
+   ancho completo). Móvil no se toca: ya cabe dentro del viewport angosto. */
+@media (min-width: 700px) {
+  .dossier .dp-hotspot[data-photo] { max-width: 480px; }
+}
+.dossier .dp-hotspot-point {
+  position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+  border-radius: 50%; border: 1px solid var(--dp-accent); background: var(--dp-paper);
+  color: var(--dp-accent); font-family: var(--dp-mono); font-weight: 600; font-size: 11px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.dossier .dp-hotspot-point:hover { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-point[aria-pressed="true"] { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-hotspot-legend { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 14px; }
+.dossier .dp-hotspot-legend-item {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dp-ink-soft);
+  background: none; border: 1px solid var(--dp-rule); border-radius: 999px; padding: 4px 11px 4px 8px; cursor: pointer;
+}
+.dossier .dp-hotspot-legend-item b { font-family: var(--dp-mono); color: var(--dp-accent); }
+.dossier .dp-hotspot-legend-item:hover { border-color: var(--dp-accent); color: var(--dp-ink); }
+.dossier .dp-hotspot-legend-item[aria-pressed="true"] { background: var(--dp-accent-soft); border-color: var(--dp-accent); color: var(--dp-ink); }
+/* Nota del punto activo — SIEMPRE debajo del stage, nunca superpuesta ni recortada
+   (antes flotaba sobre la foto con `position:absolute` y tapaba otros puntos o se
+   cortaba contra `overflow:hidden` del stage). */
+.dossier .dp-hotspot-note {
+  margin-top: 12px; background: var(--dp-accent-soft); border: 1px solid var(--dp-accent);
+  border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: var(--dp-ink); line-height: 1.5;
+}
+.dossier .dp-hotspot-note .dp-lbl { color: var(--dp-accent); display: block; margin-bottom: 4px; }
+.dossier .dp-hotspot-note p { margin: 0; }
+
+/* Galería de "Componentes del equipo" — 2 columnas en desktop (antes 1 columna
+   angosta dejaba media pantalla vacía a la derecha); móvil sigue 1 columna. */
+.dossier .dp-components-grid { display: grid; grid-template-columns: 1fr; gap: 8px 32px; }
+@media (min-width: 1000px) {
+  .dossier .dp-components-grid { grid-template-columns: 1fr 1fr; }
+  .dossier .dp-components-grid .dp-hotspot[data-photo] { max-width: none; }
+}
+
+/* Consulta rápida — pestañas horizontales por grupo + 1 tarjeta activa */
+.dossier .dp-qr { max-width: 900px; }
+.dossier .dp-qr-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.dossier .dp-qr-tabs button { font-family: var(--dp-mono); font-size: 11.5px; letter-spacing: .02em; color: var(--dp-ink-soft); background: var(--dp-accent-soft); border: 1px solid transparent; border-radius: 999px; padding: 6px 13px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.dossier .dp-qr-tabs button:hover { color: var(--dp-ink); border-color: var(--dp-accent); }
+.dossier .dp-qr-tabs button[aria-current="true"] { background: var(--dp-accent); color: var(--dp-paper); }
+.dossier .dp-qr-card { border: 1px solid var(--dp-rule-hard); border-radius: 12px; background: var(--dp-paper); padding: 16px 18px; }
+.dossier .dp-qr-title { font-size: 13px; font-weight: 700; color: var(--dp-accent); margin: 0 0 10px; }
+.dossier .dp-qr-rows { margin: 0; }
+.dossier .dp-qr-row { display: grid; grid-template-columns: minmax(96px, 38%) 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--dp-rule); align-items: baseline; }
+.dossier .dp-qr-row:last-child { border-bottom: 0; }
+.dossier .dp-qr-row dt { font-family: var(--dp-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--dp-ink-faint); }
+.dossier .dp-qr-row dd { margin: 0; font-family: var(--dp-mono); font-size: 12.5px; color: var(--dp-ink); line-height: 1.5; overflow-wrap: anywhere; }
+.dossier .dp-qr-note { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--dp-warn); font-size: 12px; color: var(--dp-ink-soft); }
+.dossier .dp-qr-masked { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-body); font-size: 12px; color: var(--dp-ink-faint); font-style: italic; }
+
+/* Ejercicio de relacionar término ↔ definición — filas rellenas redondeadas. */
+.dossier .dp-match { max-width: 1000px; margin: 26px 0; }
+.dossier .dp-match-grid { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr; gap: 8px 20px; }
+.dossier .dp-match-item {
+  display: block; width: 100%; text-align: left;
+  background: var(--dp-paper); border: 1px solid var(--dp-rule-hard); border-radius: 9px;
+  padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  font-size: 13px; color: var(--dp-ink-soft); font-family: var(--dp-body);
+  transition: background .15s ease, border-color .15s ease;
+}
+.dossier .dp-match-grid > div:first-child .dp-match-item { background: var(--dp-accent-soft); font-weight: 600; color: var(--dp-ink); }
+.dossier .dp-match-item:disabled { cursor: default; }
+.dossier .dp-match-item:hover:not(:disabled) { border-color: var(--dp-accent); }
+.dossier .dp-match-item[data-state="selected"] { color: var(--dp-accent); border-color: var(--dp-accent); background: var(--dp-accent-soft); }
+.dossier .dp-match-grid .dp-match-item[data-state="matched"] { color: var(--dp-ok); background: var(--dp-ok-soft); border-color: var(--dp-ok); }
+.dossier .dp-match-item[data-state="wrong"] { color: var(--dp-warn); background: var(--dp-warn-soft); border-color: var(--dp-warn); }
+.dossier .dp-match-status { font-family: var(--dp-mono); font-size: 11.5px; color: var(--dp-ink-faint); margin-top: 12px; }
+.dossier .dp-match-status.is-done { color: var(--dp-ok); }
 
 .dossier a:focus-visible, .dossier button:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 3px; }
