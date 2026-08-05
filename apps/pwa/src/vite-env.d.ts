@@ -26,3 +26,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+// Identidad del build, inyectada por `define` en vite.config.ts.
+// Ver src/constants/buildInfo.ts.
+declare const __BUILD_SHA__: string
+declare const __BUILD_TIME__: string

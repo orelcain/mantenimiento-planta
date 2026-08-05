@@ -19,7 +19,8 @@
     "sync:equipment:help": "node scripts/sync_equipment_from_hierarchy.js --help",
     "migrate:gantt:default-project": "node scripts/migrate_gantt_default_project.js --apply",
     "audit:theme": "node scripts/audit-theme.mjs",
-    "check:contrast": "node scripts/check-contrast.mjs"
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "stamp:build": "node scripts/stamp-build-info.mjs"
   },
   "devDependencies": {
     "mammoth": "^1.11.0",

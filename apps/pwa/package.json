@@ -7,7 +7,7 @@
     "dev": "pnpm run sync:version && vite",
     "sync:version": "node ../../scripts/sync-pwa-version.mjs",
     "prebuild": "pnpm run sync:version",
-    "build": "vite build",
+    "build": "vite build && node ../../scripts/stamp-build-info.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
