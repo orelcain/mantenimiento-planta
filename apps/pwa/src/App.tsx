@@ -82,6 +82,7 @@ const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGra
 const GraderQuickChangePage = lazyWithReload(() => import('@/pages/AnalisisGrader/GraderQuickChangePage').then((mod) => ({ default: mod.GraderQuickChangePage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
+const AnalisisGraderConfigPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderConfigPage').then((mod) => ({ default: mod.AnalisisGraderConfigPage })))
 
 // Redirect legacy `/analisis-grader/detalle?date=X&shift=Y` → `/analisis-grader/turno/:id`
 // Conservado para no romper links externos existentes tras la eliminación de DetallePage (2.118.0).
@@ -676,6 +677,13 @@ export function App() {
             <Route path="analisis-grader/turno/:shiftId" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderTurnoPage />
+              </Suspense>
+            } />
+            {/* Config GLOBAL del Grader (línea física, umbrales, rangos):
+                aplica a todos los turnos → ruta propia, solo admin. */}
+            <Route path="analisis-grader/config" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderConfigPage />
               </Suspense>
             } />
             <Route path="analisis-grader/quick-change" element={
