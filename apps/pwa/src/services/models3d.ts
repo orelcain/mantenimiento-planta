@@ -59,6 +59,54 @@ function parseModelDoc(docSnap: { id: string; data: () => Record<string, unknown
   }
 }
 
+/**
+ * Borra el archivo recién subido cuando el documento no se pudo crear.
+ *
+ * Nunca lanza: el error que le importa a quien sube es el ORIGINAL (por qué se
+ * rechazó el documento), no que además falló la limpieza. Si el borrado falla
+ * queda un huérfano y se registra para poder encontrarlo.
+ */
+async function rollbackUploadedFile(storagePath: string): Promise<void> {
+  try {
+    await deleteObject(ref(storage, storagePath))
+    logger.info('Subida revertida: archivo huérfano eliminado de Storage', { storagePath })
+  } catch (cleanupError) {
+    logger.error(
+      'No se pudo revertir la subida: queda un archivo huérfano en Storage',
+      cleanupError as Error,
+      { storagePath },
+    )
+  }
+}
+
+/**
+ * Traduce un fallo de subida a algo accionable para quien está mirando la pantalla.
+ *
+ * Sin esto, a quien no es admin le aparece `storage/unauthorized` o
+ * "Missing or insufficient permissions" — cierto pero inútil: no dice que el
+ * problema es el rol ni qué hacer.
+ *
+ * @param discarded true si ya había un archivo en Storage y se descartó, para no
+ *   prometer una limpieza que no ocurrió cuando el fallo fue en la subida misma.
+ */
+function describeUploadFailure(error: unknown, discarded = false): Error {
+  const code = (error as { code?: string })?.code
+  const tail = discarded ? ' El archivo subido se descartó.' : ''
+
+  // 'storage/unauthorized' → storage.rules (subida del archivo).
+  // 'permission-denied'   → firestore.rules (creación del doc).
+  // Los dos significan lo mismo para el usuario: falta rol de administrador.
+  if (code === 'storage/unauthorized' || code === 'permission-denied') {
+    return new Error(
+      'No tienes permisos para publicar modelos 3D: se requiere rol de administrador.' +
+        `${tail} Pídele a un administrador que lo suba.`,
+    )
+  }
+
+  const detail = error instanceof Error ? error.message : String(error)
+  return new Error(`No se pudo registrar el modelo: ${detail}.${tail}`)
+}
+
 // ============================================================================
 // CRUD
 // ============================================================================
@@ -92,18 +140,24 @@ export async function uploadModel3D(
     contentType: file.type || 'application/octet-stream',
   })
 
-  // Esperar subida con reporte de progreso
-  await new Promise<void>((resolve, reject) => {
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        onProgress?.(progress)
-      },
-      (error) => reject(error),
-      () => resolve()
-    )
-  })
+  // Esperar subida con reporte de progreso.
+  // storage.rules pide isAdmin() para escribir el archivo del modelo, así que un
+  // no-admin falla acá, en el primer byte, y no después de subir 40 MB.
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          onProgress?.(progress)
+        },
+        (error) => reject(error),
+        () => resolve()
+      )
+    })
+  } catch (error) {
+    throw describeUploadFailure(error)
+  }
 
   // Obtener URL de descarga
   const downloadURL = await getDownloadURL(storageRef)
@@ -121,13 +175,26 @@ export async function uploadModel3D(
     visibility: 'public',
   }
 
+  // Storage y Firestore NO exigen lo mismo: storage.rules deja escribir en
+  // `models3d/**` a cualquier autenticado, pero crear el doc pide isAdmin().
+  // Como el archivo se sube ANTES que el doc, un no-admin dejaba el .glb en el
+  // bucket para siempre y el modelo no aparecía en ninguna parte — invisible
+  // desde la app, así que ni siquiera se podía borrar desde la UI. Así apareció
+  // `models3d/862bb7b2-.../test.glb` (4,7 MB, 22-05-2026).
+  //
+  // Si el doc no se puede crear, el archivo se va con él.
   const docRef = doc(db, COLLECTION, modelId)
-  await setDoc(docRef, {
-    ...modelData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    updatedBy: userId,
-  })
+  try {
+    await setDoc(docRef, {
+      ...modelData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    })
+  } catch (error) {
+    await rollbackUploadedFile(storagePath)
+    throw describeUploadFailure(error, true)
+  }
 
   return {
     id: modelId,
