@@ -24,7 +24,8 @@
       "Read(//c/Users/pc hp/AppData/Roaming/Code/User/**)",
       "Read(//c/Users/pc hp/AppData/Roaming/npm/node_modules/claude-flow/**)",
       "Bash(xargs grep:*)",
-      "mcp__nanobanana__generate_image"
+      "mcp__nanobanana__generate_image",
+      "mcp__bf7c680d-5fdc-5ef4-b4a0-abadb619bf0a__send_later"
     ],
     "additionalDirectories": [
       "C:\\Users\\pc hp\\AppData\\Roaming\\npm\\node_modules\\claude-flow\\v3\\@claude-flow\\cli\\dist\\src\\mcp-tools"
