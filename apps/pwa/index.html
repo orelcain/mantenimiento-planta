@@ -14,7 +14,12 @@
          Deliberadamente permisivo en connect-src/img-src/frame-src (https: genérico) para
          no romper embeds/mapas/APIs externas que no se pudieron probar todas en esta
          sesión — bloquea lo más peligroso: script-src fuera de https:, object-src,
-         base-uri y form-action a dominios ajenos. -->
+         base-uri y form-action a dominios ajenos.
+         ⚠ NO quitar `blob:` de connect-src: three.js/GLTFLoader carga las texturas
+         embebidas de un .glb con `fetch(blob:...)` (ImageBitmapLoader). Sin blob: en
+         connect-src el fetch se bloquea, GLTFLoader tira "Couldn't load texture blob:"
+         y el modelo del Visor 3D se ve blanco/sin texturas (bug real 2026-08-04:
+         "Bomba Sihi"). blob: es same-origin y lo crea la propia página → riesgo nulo. -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
@@ -22,7 +27,7 @@
       img-src 'self' data: blob: https:;
       font-src 'self' data: https:;
       media-src 'self' data: blob: https:;
-      connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*;
+      connect-src 'self' blob: https: wss: http://localhost:* http://127.0.0.1:*;
       frame-src 'self' https:;
       worker-src 'self' blob:;
       object-src 'none';
