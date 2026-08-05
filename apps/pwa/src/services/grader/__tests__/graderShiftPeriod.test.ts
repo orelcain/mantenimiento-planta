@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildPeriodShifts,
   periodShiftRows,
+  indexPeriodShiftsByRow,
   periodDayKeys,
   formatShiftWindow,
   dateKeyOfWallUTC,
@@ -320,5 +321,61 @@ describe('P0', () => {
       pointZeroPct: undefined as unknown as number,
     })])
     expect(sinPct!.p0Pct).toBeCloseTo(5, 5)
+  })
+})
+
+/**
+ * Los lunes en Chonchi, Shoplogix parte el nocturno en dos nombres: el horario
+ * especial de arranque de semana llega como `Turno 1 Lunes` (00:00→07:15) y el
+ * nocturno normal como `Turno 1` (21:15→05:00). Datos reales del 2026-08-03.
+ */
+describe('mismo turno, dos nombres el mismo día', () => {
+  const lunes = () => build([
+      parent({
+        dateKey: '2026-08-03', shiftId: 'Turno 1 Lunes',
+        scheduledStart: wall('2026-08-03T00:00:00'), scheduledEnd: wall('2026-08-03T07:15:00'),
+        machines: [machine(3452, 0.8), machine(268, 0.4)],
+      }),
+      parent({
+        dateKey: '2026-08-03', shiftId: 'Turno 1',
+        scheduledStart: wall('2026-08-03T21:15:00'), scheduledEnd: wall('2026-08-04T05:00:00'),
+        machines: [machine(4168, 0.9), machine(2722, 0.7)],
+      }),
+    parent({
+      dateKey: '2026-08-03', shiftId: 'Turno 2',
+      scheduledStart: wall('2026-08-03T09:15:00'), scheduledEnd: wall('2026-08-03T17:00:00'),
+      machines: [machine(6526, 0.85)],
+    }),
+  ])
+
+  it('la matriz los pone en UNA fila, no en dos "Turno 1"', () => {
+    const rows = periodShiftRows(lunes())
+    expect(rows.filter(r => r === 'Turno 1')).toHaveLength(1)
+    // El orden sigue siendo por hora típica de arranque, que es la regla de la
+    // vista. Al unirse, la del Turno 1 pasa a ser la del nocturno (21:15) —el
+    // horario que corre de martes a viernes— así que queda bajo el de mañana.
+    expect(rows).toEqual(['Turno 2', 'Turno 1'])
+  })
+
+  it('la celda del lunes suma las dos jornadas y deja ver el desglose', () => {
+    const byRow = indexPeriodShiftsByRow(lunes())
+    const celda = byRow.get('2026-08-03__Turno 1')
+    expect(celda).toBeTruthy()
+    expect(celda!.cycles).toBe(3452 + 268 + 4168 + 2722)
+    expect(celda!.mergedFrom?.map(i => i.shiftId)).toEqual(['Turno 1 Lunes', 'Turno 1'])
+  })
+
+  it('la celda conserva la identidad de un turno que EXISTE, para poder abrirlo', () => {
+    const celda = indexPeriodShiftsByRow(lunes()).get('2026-08-03__Turno 1')!
+    // La instancia de más producción presta su shiftId: el link del detalle
+    // apunta a un doc real de Firestore, no al nombre normalizado.
+    expect(celda.shiftId).toBe('Turno 1')
+    expect(celda.mergedFrom!.some(i => i.shiftId === 'Turno 1 Lunes')).toBe(true)
+  })
+
+  it('un turno que corre una sola vez no se marca como fusionado', () => {
+    const celda = indexPeriodShiftsByRow(lunes()).get('2026-08-03__Turno 2')!
+    expect(celda.mergedFrom).toBeUndefined()
+    expect(celda.cycles).toBe(6526)
   })
 })

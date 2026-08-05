@@ -28,7 +28,7 @@ import {
   buildPeriodShifts,
   periodShiftRows,
   periodDayKeys,
-  indexPeriodShifts,
+  indexPeriodShiftsByRow,
   type PeriodShift,
 } from '@/services/grader/graderShiftPeriod'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -147,7 +147,7 @@ export function useGraderShiftPeriod(
     [base, unsIntervals],
   )
   const rows = useMemo(() => periodShiftRows(shifts), [shifts])
-  const byKey = useMemo(() => indexPeriodShifts(shifts), [shifts])
+  const byKey = useMemo(() => indexPeriodShiftsByRow(shifts), [shifts])
 
   const refresh = useCallback(() => setNonce(n => n + 1), [])
 
