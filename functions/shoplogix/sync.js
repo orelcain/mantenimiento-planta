@@ -483,6 +483,63 @@ async function fetchOfficialRollup({ query, plantSlug, at, logger = console }) {
  * Ambas fechas vienen en la misma escala (wall-clock-as-UTC), comparables
  * entre sí sin conversión.
  */
+/**
+ * Duración máxima creíble para un turno. Los reales rondan 7-9 h; el más largo
+ * visto (Yal "Turno 2", 14:45→00:00) son 9,25 h. 16 h deja margen de sobra para
+ * horas extra o turnos empalmados, y sigue muy por debajo de las ventanas
+ * corruptas (22-23 h) que motivan este chequeo.
+ */
+const MAX_SHIFT_MS = 16 * 3600_000
+
+/**
+ * Resuelve la ventana del turno cuando la derivada de intervals es imposible.
+ *
+ * `deriveShiftGroups` toma el primer `start` y el último `end` de los intervals
+ * que Shoplogix etiquetó con ese turno. Si Shoplogix re-etiqueta intervals de
+ * OTRO turno —pasa: el 3-ago-2026 el "Turno 2" de Chonchi saltó de 3.333 a
+ * 10.462 piezas 24 h después del cierre, y su ventana se estiró de 7,75 h a
+ * 22,75 h— la envolvente queda absurda y se traga turnos vecinos enteros.
+ *
+ * Consecuencia real: al segmentar el Excel del Grader con esa ventana, las 6.526
+ * piezas del turno de día quedaron fuera de todo turno y desaparecieron de los
+ * KPIs sin ninguna señal.
+ *
+ * Ojo con el orden del razonamiento: `isOfficialScheduleSane` valida el horario
+ * oficial CONTRA el derivado, asumiendo que el derivado es la verdad. Cuando el
+ * corrupto es el derivado, esa comparación descarta el dato bueno. Por eso acá
+ * el oficial se valida POR SÍ MISMO (duración creíble + mismo arranque), no
+ * contra el derivado.
+ *
+ * Conservador a propósito: solo actúa si el derivado es imposible Y el oficial
+ * es creíble. Sin oficial, o con un oficial igual de malo, se respeta el
+ * derivado — el comportamiento de siempre.
+ */
+function resolveShiftWindow({ scheduledStart, scheduledEnd, officialStart, officialEnd }) {
+  const sinCambio = { start: scheduledStart, end: scheduledEnd, corregida: false }
+
+  const durDerivada = scheduledEnd.getTime() - scheduledStart.getTime()
+  if (durDerivada > 0 && durDerivada <= MAX_SHIFT_MS) return sinCambio   // derivado creíble
+
+  if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return sinCambio
+  if (!(officialEnd instanceof Date) || isNaN(officialEnd.getTime())) return sinCambio
+
+  const durOficial = officialEnd.getTime() - officialStart.getTime()
+  if (!(durOficial > 0 && durOficial <= MAX_SHIFT_MS)) return sinCambio  // oficial tampoco sirve
+
+  // El oficial tiene que describir ESTE turno, no una plantilla de otro día: se
+  // exige que arranque a menos de 12 h del inicio derivado (el inicio casi nunca
+  // se corrompe — lo que se estira es el cierre, que es el último interval).
+  if (Math.abs(officialStart.getTime() - scheduledStart.getTime()) > 12 * 3600_000) return sinCambio
+
+  return {
+    start: officialStart,
+    end: officialEnd,
+    corregida: true,
+    motivo: `ventana derivada de intervals imposible (${(durDerivada / 3600_000).toFixed(1)} h): `
+      + `se adopta el horario oficial (${(durOficial / 3600_000).toFixed(1)} h)`,
+  }
+}
+
 function isOfficialScheduleSane({ officialStart, officialEnd, scheduledStart, scheduledEnd }) {
   const MAX_DRIFT_MS = 12 * 3600_000
   if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return false
@@ -712,6 +769,30 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
   // 3. Por cada turno: filtrar intervals + normalize + escribir
   for (const group of shiftGroups) {
+    // Ventana imposible por re-etiquetado de Shoplogix → adoptar el horario
+    // oficial (ver resolveShiftWindow). Va PRIMERO: el freeze-check, los filtros
+    // de intervals, los aggregates y el doc leen todos `group.scheduled*`, así
+    // que corregir acá arregla el turno completo en vez de parchar cada uso.
+    const oficialDeEsteTurno = officialRollup && officialRollup.shiftLabel === group.shiftId
+      ? officialRollup
+      : null
+    const ventana = resolveShiftWindow({
+      scheduledStart: group.scheduledStart,
+      scheduledEnd:   group.scheduledEnd,
+      officialStart:  oficialDeEsteTurno?.officialStart,
+      officialEnd:    oficialDeEsteTurno?.officialEnd,
+    })
+    if (ventana.corregida) {
+      logger.warn(
+        `[syncDay][${plantSlug}] ${group.shiftId}: ${ventana.motivo} `
+        + `(${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)} ⇒ `
+        + `${toShoplogixTime(ventana.start)}→${toShoplogixTime(ventana.end)})`,
+      )
+      group.scheduledStart = ventana.start
+      group.scheduledEnd = ventana.end
+      group.ventanaCorregida = ventana.motivo
+    }
+
     // dateKey del doc = día calendario donde ARRANCA el turno (ver nota extensa
     // más abajo, junto al armado del doc de máquina).
     const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
@@ -951,7 +1032,11 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       rawShiftId:     group.rawShiftId ?? group.shiftId,
       scheduledStart: group.scheduledStart,
       scheduledEnd:   group.scheduledEnd,
-      scheduleSource: 'intervals',
+      // 'official-corregido' deja rastro de que esta ventana NO salió de los
+      // intervals: sin esto, un turno corregido es indistinguible de uno normal
+      // y el próximo que investigue vuelve a perder el rato.
+      scheduleSource: group.ventanaCorregida ? 'official-corregido' : 'intervals',
+      ...(group.ventanaCorregida ? { ventanaCorregida: group.ventanaCorregida } : {}),
       lastSyncAt:     syncedAt,
       machines:       shiftMachineResults,
       // Ventana efectiva de producción (primer/último uptime real). Null si el
@@ -1129,6 +1214,8 @@ module.exports = {
   deriveShiftGroups,
   fetchOfficialRollup,
   isOfficialScheduleSane,
+  resolveShiftWindow,
+  MAX_SHIFT_MS,
   shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
