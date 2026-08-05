@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { APP_VERSION } from '@/constants/version'
+import { BUILD_SHA } from '@/constants/buildInfo'
 import { logger } from '@/lib/logger'
 import { getAssetUrl } from '@/lib/config'
 
@@ -19,6 +20,36 @@ function isNewerVersion(serverVer: string, currentVer: string): boolean {
   if (sM !== cM) return sM > cM
   if (sm !== cm) return sm > cm
   return sp > cp
+}
+
+/**
+ * ¿Hay que avisar de una versión nueva? Dos señales, no una:
+ *
+ * 1. **semver mayor** → release marcado a mano.
+ * 2. **`buildSha` distinto** → hay OTRO build desplegado aunque nadie haya
+ *    tocado el semver.
+ *
+ * La segunda es la que faltaba. Entre el 23/07 y el 04/08/2026 la versión quedó
+ * fija en 3.99.6 con 39 mejoras ya en producción: la condición (1) no se cumplió
+ * nunca, así que el aviso jamás salió y la gente siguió con el bundle viejo.
+ *
+ * `currentSha === 'dev'` (build local sin git) desactiva la señal (2) para no
+ * avisar de una "actualización" en cada `pnpm dev`.
+ *
+ * Pura y exportada a propósito: es la regla que decide si el usuario ve el
+ * banner, y se testea sin montar el hook.
+ */
+export function shouldNotifyUpdate(
+  server: { version?: string; buildSha?: string },
+  current: { version: string; buildSha: string },
+): { update: boolean; reason: 'semver' | 'buildSha' | null } {
+  if (server.version && isNewerVersion(server.version, current.version)) {
+    return { update: true, reason: 'semver' }
+  }
+  if (server.buildSha && current.buildSha !== 'dev' && server.buildSha !== current.buildSha) {
+    return { update: true, reason: 'buildSha' }
+  }
+  return { update: false, reason: null }
 }
 
 export function useAppVersion() {
@@ -56,16 +87,25 @@ export function useAppVersion() {
 
           const data = await response.json()
           const serverVersion = data.version
-          
-          if (serverVersion && isNewerVersion(serverVersion, APP_VERSION)) {
+          const serverSha: string | undefined = data.buildSha
+
+          const { update, reason } = shouldNotifyUpdate(
+            { version: serverVersion, buildSha: serverSha },
+            { version: APP_VERSION, buildSha: BUILD_SHA },
+          )
+
+          if (update) {
             logger.info('New app version detected', {
               current: APP_VERSION,
+              currentSha: BUILD_SHA,
               new: serverVersion,
+              newSha: serverSha ?? null,
+              reason,
             })
             setNewVersion(serverVersion)
             setHasUpdate(true)
           } else {
-            // Versiones iguales o servidor tiene versión más antigua → sin banner
+            // Mismo build y mismo (o menor) semver → sin banner
             setHasUpdate(false)
             setNewVersion(null)
           }

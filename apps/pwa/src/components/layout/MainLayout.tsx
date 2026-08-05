@@ -43,6 +43,7 @@ import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
+import { formatBuildLabel } from '@/constants/buildInfo'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
@@ -584,10 +585,12 @@ export function MainLayout() {
             })}
           </nav>
 
-          {/* Version label */}
+          {/* Version label — el sello de build responde "¿tengo lo último?" aunque
+              nadie haya subido el semver (ver constants/buildInfo.ts). */}
           <div className="px-4 pb-2">
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
               <span>v{APP_VERSION}</span>
+              <span className="text-[10px] opacity-70 tabular-nums">{formatBuildLabel()}</span>
               {isAdmin && (
                 <Button
                   size="icon"
@@ -737,6 +740,7 @@ export function MainLayout() {
               <div className="px-4 pb-2 flex items-center gap-2">
                 <div className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
                   <span>v{APP_VERSION}</span>
+                  <span className="text-[10px] opacity-70 tabular-nums">{formatBuildLabel()}</span>
                 </div>
               </div>
 
@@ -857,9 +861,9 @@ export function MainLayout() {
                 <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
               </button>
             )}
-            {/* Version badge */}
+            {/* Version badge — acá no hay espacio para el sello, va en el tooltip. */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
-              <span>v{APP_VERSION}</span>
+              <span title={`build ${formatBuildLabel()}`}>v{APP_VERSION}</span>
               {isAdmin && (
                 <Button
                   size="icon"

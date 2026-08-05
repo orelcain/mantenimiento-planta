@@ -32,6 +32,7 @@ const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) =>
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
+const ResumenPeriodoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenPeriodoDevPage'))
 const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
 import { HomeRedirect } from '@/components/HomeRedirect'
 const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
@@ -244,6 +245,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <ResumenTurnoDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/resumen-periodo"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <ResumenPeriodoDevPage />
                     </Suspense>
                   }
                 />

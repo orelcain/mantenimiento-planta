@@ -9,6 +9,10 @@
  */
 import { useMemo, useState } from 'react'
 import { GraderShiftPeriodView } from '@/components/grader/GraderShiftPeriodView'
+import { buildPeriodSummary } from '@/services/grader/graderPeriodSummary'
+import { computePeriodMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
+import { exportPeriodSummaryPng } from '@/services/grader/graderPeriodSummaryPng'
+import { exportPeriodSummaryPdf } from '@/services/grader/graderPeriodSummaryPdf'
 import {
   buildPeriodShifts, periodShiftRows, periodDayKeys, indexPeriodShifts,
   formatShiftWindow, type PeriodShift,
@@ -18,7 +22,6 @@ import type { ShoplogixShiftParent } from '@/services/shoplogix/shoplogixShift.s
 import type { GraderDailySummary } from '@/services/grader/types'
 import fixture from '@/services/grader/__tests__/fixtures/shiftPeriod.real.json'
 import { cn } from '@/lib/utils'
-import { computePeriodMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 
 type FixtureKey = 'yal_2026_07' | 'chonchi_2026_07'
 
@@ -97,10 +100,24 @@ export default function MatrizTurnosDevPage() {
           </button>
         </div>
 
+        {/* `onExport` se pasa con los MISMOS datos reales del fixture: así los
+            botones del comparativo se pueden ver y usar sin sesión, que es la
+            única forma de comprobar que existen y descargan algo. */}
         <GraderShiftPeriodView
           shifts={shifts} rows={rows} days={days} byKey={byKey}
           selectedKey={selected?.key ?? null}
           onSelect={s => setSelected(prev => (prev?.key === s.key ? null : s))}
+          onExport={format => {
+            const summary = buildPeriodSummary({
+              shifts,
+              stats: computePeriodMonthlyStats(shifts),
+              monthDate: shifts[0]?.start ?? new Date(),
+              areaLabel: 'P. Principal · Eviscerado',
+              reliability: null,
+            })
+            if (format === 'png') exportPeriodSummaryPng({ summary, filenameSuffix: 'fixture' })
+            else exportPeriodSummaryPdf({ summary, filenameSuffix: 'fixture' })
+          }}
         />
 
         <div className="rounded-md border border-border bg-card p-4 text-sm flex flex-col gap-2">

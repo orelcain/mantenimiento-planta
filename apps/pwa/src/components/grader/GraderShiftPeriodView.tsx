@@ -9,7 +9,7 @@
  */
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Info, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Info, ChevronLeft, ChevronRight, Image as ImageIcon, FileText, Loader2 } from 'lucide-react'
 import { GraderShiftPeriodMatrix } from '@/components/grader/GraderShiftPeriodMatrix'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { MATRIX_KPIS, DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
@@ -30,13 +30,17 @@ export interface GraderShiftPeriodViewProps {
   /** Mes visible. Si se pasa junto con `onMonthChange`, aparece el navegador. */
   month?: Date
   onMonthChange?: (next: Date) => void
+  /** Descargar el comparativo del período. Sin esto los botones no aparecen. */
+  onExport?: (format: 'png' | 'pdf') => void
+  /** Formato que se está generando ahora mismo, para bloquear los botones. */
+  exporting?: 'png' | 'pdf' | null
   className?: string
 }
 
 export function GraderShiftPeriodView({
   shifts, rows, days, byKey, loading = false, error = null,
   slxDegraded = false, selectedKey = null, onSelect, onOpenShift,
-  month, onMonthChange, className,
+  month, onMonthChange, onExport, exporting = null, className,
 }: GraderShiftPeriodViewProps) {
   const [kpi, setKpi] = useState<MatrixKpi>(DEFAULT_MATRIX_KPI)
   const [onlyOutOfShift, setOnlyOutOfShift] = useState(false)
@@ -164,6 +168,43 @@ export function GraderShiftPeriodView({
             </span>
           </span>
         ) : null}
+
+        {/* Comparativo del período: el entregable que contesta "¿vamos mejor?",
+            que un turno aislado no puede responder. A la derecha, separado de
+            los filtros, porque no cambia lo que se ve sino que se lo lleva. */}
+        {onExport && (
+          <div className="inline-flex items-center gap-1 ml-auto">
+            <span className="text-[11px] text-muted-foreground mr-0.5 hidden sm:inline">
+              Resumen del mes
+            </span>
+            <button
+              type="button"
+              onClick={() => onExport('png')}
+              disabled={exporting !== null || shifts.length === 0}
+              title="Descargar el comparativo del mes como imagen (PNG)"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+                         text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {exporting === 'png'
+                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                : <ImageIcon className="h-4 w-4" aria-hidden />}
+            </button>
+            <button
+              type="button"
+              onClick={() => onExport('pdf')}
+              disabled={exporting !== null || shifts.length === 0}
+              title="Descargar el comparativo del mes como PDF"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+                         text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {exporting === 'pdf'
+                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                : <FileText className="h-4 w-4" aria-hidden />}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (

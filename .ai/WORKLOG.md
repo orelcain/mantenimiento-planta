@@ -13,6 +13,42 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - Comparativo de periodo (formato C): la hoja que contesta "vamos mejor?"
+
+- Cierra los tres formatos del mockup aprobado. A (#359) y B (#364/#366) explican UN turno; un turno aislado nunca puede demostrar mejora continua. Este toma el mes.
+- **La decision que ordena todo el texto**: separar lo que Mantencion controla (MTTR, averias resueltas, micro absorbidas) de lo que no (cuantas maquinas arrancan el turno). Mezclarlos produce el reporte de siempre — "el mes estuvo malo" — que no dice a quien le toca hacer que.
+- **No inventar tendencias.** Con menos de 4 turnos la hoja dice que no hay tendencia en vez de dibujar una flecha. Las mitades se comparan por MEDIANA, no por media: un solo turno catastrofico al final arrastraba la media y daba "sin tendencia" en un mes que subio de 45% a 80%.
+- **Tabla adaptativa**: hasta 12 turnos va uno por fila; sobre eso agrupa por tipo de turno (que contesta "hay un turno que anda peor?") y DICE que esta agrupando. Nunca se recorta en silencio.
+- **Primitivas de dibujo compartidas** (`graderExecutiveCanvas`): encabezado, veredicto, KPIs, cierre y pie ahora viven una sola vez, y las usan el PNG del turno y el del periodo. El refactor del PNG de turno se probo comparando el canvas fila por fila contra el original: **2.094 filas identicas, 0 diferencias**; la unica variacion es que la hoja crecio 40 px de margen inferior, porque la medicion de los KPIs decia 108 y el dibujo avanzaba 128 (desfase preexistente, ahora corregido).
+- Las pausas NO vienen en el hook del periodo (viven en una subcoleccion y encareceran la matriz, que se abre muchas veces al dia): `graderPeriodReliability` las carga recien cuando alguien pide el comparativo, y saca el conteo por turno llamando a `computeMaintenanceReliability` turno a turno en vez de reimplementar el criterio de que pausa cuenta como averia.
+- **Mirar la hoja encontro 4 bugs que ningun test habria pillado**: el cierre declaraba "disponibilidad resuelta" con 58% de uptime; se rankeaba "mas disponible" un 59% contra un 58%; el titulo decia "Agosto de 2026"; el rango repetia el mes ("1 ago - 5 ago"). Con datos reales de julio de Yal aparecio un quinto: un tipo de turno con UN solo registro al 0% se llevaba la etiqueta "menos disponible" del mes. Todos con test.
+- Banco de pruebas nuevo en **`/dev/resumen-periodo`** (6 casos, una por rama del veredicto) y los botones enchufados tambien a `/dev/matriz-turnos`, para poder verlos sin sesion.
+- Verificacion: tsc y eslint limpios - **781 tests** (27 nuevos) - mutation test: subir `ROW_H` y bajar `HEALTHY_UPTIME_PCT` hacen fallar sus tests. Con **jsPDF real** en el navegador: 1 sola pagina. Los botones se probaron con clic real en `/dev/matriz-turnos`: disparan `resumen-periodo_fixture.png`. **NO verificado**: la carga de pausas desde Firestore, que necesita sesion.
+- Estado: EN REVISION - PR abierto.
+- Sigue: que Orel baje el comparativo de agosto real y confirme que se entiende.
+
+## 2026-08-05 - claude - Boton del resumen ejecutivo (PNG) en la vista de turno
+
+- Cierra el enganche que quedaba de los formatos A y B: el PNG solo existia en el banco de pruebas. Ahora hay un boton propio junto al de PDF en la barra del detalle de turno.
+- Usa el MISMO modelo que la pagina 1 del PDF (`buildExecutiveSummary`), asi que ambos cuentan lo mismo del turno. A diferencia del PDF **no necesita el grafico de ECharts**: se dibuja entero en canvas, asi que no hay que esperar a que ninguna pestana renderice — el PDF si tiene ese sondeo desde que el detalle paso a pestanas (#361).
+- La ventana del turno sale de `shiftWindow` (la real de Shoplogix) con fallback al `startAt/endAt` del Excel. `shiftWindow` trae ISO strings y el resumen espera `Date`: helper `toDateOrNull` para no repetir la conversion.
+- El nombre del archivo usa `displayShiftName`, asi que sale `resumen-turno_2026-08-03_Turno-1.png` y no "Turno 1 Lunes" con espacios.
+- Verificacion: tsc limpio; el warning de eslint en esa pagina es PREEXISTENTE (verificado con stash). En el navegador se ejecuto la **replica exacta del handler** con los modulos reales: `Turno 1 Lunes` -> titulo "Turno 1", veredicto "Baader 2 no produjo un solo ciclo", KPI de disponibilidad 39% desde `lineAvailability`, canvas 2480x1930 dibujado. **NO se vio el boton en pantalla**: la vista de turno pide sesion.
+- Estado: EN REVISION - PR abierto.
+- Sigue: que Orel confirme el boton y el PNG resultante. Queda el **formato C** (comparativo de periodo), que necesita decidir que periodo compara por defecto.
+
+## 2026-08-05 - claude - PDF de turno con el resumen ejecutivo como pagina 1 (formato B)
+
+- Cierra el formato B del mockup. El PDF abria con el timeline minuto a minuto: habia que leer tres paginas para saber si el turno estuvo bien o mal. Ahora la pagina 1 es el resumen ejecutivo (mismo modelo que el PNG del #359) y el detalle arranca en hoja nueva.
+- **graderExecutivePdfPage.ts** - renderiza el ExecutiveSummary en jsPDF. Comparte modelo con el PNG a proposito: si el PNG dice que el turno se perdio por la Baader 2, el PDF no puede decir otra cosa. Se tipa contra una interfaz PdfDoc minima (solo lo que se usa) en vez de contra jsPDF entero.
+- El resumen se arma DENTRO de exportTurnToPDF con lo que ya recibia (summary + pauses + upstreamSnapshot): computeMaintenanceReliability se llama ahi, asi que **no hubo que tocar el llamador**. Se agregaron shiftStart/shiftEnd opcionales para la ventana real.
+- **Secciones vacias**: las 4-7 ya tenian guardas. La que faltaba era la tabla de KPIs, que con totalPieces=0 imprimia "0 pz / 0,00% P0" - eso se lee como "no hubo piezas malas" cuando en realidad NO SE MIDIO. Ahora sin Excel dice "Datos del Grader: sin Excel cargado".
+- **Rompi los tests existentes de graderTurnToPDF** (16): su mock de jsPDF no tenia setLineWidth/setFillColor/rect/splitTextToSize, que la pagina ejecutiva si usa. Arreglado el mock - un mock que no refleja la API usada da verde falso.
+- Verificacion: tsc y eslint limpios; **556 tests** en la suite grader (7 nuevos de la pagina PDF, con doble de jsPDF que registra lo dibujado). **Comprobado que los tests pueden fallar**: rompiendo contentW cae el de "nada se sale del ancho". Con jsPDF REAL en el navegador: la pagina ejecutiva termina en y=203,9 de 297 mm (93 mm libres, 1 sola pagina, 10,7 kB) y el flujo completo corre sin errores de consola.
+- Banco de pruebas: /dev/resumen-turno ahora tiene "Descargar PDF completo" ademas del PNG.
+- Estado: EN REVISION - PR abierto.
+- Sigue: **formato C** (comparativo de periodo) - necesita decidir que periodo compara por defecto. Falta enganchar el boton del PNG en la vista de turno real (el PDF ya usa el boton existente).
+
 ## 2026-08-04 - claude - Resumen ejecutivo del turno (PNG) - formato A del mockup
 
 - La exportacion anterior apilaba todo (timeline, KPIs, pausas, gates, causas, upstream) sin jerarquia ni conclusion: sirve de registro tecnico, no de entregable. Mockup con 3 formatos aprobado por Orel; se construye el A (ejecutivo) y despues el B (PDF completo con este como pagina 1).

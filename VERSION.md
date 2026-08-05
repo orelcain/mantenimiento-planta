@@ -1,14 +1,23 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v3.99.6**
+## Versión Actual: **v4.0.0**
 
-**Fecha de lanzamiento**: 22 de mayo de 2026  \
+**Fecha de lanzamiento**: 4 de agosto de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v4.0.0 — Variadores, matriz de turnos y auditoría de Aprendizaje (04/08/2026)
+- ⚡ **Catálogo de variadores**: 8 fichas, ~300 parámetros en 61 menús verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»
+- 🗓️ **Matriz de turnos** reemplaza al calendario mensual, y el **detalle del turno pasa a 4 pestañas** (config global a `/analisis-grader/config`)
+- 📄 **Resumen ejecutivo del turno como PNG** + desglose de Puerta 0 con input propio
+- 🎓 **Auditoría del Centro de Aprendizaje cerrada en 8 equipos** (medios verificados contra manual)
+- 🧊 **Visor 3D**: los modelos con texturas ya no se ven blancos (CSP bloqueaba `blob:`)
+- 📴 **La app abre sin señal** (app shell y chunks en caché)
+- ℹ️ Cierra 39 mejoras acumuladas desde la v3.99.6. Sin cambios incompatibles: el MAJOR marca el hito, no una ruptura
 
 ### v3.99.0 — Fix HomeRedirect detecta viewport (18/07/2026)
 - 📱 **Mobile va a `/dashboard`** (muestra `MobileHomeGrid`), **desktop** usa la ruta configurada en `appConfig/defaultRoute`
