@@ -10,7 +10,7 @@ import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestion
 import { fmt } from '@/lib/format'
 import { logger } from '@/lib/logger'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2, RotateCcw, Loader2 } from 'lucide-react'
+import { Save, FolderOpen, Trash2, ChevronDown, Settings2, RotateCcw, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -40,21 +40,10 @@ import type {
 } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { getGradingBelt, GRADING_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
-import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
-import { TachMeasurementModal } from '@/components/grader/modals/TachMeasurementModal'
-import { SlowMoMeasurementModal } from '@/components/grader/modals/SlowMoMeasurementModal'
-import { Z2CaptureModal } from '@/components/grader/modals/Z2CaptureModal'
 import { useConfigChangeLogger } from '@/services/grader/useConfigChangeLogger'
-import { listRecentConfigChanges, type ConfigChangeEntry } from '@/services/grader/graderConfigChangeLog.service'
 import { InfoTooltip } from '@/components/ui'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
-import { ProductoTab } from '@/components/grader/tabs/gatesConfig/ProductoTab'
-import { CintasTab } from '@/components/grader/tabs/gatesConfig/CintasTab'
-import { DistanciasTab } from '@/components/grader/tabs/gatesConfig/DistanciasTab'
-import { DanfossTab } from '@/components/grader/tabs/gatesConfig/DanfossTab'
-import { NeumaticaTab } from '@/components/grader/tabs/gatesConfig/NeumaticaTab'
-import { VerificacionTab } from '@/components/grader/tabs/gatesConfig/VerificacionTab'
 import { SPECIES_ALLOMETRY, type BatchStats } from '@/components/grader/tabs/gatesConfig/GatesConfigShared'
 
 
@@ -171,10 +160,6 @@ export function AnalisisGraderGatesConfigPage({
   const [showTemplates, setShowTemplates] = useState(false)
   const [showWeightRanges, setShowWeightRanges] = useState(true)
   const [shiftSchedule, setShiftSchedule] = useState(() => plantLineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
-  const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
-  const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
-  const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
-  const [productoSubTab, setProductoSubTab] = useState<'resumen' | 'flipper' | 'analisis' | 'sugerencias' | 'historial'>('resumen')
   // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
   // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
   const moduleConfigLoadedRef = useRef(false)
@@ -182,28 +167,9 @@ export function AnalisisGraderGatesConfigPage({
   // FASE 6 — logger de cambios: cada setPhysicalConfig persiste diff en Firestore
   const setPhysicalConfig = useConfigChangeLogger(physicalConfig, _setPhysicalConfigRaw, { enabledRef: moduleConfigLoadedRef })
   const [loadedSchedule, setLoadedSchedule] = useState(() => plantLineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
-  // FASE 5 — Modales de medición
-  const [tachModalBelt, setTachModalBelt] = useState<GraderBeltId | null>(null)
-  const [slowMoModalGate, setSlowMoModalGate] = useState<number | null>(null)
-  const [z2CaptureOpen, setZ2CaptureOpen] = useState(false)
-  // FASE 6 — historial de cambios (últimos 10)
-  const [changeLog, setChangeLog] = useState<ConfigChangeEntry[]>([])
-  const [changeLogLoading, setChangeLogLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-
-  // FASE 6 — recargar historial al entrar al sub-tab Historial (lazy)
-  useEffect(() => {
-    if (fisicaSubTab !== 'producto' || productoSubTab !== 'historial') return
-    let cancelled = false
-    setChangeLogLoading(true)
-    listRecentConfigChanges(10)
-      .then((entries) => { if (!cancelled) setChangeLog(entries) })
-      .catch(() => logger.warn('changeLog: error cargando'))
-      .finally(() => { if (!cancelled) setChangeLogLoading(false) })
-    return () => { cancelled = true }
-  }, [fisicaSubTab, productoSubTab])
 
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)
@@ -235,9 +201,6 @@ export function AnalisisGraderGatesConfigPage({
     weights.sort((a, b) => a - b)
     return weights[Math.floor(weights.length / 2)]
   }, [parsedData.pieceRecords])
-
-  // Peso mediano manual (gramos) — cuando no hay Excel, el usuario puede ingresarlo
-  const [manualMedianG, setManualMedianG] = useState<number | undefined>(undefined)
 
   // Summary histórico seleccionado en el calendario (store compartido).
   // Fallback: si nada seleccionado, usa el summary más reciente de los últimos 60 días.
@@ -284,10 +247,9 @@ export function AnalisisGraderGatesConfigPage({
   }, [selectedFromCalendar, fallbackSummaries])
 
   // Peso efectivo para el cálculo alométrico: prioriza Excel, luego manual, luego histórico
-  const effectiveMedianG = medianWeightG ?? manualMedianG ?? historicalMedianG?.value ?? null
+  const effectiveMedianG = medianWeightG ?? historicalMedianG?.value ?? null
   const medianSource: 'excel' | 'manual' | 'historical' | null =
     medianWeightG != null ? 'excel'
-    : manualMedianG != null ? 'manual'
     : historicalMedianG != null ? 'historical'
     : null
 
@@ -363,7 +325,9 @@ export function AnalisisGraderGatesConfigPage({
     : _sgCadenceHistorical ? 'historical'
     : 'theoretical'
 
-  const { suggestions } = useSuggestionEngine({
+  // El engine se mantiene por sus efectos sobre physicalConfig; su salida
+  // la consumía el sub-tab "Sugerencias" de la config física, ya retirado.
+  useSuggestionEngine({
     physicalConfig,
     setPhysicalConfig,
     medianWeightG: effectiveMedianG,
@@ -574,29 +538,6 @@ export function AnalisisGraderGatesConfigPage({
   const handleDeleteTemplate = async (id: string) => {
     await deleteGatesTemplate(id)
     setTemplates((prev) => prev.filter((t) => t.id !== id))
-  }
-
-  const updateFlipperDistance = (gateNumber: number, distanceMeters: number) => {
-    setPhysicalConfig((prev) => ({
-      ...prev,
-      flipperPositions: prev.flipperPositions.map((fp) =>
-        fp.gateNumber === gateNumber ? { ...fp, distanceFromSensorMeters: distanceMeters } : fp,
-      ),
-    }))
-  }
-
-  const updateBeltSpeed = (beltId: string, speedMps: number) => {
-    setPhysicalConfig((prev) => ({
-      ...prev,
-      belts: prev.belts.map((b) => b.beltId === beltId ? { ...b, speedMps } : b),
-    }))
-  }
-
-  const updateBeltLength = (beltId: string, lengthMeters: number) => {
-    setPhysicalConfig((prev) => ({
-      ...prev,
-      belts: prev.belts.map((b) => b.beltId === beltId ? { ...b, lengthMeters } : b),
-    }))
   }
 
   const TABS = [
@@ -853,24 +794,6 @@ export function AnalisisGraderGatesConfigPage({
       </Card>
       )} {/* /3.1 */}
 
-      {/* Quick navigation visible — solo en modo no-tabbed */}
-      {!tabbed && (
-      <div className="sticky top-14 z-20">
-        <Card className="border-primary/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <CardContent className="py-2.5 px-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <p className="text-xs text-muted-foreground hidden sm:block">Datos cargados — puede ir al dashboard en cualquier momento</p>
-              <p className="text-xs text-muted-foreground sm:hidden">Datos listos</p>
-              <SaveIndicator status={saveStatus} />
-            </div>
-            <Button size="sm" onClick={() => onComplete(gates, config)} className="bg-primary hover:bg-primary/90 shadow-sm">
-              Ver Dashboard
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-      )} {/* /Quick nav */}
 
       {/* 3.2 Configuración de 12 Gates */}
       {(!tabbed || activeTab === 'gates') && (
@@ -1218,233 +1141,7 @@ export function AnalisisGraderGatesConfigPage({
       </Card>
       )} {/* /3.3 */}
 
-      {/* 3.4 Configuración Física de la Máquina — solo en modo no-tabbed (wizard) */}
-      {!tabbed && (
-      <Card className="relative">
-        {!tabbed && (
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setShowPhysicalConfig(!showPhysicalConfig)}
-        >
-          <CardTitle className="text-base flex items-center gap-2">
-            <ChevronDown className={`h-4 w-4 transition-transform ${showPhysicalConfig ? '' : '-rotate-90'}`} />
-            Configuración Física de la Máquina
-            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
-              Mejora las recomendaciones de IA
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        )}
-        {(tabbed || showPhysicalConfig) && (
-          <CardContent className="space-y-6">
-            {/* Banner migración: config física ahora también en Configuración Global */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
-              <Settings2 className="w-3.5 h-3.5 text-primary shrink-0" />
-              <span>Esta configuración también está disponible en <strong className="text-foreground">Configuración Global → Línea física</strong>, donde se puede editar sin pasar por el wizard.</span>
-            </div>
-            {/* Sub-tabs Física */}
-            <div className="flex gap-0 border-b border-border">
-              {([
-                { id: 'producto',     label: 'Producto' },
-                { id: 'cintas',       label: 'Cintas' },
-                { id: 'distancias',   label: 'Distancias' },
-                { id: 'calibracion',  label: 'Calibración' },
-              ] as const).map(({ id, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setFisicaSubTab(id)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
-                    fisicaSubTab === id
-                      ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
 
-            {/* Sub-tabs Calibración */}
-            {fisicaSubTab === 'calibracion' && (
-              <div className="flex gap-0 border-b border-border -mt-2">
-                {([
-                  { id: 'danfoss',      label: 'Danfoss VFD' },
-                  { id: 'neumatica',    label: 'Neumática' },
-                  { id: 'verificacion', label: 'Verificación' },
-                ] as const).map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setCalibracionSubTab(id)}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
-                      calibracionSubTab === id
-                        ? 'border-sky-400 text-sky-500 dark:text-sky-400'
-                        : 'border-transparent text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Sub-tabs Producto */}
-            {fisicaSubTab === 'producto' && (
-              <div className="flex gap-0 border-b border-border -mt-2">
-                {([
-                  { id: 'resumen',     label: 'Resumen' },
-                  { id: 'flipper',     label: 'Flipper' },
-                  { id: 'analisis',    label: 'Análisis' },
-                  { id: 'sugerencias', label: 'Sugerencias' },
-                  { id: 'historial',   label: 'Historial' },
-                ] as const).map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setProductoSubTab(id)}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
-                      productoSubTab === id
-                        ? 'border-sky-400 text-sky-500 dark:text-sky-400'
-                        : 'border-transparent text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* ── TAB PRODUCTO ── */}
-            {fisicaSubTab === 'producto' && (
-              <ProductoTab
-                physicalConfig={physicalConfig}
-                setPhysicalConfig={setPhysicalConfig}
-                batchStats={batchStats}
-                historicalMedianG={historicalMedianG}
-                medianWeightG={medianWeightG ?? null}
-                manualMedianG={manualMedianG}
-                setManualMedianG={setManualMedianG}
-                medianSource={medianSource}
-                suggestedDimensions={suggestedDimensions}
-                suggestions={suggestions}
-                changeLog={changeLog}
-                changeLogLoading={changeLogLoading}
-                productoSubTab={productoSubTab}
-                onOpenZ2Capture={() => setZ2CaptureOpen(true)}
-              />
-
-            )}
-
-            {/* Cintas — 4 cards individuales en orden de flujo */}
-            {fisicaSubTab === 'cintas' && (
-              <CintasTab
-                physicalConfig={physicalConfig}
-                updateBeltLength={updateBeltLength}
-                updateBeltSpeed={updateBeltSpeed}
-                setTachModalBelt={setTachModalBelt}
-              />
-            )}
-
-            {/* Z-Belt variador Danfoss */}
-            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'danfoss' && (
-              <DanfossTab
-                physicalConfig={physicalConfig}
-                setPhysicalConfig={setPhysicalConfig}
-              />
-            )}
-
-            {/* Distancias de flippers — 12 cards */}
-            {fisicaSubTab === 'distancias' && (
-              <DistanciasTab
-                physicalConfig={physicalConfig}
-                setPhysicalConfig={setPhysicalConfig}
-                updateFlipperDistance={updateFlipperDistance}
-                setSlowMoModalGate={setSlowMoModalGate}
-              />
-            )}
-
-            {/* ── Configuración Neumática ──────────────────────────────────── */}
-            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'neumatica' && (
-              <NeumaticaTab
-                physicalConfig={physicalConfig}
-                setPhysicalConfig={setPhysicalConfig}
-              />
-            )}
-
-
-            {/* Verificación multi-fuente de velocidades */}
-            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'verificacion' && (
-              <VerificacionTab
-                physicalConfig={physicalConfig}
-                setPhysicalConfig={setPhysicalConfig}
-              />
-            )}
-
-          </CardContent>
-        )}
-      </Card>
-      )} {/* /3.4 */}
-
-      {/* ── FASE 5: Modales de medición ── */}
-      {tachModalBelt && (
-        <TachMeasurementModal
-          open={!!tachModalBelt}
-          onOpenChange={(open) => { if (!open) setTachModalBelt(null) }}
-          beltId={tachModalBelt}
-          currentSpeedMps={physicalConfig.belts.find((b) => b.beltId === tachModalBelt)?.speedMps ?? 0}
-          effectiveMpsPerRpm={physicalConfig.belts.find((b) => b.beltId === tachModalBelt)?.vfd?.effectiveMpsPerRpm}
-          onApply={(patch) => setPhysicalConfig((p) => ({ ...p, ...patch }))}
-          applyPatchBuilder={(beltMps, measuredAt) => ({
-            belts: physicalConfig.belts.map((b) =>
-              b.beltId === tachModalBelt
-                ? {
-                    ...b,
-                    speedMps: Math.round(beltMps * 1000) / 1000,
-                    calibrationStatus: 'verified' as const,
-                    vfd: {
-                      ...(b.vfd ?? {}),
-                      measuredBeltMps: Math.round(beltMps * 1000) / 1000,
-                      measuredAt,
-                      truthSource: 'tachLinear' as const,
-                    },
-                  }
-                : b,
-            ),
-          })}
-        />
-      )}
-      {slowMoModalGate !== null && (
-        <SlowMoMeasurementModal
-          open={slowMoModalGate !== null}
-          onOpenChange={(open) => { if (!open) setSlowMoModalGate(null) }}
-          gateNumber={slowMoModalGate}
-          currentResetSec={physicalConfig.flipperMechanicalResetS}
-          onApply={(seconds, measuredAtMs) => setPhysicalConfig((p) => ({
-            ...p,
-            flipperMechanicalResetS: Math.round(seconds * 1000) / 1000,
-            flipperMechanicalMeasuredAt: measuredAtMs,
-          }))}
-        />
-      )}
-      <Z2CaptureModal
-        open={z2CaptureOpen}
-        onOpenChange={setZ2CaptureOpen}
-        currentValues={{
-          delayFlipperOpenMs:   physicalConfig.flipperDelayOpenMs   ?? 150,
-          minFlipperOpenTimeMs: physicalConfig.flipperMinOpenTimeMs ?? 350,
-          delayFlipperCloseMs:  physicalConfig.flipperDelayCloseMs  ?? 150,
-        }}
-        onApply={(values) => setPhysicalConfig((p) => ({
-          ...p,
-          flipperDelayOpenMs:   values.delayFlipperOpenMs,
-          flipperMinOpenTimeMs: values.minFlipperOpenTimeMs,
-          flipperDelayCloseMs:  values.delayFlipperCloseMs,
-        }))}
-      />
       <GlobalSettingsModal open={globalSettingsOpen} onOpenChange={handleGlobalSettingsClose} plantLineId={plantLineId} />
     </div>
   )
