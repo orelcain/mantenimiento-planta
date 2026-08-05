@@ -7,7 +7,7 @@
  * un componente puro de presentación — así se puede montar con un fixture (ver
  * `pages/dev/MatrizTurnosDevPage`) sin arrastrar Firestore ni autenticación.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGraderShiftPeriod } from '@/hooks/useGraderShiftPeriod'
 import { GraderShiftPeriodView } from '@/components/grader/GraderShiftPeriodView'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
@@ -15,6 +15,11 @@ import type { PlantLineId } from '@/config/plantLines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { computePeriodMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
+import { buildPeriodSummary } from '@/services/grader/graderPeriodSummary'
+import { loadPeriodReliability } from '@/services/grader/graderPeriodReliability'
+import { exportPeriodSummaryPng } from '@/services/grader/graderPeriodSummaryPng'
+import { exportPeriodSummaryPdf } from '@/services/grader/graderPeriodSummaryPdf'
+import { getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
 
 export interface GraderShiftPeriodContainerProps {
   plantLineId?: PlantLineId
@@ -61,6 +66,30 @@ export function GraderShiftPeriodContainer({
   const monthStats = useMemo(() => computePeriodMonthlyStats(shifts), [shifts])
   useEffect(() => { onMonthStatsLoaded?.(monthStats) }, [monthStats, onMonthStatsLoaded])
 
+  // Exportar el comparativo del período. Las pausas NO vienen en el hook (viven
+  // en una subcolección aparte y encarecerían la matriz, que se abre muchas
+  // veces al día), así que se cargan recién acá, cuando alguien las pide.
+  const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null)
+  const handleExport = useCallback(async (format: 'png' | 'pdf') => {
+    setExporting(format)
+    try {
+      const { reliability, breakdownsByShiftKey } = await loadPeriodReliability(shifts)
+      const summary = buildPeriodSummary({
+        shifts,
+        stats: monthStats,
+        monthDate: month,
+        areaLabel: getAreaDisplayLabel(plantLineId ?? DEFAULT_PLANT_LINE_ID),
+        reliability,
+        breakdownsByShiftKey,
+      })
+      const suffix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+      if (format === 'png') exportPeriodSummaryPng({ summary, filenameSuffix: suffix })
+      else exportPeriodSummaryPdf({ summary, filenameSuffix: suffix })
+    } finally {
+      setExporting(null)
+    }
+  }, [shifts, monthStats, month, plantLineId])
+
   return (
     <GraderShiftPeriodView
       month={month} onMonthChange={onMonthChange}
@@ -74,6 +103,8 @@ export function GraderShiftPeriodContainer({
         onSelectShift?.(s)
       }}
       onOpenShift={onOpenShift}
+      onExport={handleExport}
+      exporting={exporting}
       className={className}
     />
   )
