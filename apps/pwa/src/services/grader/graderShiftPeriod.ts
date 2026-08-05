@@ -47,6 +47,7 @@ import {
   isSignificantCycleCount,
   isLowActivityCycleCount,
   isUnscheduledShift,
+  displayShiftName,
   type ShiftMeta,
 } from '@/services/grader/graderShiftDisplay'
 import { resolveShiftWindow } from '@/services/grader/graderShiftWindow'
@@ -131,6 +132,13 @@ export interface PeriodShift {
   lowActivity: boolean
   /** Producción que Shoplogix registró sin turno configurado. Se muestra fiel. */
   unscheduled: boolean
+  /**
+   * Instancias que se unieron en este turno (ver `mergeSameNameShifts`), en
+   * orden cronológico. Solo lo pone la matriz, y solo cuando el mismo turno
+   * corrió dos veces el mismo día — los lunes de Chonchi. Ausente en el caso
+   * normal.
+   */
+  mergedFrom?: PeriodShift[]
 }
 
 /** Suma de ciclos de todas las máquinas del turno. */
@@ -391,16 +399,109 @@ function compareChronological(a: PeriodShift, b: PeriodShift): number {
  * ninguna constante prevé (`Turno 1 Lunes`, `Unscheduled`). Una lista fija los
  * haría desaparecer de la vista.
  */
+/**
+ * Fila a la que pertenece un turno.
+ *
+ * Shoplogix le agrega el día de la semana al nocturno cuando su horario cambia
+ * — en Chonchi el Turno 1 corre 21:15→05:00 de martes a viernes, pero el lunes
+ * arranca a las 00:00 y llega como `Turno 1 Lunes`. Son el mismo turno de
+ * gente, así que comparten fila; el nombre crudo se conserva en cada turno
+ * (`shiftId`) para no perder de dónde vino.
+ *
+ * `Unscheduled` no entra en esta normalización: no es un turno.
+ */
+function rowIdOf(s: PeriodShift): string {
+  return s.unscheduled ? s.shiftId : displayShiftName(s.shiftId)
+}
+
+/** Promedio ponderado por duración; cae a promedio simple si no hay duraciones. */
+function weightedUptime(list: readonly PeriodShift[]): number | null {
+  const withPct = list.filter(s => s.uptimePct != null)
+  if (withPct.length === 0) return null
+  const totalMin = withPct.reduce((a, s) => a + (s.durationMin ?? 0), 0)
+  if (totalMin <= 0) {
+    return withPct.reduce((a, s) => a + s.uptimePct!, 0) / withPct.length
+  }
+  return withPct.reduce((a, s) => a + s.uptimePct! * (s.durationMin ?? 0), 0) / totalMin
+}
+
+/**
+ * Une en un solo turno las instancias del MISMO turno que caen el mismo día.
+ *
+ * Pasa todos los lunes en Chonchi: `Turno 1 Lunes` (00:00→07:15) y `Turno 1`
+ * (21:15→05:00) se anclan ambos al lunes. Antes ocupaban dos filas homónimas
+ * en la matriz —"Turno 1" dos veces, distinguibles solo por el horario en
+ * gris— que es justo la incoherencia que la matriz venía a eliminar.
+ *
+ * Solo afecta a la MATRIZ. La Lista sigue mostrando cada turno con su ventana
+ * real, que es lo que se espera de una lista.
+ */
+export function mergeSameNameShifts(shifts: readonly PeriodShift[]): PeriodShift[] {
+  const groups = new Map<string, PeriodShift[]>()
+  for (const s of shifts) {
+    const k = `${s.dateKey}__${rowIdOf(s)}`
+    const g = groups.get(k)
+    if (g) g.push(s); else groups.set(k, [s])
+  }
+
+  const out: PeriodShift[] = []
+  for (const [key, list] of groups) {
+    if (list.length === 1) { out.push(list[0]!); continue }
+
+    // La instancia principal presta su identidad: abrir la celda tiene que
+    // llevar a un turno que EXISTE en Firestore, no al nombre normalizado.
+    const main = [...list].sort((a, b) => b.cycles - a.cycles)[0]!
+    const ordered = [...list].sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0))
+    const last = ordered[ordered.length - 1]!
+    const pieces = list.reduce<number | null>(
+      (a, s) => (s.pieces == null ? a : (a ?? 0) + s.pieces), null)
+    const p0Pieces = list.reduce<number | null>(
+      (a, s) => (s.p0Pieces == null ? a : (a ?? 0) + s.p0Pieces), null)
+
+    out.push({
+      ...main,
+      key,
+      start: ordered[0]!.start,
+      end: last.end,
+      endDateKey: last.endDateKey,
+      endDayOffset: last.endDayOffset,
+      startDayOffset: ordered[0]!.startDayOffset,
+      crossesMidnight: list.some(s => s.crossesMidnight),
+      // Tiempo TRABAJADO, no el lapso entre el primer inicio y el último fin:
+      // entre las dos jornadas del lunes hay 14 h de planta parada.
+      durationMin: list.reduce<number | null>(
+        (a, s) => (s.durationMin == null ? a : (a ?? 0) + s.durationMin), null),
+      cycles: list.reduce((a, s) => a + s.cycles, 0),
+      attributedCycles: list.reduce((a, s) => a + (s.attributedCycles ?? 0), 0) || undefined,
+      uptimePct: weightedUptime(list),
+      expectedCycles: list.reduce((a, s) => a + s.expectedCycles, 0),
+      uptimeSec: list.reduce((a, s) => a + s.uptimeSec, 0),
+      machines: list.flatMap(s => s.machines),
+      pieces,
+      p0Pieces,
+      p0Pct: (pieces != null && pieces > 0 && p0Pieces != null)
+        ? (p0Pieces / pieces) * 100
+        : null,
+      hasSlx: list.some(s => s.hasSlx),
+      hasGrader: list.some(s => s.hasGrader),
+      lowActivity: list.every(s => s.lowActivity),
+      mergedFrom: ordered,
+    })
+  }
+  return out
+}
+
 export function periodShiftRows(shifts: readonly PeriodShift[]): string[] {
   const startsById = new Map<string, number[]>()
   for (const s of shifts) {
     if (!s.start) continue
     const mins = s.start.getUTCHours() * 60 + s.start.getUTCMinutes()
-    const arr = startsById.get(s.shiftId)
-    if (arr) arr.push(mins); else startsById.set(s.shiftId, [mins])
+    const id = rowIdOf(s)
+    const arr = startsById.get(id)
+    if (arr) arr.push(mins); else startsById.set(id, [mins])
   }
 
-  const ids = [...new Set(shifts.map(s => s.shiftId))]
+  const ids = [...new Set(shifts.map(rowIdOf))]
   const median = (id: string): number => {
     const arr = startsById.get(id)
     if (!arr || arr.length === 0) return 9999
@@ -427,6 +528,14 @@ export function periodDayKeys(year: number, month: number): string[] {
 /** Índice `${dateKey}__${shiftId}` → turno, para pintar la matriz en O(1). */
 export function indexPeriodShifts(shifts: readonly PeriodShift[]): Map<string, PeriodShift> {
   return new Map(shifts.map(s => [s.key, s]))
+}
+
+/**
+ * Índice de la MATRIZ: una entrada por celda `${dateKey}__${fila}`, con las
+ * instancias del mismo turno ya unidas (ver `mergeSameNameShifts`).
+ */
+export function indexPeriodShiftsByRow(shifts: readonly PeriodShift[]): Map<string, PeriodShift> {
+  return new Map(mergeSameNameShifts(shifts).map(s => [`${s.dateKey}__${rowIdOf(s)}`, s]))
 }
 
 /**

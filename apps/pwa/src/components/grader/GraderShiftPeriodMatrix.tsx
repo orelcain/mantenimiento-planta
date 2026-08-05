@@ -162,7 +162,10 @@ export function GraderShiftPeriodMatrix({
 
               {/* Una fila por turno presente */}
               {rows.map(shiftId => {
+                // La fila se identifica por el nombre normalizado: `Turno 1` y
+                // `Turno 1 Lunes` son la misma (ver `mergeSameNameShifts`).
                 const sample = shifts.find(s => s.shiftId === shiftId)
+                  ?? shifts.find(s => displayShiftName(s.shiftId) === shiftId)
                 const meta = sample?.meta ?? getShiftMeta(shiftId)
                 const Icon = ICONS[meta.iconName] ?? Clock
                 // "Sin turno asignado" NO es un turno: es lo que Shoplogix no
@@ -230,7 +233,7 @@ export function GraderShiftPeriodMatrix({
                             setTipPos({ x: r.left + r.width / 2, y: r.top })
                           }}
                           onBlur={() => { setHoverKey(k => (k === s.key ? null : k)); setTipPos(null) }}
-                          aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}`}
+                          aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}${s.mergedFrom ? `, ${s.mergedFrom.length} jornadas` : ''}`}
                           aria-pressed={selected}
                           className={cn(
                             'relative rounded-sm min-h-[40px]',
@@ -264,6 +267,17 @@ export function GraderShiftPeriodMatrix({
                           {(s.crossesMidnight || s.startDayOffset > 0) && (
                             <span aria-hidden className="absolute top-0 right-[2px] text-[8px] font-bold opacity-90">
                               {s.startDayOffset > 0 ? '⁺¹' : '→'}
+                            </span>
+                          )}
+                          {/* El turno corrió DOS veces este día (los lunes, con
+                              el horario especial de arranque de semana). La
+                              celda suma ambas; el desglose va en el tooltip. */}
+                          {s.mergedFrom && (
+                            <span
+                              aria-hidden
+                              className="absolute bottom-0 left-[2px] text-[8px] font-bold opacity-90 leading-none"
+                            >
+                              ×{s.mergedFrom.length}
                             </span>
                           )}
                           {/* Sin número: a 22-28 px se recorta y se lee peor que
@@ -347,6 +361,17 @@ export function GraderShiftPeriodMatrix({
               </span>
             </div>
             <div className="font-mono text-muted-foreground">{formatShiftWindow(hovered)}</div>
+            {/* Dos jornadas del mismo turno en un día: el total de arriba las
+                suma, así que hay que poder ver de dónde sale. */}
+            {hovered.mergedFrom && (
+              <div className="mt-0.5 pl-1.5 border-l border-border/60 space-y-0.5">
+                {hovered.mergedFrom.map(inst => (
+                  <div key={inst.key} className="font-mono text-[10px] text-muted-foreground">
+                    {formatShiftWindow(inst)} · {inst.cycles.toLocaleString('es-CL')} cic
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="font-mono">
               <b>{hovered.cycles.toLocaleString('es-CL')}</b> cic
               {hovered.attributedCycles
