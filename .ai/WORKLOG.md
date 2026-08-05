@@ -13,6 +13,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-05 - claude - Boton del resumen ejecutivo (PNG) en la vista de turno
+
+- Cierra el enganche que quedaba de los formatos A y B: el PNG solo existia en el banco de pruebas. Ahora hay un boton propio junto al de PDF en la barra del detalle de turno.
+- Usa el MISMO modelo que la pagina 1 del PDF (`buildExecutiveSummary`), asi que ambos cuentan lo mismo del turno. A diferencia del PDF **no necesita el grafico de ECharts**: se dibuja entero en canvas, asi que no hay que esperar a que ninguna pestana renderice — el PDF si tiene ese sondeo desde que el detalle paso a pestanas (#361).
+- La ventana del turno sale de `shiftWindow` (la real de Shoplogix) con fallback al `startAt/endAt` del Excel. `shiftWindow` trae ISO strings y el resumen espera `Date`: helper `toDateOrNull` para no repetir la conversion.
+- El nombre del archivo usa `displayShiftName`, asi que sale `resumen-turno_2026-08-03_Turno-1.png` y no "Turno 1 Lunes" con espacios.
+- Verificacion: tsc limpio; el warning de eslint en esa pagina es PREEXISTENTE (verificado con stash). En el navegador se ejecuto la **replica exacta del handler** con los modulos reales: `Turno 1 Lunes` -> titulo "Turno 1", veredicto "Baader 2 no produjo un solo ciclo", KPI de disponibilidad 39% desde `lineAvailability`, canvas 2480x1930 dibujado. **NO se vio el boton en pantalla**: la vista de turno pide sesion.
+- Estado: EN REVISION - PR abierto.
+- Sigue: que Orel confirme el boton y el PNG resultante. Queda el **formato C** (comparativo de periodo), que necesita decidir que periodo compara por defecto.
+
 ## 2026-08-05 - claude - PDF de turno con el resumen ejecutivo como pagina 1 (formato B)
 
 - Cierra el formato B del mockup. El PDF abria con el timeline minuto a minuto: habia que leer tres paginas para saber si el turno estuvo bien o mal. Ahora la pagina 1 es el resumen ejecutivo (mismo modelo que el PNG del #359) y el detalle arranca en hoja nueva.

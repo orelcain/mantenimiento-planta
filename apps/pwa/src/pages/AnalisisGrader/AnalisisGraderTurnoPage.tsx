@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2 } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -50,6 +50,10 @@ import { ShiftQuotaCard } from '@/components/grader/ShiftQuotaCard'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
+import { buildExecutiveSummary } from '@/services/grader/graderExecutiveSummary'
+import { exportExecutiveSummaryPng } from '@/services/grader/graderExecutiveSummaryPng'
+import { computeMaintenanceReliability } from '@/services/grader/graderReliability'
+import { displayShiftName } from '@/services/grader/graderShiftDisplay'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useSyncAge } from '@/hooks/useSyncAge'
 import { usePauseTags } from '@/hooks/usePauseTags'
@@ -1152,6 +1156,47 @@ export function AnalisisGraderTurnoPage() {
       endAt:   new Date(slxProductionWindow.end.getTime() + PAD_MS).toISOString(),
     }
   }, [framedOnProduction, slxProductionWindow, baseAxisWindow])
+  const toDateOrNull = (v: string | Date | null | undefined): Date | null => {
+    if (!v) return null
+    const d = v instanceof Date ? v : new Date(v)
+    return isNaN(d.getTime()) ? null : d
+  }
+
+  /**
+   * Resumen ejecutivo como PNG — el archivo que se manda por Telegram y se
+   * entiende sin abrir nada.
+   *
+   * Usa el MISMO modelo que la pagina 1 del PDF (`buildExecutiveSummary`), asi
+   * que ambos cuentan lo mismo del turno. A diferencia del PDF, no necesita el
+   * grafico de ECharts: se dibuja entero en canvas, por eso no hay que esperar
+   * a que ninguna pestana renderice.
+   */
+  const handleExportPng = useCallback(() => {
+    if (!summary) return
+    const reliability = computeMaintenanceReliability([summary], [{ summary, pauses }])
+    const executive = buildExecutiveSummary({
+      summary,
+      upstream: upstreamLine.snapshot,
+      shiftLabel: displayShiftName(summary.shiftId),
+      // `shiftWindow` trae ISO strings; el resumen espera Date. La ventana del
+      // turno manda sobre la del Excel: es la real de Shoplogix.
+      start: toDateOrNull(shiftWindow?.startAt ?? summary.startAt),
+      end:   toDateOrNull(shiftWindow?.endAt   ?? summary.endAt),
+      reliability: {
+        mttrMacroSec: reliability.mttrMacroSec,
+        mtbfSec:      reliability.mtbfSec,
+        macroCount:   reliability.eventsCount,
+        microCount:   reliability.microCount,
+        microSec:     reliability.microSec,
+      },
+      uptimePct: upstreamLine.snapshot ? upstreamLine.snapshot.lineAvailability * 100 : null,
+    })
+    exportExecutiveSummaryPng({
+      summary: executive,
+      filenameSuffix: `${summary.dateKey}_${displayShiftName(summary.shiftId).replace(/\s+/g, '-')}`,
+    })
+  }, [summary, pauses, upstreamLine.snapshot, shiftWindow])
+
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
@@ -1495,6 +1540,18 @@ export function AnalisisGraderTurnoPage() {
               title="Exportar turno a CSV (pauses + gates + causas P0)"
             >
               <Download className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {/* Resumen ejecutivo como imagen — para mandar por Telegram sin
+              que el receptor tenga que abrir un PDF de varias paginas. */}
+          {summary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPng}
+              title="Descargar resumen ejecutivo del turno (PNG)"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
             </Button>
           )}
           {/* M17: Exportar turno a PDF */}
