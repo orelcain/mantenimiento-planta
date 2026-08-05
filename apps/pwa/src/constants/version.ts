@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.99.6' as const
+export const APP_VERSION = '4.0.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-08-04' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(home-redirect): mobile va a /dashboard (MobileHomeGrid), desktop a default config' as const
+export const VERSION_NAME = 'Catálogo de variadores, matriz de turnos y auditoría del Centro de Aprendizaje' as const
 
 /**
  * Nota:
