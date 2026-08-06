@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Caja, PlanoBorne, PlanoHoja, PlanoHojaMeta, PlanoRotulo } from '@/hooks/usePlano'
+import type { Caja, PlanoBorne, PlanoBorneLibre, PlanoHoja, PlanoHojaMeta, PlanoRotulo } from '@/hooks/usePlano'
 
 export type Foco =
   | { tipo: 'caja'; b: Caja }
@@ -15,6 +15,7 @@ type Props = {
   foco: Foco
   onSalto: (hoja: number, col: number) => void
   onBorne: (b: PlanoBorne) => void
+  onBorneLibre: (b: PlanoBorneLibre) => void
   onAparato: (tag: string) => void
   onRotulo: (r: PlanoRotulo) => void
   onFondo: () => void
@@ -33,7 +34,7 @@ const ESCALA_COLUMNA = 1.7
  * opcional con la traducción al castellano.
  */
 export function PlanoLienzo({
-  hoja, meta, mostrarEs, notasDe, foco, onSalto, onBorne, onAparato, onRotulo, onFondo,
+  hoja, meta, mostrarEs, notasDe, foco, onSalto, onBorne, onBorneLibre, onAparato, onRotulo, onFondo,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -215,6 +216,14 @@ export function PlanoLienzo({
                   strokeWidth={0.7} strokeOpacity={0.7} strokeDasharray="2 1.4"
                   className="cursor-pointer hover:opacity-40"
                   onClick={(e) => { e.stopPropagation(); onBorne(t) }} />
+          ))}
+
+          {hoja.libres.map((t, i) => (
+            <rect key={`l${i}`} x={t.b[0] - 1.6} y={t.b[1] - 1.6} width={t.b[2] + 3.2} height={t.b[3] + 3.2}
+                  rx={2} fill="var(--lc-nuevo)" opacity={0.1} stroke="var(--lc-nuevo)"
+                  strokeWidth={0.6} strokeOpacity={0.55} strokeDasharray="1.2 1.2"
+                  className="cursor-pointer hover:opacity-35"
+                  onClick={(e) => { e.stopPropagation(); onBorneLibre(t) }} />
           ))}
 
           {hoja.xrefs.map((t, i) => (

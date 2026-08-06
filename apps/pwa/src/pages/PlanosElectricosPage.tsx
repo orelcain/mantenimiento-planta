@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, Zap } from 'lucide-react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
-import { usePlano, type Caja, type PlanoRotulo } from '@/hooks/usePlano'
+import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
@@ -11,6 +11,7 @@ type Seleccion =
   | { tipo: 'aparato'; tag: string }
   | { tipo: 'salto'; t: string; h: number; c: number }
   | { tipo: 'borne'; t: string; h: number }
+  | { tipo: 'borneLibre'; l: PlanoBorneLibre }
   | { tipo: 'rotulo'; r: PlanoRotulo }
   | null
 
@@ -258,6 +259,7 @@ function Visor({ slug }: { slug: string }) {
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
             onSalto={(h, c) => { setSel({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}
             onBorne={(b) => { setSel({ tipo: 'borne', t: b.t, h: b.h }); void irA(b.h, undefined, b.tb) }}
+            onBorneLibre={(l) => { setSel({ tipo: 'borneLibre', l }); setFoco(null) }}
             onAparato={(tag) => { setSel({ tipo: 'aparato', tag }); setFoco(null) }}
             onRotulo={(r) => { setSel({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
@@ -332,6 +334,28 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
           Su columna de cableado está en la <b>hoja {sel.h}</b> del plano de bornes:
           ahí dice qué cable llega, su color y hacia dónde sigue.
         </p>
+      </>
+    )
+  }
+
+  if (sel.tipo === 'borneLibre') {
+    return (
+      <>
+        <Titulo>Borne {sel.l.t}</Titulo>
+        <p className="m-0 text-[12px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+          El plano no dice de qué regla es este {sel.l.t} — existe en{' '}
+          {sel.l.op.length} reglas. Las nombradas en esta misma hoja van primero:
+        </p>
+        <div className="mt-2 flex flex-col gap-1.5">
+          {sel.l.op.map((o) => (
+            <button key={o.k} type="button" onClick={() => onIr(o.h, undefined, o.tb)}
+                    className="flex items-baseline justify-between rounded border px-2.5 py-1.5 text-left"
+                    style={{ borderColor: 'var(--lc-border)' }}>
+              <b className="font-mono text-[13px]" style={{ color: 'var(--lc-nuevo)' }}>{o.k}</b>
+              <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
+            </button>
+          ))}
+        </div>
       </>
     )
   }

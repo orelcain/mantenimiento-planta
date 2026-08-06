@@ -118,7 +118,29 @@ def main():
             f.write(optimizar(pg.get_svg_image(text_as_path=True)))
 
         palabras = pg.get_text("words")
-        xrefs, tags, brs, consumido = [], [], [], set()
+        xrefs, tags, brs, libres, consumido = [], [], [], [], set()
+
+        # Circulos de borne del dibujo (solo esquema): el plano marca cada punto
+        # de bornera con un circulo chico y el numero PELADO al lado — sin la
+        # regla, que va rotulada en otra parte de la fila. Se detectan los
+        # circulos de ~2-7 pt y se descartan los que viven dentro de un conector
+        # (esos son pines, no bornes).
+        circulos = []
+        if blatt < 24:
+            chicos, grandes = [], []
+            for dr in pg.get_drawings():
+                r = dr["rect"]
+                w_, h_ = r.width, r.height
+                if not any(it[0] == "c" for it in dr["items"]):
+                    continue
+                if 1.5 < w_ < 7 and 1.5 < h_ < 7 and abs(w_ - h_) < 1.5:
+                    chicos.append(((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2))
+                elif 20 < w_ < 110 and abs(w_ - h_) < 8:
+                    grandes.append(r)
+            circulos = [c for c in chicos
+                        if not any(g.x0 < c[0] < g.x1 and g.y0 < c[1] < g.y1 for g in grandes)]
+            # que reglas se nombran en esta hoja, para ordenar el desambiguador
+            reglas_hoja = {w[4] for w in palabras if re.match(r"^X\d{1,2}$", w[4])}
         for j, (x0, y0, x1, y1, txt, *_) in enumerate(palabras):
             if j in consumido:
                 continue
@@ -168,13 +190,30 @@ def main():
                         consumido.add(par[0])
                     brs.append({"b": zona, "t": clave, "h": destino["h"], "tb": destino["b"]})
                     continue
+            # Numero pelado junto a un circulo de borne ("25", "120"): la regla
+            # no esta escrita al lado, asi que se buscan las candidatas en el
+            # Klemmenplan. Con una sola coincidencia el salto es directo; con
+            # varias, el panel deja elegir (primero las reglas nombradas en la
+            # misma hoja).
+            if blatt < 24 and re.match(r"^\d{1,3}$", txt) and circulos:
+                cx_, cy_ = (x0 + x1) / 2, (y0 + y1) / 2
+                if any(abs(cx_ - cc[0]) < 12 and abs(cy_ - cc[1]) < 5 for cc in circulos):
+                    op = [{"k": k, "h": v["h"], "tb": v["b"]}
+                          for k, v in bornes.items() if k.endswith(f":{txt}")]
+                    op.sort(key=lambda o: (o["k"].split(":")[0] not in reglas_hoja, o["k"]))
+                    if len(op) == 1:
+                        brs.append({"b": caja, "t": op[0]["k"], "h": op[0]["h"], "tb": op[0]["tb"]})
+                        continue
+                    if op:
+                        libres.append({"b": caja, "t": txt, "op": op[:8]})
+                        continue
             m = RE_TAG.match(txt)
             if m and m.group(1) in indice:
                 tags.append({"b": caja, "t": m.group(1)})
 
         terms = deduplicar(rotulos(pg, sin_traducir))
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
-            json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs}, f, ensure_ascii=False)
+            json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs, "libres": libres}, f, ensure_ascii=False)
 
         # Indice de busqueda global de rotulos: sin el, el buscador solo podia
         # adivinar la hoja por el titulo y no llevaba al punto exacto.

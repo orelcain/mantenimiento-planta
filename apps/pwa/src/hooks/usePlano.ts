@@ -14,6 +14,8 @@ export type PlanoAparicion = { h: number; c: number; b: Caja }
 export type PlanoBusquedaItem = { de: string; es: string; h: number; b: Caja }
 /** Referencia a un borne en el esquema; `tb` = caja de su columna en el Klemmenplan. */
 export type PlanoBorne = { b: Caja; t: string; h: number; tb: Caja }
+/** Punto de bornera con número pelado; `op` = candidatas en el Klemmenplan. */
+export type PlanoBorneLibre = { b: Caja; t: string; op: { k: string; h: number; tb: Caja }[] }
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
 
@@ -41,7 +43,7 @@ export type PlanoIndice = {
   glosario: Record<string, string>
 }
 
-export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[]; bornes: PlanoBorne[] }
+export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[]; bornes: PlanoBorne[]; libres: PlanoBorneLibre[] }
 
 /**
  * Carga el índice de un plano y sus hojas bajo demanda.
