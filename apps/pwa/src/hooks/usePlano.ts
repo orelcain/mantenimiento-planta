@@ -8,6 +8,10 @@ export type Caja = [number, number, number, number]
 export type PlanoSalto = { b: Caja; t: string; h: number; c: number }
 /** Una designación de aparato dibujada en la hoja (K7, Q1, X5...). */
 export type PlanoAparato = { b: Caja; t: string }
+/** Una aparición de un aparato en el plano: hoja, columna y caja del texto. */
+export type PlanoAparicion = { h: number; c: number; b: Caja }
+/** Un rótulo del plano en el índice de búsqueda global. */
+export type PlanoBusquedaItem = { de: string; es: string; h: number; b: Caja }
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
 
@@ -28,8 +32,10 @@ export type PlanoIndice = {
   hojasTotales: number
   faltante: number[]
   hojas: PlanoHojaMeta[]
-  /** aparato -> [[hoja, columna], ...] en todo el plano */
-  indice: Record<string, [number, number][]>
+  /** aparato -> todas sus apariciones, cada una con su caja exacta */
+  indice: Record<string, PlanoAparicion[]>
+  /** todos los rotulos traducidos del plano, para el buscador */
+  busqueda: PlanoBusquedaItem[]
   glosario: Record<string, string>
 }
 

@@ -204,7 +204,14 @@ function Visor({ slug }: { slug: string }) {
         <aside className="w-72 shrink-0 overflow-y-auto border-l p-3"
                style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
           {busca.trim()
-            ? <Resultados items={resultados} onIr={irA} />
+            ? <Resultados items={resultados}
+                onIr={(b, c, caja, aparato) => {
+                  if (aparato) setSel({ tipo: 'aparato', tag: aparato })
+                  // Elegir un resultado cierra la busqueda: si no, el panel se
+                  // quedaba en la lista y la ficha del aparato no se veia.
+                  setBusca('')
+                  void irA(b, c, caja)
+                }} />
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA} />}
         </aside>
       </div>
@@ -219,7 +226,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
   hojaActual: number
   notas: ReturnType<typeof usePlanoNotas>
-  onIr: (b: number, c?: number) => void
+  onIr: (b: number, c?: number, caja?: Caja) => void
 }) {
   if (!sel) {
     return (
@@ -271,13 +278,13 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
         Aparece en {puntos.length} punto{puntos.length !== 1 ? 's' : ''} del plano.
       </p>
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
-        {puntos.map(([b, c]) => (
-          <button key={`${b}.${c}`} type="button" onClick={() => onIr(b, c)}
+        {puntos.map((p) => (
+          <button key={`${p.h}.${p.c}`} type="button" onClick={() => onIr(p.h, undefined, p.b)}
                   className="rounded border px-2 py-1 font-mono text-[11.5px] tabular-nums"
-                  style={b === hojaActual
+                  style={p.h === hojaActual
                     ? { borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)', background: 'var(--lc-aqua-soft)' }
                     : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
-            {b}.{c}
+            {p.h}.{p.c}
           </button>
         ))}
       </div>
@@ -296,42 +303,64 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
   )
 }
 
-type Resultado = { clave: string; detalle: string; blatt: number; col?: number }
+type Resultado = {
+  clave: string
+  detalle: string
+  blatt: number
+  col?: number
+  caja?: Caja
+  aparato?: string
+}
+
+/** lowercase + sin acentos: "vacio" encuentra "Vacío" y "kuhlwasser" a "Kühlwasser". */
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
 function buscar(
   q: string,
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>,
   _hojaActual: number,
 ): Resultado[] {
-  const v = q.trim().toLowerCase()
+  const v = norm(q.trim())
   if (!v) return []
   const out: Resultado[] = []
+
+  // Aparatos: por designacion (K7, Q1, X5...). Aterrizan en su caja exacta.
   Object.entries(indice.indice).forEach(([tag, puntos]) => {
     const primero = puntos[0]
-    if (primero && tag.toLowerCase().startsWith(v)) {
-      out.push({ clave: tag, detalle: `${puntos.length} puntos`, blatt: primero[0], col: primero[1] })
+    if (primero && norm(tag).startsWith(v)) {
+      out.push({
+        clave: tag, detalle: `${puntos.length} puntos`, aparato: tag,
+        blatt: primero.h, caja: primero.b,
+      })
     }
   })
-  Object.entries(indice.glosario).forEach(([de, es]) => {
-    if (de.toLowerCase().includes(v) || es.toLowerCase().includes(v)) {
-      const h = indice.hojas.find((x) => x.titulo.includes(de) || x.tituloEs.includes(es))
-      if (h) out.push({ clave: es, detalle: `${de} · hoja ${h.blatt}`, blatt: h.blatt })
+
+  // Rotulos: en el idioma que sea. Cada resultado lleva su hoja y su caja.
+  for (const r of indice.busqueda) {
+    if (norm(r.de).includes(v) || norm(r.es).includes(v)) {
+      out.push({ clave: r.es, detalle: `${r.de} · hoja ${r.h}`, blatt: r.h, caja: r.b })
     }
-  })
+    if (out.length >= 60) break
+  }
   return out.slice(0, 60)
 }
 
-function Resultados({ items, onIr }: { items: Resultado[]; onIr: (b: number, c?: number) => void }) {
+function Resultados({ items, onIr }: {
+  items: Resultado[]
+  onIr: (b: number, c?: number, caja?: Caja, aparato?: string) => void
+}) {
   return (
     <>
       <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}</Titulo>
       {!items.length && (
         <p className="m-0 text-[12px]" style={{ color: 'var(--lc-ink-ghost)' }}>
-          Sin coincidencias. Prueba con una designación (K7, Q1) o una palabra del plano.
+          Sin coincidencias. Prueba con una designación (K7, Q1) o una palabra
+          del plano en alemán o castellano.
         </p>
       )}
       {items.map((r) => (
-        <button key={`${r.clave}${r.detalle}`} type="button" onClick={() => onIr(r.blatt, r.col)}
+        <button key={`${r.clave}${r.detalle}`} type="button"
+                onClick={() => onIr(r.blatt, r.col, r.caja, r.aparato)}
                 className="flex w-full items-baseline justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:opacity-80">
           <b className="font-mono text-[12.5px]">{r.clave}</b>
           <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>

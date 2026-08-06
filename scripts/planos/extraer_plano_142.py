@@ -54,22 +54,31 @@ def main():
     doc = fitz.open(PDF)
     os.makedirs(DEST, exist_ok=True)
 
-    # --- pasada 1: indice global de aparatos (en que hoja.columna esta cada uno)
+    # --- pasada 1: indice global de aparatos.
+    # Cada aparicion lleva su CAJA ademas de hoja.columna: sin la caja, saltar a
+    # un aparato solo podia iluminar la columna entera y el usuario terminaba
+    # buscando el K7 a ojo dentro de ella.
     cols_por_pagina, indice = {}, {}
     for i in range(doc.page_count):
         pg = doc[i]
         cab = pg.get_text("words", clip=fitz.Rect(0, 0, pg.rect.width, pg.rect.height * 0.05))
         cols_por_pagina[i] = {w[4]: round(w[0], 1) for w in cab if w[4] in "0123456789"}
         blatt = blatt_de_pagina(i, doc.page_count)
-        for w in pg.get_text("words"):
-            m = RE_TAG.match(w[4])
+        for x0, y0, x1, y1, txt, *_ in pg.get_text("words"):
+            m = RE_TAG.match(txt)
             if m and m.group(1) not in RUIDO:
-                c = columna_de(w[0], cols_por_pagina[i])
-                indice.setdefault(m.group(1), set()).add((blatt, c))
-    indice = {k: sorted(v) for k, v in sorted(indice.items()) if len(v) > 1}
+                c = columna_de(x0, cols_por_pagina[i])
+                ap = indice.setdefault(m.group(1), {})
+                # una aparicion por (hoja, columna): la primera manda
+                ap.setdefault((blatt, c), [round(x0, 1), round(y0, 1),
+                                           round(x1 - x0, 1), round(y1 - y0, 1)])
+    indice = {
+        k: [{"h": h, "c": c, "b": b} for (h, c), b in sorted(v.items())]
+        for k, v in sorted(indice.items()) if len(v) > 1
+    }
 
     # --- pasada 2: una hoja a la vez
-    hojas, sin_traducir = [], collections.Counter()
+    hojas, sin_traducir, busqueda = [], collections.Counter(), []
     for i in range(doc.page_count):
         pg, blatt = doc[i], blatt_de_pagina(i, doc.page_count)
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.svg"), "w", encoding="utf-8") as f:
@@ -109,6 +118,18 @@ def main():
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
             json.dump({"xrefs": xrefs, "tags": tags, "terms": terms}, f, ensure_ascii=False)
 
+        # Indice de busqueda global de rotulos: sin el, el buscador solo podia
+        # adivinar la hoja por el titulo y no llevaba al punto exacto.
+        vistos_busq = set()
+        for t in terms:
+            if t.get("dup"):
+                continue
+            k = (t["de"], blatt)
+            if k in vistos_busq:
+                continue
+            vistos_busq.add(k)
+            busqueda.append({"de": t["de"], "es": t["es"], "h": blatt, "b": t["b"]})
+
         hojas.append({
             "blatt": blatt,
             "vb": [round(pg.rect.width, 2), round(pg.rect.height, 2)],
@@ -121,8 +142,8 @@ def main():
     with open(os.path.join(DEST, "indice.json"), "w", encoding="utf-8") as f:
         json.dump({"plano": "142.71.00.888", "rev": "A1 · 23.08.2022",
                    "maquina": "BAADER 142", "hojasTotales": 45,
-                   "faltante": [43], "hojas": hojas,
-                   "indice": indice, "glosario": PALABRAS}, f, ensure_ascii=False)
+                   "faltante": [43], "hojas": hojas, "indice": indice,
+                   "busqueda": busqueda, "glosario": PALABRAS}, f, ensure_ascii=False)
 
     resumen(DEST, hojas, indice, sin_traducir)
 
