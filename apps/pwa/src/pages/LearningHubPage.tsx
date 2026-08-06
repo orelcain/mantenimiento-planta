@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock, Activity, GraduationCap, Waypoints } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
@@ -84,6 +84,14 @@ const SPECIAL_MODULES: SpecialModule[] = [
     // (~30 KB de parámetros y fallas) en el chunk del hub y anularía el lazy() de la ruta.
     // Actualizar al tocar variadores.ts (los conteos viven en TOTAL_PARAMETROS/TOTAL_FALLAS).
     stats: '8 familias · 164 parámetros · 46 fallas',
+  },
+  {
+    id: 'planos', title: 'Planos eléctricos', subtitle: 'El plano del fabricante, navegable',
+    description: 'Los saltos entre hojas se siguen tocando, cada aparato dice dónde más aparece y los rótulos se leen en castellano.',
+    icon: Waypoints, href: '/aprendizaje/planos', tint: '#6b8d7a',
+    // Literal como sus hermanos: importar @/data/planos por un conteo metería
+    // el catálogo en el chunk del hub. Actualizar al sumar una máquina.
+    stats: '1 máquina · 44 hojas · 936 saltos',
   },
 ]
 

@@ -532,6 +532,40 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Notas y fotos que la gente cuelga sobre el plano electrico.
+    // Se anclan al APARATO (F24, K7...) y no a un punto del dibujo, porque el
+    // mismo aparato aparece en varias hojas y la foto sirve en todas.
+    // A diferencia de variadoresAportes, esto NO se incorpora por PR: es
+    // contenido vivo, asi que su autor puede corregirlo o borrarlo.
+    match /planoNotas/{notaId} {
+      allow read: if isActiveUser();
+
+      allow create: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.plantId is string
+        && isNonEmptyString(request.resource.data.planoSlug, 1, 60)
+        && request.resource.data.ancla in ['aparato', 'hoja']
+        && isNonEmptyString(request.resource.data.anclaId, 1, 40)
+        && isNonEmptyString(request.resource.data.texto, 1, 1500)
+        && (!('fotos' in request.resource.data)
+            || (request.resource.data.fotos is list
+                && request.resource.data.fotos.size() <= 6))
+        // Vinculo opcional al maestro de repuestos, para cruzar con SAP.
+        && (!('codigoSAP' in request.resource.data)
+            || request.resource.data.codigoSAP is string)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update: if isActiveUser()
+        && isValidDocSize()
+        && (resource.data.creadoPor == request.auth.uid || isAdmin())
+        && request.resource.data.creadoPor == resource.data.creadoPor
+        && request.resource.data.anclaId == resource.data.anclaId
+        && isNonEmptyString(request.resource.data.texto, 1, 1500);
+
+      allow delete: if isActiveUser()
+        && (resource.data.creadoPor == request.auth.uid || isAdmin());
+    }
+
     match /incidents/{incidentId} {
       allow read: if isActiveUser();
       
