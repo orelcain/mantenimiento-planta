@@ -29,6 +29,8 @@ RE_COLOR = re.compile(r'^([A-Z]{2})-([A-Z]{2})$')
 
 RE_XREF = re.compile(r"^/(\d{1,2})\.(\d)$")
 RE_TAG = re.compile(r"^-?([A-Z]{1,3}\d{1,3})$")
+# Destino suelto tras un "/" separado: el "20.1" de "Q7 / 20.1".
+RE_DEST = re.compile(r"^(\d{1,2})\.(\d)$")
 # A1/A2 son los bornes de bobina IEC: aparecen en cada contactor del plano y no
 # designan un aparato. Sin esta lista negra el indice queda inservible.
 RUIDO = {"A1", "A2"}
@@ -73,13 +75,32 @@ def main():
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.svg"), "w", encoding="utf-8") as f:
             f.write(optimizar(pg.get_svg_image(text_as_path=True)))
 
-        xrefs, tags = [], []
-        for x0, y0, x1, y1, txt, *_ in pg.get_text("words"):
+        palabras = pg.get_text("words")
+        xrefs, tags, consumido = [], [], set()
+        for j, (x0, y0, x1, y1, txt, *_) in enumerate(palabras):
+            if j in consumido:
+                continue
             caja = [round(x0, 1), round(y0, 1), round(x1 - x0, 1), round(y1 - y0, 1)]
             m = RE_XREF.match(txt)
             if m:
                 xrefs.append({"b": caja, "t": txt, "h": int(m.group(1)), "c": int(m.group(2))})
                 continue
+            # El plano escribe la referencia de DOS formas. Pegada ("/8.5") y
+            # separada colgando de un aparato ("Q7 / 20.1", "X5.97 / 15.7"),
+            # que el tokenizador parte en "/" y "20.1". La segunda forma es el
+            # 11% de las referencias del plano y es la mas util para seguir un
+            # circuito, asi que hay que unir los dos tokens.
+            if txt == "/" and j + 1 < len(palabras):
+                sx0, sy0, sx1, sy1, stxt, *_ = palabras[j + 1]
+                m = RE_DEST.match(stxt)
+                if m:
+                    consumido.add(j + 1)
+                    xrefs.append({
+                        "b": [round(min(x0, sx0), 1), round(min(y0, sy0), 1),
+                              round(max(x1, sx1) - min(x0, sx0), 1),
+                              round(max(y1, sy1) - min(y0, sy0), 1)],
+                        "t": "/" + stxt, "h": int(m.group(1)), "c": int(m.group(2))})
+                    continue
             m = RE_TAG.match(txt)
             if m and m.group(1) in indice:
                 tags.append({"b": caja, "t": m.group(1)})
