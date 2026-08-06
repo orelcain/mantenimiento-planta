@@ -36,9 +36,34 @@
 const fs = require('fs')
 const path = require('path')
 
-/** Raiz del repo, derivada de la ubicacion del script: sirve en cualquier clon o worktree. */
-const REPO = path.resolve(__dirname, '..')
-const admin = require('firebase-admin')
+/**
+ * Raiz del repo. Lo normal es que el script viva en <repo>/scripts y baste con
+ * subir uno — asi anda en cualquier clon o worktree. Pero tambien se ejecuta
+ * como COPIA SUELTA fuera del repo (respaldo de la tarea programada, para que
+ * la vigilancia no se caiga cuando el working tree esta en una rama sin este
+ * archivo), y ahi hay que apuntar al repo conocido: la credencial, el .env y
+ * firebase-admin viven ahi.
+ */
+const REPO_POR_UBICACION = path.resolve(__dirname, '..')
+const REPO_CONOCIDO = 'D:/a/APP leventamiento de insidencias en planta'
+const REPO = fs.existsSync(path.join(REPO_POR_UBICACION, 'functions', '.env'))
+  ? REPO_POR_UBICACION
+  : REPO_CONOCIDO
+
+/**
+ * OJO: este require es la linea mas fragil del script. Corre ANTES del
+ * try/catch de main(), asi que si falla el proceso muere sin avisar por
+ * Telegram — silencio, que aca se lee igual que "todo bien". Paso de verdad el
+ * 2026-08-06: la copia suelta hacia `require('firebase-admin')` sin fallback,
+ * reventaba en el arranque y la tarea programada quedo muda un dia entero.
+ */
+let admin
+try {
+  admin = require('firebase-admin')
+} catch {
+  admin = require(path.join(REPO, 'node_modules', 'firebase-admin'))
+}
+
 const PLANTAS = ['chonchi', 'yal', 'filete']
 const CF = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net'
 

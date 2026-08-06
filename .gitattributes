@@ -1,0 +1,4 @@
+# cmd.exe necesita CRLF: con LF lee mal el archivo y ejecuta los comentarios
+# como comandos (paso el 2026-08-06 y dejo la tarea programada sin correr).
+*.cmd text eol=crlf
+*.bat text eol=crlf
