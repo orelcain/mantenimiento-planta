@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, Zap } from 'lucide-react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
@@ -63,12 +63,23 @@ function Catalogo() {
 
 function Visor({ slug }: { slug: string }) {
   const cat = planoPorSlug(slug)
-  const { indice, hoja, abrir, error } = usePlano(slug)
+  // Hoja inicial: la de la URL (?hoja=9, para compartir un punto del plano por
+  // chat) o la última visitada en este equipo; usePlano valida contra el índice.
+  const [inicial] = useState<number | undefined>(() => {
+    const q = Number(new URLSearchParams(window.location.search).get('hoja'))
+    if (Number.isInteger(q) && q > 0) return q
+    const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
+    return Number.isInteger(g) && g > 0 ? g : undefined
+  })
+  const { indice, hoja, abrir, error } = usePlano(slug, inicial)
   const notas = usePlanoNotas(slug)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
   const [mostrarEs, setMostrarEs] = useState(false)
   const [busca, setBusca] = useState('')
+  // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
+  const [historial, setHistorial] = useState<number[]>([])
+  const buscaRef = useRef<HTMLInputElement>(null)
 
   const meta = useMemo(
     () => indice?.hojas.find((h) => h.blatt === hoja?.blatt) ?? null,
@@ -78,18 +89,46 @@ function Visor({ slug }: { slug: string }) {
   const irA = useCallback(
     async (blatt: number, col?: number, caja?: Caja) => {
       setFoco(caja ? { tipo: 'caja', b: caja } : col != null ? { tipo: 'columna', c: col } : null)
+      // Cambiar de hoja apila la actual (tope 20, como un historial de navegador).
+      setHistorial((h) => {
+        const actual = hoja?.blatt
+        return actual != null && actual !== blatt ? [...h.slice(-19), actual] : h
+      })
       await abrir(blatt)
     },
-    [abrir],
+    [abrir, hoja],
   )
+
+  const volver = useCallback(() => {
+    setHistorial((h) => {
+      const previa = h[h.length - 1]
+      if (previa != null) {
+        setFoco(null)
+        void abrir(previa)
+      }
+      return h.slice(0, -1)
+    })
+  }, [abrir])
+
+  // La hoja abierta queda en la URL (compartible) y en localStorage (reabrir
+  // donde quedaste). replaceState para no ensuciar el historial del navegador.
+  useEffect(() => {
+    if (!hoja) return
+    localStorage.setItem(`plano-hoja:${slug}`, String(hoja.blatt))
+    const u = new URL(window.location.href)
+    u.searchParams.set('hoja', String(hoja.blatt))
+    window.history.replaceState(null, '', u)
+  }, [hoja, slug])
 
   const notasDe = useCallback((tag: string) => notas.notasDe('aparato', tag).length, [notas])
 
-  // Pasar hoja con las flechas, como en un manual de papel.
+  // Teclado: ← → pasan hoja, "/" enfoca el buscador, Backspace deshace el salto.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!indice || !hoja) return
-      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return
+      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      if (e.key === '/') { e.preventDefault(); buscaRef.current?.focus(); return }
+      if (e.key === 'Backspace') { e.preventDefault(); volver(); return }
       const i = indice.hojas.findIndex((h) => h.blatt === hoja.blatt)
       const anterior = indice.hojas[i - 1]
       const siguiente = indice.hojas[i + 1]
@@ -98,7 +137,7 @@ function Visor({ slug }: { slug: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [indice, hoja, irA])
+  }, [indice, hoja, irA, volver])
 
   if (error) {
     return <Aviso texto={error} />
@@ -130,7 +169,7 @@ function Visor({ slug }: { slug: string }) {
 
         <div className="relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
+          <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
                  placeholder="Buscar K7, Q1, B12, Messer, cuchillo…"
                  className="w-full rounded-lg border bg-transparent py-1.5 pl-8 pr-2 font-mono text-[12.5px] outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
@@ -153,7 +192,21 @@ function Visor({ slug }: { slug: string }) {
                   className="rounded p-1 disabled:opacity-30" title="Hoja anterior">
             <ChevronLeft size={16} />
           </button>
-          <span className="tabular-nums">{hoja.blatt} / {indice.hojasTotales}</span>
+          {/* Select nativo: en el teléfono el índice lateral no existe y sin
+              esto la única forma de moverse era de a una hoja con las flechas. */}
+          <select value={hoja.blatt} onChange={(e) => void irA(Number(e.target.value))}
+                  aria-label="Ir a hoja"
+                  className="cursor-pointer appearance-none rounded border-0 bg-transparent py-1 pr-0.5 font-mono text-[12px] tabular-nums outline-none"
+                  style={{ color: 'var(--lc-ink)' }}>
+            {(['circuitos', 'bornes'] as const).map((sec) => (
+              <optgroup key={sec} label={sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}>
+                {indice.hojas.filter((h) => h.seccion === sec).map((h) => (
+                  <option key={h.blatt} value={h.blatt}>{h.blatt}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <span className="tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>/ {indice.hojasTotales}</span>
           <button type="button" disabled={!siguiente}
                   onClick={() => siguiente && void irA(siguiente.blatt)}
                   className="rounded p-1 disabled:opacity-30" title="Hoja siguiente">
@@ -192,6 +245,14 @@ function Visor({ slug }: { slug: string }) {
         </nav>
 
         <main className="relative min-w-0 flex-1">
+          {historial.length > 0 && (
+            <button type="button" onClick={volver}
+                    className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11.5px] shadow-lg"
+                    style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}
+                    title="Deshacer el salto (Backspace)">
+              <ChevronLeft size={13} /> Hoja {historial[historial.length - 1]}
+            </button>
+          )}
           <PlanoLienzo
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
             onSalto={(h, c) => { setSel({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}

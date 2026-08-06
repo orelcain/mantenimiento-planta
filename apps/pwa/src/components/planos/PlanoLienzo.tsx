@@ -38,6 +38,10 @@ export function PlanoLienzo({
   const canvasRef = useRef<HTMLDivElement>(null)
   const vista = useRef({ s: 1, x: 0, y: 0 })
   const arrastre = useRef<{ x: number; y: number; movido: number } | null>(null)
+  // Pinch en el teléfono: sin esto la única forma de acercar en planta eran
+  // los botones +/− y el plano es ilegible sin zoom.
+  const punteros = useRef(new Map<number, { x: number; y: number }>())
+  const pinza = useRef<{ dist: number } | null>(null)
   const [pulso, setPulso] = useState<number | null>(null)
   const [W, H] = meta.vb
 
@@ -121,10 +125,32 @@ export function PlanoLienzo({
       onWheel={onWheel}
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest('[data-controles]')) return
-        arrastre.current = { x: e.clientX - vista.current.x, y: e.clientY - vista.current.y, movido: 0 }
-        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+        punteros.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* puntero ya levantado */ }
+        const dedos = [...punteros.current.values()]
+        if (dedos.length === 2 && dedos[0] && dedos[1]) {
+          arrastre.current = null
+          pinza.current = { dist: Math.hypot(dedos[0].x - dedos[1].x, dedos[0].y - dedos[1].y) }
+        } else {
+          arrastre.current = { x: e.clientX - vista.current.x, y: e.clientY - vista.current.y, movido: 0 }
+        }
       }}
       onPointerMove={(e) => {
+        const p = punteros.current.get(e.pointerId)
+        if (p) { p.x = e.clientX; p.y = e.clientY }
+        const dedos = [...punteros.current.values()]
+        if (pinza.current && dedos.length === 2 && dedos[0] && dedos[1]) {
+          const dist = Math.hypot(dedos[0].x - dedos[1].x, dedos[0].y - dedos[1].y)
+          if (dist > 0 && pinza.current.dist > 0) {
+            const r = stageRef.current!.getBoundingClientRect()
+            // el zoom se ancla en el centro de los dos dedos
+            zoom(dist / pinza.current.dist,
+                 (dedos[0].x + dedos[1].x) / 2 - r.left,
+                 (dedos[0].y + dedos[1].y) / 2 - r.top)
+            pinza.current.dist = dist
+          }
+          return
+        }
         const a = arrastre.current
         if (!a) return
         a.movido++
@@ -132,7 +158,16 @@ export function PlanoLienzo({
         vista.current = { ...vista.current, x: e.clientX - a.x, y: e.clientY - a.y }
         aplicar()
       }}
-      onPointerUp={() => { arrastre.current = null }}
+      onPointerUp={(e) => {
+        punteros.current.delete(e.pointerId)
+        if (punteros.current.size < 2) pinza.current = null
+        if (punteros.current.size === 0) arrastre.current = null
+      }}
+      onPointerCancel={(e) => {
+        punteros.current.delete(e.pointerId)
+        pinza.current = null
+        arrastre.current = null
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
     >
       <div

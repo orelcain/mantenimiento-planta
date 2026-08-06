@@ -49,7 +49,7 @@ export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]
  * en memoria, más un prefetch silencioso de la hoja siguiente y la anterior
  * para que pasar página no espere.
  */
-export function usePlano(slug: string | undefined) {
+export function usePlano(slug: string | undefined, inicial?: number) {
   const [indice, setIndice] = useState<PlanoIndice | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hoja, setHoja] = useState<{ blatt: number; datos: PlanoHoja } | null>(null)
@@ -120,11 +120,14 @@ export function usePlano(slug: string | undefined) {
     [indice, traer],
   )
 
-  // Abrir la primera hoja apenas llega el índice.
+  // Abrir la hoja inicial apenas llega el índice: la de la URL o la última
+  // visitada si es válida; si no, la primera del plano.
   useEffect(() => {
-    const primera = indice?.hojas[0]
-    if (primera && !hoja) void abrir(primera.blatt)
-  }, [indice, hoja, abrir])
+    if (!indice || hoja) return
+    const pedida = inicial != null && indice.hojas.some((h) => h.blatt === inicial) ? inicial : undefined
+    const destino = pedida ?? indice.hojas[0]?.blatt
+    if (destino != null) void abrir(destino)
+  }, [indice, hoja, abrir, inicial])
 
   return { indice, hoja, abrir, cargando, error }
 }
