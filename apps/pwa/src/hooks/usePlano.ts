@@ -12,6 +12,8 @@ export type PlanoAparato = { b: Caja; t: string }
 export type PlanoAparicion = { h: number; c: number; b: Caja }
 /** Un rótulo del plano en el índice de búsqueda global. */
 export type PlanoBusquedaItem = { de: string; es: string; h: number; b: Caja }
+/** Referencia a un borne en el esquema; `tb` = caja de su columna en el Klemmenplan. */
+export type PlanoBorne = { b: Caja; t: string; h: number; tb: Caja }
 /** Un rótulo en otro idioma con su traducción. `dup` = repetición a tapar. */
 export type PlanoRotulo = { b: Caja; de: string; es: string; r: number; dup?: number }
 
@@ -39,7 +41,7 @@ export type PlanoIndice = {
   glosario: Record<string, string>
 }
 
-export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[] }
+export type PlanoHoja = { svg: string; xrefs: PlanoSalto[]; tags: PlanoAparato[]; terms: PlanoRotulo[]; bornes: PlanoBorne[] }
 
 /**
  * Carga el índice de un plano y sus hojas bajo demanda.

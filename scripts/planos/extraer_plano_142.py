@@ -72,10 +72,43 @@ def main():
                 # una aparicion por (hoja, columna): la primera manda
                 ap.setdefault((blatt, c), [round(x0, 1), round(y0, 1),
                                            round(x1 - x0, 1), round(y1 - y0, 1)])
+    # Antes se exigia >1 aparicion, pero un aparato que sale una sola vez
+    # igual necesita ser clicable: es el ancla de sus notas y fotos.
     indice = {
         k: [{"h": h, "c": c, "b": b} for (h, c), b in sorted(v.items())]
-        for k, v in sorted(indice.items()) if len(v) > 1
+        for k, v in sorted(indice.items())
     }
+
+    # --- pasada 1.5: indice de bornes del Klemmenplan (hojas 24+).
+    # Cada borne es una COLUMNA vertical: su numero en una franja girada y el
+    # nombre de la regla (X5, X9...) en otra mas abajo, alineados en x. Esto
+    # permite que tocar "X5 97" en el esquema salte a la fila de cableado.
+    bornes = {}
+    for i in range(doc.page_count):
+        blatt = blatt_de_pagina(i, doc.page_count)
+        if blatt < 24:
+            continue
+        columnas = []          # (x_centro, y_top, texto, caja)
+        for blk in doc[i].get_text("dict")["blocks"]:
+            for ln in blk.get("lines", []):
+                if tuple(round(v) for v in ln.get("dir", (1, 0))) != (0, -1):
+                    continue
+                t = "".join(sp["text"] for sp in ln["spans"]).strip()
+                x0, y0, x1, y1 = ln["bbox"]
+                columnas.append(((x0 + x1) / 2, y0, t,
+                                 [round(x0, 1), round(y0, 1),
+                                  round(x1 - x0, 1), round(y1 - y0, 1)]))
+        reglas = [c for c in columnas if re.match(r"^-?X\d{1,2}$", c[2])]
+        numeros = [c for c in columnas if re.match(r"^\d{1,3}$", c[2])]
+        for cx, cy, texto, _ in reglas:
+            regla = texto.lstrip("-")
+            # el numero del borne: misma columna (x), en la franja de arriba
+            cand = [n for n in numeros if abs(n[0] - cx) < 3 and n[1] < cy]
+            if not cand:
+                continue
+            num = max(cand, key=lambda n: n[1])          # el mas cercano por arriba
+            bornes.setdefault(f"{regla}:{num[2]}", {"h": blatt, "b": num[3]})
+    print(f"    bornes indexados en el Klemmenplan: {len(bornes)}")
 
     # --- pasada 2: una hoja a la vez
     hojas, sin_traducir, busqueda = [], collections.Counter(), []
@@ -85,7 +118,7 @@ def main():
             f.write(optimizar(pg.get_svg_image(text_as_path=True)))
 
         palabras = pg.get_text("words")
-        xrefs, tags, consumido = [], [], set()
+        xrefs, tags, brs, consumido = [], [], [], set()
         for j, (x0, y0, x1, y1, txt, *_) in enumerate(palabras):
             if j in consumido:
                 continue
@@ -110,13 +143,38 @@ def main():
                               round(max(y1, sy1) - min(y0, sy0), 1)],
                         "t": "/" + stxt, "h": int(m.group(1)), "c": int(m.group(2))})
                     continue
+            # Referencia a borne en el esquema, dos formas:
+            #   token unico "X5:97" / "X5.62", o par "X5" + "97" (el numero va
+            #   ~9,6 pt a la derecha del tag, misma linea — medido en hoja 4).
+            # Si el borne existe en el Klemmenplan, la zona salta a su columna.
+            if blatt < 24:
+                mb = re.match(r"^(X\d{1,2})[:.](\d{1,3})$", txt)
+                par = None
+                if not mb and re.match(r"^X\d{1,2}$", txt):
+                    for k in range(max(0, j - 3), min(len(palabras), j + 4)):
+                        if k == j or k in consumido:
+                            continue
+                        nx0, ny0, nx1, ny1, ntxt, *_ = palabras[k]
+                        if re.match(r"^\d{1,3}$", ntxt) and abs(ny0 - y0) < 4 and 3 < nx0 - x1 < 30:
+                            par = (k, ntxt, [round(min(x0, nx0), 1), round(min(y0, ny0), 1),
+                                             round(max(x1, nx1) - min(x0, nx0), 1),
+                                             round(max(y1, ny1) - min(y0, ny0), 1)])
+                            break
+                clave = f"{mb.group(1)}:{mb.group(2)}" if mb else (f"{txt}:{par[1]}" if par else None)
+                if clave and clave in bornes:
+                    destino = bornes[clave]
+                    zona = caja if mb else par[2]
+                    if par:
+                        consumido.add(par[0])
+                    brs.append({"b": zona, "t": clave, "h": destino["h"], "tb": destino["b"]})
+                    continue
             m = RE_TAG.match(txt)
             if m and m.group(1) in indice:
                 tags.append({"b": caja, "t": m.group(1)})
 
         terms = deduplicar(rotulos(pg, sin_traducir))
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
-            json.dump({"xrefs": xrefs, "tags": tags, "terms": terms}, f, ensure_ascii=False)
+            json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs}, f, ensure_ascii=False)
 
         # Indice de busqueda global de rotulos: sin el, el buscador solo podia
         # adivinar la hoja por el titulo y no llevaba al punto exacto.
@@ -136,7 +194,7 @@ def main():
             "cols": cols_por_pagina[i],
             "seccion": "circuitos" if blatt < 24 else "bornes",
             **titulos(pg, terms),
-            "n": {"x": len(xrefs), "t": len(tags), "d": len(terms)},
+            "n": {"x": len(xrefs), "t": len(tags), "d": len(terms), "b": len(brs)},
         })
 
     with open(os.path.join(DEST, "indice.json"), "w", encoding="utf-8") as f:

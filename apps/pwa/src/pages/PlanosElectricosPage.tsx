@@ -10,6 +10,7 @@ import { NotasAparato } from '@/components/planos/NotasAparato'
 type Seleccion =
   | { tipo: 'aparato'; tag: string }
   | { tipo: 'salto'; t: string; h: number; c: number }
+  | { tipo: 'borne'; t: string; h: number }
   | { tipo: 'rotulo'; r: PlanoRotulo }
   | null
 
@@ -256,6 +257,7 @@ function Visor({ slug }: { slug: string }) {
           <PlanoLienzo
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
             onSalto={(h, c) => { setSel({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}
+            onBorne={(b) => { setSel({ tipo: 'borne', t: b.t, h: b.h }); void irA(b.h, undefined, b.tb) }}
             onAparato={(tag) => { setSel({ tipo: 'aparato', tag }); setFoco(null) }}
             onRotulo={(r) => { setSel({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
@@ -297,6 +299,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
           Toca cualquier marca de color sobre el plano.
           <br /><br />
           <b style={{ color: 'var(--lc-nuevo)' }}>Verde</b> — salto a otra hoja: te lleva y marca dónde caíste.
+          Con <b>línea punteada</b> es un borne: te lleva a su columna de cableado.
           <br />
           <b style={{ color: 'var(--lc-aqua-bright)' }}>Azul</b> — aparato: te lista todas las hojas donde
           aparece, y ahí puedes dejarle una nota o una foto.
@@ -313,6 +316,21 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
         <Titulo>Salto de hoja</Titulo>
         <p className="m-0 text-[12.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
           El circuito continúa en la <b>hoja {sel.h}</b>, columna <b>{sel.c}</b>.
+        </p>
+      </>
+    )
+  }
+
+  if (sel.tipo === 'borne') {
+    return (
+      <>
+        <Titulo>Borne</Titulo>
+        <p className="m-0 font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-nuevo)' }}>
+          {sel.t}
+        </p>
+        <p className="m-0 mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+          Su columna de cableado está en la <b>hoja {sel.h}</b> del plano de bornes:
+          ahí dice qué cable llega, su color y hacia dónde sigue.
         </p>
       </>
     )
