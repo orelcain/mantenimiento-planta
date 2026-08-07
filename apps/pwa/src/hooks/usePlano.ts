@@ -40,6 +40,8 @@ export type PlanoIndice = {
   indice: Record<string, PlanoAparicion[]>
   /** todos los rotulos traducidos del plano, para el buscador */
   busqueda: PlanoBusquedaItem[]
+  /** borne -> su columna en el Klemmenplan, para el buscador */
+  bornesIdx: Record<string, { h: number; tb: Caja }>
   glosario: Record<string, string>
 }
 

@@ -1,27 +1,32 @@
 # -*- coding: utf-8 -*-
-"""Extrae el plano electrico BAADER 142.71.00.888 a assets estaticos para la PWA.
+"""Extrae un plano electrico vectorial a assets navegables para la PWA.
 
-El PDF es VECTORIAL (0 imagenes, ~58.000 trazos), asi que cada hoja se exporta a
-SVG y encima se superpone una capa de zonas clicables construida con las cajas de
-cada palabra. No hay OCR en ninguna parte de este pipeline.
+GENERICO por maquina: los datos del plano viven en configs.json (pdf, hojas,
+donde empieza el plano de bornes). Sumar una maquina = agregar su entrada ahi
+y correr:
 
-Salida en apps/pwa/public/planos/<slug>/:
-  indice.json    metadatos de todas las hojas + indice de aparatos + glosario
-  hoja-NN.json   zonas clicables de esa hoja (saltos, aparatos, rotulos aleman)
-  hoja-NN.svg    el dibujo (~400 KB en disco, ~41 KB servido con gzip)
+    python scripts/planos/extraer_plano_142.py [slug]     (default: baader-142-888)
 
-Uso:  python scripts/planos/extraer_plano_142.py
+El PDF debe ser VECTORIAL (texto seleccionable): cada hoja se exporta a SVG y
+encima se superpone una capa clicable construida con las cajas de cada palabra.
+Sin OCR. El glosario (glosario_142.py) es compartido: aleman/ingles/frances
+tecnicos sirven para cualquier plano europeo.
+
+Salida en apps/pwa/public/planos/<slug>/: indice.json + hoja-NN.{svg,json}.
 """
 import fitz, re, json, os, sys, collections
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PDF = os.path.join(
-    os.environ.get("ONEDRIVE", os.path.expanduser("~/OneDrive")),
-    "ANTARFOOD", "⚙️ EQUIPOS PLANTA", "⚙️ BAADER 142",
-    "INFO ALOJADA EN TELEGRAM BAADER 142", "DOCUMENTOS",
-    "883_1427100888_001_A1_A3.pdf")
-SLUG = "baader-142-888"
+SLUG = sys.argv[1] if len(sys.argv) > 1 else "baader-142-888"
+CONFIGS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "configs.json"), encoding="utf-8"))
+if SLUG not in CONFIGS:
+    sys.exit(f"Slug desconocido: {SLUG}. Hay: {', '.join(CONFIGS)}")
+CFG = CONFIGS[SLUG]
+PDF = os.path.join(os.environ.get("ONEDRIVE", os.path.expanduser("~/OneDrive")), *CFG["pdf"].split("/"))
 DEST = os.path.join(RAIZ, "apps", "pwa", "public", "planos", SLUG)
+# n de hoja real de cada pagina del PDF, saltando las hojas que el PDF no trae
+BLATTS = [n for n in range(1, CFG["hojasTotales"] + 1) if n not in CFG["faltantes"]]
+BORNES_DESDE = CFG["seccionBornes"]
 
 from glosario_142 import PALABRAS, FRASES, IGNORAR, COLORES  # noqa: E402
 
@@ -34,11 +39,23 @@ RE_DEST = re.compile(r"^(\d{1,2})\.(\d)$")
 # A1/A2 son los bornes de bobina IEC: aparecen en cada contactor del plano y no
 # designan un aparato. Sin esta lista negra el indice queda inservible.
 RUIDO = {"A1", "A2"}
+# Potenciales/senales (24V1, 0/24V1, 110V2...): la misma linea recorre varias
+# hojas; indexarlas como los aparatos permite tocarla y ver todo su recorrido.
+RE_SENAL = re.compile(r"^(0/)?\d{1,3}V\d{0,2}$")
+
+
+def clave_indexable(txt):
+    m = RE_TAG.match(txt)
+    if m and m.group(1) not in RUIDO:
+        return m.group(1)
+    if RE_SENAL.match(txt):
+        return txt
+    return None
 
 
 def blatt_de_pagina(i, total):
-    """El PDF trae 44 paginas pero el plano numera 45 hojas: la 43 no esta."""
-    return i + 1 if i < 42 else i + 2
+    """Numero de hoja real de la pagina i, segun la tabla BLATTS del config."""
+    return BLATTS[i]
 
 
 def optimizar(svg):
@@ -65,10 +82,10 @@ def main():
         cols_por_pagina[i] = {w[4]: round(w[0], 1) for w in cab if w[4] in "0123456789"}
         blatt = blatt_de_pagina(i, doc.page_count)
         for x0, y0, x1, y1, txt, *_ in pg.get_text("words"):
-            m = RE_TAG.match(txt)
-            if m and m.group(1) not in RUIDO:
+            clave = clave_indexable(txt)
+            if clave:
                 c = columna_de(x0, cols_por_pagina[i])
-                ap = indice.setdefault(m.group(1), {})
+                ap = indice.setdefault(clave, {})
                 # una aparicion por (hoja, columna): la primera manda
                 ap.setdefault((blatt, c), [round(x0, 1), round(y0, 1),
                                            round(x1 - x0, 1), round(y1 - y0, 1)])
@@ -86,7 +103,7 @@ def main():
     bornes = {}
     for i in range(doc.page_count):
         blatt = blatt_de_pagina(i, doc.page_count)
-        if blatt < 24:
+        if blatt < BORNES_DESDE:
             continue
         columnas = []          # (x_centro, y_top, texto, caja)
         for blk in doc[i].get_text("dict")["blocks"]:
@@ -126,7 +143,7 @@ def main():
         # circulos de ~2-7 pt y se descartan los que viven dentro de un conector
         # (esos son pines, no bornes).
         circulos = []
-        if blatt < 24:
+        if blatt < BORNES_DESDE:
             chicos, grandes = [], []
             for dr in pg.get_drawings():
                 r = dr["rect"]
@@ -169,7 +186,7 @@ def main():
             #   token unico "X5:97" / "X5.62", o par "X5" + "97" (el numero va
             #   ~9,6 pt a la derecha del tag, misma linea — medido en hoja 4).
             # Si el borne existe en el Klemmenplan, la zona salta a su columna.
-            if blatt < 24:
+            if blatt < BORNES_DESDE:
                 mb = re.match(r"^(X\d{1,2})[:.](\d{1,3})$", txt)
                 par = None
                 if not mb and re.match(r"^X\d{1,2}$", txt):
@@ -195,7 +212,7 @@ def main():
             # Klemmenplan. Con una sola coincidencia el salto es directo; con
             # varias, el panel deja elegir (primero las reglas nombradas en la
             # misma hoja).
-            if blatt < 24 and re.match(r"^\d{1,3}$", txt) and circulos:
+            if blatt < BORNES_DESDE and re.match(r"^\d{1,3}$", txt) and circulos:
                 cx_, cy_ = (x0 + x1) / 2, (y0 + y1) / 2
                 if any(abs(cx_ - cc[0]) < 12 and abs(cy_ - cc[1]) < 5 for cc in circulos):
                     op = [{"k": k, "h": v["h"], "tb": v["b"]}
@@ -207,9 +224,9 @@ def main():
                     if op:
                         libres.append({"b": caja, "t": txt, "op": op[:8]})
                         continue
-            m = RE_TAG.match(txt)
-            if m and m.group(1) in indice:
-                tags.append({"b": caja, "t": m.group(1)})
+            clave_t = clave_indexable(txt)
+            if clave_t and clave_t in indice:
+                tags.append({"b": caja, "t": clave_t})
 
         terms = deduplicar(rotulos(pg, sin_traducir))
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
@@ -231,15 +248,16 @@ def main():
             "blatt": blatt,
             "vb": [round(pg.rect.width, 2), round(pg.rect.height, 2)],
             "cols": cols_por_pagina[i],
-            "seccion": "circuitos" if blatt < 24 else "bornes",
+            "seccion": "circuitos" if blatt < BORNES_DESDE else "bornes",
             **titulos(pg, terms),
             "n": {"x": len(xrefs), "t": len(tags), "d": len(terms), "b": len(brs)},
         })
 
     with open(os.path.join(DEST, "indice.json"), "w", encoding="utf-8") as f:
-        json.dump({"plano": "142.71.00.888", "rev": "A1 · 23.08.2022",
-                   "maquina": "BAADER 142", "hojasTotales": 45,
-                   "faltante": [43], "hojas": hojas, "indice": indice,
+        json.dump({"plano": CFG["plano"], "rev": CFG["rev"],
+                   "maquina": CFG["maquina"], "hojasTotales": CFG["hojasTotales"],
+                   "faltante": CFG["faltantes"], "hojas": hojas, "indice": indice,
+                   "bornesIdx": {k: {"h": v["h"], "tb": v["b"]} for k, v in bornes.items()},
                    "busqueda": busqueda, "glosario": PALABRAS}, f, ensure_ascii=False)
 
     resumen(DEST, hojas, indice, sin_traducir)
