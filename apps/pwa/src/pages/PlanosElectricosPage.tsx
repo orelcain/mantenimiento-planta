@@ -89,6 +89,25 @@ function Visor({ slug }: { slug: string }) {
   const [esMovil] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
   const ajuste = useRef<{ y: number; alto: number } | null>(null)
   const asideRef = useRef<HTMLElement>(null)
+  const raizRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  // Con sesion la pagina vive DENTRO del layout de la app (topbar arriba):
+  // 100dvh sobraba por esa altura y el scroll externo se llevaba el riel de
+  // busqueda. Se mide donde empieza la pagina y se resta.
+  const [altoPagina, setAltoPagina] = useState('100dvh')
+  useEffect(() => {
+    const medir = () => {
+      const top = raizRef.current?.getBoundingClientRect().top ?? 0
+      setAltoPagina(`calc(100dvh - ${Math.max(0, Math.round(top))}px)`)
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [])
+  // El indice lateral sigue a la hoja activa
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [hoja?.blatt])
   // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
   const [historial, setHistorial] = useState<number[]>([])
   // Y lo mismo para el PANEL: al tocar un borne desde la ficha del SM4 se
@@ -195,9 +214,9 @@ function Visor({ slug }: { slug: string }) {
     // layout que acote la altura, así que con h-full el cuerpo crecía hasta los
     // 2.250 px del índice de 44 hojas y el dibujo quedaba centrado fuera de la
     // pantalla. dvh además descuenta la barra del navegador en el teléfono.
-    <div className="flex h-[100dvh] flex-col" style={{ background: 'var(--lc-bg)', color: 'var(--lc-ink)' }}>
+    <div ref={raizRef} className="flex flex-col" style={{ height: altoPagina, background: 'var(--lc-bg)', color: 'var(--lc-ink)' }}>
       {/* riel superior */}
-      <header className="flex flex-wrap items-center gap-3 border-b px-3 py-2"
+      <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         <Link to="/aprendizaje/planos" className="flex flex-col leading-tight no-underline" style={{ color: 'inherit' }}>
           <span className="text-[13px] font-semibold">{cat?.maquina ?? indice.maquina}</span>
@@ -256,31 +275,44 @@ function Visor({ slug }: { slug: string }) {
 
       <div className="flex min-h-0 flex-1">
         {/* índice de hojas */}
-        <nav className="hidden w-52 shrink-0 overflow-y-auto border-r p-2 md:block"
+        <nav ref={navRef} className="hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2 md:block"
              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-          {(['circuitos', 'bornes'] as const).map((sec) => (
-            <section key={sec}>
-              <h2 className="sticky top-0 m-0 px-2 py-2 text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)' }}>
-                {sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}
-              </h2>
-              {indice.hojas.filter((h) => h.seccion === sec).map((h) => (
-                <button key={h.blatt} type="button" onClick={() => void irA(h.blatt)}
-                        aria-current={h.blatt === hoja.blatt}
-                        className="mb-0.5 block w-full rounded-md border px-2 py-1.5 text-left"
-                        style={h.blatt === hoja.blatt
-                          ? { background: 'var(--lc-aqua-soft)', borderColor: 'var(--lc-aqua)' }
-                          : { borderColor: 'transparent' }}>
-                  <span className="block font-mono text-[11.5px]" style={{ color: 'var(--lc-aqua-bright)' }}>
-                    Hoja {h.blatt}
-                  </span>
-                  <span className="block text-[10.5px] leading-snug" style={{ color: 'var(--lc-ink-mid)' }}>
-                    {mostrarEs ? h.tituloEs : h.titulo}
-                  </span>
-                </button>
-              ))}
-            </section>
-          ))}
+          {(['circuitos', 'bornes'] as const).map((sec) => {
+            const grupo = indice.hojas.filter((h) => h.seccion === sec)
+            return (
+              <section key={sec}>
+                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)', borderColor: 'var(--lc-border)' }}>
+                  {sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}
+                  <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
+                </h2>
+                <div className="pt-1.5">
+                  {grupo.map((h) => {
+                    const activa = h.blatt === hoja.blatt
+                    return (
+                      <button key={h.blatt} type="button" onClick={() => void irA(h.blatt)}
+                              aria-current={activa}
+                              className="mb-0.5 flex w-full items-center gap-2 rounded-md py-1.5 pl-1.5 pr-2 text-left"
+                              style={activa
+                                ? { background: 'var(--lc-aqua-soft)', boxShadow: 'inset 2px 0 0 var(--lc-aqua)' }
+                                : {}}>
+                        <span className="w-7 shrink-0 rounded py-0.5 text-center font-mono text-[11px] tabular-nums"
+                              style={activa
+                                ? { background: 'var(--lc-aqua)', color: '#fff' }
+                                : { background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+                          {h.blatt}
+                        </span>
+                        <span className="line-clamp-2 min-w-0 flex-1 text-[10.5px] leading-snug"
+                              style={{ color: activa ? 'var(--lc-ink)' : 'var(--lc-ink-mid)' }}>
+                          {limpiarTitulo(mostrarEs ? h.tituloEs : h.titulo)}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
         </nav>
 
         <main className="relative min-w-0 flex-1">
@@ -662,6 +694,13 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
       })}
     </>
   )
+}
+
+/** Limpia los restos de extraccion del titulo de una hoja (asteriscos del
+ *  bloque de notas, separadores colgando) para el indice lateral. */
+function limpiarTitulo(t: string): string {
+  const limpio = t.replace(/\*\)\s*/g, '').replace(/\s*\u00b7\s*$/, '').trim()
+  return limpio || 'Continuaci\u00f3n del esquema'
 }
 
 /** Nombre corto de una seleccion, para el boton de volver del panel. */
