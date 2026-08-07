@@ -317,10 +317,10 @@ function Visor({ slug }: { slug: string }) {
           </span>
         </Link>
 
-        <div className={`${esVisor ? 'hidden' : ''} order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm`}>
+        <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
-                 placeholder="Buscar K7, Q1, B12, Messer, cuchillo…"
+                 placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…' : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
                  className="w-full rounded-lg border bg-transparent py-1.5 pl-8 pr-2 font-mono text-[12.5px] outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
@@ -523,7 +523,14 @@ function Visor({ slug }: { slug: string }) {
               <ChevronLeft size={13} /> Volver a {etiquetaSel(pilaSel[pilaSel.length - 1]!.s)}
             </button>
           )}
-          {esVisor
+          {esVisor && busca.trim()
+            ? <Resultados items={resultados}
+                onIr={(b, c, caja, aparato) => {
+                  if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
+                  setBusca('')
+                  void irA(b, c, caja)
+                }} />
+            : esVisor
             ? <>
                 <Titulo>Notas de la hoja {hoja.blatt}</Titulo>
                 <p className="m-0 mb-2 text-[11.5px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
@@ -754,6 +761,14 @@ function buscar(
         clave: tag, detalle: `${puntos.length} puntos`, aparato: tag,
         blatt: primero.h, caja: primero.b,
       })
+    }
+  })
+
+  // Hojas por su titulo ("SELLADO" -> las hojas de la estacion de sellado).
+  indice.hojas.forEach((h) => {
+    if (out.length >= 60) return
+    if (h.tituloEs.toLowerCase().includes(v) || h.titulo.toLowerCase().includes(v)) {
+      out.push({ clave: `Hoja ${h.blatt}`, detalle: h.tituloEs.slice(0, 34), blatt: h.blatt })
     }
   })
 

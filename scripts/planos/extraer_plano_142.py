@@ -51,6 +51,17 @@ def titulo_ocr(blatt):
 
 from glosario_142 import PALABRAS, FRASES, IGNORAR, COLORES  # noqa: E402
 
+# El PDF de la BAADER 200 viene con la codificacion vieja rota: los umlauts
+# quedaron como „ ” ‚ y la ß como á (y la ü directamente se perdio). Se
+# transliteran los recuperables; las palabras con ü perdida van al glosario
+# en su forma mutilada.
+TRANSLIT = str.maketrans({"\u201e": "ä", "\u201d": "ö", "\u201a": "é", "á": "ß", "\u00cf": " "})
+
+
+def normalizar(t):
+    return t.translate(TRANSLIT) if CFG.get("transliterar") else t
+
+
 RE_COLOR = re.compile(r'^([A-Z]{2})-([A-Z]{2})$')
 
 RE_XREF = re.compile(r"^/(\d{1,2})\.(\d)$")
@@ -91,6 +102,16 @@ TIPOS_IEC = {
 RE_SENAL = re.compile(r"^(0/)?\d{1,3}V\d{0,2}$")
 
 
+def en_glosario(p):
+    """Busca la palabra tal cual y sin puntuacion colgante: las claves con
+    punto propio ("Zeichnungs-Nr.") no deben romperse con el strip."""
+    return p in PALABRAS or p.strip(".,:;()") in PALABRAS
+
+
+def traducir_palabra(p):
+    return PALABRAS.get(p) or PALABRAS.get(p.strip(".,:;()"), p)
+
+
 def clave_indexable(txt):
     m = RE_TAG.match(txt)
     if m and m.group(1) not in RUIDO:
@@ -129,6 +150,7 @@ def main():
         cols_por_pagina[i] = {w[4]: round(w[0], 1) for w in cab if w[4] in "0123456789"}
         blatt = blatt_de_pagina(i, doc.page_count)
         for x0, y0, x1, y1, txt, *_ in pg.get_text("words"):
+            txt = normalizar(txt)
             clave = clave_indexable(txt)
             if clave:
                 c = columna_de(x0, cols_por_pagina[i])
@@ -164,6 +186,23 @@ def main():
                                   round(x1 - x0, 1), round(y1 - y0, 1)]))
         reglas = [c for c in columnas if re.match(r"^-?X\d{1,2}$", c[2])]
         numeros = [c for c in columnas if re.match(r"^\d{1,3}$", c[2])]
+        if CFG.get("klemmenEstilo") == "bloques":
+            # banda de bornes = el cluster de y con mas numericos
+            import collections as _c
+            bandas = _c.Counter(n[1] // 25 * 25 for n in numeros)
+            if not bandas or not reglas:
+                continue
+            banda = bandas.most_common(1)[0][0]
+            en_banda = sorted([n for n in numeros if abs(n[1] // 25 * 25 - banda) <= 25],
+                              key=lambda n: n[0])
+            etiquetas = sorted(reglas, key=lambda r: r[0])
+            for nx, ny, ntxt, ncaja in en_banda:
+                izq = [r for r in etiquetas if r[0] <= nx + 8]
+                if not izq:
+                    continue
+                regla = izq[-1][2].lstrip("-")
+                bornes.setdefault(f"{regla}:{ntxt}", {"h": blatt, "b": ncaja})
+            continue
         for cx, cy, texto, _ in reglas:
             regla = texto.lstrip("-")
             # el numero del borne: misma columna (x), en la franja de arriba
@@ -207,6 +246,7 @@ def main():
             # que reglas se nombran en esta hoja, para ordenar el desambiguador
             reglas_hoja = {w[4] for w in palabras if re.match(r"^X\d{1,2}$", w[4])}
         for j, (x0, y0, x1, y1, txt, *_) in enumerate(palabras):
+            txt = normalizar(txt)
             if j in consumido:
                 continue
             caja = [round(x0, 1), round(y0, 1), round(x1 - x0, 1), round(y1 - y0, 1)]
@@ -277,6 +317,18 @@ def main():
                 tags.append({"b": caja, "t": clave_t})
 
         bornes_por_hoja[blatt] = brs
+        if CFG.get("refsSinBarra") and blatt >= BORNES_DESDE:
+            for blk in pg.get_text("dict")["blocks"]:
+                for ln in blk.get("lines", []):
+                    if tuple(round(v) for v in ln.get("dir", (1, 0))) != (0, -1):
+                        continue
+                    t = "".join(sp["text"] for sp in ln["spans"]).strip()
+                    m = re.match(r"^(\d{1,2})\.(\d)$", t)
+                    if m and int(m.group(1)) < BORNES_DESDE:
+                        x0, y0, x1, y1 = ln["bbox"]
+                        xrefs.append({"b": [round(x0, 1), round(y0, 1),
+                                            round(x1 - x0, 1), round(y1 - y0, 1)],
+                                      "t": "/" + t, "h": int(m.group(1)), "c": int(m.group(2))})
         terms = deduplicar(rotulos(pg, sin_traducir))
         terms_por_hoja[blatt] = terms
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
@@ -396,7 +448,7 @@ def rotulos(pg, sin_traducir):
             rot = 0 if d == (1, 0) else 90 if d == (0, -1) else None
             if rot is None:
                 continue
-            pals = "".join(sp["text"] for sp in ln["spans"]).strip().split()
+            pals = normalizar("".join(sp["text"] for sp in ln["spans"])).strip().split()
             if not pals:
                 continue
             frase = " ".join(pals)
@@ -406,7 +458,7 @@ def rotulos(pg, sin_traducir):
             else:
                 es = FRASES.get(frase)
             if es is None:
-                if not any(p.strip(".,:;()") in PALABRAS for p in pals):
+                if not any(en_glosario(p) for p in pals):
                     for p in pals:
                         if re.match(r"^[A-Za-zÀ-ÿ\-]{4,}$", p) and p not in IGNORAR:
                             sin_traducir[p] += 1
@@ -414,14 +466,18 @@ def rotulos(pg, sin_traducir):
                 # Umbral: una frase a medio traducir ("Die Maquina muss...")
                 # confunde mas que dejarla en su idioma. O se traduce entera o
                 # no se toca; lo que quede fuera aparece en el reporte final.
-                sustantivas = [p for p in pals if not re.match(r"^[A-Za-z]?\d*$", p)]
-                hechas = sum(1 for p in sustantivas if p.strip(".,:;()") in PALABRAS)
+                sustantivas = [p for p in pals
+                               if not re.search(r"\d", p)
+                               and not re.match(r"^[IVX]{1,4}$", p)
+                               and len(p.strip(".,:;()")) > 2
+                               and p.strip(".,:;()") not in IGNORAR]
+                hechas = sum(1 for p in sustantivas if en_glosario(p))
                 if sustantivas and hechas / len(sustantivas) < 0.6:
                     for p in pals:
                         if re.match(r"^[A-Za-zÀ-ÿ\-]{4,}$", p) and p not in IGNORAR                                 and p.strip(".,:;()") not in PALABRAS:
                             sin_traducir[p] += 1
                     continue
-                es = " ".join(PALABRAS.get(p.strip(".,:;()"), p) for p in pals)
+                es = " ".join(traducir_palabra(p) for p in pals)
             if es.lower() == frase.lower():
                 continue
             x0, y0, x1, y1 = ln["bbox"]

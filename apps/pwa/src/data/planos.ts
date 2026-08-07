@@ -33,6 +33,9 @@ export type PlanoCatalogo = {
   modo?: 'visor'
   /** Presente = los assets se sirven desde Firebase Storage, no del bundle. */
   enStorage?: boolean
+  /** Version de los assets en Storage: subirla rompe la cache del CDN de
+   *  Google (el primer upload viajo con cache publica de 24 h). */
+  vAssets?: number
 }
 
 export const PLANOS: PlanoCatalogo[] = [
@@ -70,6 +73,7 @@ export const PLANOS: PlanoCatalogo[] = [
     faltantes: [],
     modo: 'visor',
     enStorage: true,
+    vAssets: 2,
     descripcion:
       'Diagrama electrico oficial, ya en espanol. Modo visor: el PDF trae el texto ' +
       'en contornos, asi que hay navegacion y notas por hoja, sin zonas clicables.',
@@ -84,6 +88,7 @@ export const PLANOS: PlanoCatalogo[] = [
     faltantes: [],
     modo: 'visor',
     enStorage: true,
+    vAssets: 2,
     descripcion:
       'Diagrama electrico oficial, ya en espanol. Modo visor: el PDF trae el texto ' +
       'en contornos, asi que hay navegacion y notas por hoja, sin zonas clicables.',
@@ -98,7 +103,7 @@ export function planoPorSlug(slug: string | undefined) {
 export function assetPlano(slug: string, archivo: string) {
   const p = PLANOS.find((x) => x.slug === slug)
   if (p?.enStorage) {
-    return `${STORAGE_BASE}${encodeURIComponent(`planos/${slug}/${archivo}`)}?alt=media`
+    return `${STORAGE_BASE}${encodeURIComponent(`planos/${slug}/${archivo}`)}?alt=media&v=${p.vAssets ?? 1}`
   }
   return `${import.meta.env.BASE_URL}planos/${slug}/${archivo}`
 }
