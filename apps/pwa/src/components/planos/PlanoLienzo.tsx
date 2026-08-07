@@ -39,7 +39,8 @@ export function PlanoLienzo({
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const vista = useRef({ s: 1, x: 0, y: 0 })
-  const arrastre = useRef<{ x: number; y: number; movido: number } | null>(null)
+  const arrastre = useRef<{ x: number; y: number; movido: number; id: number; capturado: boolean } | null>(null)
+  const arrastroRecien = useRef(false)
   // Pinch en el teléfono: sin esto la única forma de acercar en planta eran
   // los botones +/− y el plano es ilegible sin zoom.
   const punteros = useRef(new Map<number, { x: number; y: number }>())
@@ -128,13 +129,22 @@ export function PlanoLienzo({
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest('[data-controles]')) return
         punteros.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* puntero ya levantado */ }
+        // OJO: capturar el puntero AQUÍ rompía TODOS los clics reales del
+        // plano. Con captura activa el navegador retargetea el click a este
+        // contenedor, así que los rect de saltos/bornes/aparatos no lo
+        // recibían nunca — y los tests sintéticos no lo veían porque
+        // despachan click directo al rect. La captura se toma recién al
+        // EMPEZAR a arrastrar, que es cuando de verdad sirve (no perder el
+        // paneo al salir del borde). El pinch sí captura al tiro: con dos
+        // dedos abajo nadie está intentando tocar un link.
         const dedos = [...punteros.current.values()]
         if (dedos.length === 2 && dedos[0] && dedos[1]) {
           arrastre.current = null
           pinza.current = { dist: Math.hypot(dedos[0].x - dedos[1].x, dedos[0].y - dedos[1].y) }
+          try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* ya levantado */ }
         } else {
-          arrastre.current = { x: e.clientX - vista.current.x, y: e.clientY - vista.current.y, movido: 0 }
+          arrastre.current = { x: e.clientX - vista.current.x, y: e.clientY - vista.current.y,
+                              movido: 0, id: e.pointerId, capturado: false }
         }
       }}
       onPointerMove={(e) => {
@@ -157,18 +167,35 @@ export function PlanoLienzo({
         if (!a) return
         a.movido++
         if (a.movido < 2) return
+        if (!a.capturado) {
+          try { stageRef.current?.setPointerCapture(a.id) } catch { /* ya levantado */ }
+          a.capturado = true
+        }
         vista.current = { ...vista.current, x: e.clientX - a.x, y: e.clientY - a.y }
         aplicar()
       }}
       onPointerUp={(e) => {
         punteros.current.delete(e.pointerId)
         if (punteros.current.size < 2) pinza.current = null
-        if (punteros.current.size === 0) arrastre.current = null
+        if (punteros.current.size === 0) {
+          // El click que el navegador dispara tras SOLTAR un arrastre no es
+          // intención de tocar lo que quedó bajo el dedo: se suprime. Antes lo
+          // enmascaraba la captura (que se tragaba TODOS los clics, buenos y
+          // malos); al arreglarla, este guardián se vuelve necesario.
+          arrastroRecien.current = !!arrastre.current && arrastre.current.movido >= 2
+          arrastre.current = null
+        }
       }}
       onPointerCancel={(e) => {
         punteros.current.delete(e.pointerId)
         pinza.current = null
         arrastre.current = null
+      }}
+      onClickCapture={(e) => {
+        if (arrastroRecien.current) {
+          arrastroRecien.current = false
+          e.stopPropagation()
+        }
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
     >
@@ -284,16 +311,21 @@ function CapaCastellano({ terms }: { terms: PlanoRotulo[] }) {
             : <rect key={i} x={x - 0.6} y={y - 0.6} width={w + 1.2} height={h + 1.2} fill="#FCFBF8" />
         }
 
-        // El castellano es más largo: se encoge la letra hasta caber en su caja
-        // en vez de desbordar sobre el rótulo vecino.
+        // El castellano es más largo: se encoge la letra hasta caber. La caja
+        // JAMÁS excede el largo original: en el cajetín las celdas vecinas van
+        // pegadas y la holgura del 15% tapaba el rótulo de al lado. Si ni con
+        // letra mínima cabe, se corta con elipsis.
         let fs = Math.min(grueso * 0.95, 6.6)
-        fs = Math.max(Math.min(fs, (largo * 1.15) / (t.es.length * 0.52)), 2.9)
-        const L = Math.max(largo, t.es.length * fs * 0.52)
+        fs = Math.max(Math.min(fs, largo / (t.es.length * 0.52)), 2.6)
+        let texto = t.es
+        const capacidad = Math.floor(largo / (fs * 0.52))
+        if (texto.length > capacidad && capacidad > 2) texto = texto.slice(0, capacidad - 1) + '…'
+        const L = largo
 
         const contenido = (
           <>
             <rect x={-0.6} y={-0.6} width={L + 1.2} height={grueso + 1.2} fill="#FCFBF8" />
-            <text x={0} y={grueso * 0.82} fontSize={fs} fill="#7A5400" fontWeight={600}>{t.es}</text>
+            <text x={0} y={grueso * 0.82} fontSize={fs} fill="#7A5400" fontWeight={600}>{texto}</text>
             <line x1={0} y1={grueso + 0.7} x2={L} y2={grueso + 0.7} stroke="#D6A312" strokeWidth={0.5} />
           </>
         )
