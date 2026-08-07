@@ -36,6 +36,8 @@ export type PlanoCatalogo = {
   /** Version de los assets en Storage: subirla rompe la cache del CDN de
    *  Google (el primer upload viajo con cache publica de 24 h). */
   vAssets?: number
+  /** 'es' = el plano ya viene en espanol: se oculta el toggle DE/ES. */
+  idioma?: 'es'
 }
 
 export const PLANOS: PlanoCatalogo[] = [
@@ -92,6 +94,47 @@ export const PLANOS: PlanoCatalogo[] = [
     descripcion:
       'Diagrama electrico oficial, ya en espanol. Modo visor: el PDF trae el texto ' +
       'en contornos, asi que hay navegacion y notas por hoja, sin zonas clicables.',
+  },
+  {
+    slug: 'baader-142-860',
+    maquina: 'BAADER 142 (antiguas)',
+    numero: '142.70.00.860',
+    revision: '14.09.05',
+    aplicaA: 'Candidato para las 142 antiguas — FALTA confirmar contra la placa (Wiring Diagr.)',
+    hojas: 31,
+    faltantes: [],
+    descripcion:
+      'El plano de la generacion anterior (protecciones F1-F5, sin PLC). Ojo: hay 3 ' +
+      'candidatos para las viejas (851/860/866); este es el que la curaduria del equipo ' +
+      'rotulo como "Baader 142 antigua". Confirmar en terreno con la placa.',
+  },
+  {
+    slug: 'gea-neum-50520184',
+    maquina: 'GEA PowerPak (serial 50520184) · NEUMÁTICO',
+    numero: '50520184-N',
+    revision: '—',
+    aplicaA: 'Termoformadora GEA V2 · serial 50520184',
+    hojas: 64,
+    faltantes: [],
+    enStorage: true,
+    idioma: 'es',
+    descripcion:
+      'Diagrama neumatico oficial en espanol, con texto real: el buscador encuentra ' +
+      'valvulas, cilindros y bombas por nombre.',
+  },
+  {
+    slug: 'gea-neum-50540108',
+    maquina: 'GEA PowerPak (serial 50540108) · NEUMÁTICO',
+    numero: '50540108-N',
+    revision: '—',
+    aplicaA: 'Termoformadora GEA V2 · serial 50540108',
+    hojas: 38,
+    faltantes: [],
+    enStorage: true,
+    idioma: 'es',
+    descripcion:
+      'Diagrama neumatico oficial en espanol, con texto real: el buscador encuentra ' +
+      'valvulas, cilindros y bombas por nombre.',
   },
 ]
 
