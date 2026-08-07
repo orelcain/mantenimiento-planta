@@ -18,6 +18,7 @@ const require = createRequire(import.meta.url)
 const admin = require('firebase-admin')
 
 const slug = process.argv[2]
+const soloIndice = process.argv[3] === 'indice'
 if (!slug) {
   console.error('Uso: node scripts/planos/subir_storage.mjs <slug>')
   process.exit(1)
@@ -40,7 +41,9 @@ admin.initializeApp({
 })
 const bucket = admin.storage().bucket()
 
-const archivos = readdirSync(staging).filter((f) => f.endsWith('.svg') || f.endsWith('.json'))
+const archivos = readdirSync(staging)
+  .filter((f) => f.endsWith('.svg') || f.endsWith('.json'))
+  .filter((f) => !soloIndice || f === 'indice.json')
 console.log(`${archivos.length} archivos de ${staging}`)
 
 let subidos = 0, bytes = 0
@@ -53,7 +56,8 @@ for (const nombre of archivos) {
     metadata: {
       contentType: nombre.endsWith('.svg') ? 'image/svg+xml' : 'application/json',
       contentEncoding: 'gzip',
-      cacheControl: 'public, max-age=86400',
+      // el indice cambia (titulos, capas nuevas); las hojas SVG son inmutables
+      cacheControl: nombre === 'indice.json' ? 'public, max-age=300' : 'public, max-age=86400',
     },
   })
   subidos++

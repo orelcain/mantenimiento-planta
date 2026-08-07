@@ -1,0 +1,342 @@
+{
+ "1": {
+  "h": "1",
+  "t": "INDICE DE HOJAS"
+ },
+ "2": {
+  "h": "2",
+  "t": "INDICE DE HOJAS"
+ },
+ "3": {
+  "h": "3",
+  "t": "TIROMAT"
+ },
+ "4": {
+  "h": "*0",
+  "t": "OPTIONEN"
+ },
+ "5": {
+  "h": "0",
+  "t": "CAN BUS - POTENCIA DE CONEXION"
+ },
+ "6": {
+  "h": "0",
+  "t": "FAQ BORNES + LISTA DE PIEZAS"
+ },
+ "7": {
+  "h": "0.14",
+  "t": "OCUPACIONCABLE DE UNION25G075"
+ },
+ "8": {
+  "h": "",
+  "t": "OCUPACIONCABLE DE UNION18G075"
+ },
+ "9": {
+  "h": "",
+  "t": "OCUPACIONCABLE DE UNION18G075"
+ },
+ "10": {
+  "h": "1",
+  "t": "ALIMENTACION DE TENSION"
+ },
+ "11": {
+  "h": "1.1",
+  "t": "CALEFACCION DEL ARMARIO DE DISTRIBUCION CON TERMOSTATO 1L/N/PE"
+ },
+ "12": {
+  "h": "2",
+  "t": "ALIMENTACION DE TENSION DE MANDO"
+ },
+ "13": {
+  "h": "12",
+  "t": "CALEFACCION PREVIA ABAJO1"
+ },
+ "15": {
+  "h": "42",
+  "t": "BOMBA DE VACI0 ESTACION DE MOL DE O27KW100M3/H"
+ },
+ "16": {
+  "h": "43",
+  "t": "BOMBA DE VACI0 ESTACION DE S EL LA D055KW250M3/H"
+ },
+ "18": {
+  "h": "55",
+  "t": "ACCIONAMIENTO DE REGULACION MOTOR DE AVANCE"
+ },
+ "19": {
+  "h": "56",
+  "t": "ACCIONAMIENTO DE REGULACION MOTOR DE AVANCE"
+ },
+ "20": {
+  "h": "59",
+  "t": "CINTA TRANSPORTADORA CONVERTIDOR DE FRECUENCIA O75KW"
+ },
+ "22": {
+  "h": "66",
+  "t": "ASPIRADOR DE TIRAS MARGINALES 1"
+ },
+ "23": {
+  "h": "150",
+  "t": "AIRE COMPRIMIDO MAQUINA"
+ },
+ "24": {
+  "h": "151",
+  "t": "AGUA DE REFRIGERACION MAQUINA"
+ },
+ "25": {
+  "h": "153",
+  "t": "BOMBAS DE VACIO CON ECTADO"
+ },
+ "26": {
+  "h": "155",
+  "t": "PARADA DE EMERGENCIA INTERRUPTOR"
+ },
+ "27": {
+  "h": "156",
+  "t": "SAFET Y PLC"
+ },
+ "28": {
+  "h": "157",
+  "t": "RELE DE SEGURIDAD"
+ },
+ "29": {
+  "h": "158",
+  "t": "CADENA DE SEGURIDAD ESTACION DE MOL DE O"
+ },
+ "30": {
+  "h": "159",
+  "t": "CADENA DE SEGURIDAD ESTACION DE MOL DE O"
+ },
+ "31": {
+  "h": "165",
+  "t": "CADENA DE SEGURIDAD ESTACION DE SELLADO"
+ },
+ "33": {
+  "h": "200",
+  "t": "ESTACION DE MOL DE O"
+ },
+ "34": {
+  "h": "205",
+  "t": "CALEFACCION PREVIA 1 VALVULA + INTERRUPTOR DE APROXIMACION"
+ },
+ "35": {
+  "h": "210",
+  "t": "ELEVACION ESTACION DE MOL DE O"
+ },
+ "36": {
+  "h": "214",
+  "t": "VALVULA GRABAR"
+ },
+ "37": {
+  "h": "218.2",
+  "t": "VALVULA EMBUTIRAPROFUNDIDAD"
+ },
+ "38": {
+  "h": "255",
+  "t": "BASTIDORCOBERTERO1 PARA EL EVAR Y DE SCEN DE R"
+ },
+ "39": {
+  "h": "259",
+  "t": "BASTIDORCOBERTERO1 PARA EL EVAR Y DE SCEN DE R"
+ },
+ "40": {
+  "h": "260",
+  "t": "BRAZOPALPADOR LAMINA SUPERIOR"
+ },
+ "41": {
+  "h": "264",
+  "t": "FRENO LAMINA SUPERIOR"
+ },
+ "42": {
+  "h": "265",
+  "t": "ELEVACION ESTACION DE SELLADO"
+ },
+ "43": {
+  "h": "270",
+  "t": "SELLAR"
+ },
+ "44": {
+  "h": "272",
+  "t": "VACIO ARRIBA+ABAJO"
+ },
+ "45": {
+  "h": "300",
+  "t": "CORTADORA TRANSVERSAL 1"
+ },
+ "46": {
+  "h": "400",
+  "t": "BOMBA 1LUBRICACION DE CADENA S"
+ },
+ "48": {
+  "h": "460",
+  "t": "A PARA TOAJENO1"
+ },
+ "49": {
+  "h": "462",
+  "t": "A PARA TOAJENO2"
+ },
+ "50": {
+  "h": "464",
+  "t": "A PARA TOAJENO3"
+ },
+ "51": {
+  "h": "600",
+  "t": "B&RAUT0MATION PANEL APC210010.4"
+ },
+ "52": {
+  "h": "601",
+  "t": "B&R MANDO X20"
+ },
+ "53": {
+  "h": "604",
+  "t": "CON MUTADOR ETHERNET"
+ },
+ "54": {
+  "h": "608",
+  "t": "PHOENIXMGUARD+B&RINDUSTRIALCOMPUTERAPC2200"
+ },
+ "55": {
+  "h": "610",
+  "t": "B&RMAND0 X20 -R EL ACION"
+ },
+ "56": {
+  "h": "620",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "57": {
+  "h": "621",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "58": {
+  "h": "622",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "59": {
+  "h": "623",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "60": {
+  "h": "624",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "61": {
+  "h": "625",
+  "t": "B&R MANDO X2O- ESTACION DE SELLADO"
+ },
+ "62": {
+  "h": "630",
+  "t": "B&R MANDO X2O- ESTACION DE CORTE"
+ },
+ "63": {
+  "h": "631",
+  "t": "B&R MANDO X2O- ESTACION DE CORTE"
+ },
+ "64": {
+  "h": "632",
+  "t": "B&R MANDO X2O- ESTACION DE CORTE"
+ },
+ "69": {
+  "h": "1",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "70": {
+  "h": "2",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "71": {
+  "h": "3",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "72": {
+  "h": "4",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "73": {
+  "h": "5",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "74": {
+  "h": "6",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "75": {
+  "h": "7",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "76": {
+  "h": "8",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "77": {
+  "h": "６",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "78": {
+  "h": "10",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "79": {
+  "h": "11",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "80": {
+  "h": "12",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "81": {
+  "h": "13",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "82": {
+  "h": "14",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "83": {
+  "h": "15",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "84": {
+  "h": "16",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "85": {
+  "h": "17",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "86": {
+  "h": "18",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "87": {
+  "h": "19",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "88": {
+  "h": "20",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "89": {
+  "h": "21",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "90": {
+  "h": "22",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "91": {
+  "h": "23",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "92": {
+  "h": "24",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "93": {
+  "h": "25",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ },
+ "94": {
+  "h": "26",
+  "t": "TIROMAT LUGAR DE MONTAJE"
+ }
+}
