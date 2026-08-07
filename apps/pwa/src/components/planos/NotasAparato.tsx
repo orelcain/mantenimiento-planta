@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Camera, Loader2, Trash2, X } from 'lucide-react'
+import { Camera, Loader2, Pencil, Trash2, X } from 'lucide-react'
 import type { PlanoNota } from '@/hooks/usePlanoNotas'
 import { auth } from '@/services/firebase'
 
@@ -8,6 +8,7 @@ type Props = {
   notas: PlanoNota[]
   onCrear: (n: { texto: string; codigoSAP?: string; archivos?: File[] }) => Promise<void>
   onBorrar: (n: PlanoNota) => Promise<void>
+  onEditar: (id: string, texto: string) => Promise<void>
 }
 
 /**
@@ -16,7 +17,8 @@ type Props = {
  * El sentido es didáctico: que al tocar F24 en el dibujo salga la foto del
  * automático real en el tablero, y su código SAP para pedirlo sin buscarlo.
  */
-export function NotasAparato({ anclaId, notas, onCrear, onBorrar }: Props) {
+export function NotasAparato({ anclaId, notas, onCrear, onBorrar, onEditar }: Props) {
+  const [editando, setEditando] = useState<{ id: string; texto: string } | null>(null)
   const [texto, setTexto] = useState('')
   const [sap, setSap] = useState('')
   const [archivos, setArchivos] = useState<File[]>([])
@@ -46,9 +48,31 @@ export function NotasAparato({ anclaId, notas, onCrear, onBorrar }: Props) {
       {notas.map((n) => (
         <article key={n.id} className="rounded-lg border p-3"
                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-          <p className="m-0 whitespace-pre-wrap text-[13px] leading-relaxed" style={{ color: 'var(--lc-ink)' }}>
-            {n.texto}
-          </p>
+          {editando?.id === n.id ? (
+            <div className="flex flex-col gap-1.5">
+              <textarea value={editando.texto} rows={3} maxLength={1500} autoFocus
+                        onChange={(e) => setEditando({ id: n.id, texto: e.target.value })}
+                        className="w-full resize-y rounded border bg-transparent p-2 text-[13px] outline-none"
+                        style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
+              <div className="flex gap-2">
+                <button type="button"
+                        onClick={() => { void onEditar(n.id, editando.texto).then(() => setEditando(null)) }}
+                        className="rounded px-2.5 py-1 text-[11.5px] font-medium"
+                        style={{ background: 'var(--lc-aqua)', color: '#fff' }}>
+                  Guardar
+                </button>
+                <button type="button" onClick={() => setEditando(null)}
+                        className="rounded border px-2.5 py-1 text-[11.5px]"
+                        style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="m-0 whitespace-pre-wrap text-[13px] leading-relaxed" style={{ color: 'var(--lc-ink)' }}>
+              {n.texto}
+            </p>
+          )}
 
           {!!n.fotos?.length && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -67,10 +91,17 @@ export function NotasAparato({ anclaId, notas, onCrear, onBorrar }: Props) {
               {n.codigoSAP ? ` · SAP ${n.codigoSAP}` : ''}
             </span>
             {n.creadoPor === uid && (
-              <button type="button" onClick={() => void onBorrar(n)} title="Borrar nota"
-                      className="rounded p-1 hover:opacity-70" style={{ color: 'var(--lc-danger)' }}>
-                <Trash2 size={13} />
-              </button>
+              <span className="flex gap-0.5">
+                <button type="button" onClick={() => setEditando({ id: n.id, texto: n.texto })}
+                        title="Editar nota" className="rounded p-1 hover:opacity-70"
+                        style={{ color: 'var(--lc-ink-mid)' }}>
+                  <Pencil size={13} />
+                </button>
+                <button type="button" onClick={() => void onBorrar(n)} title="Borrar nota"
+                        className="rounded p-1 hover:opacity-70" style={{ color: 'var(--lc-danger)' }}>
+                  <Trash2 size={13} />
+                </button>
+              </span>
             )}
           </footer>
         </article>

@@ -43,5 +43,37 @@
     "seccionBornes": 999,
     "modo": "visor",
     "storage": true
+  },
+  "baader-142-860": {
+    "maquina": "BAADER 142 (antiguas)",
+    "plano": "142.70.00.860",
+    "rev": "14.09.05",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ BAADER 142/INFO ALOJADA EN TELEGRAM BAADER 142/DOCUMENTOS/841_circuito electrico baader 142.pdf",
+    "hojasTotales": 31,
+    "faltantes": [],
+    "seccionBornes": 20,
+    "transliterar": true
+  },
+  "gea-neum-50520184": {
+    "maquina": "GEA PowerPak 50520184 · neumatico",
+    "plano": "50520184-N",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GEA V2/SERIAL NUMBER 50520184/50520184_GEA PowerPak_50520_Pneumatic diagram_es.pdf",
+    "hojasTotales": 64,
+    "faltantes": [],
+    "seccionBornes": 999,
+    "storage": true,
+    "idioma": "es"
+  },
+  "gea-neum-50540108": {
+    "maquina": "GEA PowerPak 50540108 · neumatico",
+    "plano": "50540108-N",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GEA V2/SERIAL NUMBER 50540108/50540108_GEA PowerPak_5550_Pneumatic diagram_ES.pdf",
+    "hojasTotales": 38,
+    "faltantes": [],
+    "seccionBornes": 999,
+    "storage": true,
+    "idioma": "es"
   }
 }

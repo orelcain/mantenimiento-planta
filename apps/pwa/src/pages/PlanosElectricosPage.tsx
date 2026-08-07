@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Link as LinkIcon, Printer, QrCode, Search, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
 import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
@@ -70,6 +70,8 @@ function Visor({ slug }: { slug: string }) {
   // Modo visor (GEA): sin texto extraible -> sin zonas ni buscador ni DE/ES;
   // lo que SI hay es navegacion completa y notas con fotos POR HOJA.
   const esVisor = cat?.modo === 'visor'
+  // Plano ya en espanol (neumaticos GEA): el toggle DE/ES no aplica.
+  const sinIdiomas = esVisor || cat?.idioma === 'es'
   // Hoja inicial: la de la URL (?hoja=9, para compartir un punto del plano por
   // chat) o la última visitada en este equipo; usePlano valida contra el índice.
   const [inicial] = useState<number | undefined>(() => {
@@ -78,7 +80,7 @@ function Visor({ slug }: { slug: string }) {
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, error } = usePlano(slug, inicial)
+  const { indice, hoja, abrir, cargando, error } = usePlano(slug, inicial)
   const notas = usePlanoNotas(slug)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
@@ -325,7 +327,7 @@ function Visor({ slug }: { slug: string }) {
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
 
-        <div className={`${esVisor ? 'hidden' : 'flex'} overflow-hidden rounded-lg border`} style={{ borderColor: 'var(--lc-border)' }}>
+        <div className={`${sinIdiomas ? 'hidden' : 'flex'} overflow-hidden rounded-lg border`} style={{ borderColor: 'var(--lc-border)' }}>
           {([['DE', false], ['ES', true]] as const).map(([txt, v]) => (
             <button key={txt} type="button" onClick={() => setMostrarEs(v)} aria-pressed={mostrarEs === v}
                     className="px-3 py-1.5 text-[12px] font-semibold"
@@ -340,6 +342,11 @@ function Visor({ slug }: { slug: string }) {
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
                 className="hidden rounded p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
+        </button>
+        <button type="button" title="Copiar link de esta vista"
+                onClick={() => { void navigator.clipboard?.writeText(window.location.href) }}
+                className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+          <LinkIcon size={15} />
         </button>
         <button type="button" title="QR de este punto del plano" onClick={() => setMostrarQR(true)}
                 className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
@@ -458,6 +465,14 @@ function Visor({ slug }: { slug: string }) {
               <ChevronLeft size={13} /> Hoja {historial[historial.length - 1]}
             </button>
           )}
+          {cargando && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+              <span className="rounded-full border px-3 py-1 text-[11px] shadow"
+                    style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+                Cargando hoja…
+              </span>
+            </div>
+          )}
           <PlanoLienzo
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
             resaltarTag={resaltar && sel?.tipo === 'aparato' ? sel.tag : null}
@@ -545,6 +560,7 @@ function Visor({ slug }: { slug: string }) {
                   notas={notas.notasDe('hoja', String(hoja.blatt))}
                   onCrear={(n) => notas.crear({ ancla: 'hoja', anclaId: String(hoja.blatt), ...n })}
                   onBorrar={notas.borrar}
+                  onEditar={notas.editar}
                 />
               </>
             : busca.trim()
@@ -727,6 +743,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
         notas={notas.notasDe('aparato', sel.tag)}
         onCrear={(n) => notas.crear({ ancla: 'aparato', anclaId: sel.tag, ...n })}
         onBorrar={notas.borrar}
+        onEditar={notas.editar}
       />
     </>
   )

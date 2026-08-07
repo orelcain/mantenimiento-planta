@@ -329,6 +329,26 @@ def main():
                         xrefs.append({"b": [round(x0, 1), round(y0, 1),
                                             round(x1 - x0, 1), round(y1 - y0, 1)],
                                       "t": "/" + t, "h": int(m.group(1)), "c": int(m.group(2))})
+        # Planos ya en espanol (neumaticos GEA): no hay nada que traducir,
+        # pero TODO su texto entra al indice de busqueda global — "vacio"
+        # encuentra las hojas de la bomba de vacio.
+        if CFG.get("idioma") == "es":
+            vistos_linea = set()
+            for blk in pg.get_text("dict")["blocks"]:
+                for ln in blk.get("lines", []):
+                    if tuple(round(v) for v in ln.get("dir", (1, 0))) != (1, 0):
+                        continue
+                    t = " ".join("".join(sp["text"] for sp in ln["spans"]).split())
+                    if len(t) < 5 or len(t) > 60 or not re.search(r"[A-Za-zA-y]{4}", t):
+                        continue
+                    tl = t.lower()
+                    if tl in vistos_linea or len(vistos_linea) >= 60:
+                        continue
+                    vistos_linea.add(tl)
+                    x0, y0, x1, y1 = ln["bbox"]
+                    busqueda.append({"de": t, "es": t, "h": blatt,
+                                     "b": [round(x0, 1), round(y0, 1),
+                                           round(x1 - x0, 1), round(y1 - y0, 1)]})
         terms = deduplicar(rotulos(pg, sin_traducir))
         terms_por_hoja[blatt] = terms
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
