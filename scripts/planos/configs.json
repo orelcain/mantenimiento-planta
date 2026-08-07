@@ -17,7 +17,10 @@
     "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ BAADER 200/DOCUMENTOS/Plano Electrico de BAADER 200.pdf",
     "hojasTotales": 10,
     "faltantes": [],
-    "seccionBornes": 8
+    "seccionBornes": 8,
+    "transliterar": true,
+    "klemmenEstilo": "bloques",
+    "refsSinBarra": true
   },
   "gea-50520184": {
     "maquina": "GEA PowerPak 50520184",
