@@ -39,6 +39,32 @@ RE_DEST = re.compile(r"^(\d{1,2})\.(\d)$")
 # A1/A2 son los bornes de bobina IEC: aparecen en cada contactor del plano y no
 # designan un aparato. Sin esta lista negra el indice queda inservible.
 RUIDO = {"A1", "A2"}
+
+# Que ES cada aparato segun la letra de su designacion (IEC 81346 / DIN 40719,
+# el estandar que usa BAADER). Base de la descripcion en lenguaje natural.
+TIPOS_IEC = {
+    "SM": "motor paso a paso",
+    "K": "rele auxiliar o contactor: su bobina manda contactos en otros puntos del plano",
+    "F": "proteccion — fusible, guardamotor o rele termico",
+    "Q": "interruptor de potencia o seccionador",
+    "S": "elemento de mando — pulsador, selector o fin de carrera",
+    "B": "sensor o detector — inductivo, presion, temperatura",
+    "M": "motor",
+    "Y": "electrovalvula — neumatica o hidraulica",
+    "X": "regla de bornes o conector",
+    "W": "cable o manguera de conexion",
+    "T": "transformador",
+    "G": "fuente de alimentacion o generador",
+    "H": "senalizacion — lampara o bocina",
+    "A": "modulo electronico — PLC, tarjeta o unidad de control",
+    "R": "resistencia",
+    "U": "convertidor o variador",
+    "V": "semiconductor — diodo o rectificador",
+    "P": "instrumento indicador",
+    "C": "condensador",
+    "E": "elemento vario — calefactor o iluminacion",
+    "I": "modulo de entradas",
+}
 # Potenciales/senales (24V1, 0/24V1, 110V2...): la misma linea recorre varias
 # hojas; indexarlas como los aparatos permite tocarla y ver todo su recorrido.
 RE_SENAL = re.compile(r"^(0/)?\d{1,3}V\d{0,2}$")
@@ -129,6 +155,7 @@ def main():
 
     # --- pasada 2: una hoja a la vez
     hojas, sin_traducir, busqueda = [], collections.Counter(), []
+    bornes_por_hoja = {}
     for i in range(doc.page_count):
         pg, blatt = doc[i], blatt_de_pagina(i, doc.page_count)
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.svg"), "w", encoding="utf-8") as f:
@@ -228,6 +255,7 @@ def main():
             if clave_t and clave_t in indice:
                 tags.append({"b": caja, "t": clave_t})
 
+        bornes_por_hoja[blatt] = brs
         terms = deduplicar(rotulos(pg, sin_traducir))
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
             json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs, "libres": libres}, f, ensure_ascii=False)
@@ -258,9 +286,56 @@ def main():
                    "maquina": CFG["maquina"], "hojasTotales": CFG["hojasTotales"],
                    "faltante": CFG["faltantes"], "hojas": hojas, "indice": indice,
                    "bornesIdx": {k: {"h": v["h"], "tb": v["b"]} for k, v in bornes.items()},
+                   "descs": construir_descripciones(indice, hojas, bornes_por_hoja),
                    "busqueda": busqueda, "glosario": PALABRAS}, f, ensure_ascii=False)
 
     resumen(DEST, hojas, indice, sin_traducir)
+
+
+def construir_descripciones(indice, hojas, bornes_por_hoja):
+    """Descripcion en lenguaje tecnico natural de cada aparato, generada SOLO
+    con datos del propio plano (nada inventado): que es (por la letra IEC de
+    su designacion), en que circuitos trabaja (titulos de sus hojas) y por que
+    bornes se cablea (los que el dibujo pone a menos de ~55 pt).
+    """
+    titulos = {h["blatt"]: h["tituloEs"] for h in hojas}
+    descs = {}
+    for tag, puntos in indice.items():
+        if RE_SENAL.match(tag):
+            continue
+        pref = re.match(r"^([A-Z]{1,3})", tag).group(1)
+        tipo = TIPOS_IEC.get(pref[:2]) or TIPOS_IEC.get(pref[0])
+        partes = []
+        if tipo:
+            partes.append(tipo[0].upper() + tipo[1:] + ".")
+        vistos, lugares = set(), []
+        for pt in puntos:
+            if pt["h"] in vistos or pt["h"] >= BORNES_DESDE:
+                continue
+            vistos.add(pt["h"])
+            t = titulos.get(pt["h"], "")
+            if t and t != "Continuacion del esquema":
+                lugares.append(f"«{t[:48]}» (hoja {pt['h']})")
+            else:
+                lugares.append(f"hoja {pt['h']}")
+        if lugares:
+            partes.append("Trabaja en " + "; ".join(lugares[:3])
+                          + ("…" if len(lugares) > 3 else "") + ".")
+        # a una regla de bornes no le corresponde "cableado por": los bornes
+        # vecinos a sus menciones son referencias de OTRAS reglas
+        cerca = []
+        for pt in (puntos if pref[0] != "X" else []):
+            for b in bornes_por_hoja.get(pt["h"], []):
+                dx = (b["b"][0] + b["b"][2] / 2) - (pt["b"][0] + pt["b"][2] / 2)
+                dy = (b["b"][1] + b["b"][3] / 2) - (pt["b"][1] + pt["b"][3] / 2)
+                if dx * dx + dy * dy < 55 * 55 and b["t"] not in cerca:
+                    cerca.append(b["t"])
+        if cerca:
+            partes.append("Cableado por los bornes " + ", ".join(cerca[:5])
+                          + ("…" if len(cerca) > 5 else "") + ".")
+        if partes:
+            descs[tag] = " ".join(partes)
+    return descs
 
 
 def columna_de(x, cols):

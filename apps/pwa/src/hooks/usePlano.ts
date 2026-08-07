@@ -42,6 +42,8 @@ export type PlanoIndice = {
   busqueda: PlanoBusquedaItem[]
   /** borne -> su columna en el Klemmenplan, para el buscador */
   bornesIdx: Record<string, { h: number; tb: Caja }>
+  /** descripcion tecnica natural de cada aparato, generada del propio plano */
+  descs?: Record<string, string>
   glosario: Record<string, string>
 }
 
