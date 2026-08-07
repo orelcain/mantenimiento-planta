@@ -71,7 +71,10 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     setError(null)
     if (!slug) return
     let vivo = true
-    fetch(assetPlano(slug, 'indice.json'))
+    // El indice CAMBIA (titulos OCR, capas nuevas) y los planos en Storage se
+    // subieron primero con cache de 24 h: revalidar siempre (ETag barato).
+    // Las hojas SVG son inmutables y siguen con la cache normal.
+    fetch(assetPlano(slug, 'indice.json'), { cache: 'no-cache' })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
