@@ -371,14 +371,18 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
   }
 
   const puntos = indice.indice[sel.tag] ?? []
+  const esSenal = /^(0\/)?\d{1,3}V\d{0,2}$/.test(sel.tag)
+  const esRegla = /^X\d{1,2}$/.test(sel.tag)
   return (
     <>
-      <Titulo>Aparato</Titulo>
+      <Titulo>{esSenal ? 'Señal' : esRegla ? 'Regla de bornes' : 'Aparato'}</Titulo>
       <p className="m-0 font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
         {sel.tag}
       </p>
       <p className="m-0 mt-1 text-[11.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
-        Aparece en {puntos.length} punto{puntos.length !== 1 ? 's' : ''} del plano.
+        {esSenal
+          ? `Este potencial recorre ${new Set(puntos.map((p) => p.h)).size} hojas del plano. Síguelo:`
+          : `Aparece en ${puntos.length} punto${puntos.length !== 1 ? 's' : ''} del plano.`}
       </p>
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
         {puntos.map((p) => (
@@ -437,6 +441,22 @@ function buscar(
       })
     }
   })
+
+  // Bornes: "X5:97", "X5.97", "X5 97" o el numero pelado "97".
+  const claveBorne = v.toUpperCase().replace(/[.\s]+/g, ':')
+  if (/^X\d/.test(claveBorne)) {
+    Object.entries(indice.bornesIdx).forEach(([k, dst]) => {
+      if (k.startsWith(claveBorne)) {
+        out.push({ clave: k, detalle: `borne · hoja ${dst.h}`, blatt: dst.h, caja: dst.tb })
+      }
+    })
+  } else if (/^\d{1,3}$/.test(v)) {
+    Object.entries(indice.bornesIdx).forEach(([k, dst]) => {
+      if (k.endsWith(`:${v}`) && out.length < 40) {
+        out.push({ clave: k, detalle: `borne · hoja ${dst.h}`, blatt: dst.h, caja: dst.tb })
+      }
+    })
+  }
 
   // Rotulos: en el idioma que sea. Cada resultado lleva su hoja y su caja.
   for (const r of indice.busqueda) {
