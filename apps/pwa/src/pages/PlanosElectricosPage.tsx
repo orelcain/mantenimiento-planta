@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Search, Zap } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, X, Zap } from 'lucide-react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
 import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
@@ -80,6 +80,7 @@ function Visor({ slug }: { slug: string }) {
   const [foco, setFoco] = useState<Foco>(null)
   const [mostrarEs, setMostrarEs] = useState(false)
   const [busca, setBusca] = useState('')
+  const [ayuda, setAyuda] = useState(false)
   // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
   const [historial, setHistorial] = useState<number[]>([])
   // Y lo mismo para el PANEL: al tocar un borne desde la ficha del SM4 se
@@ -177,6 +178,8 @@ function Visor({ slug }: { slug: string }) {
   const anterior = indice.hojas[i - 1]
   const siguiente = indice.hojas[i + 1]
   const resultados = buscar(busca, indice, hoja.blatt)
+  // En movil el panel es una hoja inferior: cerrada = plano completo.
+  const abiertoMovil = sel !== null || !!busca.trim() || ayuda
 
   return (
     // Altura del viewport, NO h-full: esta ruta se monta directo bajo #root, sin
@@ -194,7 +197,7 @@ function Visor({ slug }: { slug: string }) {
           </span>
         </Link>
 
-        <div className="relative min-w-[180px] flex-1 md:max-w-sm">
+        <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
                  placeholder="Buscar K7, Q1, B12, Messer, cuchillo…"
@@ -272,6 +275,12 @@ function Visor({ slug }: { slug: string }) {
         </nav>
 
         <main className="relative min-w-0 flex-1">
+          <button type="button" aria-label="Cómo se usa"
+                  onClick={() => setAyuda(true)}
+                  className="absolute bottom-24 left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border shadow-lg md:hidden"
+                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+            ?
+          </button>
           {historial.length > 0 && (
             <button type="button" onClick={volver}
                     className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11.5px] shadow-lg"
@@ -291,8 +300,19 @@ function Visor({ slug }: { slug: string }) {
           />
         </main>
 
-        <aside className="w-72 shrink-0 overflow-y-auto border-l p-3"
-               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+        <aside
+          className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-0 bottom-0 z-50 max-h-[55dvh] overflow-y-auto rounded-t-2xl border-t p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-l md:border-t-0 md:pb-3 md:shadow-none`}
+          style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+          {/* agarradera + cerrar, solo en la hoja movil */}
+          <div className="relative mb-2 md:hidden">
+            <div className="mx-auto h-1 w-10 rounded-full" style={{ background: 'var(--lc-border)' }} />
+            <button type="button" aria-label="Cerrar panel"
+                    onClick={() => { setSel(null); setBusca(''); setAyuda(false) }}
+                    className="absolute -top-1 right-0 rounded p-1.5"
+                    style={{ color: 'var(--lc-ink-mid)' }}>
+              <X size={16} />
+            </button>
+          </div>
           {!busca.trim() && pilaSel.length > 0 && (
             <button type="button" onClick={volverSel}
                     className="mb-2 flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11.5px]"
