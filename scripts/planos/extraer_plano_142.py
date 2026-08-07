@@ -31,6 +31,23 @@ DEST = (os.path.join(os.path.dirname(os.path.abspath(__file__)), "_staging", SLU
 # n de hoja real de cada pagina del PDF, saltando las hojas que el PDF no trae
 BLATTS = [n for n in range(1, CFG["hojasTotales"] + 1) if n not in CFG["faltantes"]]
 BORNES_DESDE = CFG["seccionBornes"]
+# Titulos sacados del cajetin por OCR (scripts/planos/ocr_titulos.py) para los
+# planos cuyo texto viene en contornos. {pagina: {"h": hojaGea, "t": titulo}}
+_ruta_titulos = os.path.join(os.path.dirname(os.path.abspath(__file__)), "titulos", f"{SLUG}.json")
+TITULOS_OCR = json.load(open(_ruta_titulos, encoding="utf-8")) if os.path.exists(_ruta_titulos) else {}
+
+
+def titulo_ocr(blatt):
+    d = TITULOS_OCR.get(str(blatt))
+    if not d:
+        return None
+    t = re.sub(r"^(TIROMAT|POWERPAK|GEA)\s*", "", d["t"]).strip()
+    if not t:
+        return None
+    h = d.get("h", "")
+    # el numero de hoja GEA real tiene saltos (la pagina 41 es la HOJA 264):
+    # se conserva como referencia cruzada con el indice de papel
+    return f"H{h} · {t}" if h and h != str(blatt) else t
 
 from glosario_142 import PALABRAS, FRASES, IGNORAR, COLORES  # noqa: E402
 
@@ -277,12 +294,13 @@ def main():
             vistos_busq.add(k)
             busqueda.append({"de": t["de"], "es": t["es"], "h": blatt, "b": t["b"]})
 
+        t_ocr = titulo_ocr(blatt)
         hojas.append({
             "blatt": blatt,
             "vb": [round(pg.rect.width, 2), round(pg.rect.height, 2)],
             "cols": cols_por_pagina[i],
             "seccion": "circuitos" if blatt < BORNES_DESDE else "bornes",
-            **titulos(pg, terms),
+            **({"titulo": t_ocr, "tituloEs": t_ocr} if t_ocr else titulos(pg, terms)),
             "n": {"x": len(xrefs), "t": len(tags), "d": len(terms), "b": len(brs)},
         })
 
