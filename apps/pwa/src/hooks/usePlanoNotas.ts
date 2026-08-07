@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query,
+  addDoc, collection, deleteDoc, doc, onSnapshot, query,
   serverTimestamp, updateDoc, where, type Timestamp,
 } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
@@ -41,15 +41,17 @@ export function usePlanoNotas(planoSlug: string | undefined) {
   useEffect(() => {
     if (!planoSlug) return
     setCargando(true)
-    const q = query(
-      collection(db, COL),
-      where('planoSlug', '==', planoSlug),
-      orderBy('createdAt', 'desc'),
-    )
+    // Sin orderBy: where + orderBy exige un indice compuesto que no existe y
+    // las notas fallaban CON sesion iniciada ("failed-precondition"). Son
+    // pocas notas por plano: se ordenan en memoria.
+    const q = query(collection(db, COL), where('planoSlug', '==', planoSlug))
     const off = onSnapshot(
       q,
       (snap) => {
-        setNotas(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PlanoNota))
+        const filas = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PlanoNota)
+        // mas nuevas primero; las recien creadas (serverTimestamp pendiente) arriba
+        filas.sort((a, b) => (b.createdAt?.toMillis?.() ?? Infinity) - (a.createdAt?.toMillis?.() ?? Infinity))
+        setNotas(filas)
         setError(null)
         setCargando(false)
       },

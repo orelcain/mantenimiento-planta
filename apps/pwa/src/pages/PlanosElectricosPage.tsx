@@ -380,6 +380,12 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
       <p className="m-0 font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
         {sel.tag}
       </p>
+      {!esSenal && indice.descs?.[sel.tag] && (
+        <p className="m-0 mt-1.5 rounded-md border-l-2 py-1 pl-2 text-[11.5px] leading-relaxed"
+           style={{ color: 'var(--lc-ink-mid)', borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
+          {indice.descs[sel.tag]}
+        </p>
+      )}
       <p className="m-0 mt-1 text-[11.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
         {esSenal
           ? `Este potencial recorre ${new Set(puntos.map((p) => p.h)).size} hojas del plano. Síguelo:`
