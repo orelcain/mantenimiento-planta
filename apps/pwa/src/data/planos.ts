@@ -9,6 +9,11 @@
  * se cargan de a una y NO se meten en el bundle.
  */
 
+/** Los planos pesados viven en Firebase Storage (lectura publica via
+ *  storage.rules `planos/`), no en el repo: la GEA sola son ~400 MB de SVG. */
+const STORAGE_BASE =
+  'https://firebasestorage.googleapis.com/v0/b/mantenimiento-planta-771a3.firebasestorage.app/o/'
+
 export type PlanoCatalogo = {
   /** Carpeta en public/planos/ y segmento de URL. */
   slug: string
@@ -23,6 +28,11 @@ export type PlanoCatalogo = {
   /** Hojas que el PDF original no trae. Se avisa en vez de fingir que no faltan. */
   faltantes: number[]
   descripcion: string
+  /** 'visor': el PDF trae el texto en contornos (sin palabras extraibles) —
+   *  hojas navegables y notas por hoja, pero sin zonas clicables ni indice. */
+  modo?: 'visor'
+  /** Presente = los assets se sirven desde Firebase Storage, no del bundle. */
+  enStorage?: boolean
 }
 
 export const PLANOS: PlanoCatalogo[] = [
@@ -50,6 +60,34 @@ export const PLANOS: PlanoCatalogo[] = [
       'Esquema de circuitos (hojas 1-7) y plano de bornes (8-10) de la fileteadora. ' +
       'Mismo visor: saltos, bornes y rotulos traducidos.',
   },
+  {
+    slug: 'gea-50520184',
+    maquina: 'GEA PowerPak (serial 50520184)',
+    numero: '50520184',
+    revision: '—',
+    aplicaA: 'Termoformadora GEA V2 · serial 50520184',
+    hojas: 146,
+    faltantes: [],
+    modo: 'visor',
+    enStorage: true,
+    descripcion:
+      'Diagrama electrico oficial, ya en espanol. Modo visor: el PDF trae el texto ' +
+      'en contornos, asi que hay navegacion y notas por hoja, sin zonas clicables.',
+  },
+  {
+    slug: 'gea-50540108',
+    maquina: 'GEA PowerPak (serial 50540108)',
+    numero: '50540108',
+    revision: '—',
+    aplicaA: 'Termoformadora GEA V2 · serial 50540108',
+    hojas: 94,
+    faltantes: [],
+    modo: 'visor',
+    enStorage: true,
+    descripcion:
+      'Diagrama electrico oficial, ya en espanol. Modo visor: el PDF trae el texto ' +
+      'en contornos, asi que hay navegacion y notas por hoja, sin zonas clicables.',
+  },
 ]
 
 export function planoPorSlug(slug: string | undefined) {
@@ -58,5 +96,9 @@ export function planoPorSlug(slug: string | undefined) {
 
 /** Ruta pública de un asset del plano (índice, hoja SVG o sus zonas). */
 export function assetPlano(slug: string, archivo: string) {
+  const p = PLANOS.find((x) => x.slug === slug)
+  if (p?.enStorage) {
+    return `${STORAGE_BASE}${encodeURIComponent(`planos/${slug}/${archivo}`)}?alt=media`
+  }
   return `${import.meta.env.BASE_URL}planos/${slug}/${archivo}`
 }

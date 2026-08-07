@@ -23,7 +23,11 @@ if SLUG not in CONFIGS:
     sys.exit(f"Slug desconocido: {SLUG}. Hay: {', '.join(CONFIGS)}")
 CFG = CONFIGS[SLUG]
 PDF = os.path.join(os.environ.get("ONEDRIVE", os.path.expanduser("~/OneDrive")), *CFG["pdf"].split("/"))
-DEST = os.path.join(RAIZ, "apps", "pwa", "public", "planos", SLUG)
+# Los planos "storage" NO van al repo (pesan decenas de MB): se extraen a un
+# staging local y se suben a Firebase Storage con scripts/planos/subir_storage.mjs
+DEST = (os.path.join(os.path.dirname(os.path.abspath(__file__)), "_staging", SLUG)
+        if CFG.get("storage")
+        else os.path.join(RAIZ, "apps", "pwa", "public", "planos", SLUG))
 # n de hoja real de cada pagina del PDF, saltando las hojas que el PDF no trae
 BLATTS = [n for n in range(1, CFG["hojasTotales"] + 1) if n not in CFG["faltantes"]]
 BORNES_DESDE = CFG["seccionBornes"]

@@ -18,5 +18,27 @@
     "hojasTotales": 10,
     "faltantes": [],
     "seccionBornes": 8
+  },
+  "gea-50520184": {
+    "maquina": "GEA PowerPak 50520184",
+    "plano": "50520184",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GEA V2/SERIAL NUMBER 50520184/50520184_GEA PowerPak_50520_Electrical diagram_es.pdf",
+    "hojasTotales": 146,
+    "faltantes": [],
+    "seccionBornes": 999,
+    "modo": "visor",
+    "storage": true
+  },
+  "gea-50540108": {
+    "maquina": "GEA PowerPak 50540108",
+    "plano": "50540108",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ GEA V2/SERIAL NUMBER 50540108/50540108_GEA PowerPak_5550_Electrical diagram_ES.pdf",
+    "hojasTotales": 94,
+    "faltantes": [],
+    "seccionBornes": 999,
+    "modo": "visor",
+    "storage": true
   }
 }

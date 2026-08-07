@@ -26,6 +26,14 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // Hojas de planos eléctricos servidas desde Storage (los que no caben en
+    // el repo, p.ej. GEA ~400 MB en SVG). Lectura pública deliberada: el
+    // Centro de Aprendizaje es público, igual que models3d.
+    match /planos/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Fotos colgadas sobre el plano eléctrico: el automático real, la bornera,
     // cómo quedó el cableado. Mismo límite que planosAguas.
     match /planosElectricos/{allPaths=**} {
