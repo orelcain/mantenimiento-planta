@@ -155,7 +155,7 @@ def main():
 
     # --- pasada 2: una hoja a la vez
     hojas, sin_traducir, busqueda = [], collections.Counter(), []
-    bornes_por_hoja = {}
+    bornes_por_hoja, terms_por_hoja = {}, {}
     for i in range(doc.page_count):
         pg, blatt = doc[i], blatt_de_pagina(i, doc.page_count)
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.svg"), "w", encoding="utf-8") as f:
@@ -257,6 +257,7 @@ def main():
 
         bornes_por_hoja[blatt] = brs
         terms = deduplicar(rotulos(pg, sin_traducir))
+        terms_por_hoja[blatt] = terms
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
             json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs, "libres": libres}, f, ensure_ascii=False)
 
@@ -286,13 +287,13 @@ def main():
                    "maquina": CFG["maquina"], "hojasTotales": CFG["hojasTotales"],
                    "faltante": CFG["faltantes"], "hojas": hojas, "indice": indice,
                    "bornesIdx": {k: {"h": v["h"], "tb": v["b"]} for k, v in bornes.items()},
-                   "descs": construir_descripciones(indice, hojas, bornes_por_hoja),
+                   "descs": construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja),
                    "busqueda": busqueda, "glosario": PALABRAS}, f, ensure_ascii=False)
 
     resumen(DEST, hojas, indice, sin_traducir)
 
 
-def construir_descripciones(indice, hojas, bornes_por_hoja):
+def construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja):
     """Descripcion en lenguaje tecnico natural de cada aparato, generada SOLO
     con datos del propio plano (nada inventado): que es (por la letra IEC de
     su designacion), en que circuitos trabaja (titulos de sus hojas) y por que
@@ -333,6 +334,21 @@ def construir_descripciones(indice, hojas, bornes_por_hoja):
         if cerca:
             partes.append("Cableado por los bornes " + ", ".join(cerca[:5])
                           + ("…" if len(cerca) > 5 else "") + ".")
+        # A que esta asociado: el rotulo funcional del dibujo mas cercano a sus
+        # menciones ("Kratzer A" bajo el conector SM4 -> «Excavador A»)
+        mejor, mejor_d = None, 90.0 * 90.0
+        for pt in puntos:
+            for t in terms_por_hoja.get(pt["h"], []):
+                if t.get("dup") or t.get("r") == 90 or len(t["es"]) < 4:
+                    continue
+                dx = (t["b"][0] + t["b"][2] / 2) - (pt["b"][0] + pt["b"][2] / 2)
+                dy = (t["b"][1] + t["b"][3] / 2) - (pt["b"][1] + pt["b"][3] / 2)
+                d = dx * dx + dy * dy
+                if d < mejor_d:
+                    mejor, mejor_d = t["es"], d
+        if mejor:
+            partes.insert(1 if partes else 0,
+                          f"Asociado a «{mejor[:44]}».")
         if partes:
             descs[tag] = " ".join(partes)
     return descs
@@ -376,8 +392,9 @@ def rotulos(pg, sin_traducir):
                 # Umbral: una frase a medio traducir ("Die Maquina muss...")
                 # confunde mas que dejarla en su idioma. O se traduce entera o
                 # no se toca; lo que quede fuera aparece en el reporte final.
-                hechas = sum(1 for p in pals if p.strip(".,:;()") in PALABRAS)
-                if hechas / len(pals) < 0.6:
+                sustantivas = [p for p in pals if not re.match(r"^[A-Za-z]?\d*$", p)]
+                hechas = sum(1 for p in sustantivas if p.strip(".,:;()") in PALABRAS)
+                if sustantivas and hechas / len(sustantivas) < 0.6:
                     for p in pals:
                         if re.match(r"^[A-Za-zÀ-ÿ\-]{4,}$", p) and p not in IGNORAR                                 and p.strip(".,:;()") not in PALABRAS:
                             sin_traducir[p] += 1
@@ -437,7 +454,7 @@ def resumen(dest, hojas, indice, sin_traducir):
     if sin_traducir:
         print(f"\n    {len(sin_traducir)} terminos alemanes AUN SIN traducir "
               f"(los 25 mas frecuentes):")
-        for t, n in sin_traducir.most_common(25):
+        for t, n in sin_traducir.most_common():
             print(f"      {n:4d}  {t}")
 
 
