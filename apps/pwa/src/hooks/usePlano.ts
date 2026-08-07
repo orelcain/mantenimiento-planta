@@ -95,7 +95,11 @@ export function usePlano(slug: string | undefined, inicial?: number) {
         fetch(assetPlano(slug, `hoja-${nn}.svg`)).then((r) => (r.ok ? r.text() : Promise.reject(r.status))),
         fetch(assetPlano(slug, `hoja-${nn}.json`)).then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
       ])
-      const datos: PlanoHoja = { svg, ...zonas }
+      // Defaults ANTES del spread: un hoja-NN.json viejo en la caché HTTP del
+      // navegador (de un deploy anterior, sin `bornes` o `libres`) reventaba
+      // el lienzo en `.map`. Con esto, un JSON incompleto degrada a "esa capa
+      // no aparece" en vez de a pantalla en blanco.
+      const datos: PlanoHoja = { svg, xrefs: [], tags: [], terms: [], bornes: [], libres: [], ...zonas }
       cache.current.set(blatt, datos)
       return datos
     },

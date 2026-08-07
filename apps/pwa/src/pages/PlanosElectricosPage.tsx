@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Search, Zap } from 'lucide-react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
 import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
+import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 
@@ -396,6 +397,8 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
         ))}
       </div>
 
+      <FichasSap notas={notas.notasDe('aparato', sel.tag)} />
+
       <Titulo>Notas y fotos</Titulo>
       {notas.error && (
         <p className="m-0 mb-2 text-[11.5px]" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
@@ -489,6 +492,74 @@ function Resultados({ items, onIr }: {
           <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
         </button>
       ))}
+    </>
+  )
+}
+
+/**
+ * El cruce que cierra el circulo del modulo: los codigos SAP que la gente dejo
+ * en las notas del aparato, resueltos contra el maestro de repuestos y el
+ * stock de bodega. Veo la falla en el plano -> se que pedir y cuantos hay.
+ */
+function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas'] }) {
+  const saps = useMemo(
+    () => [...new Set(notas.map((n) => n.codigoSAP).filter((s): s is string => !!s))],
+    [notas],
+  )
+  const info = usePlanoSap(saps)
+  const fichas = saps.map((s) => info[s]).filter((f): f is NonNullable<typeof f> => !!f)
+  if (!fichas.length) return null
+  return (
+    <>
+      <Titulo>Repuesto vinculado</Titulo>
+      {fichas.map((f) => {
+        const sinStock = f.stockActual != null && f.stockActual <= 0
+        const bajo = f.stockActual != null && f.stockMinimo != null
+          && f.stockActual > 0 && f.stockActual < f.stockMinimo
+        return (
+          <div key={f.sap} className="mb-3 rounded-lg border p-3"
+               style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[13px] font-semibold leading-snug">
+                {f.nombre ?? 'SAP sin catalogar'}
+              </span>
+              <span className="shrink-0 font-mono text-[11px]" style={{ color: 'var(--lc-aqua-bright)' }}>
+                {f.sap}
+              </span>
+            </div>
+            {(f.marca || f.modeloTipo || f.codigoFabricante) && (
+              <p className="m-0 mt-1 font-mono text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+                {[f.marca, f.modeloTipo, f.codigoFabricante].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {f.stockActual == null ? (
+                <span className="rounded px-2 py-0.5 text-[10.5px]"
+                      style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+                  sin registro de bodega
+                </span>
+              ) : (
+                <span className="rounded px-2 py-0.5 font-mono text-[11px] font-semibold"
+                      style={sinStock
+                        ? { background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }
+                        : bajo
+                          ? { background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }
+                          : { background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
+                  {f.stockActual} {f.unidad ?? 'un'} en bodega
+                </span>
+              )}
+              {f.ubicacionBodega && (
+                <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
+              )}
+              <Link to={`/repuestos?q=${encodeURIComponent(f.sap)}`}
+                    className="ml-auto text-[11px] underline-offset-2 hover:underline"
+                    style={{ color: 'var(--lc-aqua-bright)' }}>
+                Ver en Repuestos
+              </Link>
+            </div>
+          </div>
+        )
+      })}
     </>
   )
 }
