@@ -82,6 +82,9 @@ function Visor({ slug }: { slug: string }) {
   const [busca, setBusca] = useState('')
   // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
   const [historial, setHistorial] = useState<number[]>([])
+  // Y lo mismo para el PANEL: al tocar un borne desde la ficha del SM4 se
+  // perdia la ficha con sus 8 puntos, sin camino de vuelta.
+  const [pilaSel, setPilaSel] = useState<{ s: NonNullable<Seleccion>; h: number }[]>([])
   const buscaRef = useRef<HTMLInputElement>(null)
 
   const meta = useMemo(
@@ -101,6 +104,27 @@ function Visor({ slug }: { slug: string }) {
     },
     [abrir, hoja],
   )
+
+  const seleccionar = useCallback((nuevo: Seleccion) => {
+    setSel((previo) => {
+      if (previo && nuevo && previo !== nuevo && hoja) {
+        setPilaSel((p) => [...p.slice(-14), { s: previo, h: hoja.blatt }])
+      }
+      return nuevo
+    })
+  }, [hoja])
+
+  const volverSel = useCallback(() => {
+    setPilaSel((p) => {
+      const previa = p[p.length - 1]
+      if (previa) {
+        setSel(previa.s)
+        setFoco(null)
+        void abrir(previa.h)
+      }
+      return p.slice(0, -1)
+    })
+  }, [abrir])
 
   const volver = useCallback(() => {
     setHistorial((h) => {
@@ -258,21 +282,28 @@ function Visor({ slug }: { slug: string }) {
           )}
           <PlanoLienzo
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
-            onSalto={(h, c) => { setSel({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}
-            onBorne={(b) => { setSel({ tipo: 'borne', t: b.t, h: b.h }); void irA(b.h, undefined, b.tb) }}
-            onBorneLibre={(l) => { setSel({ tipo: 'borneLibre', l }); setFoco(null) }}
-            onAparato={(tag) => { setSel({ tipo: 'aparato', tag }); setFoco(null) }}
-            onRotulo={(r) => { setSel({ tipo: 'rotulo', r }); setFoco(null) }}
+            onSalto={(h, c) => { seleccionar({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}
+            onBorne={(b) => { seleccionar({ tipo: 'borne', t: b.t, h: b.h }); void irA(b.h, undefined, b.tb) }}
+            onBorneLibre={(l) => { seleccionar({ tipo: 'borneLibre', l }); setFoco(null) }}
+            onAparato={(tag) => { seleccionar({ tipo: 'aparato', tag }); setFoco(null) }}
+            onRotulo={(r) => { seleccionar({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
           />
         </main>
 
         <aside className="w-72 shrink-0 overflow-y-auto border-l p-3"
                style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+          {!busca.trim() && pilaSel.length > 0 && (
+            <button type="button" onClick={volverSel}
+                    className="mb-2 flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11.5px]"
+                    style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+              <ChevronLeft size={13} /> Volver a {etiquetaSel(pilaSel[pilaSel.length - 1]!.s)}
+            </button>
+          )}
           {busca.trim()
             ? <Resultados items={resultados}
                 onIr={(b, c, caja, aparato) => {
-                  if (aparato) setSel({ tipo: 'aparato', tag: aparato })
+                  if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
                   // Elegir un resultado cierra la busqueda: si no, el panel se
                   // quedaba en la lista y la ficha del aparato no se veia.
                   setBusca('')
@@ -568,6 +599,17 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
       })}
     </>
   )
+}
+
+/** Nombre corto de una seleccion, para el boton de volver del panel. */
+function etiquetaSel(s: NonNullable<Seleccion>): string {
+  switch (s.tipo) {
+    case 'aparato': return s.tag
+    case 'borne': return `borne ${s.t}`
+    case 'borneLibre': return `borne ${s.l.t}`
+    case 'salto': return `salto ${s.t}`
+    case 'rotulo': return `«${s.r.es.slice(0, 22)}»`
+  }
 }
 
 function Titulo({ children }: { children: React.ReactNode }) {
