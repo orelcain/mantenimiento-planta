@@ -81,6 +81,9 @@ function Visor({ slug }: { slug: string }) {
   const [mostrarEs, setMostrarEs] = useState(false)
   const [busca, setBusca] = useState('')
   const [ayuda, setAyuda] = useState(false)
+  // "Resaltar todos": ilumina cada aparicion del aparato/senal seleccionado
+  // en la hoja actual, para seguir un cable con la vista.
+  const [resaltar, setResaltar] = useState(false)
   // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
   // minimizable a una barrita (las esquinas curvas del telefono escondian el
   // contenido pegado al borde; ademas a veces solo quieres ver el plano).
@@ -108,6 +111,7 @@ function Visor({ slug }: { slug: string }) {
   useEffect(() => {
     navRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' })
   }, [hoja?.blatt])
+
   // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
   const [historial, setHistorial] = useState<number[]>([])
   // Y lo mismo para el PANEL: al tocar un borne desde la ficha del SM4 se
@@ -135,6 +139,7 @@ function Visor({ slug }: { slug: string }) {
 
   const seleccionar = useCallback((nuevo: Seleccion) => {
     setMinimizada(false)
+    setResaltar(false)
     setSel((previo) => {
       if (previo && nuevo && previo !== nuevo && hoja) {
         setPilaSel((p) => [...p.slice(-14), { s: previo, h: hoja.blatt }])
@@ -155,6 +160,23 @@ function Visor({ slug }: { slug: string }) {
     })
   }, [abrir])
 
+// Deep-link ?ap=F24: abre la ficha del aparato y salta a su primera
+  // aparicion. Para mandar por chat "mira ESTE aparato", no solo la hoja.
+  const apAbierto = useRef(false)
+  useEffect(() => {
+    if (apAbierto.current || !indice || !hoja) return
+    apAbierto.current = true
+    const ap = new URLSearchParams(window.location.search).get('ap')?.toUpperCase()
+    if (!ap || !indice.indice[ap]) return
+    // si la URL tambien trae ?hoja=, mandan la hoja pedida: se busca la
+    // aparicion del aparato AHI; si no hay, recien se va a la primera
+    const puntos = indice.indice[ap]
+    const enHojaPedida = puntos.find((pt) => pt.h === hoja.blatt)
+    const destino = enHojaPedida ?? puntos[0]
+    setSel({ tipo: 'aparato', tag: ap })
+    if (destino) void irA(destino.h, undefined, destino.b)
+  }, [indice, hoja, irA])
+
   const volver = useCallback(() => {
     setHistorial((h) => {
       const previa = h[h.length - 1]
@@ -173,8 +195,10 @@ function Visor({ slug }: { slug: string }) {
     localStorage.setItem(`plano-hoja:${slug}`, String(hoja.blatt))
     const u = new URL(window.location.href)
     u.searchParams.set('hoja', String(hoja.blatt))
+    if (sel?.tipo === 'aparato') u.searchParams.set('ap', sel.tag)
+    else u.searchParams.delete('ap')
     window.history.replaceState(null, '', u)
-  }, [hoja, slug])
+  }, [hoja, slug, sel])
 
   const notasDe = useCallback((tag: string) => notas.notasDe('aparato', tag).length, [notas])
 
@@ -279,6 +303,7 @@ function Visor({ slug }: { slug: string }) {
              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
           {(['circuitos', 'bornes'] as const).map((sec) => {
             const grupo = indice.hojas.filter((h) => h.seccion === sec)
+            if (!grupo.length) return null
             return (
               <section key={sec}>
                 <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider"
@@ -332,6 +357,7 @@ function Visor({ slug }: { slug: string }) {
           )}
           <PlanoLienzo
             hoja={hoja.datos} meta={meta} mostrarEs={mostrarEs} notasDe={notasDe} foco={foco}
+            resaltarTag={resaltar && sel?.tipo === 'aparato' ? sel.tag : null}
             onSalto={(h, c) => { seleccionar({ tipo: 'salto', t: `/${h}.${c}`, h, c }); void irA(h, c) }}
             onBorne={(b) => { seleccionar({ tipo: 'borne', t: b.t, h: b.h }); void irA(b.h, undefined, b.tb) }}
             onBorneLibre={(l) => { seleccionar({ tipo: 'borneLibre', l }); setFoco(null) }}
@@ -403,7 +429,9 @@ function Visor({ slug }: { slug: string }) {
                   setBusca('')
                   void irA(b, c, caja)
                 }} />
-            : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA} />}
+            : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA}
+                     resaltar={resaltar} onResaltar={() => setResaltar((v) => !v)}
+                     enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0} />}
           </>}
         </aside>
       </div>
@@ -413,12 +441,15 @@ function Visor({ slug }: { slug: string }) {
 
 /* ────────────────────────────── panel ────────────────────────────── */
 
-function Panel({ sel, indice, hojaActual, notas, onIr }: {
+function Panel({ sel, indice, hojaActual, notas, onIr, resaltar, onResaltar, enEstaHoja }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
   hojaActual: number
   notas: ReturnType<typeof usePlanoNotas>
   onIr: (b: number, c?: number, caja?: Caja) => void
+  resaltar: boolean
+  onResaltar: () => void
+  enEstaHoja: number
 }) {
   if (!sel) {
     return (
@@ -517,6 +548,15 @@ function Panel({ sel, indice, hojaActual, notas, onIr }: {
           ? `Este potencial recorre ${new Set(puntos.map((p) => p.h)).size} hojas del plano. Síguelo:`
           : `Aparece en ${puntos.length} punto${puntos.length !== 1 ? 's' : ''} del plano.`}
       </p>
+      {enEstaHoja > 1 && (
+        <button type="button" onClick={onResaltar} aria-pressed={resaltar}
+                className="mt-2 w-full rounded-md border px-2 py-1.5 text-[11.5px] font-medium"
+                style={resaltar
+                  ? { background: 'var(--lc-aqua)', borderColor: 'var(--lc-aqua)', color: '#fff' }
+                  : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+          {resaltar ? 'Quitar resaltado' : `Resaltar sus ${enEstaHoja} puntos en esta hoja`}
+        </button>
+      )}
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
         {puntos.map((p) => (
           <button key={`${p.h}.${p.c}`} type="button" onClick={() => onIr(p.h, undefined, p.b)}

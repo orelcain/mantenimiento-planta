@@ -91,7 +91,7 @@ const SPECIAL_MODULES: SpecialModule[] = [
     icon: Waypoints, href: '/aprendizaje/planos', tint: '#6b8d7a',
     // Literal como sus hermanos: importar @/data/planos por un conteo metería
     // el catálogo en el chunk del hub. Actualizar al sumar una máquina.
-    stats: '1 máquina · 44 hojas · 936 saltos',
+    stats: '2 máquinas · 54 hojas · 951 saltos',
   },
 ]
 

@@ -38,6 +38,18 @@ export const PLANOS: PlanoCatalogo[] = [
       'Esquema de circuitos y plano de bornes de la evisceradora. Confirmado contra la placa: ' +
       'el campo Wiring Diagr. dice 1427100888.',
   },
+  {
+    slug: 'baader-200-862',
+    maquina: 'BAADER 200',
+    numero: '200.70.00.862',
+    revision: '—',
+    aplicaA: 'BAADER 200 (fileteadora)',
+    hojas: 10,
+    faltantes: [],
+    descripcion:
+      'Esquema de circuitos (hojas 1-7) y plano de bornes (8-10) de la fileteadora. ' +
+      'Mismo visor: saltos, bornes y rotulos traducidos.',
+  },
 ]
 
 export function planoPorSlug(slug: string | undefined) {

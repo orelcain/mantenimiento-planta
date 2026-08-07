@@ -12,6 +12,8 @@ type Props = {
   mostrarEs: boolean
   /** Cuántas notas tiene colgadas un aparato, para marcarlo en el dibujo. */
   notasDe: (tag: string) => number
+  /** Aparato/señal cuyas apariciones se iluminan todas a la vez, o null. */
+  resaltarTag: string | null
   foco: Foco
   onSalto: (hoja: number, col: number) => void
   onBorne: (b: PlanoBorne) => void
@@ -34,7 +36,7 @@ const ESCALA_COLUMNA = 1.7
  * opcional con la traducción al castellano.
  */
 export function PlanoLienzo({
-  hoja, meta, mostrarEs, notasDe, foco, onSalto, onBorne, onBorneLibre, onAparato, onRotulo, onFondo,
+  hoja, meta, mostrarEs, notasDe, foco, resaltarTag, onSalto, onBorne, onBorneLibre, onAparato, onRotulo, onFondo,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -227,12 +229,15 @@ export function PlanoLienzo({
 
           {hoja.tags.map((t, i) => {
             const n = notasDe(t.t)
+            const brillante = resaltarTag === t.t
             return (
               <g key={`t${i}`} className="cursor-pointer"
                  onClick={(e) => { e.stopPropagation(); onAparato(t.t) }}>
                 <rect x={t.b[0] - 0.8} y={t.b[1] - 0.8} width={t.b[2] + 1.6} height={t.b[3] + 1.6} rx={1.5}
-                      fill="var(--lc-aqua)" opacity={n ? 0.3 : 0.15} stroke="var(--lc-aqua)"
-                      strokeWidth={0.6} strokeOpacity={0.5} className="hover:opacity-50" />
+                      fill="var(--lc-aqua)" opacity={brillante ? 0.55 : n ? 0.3 : 0.15}
+                      stroke={brillante ? 'var(--lc-aqua-bright)' : 'var(--lc-aqua)'}
+                      strokeWidth={brillante ? 1.4 : 0.6} strokeOpacity={brillante ? 1 : 0.5}
+                      className="hover:opacity-50" />
                 {n > 0 && (
                   <circle cx={t.b[0] + t.b[2] + 1.4} cy={t.b[1] - 0.6} r={1.9} fill="var(--lc-prep)" />
                 )}
