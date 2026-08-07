@@ -69,7 +69,10 @@ export function PlanoLienzo({
       if (!r) return
       const chico = Math.min(r.width, r.height) < 520 // en teléfono hace falta más aumento
       const s = Math.max(escala * (chico ? 1.35 : 1), 1.5)
-      vista.current = { s, x: r.width / 2 - cx * s, y: r.height / 2 - cy * s }
+      // en movil el panel es una hoja inferior que tapa el 55% de abajo: el
+      // foco va al tercio superior para que el elemento marcado quede visible
+      const focoY = chico ? r.height * 0.28 : r.height / 2
+      vista.current = { s, x: r.width / 2 - cx * s, y: focoY - cy * s }
       aplicar()
     },
     [aplicar],
@@ -269,7 +272,7 @@ export function PlanoLienzo({
         </svg>
       </div>
 
-      <div data-controles className="absolute bottom-3 right-3 flex flex-col overflow-hidden rounded-lg border shadow-lg"
+      <div data-controles className="absolute bottom-24 right-3 flex flex-col overflow-hidden rounded-lg border shadow-lg md:bottom-3"
            style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         {[
           ['+', 'Acercar', () => { const r = stageRef.current!.getBoundingClientRect(); zoom(1.4, r.width / 2, r.height / 2) }],
