@@ -5,7 +5,18 @@
     "rev": "A1 · 23.08.2022",
     "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ BAADER 142/INFO ALOJADA EN TELEGRAM BAADER 142/DOCUMENTOS/883_1427100888_001_A1_A3.pdf",
     "hojasTotales": 45,
-    "faltantes": [43],
+    "faltantes": [
+      43
+    ],
     "seccionBornes": 24
+  },
+  "baader-200-862": {
+    "maquina": "BAADER 200",
+    "plano": "200.70.00.862",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ BAADER 200/DOCUMENTOS/Plano Electrico de BAADER 200.pdf",
+    "hojasTotales": 10,
+    "faltantes": [],
+    "seccionBornes": 8
   }
 }
