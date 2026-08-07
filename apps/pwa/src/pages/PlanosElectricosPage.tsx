@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
 import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
@@ -84,6 +85,12 @@ function Visor({ slug }: { slug: string }) {
   // "Resaltar todos": ilumina cada aparicion del aparato/senal seleccionado
   // en la hoja actual, para seguir un cable con la vista.
   const [resaltar, setResaltar] = useState(false)
+  const [mostrarQR, setMostrarQR] = useState(false)
+  // Ultimos aparatos consultados en este equipo (la falla de ayer sin re-buscar)
+  const [recientes, setRecientes] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`plano-recientes:${slug}`) ?? '[]') as string[] }
+    catch { return [] }
+  })
   // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
   // minimizable a una barrita (las esquinas curvas del telefono escondian el
   // contenido pegado al borde; ademas a veces solo quieres ver el plano).
@@ -140,13 +147,20 @@ function Visor({ slug }: { slug: string }) {
   const seleccionar = useCallback((nuevo: Seleccion) => {
     setMinimizada(false)
     setResaltar(false)
+    if (nuevo?.tipo === 'aparato') {
+      setRecientes((r) => {
+        const v = [nuevo.tag, ...r.filter((x) => x !== nuevo.tag)].slice(0, 6)
+        localStorage.setItem(`plano-recientes:${slug}`, JSON.stringify(v))
+        return v
+      })
+    }
     setSel((previo) => {
       if (previo && nuevo && previo !== nuevo && hoja) {
         setPilaSel((p) => [...p.slice(-14), { s: previo, h: hoja.blatt }])
       }
       return nuevo
     })
-  }, [hoja])
+  }, [hoja, slug])
 
   const volverSel = useCallback(() => {
     setPilaSel((p) => {
@@ -173,9 +187,35 @@ function Visor({ slug }: { slug: string }) {
     const puntos = indice.indice[ap]
     const enHojaPedida = puntos.find((pt) => pt.h === hoja.blatt)
     const destino = enHojaPedida ?? puntos[0]
-    setSel({ tipo: 'aparato', tag: ap })
+    seleccionar({ tipo: 'aparato', tag: ap })
     if (destino) void irA(destino.h, undefined, destino.b)
-  }, [indice, hoja, irA])
+  }, [indice, hoja, irA, seleccionar])
+
+  const imprimirHoja = useCallback(() => {
+    if (!hoja || !indice) return
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(
+      `<title>${indice.maquina} - ${indice.plano} - Hoja ${hoja.blatt}</title>`
+      + '<style>@page{size:A3 landscape;margin:8mm} body{margin:0} svg{width:100%;height:auto}'
+      + 'header{font:600 12px system-ui;padding:4px 0}</style>'
+      + `<header>${indice.maquina} · ${indice.plano} · Hoja ${hoja.blatt} / ${indice.hojasTotales}</header>`
+      + hoja.datos.svg,
+    )
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 400)
+  }, [hoja, indice])
+
+  const abrirAparato = useCallback((tag: string) => {
+    const puntos = indice?.indice[tag]
+    if (!puntos?.length) return
+    const enEsta = puntos.find((pt) => pt.h === hoja?.blatt)
+    const destino = enEsta ?? puntos[0]!
+    seleccionar({ tipo: 'aparato', tag })
+    setBusca('')
+    void irA(destino.h, undefined, destino.b)
+  }, [indice, hoja, seleccionar, irA])
 
   const volver = useCallback(() => {
     setHistorial((h) => {
@@ -201,6 +241,19 @@ function Visor({ slug }: { slug: string }) {
   }, [hoja, slug, sel])
 
   const notasDe = useCallback((tag: string) => notas.notasDe('aparato', tag).length, [notas])
+
+  // En que hojas hay conocimiento acumulado: una nota de F24 "vive" en cada
+  // hoja donde F24 aparece. Alimenta el badge ambar del indice lateral.
+  const notasPorHoja = useMemo(() => {
+    const m = new Map<number, number>()
+    if (!indice) return m
+    notas.notas.forEach((n) => {
+      if (n.ancla !== 'aparato') return
+      const hojasDel = new Set((indice.indice[n.anclaId] ?? []).map((pt) => pt.h))
+      hojasDel.forEach((h) => m.set(h, (m.get(h) ?? 0) + 1))
+    })
+    return m
+  }, [notas.notas, indice])
 
   // Teclado: ← → pasan hoja, "/" enfoca el buscador, Backspace deshace el salto.
   useEffect(() => {
@@ -230,6 +283,18 @@ function Visor({ slug }: { slug: string }) {
   const anterior = indice.hojas[i - 1]
   const siguiente = indice.hojas[i + 1]
   const resultados = buscar(busca, indice, hoja.blatt)
+  const vNota = busca.trim().toLowerCase()
+  if (vNota) {
+    notas.notas.forEach((n) => {
+      if (n.ancla !== 'aparato') return
+      if (!n.texto.toLowerCase().includes(vNota) && !n.anclaId.toLowerCase().includes(vNota)) return
+      const primera = indice.indice[n.anclaId]?.[0]
+      if (primera && resultados.length < 60) {
+        resultados.push({ clave: n.anclaId, detalle: `nota: ${n.texto.slice(0, 26)}…`,
+                          blatt: primera.h, caja: primera.b, aparato: n.anclaId })
+      }
+    })
+  }
   // En movil el panel es una hoja inferior: cerrada = plano completo.
   const abiertoMovil = sel !== null || !!busca.trim() || ayuda
 
@@ -269,6 +334,14 @@ function Visor({ slug }: { slug: string }) {
           ))}
         </div>
 
+        <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
+                className="hidden rounded p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
+          <Printer size={15} />
+        </button>
+        <button type="button" title="QR de este punto del plano" onClick={() => setMostrarQR(true)}
+                className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+          <QrCode size={15} />
+        </button>
         <div className="flex items-center gap-1 font-mono text-[12px]">
           <button type="button" disabled={!anterior} onClick={() => anterior && void irA(anterior.blatt)}
                   className="rounded p-1 disabled:opacity-30" title="Hoja anterior">
@@ -297,6 +370,26 @@ function Visor({ slug }: { slug: string }) {
         </div>
       </header>
 
+      {mostrarQR && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6"
+             onClick={() => setMostrarQR(false)}>
+          <div className="flex flex-col items-center gap-3 rounded-2xl p-5"
+               style={{ background: 'var(--lc-surface)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="rounded-lg bg-white p-3">
+              <QRCodeSVG value={window.location.href} size={208} />
+            </div>
+            <p className="m-0 max-w-[240px] text-center text-[11.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+              Este QR abre exactamente esta vista: hoja {hoja.blatt}
+              {sel?.tipo === 'aparato' ? ` con la ficha de ${sel.tag}` : ''}. Imprímelo y pégalo en el tablero.
+            </p>
+            <button type="button" onClick={() => setMostrarQR(false)}
+                    className="rounded-md border px-3 py-1.5 text-[12px]"
+                    style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         {/* índice de hojas */}
         <nav ref={navRef} className="hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2 md:block"
@@ -331,6 +424,13 @@ function Visor({ slug }: { slug: string }) {
                               style={{ color: activa ? 'var(--lc-ink)' : 'var(--lc-ink-mid)' }}>
                           {limpiarTitulo(mostrarEs ? h.tituloEs : h.titulo)}
                         </span>
+                        {(notasPorHoja.get(h.blatt) ?? 0) > 0 && (
+                          <span title={`${notasPorHoja.get(h.blatt)} nota(s) de aparatos de esta hoja`}
+                                className="shrink-0 rounded-full px-1.5 font-mono text-[9.5px]"
+                                style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
+                            {notasPorHoja.get(h.blatt)}
+                          </span>
+                        )}
                       </button>
                     )
                   })}
@@ -430,6 +530,7 @@ function Visor({ slug }: { slug: string }) {
                   void irA(b, c, caja)
                 }} />
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA}
+                     recientes={recientes} onAbrirAparato={abrirAparato}
                      resaltar={resaltar} onResaltar={() => setResaltar((v) => !v)}
                      enEstaHoja={sel?.tipo === 'aparato' ? hoja.datos.tags.filter((t) => t.t === sel.tag).length : 0} />}
           </>}
@@ -441,12 +542,14 @@ function Visor({ slug }: { slug: string }) {
 
 /* ────────────────────────────── panel ────────────────────────────── */
 
-function Panel({ sel, indice, hojaActual, notas, onIr, resaltar, onResaltar, enEstaHoja }: {
+function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, resaltar, onResaltar, enEstaHoja }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
   hojaActual: number
   notas: ReturnType<typeof usePlanoNotas>
   onIr: (b: number, c?: number, caja?: Caja) => void
+  recientes: string[]
+  onAbrirAparato: (tag: string) => void
   resaltar: boolean
   onResaltar: () => void
   enEstaHoja: number
@@ -466,6 +569,23 @@ function Panel({ sel, indice, hojaActual, notas, onIr, resaltar, onResaltar, enE
           <br />
           <b style={{ color: 'var(--lc-prep)' }}>Ámbar</b> — rótulo en otro idioma con su traducción.
         </p>
+        {recientes.length > 0 && (
+          <>
+            <h2 className="m-0 mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--lc-ink-ghost)' }}>
+              Recientes
+            </h2>
+            <div className="flex flex-wrap gap-1.5">
+              {recientes.map((t) => (
+                <button key={t} type="button" onClick={() => onAbrirAparato(t)}
+                        className="rounded border px-2 py-1 font-mono text-[11.5px]"
+                        style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </>
     )
   }
