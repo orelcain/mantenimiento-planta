@@ -67,6 +67,9 @@ function Catalogo() {
 
 function Visor({ slug }: { slug: string }) {
   const cat = planoPorSlug(slug)
+  // Modo visor (GEA): sin texto extraible -> sin zonas ni buscador ni DE/ES;
+  // lo que SI hay es navegacion completa y notas con fotos POR HOJA.
+  const esVisor = cat?.modo === 'visor'
   // Hoja inicial: la de la URL (?hoja=9, para compartir un punto del plano por
   // chat) o la última visitada en este equipo; usePlano valida contra el índice.
   const [inicial] = useState<number | undefined>(() => {
@@ -314,7 +317,7 @@ function Visor({ slug }: { slug: string }) {
           </span>
         </Link>
 
-        <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
+        <div className={`${esVisor ? 'hidden' : ''} order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm`}>
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
                  placeholder="Buscar K7, Q1, B12, Messer, cuchillo…"
@@ -322,7 +325,7 @@ function Visor({ slug }: { slug: string }) {
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
 
-        <div className="flex overflow-hidden rounded-lg border" style={{ borderColor: 'var(--lc-border)' }}>
+        <div className={`${esVisor ? 'hidden' : 'flex'} overflow-hidden rounded-lg border`} style={{ borderColor: 'var(--lc-border)' }}>
           {([['DE', false], ['ES', true]] as const).map(([txt, v]) => (
             <button key={txt} type="button" onClick={() => setMostrarEs(v)} aria-pressed={mostrarEs === v}
                     className="px-3 py-1.5 text-[12px] font-semibold"
@@ -520,7 +523,24 @@ function Visor({ slug }: { slug: string }) {
               <ChevronLeft size={13} /> Volver a {etiquetaSel(pilaSel[pilaSel.length - 1]!.s)}
             </button>
           )}
-          {busca.trim()
+          {esVisor
+            ? <>
+                <Titulo>Notas de la hoja {hoja.blatt}</Titulo>
+                <p className="m-0 mb-2 text-[11.5px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+                  Este plano viene sin texto seleccionable (modo visor): navega con el
+                  índice y deja acá lo que conviene saber de esta hoja — fotos incluidas.
+                </p>
+                {notas.error && (
+                  <p className="m-0 mb-2 text-[11.5px]" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
+                )}
+                <NotasAparato
+                  anclaId={`hoja ${hoja.blatt}`}
+                  notas={notas.notasDe('hoja', String(hoja.blatt))}
+                  onCrear={(n) => notas.crear({ ancla: 'hoja', anclaId: String(hoja.blatt), ...n })}
+                  onBorrar={notas.borrar}
+                />
+              </>
+            : busca.trim()
             ? <Resultados items={resultados}
                 onIr={(b, c, caja, aparato) => {
                   if (aparato) seleccionar({ tipo: 'aparato', tag: aparato })
