@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Search, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, X, Zap } from 'lucide-react'
 import { PLANOS, planoPorSlug } from '@/data/planos'
 import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
@@ -81,6 +81,14 @@ function Visor({ slug }: { slug: string }) {
   const [mostrarEs, setMostrarEs] = useState(false)
   const [busca, setBusca] = useState('')
   const [ayuda, setAyuda] = useState(false)
+  // La hoja inferior movil: altura ajustable arrastrando la agarradera, y
+  // minimizable a una barrita (las esquinas curvas del telefono escondian el
+  // contenido pegado al borde; ademas a veces solo quieres ver el plano).
+  const [altoHoja, setAltoHoja] = useState<number | null>(null)
+  const [minimizada, setMinimizada] = useState(false)
+  const [esMovil] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  const ajuste = useRef<{ y: number; alto: number } | null>(null)
+  const asideRef = useRef<HTMLElement>(null)
   // Miga de pan: tras seguir 2-3 saltos hay que poder deshacer el camino.
   const [historial, setHistorial] = useState<number[]>([])
   // Y lo mismo para el PANEL: al tocar un borne desde la ficha del SM4 se
@@ -107,6 +115,7 @@ function Visor({ slug }: { slug: string }) {
   )
 
   const seleccionar = useCallback((nuevo: Seleccion) => {
+    setMinimizada(false)
     setSel((previo) => {
       if (previo && nuevo && previo !== nuevo && hoja) {
         setPilaSel((p) => [...p.slice(-14), { s: previo, h: hoja.blatt }])
@@ -301,18 +310,51 @@ function Visor({ slug }: { slug: string }) {
         </main>
 
         <aside
-          className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-0 bottom-0 z-50 max-h-[55dvh] overflow-y-auto rounded-t-2xl border-t p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-l md:border-t-0 md:pb-3 md:shadow-none`}
-          style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-          {/* agarradera + cerrar, solo en la hoja movil */}
-          <div className="relative mb-2 md:hidden">
-            <div className="mx-auto h-1 w-10 rounded-full" style={{ background: 'var(--lc-border)' }} />
+          ref={asideRef}
+          className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-2 bottom-3 z-50 max-h-[55dvh] overflow-y-auto rounded-2xl border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-0 md:border-l md:pb-3 md:shadow-none`}
+          style={{
+            background: 'var(--lc-surface)', borderColor: 'var(--lc-border)',
+            ...(esMovil && minimizada ? { height: 52, overflowY: 'hidden' as const } : {}),
+            ...(esMovil && !minimizada && altoHoja ? { height: altoHoja, maxHeight: '82dvh' } : {}),
+          }}>
+          {/* agarradera (arrastra para ajustar la altura) + minimizar + cerrar */}
+          <div
+            className="relative mb-2 -mt-1 cursor-ns-resize touch-none pt-1 md:hidden"
+            onPointerDown={(e) => {
+              ajuste.current = { y: e.clientY, alto: asideRef.current?.getBoundingClientRect().height ?? 300 }
+              ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              const a = ajuste.current
+              if (!a) return
+              const alto = Math.min(a.alto + (a.y - e.clientY), window.innerHeight * 0.82)
+              if (alto < 110) { setMinimizada(true); setAltoHoja(null) }
+              else { setMinimizada(false); setAltoHoja(Math.max(alto, 140)) }
+            }}
+            onPointerUp={() => { ajuste.current = null }}
+          >
+            <div className="mx-auto h-1 w-12 rounded-full" style={{ background: 'var(--lc-border)' }} />
+            <button type="button" aria-label={minimizada ? 'Expandir panel' : 'Minimizar panel'}
+                    onClick={() => { setMinimizada((m) => !m) }}
+                    className="absolute -top-1 right-8 rounded p-1.5"
+                    style={{ color: 'var(--lc-ink-mid)' }}>
+              {minimizada ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
             <button type="button" aria-label="Cerrar panel"
-                    onClick={() => { setSel(null); setBusca(''); setAyuda(false) }}
+                    onClick={() => { setSel(null); setBusca(''); setAyuda(false); setMinimizada(false); setAltoHoja(null) }}
                     className="absolute -top-1 right-0 rounded p-1.5"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               <X size={16} />
             </button>
           </div>
+          {esMovil && minimizada && (
+            <button type="button" onClick={() => setMinimizada(false)}
+                    className="flex w-full items-center gap-2 px-1 text-left text-[12.5px] font-semibold"
+                    style={{ color: 'var(--lc-ink)' }}>
+              {sel ? etiquetaSel(sel) : busca.trim() ? `Resultados de “${busca.trim()}”` : 'Panel'}
+            </button>
+          )}
+          {!(esMovil && minimizada) && <>
           {!busca.trim() && pilaSel.length > 0 && (
             <button type="button" onClick={volverSel}
                     className="mb-2 flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11.5px]"
@@ -330,6 +372,7 @@ function Visor({ slug }: { slug: string }) {
                   void irA(b, c, caja)
                 }} />
             : <Panel sel={sel} indice={indice} hojaActual={hoja.blatt} notas={notas} onIr={irA} />}
+          </>}
         </aside>
       </div>
     </div>
