@@ -13,10 +13,13 @@
  *    Este es el aporte cuantificable del módulo: la tendencia muestra el desgaste
  *    que el kit corrige en silencio, para intervenir ANTES de la parada.
  *
- * El embed no necesita sesión (no escribe nada); la persistencia vive en esta
- * página React, que sí hereda la sesión de Firebase.
+ * El iframe NO hereda la sesión de Firebase (storage particionado), así que esta
+ * página actúa de PUENTE: la herramienta pide por postMessage listar/crear/editar/
+ * borrar notas de figura y subir sus fotos, y acá se ejecuta contra Firestore y
+ * Storage — mismo patrón que PlanosAguasPage. También se le manda el tema
+ * (claro/oscuro) para que no sea una isla clara dentro de la app en oscuro.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, CircleGauge, LineChart as LineChartIcon, Loader2, RotateCcw, Save,
@@ -46,6 +49,15 @@ import {
   type LecturaProtocolo,
   type MaquinaBaader,
 } from '@/services/baader142/perilla5Protocolo'
+import {
+  borrarNota,
+  crearNota,
+  editarNota,
+  listarNotas,
+  pathDeFoto,
+  subirFoto,
+  type NotaFigura,
+} from '@/services/baader142/perilla5Notas'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
@@ -96,6 +108,101 @@ const FORM_VACIO: Record<keyof ContadoresProtocolo, string> = Object.fromEntries
 export function Perilla5Page() {
   const [searchParams, setSearchParams] = useSearchParams()
   const vista: Vista = searchParams.get('vista') === 'protocolo' ? 'protocolo' : 'herramienta'
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { isDark } = useTheme()
+  const { user } = useAuthStore()
+
+  /* ---------- PUENTE con la herramienta embebida ----------
+   * El iframe no tiene sesión de Firebase, así que nos pide a nosotros cada
+   * operación sobre las notas y nosotros la ejecutamos. Todo mensaje se valida
+   * por origen y por fuente antes de tocar nada. */
+  useEffect(() => {
+    const ORIGIN = window.location.origin
+    const post = (msg: Record<string, unknown>) => {
+      iframeRef.current?.contentWindow?.postMessage({ __p5: true, ...msg }, ORIGIN)
+    }
+
+    const enviarNotas = async () => {
+      const notas = await listarNotas()
+      post({ type: 'notas', notas, uid: user?.id ?? null, autor: user?.nombre ?? null })
+    }
+
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== ORIGIN) return
+      if (e.source !== iframeRef.current?.contentWindow) return
+      const m = e.data as Record<string, unknown>
+      if (!m || m.__p5 !== true) return
+      const reqId = m.reqId
+
+      if (m.type === 'hello') {
+        post({ type: 'tema', dark: isDark })
+        void enviarNotas()
+        return
+      }
+      if (!user?.id) {
+        // Sin sesión la herramienta funciona igual, pero no puede compartir notas.
+        post({ type: 'result', ok: false, code: 'sin-sesion', reqId })
+        return
+      }
+
+      if (m.type === 'nota-crear') {
+        const n = (m.nota ?? {}) as Partial<NotaFigura> & { fotoData?: string }
+        ;(async () => {
+          let fotoUrl: string | undefined
+          let fotoPath: string | undefined
+          if (n.fotoData && typeof n.fotoData === 'string' && n.fotoData.startsWith('data:image/')) {
+            fotoPath = pathDeFoto(String(n.figura ?? 'fig'), user.id)
+            fotoUrl = await subirFoto(n.fotoData, fotoPath)
+          }
+          await crearNota({
+            plantId: 'chonchi',
+            figura: String(n.figura ?? ''),
+            tipo: (n.tipo as NotaFigura['tipo']) ?? 'nota',
+            x: Number(n.x ?? 0),
+            y: Number(n.y ?? 0),
+            ...(n.texto ? { texto: String(n.texto).slice(0, 600) } : {}),
+            ...(fotoUrl ? { fotoUrl, fotoPath } : {}),
+            creadoPor: user.id,
+            ...(user.nombre ? { creadoPorNombre: user.nombre } : {}),
+          })
+          await enviarNotas()
+          post({ type: 'result', ok: true, reqId })
+        })().catch((err) =>
+          post({ type: 'result', ok: false, code: (err as { code?: string })?.code ?? 'error', reqId }),
+        )
+      } else if (m.type === 'nota-editar' && typeof m.id === 'string') {
+        editarNota(m.id, {
+          tipo: (m.tipo as NotaFigura['tipo']) ?? 'nota',
+          texto: typeof m.texto === 'string' ? m.texto.slice(0, 600) : '',
+        })
+          .then(enviarNotas)
+          .then(() => post({ type: 'result', ok: true, reqId }))
+          .catch((err) =>
+            post({ type: 'result', ok: false, code: (err as { code?: string })?.code ?? 'error', reqId }),
+          )
+      } else if (m.type === 'nota-borrar' && typeof m.id === 'string') {
+        borrarNota(m.id, typeof m.fotoPath === 'string' ? m.fotoPath : undefined)
+          .then(enviarNotas)
+          .then(() => post({ type: 'result', ok: true, reqId }))
+          .catch((err) =>
+            post({ type: 'result', ok: false, code: (err as { code?: string })?.code ?? 'error', reqId }),
+          )
+      } else if (m.type === 'notas-refrescar') {
+        void enviarNotas()
+      }
+    }
+
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [user?.id, user?.nombre, isDark])
+
+  // El tema puede cambiar con la herramienta ya abierta.
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { __p5: true, type: 'tema', dark: isDark },
+      window.location.origin,
+    )
+  }, [isDark])
 
   const setVista = useCallback(
     (v: Vista) => {
@@ -108,20 +215,32 @@ export function Perilla5Page() {
   )
 
   // El embed recibe los deep-links del modo práctica tal cual (?t=px&q=825).
+  // `embed=1` le dice que oculte su propia cabecera (esta página ya pone el
+  // título) y `theme` evita el parpadeo claro antes del primer postMessage.
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
-    const params = new URLSearchParams({ v })
+    const params = new URLSearchParams({ v, embed: '1' })
     const t = searchParams.get('t')
     const q = searchParams.get('q')
     if (t) params.set('t', t)
     if (q) params.set('q', q)
+    params.set('theme', isDark ? 'dark' : 'light')
     return `${basePath}perilla5-baader142-embed.html?${params.toString()}`
+    // El tema inicial se fija al montar; los cambios posteriores van por postMessage
+    // (recargar el iframe perdería el zoom y la figura abierta).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   return (
     <div className="min-h-screen" style={{ background: LC.bg, color: LC.ink }}>
-      <div className="mx-auto max-w-5xl px-4 py-5">
+      {/* La herramienta es una superficie de lectura densa (tablas, figuras,
+          buscador): encajonarla en max-w-5xl la hacía ver postiza en el monitor
+          del taller. La vista de protocolo sí se queda angosta, que es un
+          formulario. */}
+      <div
+        className={`mx-auto px-4 py-5 ${vista === 'herramienta' ? 'max-w-[1400px]' : 'max-w-5xl'}`}
+      >
         <Link
           to="/aprendizaje"
           className="inline-flex items-center gap-1.5 text-sm"
@@ -185,10 +304,17 @@ export function Perilla5Page() {
                 iframe, así que su "pantalla completa" es este alto: en el teléfono
                 se le da todo lo que sobra para que el dibujo se vea grande. */}
             <iframe
+              ref={iframeRef}
               src={iframeSrc}
               title="Herramienta Perilla 5 · Diagnóstico BAADER 142"
-              className="block h-[calc(100dvh-150px)] min-h-[520px] w-full sm:h-[calc(100dvh-230px)]"
-              style={{ background: '#EFF1F3' }}
+              className="block h-[calc(100dvh-150px)] min-h-[520px] w-full sm:h-[calc(100dvh-200px)]"
+              style={{ background: isDark ? '#0D1722' : '#EFF1F3' }}
+              onLoad={() => {
+                iframeRef.current?.contentWindow?.postMessage(
+                  { __p5: true, type: 'tema', dark: isDark },
+                  window.location.origin,
+                )
+              }}
             />
           </div>
         ) : (

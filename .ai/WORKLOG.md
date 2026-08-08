@@ -13,6 +13,51 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-08 - claude - Perilla 5: notas compartidas, tema claro/oscuro y menos cascarón
+
+Segunda tanda de feedback de Orel sobre el módulo.
+
+- **Notas compartidas (era el pedido principal)**: hasta ahora vivían en el localStorage de
+  cada teléfono, así que lo que anotaba un técnico no lo veía el del turno siguiente. Ahora
+  van a **`baader142Notas`** vía PUENTE postMessage (el iframe no hereda la sesión de Firebase
+  — mismo patrón que `PlanosAguasPage`). **La foto NO va en el documento**: se sube a Storage
+  (`baader142Notas/{figura}/`) y en Firestore queda su URL, porque con la imagen en base64
+  traer las notas de todas las figuras costaría decenas de MB; así cada doc pesa ~½ KB.
+  Contenido vivo, no evidencia: cada uno edita y borra lo suyo, los admin cualquiera
+  (regla como `planoNotas`, no como `variadoresCambios`). Abierto suelto desde OneDrive sigue
+  usando localStorage + export/import, y el menú dice en cuál de los dos modos está.
+- **Tema claro/oscuro**: el embed era una isla clara dentro de la app en oscuro. Se tokenizaron
+  los ~26 colores fijos que quedaban (`--flag-*`, `--row-alt`, `--field`, `--map-*`…) y se agregó
+  `:root[data-theme="dark"]` alineado con los tokens `--lc-*` del Centro de Aprendizaje. El tema
+  entra por `?theme=` al montar (evita el parpadeo) y después por postMessage, porque recargar
+  el iframe perdería el zoom y la figura abierta. **Las figuras conservan fondo blanco a
+  propósito**: un dibujo técnico en negativo no se lee.
+- **Cabecera**: ocupaba ~200 px con un título gigante y un párrafo de tres líneas, y dentro de la
+  PWA además repetía el título que ya pone la página. Ahora es **una sola línea**, y embebida se
+  oculta entera (`body.embed`).
+- **"Mapa" → "Piezas"**, y su SVG de 660 px fijos (scroll horizontal obligado en el teléfono, y lo
+  que Orel señaló como "metido a la fuerza") se rehízo como **tarjetas responsivas**: columna en
+  móvil, grilla en pantalla ancha. Se conserva lo que valía —el orden de las estaciones y el
+  "se revisa de la primera a la última"— y se gana legibilidad.
+- **Ancho en PC**: la herramienta pasa de `max-w-5xl` a `max-w-[1400px]` y el `.wrap` del embed de
+  820 a 1180 px. La vista de protocolo se queda angosta: es un formulario.
+- **"Vacío" NO se quita** (Orel preguntó): es la causa raíz de "esófago demasiado largo" y
+  "vísceras mal chupadas", que son los defectos de corte que más reporta el operador. Sin esa
+  sección el técnico busca en el motor lo que está en el ciclón. Es §21 del manual, verificable.
+- ⚠ **Bug de encoding que casi se publica**: ensamblar `part5.html` con
+  `Get-Content | Set-Content -Encoding UTF8` en PowerShell 5.1 dejó BOM + **284 caracteres en
+  mojibake** (`alcanzÃ³`, `SOLUCIÃ³N`) — visible en pantalla, invisible para tsc/eslint/tests.
+  Reparado línea a línea (el archivo había quedado mixto: lo ensamblado roto, lo editado después
+  sano). **Regla para el futuro: ensamblar SIEMPRE con Python `io.open(encoding='utf-8')`,
+  nunca con `Get-Content | Set-Content`.**
+- Verificación: tsc 0 · eslint 0 · **1038 tests verdes** · en 402×874 y en 1325 px de ancho:
+  tema claro y oscuro, cabecera oculta al embeber, tarjetas de estaciones sin scroll horizontal,
+  **paneo probado con arrastre sintético** (se mueve y frena en el borde: tras arrastrar 1500 px
+  el clamp deja `tx=0`), y el flujo de nota **sin sesión** avisa y no pierde lo escrito.
+- **NO verificado**: guardar/editar/borrar una nota CON sesión — necesita el login de Orel y la
+  regla desplegada. Probar con una nota de prueba tras el merge.
+- Estado: EN REVISIÓN — PR abierto. Rama `claude/perilla5-notas-compartidas`.
+
 ## 2026-08-08 - claude - Perilla 5: figuras anotables, zoom real y ajuste a iPhone
 
 Feedback de Orel sobre el módulo recién desplegado: figuras repetidas, faltaba zoom/paneo,
