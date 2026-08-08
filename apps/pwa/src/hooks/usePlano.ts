@@ -1,6 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { assetPlano } from '@/data/planos'
 
+const CACHE_PLANOS = 'planos-offline-v1'
+
+/** Red primero; si no hay señal, lo guardado con "Disponible sin señal". */
+async function fetchConCache(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    const r = await fetch(url, init)
+    if (r.ok) return r
+    throw new Error(String(r.status))
+  } catch (e) {
+    const c = await caches.open(CACHE_PLANOS).then((c) => c.match(url)).catch(() => undefined)
+    if (c) return c
+    throw e
+  }
+}
+
+/** Descarga todas las hojas de un plano a la cache local del navegador. */
+export async function guardarPlanoOffline(
+  slug: string,
+  hojas: number[],
+  onAvance: (hechas: number, total: number) => void,
+): Promise<void> {
+  const cache = await caches.open(CACHE_PLANOS)
+  const urls = [assetPlano(slug, 'indice.json')]
+  hojas.forEach((b) => {
+    const nn = String(b).padStart(2, '0')
+    urls.push(assetPlano(slug, `hoja-${nn}.svg`), assetPlano(slug, `hoja-${nn}.json`))
+  })
+  let hechas = 0
+  for (const url of urls) {
+    const r = await fetch(url)
+    if (r.ok) await cache.put(url, r)
+    hechas++
+    onAvance(hechas, urls.length)
+  }
+}
+
 /** Caja de un texto del plano: [x, y, ancho, alto] en coordenadas de la hoja. */
 export type Caja = [number, number, number, number]
 
@@ -74,7 +110,7 @@ export function usePlano(slug: string | undefined, inicial?: number) {
     // El indice CAMBIA (titulos OCR, capas nuevas) y los planos en Storage se
     // subieron primero con cache de 24 h: revalidar siempre (ETag barato).
     // Las hojas SVG son inmutables y siguen con la cache normal.
-    fetch(assetPlano(slug, 'indice.json'), { cache: 'no-cache' })
+    fetchConCache(assetPlano(slug, 'indice.json'), { cache: 'no-cache' })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -97,8 +133,8 @@ export function usePlano(slug: string | undefined, inicial?: number) {
       if (yaEsta) return yaEsta
       const nn = String(blatt).padStart(2, '0')
       const [svg, zonas] = await Promise.all([
-        fetch(assetPlano(slug, `hoja-${nn}.svg`)).then((r) => (r.ok ? r.text() : Promise.reject(r.status))),
-        fetch(assetPlano(slug, `hoja-${nn}.json`)).then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
+        fetchConCache(assetPlano(slug, `hoja-${nn}.svg`)).then((r) => r.text()),
+        fetchConCache(assetPlano(slug, `hoja-${nn}.json`)).then((r) => r.json()),
       ])
       // Defaults ANTES del spread: un hoja-NN.json viejo en la caché HTTP del
       // navegador (de un deploy anterior, sin `bornes` o `libres`) reventaba

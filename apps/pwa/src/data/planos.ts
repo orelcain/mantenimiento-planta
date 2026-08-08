@@ -136,6 +136,19 @@ export const PLANOS: PlanoCatalogo[] = [
       'Diagrama neumatico oficial en espanol, con texto real: el buscador encuentra ' +
       'valvulas, cilindros y bombas por nombre.',
   },
+  {
+    slug: 'baader-200-508',
+    maquina: 'BAADER 200 · plano de planta',
+    numero: 'AquaChile 508',
+    revision: '—',
+    aplicaA: 'La B200 de ESTA planta: plano dibujado en AquaChile, con los reles reales',
+    hojas: 18,
+    faltantes: [],
+    idioma: 'es',
+    descripcion:
+      'El as-built local en espanol: listas de reles (-RL33 POSICION ZERO...), ' +
+      'tableros y partidas tal como estan cableados aca. Busqueda por texto completo.',
+  },
 ]
 
 export function planoPorSlug(slug: string | undefined) {
