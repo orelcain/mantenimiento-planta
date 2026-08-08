@@ -55,7 +55,14 @@ from glosario_142 import PALABRAS, FRASES, IGNORAR, COLORES  # noqa: E402
 # quedaron como „ ” ‚ y la ß como á (y la ü directamente se perdio). Se
 # transliteran los recuperables; las palabras con ü perdida van al glosario
 # en su forma mutilada.
-TRANSLIT = str.maketrans({"\u201e": "ä", "\u201d": "ö", "\u201a": "é", "á": "ß", "\u00cf": " "})
+# La u-dieresis NO se perdio: es el byte CP850 0x81, invisible en consola
+# ("Ersatz fr:" parecia "Ersatz fr:"). Idem 0x8E=A., 0x9A=U., 0x99=O.
+TRANSLIT = str.maketrans({
+    "„": "ä", "”": "ö", "‚": "é",
+    "á": "ß", "Ï": " ",
+    "": "ü", "": "Ä", "": "Ü",
+    "": "Ö", "": "ä", "": "ö",
+})
 
 
 def normalizar(t):
@@ -215,6 +222,7 @@ def main():
 
     # --- pasada 2: una hoja a la vez
     hojas, sin_traducir, busqueda = [], collections.Counter(), []
+    lineas_saltadas = collections.Counter()
     bornes_por_hoja, terms_por_hoja = {}, {}
     for i in range(doc.page_count):
         pg, blatt = doc[i], blatt_de_pagina(i, doc.page_count)
@@ -349,7 +357,7 @@ def main():
                     busqueda.append({"de": t, "es": t, "h": blatt,
                                      "b": [round(x0, 1), round(y0, 1),
                                            round(x1 - x0, 1), round(y1 - y0, 1)]})
-        terms = deduplicar(rotulos(pg, sin_traducir))
+        terms = deduplicar(rotulos(pg, sin_traducir, lineas_saltadas))
         terms_por_hoja[blatt] = terms
         with open(os.path.join(DEST, f"hoja-{blatt:02d}.json"), "w", encoding="utf-8") as f:
             json.dump({"xrefs": xrefs, "tags": tags, "terms": terms, "bornes": brs, "libres": libres}, f, ensure_ascii=False)
@@ -384,7 +392,7 @@ def main():
                    "descs": construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja),
                    "busqueda": busqueda, "glosario": PALABRAS}, f, ensure_ascii=False)
 
-    resumen(DEST, hojas, indice, sin_traducir)
+    resumen(DEST, hojas, indice, sin_traducir, lineas_saltadas)
 
 
 def construir_descripciones(indice, hojas, bornes_por_hoja, terms_por_hoja):
@@ -454,7 +462,7 @@ def columna_de(x, cols):
     return int(min(cols, key=lambda c: abs(cols[c] - x)))
 
 
-def rotulos(pg, sin_traducir):
+def rotulos(pg, sin_traducir, lineas_saltadas=None):
     """Rotulos alemanes traducidos POR LINEA del dibujo.
 
     Palabra por palabra no sirve: el castellano es mas largo y las cajas se
@@ -490,9 +498,12 @@ def rotulos(pg, sin_traducir):
                                if not re.search(r"\d", p)
                                and not re.match(r"^[IVX]{1,4}$", p)
                                and len(p.strip(".,:;()")) > 2
+                               and not re.match(r"^-+$", p)
                                and p.strip(".,:;()") not in IGNORAR]
                 hechas = sum(1 for p in sustantivas if en_glosario(p))
                 if sustantivas and hechas / len(sustantivas) < 0.6:
+                    if lineas_saltadas is not None:
+                        lineas_saltadas[frase[:64]] += 1
                     for p in pals:
                         if re.match(r"^[A-Za-zÀ-ÿ\-]{4,}$", p) and p not in IGNORAR                                 and p.strip(".,:;()") not in PALABRAS:
                             sin_traducir[p] += 1
@@ -541,7 +552,7 @@ def titulos(pg, terms):
             "tituloEs": es or "Continuacion del esquema"}
 
 
-def resumen(dest, hojas, indice, sin_traducir):
+def resumen(dest, hojas, indice, sin_traducir, lineas_saltadas=None):
     peso = sum(os.path.getsize(os.path.join(dest, f)) for f in os.listdir(dest))
     trad = sum(h["n"]["d"] for h in hojas)
     print(f"OK  {len(hojas)} hojas -> {dest}")
@@ -549,6 +560,12 @@ def resumen(dest, hojas, indice, sin_traducir):
     print(f"    {sum(h['n']['x'] for h in hojas)} saltos entre hojas")
     print(f"    {len(indice)} aparatos en el indice")
     print(f"    {trad} rotulos traducidos")
+    if lineas_saltadas:
+        saltos_tot = sum(lineas_saltadas.values())
+        cobertura = trad / (trad + saltos_tot) * 100 if trad + saltos_tot else 100
+        print(f"    COBERTURA: {cobertura:.0f}% ({saltos_tot} lineas quedaron en su idioma)")
+        for t, n in lineas_saltadas.most_common(40):
+            print(f"      {n:3d}x  {t}")
     if sin_traducir:
         print(f"\n    {len(sin_traducir)} terminos alemanes AUN SIN traducir "
               f"(los 25 mas frecuentes):")

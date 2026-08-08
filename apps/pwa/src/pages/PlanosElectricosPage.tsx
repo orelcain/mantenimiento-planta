@@ -84,7 +84,11 @@ function Visor({ slug }: { slug: string }) {
   const notas = usePlanoNotas(slug)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
-  const [mostrarEs, setMostrarEs] = useState(false)
+  // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
+  // cotejar con el original. La eleccion se recuerda por equipo.
+  const [mostrarEs, setMostrarEs] = useState(
+    () => (localStorage.getItem('plano-idioma') ?? 'es') === 'es',
+  )
   const [busca, setBusca] = useState('')
   const [ayuda, setAyuda] = useState(false)
   // "Resaltar todos": ilumina cada aparicion del aparato/senal seleccionado
@@ -329,7 +333,9 @@ function Visor({ slug }: { slug: string }) {
 
         <div className={`${sinIdiomas ? 'hidden' : 'flex'} overflow-hidden rounded-lg border`} style={{ borderColor: 'var(--lc-border)' }}>
           {([['DE', false], ['ES', true]] as const).map(([txt, v]) => (
-            <button key={txt} type="button" onClick={() => setMostrarEs(v)} aria-pressed={mostrarEs === v}
+            <button key={txt} type="button"
+                    onClick={() => { setMostrarEs(v); localStorage.setItem('plano-idioma', v ? 'es' : 'de') }}
+                    aria-pressed={mostrarEs === v}
                     className="px-3 py-1.5 text-[12px] font-semibold"
                     style={mostrarEs === v
                       ? { background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }
