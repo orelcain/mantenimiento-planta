@@ -117,11 +117,14 @@ export async function lecturasDeMaquina(
   max = 60,
 ): Promise<LecturaProtocolo[]> {
   try {
+    // createdAt desempata las lecturas del mismo día (semanal + pre-reset es el
+    // caso esperado); sin él, el orden dentro del día quedaría al azar del docId.
     const q = query(
       collection(db, PROTOCOLO_COLLECTION),
       where('plantId', '==', plantId),
       where('maquina', '==', maquina),
       orderBy('fecha', 'desc'),
+      orderBy('createdAt', 'desc'),
       limit(max),
     )
     const snap = await getDocs(q)

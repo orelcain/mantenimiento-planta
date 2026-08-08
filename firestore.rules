@@ -556,7 +556,7 @@ service cloud.firestore {
         // El denominador de todas las tasas: sin pescados no hay lectura util.
         && request.resource.data.fish is int
         && request.resource.data.fish > 0
-        && request.resource.data.fish <= 10000000
+        && request.resource.data.fish <= 1000000
         // Los otros 16 contadores: enteros no negativos acotados.
         && request.resource.data.stops is int && request.resource.data.stops >= 0 && request.resource.data.stops <= 1000000
         && request.resource.data.stopc is int && request.resource.data.stopc >= 0 && request.resource.data.stopc <= 1000000

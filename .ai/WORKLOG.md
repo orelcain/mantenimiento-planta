@@ -45,7 +45,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Gotcha de verificación que costó 10 min: un service worker viejo de otra sesión en :5174 servía
   un bundle sin la ruta nueva → redirect a /login. Desregistrar SW + borrar caches antes de
   verificar en un puerto reciclado.
-- Estado: EN REVISIÓN — PR abierto. Rama `claude/perilla5-baader142` (worktree wt-perilla5).
+- **Revisión cruzada** (subagente, protocolo de equipo): 5 hallazgos reales, todos corregidos en el
+  2º commit — (1) staleness guard al cambiar de máquina (la respuesta lenta de N1 pisaba la lista
+  de N2); (2) fecha por defecto LOCAL, no UTC (a las 20:00 de Chile el default caía en mañana —
+  justo la ventana "fin de turno" del caso de uso); (3) orderBy secundario `createdAt` + índice
+  de 4 campos (semanal + pre-reset el mismo día es el caso esperado); (4) tope de `fish` bajado a
+  1M para calzar con los contadores (una lectura legítima con fish>2,7M era rechazada); (5) los
+  mensajes guardado/error se limpian al cambiar de máquina.
+- Estado: EN REVISIÓN — PR #402 abierto, CI build verde. Rama `claude/perilla5-baader142` (worktree wt-perilla5).
 - Sigue: OK de Orel a la regla; tras merge+deploy: guardar 1 lectura real de prueba, después las
   base del 08-08; pedir a Danilo los datos pendientes del handoff (SM1/SM2 en pos.5, código del
   excavador A de la N1, test de persistencia de contadores, kit de N2/N3).

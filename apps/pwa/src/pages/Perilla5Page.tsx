@@ -203,7 +203,12 @@ function VistaProtocolo() {
   const { isDark } = useTheme()
 
   const [maquina, setMaquina] = useState<MaquinaBaader>('baader-n1')
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10))
+  // Fecha LOCAL (no toISOString/UTC): la lectura semanal se hace al fin del turno
+  // de la tarde, justo la ventana en que la fecha UTC ya saltó al día siguiente.
+  const [fecha, setFecha] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
   const [form, setForm] = useState<Record<keyof ContadoresProtocolo, string>>({ ...FORM_VACIO })
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -220,9 +225,23 @@ function VistaProtocolo() {
     setCargando(false)
   }, [maquina])
 
+  // Guard de staleness: si el usuario cambia de máquina con una carga lenta en
+  // vuelo, la respuesta vieja no debe pisar la lista de la máquina nueva.
   useEffect(() => {
-    void cargar()
-  }, [cargar])
+    let vivo = true
+    setCargando(true)
+    void lecturasDeMaquina(maquina).then((rows) => {
+      if (!vivo) return
+      setLecturas(rows)
+      setCargando(false)
+    })
+    // Los mensajes de la máquina anterior no aplican a la nueva.
+    setError(null)
+    setGuardadoOk(false)
+    return () => {
+      vivo = false
+    }
+  }, [maquina])
 
   const num = (k: keyof ContadoresProtocolo): number => {
     const v = Number.parseInt(form[k], 10)
