@@ -580,6 +580,21 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Consultas al modulo de planos (telemetria para KPIs de uso: cuantas
+    // veces se consulta cada plano/aparato). Solo se CREA; nadie edita.
+    match /planoUsos/{usoId} {
+      allow read: if isSupervisor();
+      allow create: if isActiveUser()
+        && request.resource.data.plantId is string
+        && isNonEmptyString(request.resource.data.planoSlug, 1, 60)
+        && request.resource.data.tipo in ['apertura', 'aparato']
+        && (!('tag' in request.resource.data)
+            || isNonEmptyString(request.resource.data.tag, 1, 40))
+        && request.resource.data.uid == request.auth.uid
+        && isNonEmptyString(request.resource.data.dia, 10, 10);
+      allow update, delete: if false;
+    }
+
     // Notas y fotos que la gente cuelga sobre el plano electrico.
     // Se anclan al APARATO (F24, K7...) y no a un punto del dibujo, porque el
     // mismo aparato aparece en varias hojas y la foto sirve en todas.

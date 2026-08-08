@@ -75,5 +75,15 @@
     "seccionBornes": 999,
     "storage": true,
     "idioma": "es"
+  },
+  "baader-200-508": {
+    "maquina": "BAADER 200 · plano de planta",
+    "plano": "AquaChile 508",
+    "rev": "—",
+    "pdf": "ANTARFOOD/⚙️ EQUIPOS PLANTA/⚙️ BAADER 200/INFO ALOJADA EN TELEGRAM BAADER 200/DOCUMENTOS/508_Plano Electrico baader 200 Aqua  Chile 2.pdf",
+    "hojasTotales": 18,
+    "faltantes": [],
+    "seccionBornes": 999,
+    "idioma": "es"
   }
 }

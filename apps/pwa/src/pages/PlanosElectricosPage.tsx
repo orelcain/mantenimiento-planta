@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Link as LinkIcon, Printer, QrCode, Search, X, Zap } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Link as LinkIcon, Loader2, Printer, QrCode, Search, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import { PLANOS, planoPorSlug } from '@/data/planos'
-import { usePlano, type Caja, type PlanoBorneLibre, type PlanoRotulo } from '@/hooks/usePlano'
+import { PLANOS, assetPlano, planoPorSlug } from '@/data/planos'
+import { usePlano, guardarPlanoOffline, type Caja, type PlanoBorneLibre, type PlanoIndice, type PlanoRotulo } from '@/hooks/usePlano'
 import { usePlanoNotas } from '@/hooks/usePlanoNotas'
 import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { NotasAparato } from '@/components/planos/NotasAparato'
+
+/** minusculas y sin acentos: "posicion" debe encontrar "POSICIÓN ZERO". */
+const sinAcentos = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
 type Seleccion =
   | { tipo: 'aparato'; tag: string }
@@ -25,6 +28,54 @@ export function PlanosElectricosPage() {
 /* ────────────────────────────── catálogo ────────────────────────────── */
 
 function Catalogo() {
+  // Buscador GLOBAL: un aparato o palabra buscado en LOS 8 PLANOS a la vez
+  // ("¿en qué plano está el K7?"). Los índices se cargan la primera vez que
+  // se busca y quedan en memoria.
+  const [q, setQ] = useState('')
+  const [indices, setIndices] = useState<Map<string, PlanoIndice> | null>(null)
+  const [cargandoIdx, setCargandoIdx] = useState(false)
+  useEffect(() => {
+    if (q.trim().length < 2 || indices || cargandoIdx) return
+    setCargandoIdx(true)
+    void Promise.all(PLANOS.map(async (p) => {
+      try {
+        const r = await fetch(assetPlano(p.slug, 'indice.json'))
+        return [p.slug, await r.json()] as const
+      } catch { return null }
+    })).then((rs) => {
+      setIndices(new Map(rs.filter((x): x is [string, PlanoIndice] => !!x)))
+      setCargandoIdx(false)
+    })
+  }, [q, indices, cargandoIdx])
+
+  const v = sinAcentos(q.trim())
+  const hits: { slug: string; maquina: string; clave: string; detalle: string; href: string }[] = []
+  if (v.length >= 2 && indices) {
+    for (const p of PLANOS) {
+      const idx = indices.get(p.slug)
+      if (!idx) continue
+      let porPlano = 0
+      for (const [tag, puntos] of Object.entries(idx.indice)) {
+        if (porPlano >= 3 || hits.length >= 24) break
+        if (tag.toLowerCase().startsWith(v)) {
+          hits.push({ slug: p.slug, maquina: p.maquina, clave: tag,
+                      detalle: `${puntos.length} punto${puntos.length !== 1 ? 's' : ''}`,
+                      href: `/aprendizaje/planos/${p.slug}?ap=${encodeURIComponent(tag)}` })
+          porPlano++
+        }
+      }
+      for (const item of idx.busqueda ?? []) {
+        if (porPlano >= 3 || hits.length >= 24) break
+        if (sinAcentos(item.es).includes(v)) {
+          hits.push({ slug: p.slug, maquina: p.maquina, clave: item.es.slice(0, 34),
+                      detalle: `hoja ${item.h}`,
+                      href: `/aprendizaje/planos/${p.slug}?hoja=${item.h}` })
+          porPlano++
+        }
+      }
+    }
+  }
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5" style={{ color: 'var(--lc-ink)' }}>
       <header>
@@ -33,6 +84,32 @@ function Catalogo() {
           El plano del fabricante, navegable: los saltos entre hojas se siguen tocando,
           cada aparato dice dónde más aparece, y los rótulos se leen en castellano.
         </p>
+        <div className="relative mt-3">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--lc-ink-ghost)' }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} type="search"
+                 placeholder="Buscar en todos los planos: K7, RL33, sellado, excavador…"
+                 className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-2 font-mono text-[13px] outline-none"
+                 style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
+        </div>
+        {v.length >= 2 && (
+          <div className="mt-2 flex flex-col gap-0.5">
+            {cargandoIdx && (
+              <p className="m-0 text-[11.5px]" style={{ color: 'var(--lc-ink-ghost)' }}>Buscando en los {PLANOS.length} planos…</p>
+            )}
+            {!cargandoIdx && !hits.length && (
+              <p className="m-0 text-[11.5px]" style={{ color: 'var(--lc-ink-ghost)' }}>Sin coincidencias en ningún plano.</p>
+            )}
+            {hits.map((h, i) => (
+              <Link key={i} to={h.href}
+                    className="flex items-baseline justify-between gap-3 rounded-md px-2 py-1.5 no-underline hover:opacity-80"
+                    style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
+                <span className="font-mono text-[12.5px]" style={{ color: 'var(--lc-aqua-bright)' }}>{h.clave}</span>
+                <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </header>
 
       {PLANOS.map((p) => (
@@ -251,6 +328,16 @@ function Visor({ slug }: { slug: string }) {
 
   const notasDe = useCallback((tag: string) => notas.notasDe('aparato', tag).length, [notas])
 
+  // Telemetria minima para la META GRANDE: cuantas consultas recibe cada plano
+  // y cada aparato. Fire-and-forget, una vez por sesion, solo con sesion.
+  useEffect(() => {
+    if (!indice) return
+    void registrarUso(slug, 'apertura')
+  }, [indice, slug])
+  useEffect(() => {
+    if (sel?.tipo === 'aparato') void registrarUso(slug, 'aparato', sel.tag)
+  }, [sel, slug])
+
   // En que hojas hay conocimiento acumulado: una nota de F24 "vive" en cada
   // hoja donde F24 aparece. Alimenta el badge ambar del indice lateral.
   const notasPorHoja = useMemo(() => {
@@ -349,6 +436,7 @@ function Visor({ slug }: { slug: string }) {
                 className="hidden rounded p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
         </button>
+        <BotonOffline slug={slug} indice={indice} />
         <button type="button" title="Copiar link de esta vista"
                 onClick={() => { void navigator.clipboard?.writeText(window.location.href) }}
                 className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
@@ -790,7 +878,7 @@ function buscar(
   // Hojas por su titulo ("SELLADO" -> las hojas de la estacion de sellado).
   indice.hojas.forEach((h) => {
     if (out.length >= 60) return
-    if (h.tituloEs.toLowerCase().includes(v) || h.titulo.toLowerCase().includes(v)) {
+    if (sinAcentos(h.tituloEs).includes(v) || sinAcentos(h.titulo).includes(v)) {
       out.push({ clave: `Hoja ${h.blatt}`, detalle: h.tituloEs.slice(0, 34), blatt: h.blatt })
     }
   })
@@ -911,6 +999,61 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
         )
       })}
     </>
+  )
+}
+
+/** Registra una consulta (plano o aparato) para los KPIs de uso del modulo.
+ *  Silencioso: sin sesion o sin red simplemente no registra. */
+async function registrarUso(slug: string, tipo: 'apertura' | 'aparato', tag?: string) {
+  try {
+    const { auth: a, db: base } = await import('@/services/firebase')
+    if (!a.currentUser) return
+    const clave = `uso:${slug}:${tipo}:${tag ?? ''}`
+    if (sessionStorage.getItem(clave)) return
+    sessionStorage.setItem(clave, '1')
+    const { addDoc, collection, serverTimestamp } = await import('firebase/firestore')
+    await addDoc(collection(base, 'planoUsos'), {
+      plantId: 'chonchi',
+      planoSlug: slug,
+      tipo,
+      ...(tag ? { tag } : {}),
+      uid: a.currentUser.uid,
+      dia: new Date().toISOString().slice(0, 10),
+      ts: serverTimestamp(),
+    })
+  } catch { /* telemetria jamas molesta al usuario */ }
+}
+
+/** Boton "Disponible sin señal": descarga las hojas del plano a la cache del
+ *  navegador para las zonas de planta sin cobertura. */
+function BotonOffline({ slug, indice }: { slug: string; indice: PlanoIndice | null }) {
+  const clave = `plano-offline:${slug}`
+  const [estado, setEstado] = useState<'no' | 'bajando' | 'si'>(
+    () => (localStorage.getItem(clave) ? 'si' : 'no'),
+  )
+  const [avance, setAvance] = useState(0)
+  if (!indice) return null
+  const bajar = async () => {
+    setEstado('bajando')
+    try {
+      await guardarPlanoOffline(slug, indice.hojas.map((h) => h.blatt),
+        (hechas, total) => setAvance(Math.round((hechas / total) * 100)))
+      localStorage.setItem(clave, new Date().toISOString())
+      setEstado('si')
+    } catch {
+      setEstado('no')
+    }
+  }
+  return (
+    <button type="button"
+            title={estado === 'si' ? 'Guardado para usar sin señal' : 'Guardar para usar sin señal'}
+            onClick={() => { if (estado === 'no') void bajar() }}
+            className="flex items-center gap-1 rounded p-1.5 font-mono text-[10.5px]"
+            style={{ color: estado === 'si' ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
+      {estado === 'bajando' ? <><Loader2 size={14} className="animate-spin" />{avance}%</>
+        : estado === 'si' ? <><Check size={14} /><Download size={12} /></>
+        : <Download size={15} />}
+    </button>
   )
 }
 
