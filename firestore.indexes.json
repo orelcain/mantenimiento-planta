@@ -1,6 +1,24 @@
 {
   "indexes": [
     {
+      "collectionGroup": "baader142Protocolo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "plantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "maquina",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fecha",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "incidents",
       "queryScope": "COLLECTION",
       "fields": [

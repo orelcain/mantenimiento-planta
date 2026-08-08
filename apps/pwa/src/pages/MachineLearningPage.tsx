@@ -17,6 +17,7 @@ import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
 import { hmiPracticeUrl, glossaryPracticeUrl } from '@/services/grader/graderHmiPractice'
+import { perilla5PracticeUrl } from '@/services/baader142/perilla5Practice'
 import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
@@ -534,17 +535,22 @@ export function MachineLearningPage() {
  */
 function HmiPracticeButton({ contentId, machineSlug }: { contentId: string; machineSlug?: string }) {
   const navigate = useNavigate()
-  if (machineSlug !== 'grader') return null
-  const url = hmiPracticeUrl(contentId)
+  // Cada máquina con simulador/herramienta navegable resuelve su propia URL de práctica.
+  const url =
+    machineSlug === 'grader' ? hmiPracticeUrl(contentId)
+    : machineSlug === 'baader-142' ? perilla5PracticeUrl(contentId)
+    : null
   if (!url) return null
   return (
     <button
       className="dp-practice"
       onClick={() => navigate(url)}
-      title="Abre el simulador HMI Grader navegado a la pantalla de este procedimiento"
+      title={machineSlug === 'baader-142'
+        ? 'Abre la herramienta Perilla 5 navegada a la sección de este contenido'
+        : 'Abre el simulador HMI Grader navegado a la pantalla de este procedimiento'}
     >
       <MonitorPlay className="h-3.5 w-3.5" />
-      Practicar en el simulador
+      {machineSlug === 'baader-142' ? 'Abrir en Perilla 5' : 'Practicar en el simulador'}
     </button>
   )
 }
@@ -589,6 +595,7 @@ function ProceduresList({
           proc.menuPath && proc.menuPath.length > 0 ? 'ruta de menú' : null,
           proc.formula ? 'fórmula' : null,
           machineSlug === 'grader' && hmiPracticeUrl(proc.id) ? 'práctica' : null,
+          machineSlug === 'baader-142' && perilla5PracticeUrl(proc.id) ? 'práctica' : null,
         ].filter(Boolean) as string[]
         return (
           <div key={proc.id} id={`proc-${proc.id}`} className="dp-acc-item" data-open={open}>

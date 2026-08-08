@@ -13,6 +13,43 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-08 - claude - Perilla 5 · Diagnóstico BAADER 142 → módulo de Aprendizaje
+
+- Origen: handoff de Claude mobile (sesión de terreno con Danilo, 08-08). La herramienta HTML de
+  diagnóstico del selector 5 (S24) ya venía validada en planta; acá se integró a la PWA y se le dio
+  la parte cuantificable: registro persistente del protocolo del Upgrade Kit + tendencia.
+- **Módulo especial `/aprendizaje/perilla-5`** (patrón Variadores): entrada en SPECIAL_MODULES,
+  ruta lazy en App.tsx, página `Perilla5Page.tsx` con dos vistas por `?vista=`:
+  - `herramienta` (default): embed del HTML standalone (`public/perilla5-baader142-embed.html`,
+    2.5 MB: 14 secciones, interpretador, 46 códigos con solución didáctica resumen/completo con
+    porqués, 43 figuras del manual 1420000804 + 12 fotos de planta incrustadas como WebP).
+    Acepta deep-links `?t=<sección>&q=<búsqueda>`.
+  - `protocolo`: formulario de los 13 contadores (tasas /1000 en vivo con umbrales), guardado en
+    **`baader142Protocolo`** (plantId 'chonchi' desde nacimiento, evidencia histórica: solo
+    create+read) + tendencia Chart.js de las 5 tasas E82x-C por herramienta + historial con
+    dominante. Máquinas: **baader-n1 (antigua) / n2 / n3** (orden confirmado por Orel).
+- **Modo práctica runbook→herramienta**: `perilla5Practice.ts` (26 targets) + dispatcher por slug
+  en `HmiPracticeButton` (antes hard-coded a grader). Los diagnosis E8xx de la ficha 142 ahora
+  tienen botón "Abrir en Perilla 5" que abre el buscador con el código precargado.
+- **firestore.rules**: bloque `baader142Protocolo` con validación campo a campo (estilo
+  variadoresCambios: enum de máquina, fecha regex, 17 contadores int acotados, creadoPor==uid).
+  ⚠ REQUIERE OK DE OREL (regla nueva). **firestore.indexes.json**: índice compuesto
+  (plantId, maquina, fecha desc) — sin él la query de lecturas devolvería [] en silencio.
+- Umbrales 5/30/100 etiquetados "criterio interno de Mantención ANTARFOOD" (sin respaldo de manual,
+  regla del PR #310); todo lo demás citado a §22.4 / runbook E8xx.
+- Verificación: tsc 0 · eslint 0 (1 warning preexistente de main en LearningHubPage) · **1038
+  tests verdes (78 archivos)** · preview en wt (5174): herramienta carga con figuras y deep-link
+  `?t=px&q=825` funciona, formulario precarga base 08-08 con tasas correctas (373 crítico rojo),
+  tema claro Y oscuro OK, 375px sin scroll horizontal. NO verificado: escritura real a Firestore
+  (la regla no está desplegada hasta el merge) — probar con UNA lectura tras el deploy.
+- Gotcha de verificación que costó 10 min: un service worker viejo de otra sesión en :5174 servía
+  un bundle sin la ruta nueva → redirect a /login. Desregistrar SW + borrar caches antes de
+  verificar en un puerto reciclado.
+- Estado: EN REVISIÓN — PR abierto. Rama `claude/perilla5-baader142` (worktree wt-perilla5).
+- Sigue: OK de Orel a la regla; tras merge+deploy: guardar 1 lectura real de prueba, después las
+  base del 08-08; pedir a Danilo los datos pendientes del handoff (SM1/SM2 en pos.5, código del
+  excavador A de la N1, test de persistencia de contadores, kit de N2/N3).
+
 ## 2026-08-05 - claude - El sync captura el arranque anticipado del turno (FASE 2)
 
 - Cierra lo que la fase 1 (#373) solo podia AVISAR: ahora los ciclos de antes de las 08:00 entran en el turno que les corresponde.

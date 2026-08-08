@@ -77,6 +77,13 @@ const SPECIAL_MODULES: SpecialModule[] = [
     inDevelopment: true,
   },
   {
+    id: 'perilla-5', title: 'Perilla 5 · Baader 142', subtitle: 'Diagnóstico guiado',
+    description: 'Las 10 posiciones del selector 5, el protocolo del Upgrade Kit y los 46 códigos E con solución paso a paso. Con registro de lecturas y tendencia por herramienta.',
+    icon: Activity, href: '/aprendizaje/perilla-5', tint: '#0B5EA8',
+    // Literal como sus hermanos (misma razón que variadores: no romper el lazy del hub).
+    stats: '14 secciones · 46 códigos · 55 figuras del manual',
+  },
+  {
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
     description: 'Qué parámetros espera cada variador de planta y en qué menú están, para reemplazar uno sin buscar el manual.',
     icon: Gauge, href: '/aprendizaje/variadores', tint: '#7d7f9e',
