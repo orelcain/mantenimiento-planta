@@ -13,6 +13,47 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-08 - claude - Perilla 5: figuras anotables, zoom real y ajuste a iPhone
+
+Feedback de Orel sobre el módulo recién desplegado: figuras repetidas, faltaba zoom/paneo,
+quería anotar sobre las figuras, y el layout no cuadraba en su iPhone 16 Pro.
+
+- **Duplicados: eran muchos más de los que se veían.** Un chequeo por hash perceptual
+  (dHash 12×12, umbral Hamming ≤12) sobre las 55 figuras encontró que **9 de las 12 "fotos de
+  campo" de Telegram eran capturas de páginas del manual** que ya estaban extraídas en mejor
+  calidad (`foto-aj-centrador` = dib. 20, `foto-aj-expulsador` = dib. 63, etc.), y que
+  **dib. 64 es la MISMA foto que dib. 35** — BAADER la publica dos veces (pág. 41 y 85).
+  Se borraron 10 archivos, se dejó `ALIAS={'dib-64':'dib-35'}` para que el enlace del texto
+  siga funcionando con un solo recurso, y sobrevivieron las 2 fotos realmente únicas (la
+  disposición real de prismas y la nota manuscrita de medidas). De paso aparecieron **dib. 16
+  y 17 (§12.3.1), que faltaban**: el grep textual no los encuentra porque su rótulo es solo el
+  número dentro del cajón. Neto: 55 → **46 figuras**, y el HTML bajó de 2,5 a 2,07 MB.
+- **Visor reescrito**: pinch-zoom, doble toque (acerca al punto / vuelve a encuadrar), paneo con
+  clamp a los bordes, rueda en escritorio, botones ±/ajustar. Los pins se **contra-escalan**
+  (`scale(1/s)`) para no crecer con el zoom — verificado: 28 px a 100% y a 225%.
+- **Anotaciones sobre la figura**: pin en coordenadas relativas (0-1) para que quede en el mismo
+  punto del dibujo con cualquier zoom o pantalla. Tres tipos: *nota* (círculo numerado, texto al
+  tocar), *cota* (la medida se escribe sobre el dibujo, estilo LCD) y *foto* (se abre en el
+  propio visor con su zoom). Hover en escritorio, hoja inferior en táctil. Persisten en
+  localStorage con export/import JSON; las fotos del celular se comprimen a WebP ≤1100 px
+  (una foto de iPhone de ~4 MB queda en ~100 KB) porque sin eso dos fotos llenaban la cuota.
+  Las miniaturas con notas se marcan con borde naranja y contador.
+- **iPhone 16 Pro (402×874)**: safe-areas (Dynamic Island y home indicator), breakpoint ≤460 px
+  que cubre iPhone 16/16 Pro/Pro Max, **todos los inputs a 16 px** (bajo eso Safari hace zoom
+  solo al enfocar), tocables ≥46 px, y en la PWA la descripción larga se oculta en móvil para
+  que el iframe pase de 65% a **83% del alto** (el visor es `position:fixed` dentro del iframe,
+  así que su pantalla completa ES ese alto).
+- **Bug encontrado al verificar, no en el código**: el stage centraba por flex Y por transform a
+  la vez, así que la figura terminaba fuera de pantalla (translate sumado al centrado del flex).
+  Se ve solo mirando: los tests de estado daban todos verdes. Fix: canvas `position:absolute` en
+  0,0 y el encuadre lo hace únicamente `fit()`.
+- Verificación: tsc 0 · eslint 0 (1 warning preexistente) · **1038 tests verdes** · emulación
+  402×874: sin scroll horizontal, flujo completo de nota/cota/foto probado punta a punta
+  (crear → pin → tocar → ver foto ampliada → borrar), badges y export.
+- Estado: EN REVISIÓN — PR abierto. Rama `claude/perilla5-visor-movil`.
+- Sigue: si se quiere que las notas se compartan entre técnicos (hoy viven en cada teléfono),
+  el paso es el puente postMessage → Firestore, como hace PlanosAguasPage.
+
 ## 2026-08-08 - claude - Perilla 5 · Diagnóstico BAADER 142 → módulo de Aprendizaje
 
 - Origen: handoff de Claude mobile (sesión de terreno con Danilo, 08-08). La herramienta HTML de

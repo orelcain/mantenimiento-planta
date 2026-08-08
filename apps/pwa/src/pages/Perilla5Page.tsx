@@ -132,10 +132,12 @@ export function Perilla5Page() {
 
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold leading-tight">
+            <h1 className="text-xl font-semibold leading-tight sm:text-2xl">
               Perilla 5 · Diagnóstico Baader 142
             </h1>
-            <p className="mt-1 text-sm" style={{ color: LC.inkMid }}>
+            {/* En el teléfono la herramienta necesita todo el alto posible: la
+                descripción larga solo aparece de tablet para arriba. */}
+            <p className="mt-1 hidden text-sm sm:block" style={{ color: LC.inkMid }}>
               Todo lo que la máquina cuenta antes de fallar: las 10 posiciones del selector 5,
               el protocolo del Upgrade Kit y los 46 códigos E con su solución. Validada en
               terreno el 08-08-2026.
@@ -179,10 +181,13 @@ export function Perilla5Page() {
             className="mt-4 overflow-hidden rounded-lg border"
             style={{ borderColor: LC.border }}
           >
+            {/* El visor de figuras de la herramienta es position:fixed DENTRO del
+                iframe, así que su "pantalla completa" es este alto: en el teléfono
+                se le da todo lo que sobra para que el dibujo se vea grande. */}
             <iframe
               src={iframeSrc}
               title="Herramienta Perilla 5 · Diagnóstico BAADER 142"
-              className="block h-[calc(100vh-230px)] min-h-[560px] w-full"
+              className="block h-[calc(100dvh-150px)] min-h-[520px] w-full sm:h-[calc(100dvh-230px)]"
               style={{ background: '#EFF1F3' }}
             />
           </div>
