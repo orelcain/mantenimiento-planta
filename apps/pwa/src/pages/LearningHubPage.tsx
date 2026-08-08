@@ -81,7 +81,7 @@ const SPECIAL_MODULES: SpecialModule[] = [
     description: 'Las 10 posiciones del selector 5, el protocolo del Upgrade Kit y los 46 códigos E con solución paso a paso. Con registro de lecturas y tendencia por herramienta.',
     icon: Activity, href: '/aprendizaje/perilla-5', tint: '#0B5EA8',
     // Literal como sus hermanos (misma razón que variadores: no romper el lazy del hub).
-    stats: '14 secciones · 46 códigos · 55 figuras del manual',
+    stats: '14 secciones · 46 códigos · 46 figuras anotables',
   },
   {
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
