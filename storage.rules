@@ -43,6 +43,15 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // Fotos que el técnico cuelga sobre una figura del manual de la BAADER 142
+    // (módulo Perilla 5). Mismo límite y forma que planosAguas/planosElectricos.
+    match /baader142Notas/{allPaths=**} {
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
     // Fotos de incidencias (max 10MB, solo imágenes)
     match /incidents/{incidentId}/{fileName} {
       allow write: if request.auth != null

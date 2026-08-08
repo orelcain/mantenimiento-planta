@@ -28,6 +28,39 @@
   --mono:'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --disp:'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
   --body:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* fondos de aviso y superficies derivadas (se reescriben en oscuro) */
+  --flag-bg:#F2F7FB; --flag-danger:#FDF1F3; --flag-warn:#FFF7E8; --flag-ok:#EFF8F2;
+  --row-alt:#F7F9FA; --code-bg:#E3E7EA; --soft:#EAF2F8; --soft2:#F4F6F7;
+  --field:#FFFFFF;
+  /* mapa de estaciones */
+  --map-box:#EAF2F8; --map-box-hi:#DCEBF7; --map-chain:#E3E7EA; --map-chain-b:#C0C7CC;
+}
+/* ---------- TEMA OSCURO ----------
+   Alineado con los tokens del Centro de Aprendizaje de la PWA (--lc-*), para que
+   la herramienta embebida no sea una isla clara dentro de la app en oscuro.
+   Las figuras del manual conservan su fondo blanco a propósito: un dibujo técnico
+   en negativo se lee mal. */
+:root[data-theme="dark"]{
+  --panel:#1B5C93;
+  --panel-dark:#0F3B60;
+  --panel-ink:#DCE9F5;
+  --steel:#2A3F52;
+  --steel-dark:#5C7183;
+  --paper:#0D1722;
+  --card:#16242F;
+  --ink:#E9EEF3;
+  --ink-soft:#9FB3C4;
+  --line:#22384A;
+  --lcd-bg:#B8CC2B;
+  --lcd-ink:#1A2406;
+  --stop:#E4566B;
+  --go:#3FB37A;
+  --warn:#E0A93A;
+  --shadow:0 1px 0 rgba(0,0,0,.35), 0 6px 20px -8px rgba(0,0,0,.6);
+  --flag-bg:#132A3D; --flag-danger:#2E1620; --flag-warn:#2C2312; --flag-ok:#13291F;
+  --row-alt:#12202B; --code-bg:#22384A; --soft:#152B3D; --soft2:#16242F;
+  --field:#0F1D28;
+  --map-box:#152B3D; --map-box-hi:#1B3A52; --map-chain:#1B2B38; --map-chain-b:#2A3F52;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;overflow-x:hidden}
@@ -38,31 +71,36 @@ body{
   /* iPhone: el notch/Dynamic Island y el indicador de inicio no tapan contenido */
   padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
 }
-.wrap{max-width:820px;margin:0 auto;padding:0 0 calc(60px + env(safe-area-inset-bottom))}
+.wrap{max-width:1180px;margin:0 auto;padding:0 0 calc(60px + env(safe-area-inset-bottom))}
 
-/* ---------- CABECERA: motivo de las barras del logo BAADER ---------- */
+/* ---------- CABECERA compacta: una sola línea ----------
+   Antes ocupaba ~200 px con un título gigante y un párrafo de tres líneas: en el
+   teléfono eso era un cuarto de la pantalla antes de llegar al contenido, y dentro
+   de la PWA además repetía el título que ya pone la página (por eso .embed lo
+   esconde entero). */
 header{
   background:var(--panel);
   color:var(--panel-ink);
-  padding:calc(22px + env(safe-area-inset-top)) 18px 18px;
+  padding:calc(10px + env(safe-area-inset-top)) 18px 10px;
   position:relative;
   overflow:hidden;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
 }
 header::before{
-  content:"";position:absolute;top:0;left:0;right:0;height:7px;
+  content:"";position:absolute;top:0;left:0;right:0;height:4px;
   background:repeating-linear-gradient(105deg, var(--panel-ink) 0 5px, transparent 5px 12px);
   opacity:.85;
 }
-.eyebrow{
-  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-  color:#8FC2EA;margin:10px 0 6px
-}
 header h1{
-  font-family:var(--disp);font-weight:700;font-size:clamp(30px,8vw,46px);
-  line-height:.95;letter-spacing:.01em;margin:0;text-transform:uppercase
+  font-family:var(--disp);font-weight:700;font-size:23px;
+  line-height:1.1;letter-spacing:.02em;margin:2px 0 0;text-transform:uppercase;white-space:nowrap
 }
 header h1 em{font-style:normal;color:var(--lcd-bg)}
-header p{margin:10px 0 0;font-size:14.5px;color:#C6DCF0;max-width:52ch}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:#8FC2EA;margin:0
+}
+body.embed header{display:none}
 
 /* ---------- EL DIAL: navegación con forma de perilla ---------- */
 nav.dial{
@@ -126,13 +164,13 @@ p{margin:0 0 12px}
 ul,ol{margin:0 0 14px;padding-left:20px}
 li{margin-bottom:6px}
 strong{font-weight:600}
-code{font-family:var(--mono);font-size:.88em;background:#E3E7EA;padding:1px 5px;border-radius:3px}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px}
 
-.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:15px 16px;margin:0 0 16px;box-shadow:var(--shadow)}
-.flag{border-left:4px solid var(--panel);background:#F2F7FB;padding:12px 14px;margin:0 0 16px;border-radius:0 5px 5px 0;font-size:15px}
-.flag.danger{border-left-color:var(--stop);background:#FDF1F3}
-.flag.warn{border-left-color:var(--warn);background:#FFF7E8}
-.flag.ok{border-left-color:var(--go);background:#EFF8F2}
+.card{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:15px 16px;margin:0 0 16px;box-shadow:var(--shadow)}
+.flag{border-left:4px solid var(--panel);background:var(--flag-bg);padding:12px 14px;margin:0 0 16px;border-radius:0 5px 5px 0;font-size:15px}
+.flag.danger{border-left-color:var(--stop);background:var(--flag-danger)}
+.flag.warn{border-left-color:var(--warn);background:var(--flag-warn)}
+.flag.ok{border-left-color:var(--go);background:var(--flag-ok)}
 .flag b{display:block;font-family:var(--disp);text-transform:uppercase;font-size:15px;letter-spacing:.05em;margin-bottom:3px}
 
 .steps{list-style:none;padding:0;counter-reset:s}
@@ -147,7 +185,7 @@ code{font-family:var(--mono);font-size:.88em;background:#E3E7EA;padding:1px 5px;
 table{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 16px;display:block;overflow-x:auto}
 th,td{border-bottom:1px solid var(--line);padding:8px 9px;text-align:left;vertical-align:top}
 th{background:var(--panel);color:#fff;font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;white-space:nowrap}
-tbody tr:nth-child(even){background:#F7F9FA}
+tbody tr:nth-child(even){background:var(--row-alt)}
 td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 
 .btn{
@@ -156,6 +194,7 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 }
 .btn:hover{background:var(--panel-dark)}
 .btn.ghost{background:transparent;color:var(--panel);border:2px solid var(--panel)}
+:root[data-theme="dark"] .btn.ghost{color:#7FB3DC;border-color:#7FB3DC}
 .btn:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
 
 /* ---------- INTERPRETADOR ---------- */
@@ -164,14 +203,14 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 .grid-in .hd{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.06em}
 .grid-in input{
   font-family:var(--mono);font-size:15px;padding:8px;width:100%;
-  border:1px solid var(--steel-dark);border-radius:4px;background:#fff;text-align:right
+  border:1px solid var(--steel-dark);border-radius:4px;background:var(--field);color:var(--ink);text-align:right
 }
 .grid-in input:focus{outline:2px solid var(--panel);border-color:var(--panel)}
 .rate{font-family:var(--mono);font-size:14px;text-align:right;color:var(--ink-soft)}
 .rate.lv2{color:var(--warn);font-weight:600}
 .rate.lv3{color:var(--stop);font-weight:600}
 .verdict{margin-top:16px}
-.vr{border-left:5px solid var(--steel-dark);background:#fff;border-radius:0 5px 5px 0;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.vr{border-left:5px solid var(--steel-dark);background:var(--card);border-radius:0 5px 5px 0;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .vr.crit{border-left-color:var(--stop)}
 .vr.warn{border-left-color:var(--warn)}
 .vr.ok{border-left-color:var(--go)}
@@ -184,21 +223,21 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 .pill.ok{background:var(--go);color:#fff}
 
 /* buscador de códigos */
-#codeq{width:100%;font-family:var(--mono);font-size:16px;padding:11px 12px;border:2px solid var(--panel);border-radius:5px}
-.hit{background:#fff;border:1px solid var(--line);border-left:4px solid var(--panel);border-radius:0 5px 5px 0;padding:11px 13px;margin-bottom:9px}
+#codeq{width:100%;font-family:var(--mono);font-size:16px;padding:11px 12px;border:2px solid var(--panel);border-radius:5px;background:var(--field);color:var(--ink)}
+.hit{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--panel);border-radius:0 5px 5px 0;padding:11px 13px;margin-bottom:9px}
 .hit .c{font-family:var(--mono);font-weight:600;color:var(--panel);font-size:15px}
 .hit .m{font-size:14.5px;margin:3px 0 5px}
 .hit .a{font-size:13.5px;color:var(--ink-soft)}
 
 
 /* --- acordeón de síntomas --- */
-.sym{border:1px solid var(--line);border-radius:6px;background:#fff;margin-bottom:9px;overflow:hidden;box-shadow:var(--shadow)}
+.sym{border:1px solid var(--line);border-radius:6px;background:var(--card);margin-bottom:9px;overflow:hidden;box-shadow:var(--shadow)}
 .sym>button{
-  width:100%;text-align:left;background:#fff;border:0;cursor:pointer;
+  width:100%;text-align:left;background:var(--card);border:0;cursor:pointer;
   padding:13px 44px 13px 14px;font-family:var(--body);font-size:15.5px;font-weight:600;color:var(--ink);
   position:relative;line-height:1.35
 }
-.sym>button:hover{background:#F5F8FA}
+.sym>button:hover{background:var(--soft)}
 .sym>button:focus-visible{outline:3px solid var(--warn);outline-offset:-3px}
 .sym>button .zone{display:block;font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--panel);margin-bottom:3px}
 .sym>button::after{content:"+";position:absolute;right:15px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:22px;color:var(--panel);line-height:1}
@@ -208,16 +247,32 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 .sym .body h6{font-family:var(--disp);text-transform:uppercase;letter-spacing:.06em;font-size:15px;margin:15px 0 6px;color:var(--panel-dark)}
 .sym .body ol,.sym .body ul{font-size:14.5px;margin:0 0 4px}
 .sym .body li{margin-bottom:5px}
-.counters{font-family:var(--mono);font-size:12.5px;background:#EAF2F8;border-radius:4px;padding:8px 10px;margin:12px 0 0;color:var(--panel-dark)}
+.counters{font-family:var(--mono);font-size:12.5px;background:var(--soft);border-radius:4px;padding:8px 10px;margin:12px 0 0;color:var(--panel-dark)}
 .counters b{color:var(--ink)}
-.loc{font-family:var(--mono);font-size:12px;color:var(--ink-soft);background:#F4F6F7;border-left:3px solid var(--steel-dark);padding:8px 10px;margin-top:12px;border-radius:0 4px 4px 0}
-.first{background:#FFF7E8;border-left:3px solid var(--warn);padding:9px 11px;margin:10px 0 0;font-size:14.5px;border-radius:0 4px 4px 0}
+.loc{font-family:var(--mono);font-size:12px;color:var(--ink-soft);background:var(--soft2);border-left:3px solid var(--steel-dark);padding:8px 10px;margin-top:12px;border-radius:0 4px 4px 0}
+.first{background:var(--flag-warn);border-left:3px solid var(--warn);padding:9px 11px;margin:10px 0 0;font-size:14.5px;border-radius:0 4px 4px 0}
 .first b{font-family:var(--disp);text-transform:uppercase;letter-spacing:.05em;display:block;font-size:14px;margin-bottom:2px}
 
-/* --- mapa SVG de estaciones --- */
-.mapwrap{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 6px 8px;margin:0 0 16px;overflow-x:auto;box-shadow:var(--shadow)}
-.mapwrap svg{display:block;min-width:660px;width:100%;height:auto}
-.mapnote{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);padding:0 8px}
+/* --- recorrido del pescado: tarjetas, no SVG ---
+   Era un SVG de 660 px fijos: en el teléfono obligaba a scroll horizontal y no se
+   leía. Como tarjetas se apila en móvil y se despliega en fila en pantalla ancha. */
+.mapnote{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin:-6px 0 16px}
+.ruta{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fit,minmax(155px,1fr))}
+.est{background:var(--map-box);border:1.5px solid var(--panel);border-radius:6px;
+  padding:9px 11px;position:relative;margin:0}
+.est.tool{background:var(--map-box-hi);border-width:2px}
+.est .n{position:absolute;top:-9px;left:9px;background:var(--panel);color:#fff;
+  font-family:var(--mono);font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px}
+.est b{display:block;font-size:14.5px;color:var(--ink);margin:4px 0 3px}
+.est span{display:block;font-size:12.5px;color:var(--ink-soft);line-height:1.4}
+.est .sm{display:inline-block;font-family:var(--disp);font-size:19px;font-weight:700;
+  color:var(--panel);margin:5px 6px 0 0;vertical-align:-2px}
+.est .ref{font-family:var(--mono);font-size:10.5px;color:var(--panel);display:block;margin-top:4px}
+.est .ref b{display:inline;font-family:inherit;font-size:inherit;color:inherit;margin:0}
+.cadena{font-family:var(--mono);font-size:11px;color:var(--ink-soft);
+  border-top:2px solid var(--map-chain-b);padding-top:7px;margin:4px 0 14px;
+  display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 
 /* --- solución dentro de la ficha de código --- */
 .hit{padding:12px 13px}
@@ -236,8 +291,8 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 .hit .togg:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
 .hit.open .togg{background:var(--steel-dark)}
 .hit .proto{font-family:var(--mono);font-size:11.5px;margin-top:7px;padding:5px 9px;border-radius:4px;display:inline-block}
-.hit .proto.yes{background:#EFF8F2;color:#00602C;border:1px solid #BFE3CC}
-.hit .proto.no{background:#FDF1F3;color:#8F0B21;border:1px solid #F2C3CC}
+.hit .proto.yes{background:var(--flag-ok);color:var(--go);border:1px solid var(--go)}
+.hit .proto.no{background:var(--flag-danger);color:var(--stop);border:1px solid var(--stop)}
 
 /* ---------- FIGURAS DEL MANUAL: enlaces, miniaturas, visor ---------- */
 .figref{display:inline;background:none;border:0;padding:0;margin:0;cursor:pointer;
@@ -298,7 +353,7 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 #fv-nav{flex:0 0 auto;display:flex;gap:8px;padding:0 10px 10px}
 #fv-nav button{flex:1;min-height:48px}
 /* hoja inferior de la nota */
-#notesheet{position:fixed;left:0;right:0;bottom:0;z-index:100;background:var(--card);
+#notesheet{position:fixed;left:0;right:0;bottom:0;z-index:100;background:var(--card);color:var(--ink);
   border-radius:16px 16px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.45);
   padding:14px 16px calc(16px + env(safe-area-inset-bottom));
   transform:translateY(105%);transition:transform .2s ease;max-height:78vh;overflow-y:auto}
@@ -306,13 +361,13 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 #notesheet h4{font-family:var(--disp);text-transform:uppercase;letter-spacing:.05em;font-size:17px;margin:0 0 2px}
 #notesheet .meta{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-bottom:10px}
 #notesheet .txt{font-size:16px;line-height:1.5;margin-bottom:12px;white-space:pre-wrap}
-#notesheet img.nf{width:100%;max-height:46vh;object-fit:contain;background:#EFF1F3;border-radius:8px;
+#notesheet img.nf{width:100%;max-height:46vh;object-fit:contain;background:var(--paper);border-radius:8px;
   border:1px solid var(--line);cursor:zoom-in}
 #notesheet .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #notesheet .row button{flex:1 1 auto;min-height:46px;font-size:15px}
 #notesheet input[type=text],#notesheet textarea,#notesheet select{
   width:100%;font-family:var(--body);font-size:16px;padding:11px 12px;border:1.5px solid var(--steel-dark);
-  border-radius:8px;background:#fff;color:var(--ink);margin-bottom:9px}
+  border-radius:8px;background:var(--field);color:var(--ink);margin-bottom:9px}
 #notesheet label{display:block;font-family:var(--mono);font-size:11px;text-transform:uppercase;
   letter-spacing:.06em;color:var(--ink-soft);margin-bottom:4px}
 #notesheet .thumb{max-height:120px;border-radius:6px;border:1px solid var(--line);margin-bottom:9px}
@@ -330,14 +385,14 @@ td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
 .modewrap{display:flex;gap:8px;align-items:center;margin:12px 0 14px;flex-wrap:wrap}
 .modewrap .mlbl{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft)}
 .modebtn{font-family:var(--disp);text-transform:uppercase;letter-spacing:.05em;font-size:15px;font-weight:600;
-  background:#fff;color:var(--panel);border:2px solid var(--panel);border-radius:5px;padding:10px 15px;cursor:pointer}
+  background:var(--card);color:var(--panel);border:2px solid var(--panel);border-radius:5px;padding:10px 15px;cursor:pointer}
 .modebtn.on{background:var(--panel);color:#fff}
 .sol .why{display:block;font-size:13px;color:var(--ink-soft);margin-top:3px;font-weight:400;font-style:normal}
 .sol .why::before{content:"Por qué: ";font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--steel-dark)}
 #codes.res .sol li:not(.key){display:none}
 #codes.res .sol .why{display:none}
 #codes.res .sol li.key{font-size:15.5px;margin-bottom:11px}
-.donde{font-size:13.5px;color:var(--ink);background:#F2F7FB;border-left:3px solid var(--panel);padding:8px 10px;margin-top:10px;border-radius:0 4px 4px 0}
+.donde{font-size:13.5px;color:var(--ink);background:var(--flag-bg);border-left:3px solid var(--panel);padding:8px 10px;margin-top:10px;border-radius:0 4px 4px 0}
 .donde b{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--panel);display:block;margin-bottom:2px}
 
 footer{padding:26px 18px calc(26px + env(safe-area-inset-bottom));color:var(--ink-soft);font-size:12.5px;border-top:1px solid var(--line);margin-top:34px;font-family:var(--mono)}
@@ -393,9 +448,8 @@ footer{padding:26px 18px calc(26px + env(safe-area-inset-bottom));color:var(--in
 <div class="wrap">
 
 <header>
-  <div class="eyebrow">Planta Chonchi · Evisceradora · Control A3C</div>
-  <h1>Perilla 5<br><em>Diagnóstico</em></h1>
-  <p>Todo lo que la BAADER 142 te puede contar antes de fallar. Cada posición del selector 5, qué muestra, cómo leerla y qué hacer con lo que dice.</p>
+  <h1>Perilla 5 · <em>Diagnóstico</em></h1>
+  <div class="eyebrow">BAADER 142 · Chonchi · A3C</div>
 </header>
 
 <nav class="dial" aria-label="Posiciones del selector 5">
@@ -411,7 +465,7 @@ footer{padding:26px 18px calc(26px + env(safe-area-inset-bottom));color:var(--in
     <button class="detent" role="tab" data-t="p8" aria-selected="false"><span class="tick">8</span>Reset</button>
     <button class="detent" role="tab" data-t="pf" aria-selected="false"><span class="tick">≈</span>Pescado</button>
     <button class="detent" role="tab" data-t="pv" aria-selected="false"><span class="tick">⊘</span>Vacío</button>
-    <button class="detent" role="tab" data-t="pm" aria-selected="false"><span class="tick">⌖</span>Mapa</button>
+    <button class="detent" role="tab" data-t="pm" aria-selected="false"><span class="tick">⌖</span>Piezas</button>
     <button class="detent" role="tab" data-t="px" aria-selected="false"><span class="tick">E</span>Códigos</button>
     <button class="detent" role="tab" data-t="pr" aria-selected="false"><span class="tick">✓</span>Rondas</button>
   </div>
@@ -1150,111 +1204,69 @@ E 803         62 %</div></div>
   <p style="font-family:var(--mono);font-size:12px;color:var(--ink-soft)">Fuente: párrafo 21 completo y 22.5/22.6 del manual · Sistema: dib. 44 · Ciclón: dib. 47/48 · Sensor: dib. 50/51</p>
 </section>
 
-<!-- ================= MAPA ================= -->
+<!-- ================= PIEZAS ================= -->
 <section id="pm">
   <div class="pos-head">
     <div class="pos-num">Ubicación</div>
-    <h2>Mapa</h2>
-    <div class="sub">Dónde está cada cosa · Recorrido del pescado y referencias del manual</div>
+    <h2>Piezas</h2>
+    <div class="sub">Dónde está cada cosa · Recorrido del pescado, figuras del manual y repuestos</div>
   </div>
 
-  <p>El pescado entra por la izquierda y sale por la derecha. Cada estación actúa en ese orden — por eso una falla arriba se manifiesta como defecto abajo.</p>
+  <p>El pescado recorre las estaciones en este orden. Cada una condiciona a la siguiente: por eso, ante un defecto de corte, se revisa <strong>de la primera a la última</strong>, nunca al revés.</p>
 
-  <div class="mapwrap">
-  <svg viewBox="0 0 980 330" role="img" aria-label="Secuencia de estaciones de la BAADER 142">
-    <defs>
-      <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
-        <path d="M0,0 L9,4.5 L0,9 z" fill="#9AA4AC"/>
-      </marker>
-    </defs>
-    <!-- cadena -->
-    <rect x="20" y="176" width="940" height="26" fill="#E3E7EA" stroke="#C0C7CC"/>
-    <g fill="#C0C7CC">
-      <rect x="60" y="176" width="7" height="26"/><rect x="180" y="176" width="7" height="26"/>
-      <rect x="300" y="176" width="7" height="26"/><rect x="420" y="176" width="7" height="26"/>
-      <rect x="540" y="176" width="7" height="26"/><rect x="660" y="176" width="7" height="26"/>
-      <rect x="780" y="176" width="7" height="26"/><rect x="900" y="176" width="7" height="26"/>
-    </g>
-    <text x="24" y="222" font-family="IBM Plex Mono,monospace" font-size="11" fill="#4A555E">CADENA DE TRANSPORTE · 5 carros × 11 prismas</text>
-    <line x1="20" y1="240" x2="950" y2="240" stroke="#9AA4AC" stroke-width="1.5" marker-end="url(#ar)"/>
-    <text x="24" y="256" font-family="IBM Plex Mono,monospace" font-size="11" fill="#4A555E">SENTIDO DE MARCHA DEL PESCADO</text>
-
-    <!-- estaciones -->
-    <g font-family="IBM Plex Sans,sans-serif">
-      <!-- 1 entrada -->
-      <rect x="24" y="60" width="112" height="104" rx="4" fill="#EAF2F8" stroke="#0B5EA8" stroke-width="1.5"/>
-      <text x="80" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Entrada</text>
-      <text x="80" y="100" text-anchor="middle" font-size="10.5" fill="#4A555E">Chapaleta ciclo</text>
-      <text x="80" y="114" text-anchor="middle" font-size="10.5" fill="#4A555E">Tope de colas</text>
-      <text x="80" y="128" text-anchor="middle" font-size="10.5" fill="#4A555E">Abrazadera</text>
-      <text x="80" y="150" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">Y1 · dib.7</text>
-
-      <!-- 2 medicion -->
-      <rect x="148" y="60" width="120" height="104" rx="4" fill="#EAF2F8" stroke="#0B5EA8" stroke-width="1.5"/>
-      <text x="208" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Medición</text>
-      <text x="208" y="100" text-anchor="middle" font-size="10.5" fill="#4A555E">Largo + altura</text>
-      <text x="208" y="114" text-anchor="middle" font-size="10.5" fill="#4A555E">Palpador · ano</text>
-      <text x="208" y="128" text-anchor="middle" font-size="10.5" fill="#4A555E">400 · 51 mm</text>
-      <text x="208" y="150" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B11 B12 B13 · dib.15/18</text>
-
-      <!-- 3 centraje -->
-      <rect x="280" y="60" width="106" height="104" rx="4" fill="#DCEBF7" stroke="#0B5EA8" stroke-width="2"/>
-      <text x="333" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Centraje</text>
-      <text x="333" y="100" text-anchor="middle" font-size="10.5" fill="#4A555E">2 barras · 6 mm</text>
-      <text x="333" y="118" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="17" font-weight="700" fill="#0B5EA8">SM1</text>
-      <text x="333" y="136" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B1 · E821</text>
-      <text x="333" y="152" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#4A555E">dib.20</text>
-
-      <!-- 4 puntero+cuchilla -->
-      <rect x="398" y="60" width="118" height="104" rx="4" fill="#DCEBF7" stroke="#0B5EA8" stroke-width="2"/>
-      <text x="457" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Puntero +</text>
-      <text x="457" y="96" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Cuchilla</text>
-      <text x="457" y="112" text-anchor="middle" font-size="10.5" fill="#4A555E">Corte princesa</text>
-      <text x="457" y="130" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="17" font-weight="700" fill="#0B5EA8">SM2</text>
-      <text x="457" y="146" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B2 · E822</text>
-      <text x="457" y="160" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#4A555E">dib.9 p.2/3</text>
-
-      <!-- 5 aspirador -->
-      <rect x="528" y="60" width="118" height="104" rx="4" fill="#DCEBF7" stroke="#0B5EA8" stroke-width="2"/>
-      <text x="587" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Aspirador</text>
-      <text x="587" y="99" text-anchor="middle" font-size="10.5" fill="#4A555E">Guillotina · esófago</text>
-      <text x="587" y="112" text-anchor="middle" font-size="10.5" fill="#4A555E">Hoja frontal + membrana</text>
-      <text x="587" y="130" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="17" font-weight="700" fill="#0B5EA8">SM3</text>
-      <text x="587" y="146" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B3 B7 · E823</text>
-      <text x="587" y="160" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#4A555E">dib.9 p.4/5/6/8</text>
-
-      <!-- 6 excavador A -->
-      <rect x="658" y="60" width="112" height="104" rx="4" fill="#DCEBF7" stroke="#0B5EA8" stroke-width="2"/>
-      <text x="714" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Excavador A</text>
-      <text x="714" y="99" text-anchor="middle" font-size="10.5" fill="#4A555E">Recto · espinas</text>
-      <text x="714" y="112" text-anchor="middle" font-size="10.5" fill="#4A555E">Riñón trasero</text>
-      <text x="714" y="130" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="17" font-weight="700" fill="#0B5EA8">SM4</text>
-      <text x="714" y="146" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B4 B8 · E824</text>
-      <text x="714" y="160" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#4A555E">dib.9 p.9</text>
-
-      <!-- 7 excavador B -->
-      <rect x="782" y="60" width="112" height="104" rx="4" fill="#DCEBF7" stroke="#0B5EA8" stroke-width="2"/>
-      <text x="838" y="82" text-anchor="middle" font-size="12.5" font-weight="600" fill="#073F72">Excavador B</text>
-      <text x="838" y="99" text-anchor="middle" font-size="10.5" fill="#4A555E">Riñón · corazón</text>
-      <text x="838" y="112" text-anchor="middle" font-size="10.5" fill="#4A555E">Entra a la cabeza</text>
-      <text x="838" y="130" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="17" font-weight="700" fill="#0B5EA8">SM5</text>
-      <text x="838" y="146" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0B5EA8">B5 B9 · E825</text>
-      <text x="838" y="160" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#4A555E">dib.9 p.7</text>
-
-      <!-- extractor -->
-      <rect x="906" y="60" width="54" height="104" rx="4" fill="#EAF2F8" stroke="#0B5EA8" stroke-width="1.5"/>
-      <text x="933" y="84" text-anchor="middle" font-size="11" font-weight="600" fill="#073F72">Extrac-</text>
-      <text x="933" y="98" text-anchor="middle" font-size="11" font-weight="600" fill="#073F72">tor</text>
-      <text x="933" y="126" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#0B5EA8">B14 B15</text>
-      <text x="933" y="142" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9.5" fill="#0B5EA8">Y8 Y9</text>
-      <text x="933" y="158" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#4A555E">E827</text>
-
-      <!-- eyebrow -->
-      <text x="24" y="34" font-family="IBM Plex Mono,monospace" font-size="11" letter-spacing="1.5" fill="#4A555E">ORDEN DE ACTUACIÓN SOBRE EL PESCADO</text>
-      <text x="24" y="300" font-family="IBM Plex Mono,monospace" font-size="10.5" fill="#4A555E">Caja de accionamiento: bielas de mando y amortiguadores · engrasador central dib.42 pos.1</text>
-      <text x="24" y="318" font-family="IBM Plex Mono,monospace" font-size="10.5" fill="#4A555E">Lado del pescado: bielas visibles con la cubierta levantada · medidas dib.21 a 24</text>
-    </g>
-  </svg>
+  <ol class="ruta">
+    <li class="est">
+      <span class="n">1</span>
+      <b>Entrada</b>
+      <span>Chapaleta de ciclo, tope de colas y abrazadera</span>
+      <span class="ref">Y1 · dib. 7</span>
+    </li>
+    <li class="est">
+      <span class="n">2</span>
+      <b>Medición</b>
+      <span>Largo y altura. El palpador ubica el ano: de acá sale el recorrido de todas las herramientas</span>
+      <span class="ref">B11 B12 B13 · 400 y 51 mm · dib. 15 y 18</span>
+    </li>
+    <li class="est tool">
+      <span class="n">3</span>
+      <b>Centraje <span class="sm">SM1</span></b>
+      <span>Dos barras a 6 mm sujetan el pescado al centro</span>
+      <span class="ref">B1 · E821 · dib. 20</span>
+    </li>
+    <li class="est tool">
+      <span class="n">4</span>
+      <b>Puntero y cuchilla <span class="sm">SM2</span></b>
+      <span>Entra por el ano y abre el corte princesa</span>
+      <span class="ref">B2 · E822 · dib. 9 pos. 2 y 3</span>
+    </li>
+    <li class="est tool">
+      <span class="n">5</span>
+      <b>Aspirador <span class="sm">SM3</span></b>
+      <span>Guillotina el esófago; la hoja de membrana abre el riñón</span>
+      <span class="ref">B3 B7 · E823 · dib. 9 pos. 4/5/6/8</span>
+    </li>
+    <li class="est tool">
+      <span class="n">6</span>
+      <b>Excavador A <span class="sm">SM4</span></b>
+      <span>Separa el recto y abre los huecos de espinas</span>
+      <span class="ref">B4 B8 · E824 · dib. 9 pos. 9</span>
+    </li>
+    <li class="est tool">
+      <span class="n">7</span>
+      <b>Excavador B <span class="sm">SM5</span></b>
+      <span>Riñón y corazón; entra a la cabeza</span>
+      <span class="ref">B5 B9 · E825 · dib. 9 pos. 7</span>
+    </li>
+    <li class="est">
+      <span class="n">8</span>
+      <b>Extractor</b>
+      <span>Dos chapaletas neumáticas sacan el pescado de los prismas</span>
+      <span class="ref">B14 B15 · Y8 Y9 · E827 · dib. 63</span>
+    </li>
+  </ol>
+  <div class="cadena">
+    <span>Cadena de transporte · 5 carros × 11 prismas</span>
+    <span>Bielas: lado del pescado dib. 21–24 · caja de accionamiento dib. 25–29</span>
   </div>
   <p class="mapnote">Los códigos <code>dib. N</code> son los números de figura del manual de instrucciones 1420000804. Tocá cualquier referencia subrayada para ver la figura.</p>
 
@@ -1289,8 +1301,9 @@ E 803         62 %</div></div>
   <strong>Pellizcá</strong> para acercar y arrastrá para moverte; <strong>doble toque</strong> acerca al punto y otro doble toque vuelve a encuadrar.
   Con <strong>+ Nota</strong> tocás el punto exacto del dibujo y dejás una <em>nota</em> (texto que se lee al tocar el número),
   una <em>cota</em> (la medida queda escrita sobre el dibujo) o una <em>foto</em> del punto real de la máquina.
-  Las figuras que ya tienen anotaciones se marcan con borde naranja. Todo queda guardado en tu teléfono;
-  desde <strong>☰</strong> podés exportarlas para pasarlas a otro equipo o para que se sumen al manual de planta.</div>
+  Las figuras que ya tienen anotaciones se marcan con borde naranja. Abierta desde la app, lo que anotás
+  <strong>lo ve el resto de Mantención</strong>; abierta como archivo suelto, las notas quedan en ese equipo
+  y se pasan con <strong>☰ → Exportar</strong>.</div>
   <div id="gallery"></div>
 
   <h3>Códigos de repuestos frecuentes</h3>
@@ -1893,207 +1906,207 @@ if(sbox){
   });
 }
 </script>
-﻿<script>
-/* ---------- buscador de cÃ³digos con soluciÃ³n (pasos con porquÃ©) ---------- */
-const TOOLNAME={1:'Centraje Â· SM1',2:'Cuchilla abridora Â· SM2',3:'Aspirador Â· SM3',4:'Excavador A Â· SM4',5:'Excavador B Â· SM5'};
+<script>
+/* ---------- buscador de códigos con solución (pasos con porqué) ---------- */
+const TOOLNAME={1:'Centraje · SM1',2:'Cuchilla abridora · SM2',3:'Aspirador · SM3',4:'Excavador A · SM4',5:'Excavador B · SM5'};
 const TOOLDATA={
  1:{ind:'B1',trans:'B21',
-    biela:'Biela en caja de accionamiento <strong>256 Â± 2 mm</strong>. Barras a <strong>6 mm</strong>, muelle <strong>65 mm</strong> entre ojales.',
-    fig:'dib. 20 y 25 Â· pÃ¡rrafo 12.5',
-    donde:'La herramienta (dos barras redondas) estÃ¡ al inicio del campo de trabajo, antes del puntero. Su motor, el inductivo B1 y la biela estÃ¡n DENTRO de la caja de accionamiento: parate en el lado trasero de la mÃ¡quina (opuesto a la entrada del pescado) y abrÃ­ la puerta de la caja.',
+    biela:'Biela en caja de accionamiento <strong>256 ± 2 mm</strong>. Barras a <strong>6 mm</strong>, muelle <strong>65 mm</strong> entre ojales.',
+    fig:'dib. 20 y 25 · párrafo 12.5',
+    donde:'La herramienta (dos barras redondas) está al inicio del campo de trabajo, antes del puntero. Su motor, el inductivo B1 y la biela están DENTRO de la caja de accionamiento: parate en el lado trasero de la máquina (opuesto a la entrada del pescado) y abrí la puerta de la caja.',
     figs:['dib-20','dib-25','dib-30','foto-aj-centrador']},
  2:{ind:'B2',trans:'B22',
-    biela:'Biela en caja <strong>230 Â± 1 mm</strong>. Trayecto de giro â‰ˆ30Â° con el protector de cuchilla horizontal. No tocar la biela del lado del pescado para corregir el puntero.',
-    fig:'dib. 26 Â· cuchilla SAP 3300012257',
-    donde:'La cuchilla circular se ve levantando la cubierta del campo de trabajo, despuÃ©s del puntero. Su motor SM2 y la biela de 230 mm estÃ¡n en la caja de accionamiento, lado trasero.',
+    biela:'Biela en caja <strong>230 ± 1 mm</strong>. Trayecto de giro â‰ˆ30° con el protector de cuchilla horizontal. No tocar la biela del lado del pescado para corregir el puntero.',
+    fig:'dib. 26 · cuchilla SAP 3300012257',
+    donde:'La cuchilla circular se ve levantando la cubierta del campo de trabajo, después del puntero. Su motor SM2 y la biela de 230 mm están en la caja de accionamiento, lado trasero.',
     figs:['dib-26','dib-30','foto-aj-cuchilla']},
  3:{ind:'B3',trans:'B23',
-    biela:'Biela lado pescado <strong>362 Â± 2 mm</strong>, en caja <strong>395 Â± 3 mm</strong> (cotas 10/12/5 mm). Trayecto de giro 60 mm.',
+    biela:'Biela lado pescado <strong>362 ± 2 mm</strong>, en caja <strong>395 ± 3 mm</strong> (cotas 10/12/5 mm). Trayecto de giro 60 mm.',
     fig:'dib. 22, 27 y 31',
-    donde:'El aspirador es el tubo grande del centro del campo de trabajo. La biela corta (362) se ve levantando la cubierta; la biela larga con amortiguador (395) estÃ¡ en la caja de accionamiento, lado trasero.',
+    donde:'El aspirador es el tubo grande del centro del campo de trabajo. La biela corta (362) se ve levantando la cubierta; la biela larga con amortiguador (395) está en la caja de accionamiento, lado trasero.',
     figs:['dib-22','dib-27','dib-30']},
  4:{ind:'B4',trans:'B24',
-    biela:'Biela lado pescado <strong>335 Â± 5 mm</strong>, en caja <strong>408 Â± 3 mm</strong> (cotas 40/10/15 mm). Trayecto de giro 120 mm.',
+    biela:'Biela lado pescado <strong>335 ± 5 mm</strong>, en caja <strong>408 ± 3 mm</strong> (cotas 40/10/15 mm). Trayecto de giro 120 mm.',
     fig:'dib. 23, 28 y 31',
-    donde:'El excavador A trabaja justo despuÃ©s del aspirador (sentido de marcha del pescado). Biela corta (335) bajo la cubierta del campo de trabajo; biela con amortiguador (408) en la caja de accionamiento.',
+    donde:'El excavador A trabaja justo después del aspirador (sentido de marcha del pescado). Biela corta (335) bajo la cubierta del campo de trabajo; biela con amortiguador (408) en la caja de accionamiento.',
     figs:['dib-23','dib-28','dib-30']},
  5:{ind:'B5',trans:'B25',
-    biela:'Biela lado pescado <strong>290 Â± 2 mm</strong>, en caja <strong>298 Â± 3 mm</strong> (cotas 4/10/10 mm).',
+    biela:'Biela lado pescado <strong>290 ± 2 mm</strong>, en caja <strong>298 ± 3 mm</strong> (cotas 4/10/10 mm).',
     fig:'dib. 24, 29 y 31',
-    donde:'El excavador B es la Ãºltima herramienta antes del extractor, al final del campo de trabajo. Biela corta (290) bajo la cubierta; biela con amortiguador (298) en la caja de accionamiento.',
+    donde:'El excavador B es la última herramienta antes del extractor, al final del campo de trabajo. Biela corta (290) bajo la cubierta; biela con amortiguador (298) en la caja de accionamiento.',
     figs:['dib-24','dib-29','dib-30']}
 };
 
 function solSM(d,extra){
   const T=TOOLDATA[d];
   return [
-   {t:'Parar la mÃ¡quina, interruptor principal en 0 y asegurarlo antes de tocar nada.',k:true,
-    w:'Zona de cuchillas, y herramientas que pueden caer solas si falla la refrigeraciÃ³n del control. El manual lo exige antes de cualquier intervenciÃ³n.'}
+   {t:'Parar la máquina, interruptor principal en 0 y asegurarlo antes de tocar nada.',k:true,
+    w:'Zona de cuchillas, y herramientas que pueden caer solas si falla la refrigeración del control. El manual lo exige antes de cualquier intervención.'}
   ].concat(extra).concat([
    {t:'Inductivo <strong>'+T.ind+'</strong>: distancia <strong>0,8 mm</strong> a la polea de correa dentada, diodo conmutando al pasar el metal, conector seco y cable sin cortes.',k:true,
-    w:'El inductivo es el Ãºnico "ojo" con que el control ve la posiciÃ³n CERO de este motor. Si el soporte se corriÃ³ un par de milÃ­metros, el motor busca un cero que su sensor ya no ve â€” y eso ES este cÃ³digo. El diodo es la prueba de vida sin instrumentos.'},
-   {t:'Correa dentada del motor: tensiÃ³n suficiente (chequeo semanal). Correa floja = pasos perdidos.',k:true,
-    w:'La correa lleva los pasos del motor a la herramienta. Floja, salta dientes: el motor hizo su carrera completa pero la herramienta quedÃ³ corta, y el control lo nota reciÃ©n cuando la herramienta no vuelve al cero. Es la causa nÂº1 de un E82x-C subiendo de a poco: el kit lo corrige en silencio hasta que un dÃ­a para la mÃ¡quina.'},
+    w:'El inductivo es el único "ojo" con que el control ve la posición CERO de este motor. Si el soporte se corrió un par de milímetros, el motor busca un cero que su sensor ya no ve — y eso ES este código. El diodo es la prueba de vida sin instrumentos.'},
+   {t:'Correa dentada del motor: tensión suficiente (chequeo semanal). Correa floja = pasos perdidos.',k:true,
+    w:'La correa lleva los pasos del motor a la herramienta. Floja, salta dientes: el motor hizo su carrera completa pero la herramienta quedó corta, y el control lo nota recién cuando la herramienta no vuelve al cero. Es la causa nº1 de un E82x-C subiendo de a poco: el kit lo corrige en silencio hasta que un día para la máquina.'},
    {t:'Buje fijador de la polea: apretado, sin juego entre chaveta y ranura.',
-    w:'Un buje suelto deja que la polea gire "muerta" unos grados en cada inversiÃ³n de giro: pasos que se pierden mecÃ¡nicamente aunque el motor y la correa estÃ©n perfectos.'},
+    w:'Un buje suelto deja que la polea gire "muerta" unos grados en cada inversión de giro: pasos que se pierden mecánicamente aunque el motor y la correa estén perfectos.'},
    {t:T.biela,
-    w:'La cota de la biela define el recorrido real de la herramienta. Fuera de medida, la herramienta llega a otro punto del que el control calcula y los topes dejan de calzar con las posiciones electrÃ³nicas.'},
-   {t:'Mover la herramienta a mano: giro suave, sin marcha dura en articulaciÃ³n ni biela. Lubricar si corresponde (FLC 65, cada 40 h).',
-    w:'El motor paso a paso tiene torque limitado: una articulaciÃ³n seca le roba pasos justo en la inversiÃ³n de giro, donde mÃ¡s fuerza necesita. La marcha dura estÃ¡ detrÃ¡s de la mitad de los E8xx â€” y aparece sola si no se engrasa despuÃ©s de limpiar.'},
-   {t:'Cilindro neumÃ¡tico libre y no estrangulado. Aire a <strong>4 bar</strong> en el regulador.',
-    w:'Con el cilindro estrangulado el trayecto de giro queda corto: corte desgarrado y esfuerzo extra que el motor paga en pasos. Bajo 2 bar ademÃ¡s corta el presostato S8.'},
-   {t:'Verificar con perilla 5 â†’ posiciÃ³n <strong>5</strong>: el motor debe llegar limpio a CERO, MAX y MIN.',k:true,
-    w:'Es el banco de pruebas sin pescado: si llega firme a las tres referencias, la cadena sensorâ†’correaâ†’mecÃ¡nica quedÃ³ sana. Si algo sigue mal, se ve al tiro acÃ¡.'},
-   {t:'Cerrar, y correr <strong>Test 12</strong> (perilla 5 â†’ 2) antes de volver a producciÃ³n.',
-    w:'Confirma bajo movimiento real. Si la mÃ¡quina hace marcha de referencia sola durante el test, la herramienta que estaba activa en ese momento sigue con problema.'}
+    w:'La cota de la biela define el recorrido real de la herramienta. Fuera de medida, la herramienta llega a otro punto del que el control calcula y los topes dejan de calzar con las posiciones electrónicas.'},
+   {t:'Mover la herramienta a mano: giro suave, sin marcha dura en articulación ni biela. Lubricar si corresponde (FLC 65, cada 40 h).',
+    w:'El motor paso a paso tiene torque limitado: una articulación seca le roba pasos justo en la inversión de giro, donde más fuerza necesita. La marcha dura está detrás de la mitad de los E8xx — y aparece sola si no se engrasa después de limpiar.'},
+   {t:'Cilindro neumático libre y no estrangulado. Aire a <strong>4 bar</strong> en el regulador.',
+    w:'Con el cilindro estrangulado el trayecto de giro queda corto: corte desgarrado y esfuerzo extra que el motor paga en pasos. Bajo 2 bar además corta el presostato S8.'},
+   {t:'Verificar con perilla 5 → posición <strong>5</strong>: el motor debe llegar limpio a CERO, MAX y MIN.',k:true,
+    w:'Es el banco de pruebas sin pescado: si llega firme a las tres referencias, la cadena sensor→correa→mecánica quedó sana. Si algo sigue mal, se ve al tiro acá.'},
+   {t:'Cerrar, y correr <strong>Test 12</strong> (perilla 5 → 2) antes de volver a producción.',
+    w:'Confirma bajo movimiento real. Si la máquina hace marcha de referencia sola durante el test, la herramienta que estaba activa en ese momento sigue con problema.'}
   ]);
 }
 
 const FAM=[
- {base:800,m:'no encuentra su posiciÃ³n cero',proto:false,
-  extra:d=>[{t:'EmpezÃ¡ por el sensor: inductivo de cero defectuoso o distancia demasiado grande.',k:true,
-   w:'Es la causa nÂº1 segÃºn el manual (Â§12.8). El motor da vueltas buscando un cero que su ojo no ve. MirÃ¡ el sensor antes de desarmar mecÃ¡nica.'}]},
+ {base:800,m:'no encuentra su posición cero',proto:false,
+  extra:d=>[{t:'Empezá por el sensor: inductivo de cero defectuoso o distancia demasiado grande.',k:true,
+   w:'Es la causa nº1 según el manual (§12.8). El motor da vueltas buscando un cero que su ojo no ve. Mirá el sensor antes de desarmar mecánica.'}]},
  {base:810,m:'marcha de prueba defectuosa',proto:false,
-  extra:d=>[{t:'Repetir el test: Test 12 (perilla 5 â†’ 2) o Test 13 (â†’ 3).',k:true,
-   w:'La marcha de prueba aÃ­sla la falla sin pescado. Si el error repite en la misma herramienta, es de esa herramienta; si cambia de lugar, sospechÃ¡ aire, presiÃ³n o control.'}]},
- {base:820,m:'no alcanzÃ³ su posiciÃ³n cero despuÃ©s de la Ãºltima carrera durante la producciÃ³n',proto:true,
-  extra:d=>[{t:'<strong>Reset inmediato:</strong> pulsar <code>I</code> (la mÃ¡quina hace marcha de referencia) â†’ pulsar <code>I</code> otra vez (arranca).',k:true,
-   w:'E82x significa "no llegÃ³ al cero tras la Ãºltima carrera": la marcha de referencia lo vuelve a encontrar y la producciÃ³n sigue. Si reaparece seguido, reciÃ©n ahÃ­ empieza el diagnÃ³stico.'},
-  {t:'Antes de desarmar, perilla 5 â†’ posiciÃ³n <strong>1</strong>: leer <strong>âˆ‘E82'+d+'</strong> y <strong>âˆ‘E82'+d+'-C</strong>.',k:true,
-   w:'El -C alto = desgaste que el kit venÃ­a tapando (correa, mecÃ¡nica). Paradas con -C en cero = falla dura (inductivo, cable, bloqueo). Esta lectura de 30 segundos te ahorra desarmar lo que no es.'}]
-   .concat(d===4?[{t:'<strong>Caso resuelto en planta (ago-2026, Baader N2):</strong> E824 repetido â†’ el plato de la polea estaba suelto al eje del SM4. Se reapretÃ³ con llave Allen 8 y no volviÃ³ a marcar errores seguidos.',k:true,
-   w:'Es exactamente el mecanismo del buje/plato fijador suelto: la polea gira "muerta" unos grados en cada inversiÃ³n y el motor pierde pasos aunque correa y sensor estÃ©n perfectos. Confirmado por los colegas de turno.'}]:[])},
- {base:830,m:'iniciador de ranura (interruptor de aproximaciÃ³n) defectuoso',proto:false,
-  extra:d=>[{t:'Revisar conector y cable del inductivo '+TOOLDATA[d].ind+'; si estÃ¡n sanos, <strong>cambiar el inductivo</strong>.',k:true,
-   w:'El manual condena directo al sensor en esta familia. El cable y el conector se revisan primero porque es gratis â€” y con agua y vibraciÃ³n fallan mÃ¡s de lo que parece.'}]},
- {base:840,m:'no alcanza la posiciÃ³n de tope mÃ­nima prevista',proto:false,
-  extra:d=>[{t:'Perilla 5 â†’ posiciÃ³n <strong>5</strong>, llevar el motor a MIN, y ajustar <strong>0,5 â€“ 1 mm</strong> entre el tornillo de tope de enfrente y el tope.',k:true,
-   w:'Si ese tornillo quedÃ³ a mÃ¡s de 1 mm, el motor llega "blando" y el control interpreta que nunca pisÃ³ el MIN. A menos de 0,5 mm golpea y pierde pasos.'},
+  extra:d=>[{t:'Repetir el test: Test 12 (perilla 5 → 2) o Test 13 (→ 3).',k:true,
+   w:'La marcha de prueba aísla la falla sin pescado. Si el error repite en la misma herramienta, es de esa herramienta; si cambia de lugar, sospechá aire, presión o control.'}]},
+ {base:820,m:'no alcanzó su posición cero después de la última carrera durante la producción',proto:true,
+  extra:d=>[{t:'<strong>Reset inmediato:</strong> pulsar <code>I</code> (la máquina hace marcha de referencia) → pulsar <code>I</code> otra vez (arranca).',k:true,
+   w:'E82x significa "no llegó al cero tras la última carrera": la marcha de referencia lo vuelve a encontrar y la producción sigue. Si reaparece seguido, recién ahí empieza el diagnóstico.'},
+  {t:'Antes de desarmar, perilla 5 → posición <strong>1</strong>: leer <strong>∑E82'+d+'</strong> y <strong>∑E82'+d+'-C</strong>.',k:true,
+   w:'El -C alto = desgaste que el kit venía tapando (correa, mecánica). Paradas con -C en cero = falla dura (inductivo, cable, bloqueo). Esta lectura de 30 segundos te ahorra desarmar lo que no es.'}]
+   .concat(d===4?[{t:'<strong>Caso resuelto en planta (ago-2026, Baader N2):</strong> E824 repetido → el plato de la polea estaba suelto al eje del SM4. Se reapretó con llave Allen 8 y no volvió a marcar errores seguidos.',k:true,
+   w:'Es exactamente el mecanismo del buje/plato fijador suelto: la polea gira "muerta" unos grados en cada inversión y el motor pierde pasos aunque correa y sensor estén perfectos. Confirmado por los colegas de turno.'}]:[])},
+ {base:830,m:'iniciador de ranura (interruptor de aproximación) defectuoso',proto:false,
+  extra:d=>[{t:'Revisar conector y cable del inductivo '+TOOLDATA[d].ind+'; si están sanos, <strong>cambiar el inductivo</strong>.',k:true,
+   w:'El manual condena directo al sensor en esta familia. El cable y el conector se revisan primero porque es gratis — y con agua y vibración fallan más de lo que parece.'}]},
+ {base:840,m:'no alcanza la posición de tope mínima prevista',proto:false,
+  extra:d=>[{t:'Perilla 5 → posición <strong>5</strong>, llevar el motor a MIN, y ajustar <strong>0,5 – 1 mm</strong> entre el tornillo de tope de enfrente y el tope.',k:true,
+   w:'Si ese tornillo quedó a más de 1 mm, el motor llega "blando" y el control interpreta que nunca pisó el MIN. A menos de 0,5 mm golpea y pierde pasos.'},
   {t:'Verificar que nada obstruya el recorrido hacia abajo: restos, hielo, pescado trabado.',k:true,
-   w:'Una obstrucciÃ³n da exactamente el mismo sÃ­ntoma que un tope corrido â€” y es mucho mÃ¡s comÃºn despuÃ©s de una limpieza o un atasco.'}]},
- {base:850,m:'no alcanza la posiciÃ³n de tope mÃ¡xima prevista',proto:false,
-  extra:d=>[{t:'Perilla 5 â†’ posiciÃ³n <strong>5</strong>, llevar el motor a MAX, apretar el tornillo de tope contra el tope y fijar los allen de la polea dentada.',k:true,
-   w:'El tope MAX se fija CONTRA el tope con el motor en MAX: asÃ­ el fin de carrera fÃ­sico y el electrÃ³nico quedan en el mismo punto. Si se fija en otra posiciÃ³n, el control espera un tope que la mecÃ¡nica no le da.'},
-  {t:'Verificar el preajuste: <strong>2 mm</strong> entre tornillo de tope y tuerca hexagonal (â‰ˆ17 mm palancaâ€“tornillo).',
-   w:'Es el punto de partida del manual para que la secuencia CEROâ†’MAXâ†’MIN calce a la primera.'}]},
- {base:860,m:'recorrido desde el tope mÃ­nimo hasta la posiciÃ³n cero incorrecto',proto:false,
+   w:'Una obstrucción da exactamente el mismo síntoma que un tope corrido — y es mucho más común después de una limpieza o un atasco.'}]},
+ {base:850,m:'no alcanza la posición de tope máxima prevista',proto:false,
+  extra:d=>[{t:'Perilla 5 → posición <strong>5</strong>, llevar el motor a MAX, apretar el tornillo de tope contra el tope y fijar los allen de la polea dentada.',k:true,
+   w:'El tope MAX se fija CONTRA el tope con el motor en MAX: así el fin de carrera físico y el electrónico quedan en el mismo punto. Si se fija en otra posición, el control espera un tope que la mecánica no le da.'},
+  {t:'Verificar el preajuste: <strong>2 mm</strong> entre tornillo de tope y tuerca hexagonal (â‰ˆ17 mm palanca–tornillo).',
+   w:'Es el punto de partida del manual para que la secuencia CERO→MAX→MIN calce a la primera.'}]},
+ {base:860,m:'recorrido desde el tope mínimo hasta la posición cero incorrecto',proto:false,
   extra:d=>[{t:'Tensar primero la <strong>correa dentada</strong>.',k:true,
-   w:'Este cÃ³digo delata que la transmisiÃ³n "se estira": el motor gira lo correcto pero la herramienta llega tarde del MIN al CERO. Correa floja es el sospechoso de siempre.'},
-  {t:'DespuÃ©s rehacer los topes completos con perilla 5 â†’ posiciÃ³n 5 (orden SM3 â†’ SM2 â†’ SM1 â†’ SM4 â†’ SM5).',k:true,
-   w:'Cualquier tensado de correa corre los topes: si no se rehacen, cambiÃ¡s un cÃ³digo por otro.'}]}
+   w:'Este código delata que la transmisión "se estira": el motor gira lo correcto pero la herramienta llega tarde del MIN al CERO. Correa floja es el sospechoso de siempre.'},
+  {t:'Después rehacer los topes completos con perilla 5 → posición 5 (orden SM3 → SM2 → SM1 → SM4 → SM5).',k:true,
+   w:'Cualquier tensado de correa corre los topes: si no se rehacen, cambiás un código por otro.'}]}
 ];
 
 let CODES=[];
 FAM.forEach(f=>{
   for(let d=1;d<=5;d++){
     const n='E'+(f.base+d);
-    CODES.push({c:n+' Â· '+TOOLNAME[d], m:'El motor paso a paso '+f.m+'.',
+    CODES.push({c:n+' · '+TOOLNAME[d], m:'El motor paso a paso '+f.m+'.',
       proto:f.proto,
       sol:solSM(d,f.extra(d)),
       donde:TOOLDATA[d].donde,
       figs:TOOLDATA[d].figs,
-      loc:'Topes e inductivo: dib. 30 Â· '+TOOLDATA[d].fig,
+      loc:'Topes e inductivo: dib. 30 · '+TOOLDATA[d].fig,
       t:n+' '+(f.base+d)+' '+TOOLNAME[d]+' '+f.m});
   }
 });
 CODES=CODES.concat([
- {c:'E826',m:'El accionamiento bloquea durante la producciÃ³n.',proto:false,
+ {c:'E826',m:'El accionamiento bloquea durante la producción.',proto:false,
   sol:[{t:'Parar. Interruptor principal en 0 y asegurarlo.',k:true,
-   w:'Un bloqueo con energÃ­a es la situaciÃ³n mÃ¡s peligrosa de la mÃ¡quina: si el atasco cede solo, todo se mueve de golpe.'},
+   w:'Un bloqueo con energía es la situación más peligrosa de la máquina: si el atasco cede solo, todo se mueve de golpe.'},
   {t:'Buscar el atasco: pescado trabado en la cadena, resto en una herramienta, hielo.',k:true,
-   w:'E826 casi nunca es elÃ©ctrico: el accionamiento SM6 empuja y algo fÃ­sico no lo deja. Lo que buscÃ¡s es el algo.'},
+   w:'E826 casi nunca es eléctrico: el accionamiento SM6 empuja y algo físico no lo deja. Lo que buscás es el algo.'},
   {t:'Girar el accionamiento a mano para localizar el punto duro.',
-   w:'A mano sentÃ­s exactamente en quÃ© punto del ciclo se traba â€” eso apunta a la estaciÃ³n donde estÃ¡ el atasco.'},
-  {t:'Revisar que ningÃºn excavador haya penetrado en una abrazadera de colas (sÃ­ntoma asociado a E9xx).',
-   w:'Es el choque mÃ¡s caro: dobla herramienta y abrazadera. Pasa cuando el control perdiÃ³ las posiciones (por eso se asocia a la familia E9xx).'},
+   w:'A mano sentís exactamente en qué punto del ciclo se traba — eso apunta a la estación donde está el atasco.'},
+  {t:'Revisar que ningún excavador haya penetrado en una abrazadera de colas (síntoma asociado a E9xx).',
+   w:'Es el choque más caro: dobla herramienta y abrazadera. Pasa cuando el control perdió las posiciones (por eso se asocia a la familia E9xx).'},
   {t:'Despejar, cerrar, y correr Test 12 antes de producir.',k:true,
-   w:'Si el bloqueo doblÃ³ algo, el Test 12 lo muestra sin arriesgar mÃ¡s pescado.'}],
-  donde:'El accionamiento SM6 estÃ¡ en la caja de accionamiento; el atasco puede estar en cualquier estaciÃ³n del campo de trabajo. Recorrelo de entrada a salida con la cubierta levantada.',
+   w:'Si el bloqueo dobló algo, el Test 12 lo muestra sin arriesgar más pescado.'}],
+  donde:'El accionamiento SM6 está en la caja de accionamiento; el atasco puede estar en cualquier estación del campo de trabajo. Recorrelo de entrada a salida con la cubierta levantada.',
   figs:['dib-43','dib-30'],
-  loc:'Accionamiento SM6 Â· dib. 43',t:'826 bloqueo atasco accionamiento trabado'},
- {c:'E827',m:'El extractor de pescados no estÃ¡ en posiciÃ³n bÃ¡sica, o su inductivo estÃ¡ defectuoso.',proto:false,
+  loc:'Accionamiento SM6 · dib. 43',t:'826 bloqueo atasco accionamiento trabado'},
+ {c:'E827',m:'El extractor de pescados no está en posición básica, o su inductivo está defectuoso.',proto:false,
   sol:[{t:'Verificar inductivos <strong>B14</strong> (carro delante del extractor) y <strong>B15</strong> (control extractor): diodo, conector, distancia.',k:true,
-   w:'El control necesita saber que el extractor volviÃ³ a su posiciÃ³n bÃ¡sica antes del siguiente carro. Si B14/B15 no lo confirman, la mÃ¡quina no sigue â€” aunque el extractor estÃ© fÃ­sicamente bien.'},
+   w:'El control necesita saber que el extractor volvió a su posición básica antes del siguiente carro. Si B14/B15 no lo confirman, la máquina no sigue — aunque el extractor esté físicamente bien.'},
   {t:'Cabezas articuladas de los cilindros: <strong>â‰ˆ2 mm</strong> entre la abrazadera de colas abierta y la chapaleta derecha, <strong>ambas ajustadas igual</strong>.',k:true,
-   w:'Con mÃ¡s luz la chapaleta no alcanza a sacar el pescado; con menos, roza la abrazadera y el extractor no vuelve limpio a su posiciÃ³n.'},
+   w:'Con más luz la chapaleta no alcanza a sacar el pescado; con menos, roza la abrazadera y el extractor no vuelve limpio a su posición.'},
   {t:'La chapaleta izquierda al cerrarse no debe tocar la derecha, ni la cubierta al abrirse.',
-   w:'Cualquier roce frena el cilindro a mitad de carrera: posiciÃ³n bÃ¡sica nunca alcanzada = E827 repetido.'},
-  {t:'Verificar vÃ¡lvulas <strong>Y8</strong> (extractor izquierda) e <strong>Y9</strong> (derecha) y sus mangueras.',
-   w:'Sin aire no hay movimiento: bobina quemada o manguera pinchada dan el mismo cÃ³digo que un inductivo muerto.'},
+   w:'Cualquier roce frena el cilindro a mitad de carrera: posición básica nunca alcanzada = E827 repetido.'},
+  {t:'Verificar válvulas <strong>Y8</strong> (extractor izquierda) e <strong>Y9</strong> (derecha) y sus mangueras.',
+   w:'Sin aire no hay movimiento: bobina quemada o manguera pinchada dan el mismo código que un inductivo muerto.'},
   {t:'Mover el extractor a mano: debe salir y volver libre.',k:true,
-   w:'La prueba mÃ¡s rÃ¡pida para separar mecÃ¡nica (se traba a mano) de elÃ©ctrica (libre a mano pero el cÃ³digo sigue).'}],
-  donde:'El extractor estÃ¡ al final de la mÃ¡quina, en la salida de pescados. Las dos chapaletas neumÃ¡ticas se ven de frente; B14/B15 y los cilindros estÃ¡n detrÃ¡s de la salida.',
+   w:'La prueba más rápida para separar mecánica (se traba a mano) de eléctrica (libre a mano pero el código sigue).'}],
+  donde:'El extractor está al final de la máquina, en la salida de pescados. Las dos chapaletas neumáticas se ven de frente; B14/B15 y los cilindros están detrás de la salida.',
   figs:['dib-63','foto-aj-expulsador','dib-10'],
-  loc:'Extractor: dib. 63 Â· vÃ¡lvulas dib. 43',t:'827 extractor salida chapaleta b14 b15 y8 y9'},
+  loc:'Extractor: dib. 63 · válvulas dib. 43',t:'827 extractor salida chapaleta b14 b15 y8 y9'},
  {c:'E777',m:'Pescado en la entrada.',proto:false,
-  sol:[{t:'Si es <strong>esporÃ¡dico</strong>: fallo de introducciÃ³n del operador o abrazadera puntual. Solo resetear y seguir.',k:true,
-   w:'Un E777 aislado es parte de la operaciÃ³n normal â€” pescado mal presentado, cola corta, descuido. No amerita intervenciÃ³n.'},
-  {t:'Si es <strong>regular</strong>, el manual apunta directo: <strong>resorte de tracciÃ³n del carro roto</strong> â€” SAP <strong>3300106055</strong> / manual <strong>38010160</strong>. Cambiarlo.',k:true,
-   w:'El resorte es lo que hace que la abrazadera muerda la cola con fuerza pareja. Roto, TODOS los carros que pasan por ese punto sueltan el pescado â€” por eso la regularidad es la firma de este repuesto.'},
+  sol:[{t:'Si es <strong>esporádico</strong>: fallo de introducción del operador o abrazadera puntual. Solo resetear y seguir.',k:true,
+   w:'Un E777 aislado es parte de la operación normal — pescado mal presentado, cola corta, descuido. No amerita intervención.'},
+  {t:'Si es <strong>regular</strong>, el manual apunta directo: <strong>resorte de tracción del carro roto</strong> — SAP <strong>3300106055</strong> / manual <strong>38010160</strong>. Cambiarlo.',k:true,
+   w:'El resorte es lo que hace que la abrazadera muerda la cola con fuerza pareja. Roto, TODOS los carros que pasan por ese punto sueltan el pescado — por eso la regularidad es la firma de este repuesto.'},
   {t:'Revisar de paso los dientes de las abrazaderas: que engranen sin tropezarse, limpios, sin embotamiento.',
-   w:'La sangre seca hace resbalar los dientes y el desgaste los redondea: mismo sÃ­ntoma, otra causa. Se revisa en la misma pasada.'},
+   w:'La sangre seca hace resbalar los dientes y el desgaste los redondea: mismo síntoma, otra causa. Se revisa en la misma pasada.'},
   {t:'Muelles de abrazadera: 38.03.0219 (espira derecha) y 38.03.0218 (espira izquierda).',
-   w:'Cada lado usa su espira. Montarlos cruzados deja la abrazadera con fuerza dispareja â€” y no se nota a simple vista.'}],
-  donde:'La entrada estÃ¡ donde el operador coloca el pescado: chapaleta de ciclo, tope de colas y abrazadera. El resorte de tracciÃ³n va en el carro, se ve por debajo de la zona de alimentaciÃ³n.',
+   w:'Cada lado usa su espira. Montarlos cruzados deja la abrazadera con fuerza dispareja — y no se nota a simple vista.'}],
+  donde:'La entrada está donde el operador coloca el pescado: chapaleta de ciclo, tope de colas y abrazadera. El resorte de tracción va en el carro, se ve por debajo de la zona de alimentación.',
   figs:['dib-12','foto-resorte-carro','tabla-muelles','dib-14'],
-  loc:'Abrazadera: dib. 12 Â· tabla de muelles pÃ¡rrafo 19',t:'777 entrada abrazadera resorte carro cola'},
- {c:'E900 â€“ E999',m:'Fallo en la placa de la unidad de control, o control colgado. Solo visible en el display de la unidad de control, no en el pupitre.',proto:false,
-  sol:[{t:'<strong>Desconectar el interruptor principal mÃ­nimo 5 segundos</strong> y volver a energizar. Es el Ãºnico remedio del manual.',k:true,
-   w:'La familia E9xx es el propio computador colgado: no hay nada que ajustar en la mÃ¡quina. El corte largo descarga la lÃ³gica y la deja partir de cero.'},
-  {t:'SÃ­ntomas asociados que confirman esta familia: movimiento incontrolado de herramientas, pescado conducido al canalÃ³n sin elaborar, excavador que penetra en la abrazadera, display que no responde a la perilla 5.',k:true,
-   w:'Si ves cualquiera de estos, dejÃ¡ de buscar en sensores y correas: es el control, no la mecÃ¡nica.'},
-  {t:'Si se repite seguido: revisar la refrigeraciÃ³n del A3C (agua fluyendo, vÃ¡lvula Y14).',k:true,
-   w:'El sobrecalentamiento es la causa tÃ­pica de cuelgues repetidos â€” el A3C se refrigera por agua y sobre 50 Â°C la mÃ¡quina se desconecta con las herramientas cayendo solas.'},
-  {t:'Si persiste con refrigeraciÃ³n sana, la placa del A3C requiere servicio Baader.',
-   w:'La placa es de 2005: si falla con agua corriendo y sin patrÃ³n tÃ©rmico, no hay reparaciÃ³n en planta.'}],
-  donde:'La unidad de control A3C estÃ¡ en su caja refrigerada por agua, al costado de la mÃ¡quina. Su display propio (donde se ven los E9xx) estÃ¡ dentro de esa caja â€” no es el display del pupitre.',
+  loc:'Abrazadera: dib. 12 · tabla de muelles párrafo 19',t:'777 entrada abrazadera resorte carro cola'},
+ {c:'E900 – E999',m:'Fallo en la placa de la unidad de control, o control colgado. Solo visible en el display de la unidad de control, no en el pupitre.',proto:false,
+  sol:[{t:'<strong>Desconectar el interruptor principal mínimo 5 segundos</strong> y volver a energizar. Es el único remedio del manual.',k:true,
+   w:'La familia E9xx es el propio computador colgado: no hay nada que ajustar en la máquina. El corte largo descarga la lógica y la deja partir de cero.'},
+  {t:'Síntomas asociados que confirman esta familia: movimiento incontrolado de herramientas, pescado conducido al canalón sin elaborar, excavador que penetra en la abrazadera, display que no responde a la perilla 5.',k:true,
+   w:'Si ves cualquiera de estos, dejá de buscar en sensores y correas: es el control, no la mecánica.'},
+  {t:'Si se repite seguido: revisar la refrigeración del A3C (agua fluyendo, válvula Y14).',k:true,
+   w:'El sobrecalentamiento es la causa típica de cuelgues repetidos — el A3C se refrigera por agua y sobre 50 °C la máquina se desconecta con las herramientas cayendo solas.'},
+  {t:'Si persiste con refrigeración sana, la placa del A3C requiere servicio Baader.',
+   w:'La placa es de 2005: si falla con agua corriendo y sin patrón térmico, no hay reparación en planta.'}],
+  donde:'La unidad de control A3C está en su caja refrigerada por agua, al costado de la máquina. Su display propio (donde se ven los E9xx) está dentro de esa caja — no es el display del pupitre.',
   figs:['dib-34','dib-41','dib-43'],
   loc:'Unidad de control A3C: dib. 34 pos. 1',t:'900 999 placa colgado control incontrolado canalon'},
- {c:'E770',m:'Tarjeta del contador de valor de rotaciÃ³n defectuosa. Solo con Upgrade Kit.',proto:false,
-  sol:[{t:'Ir a la caja de conexiÃ³n del kit: verificar el LED de <strong>24 V</strong> encendido.',k:true,
-   w:'Sin alimentaciÃ³n, todos los transmisores "mueren" a la vez y el control lo reporta como tarjeta mala. El LED de 24 V descarta eso en 5 segundos.'},
-  {t:'Verificar los <strong>2 LEDs bajo cada enchufe</strong>: deben alternar segÃºn el sentido de giro del transmisor.',k:true,
-   w:'Cada par de LEDs muestra los pulsos del canal. Si TODOS los canales estÃ¡n muertos con 24 V presente, la falla es comÃºn: la tarjeta.'},
-  {t:'Si no hay 24 V, revisar alimentaciÃ³n antes de condenar la tarjeta.',
+ {c:'E770',m:'Tarjeta del contador de valor de rotación defectuosa. Solo con Upgrade Kit.',proto:false,
+  sol:[{t:'Ir a la caja de conexión del kit: verificar el LED de <strong>24 V</strong> encendido.',k:true,
+   w:'Sin alimentación, todos los transmisores "mueren" a la vez y el control lo reporta como tarjeta mala. El LED de 24 V descarta eso en 5 segundos.'},
+  {t:'Verificar los <strong>2 LEDs bajo cada enchufe</strong>: deben alternar según el sentido de giro del transmisor.',k:true,
+   w:'Cada par de LEDs muestra los pulsos del canal. Si TODOS los canales están muertos con 24 V presente, la falla es común: la tarjeta.'},
+  {t:'Si no hay 24 V, revisar alimentación antes de condenar la tarjeta.',
    w:'Un fusible o un cable cuesta minutos; la tarjeta, semanas de repuesto.'},
-  {t:'Con alimentaciÃ³n sana y LEDs muertos en todos los canales: cambiar la tarjeta.',k:true,
-   w:'Ya descartaste alimentaciÃ³n y canales individuales â€” lo Ãºnico comÃºn que queda es la tarjeta contadora.'}],
-  donde:'La caja de conexiÃ³n del kit estÃ¡ montada en la pared de la mÃ¡quina, cerca de la caja de accionamiento: es la caja con enchufes y pares de LEDs visibles.',
+  {t:'Con alimentación sana y LEDs muertos en todos los canales: cambiar la tarjeta.',k:true,
+   w:'Ya descartaste alimentación y canales individuales — lo único común que queda es la tarjeta contadora.'}],
+  donde:'La caja de conexión del kit está montada en la pared de la máquina, cerca de la caja de accionamiento: es la caja con enchufes y pares de LEDs visibles.',
   figs:['dib-65','dib-64'],
-  loc:'Caja de conexiÃ³n: dib. 65',t:'770 upgrade kit tarjeta rotacion'}
+  loc:'Caja de conexión: dib. 65',t:'770 upgrade kit tarjeta rotacion'}
 ]);
 for(let d=1;d<=5;d++){
-  CODES.push({c:'E77'+d+' Â· '+TOOLNAME[d],m:'Transmisor de valor de rotaciÃ³n '+TOOLDATA[d].trans+' defectuoso. Solo con Upgrade Kit.',proto:false,
-   sol:[{t:'En la caja de conexiÃ³n, verificar los 2 LEDs bajo el enchufe de <strong>'+TOOLDATA[d].trans+'</strong>: deben alternar al girar el motor (perilla 5 â†’ posiciÃ³n 5 para moverlo).',k:true,
-    w:'Los LEDs son los pulsos del transmisor vistos en vivo. Si alternan, el transmisor estÃ¡ sano y el problema es de la tarjeta o del cÃ³digo leÃ­do.'},
+  CODES.push({c:'E77'+d+' · '+TOOLNAME[d],m:'Transmisor de valor de rotación '+TOOLDATA[d].trans+' defectuoso. Solo con Upgrade Kit.',proto:false,
+   sol:[{t:'En la caja de conexión, verificar los 2 LEDs bajo el enchufe de <strong>'+TOOLDATA[d].trans+'</strong>: deben alternar al girar el motor (perilla 5 → posición 5 para moverlo).',k:true,
+    w:'Los LEDs son los pulsos del transmisor vistos en vivo. Si alternan, el transmisor está sano y el problema es de la tarjeta o del código leído.'},
    {t:'Revisar conector y cable del transmisor: humedad, corte, ficha suelta.',k:true,
-    w:'En ambiente de planta el cable falla mucho mÃ¡s que el transmisor. Es la revisiÃ³n barata antes del repuesto.'},
+    w:'En ambiente de planta el cable falla mucho más que el transmisor. Es la revisión barata antes del repuesto.'},
    {t:'Verificar LED de 24 V de la caja.',
-    w:'Sin 24 V el canal estÃ¡ muerto aunque transmisor y cable estÃ©n perfectos.'},
-   {t:'Si el cableado estÃ¡ sano y los LEDs no conmutan: cambiar el transmisor '+TOOLDATA[d].trans+'.',k:true,
-    w:'Descartado todo lo demÃ¡s, el emisor de pulsos es lo Ãºnico que queda.'},
-   {t:'Mientras tanto la mÃ¡quina puede producir, pero pierde la correcciÃ³n automÃ¡tica de esa herramienta: vigilar el corte.',
-    w:'Sin transmisor, el kit no puede reponer pasos perdidos de ese motor: cualquier desgaste que venÃ­a tapando se va a notar en el corte hasta que cambies el repuesto.'}],
-   donde:'El transmisor '+TOOLDATA[d].trans+' va montado sobre el motor en la caja de accionamiento (lado trasero). Los LEDs de su canal estÃ¡n en la caja de conexiÃ³n del kit.',
+    w:'Sin 24 V el canal está muerto aunque transmisor y cable estén perfectos.'},
+   {t:'Si el cableado está sano y los LEDs no conmutan: cambiar el transmisor '+TOOLDATA[d].trans+'.',k:true,
+    w:'Descartado todo lo demás, el emisor de pulsos es lo único que queda.'},
+   {t:'Mientras tanto la máquina puede producir, pero pierde la corrección automática de esa herramienta: vigilar el corte.',
+    w:'Sin transmisor, el kit no puede reponer pasos perdidos de ese motor: cualquier desgaste que venía tapando se va a notar en el corte hasta que cambies el repuesto.'}],
+   donde:'El transmisor '+TOOLDATA[d].trans+' va montado sobre el motor en la caja de accionamiento (lado trasero). Los LEDs de su canal están en la caja de conexión del kit.',
    figs:['dib-64','dib-65','dib-35'],
-   loc:'Transmisores: dib. 35 y 64 Â· caja de conexiÃ³n dib. 65',
+   loc:'Transmisores: dib. 35 y 64 · caja de conexión dib. 65',
    t:'77'+d+' upgrade kit '+TOOLDATA[d].trans+' '+TOOLNAME[d]+' transmisor rotacion'});
 }
 CODES.push(
- {c:'no water-cooling for computer',m:'IndicaciÃ³n A3C parpadeando. El control desconectÃ³ las unidades de potencia.',proto:false,
-  sol:[{t:'Verificar que <strong>llegue agua</strong> a la mÃ¡quina: manguera conectada, sin grifo de cierre cerrado aguas arriba. <strong>Nunca instalar grifos de cierre delante de la mÃ¡quina.</strong>',k:true,
-   w:'El A3C se refrigera por agua. La causa mÃ¡s tonta y mÃ¡s comÃºn es un grifo que alguien cerrÃ³ â€” y por eso el manual prohÃ­be instalarlos delante de la mÃ¡quina.'},
-  {t:'Verificar la vÃ¡lvula magnÃ©tica <strong>Y14</strong> (agua de refrigeraciÃ³n del A3C): bobina, conector, y que abra.',k:true,
-   w:'Y14 es la Ãºnica vÃ¡lvula entre el agua y el control. Si no abre, el A3C se queda sin refrigeraciÃ³n con la red de agua perfecta.'},
+ {c:'no water-cooling for computer',m:'Indicación A3C parpadeando. El control desconectó las unidades de potencia.',proto:false,
+  sol:[{t:'Verificar que <strong>llegue agua</strong> a la máquina: manguera conectada, sin grifo de cierre cerrado aguas arriba. <strong>Nunca instalar grifos de cierre delante de la máquina.</strong>',k:true,
+   w:'El A3C se refrigera por agua. La causa más tonta y más común es un grifo que alguien cerró — y por eso el manual prohíbe instalarlos delante de la máquina.'},
+  {t:'Verificar la válvula magnética <strong>Y14</strong> (agua de refrigeración del A3C): bobina, conector, y que abra.',k:true,
+   w:'Y14 es la única válvula entre el agua y el control. Si no abre, el A3C se queda sin refrigeración con la red de agua perfecta.'},
   {t:'Abrir el grifo de purga de la caja del A3C y confirmar que circula agua.',k:true,
-   w:'Es la verificaciÃ³n directa: si por la purga no sale agua, el problema estÃ¡ aguas arriba de la caja.'},
-  {t:'Recordar el riesgo: sobre <strong>50 Â°C</strong> la mÃ¡quina se desconecta y <strong>las herramientas caen incontroladamente</strong>. No operar sin refrigeraciÃ³n.',
-   w:'No es solo un cÃ³digo: es la protecciÃ³n que evita que el control cocinado suelte las herramientas en plena producciÃ³n.'},
-  {t:'En Ã©poca de heladas, si la mÃ¡quina queda parada: vaciar el sistema de agua para no daÃ±ar Y13/Y14 y el circuito del A3C (pÃ¡rrafo 16).',
-   w:'El hielo revienta las vÃ¡lvulas magnÃ©ticas por dentro â€” y la falla aparece reciÃ©n al reponer agua, como esta misma indicaciÃ³n.'}],
-  donde:'La caja del A3C con su circuito de agua estÃ¡ al costado de la mÃ¡quina. Y14 estÃ¡ en la entrada de agua de esa caja; el grifo de purga, en la caja misma.',
+   w:'Es la verificación directa: si por la purga no sale agua, el problema está aguas arriba de la caja.'},
+  {t:'Recordar el riesgo: sobre <strong>50 °C</strong> la máquina se desconecta y <strong>las herramientas caen incontroladamente</strong>. No operar sin refrigeración.',
+   w:'No es solo un código: es la protección que evita que el control cocinado suelte las herramientas en plena producción.'},
+  {t:'En época de heladas, si la máquina queda parada: vaciar el sistema de agua para no dañar Y13/Y14 y el circuito del A3C (párrafo 16).',
+   w:'El hielo revienta las válvulas magnéticas por dentro — y la falla aparece recién al reponer agua, como esta misma indicación.'}],
+  donde:'La caja del A3C con su circuito de agua está al costado de la máquina. Y14 está en la entrada de agua de esa caja; el grifo de purga, en la caja misma.',
   figs:['dib-40','dib-41','dib-43'],
-  loc:'Y14: dib. 43 Â· caja A3C: dib. 41 Â· vaciado: dib. 40/41',
+  loc:'Y14: dib. 43 · caja A3C: dib. 41 · vaciado: dib. 40/41',
   t:'agua refrigeracion temperatura y14 a3c 50 grados computer cooling water'});
 
 const cbox=document.getElementById('codes');
@@ -2115,34 +2128,34 @@ function drawCodes(q){
   const hits=CODES.filter(x=>!s||(x.c+' '+x.m+' '+(x.t||'')).toLowerCase().includes(s));
   cbox.innerHTML='';
   if(!hits.length){
-    cbox.innerHTML='<div class="hit"><div class="m">Sin resultados. ProbÃ¡ con el nÃºmero del cÃ³digo (824), el nombre de la herramienta (excavador), o una palabra del sÃ­ntoma (cero, tope, correa).</div></div>';
+    cbox.innerHTML='<div class="hit"><div class="m">Sin resultados. Probá con el número del código (824), el nombre de la herramienta (excavador), o una palabra del síntoma (cero, tope, correa).</div></div>';
     return;
   }
   hits.forEach(x=>{
     const d=document.createElement('div');
     d.className='hit';
     d.innerHTML='<div class="c">'+x.c+'</div><div class="m">'+x.m+'</div>'+
-      '<div class="proto '+(x.proto?'yes':'no')+'">'+(x.proto?'âœ“ Queda en el protocolo (âˆ‘ y âˆ‘-C)':'âœ— NO queda en el protocolo â€” anotar a mano')+'</div>'+
-      '<button type="button" class="togg" aria-expanded="false">Ver soluciÃ³n</button>'+
-      '<div class="sol"><h6>SoluciÃ³n paso a paso</h6><ol>'+x.sol.map(stepHTML).join('')+'</ol>'+
-      (x.donde?'<div class="donde"><b>DÃ³nde pararse</b>'+x.donde+'</div>':'')+
+      '<div class="proto '+(x.proto?'yes':'no')+'">'+(x.proto?'✓ Queda en el protocolo (∑ y ∑-C)':'✗ NO queda en el protocolo — anotar a mano')+'</div>'+
+      '<button type="button" class="togg" aria-expanded="false">Ver solución</button>'+
+      '<div class="sol"><h6>Solución paso a paso</h6><ol>'+x.sol.map(stepHTML).join('')+'</ol>'+
+      (x.donde?'<div class="donde"><b>Dónde pararse</b>'+x.donde+'</div>':'')+
       figrowHTML(x.figs)+
-      '<div class="loc">DÃ³nde estÃ¡: '+x.loc+'</div></div>';
+      '<div class="loc">Dónde está: '+x.loc+'</div></div>';
     const b=d.querySelector('.togg');
     b.addEventListener('click',()=>{
       const open=d.classList.toggle('open');
       b.setAttribute('aria-expanded',open?'true':'false');
-      b.textContent=open?'Ocultar soluciÃ³n':'Ver soluciÃ³n';
+      b.textContent=open?'Ocultar solución':'Ver solución';
     });
     cbox.appendChild(d);
   });
-  // si la bÃºsqueda dio un Ãºnico resultado, abrirlo directo
+  // si la búsqueda dio un único resultado, abrirlo directo
   if(hits.length===1){
     const only=cbox.querySelector('.hit');
     only.classList.add('open');
     const b=only.querySelector('.togg');
     b.setAttribute('aria-expanded','true');
-    b.textContent='Ocultar soluciÃ³n';
+    b.textContent='Ocultar solución';
   }
   if(window.wireFigs)wireFigs(cbox);
   if(window.linkify)linkify(cbox);
@@ -2225,8 +2238,54 @@ const NOTAS_KEY='p5notas.v1';
 let NOTAS={};
 try{ NOTAS=JSON.parse(localStorage.getItem(NOTAS_KEY)||'{}'); }catch(e){ NOTAS={}; }
 
+/* ---------- PUENTE con la PWA ----------
+ * Dentro de la app las notas son COMPARTIDAS (Firestore, vía la página que nos
+ * embebe: este iframe no hereda la sesión de Firebase). Abierto suelto desde
+ * OneDrive no hay a quién preguntarle, así que las notas quedan en este equipo.
+ * `COMPARTIDO` decide cuál de los dos caminos se usa en cada operación. */
+const EMBEBIDO=(function(){ try{ return window.self!==window.top; }catch(e){ return true; } })();
+let COMPARTIDO=false, YO=null, MI_NOMBRE=null;
+const pend=new Map(); let reqSeq=0;
+
+function pedirAlPadre(type,extra){
+  return new Promise((resolve)=>{
+    if(!EMBEBIDO){ resolve({ok:false,code:'suelto'}); return; }
+    const reqId='r'+(++reqSeq);
+    pend.set(reqId,resolve);
+    parent.postMessage(Object.assign({__p5:true,type,reqId},extra||{}),'*');
+    setTimeout(()=>{ if(pend.has(reqId)){ pend.delete(reqId); resolve({ok:false,code:'timeout'}); } },20000);
+  });
+}
+
+window.addEventListener('message',ev=>{
+  const m=ev.data;
+  if(!m||m.__p5!==true)return;
+  if(m.type==='tema'){ aplicarTema(m.dark?'dark':'light'); return; }
+  if(m.type==='notas'){
+    // La PWA manda TODAS las notas de la planta; se reparten por figura.
+    COMPARTIDO=true; YO=m.uid||null; MI_NOMBRE=m.autor||null;
+    const porFig={};
+    (m.notas||[]).forEach(n=>{
+      const k=resolveKey(n.figura);
+      (porFig[k]=porFig[k]||[]).push({
+        id:n.id,tipo:n.tipo,x:n.x,y:n.y,texto:n.texto||'',
+        foto:n.fotoUrl||null,fotoPath:n.fotoPath||null,
+        autor:n.creadoPorNombre||'',mio:!!(YO&&n.creadoPor===YO)
+      });
+    });
+    NOTAS=porFig;
+    if(view.key&&document.getElementById('figview').classList.contains('on'))pintarPins();
+    marcarMiniaturas();
+    return;
+  }
+  if(m.type==='result'&&m.reqId&&pend.has(m.reqId)){
+    const r=pend.get(m.reqId); pend.delete(m.reqId); r(m);
+  }
+});
+
 function notasDe(key){ return NOTAS[resolveKey(key)]||[]; }
 function guardarNotas(){
+  if(COMPARTIDO)return true;   // en modo compartido escribe la PWA, no nosotros
   try{
     localStorage.setItem(NOTAS_KEY,JSON.stringify(NOTAS));
     return true;
@@ -2237,6 +2296,20 @@ function guardarNotas(){
 }
 function nuevoId(){ return 'n'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36); }
 function totalNotas(){ return Object.values(NOTAS).reduce((a,l)=>a+l.length,0); }
+
+/* ---------- tema claro / oscuro ---------- */
+function aplicarTema(t){
+  document.documentElement.setAttribute('data-theme',t==='dark'?'dark':'light');
+  try{ if(!EMBEBIDO)localStorage.setItem('p5tema',t); }catch(e){}
+}
+(function temaInicial(){
+  var t=null;
+  try{ t=new URLSearchParams(location.search).get('theme'); }catch(e){}
+  if(!t){ try{ t=localStorage.getItem('p5tema'); }catch(e){} }
+  if(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';
+  aplicarTema(t||'light');
+  if(EMBEBIDO)document.body.classList.add('embed');
+})();
 
 /* ---------- visor: estado de zoom y paneo ---------- */
 const view={key:null,scale:1,base:1,tx:0,ty:0,w:0,h:0,adding:false};
@@ -2431,9 +2504,18 @@ function abrirNota(key,id){
       '<button class="btn" data-a="close">Cerrar</button>'+
     '</div>';
   sheet.querySelector('[data-a=close]').onclick=cerrarSheet;
-  sheet.querySelector('[data-a=edit]').onclick=()=>editarNota(key,id);
-  sheet.querySelector('[data-a=del]').onclick=()=>{
+  const bEdit=sheet.querySelector('[data-a=edit]'), bDel=sheet.querySelector('[data-a=del]');
+  // Compartidas: cada uno corrige o borra lo suyo (los admin, cualquiera).
+  if(COMPARTIDO&&n.mio===false){ bEdit.remove(); bDel.remove(); }
+  if(bEdit)bEdit.onclick=()=>editarNota(key,id);
+  if(bDel)bDel.onclick=async()=>{
     if(!confirm('¿Borrar esta nota?'))return;
+    if(COMPARTIDO){
+      bDel.disabled=true; bDel.textContent='Borrando…';
+      const r=await pedirAlPadre('nota-borrar',{id:n.id,fotoPath:n.fotoPath||null});
+      if(!r.ok){ alert(msgError(r.code)); bDel.disabled=false; bDel.textContent='Borrar'; return; }
+      cerrarSheet(); return;   // la PWA reenvía la lista y se repinta sola
+    }
     NOTAS[key]=(NOTAS[key]||[]).filter(x=>x.id!==id);
     if(!NOTAS[key].length)delete NOTAS[key];
     guardarNotas(); pintarPins(); marcarMiniaturas(); cerrarSheet();
@@ -2499,9 +2581,22 @@ function editarNota(key,id,pos){
     comprimirFoto(f,d=>{ fotoData=d; prev.innerHTML='<img class="thumb" src="'+d+'">'; });
   };
   sheet.querySelector('[data-a=cancel]').onclick=cerrarSheet;
-  sheet.querySelector('[data-a=save]').onclick=()=>{
+  const bSave=sheet.querySelector('[data-a=save]');
+  bSave.onclick=async()=>{
     const v=txt.value.trim();
     if(!v&&!fotoData){ alert('Escribí un texto o adjuntá una foto.'); return; }
+
+    if(COMPARTIDO){
+      bSave.disabled=true; bSave.textContent='Guardando…';
+      const r=esNueva
+        ? await pedirAlPadre('nota-crear',{nota:{
+            figura:key,tipo:selTipo.value,x:n.x,y:n.y,texto:v,
+            fotoData:(fotoData&&fotoData!==n.foto)?fotoData:null}})
+        : await pedirAlPadre('nota-editar',{id:n.id,tipo:selTipo.value,texto:v});
+      if(!r.ok){ alert(msgError(r.code)); bSave.disabled=false; bSave.textContent='Guardar'; return; }
+      cerrarSheet(); return;   // la PWA reenvía la lista y se repinta sola
+    }
+
     n.tipo=selTipo.value; n.texto=v; n.foto=fotoData||undefined;
     n.autor=autor.value.trim()||undefined;
     n.fecha=n.fecha||new Date().toLocaleDateString('es-CL');
@@ -2511,6 +2606,13 @@ function editarNota(key,id,pos){
     if(guardarNotas()){ pintarPins(); marcarMiniaturas(); cerrarSheet(); }
   };
   sheet.classList.add('on'); sheetbg.classList.add('on');
+}
+
+function msgError(code){
+  if(code==='sin-sesion')return 'Para dejar una nota compartida tenés que iniciar sesión en la app.';
+  if(code==='timeout')return 'La app no respondió. Revisá la conexión y probá de nuevo.';
+  if(code==='permission-denied')return 'Tu usuario no tiene permiso para esto.';
+  return 'No se pudo guardar. Revisá la conexión y probá de nuevo.';
 }
 
 /* Las fotos del celular pesan 3-6 MB: sin comprimir, dos llenan el almacenamiento. */
@@ -2540,15 +2642,23 @@ function abrirMenuNotas(){
   const n=notasDe(key).length, t=totalNotas();
   sheet.innerHTML=
     '<h4>Notas</h4>'+
-    '<div class="meta">'+n+' en esta figura · '+t+' en total, guardadas en este teléfono</div>'+
+    '<div class="meta">'+n+' en esta figura · '+t+' en total</div>'+
+    (COMPARTIDO&&YO
+      ? '<div class="flag ok" style="margin:0 0 10px"><b>Compartidas con el equipo</b>'+
+        'Lo que anotás lo ve el resto de Mantención en su propia sesión. Podés corregir '+
+        'o borrar tus notas; las de otros quedan como están.</div>'
+      : (EMBEBIDO
+        ? '<div class="flag warn" style="margin:0 0 10px"><b>Falta iniciar sesión</b>'+
+          'Estás viendo las notas del equipo, pero para dejar la tuya tenés que iniciar '+
+          'sesión en la app.</div>'
+        : '<div class="flag" style="margin:0 0 10px"><b>Solo en este teléfono</b>'+
+          'Estás usando el manual suelto. Abrilo desde la app (Aprendizaje → Perilla 5) '+
+          'para que las notas se compartan con el equipo.</div>'))+
     '<div class="row" style="margin-top:4px">'+
       '<button class="btn ghost" data-a="exp">Exportar todas</button>'+
-      '<button class="btn ghost" data-a="imp">Importar</button>'+
+      (COMPARTIDO?'':'<button class="btn ghost" data-a="imp">Importar</button>')+
     '</div>'+
     '<input type="file" id="n-imp" accept="application/json" style="display:none">'+
-    '<p style="font-size:13.5px;color:var(--ink-soft);margin:12px 0 0">'+
-      'Las notas viven en este teléfono. Exportá el archivo para pasarlas a otro equipo '+
-      'o para que se incorporen al manual de planta.</p>'+
     '<div class="row"><button class="btn" data-a="close">Cerrar</button></div>';
   sheet.querySelector('[data-a=close]').onclick=cerrarSheet;
   sheet.querySelector('[data-a=exp]').onclick=()=>{
@@ -2559,7 +2669,8 @@ function abrirMenuNotas(){
     a.click(); URL.revokeObjectURL(a.href);
   };
   const imp=sheet.querySelector('#n-imp');
-  sheet.querySelector('[data-a=imp]').onclick=()=>imp.click();
+  const bImp=sheet.querySelector('[data-a=imp]');
+  if(bImp)bImp.onclick=()=>imp.click();
   imp.onchange=()=>{
     const f=imp.files&&imp.files[0]; if(!f)return;
     const fr=new FileReader();
@@ -2748,6 +2859,9 @@ window.linkify=function(root){
 if(typeof drawCodes==='function')drawCodes(document.getElementById('codeq').value||'');
 wireFigs(document);
 linkify(document.querySelector('.wrap'));
+
+/* Saludo al contenedor: si nos responde, las notas pasan a ser compartidas. */
+if(EMBEBIDO){ try{ parent.postMessage({__p5:true,type:'hello'},'*'); }catch(e){} }
 
 /* deep-link: ?t=<seccion> abre esa pestaña; ?q=<texto> precarga el buscador;
    ?fig=<clave> abre una figura directo. Lo usa el modo práctica de la PWA. */
