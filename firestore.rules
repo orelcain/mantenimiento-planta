@@ -532,6 +532,54 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ============================================
+    // LECTURAS DEL PROTOCOLO BAADER 142 (Upgrade Kit)
+    // ============================================
+    // Cada doc es UNA lectura de los 13 contadores del protocolo (selector 5
+    // pos. 1). Registro semanal + antes de cada reset: la tendencia E82x-C
+    // muestra el desgaste que el kit corrige en silencio, para intervenir antes
+    // de la parada. Igual que variadoresCambios: evidencia historica, solo se
+    // crea y se lee, no se edita ni se borra desde la app.
+    match /baader142Protocolo/{lecturaId} {
+      allow read: if isActiveUser();
+
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.plantId is string
+        && request.resource.data.plantId.size() > 0
+        && request.resource.data.plantId.size() <= 40
+        // Orden de planta: N1 (antigua) / N2 / N3.
+        && request.resource.data.maquina in ['baader-n1', 'baader-n2', 'baader-n3']
+        // Fecha de la lectura como YYYY-MM-DD (dia en que se leyo el panel).
+        && request.resource.data.fecha is string
+        && request.resource.data.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        // El denominador de todas las tasas: sin pescados no hay lectura util.
+        && request.resource.data.fish is int
+        && request.resource.data.fish > 0
+        && request.resource.data.fish <= 1000000
+        // Los otros 16 contadores: enteros no negativos acotados.
+        && request.resource.data.stops is int && request.resource.data.stops >= 0 && request.resource.data.stops <= 1000000
+        && request.resource.data.stopc is int && request.resource.data.stopc >= 0 && request.resource.data.stopc <= 1000000
+        && request.resource.data.tclip is int && request.resource.data.tclip >= 0 && request.resource.data.tclip <= 1000000
+        && request.resource.data.tclipc is int && request.resource.data.tclipc >= 0 && request.resource.data.tclipc <= 1000000
+        && request.resource.data.anusi is int && request.resource.data.anusi >= 0 && request.resource.data.anusi <= 1000000
+        && request.resource.data.anuso is int && request.resource.data.anuso >= 0 && request.resource.data.anuso <= 1000000
+        && request.resource.data.e821 is int && request.resource.data.e821 >= 0 && request.resource.data.e821 <= 1000000
+        && request.resource.data.e821c is int && request.resource.data.e821c >= 0 && request.resource.data.e821c <= 1000000
+        && request.resource.data.e822 is int && request.resource.data.e822 >= 0 && request.resource.data.e822 <= 1000000
+        && request.resource.data.e822c is int && request.resource.data.e822c >= 0 && request.resource.data.e822c <= 1000000
+        && request.resource.data.e823 is int && request.resource.data.e823 >= 0 && request.resource.data.e823 <= 1000000
+        && request.resource.data.e823c is int && request.resource.data.e823c >= 0 && request.resource.data.e823c <= 1000000
+        && request.resource.data.e824 is int && request.resource.data.e824 >= 0 && request.resource.data.e824 <= 1000000
+        && request.resource.data.e824c is int && request.resource.data.e824c >= 0 && request.resource.data.e824c <= 1000000
+        && request.resource.data.e825 is int && request.resource.data.e825 >= 0 && request.resource.data.e825 <= 1000000
+        && request.resource.data.e825c is int && request.resource.data.e825c >= 0 && request.resource.data.e825c <= 1000000
+        && (!('notas' in request.resource.data) || request.resource.data.notas.size() <= 500)
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
     // Notas y fotos que la gente cuelga sobre el plano electrico.
     // Se anclan al APARATO (F24, K7...) y no a un punto del dibujo, porque el
     // mismo aparato aparece en varias hojas y la foto sirve en todas.

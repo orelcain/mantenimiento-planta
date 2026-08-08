@@ -6,7 +6,13 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
-(ninguna)
+- [ ] **Perilla 5 · Diagnóstico BAADER 142 → módulo de Aprendizaje** — EN REVISIÓN — claude (PR abierto; ver WORKLOG 2026-08-08).
+  Handoff de Claude mobile (2026-08-08, sesión de terreno con Danilo): herramienta HTML validada
+  en planta (`⚙️ EQUIPOS PLANTA/⚙️ BAADER 142/MANUAL_PERILLA5_BAADER_142.html`, ya con 55 figuras
+  del manual incrustadas). Alcance: (1) embed como módulo especial `/aprendizaje/perilla-5`;
+  (2) registro de lecturas del protocolo (Upgrade Kit) en Firestore `baader142Protocolo`
+  (plantId desde nacimiento) + tendencia E82x-C /1000 para intervenir ANTES de la parada;
+  (3) deep-links runbook→herramienta estilo modo práctica del Grader. Rama `claude/perilla5-baader142`.
 
 ## TODO — repuestos (app viva)
 

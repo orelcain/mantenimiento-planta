@@ -108,6 +108,7 @@ const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200Lear
 const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
 const PlanosElectricosPage = lazyWithReload(() => import('@/pages/PlanosElectricosPage').then((mod) => ({ default: mod.PlanosElectricosPage })))
 const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').then((mod) => ({ default: mod.VariadoresPage })))
+const Perilla5Page = lazyWithReload(() => import('@/pages/Perilla5Page').then((mod) => ({ default: mod.Perilla5Page })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
@@ -418,6 +419,14 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <VariadoresPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/perilla-5"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Perilla5Page />
                 </Suspense>
               }
             />
