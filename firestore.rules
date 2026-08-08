@@ -595,6 +595,49 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ============================================
+    // NOTAS SOBRE LAS FIGURAS DEL MANUAL BAADER 142
+    // ============================================
+    // Anotaciones que el tecnico deja sobre un punto exacto de una figura
+    // (x,y relativos 0-1): una nota, una cota medida en terreno, o una foto del
+    // punto real. Contenido VIVO y compartido entre turnos: a diferencia de
+    // variadoresAportes (que se incorpora por PR), acá el autor puede corregir o
+    // borrar lo suyo, igual que planoNotas.
+    // La foto NO va en el doc: se sube a Storage y acá queda su URL, para que
+    // cargar todas las notas de la planta siga siendo barato.
+    match /baader142Notas/{notaId} {
+      allow read: if isActiveUser();
+
+      allow create: if isActiveUser()
+        && isValidDocSize()
+        && request.resource.data.plantId is string
+        && request.resource.data.plantId.size() > 0
+        && request.resource.data.plantId.size() <= 40
+        && isNonEmptyString(request.resource.data.figura, 1, 60)
+        && request.resource.data.tipo in ['nota', 'cota', 'foto']
+        && request.resource.data.x is number
+        && request.resource.data.x >= 0 && request.resource.data.x <= 1
+        && request.resource.data.y is number
+        && request.resource.data.y >= 0 && request.resource.data.y <= 1
+        && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600)
+        && (!('fotoUrl' in request.resource.data) || request.resource.data.fotoUrl.size() <= 800)
+        // Nota vacia no sirve: o dice algo o trae foto.
+        && (('texto' in request.resource.data && request.resource.data.texto.size() > 0)
+            || ('fotoUrl' in request.resource.data && request.resource.data.fotoUrl.size() > 0))
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      allow update: if isActiveUser()
+        && isValidDocSize()
+        && (resource.data.creadoPor == request.auth.uid || isAdmin())
+        && request.resource.data.creadoPor == resource.data.creadoPor
+        && request.resource.data.figura == resource.data.figura
+        && request.resource.data.tipo in ['nota', 'cota', 'foto']
+        && (!('texto' in request.resource.data) || request.resource.data.texto.size() <= 600);
+
+      allow delete: if isActiveUser()
+        && (resource.data.creadoPor == request.auth.uid || isAdmin());
+    }
+
     // Notas y fotos que la gente cuelga sobre el plano electrico.
     // Se anclan al APARATO (F24, K7...) y no a un punto del dibujo, porque el
     // mismo aparato aparece en varias hojas y la foto sirve en todas.
