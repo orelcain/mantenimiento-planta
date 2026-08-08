@@ -37,6 +37,7 @@ FRASES = {
     "Ersatz für:": "Sustituye a:", "Ersetzt durch:": "Sustituido por:",
     "Food Processing Machinery": "Maquinaria de proceso de alimentos",
     "kommt vor in Typ/Gr.": "Se usa en tipo/tamano",
+    "in Feld": "en campo",
     "Not- Aus": "Parada de emergencia",
     "Not-Aus": "Parada de emergencia",
     "Überlast Motore": "Sobrecarga de motores",
@@ -109,6 +110,26 @@ FRASES = {
     "für Druckluft": "para aire comprimido",
     "Spülwasser Klammern": "Agua de enjuague abrazaderas",
     "Maschine läuft": "Maquina en marcha",
+    # --- variantes de los bloques legales (860/200: terminan en "der") -------
+    "*) Die Maschine muß unter Berücksichtigung der": "*) La maquina debe conectarse a la red segun",
+    "Betrieb muß Isolationsüberwachung vorgesehen": "Sin tierra hay que prever vigilancia de aislacion.",
+    "4) Eingeklammerte Zahlen sind Ader-Nr.": "4) Los numeros entre parentesis son n de hilo.",
+    "Brücke zwischen X1:55 - X1:56.": "Puente entre X1:55 - X1:56.",
+    "Brücke zwischen F5.5:3 - F5.5:4": "Puente entre F5.5:3 - F5.5:4",
+    "Tür Einlauf": "Puerta de entrada",
+    "Wenn M4 und M6 nicht vorhanden,": "Si M4 y M6 no estan presentes,",
+    "S15 entfällt bei Ausführung": "S15 no aplica en ejecucion con",
+    "Zuführband.": "cinta de entrada.",
+    # --- residuos 888 --------------------------------------------------------
+    "Wassergek. Motor": "Motor refrigerado por agua",
+    "run different way": "recorrido alternativo",
+    "run short way": "recorrido corto",
+    "Grundplatte 2 (SPS-Seite)": "Placa base 2 (lado PLC)",
+    "Quittierung/ quit": "Reconocimiento",
+    "Schnittstelle PCS( autom. Rohrreinigung)": "Interfaz PCS (limpieza autom. de tuberias)",
+    "Interface PCS( autom. pipe cleaningsystem)": "Interfaz PCS (limpieza autom. de tuberias)",
+    "Look for BK/ WH core at X16:2": "Ojo: hilo BK/WH en X16:2",
+    "Rutsche (geradeaus)": "Canaleta (recta)",
 }
 
 GLOSARIO = {
@@ -118,7 +139,7 @@ GLOSARIO = {
     "Zeichnungs-Nr.": "N de plano", "Klass.-Nr.": "N de clasificacion",
     "Maßstab": "Escala", "Werkstoff": "Material", "Ersatz": "Sustituye",
     "Ersetzt": "Sustituido", "Änderg.-Nr.": "N de modificacion",
-    "Feld": "Campo", "kommt": "aparece", "vor": "en", "Typ/Gr.": "Tipo/tamano",
+    "Feld": "Campo", "in Feld": "en campo", "kommt": "aparece", "vor": "en", "Typ/Gr.": "Tipo/tamano",
     "Geräteliste": "Lista de aparatos", "Hierzu": "Ver tambien",
 
     # --- estado / mando -----------------------------------------------------
