@@ -1816,7 +1816,9 @@ const FAM=[
   extra:d=>[{t:'<strong>Reset inmediato:</strong> pulsar <code>I</code> (la máquina hace marcha de referencia) → pulsar <code>I</code> otra vez (arranca).',k:true,
    w:'E82x significa "no llegó al cero tras la última carrera": la marcha de referencia lo vuelve a encontrar y la producción sigue. Si reaparece seguido, recién ahí empieza el diagnóstico.'},
   {t:'Antes de desarmar, perilla 5 → posición <strong>1</strong>: leer <strong>∑E82'+d+'</strong> y <strong>∑E82'+d+'-C</strong>.',k:true,
-   w:'El -C alto = desgaste que el kit venía tapando (correa, mecánica). Paradas con -C en cero = falla dura (inductivo, cable, bloqueo). Esta lectura de 30 segundos te ahorra desarmar lo que no es.'}]},
+   w:'El -C alto = desgaste que el kit venía tapando (correa, mecánica). Paradas con -C en cero = falla dura (inductivo, cable, bloqueo). Esta lectura de 30 segundos te ahorra desarmar lo que no es.'}]
+   .concat(d===4?[{t:'<strong>Caso resuelto en planta (ago-2026, Baader N2):</strong> E824 repetido → el plato de la polea estaba suelto al eje del SM4. Se reapretó con llave Allen 8 y no volvió a marcar errores seguidos.',k:true,
+   w:'Es exactamente el mecanismo del buje/plato fijador suelto: la polea gira "muerta" unos grados en cada inversión y el motor pierde pasos aunque correa y sensor estén perfectos. Confirmado por los colegas de turno.'}]:[])},
  {base:830,m:'iniciador de ranura (interruptor de aproximación) defectuoso',proto:false,
   extra:d=>[{t:'Revisar conector y cable del inductivo '+TOOLDATA[d].ind+'; si están sanos, <strong>cambiar el inductivo</strong>.',k:true,
    w:'El manual condena directo al sensor en esta familia. El cable y el conector se revisan primero porque es gratis — y con agua y vibración fallan más de lo que parece.'}]},
