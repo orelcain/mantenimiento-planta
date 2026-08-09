@@ -35,6 +35,13 @@ import {
   MessageSquare,
   AlertTriangle,
   Trash2,
+  Eye,
+  Code2,
+  BarChart3,
+  Wrench,
+  ThumbsUp,
+  ThumbsDown,
+  Dot,
 } from 'lucide-react'
 import {
   getAllAgents,
@@ -82,7 +89,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
         <div className="text-muted-foreground truncate" title={c.userQuery}>❓ "{c.userQuery}"</div>
         <div className="text-red-400 truncate text-[10px]" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
         <div className="text-green-400 text-[10px]">✅ {c.correctResponse.slice(0, 120)}</div>
-        {c.equipmentName && <div className="text-[9px] text-muted-foreground">🔧 {c.equipmentName}</div>}
+        {c.equipmentName && <div className="flex items-center gap-1 text-[9px] text-muted-foreground"><Wrench className="size-2.5" /> {c.equipmentName}</div>}
         <div className="text-[9px] text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
@@ -124,15 +131,17 @@ function statusBadgeVariant(status: MissionLog['status']): 'default' | 'destruct
   }
 }
 
-function capabilityEmoji(cap: string): string {
+/** Ícono por capacidad del agente. Devuelve COMPONENTE, no emoji: así hereda
+ *  color y tamaño del tema, y se ve igual en Windows, Android e iOS. */
+function capabilityIcon(cap: string) {
   switch (cap) {
-    case 'reasoning': return '🧠'
-    case 'vision': return '👁️'
-    case 'code': return '💻'
-    case 'speed': return '⚡'
-    case 'general': return '🔄'
-    case 'analysis': return '📊'
-    default: return '•'
+    case 'reasoning': return Brain
+    case 'vision': return Eye
+    case 'code': return Code2
+    case 'speed': return Zap
+    case 'general': return RefreshCw
+    case 'analysis': return BarChart3
+    default: return Dot
   }
 }
 
@@ -343,7 +352,12 @@ export function MissionControlPanel() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-muted-foreground">
-                      {agent.capabilities.map(c => capabilityEmoji(c)).join(' ')}
+                      <span className="inline-flex items-center gap-1">
+                        {agent.capabilities.map(c => {
+                          const Icon = capabilityIcon(c)
+                          return <Icon key={c} className="size-3" aria-label={c} />
+                        })}
+                      </span>
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       · P{agent.priority} · {agent.costTier}
@@ -521,7 +535,7 @@ export function MissionControlPanel() {
                             style={{ height: `${height}%`, minHeight: 2 }}
                           />
                           <div className="absolute -top-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-popover text-popover-foreground text-[9px] px-1 py-0.5 rounded shadow whitespace-nowrap z-10">
-                            {day.date.slice(5)}: {day.positive}👍 {day.negative}👎
+                            {day.date.slice(5)}: {day.positive}<ThumbsUp className="inline size-3" /> {day.negative}<ThumbsDown className="inline size-3" />
                           </div>
                         </div>
                       )
@@ -599,7 +613,7 @@ export function MissionControlPanel() {
                 <div className="text-center py-4 text-xs text-muted-foreground">
                   <Brain className="h-6 w-6 mx-auto mb-1.5 opacity-30" />
                   Sin datos de aprendizaje aún.<br />
-                  <span className="text-[10px]">Los usuarios pueden dar 👍/👎 en las respuestas del chat para que ARIA aprenda.</span>
+                  <span className="text-[10px]">Los usuarios pueden puntuar las respuestas del chat para que ARIA aprenda.</span>
                 </div>
               )}
             </>

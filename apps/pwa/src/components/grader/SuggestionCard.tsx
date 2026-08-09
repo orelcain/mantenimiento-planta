@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Fish, CalendarDays, BarChart3, Ruler, ClipboardList, Video, Brain, FlaskConical, Target, AlertTriangle } from 'lucide-react'
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
@@ -15,13 +15,15 @@ const CONFIDENCE_LABELS = {
   low:    { label: 'Baja',   color: 'text-red-400'     },
 } as const
 
+/** Ícono por fuente de la sugerencia. Componentes, no emojis: el emoji cambia
+ *  de forma según el sistema operativo y no hereda color ni tamaño del tema. */
 const SOURCE_ICONS = {
-  fishbase:    '🐟',
-  historical:  '📅',
-  batch:       '📊',
-  geometric:   '📐',
-  datasheet:   '📋',
-  measurement: '🎥',
+  fishbase:    Fish,
+  historical:  CalendarDays,
+  batch:       BarChart3,
+  geometric:   Ruler,
+  datasheet:   ClipboardList,
+  measurement: Video,
 } as const
 
 interface Props {
@@ -51,7 +53,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
             <span className="text-muted-foreground">→</span>
             <span className="font-semibold text-foreground">{s.suggestedValue} {typeof s.suggestedValue === 'number' ? s.unit : ''}</span>
             <span className={cn('ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium', style.badge)}>
-              {SOURCE_ICONS[s.source]} {s.sourceLabel}
+              {(() => { const Icon = SOURCE_ICONS[s.source]; return Icon ? <Icon className="inline size-3" /> : null })()} {s.sourceLabel}
             </span>
           </div>
           <p className="text-muted-foreground mt-0.5 line-clamp-2">{s.reasoning}</p>
@@ -62,16 +64,16 @@ export function SuggestionCard({ suggestion: s }: Props) {
       {/* Expanded content */}
       {expanded && (
         <div className="px-3 pb-3 space-y-2.5 border-t border-white/10 pt-2.5">
-          {/* 🧠 Por qué */}
+          {/* Por qué */}
           <div>
-            <p className="font-semibold text-muted-foreground mb-1">🧠 Por qué</p>
+            <p className="font-semibold text-muted-foreground mb-1"><Brain className="inline size-3" /> Por qué</p>
             <p className="text-muted-foreground leading-relaxed">{s.reasoning}</p>
           </div>
 
-          {/* 📊 Datos usados */}
+          {/* Datos usados */}
           {s.dataPoints.length > 0 && (
             <div>
-              <p className="font-semibold text-muted-foreground mb-1">📊 Datos usados</p>
+              <p className="font-semibold text-muted-foreground mb-1"><BarChart3 className="inline size-3" /> Datos usados</p>
               <div className="space-y-0.5">
                 {s.dataPoints.map((dp, i) => (
                   <div key={i} className="flex justify-between gap-2">
@@ -85,24 +87,24 @@ export function SuggestionCard({ suggestion: s }: Props) {
             </div>
           )}
 
-          {/* 🔬 Fórmula */}
+          {/* Fórmula */}
           {s.formula && (
             <div>
-              <p className="font-semibold text-muted-foreground mb-1">🔬 Fórmula</p>
+              <p className="font-semibold text-muted-foreground mb-1"><FlaskConical className="inline size-3" /> Fórmula</p>
               <pre className="font-mono text-[10px] text-foreground/80 whitespace-pre-wrap bg-black/20 rounded p-2">{s.formula}</pre>
             </div>
           )}
 
-          {/* 🎯 Confianza */}
+          {/* Confianza */}
           <div>
-            <p className="font-semibold text-muted-foreground mb-1">🎯 Confianza: <span className={conf.color}>{conf.label}</span></p>
+            <p className="font-semibold text-muted-foreground mb-1"><Target className="inline size-3" /> Confianza: <span className={conf.color}>{conf.label}</span></p>
             <p className="text-muted-foreground">{s.confidenceReason}</p>
           </div>
 
-          {/* ⚠️ Impacto */}
+          {/* Impacto */}
           {s.impactText && (
             <div>
-              <p className="font-semibold text-muted-foreground mb-1">⚠️ Impacto esperado</p>
+              <p className="font-semibold text-muted-foreground mb-1"><AlertTriangle className="inline size-3" /> Impacto esperado</p>
               <p className="text-muted-foreground">{s.impactText}</p>
             </div>
           )}

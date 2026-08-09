@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers } from 'lucide-react'
+import { Pill } from '@/components/piel'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -1041,7 +1042,7 @@ export function SensorsPage() {
                       )}
                       {usbDevices.length > 0 && (
                         <span className="text-green-600 ml-2">
-                          • {usbDevices.length} USB detectado(s) 🔌
+                          • {usbDevices.length} USB detectado(s)
                         </span>
                       )}
                       {usbError && (
@@ -1087,7 +1088,7 @@ export function SensorsPage() {
                                 )}
                                 {d.apSsid && (
                                   <div className="text-xs text-muted-foreground mt-1">
-                                    📶 {d.apSsid}
+                                    <Signal className="inline size-3.5" /> {d.apSsid}
                                   </div>
                                 )}
                               </div>
@@ -1290,16 +1291,16 @@ export function SensorsPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="line">📈 Línea de tiempo</SelectItem>
-                                  <SelectItem value="area">🌊 Área suavizada</SelectItem>
-                                  <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
-                                  <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
-                                  <SelectItem value="bar">📊 Barras por hora</SelectItem>
-                                  <SelectItem value="radar">🕸️ Radar de estado</SelectItem>
-                                  <SelectItem value="gauge">🧭 Gauge (Temperatura)</SelectItem>
-                                  <SelectItem value="heatmap">🧩 Heatmap (Día vs Hora)</SelectItem>
-                                  <SelectItem value="candlestick">🕯️ Candlestick (OHLC)</SelectItem>
-                                  <SelectItem value="mixed">🧪 Mixed (Combinado)</SelectItem>
+                                  <SelectItem value="line"><LineChart className="mr-1.5 inline size-3.5" />Línea de tiempo</SelectItem>
+                                  <SelectItem value="area"><AreaChart className="mr-1.5 inline size-3.5" />Área suavizada</SelectItem>
+                                  <SelectItem value="dual-axis"><Crosshair className="mr-1.5 inline size-3.5" />Doble eje (recomendado)</SelectItem>
+                                  <SelectItem value="scatter"><ScatterChart className="mr-1.5 inline size-3.5" />Scatter (correlación)</SelectItem>
+                                  <SelectItem value="bar"><BarChart3 className="mr-1.5 inline size-3.5" />Barras por hora</SelectItem>
+                                  <SelectItem value="radar"><Radar className="mr-1.5 inline size-3.5" />Radar de estado</SelectItem>
+                                  <SelectItem value="gauge"><Gauge className="mr-1.5 inline size-3.5" />Gauge (temperatura)</SelectItem>
+                                  <SelectItem value="heatmap"><Grid3x3 className="mr-1.5 inline size-3.5" />Heatmap (día vs hora)</SelectItem>
+                                  <SelectItem value="candlestick"><CandlestickChart className="mr-1.5 inline size-3.5" />Candlestick (OHLC)</SelectItem>
+                                  <SelectItem value="mixed"><Layers className="mr-1.5 inline size-3.5" />Mixed (combinado)</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1312,11 +1313,11 @@ export function SensorsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="1h">⏱️ Última hora</SelectItem>
-                                  <SelectItem value="6h">🕐 Últimas 6 horas</SelectItem>
-                                  <SelectItem value="12h">🕛 Últimas 12 horas</SelectItem>
-                                  <SelectItem value="24h">📅 Últimas 24 horas</SelectItem>
-                                  <SelectItem value="48h">📆 Últimos 2 días</SelectItem>
-                                  <SelectItem value="7d">📊 Última semana</SelectItem>
+                                  <SelectItem value="6h"><Clock className="mr-1.5 inline size-3.5" />Últimas 6 horas</SelectItem>
+                                  <SelectItem value="12h"><Clock className="mr-1.5 inline size-3.5" />Últimas 12 horas</SelectItem>
+                                  <SelectItem value="24h"><Clock className="mr-1.5 inline size-3.5" />Últimas 24 horas</SelectItem>
+                                  <SelectItem value="48h"><CalendarDays className="mr-1.5 inline size-3.5" />Últimos 2 días</SelectItem>
+                                  <SelectItem value="7d"><CalendarDays className="mr-1.5 inline size-3.5" />Última semana</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1326,7 +1327,7 @@ export function SensorsPage() {
                           <div className="rounded border bg-card p-4">
                             {historyLoading ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
-                                🔄 Cargando historial...
+                                <RefreshCw className="inline size-3.5 animate-spin" /> Cargando historial…
                               </div>
                             ) : historyData.length === 0 ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
@@ -1352,7 +1353,7 @@ export function SensorsPage() {
                                       defaultPreset={timeRange}
                                     />
                                     <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                      💡 Zoom: scroll | Pan: Ctrl+arrastrar
+                                      <Lightbulb className="inline size-3.5" /> Zoom: scroll · Pan: Ctrl+arrastrar
                                     </div>
                                   </div>
                                 </div>
@@ -1522,7 +1523,7 @@ export function SensorsPage() {
                               onClick={() => setWifiStaSsid(n.ssid || '')}
                               className="text-xs"
                             >
-                              {n.ssid || '(oculta)'} {typeof n.rssi === 'number' ? `· ${n.rssi} dBm` : ''}{n.secure ? ' 🔒' : ''}
+                              {n.ssid || '(oculta)'} {typeof n.rssi === 'number' ? `· ${n.rssi} dBm` : ''}{n.secure && <Lock className="ml-1 inline size-3" aria-label="Red protegida" />}
                             </Button>
                           ))}
                         </div>
@@ -1645,7 +1646,7 @@ export function SensorsPage() {
                             rel="noopener noreferrer"
                             className="text-xs text-primary hover:underline flex items-center gap-1"
                           >
-                            🌐 Abrir panel local
+                            <Globe className="inline size-3.5" /> Abrir panel local
                           </a>
                         )}
                       </div>
@@ -1654,7 +1655,7 @@ export function SensorsPage() {
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
                     <div className="text-xs text-muted-foreground bg-amber-500/[0.08] p-2 rounded border border-amber-200 dark:border-amber-800">
-                      ⚠️ Este dispositivo no ha reportado información de WiFi aún
+                      <AlertTriangle className="inline size-3.5" /> Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
                 </CardContent>
@@ -1748,7 +1749,7 @@ export function SensorsPage() {
                   {loadingEquipment ? (
                     <div className="p-4 text-sm bg-primary/[0.08] border border-blue-200 dark:border-blue-800 rounded">
                       <div className="font-medium text-primary mb-1">
-                        🔄 Cargando equipos...
+                        <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
                       </div>
                       <div className="text-xs text-primary">
                         Por favor espera un momento
@@ -1757,7 +1758,7 @@ export function SensorsPage() {
                   ) : equipment.length === 0 ? (
                     <div className="p-4 text-sm bg-amber-500/[0.08] border border-amber-200 dark:border-amber-800 rounded">
                       <div className="font-medium text-amber-600 mb-1">
-                        ⚠️ No hay equipos disponibles
+                        <AlertTriangle className="inline size-3.5" /> No hay equipos disponibles
                       </div>
                       <div className="text-xs text-amber-600">
                         Ve a la página de Equipos para agregar equipos a la jerarquía.
@@ -2043,7 +2044,7 @@ export function SensorsPage() {
                         <>
                           {filteredEquipment.length > 5 && (
                             <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.08] border-b text-primary">
-                              💡 Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
+                              <ChevronsDown className="inline size-3.5" /> Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}
                           <div className="divide-y">
@@ -2064,7 +2065,7 @@ export function SensorsPage() {
                                     </div>
                                     {e.hierarchyPath && (
                                       <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                        <span className="opacity-60">📍</span>
+                                        <MapPin className="size-3 opacity-60" />
                                         <span className="truncate">{e.hierarchyPath}</span>
                                       </div>
                                     )}
@@ -2088,7 +2089,9 @@ export function SensorsPage() {
                                       }
                                       className="text-xs"
                                     >
-                                      {e.criticidad === 'alta' ? '🔴 Alta' : e.criticidad === 'media' ? '🟡 Media' : '🟢 Baja'}
+                                      <Pill tone={e.criticidad === 'alta' ? 'critical' : e.criticidad === 'media' ? 'warning' : 'ok'} dot>
+                                        {e.criticidad === 'alta' ? 'Alta' : e.criticidad === 'media' ? 'Media' : 'Baja'}
+                                      </Pill>
                                     </Badge>
                                   </div>
                                 </div>
@@ -2146,7 +2149,7 @@ export function SensorsPage() {
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
                       <div className="text-xs text-muted-foreground bg-primary/[0.08] p-2 rounded border border-blue-200 dark:border-blue-800">
-                        💡 Selecciona un equipo de la lista arriba para asignarlo a este sensor
+                        <Lightbulb className="inline size-3.5" /> Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
                   </div>
@@ -2417,7 +2420,9 @@ export function SensorsPage() {
                       </div>
                     )}
                     <div className="text-xs text-muted-foreground mt-1">
-                      {apPassword.length === 0 ? '⚠️ Vacío = red abierta (sin contraseña)' : `${apPassword.length} caracteres`}
+                      {apPassword.length === 0
+                          ? <><AlertTriangle className="inline size-3" /> Vacío = red abierta (sin contraseña)</>
+                          : `${apPassword.length} caracteres`}
                     </div>
                   </div>
 
@@ -2500,7 +2505,7 @@ export function SensorsPage() {
                         <div className="text-xs text-muted-foreground space-y-1">
                           <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
                           <p className={sendInterval <= 10 ? 'text-amber-600' : ''}>
-                            {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
+                            {sendInterval <= 10 && <AlertTriangle className="inline size-3" />}{' '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
                             {sendInterval <= 10 && ' (alto consumo)'}
                           </p>
                         </div>
