@@ -102,6 +102,27 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
 
 ## Reglas de desarrollo
 
+### 🎨 NUEVA PIEL estilo Apple (OBLIGATORIO para TODA UI nueva o modificada — 2026-08-09)
+
+- **Fuente única de normas**: `ANTARFOOD\ARIA_MANTENIMIENTO_PLANTA\docs\NUEVA_PIEL_APPLE_HIG.md`
+  (OneDrive; copia versionada en `docs/NUEVA_PIEL_APPLE_HIG.md` de este repo — si difieren,
+  manda OneDrive). Leerla ANTES de diseñar/construir UI. Skill: `/nueva-piel-apple`.
+- Resumen no negociable: tokens HIG (claro systemGrouped #F2F2F7+blanco / oscuro ELEVADO
+  #1C1C1E/#2C2C2E, jerarquía de texto por OPACIDAD), acento adaptativo #2E75B6→#5AA0DC,
+  8 roles tipográficos (números SIEMPRE `tabular-nums`), radios solo 10/14-16/18-20/999,
+  targets ≥44px, componer desde los 5 primitivos (Button/GroupedList/Pill/Sheet/TabBar),
+  translucidez SOLO en cromo de navegación, motion solo `transform`+`opacity`.
+- PROHIBIDO en código nuevo: emojis como íconos (usar lucide), clases Tailwind de color
+  crudas (`text-amber-400`…), radios fuera de escala, chips `bg-*-500/10`, modales
+  centrados nuevos (usar Sheet), spinners (usar skeleton).
+- **Guardarraíl automático**: `node scripts/audit-piel.mjs` debe pasar antes de cada PR de
+  UI (ratchet: las violaciones no pueden AUMENTAR vs `scripts/audit-piel.baseline.json`;
+  si tu PR las baja, actualiza la línea base en el mismo PR con `--update-baseline`).
+  Detalle de ocurrencias: `--verbose`.
+- Excepciones: HMIs/simuladores y visor 3D (oscuros a propósito); colores que vienen en
+  datos pasan por `softenAccentHex()`; colores de tags del usuario se respetan.
+
+
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
 - **Ruta única**: `D:\a\APP leventamiento de insidencias en planta\` — único clon git local. NO existe clon en OneDrive (eliminado 2026-04-09, era legacy con drift de 240 commits).
 - **Sync**: solo `git push origin main` — el otro PC del trabajo accede via claude.ai conectado a GitHub directamente, no necesita carpeta sincronizada.
