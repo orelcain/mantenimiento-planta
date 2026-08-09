@@ -95,9 +95,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   className={cn(
                     'p-3 rounded-card border flex items-start gap-3',
                     gb.severity === 'critical'
-                      ? 'border-red-300 bg-red-500/[0.08]'
+                      ? 'border-red-300 bg-red-500/[0.15]'
                       : gb.severity === 'warn'
-                      ? 'border-amber-300 bg-amber-500/[0.08]'
+                      ? 'border-amber-300 bg-amber-500/[0.15]'
                       : 'border-muted bg-muted',
                   )}
                 >
@@ -223,8 +223,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   {analytics.gateAdvancedStats.map((gs) => (
                     <tr key={gs.gateNumber} className={cn(
                       'border-b hover:bg-muted/30',
-                      gs.cv > 0.15 && 'bg-amber-500/[0.08]',
-                      gs.mismatchPct > 30 && 'bg-red-500/[0.08]',
+                      gs.cv > 0.15 && 'bg-amber-500/[0.15]',
+                      gs.mismatchPct > 30 && 'bg-red-500/[0.15]',
                     )}>
                       <td className="py-2 px-2 font-medium">Gate {gs.gateNumber}</td>
                       <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString('es-CL')}</td>
@@ -422,9 +422,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       t.status === 'critical' ? 'text-red-600' :
                       'text-muted-foreground'
                     const bg =
-                      t.status === 'ok' ? 'bg-emerald-500/[0.08]' :
-                      t.status === 'warn' ? 'bg-amber-500/[0.08]' :
-                      t.status === 'critical' ? 'bg-red-500/[0.08]' :
+                      t.status === 'ok' ? 'bg-emerald-500/[0.15]' :
+                      t.status === 'warn' ? 'bg-amber-500/[0.15]' :
+                      t.status === 'critical' ? 'bg-red-500/[0.15]' :
                       ''
                     const label =
                       t.status === 'ok' ? 'OK' :
@@ -521,7 +521,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       key={o.gateNumber}
                       className={cn(
                         'border-b hover:bg-muted/30',
-                        !o.isMatch && o.suggestedCalibre != null && 'bg-cat-6-tint/[0.08]',
+                        !o.isMatch && o.suggestedCalibre != null && 'bg-cat-6-tint/[0.15]',
                       )}
                     >
                       <td className="py-2 px-2 font-medium">Gate {o.gateNumber}</td>

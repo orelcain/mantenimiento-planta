@@ -652,7 +652,7 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-emerald-500/[0.25] bg-emerald-500/[0.08] cursor-pointer hover:bg-emerald-500/[0.08] transition-colors"
+              className="border-emerald-500/[0.25] bg-emerald-500/[0.15] cursor-pointer hover:bg-emerald-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -671,7 +671,7 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-red-500/[0.25] bg-red-500/[0.08] cursor-pointer hover:bg-red-500/[0.08] transition-colors"
+              className="border-red-500/[0.25] bg-red-500/[0.15] cursor-pointer hover:bg-red-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -693,7 +693,7 @@ export function GraderPeriodView({ data }: Props) {
 
       {/* ── Panel de insights automáticos ───────────────────────────────── */}
       {insights && (
-        <Card className="border-primary/[0.25] bg-primary/[0.08]">
+        <Card className="border-primary/[0.25] bg-primary/[0.15]">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm text-primary flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />

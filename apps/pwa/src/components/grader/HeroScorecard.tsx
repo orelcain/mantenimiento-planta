@@ -30,19 +30,19 @@ function fmtSyncRelative(at: Date | null | undefined): string {
 const VERDICT_STYLE = {
   ok: {
     border: 'border-emerald-500',
-    bg: 'bg-emerald-500/[0.08]',
+    bg: 'bg-emerald-500/[0.15]',
     numColor: 'text-emerald-400',
     label: 'Turno en rango',
   },
   warn: {
     border: 'border-amber-500',
-    bg: 'bg-amber-500/[0.08]',
+    bg: 'bg-amber-500/[0.15]',
     numColor: 'text-amber-400',
     label: 'Turno con oportunidades',
   },
   critical: {
     border: 'border-red-500',
-    bg: 'bg-red-500/[0.08]',
+    bg: 'bg-red-500/[0.15]',
     numColor: 'text-red-400',
     label: 'Turno fuera de rango',
   },
@@ -240,12 +240,12 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
 
           <div className="flex h-2 rounded-ctl overflow-hidden bg-background/60">
             <div
-              className="h-full bg-primary/[0.08] cursor-help"
+              className="h-full bg-primary/[0.15] cursor-help"
               style={{ width: `${100 - manualLine.pctOfGrader}%` }}
               title={`Procesadas por las Baader: ${manualLine.baaderCycles.toLocaleString('es-CL')} ciclos (Shoplogix).`}
             />
             <div
-              className="h-full bg-cat-6-tint/[0.08] cursor-help"
+              className="h-full bg-cat-6-tint/[0.15] cursor-help"
               style={{ width: `${manualLine.pctOfGrader}%` }}
               title={MANUAL_LINE_TOOLTIP}
             />
@@ -253,12 +253,12 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
 
           <div className="flex items-center gap-3 flex-wrap text-[11px]">
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-[2px] bg-primary/[0.08]" />
+              <span className="w-2 h-2 rounded-[2px] bg-primary/[0.15]" />
               <span className="text-muted-foreground">Baader</span>
               <b className="tabular-nums">{manualLine.baaderCycles.toLocaleString('es-CL')}</b>
             </span>
             <span className="flex items-center gap-1.5 cursor-help" title={MANUAL_LINE_TOOLTIP}>
-              <span className="w-2 h-2 rounded-[2px] bg-cat-6-tint/[0.08]" />
+              <span className="w-2 h-2 rounded-[2px] bg-cat-6-tint/[0.15]" />
               <span className="text-muted-foreground">{MANUAL_LINE_LABEL}</span>
               <b className="tabular-nums text-violet-400">
                 {manualLine.manualPieces.toLocaleString('es-CL')}

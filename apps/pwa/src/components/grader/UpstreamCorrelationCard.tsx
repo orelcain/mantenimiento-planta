@@ -37,13 +37,13 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:      { bg: 'bg-cat-5-tint/[0.08]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
-  upstream_majority:    { bg: 'bg-amber-500/[0.08]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-amber-600',   icon: AlertTriangle, label: 'Upstream parcial' },
+  upstream_global:      { bg: 'bg-cat-5-tint/[0.15]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-amber-600',   icon: AlertTriangle, label: 'Upstream parcial' },
   upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
   // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
-  coincidental_planned: { bg: 'bg-cat-7-tint/[0.08]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
-  no_correlation:       { bg: 'bg-emerald-500/[0.08]', border: 'border-emerald-500/[0.25] dark:border-emerald-500/[0.25]', text: 'text-emerald-600', icon: CheckCircle2,  label: 'Interna' },
+  coincidental_planned: { bg: 'bg-cat-7-tint/[0.15]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
+  no_correlation:       { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25] dark:border-emerald-500/[0.25]', text: 'text-emerald-600', icon: CheckCircle2,  label: 'Interna' },
 }
 
 function CorrelationRow({ corr, expanded, onToggle }: {

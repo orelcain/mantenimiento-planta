@@ -209,7 +209,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Fila 2: Mejor / Peor turno ── */}
       <div className="grid grid-cols-2 gap-2">
-        <Card className={`border-emerald-500/[0.25] bg-emerald-500/[0.08] ${!best ? 'opacity-40' : ''}`}>
+        <Card className={`border-emerald-500/[0.25] bg-emerald-500/[0.15] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
@@ -224,7 +224,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           </CardContent>
         </Card>
 
-        <Card className={`border-cat-5-tint/[0.25] bg-cat-5-tint/[0.08] ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
@@ -371,7 +371,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-amber-500/[0.08] transition-all"
+                    className="h-full rounded-full bg-amber-500/[0.15] transition-all"
                     style={{ width: `${barPct.toFixed(1)}%` }}
                   />
                 </div>

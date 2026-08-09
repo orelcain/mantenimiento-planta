@@ -714,7 +714,7 @@ export function AnalisisGraderWizardPage() {
           vivía al fondo de la página (bajo el calendario) y el usuario no lo
           veía → daba la impresión de que "no pasaba nada". */}
       {multiDayInfo && !savedToCalendar && (
-        <Card className="border-primary/[0.25] bg-primary/[0.08] shadow-md ring-1 ring-sky-500/20">
+        <Card className="border-primary/[0.25] bg-primary/[0.15] shadow-md ring-1 ring-sky-500/20">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
               <Upload className="h-4 w-4 text-sky-400 shrink-0 animate-pulse" />
@@ -762,7 +762,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {savedToCalendar && (
-        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.08]">
+        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
             <p className="text-sm text-emerald-600 font-medium">
@@ -772,7 +772,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {saveError && (
-        <Card className="border-red-500/[0.25] bg-red-500/[0.08]">
+        <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -785,7 +785,7 @@ export function AnalisisGraderWizardPage() {
             <Button
               size="sm"
               variant="ghost"
-              className="text-red-600 hover:bg-red-500/[0.08] shrink-0"
+              className="text-red-600 hover:bg-red-500/[0.15] shrink-0"
               onClick={() => setSaveError(null)}
             >
               Cerrar
@@ -824,11 +824,11 @@ export function AnalisisGraderWizardPage() {
               `lineId` de la pestaña activa se propaga al guardar el doc
               con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
           {lineConfig.hasGraderData && (
-            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.08]">
+            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15]">
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-primary/[0.08] transition-colors rounded-card"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-primary/[0.15] transition-colors rounded-card"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />
@@ -836,7 +836,7 @@ export function AnalisisGraderWizardPage() {
                   Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
                 </span>
                 {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/[0.08] text-primary font-medium">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-medium">
                     {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
                   </span>
                 )}

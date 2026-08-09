@@ -21,11 +21,11 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
   const p0Better = m.deltaP0 < 0
   const p0Worse = m.deltaP0 > 0
   const p0Color = p0Better ? 'text-emerald-600' : p0Worse ? 'text-red-600' : 'text-muted-foreground'
-  const p0BgClass = p0Better ? 'bg-emerald-500/[0.08] border-emerald-500/[0.25]' : p0Worse ? 'bg-red-500/[0.08] border-red-500/[0.25]' : 'bg-muted/20'
+  const p0BgClass = p0Better ? 'bg-emerald-500/[0.15] border-emerald-500/[0.25]' : p0Worse ? 'bg-red-500/[0.15] border-red-500/[0.25]' : 'bg-muted/20'
   const percentileLabel = m.percentileP0 >= 75 ? 'peor 25%' : m.percentileP0 >= 50 ? 'peor 50%' : m.percentileP0 >= 25 ? 'mejor 50%' : 'mejor 25%'
 
   return (
-    <Card className="border-cat-6-tint/[0.25] bg-cat-6-tint/[0.08]">
+    <Card className="border-cat-6-tint/[0.25] bg-cat-6-tint/[0.15]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Brain className="h-4 w-4 text-violet-500" />
@@ -76,7 +76,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
                     className={cn(
                       'flex items-center justify-between gap-2 p-1.5 rounded-ctl border text-xs',
                       isInCurrent
-                        ? 'border-amber-500/[0.25] bg-amber-500/[0.08]'
+                        ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
                         : 'border-border bg-muted/10',
                     )}
                   >

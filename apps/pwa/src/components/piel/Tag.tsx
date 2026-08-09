@@ -23,14 +23,14 @@ export type TagTone = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 'neutral'
 // Tailwind necesita las clases COMPLETAS en el código para no purgarlas: por eso
 // el mapa es literal y no `text-cat-${n}-ink` interpolado.
 const TONES: Record<TagTone, string> = {
-  1: 'text-cat-1-ink bg-cat-1-tint/[0.08]',
-  2: 'text-cat-2-ink bg-cat-2-tint/[0.08]',
-  3: 'text-cat-3-ink bg-cat-3-tint/[0.08]',
-  4: 'text-cat-4-ink bg-cat-4-tint/[0.08]',
-  5: 'text-cat-5-ink bg-cat-5-tint/[0.08]',
-  6: 'text-cat-6-ink bg-cat-6-tint/[0.08]',
-  7: 'text-cat-7-ink bg-cat-7-tint/[0.08]',
-  8: 'text-cat-8-ink bg-cat-8-tint/[0.08]',
+  1: 'text-cat-1-ink bg-cat-1-tint/[0.15]',
+  2: 'text-cat-2-ink bg-cat-2-tint/[0.15]',
+  3: 'text-cat-3-ink bg-cat-3-tint/[0.15]',
+  4: 'text-cat-4-ink bg-cat-4-tint/[0.15]',
+  5: 'text-cat-5-ink bg-cat-5-tint/[0.15]',
+  6: 'text-cat-6-ink bg-cat-6-tint/[0.15]',
+  7: 'text-cat-7-ink bg-cat-7-tint/[0.15]',
+  8: 'text-cat-8-ink bg-cat-8-tint/[0.15]',
   neutral: 'text-muted-foreground bg-muted-foreground/[0.10]',
 }
 

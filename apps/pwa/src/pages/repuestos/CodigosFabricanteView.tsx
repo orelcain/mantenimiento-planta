@@ -273,14 +273,14 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
               {existe === undefined ? null : existe ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-emerald-600"
+                  className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-emerald-600"
                   title={existe.textoBreve || 'Ya está en el maestro'}
                 >
                   <CircleCheck className="h-3 w-3" />
                   {existe.codigoSAP ? `En repuestos · SAP ${existe.codigoSAP}` : 'En repuestos · sin SAP'}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-ctl bg-amber-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+                <span className="inline-flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
                   <CirclePlus className="h-3 w-3" /> No está en repuestos
                 </span>
               )}
@@ -296,7 +296,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 {p.codigoProveedor && (
                   <button
                     onClick={() => copiar(p.codigoProveedor!)}
-                    className="inline-flex items-center gap-1 rounded-ctl bg-primary/[0.08] px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-sky-600 hover:bg-primary/[0.08] dark:text-sky-400"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-sky-600 hover:bg-primary/[0.15] dark:text-sky-400"
                     title={`Código ${p.proveedor || 'del distribuidor'} — clic para copiar`}
                   >
                     {p.proveedor || 'Distribuidor'}: {p.codigoProveedor}
@@ -306,7 +306,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 {p.codigoSap && (
                   <button
                     onClick={() => copiar(p.codigoSap!)}
-                    className="inline-flex items-center gap-1 rounded-ctl bg-cat-6-tint/[0.08] px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-violet-600 hover:bg-cat-6-tint/[0.08] dark:text-violet-400"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-cat-6-tint/[0.15] px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-violet-600 hover:bg-cat-6-tint/[0.15] dark:text-violet-400"
                     title="Código SAP ya creado para esta pieza — clic para copiar"
                   >
                     SAP: {p.codigoSap}

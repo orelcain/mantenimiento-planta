@@ -48,18 +48,18 @@ const INK = {
   stone: 'text-muted-foreground',
 }
 const TINT = {
-  red: 'bg-red-500/[0.08]', amber: 'bg-amber-500/[0.08]', emerald: 'bg-emerald-500/[0.08]',
-  green: 'bg-green-500/[0.08]', yellow: 'bg-amber-500/[0.08]',
-  blue: 'bg-primary/[0.08]', sky: 'bg-primary/[0.08]',
-  indigo: 'bg-cat-3-tint/[0.08]', violet: 'bg-cat-6-tint/[0.08]', purple: 'bg-cat-6-tint/[0.08]',
-  orange: 'bg-cat-4-tint/[0.08]', teal: 'bg-cat-7-tint/[0.08]', cyan: 'bg-cat-7-tint/[0.08]',
-  rose: 'bg-cat-5-tint/[0.08]', pink: 'bg-cat-5-tint/[0.08]',
+  red: 'bg-red-500/[0.15]', amber: 'bg-amber-500/[0.15]', emerald: 'bg-emerald-500/[0.15]',
+  green: 'bg-green-500/[0.15]', yellow: 'bg-amber-500/[0.15]',
+  blue: 'bg-primary/[0.15]', sky: 'bg-primary/[0.15]',
+  indigo: 'bg-cat-3-tint/[0.15]', violet: 'bg-cat-6-tint/[0.15]', purple: 'bg-cat-6-tint/[0.15]',
+  orange: 'bg-cat-4-tint/[0.15]', teal: 'bg-cat-7-tint/[0.15]', cyan: 'bg-cat-7-tint/[0.15]',
+  rose: 'bg-cat-5-tint/[0.15]', pink: 'bg-cat-5-tint/[0.15]',
   zinc: 'bg-muted-foreground/[0.10]', gray: 'bg-muted-foreground/[0.10]',
   slate: 'bg-muted-foreground/[0.10]', neutral: 'bg-muted-foreground/[0.10]',
   stone: 'bg-muted-foreground/[0.10]',
 }
 const BORDER = Object.fromEntries(
-  Object.entries(TINT).map(([k, v]) => [k, v.replace('bg-', 'border-').replace('/[0.08]', '/[0.25]')]),
+  Object.entries(TINT).map(([k, v]) => [k, v.replace('bg-', 'border-').replace('/[0.15]', '/[0.25]')]),
 )
 
 const FAMS = Object.keys(INK).join('|')

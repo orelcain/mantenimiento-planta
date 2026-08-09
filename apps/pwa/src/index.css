@@ -125,6 +125,9 @@
   /* Marca. Var-izada para permitir el acento adaptativo de la piel nueva. */
   --brand: 46 117 182;              /* #2E75B6 */
   --brand-foreground: 255 255 255;
+  /* Tinta de marca para texto SOBRE tinte de marca: el #2E75B6 puro sobre su
+     propio tinte al 15% da 3.98:1 y reprueba AA — medido. */
+  --brand-ink: 42 106 166;          /* #2a6aa6 */
 
   /* ── PALETA CATEGÓRICA (docs/NUEVA_PIEL_APPLE_HIG.md §1.6) ────────────────
      Hueco real del sistema detectado al barrer Bodega: la piel definía colores
@@ -138,14 +141,14 @@
      Los 8 pasan AA sobre su propio tinte en ambos temas — medido, y vigilado
      en `scripts/check-contrast.mjs`. Dos hubo que corregirlos: el índigo
      oscuro (3.78:1) y el teal claro (4.41:1). */
-  --cat-1-ink: 0 64 221;      --cat-1-tint: 0 122 255;     /* azul     */
-  --cat-2-ink: 33 126 56;     --cat-2-tint: 52 199 89;     /* verde    */
-  --cat-3-ink: 54 52 163;     --cat-3-tint: 88 86 214;     /* índigo   */
-  --cat-4-ink: 201 52 0;      --cat-4-tint: 255 149 0;     /* naranja  */
-  --cat-5-ink: 211 15 69;     --cat-5-tint: 255 45 85;     /* rosa     */
-  --cat-6-ink: 137 68 171;    --cat-6-tint: 175 82 222;    /* púrpura  */
-  --cat-7-ink: 12 126 120;    --cat-7-tint: 48 176 199;    /* teal     */
-  --cat-8-ink: 127 85 57;     --cat-8-tint: 162 132 94;    /* café     */
+  --cat-1-ink: 0 100 209;      --cat-1-tint: 0 122 255;     /* azul     */
+  --cat-2-ink: 33 125 56;     --cat-2-tint: 52 199 89;     /* verde    */
+  --cat-3-ink: 88 86 214;     --cat-3-tint: 88 86 214;     /* índigo   */
+  --cat-4-ink: 158 92 0;      --cat-4-tint: 255 149 0;     /* naranja  */
+  --cat-5-ink: 199 35 66;     --cat-5-tint: 255 45 85;     /* rosa     */
+  --cat-6-ink: 147 69 186;    --cat-6-tint: 175 82 222;    /* púrpura  */
+  --cat-7-ink: 32 118 133;    --cat-7-tint: 48 176 199;    /* teal     */
+  --cat-8-ink: 126 103 73;     --cat-8-tint: 162 132 94;    /* café     */
 }
 .dark {
   color-scheme: dark;
@@ -203,14 +206,14 @@
   /* Paleta categórica en oscuro: NO es el claro invertido. La tinta usa los
      tonos vivos (que sobre superficie oscura son los legibles) y el tinte el
      system color dark de Apple. Ver el bloque de `:root` para el porqué. */
-  --cat-1-ink: 64 156 255;    --cat-1-tint: 10 132 255;
-  --cat-2-ink: 48 219 91;     --cat-2-tint: 48 209 88;
-  --cat-3-ink: 143 140 255;   --cat-3-tint: 94 92 230;
-  --cat-4-ink: 255 179 64;    --cat-4-tint: 255 159 10;
-  --cat-5-ink: 255 100 130;   --cat-5-tint: 255 55 95;
-  --cat-6-ink: 218 143 255;   --cat-6-tint: 191 90 242;
-  --cat-7-ink: 93 231 223;    --cat-7-tint: 64 200 224;
-  --cat-8-ink: 195 160 132;   --cat-8-tint: 172 142 104;
+  --cat-1-ink: 76 165 255;    --cat-1-tint: 10 132 255;
+  --cat-2-ink: 48 209 88;     --cat-2-tint: 48 209 88;
+  --cat-3-ink: 150 149 239;   --cat-3-tint: 94 92 230;
+  --cat-4-ink: 255 159 10;    --cat-4-tint: 255 159 10;
+  --cat-5-ink: 255 113 141;   --cat-5-tint: 255 55 95;
+  --cat-6-ink: 208 133 245;   --cat-6-tint: 191 90 242;
+  --cat-7-ink: 64 200 224;    --cat-7-tint: 64 200 224;
+  --cat-8-ink: 188 163 133;   --cat-8-tint: 172 142 104;
 }
 
 /* ============================================================================
@@ -271,10 +274,12 @@
   /* El verde accesible de Apple (#248A3D) queda en 4.40:1 sobre card y 4.14:1
      sobre el fondo gris — MEDIDO, reprueba AA. Se oscurece al mínimo que cumple
      en el peor caso: #217E38 → 5.11:1 card / 4.58:1 fondo. */
-  --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 126 56;
-  --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 126 56;
-  --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 215 0 21;
-  --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 201 52 0;
+  /* Los -600 son la TINTA sobre el tinte al 15% (§1.4). Recalculados al subir
+     el tinte de 8% a 15%: con más fondo, la tinta necesita más peso. */
+  --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 125 56;
+  --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 125 56;
+  --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 196 45 37;
+  --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 158 92 0;
   --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
 
   /* Geometría Apple: más redondeada y con más salto entre niveles. */
@@ -312,15 +317,16 @@
   --lc-border-hi: #48484a;
 
   /* Tintes dark del sistema; el 600 usa la variante accesible dark de Apple. */
-  --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 219 91;
-  --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 219 91;
-  --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 105 97;
-  --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 179 64;
+  --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;
+  --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
+  --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
+  --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
   --tw-blue-400: 90 160 220;     --tw-blue-500: 90 160 220;
 
   /* Acento adaptativo: el #2E75B6 pierde fuerza sobre superficie oscura. */
   --brand: 90 160 220;              /* #5AA0DC */
   --brand-foreground: 16 20 26;
+  --brand-ink: 113 173 225;         /* #71ade1 */
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que

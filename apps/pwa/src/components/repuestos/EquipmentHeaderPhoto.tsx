@@ -124,7 +124,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
               )}
               {isAdmin && (
                 <button onClick={() => handleDelete(photos[lightbox.idx]!)}
-                  className="ml-2 h-8 rounded-card bg-red-500/[0.08] px-3 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-500/[0.08]">
+                  className="ml-2 h-8 rounded-card bg-red-500/[0.15] px-3 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-500/[0.15]">
                   Eliminar
                 </button>
               )}

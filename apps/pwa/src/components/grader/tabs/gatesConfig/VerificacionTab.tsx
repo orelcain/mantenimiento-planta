@@ -81,7 +81,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
           }
 
           return (
-            <div key={belt.beltId} className={cn('rounded-card border p-3 text-xs', hasDiscrepancy && 'border-amber-400 bg-amber-500/[0.08]')}>
+            <div key={belt.beltId} className={cn('rounded-card border p-3 text-xs', hasDiscrepancy && 'border-amber-400 bg-amber-500/[0.15]')}>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="font-medium text-sm">{belt.label}</span>
                 {belt.vfd?.label && (
@@ -107,7 +107,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </Select>
                   </div>
                 )}
-                {hasDiscrepancy && <Badge className="text-[10px] bg-amber-500/[0.08] text-amber-600">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
+                {hasDiscrepancy && <Badge className="text-[10px] bg-amber-500/[0.15] text-amber-600">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
                 <span className="ml-auto font-mono font-semibold">{belt.speedMps.toFixed(3)} m/s actual</span>
               </div>
               <table className="w-full">
@@ -122,7 +122,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                 </thead>
                 <tbody>
                   {/* Fuente 1: Z2 units */}
-                  <tr className={cn('border-b', truthSource === 'z2' && 'bg-green-500/[0.08]')}>
+                  <tr className={cn('border-b', truthSource === 'z2' && 'bg-green-500/[0.15]')}>
                     <td className="py-1 px-2">Z2 controller</td>
                     <td className="py-1 px-2 font-mono">{z2Units ?? '—'} units × {k.toFixed(6)}</td>
                     <td className="py-1 px-2 text-right font-mono">{speedFromZ2?.toFixed(3) ?? '—'}</td>
@@ -135,7 +135,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 2: VFD RPM */}
-                  <tr className={cn('border-b', truthSource === 'vfd' && 'bg-green-500/[0.08]')}>
+                  <tr className={cn('border-b', truthSource === 'vfd' && 'bg-green-500/[0.15]')}>
                     <td className="py-1 px-2">VFD Danfoss</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -163,7 +163,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 3: Tachómetro en eje */}
-                  <tr className={cn('border-b', truthSource === 'tachShaft' && 'bg-green-500/[0.08]')}>
+                  <tr className={cn('border-b', truthSource === 'tachShaft' && 'bg-green-500/[0.15]')}>
                     <td className="py-1 px-2">Tacómetro eje</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -191,7 +191,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </td>
                   </tr>
                   {/* Fuente 4: Tachómetro lineal directo */}
-                  <tr className={cn(truthSource === 'tachLinear' && 'bg-green-500/[0.08]')}>
+                  <tr className={cn(truthSource === 'tachLinear' && 'bg-green-500/[0.15]')}>
                     <td className="py-1 px-2">Tacómetro lineal</td>
                     <td className="py-1 px-2">
                       <div className="flex items-center gap-1">
@@ -222,7 +222,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
               </table>
               {/* Cuando hay tacómetro y VFD: derivar el factor effectiveMpsPerRpm */}
               {belt.vfd?.measuredBeltMps && belt.vfd?.vfdCurrentRpm && (
-                <div className="mt-2 p-2 rounded-ctl bg-green-500/[0.08] border border-green-500/[0.25]">
+                <div className="mt-2 p-2 rounded-ctl bg-green-500/[0.15] border border-green-500/[0.25]">
                   <span className="text-xs text-green-600 font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>

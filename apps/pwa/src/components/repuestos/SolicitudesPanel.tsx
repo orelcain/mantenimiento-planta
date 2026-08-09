@@ -28,9 +28,9 @@ interface Props {
 }
 
 const ESTADO_META: Record<SolicitudEstado, { label: string; cls: string }> = {
-  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/[0.08] text-amber-600' },
-  aprobada: { label: 'Aprobada', cls: 'bg-primary/[0.08] text-primary' },
-  entregada: { label: 'Entregada', cls: 'bg-emerald-500/[0.08] text-emerald-600' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/[0.15] text-amber-600' },
+  aprobada: { label: 'Aprobada', cls: 'bg-primary/[0.15] text-primary' },
+  entregada: { label: 'Entregada', cls: 'bg-emerald-500/[0.15] text-emerald-600' },
 }
 
 const ACCION_LABEL: Record<Exclude<SolicitudEstado, 'entregada'>, string> = {

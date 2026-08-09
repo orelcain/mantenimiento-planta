@@ -23,9 +23,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.08] text-red-600' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-600' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-600' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.15] text-red-600' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -189,7 +189,7 @@ export function InterventionEditDialog({
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -199,7 +199,7 @@ export function InterventionEditDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {isAdmin ? (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleting || saving}
-              className="text-red-600 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/[0.08]">
+              className="text-red-600 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/[0.15]">
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
               Eliminar
             </Button>

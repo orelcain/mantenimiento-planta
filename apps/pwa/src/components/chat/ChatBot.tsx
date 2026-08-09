@@ -404,7 +404,7 @@ function MessageBubble({
 
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
-            <div className="mt-2 p-2 bg-amber-500/[0.08] border border-amber-500/[0.25] rounded-lg space-y-1.5">
+            <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-lg space-y-1.5">
               <div className="text-[11px] font-medium text-amber-600">
                 ✏️ ¿Cuál era la respuesta correcta?
               </div>
@@ -736,7 +736,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
     : technicians
 
   return (
-    <div className="px-3 py-2 border-t border-amber-300 bg-amber-500/[0.08] dark:border-amber-700">
+    <div className="px-3 py-2 border-t border-amber-300 bg-amber-500/[0.15] dark:border-amber-700">
       <div className="flex items-center gap-2 mb-1.5">
         <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
         <span className="text-xs text-amber-600 flex-1 font-medium">
@@ -757,7 +757,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="mb-2">
           <button
             onClick={() => { setShowEquipmentPicker(p => !p); setShowTechPicker(false) }}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-amber-300 dark:border-amber-600 bg-amber-500/[0.08] hover:bg-amber-100 dark:hover:bg-amber-500/[0.08] transition-colors flex items-center justify-between"
+            className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-amber-300 dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-100 dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
           >
             <span className="truncate">
               🏭 {pendingData?.equipmentName
@@ -822,7 +822,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             currentTechId === userId ? (
               <button
                 onClick={() => { onAssignTechnician('', '') }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-green-300 dark:border-green-600 bg-green-500/[0.08] hover:bg-green-100 dark:hover:bg-green-500/[0.08] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-green-300 dark:border-green-600 bg-green-500/[0.15] hover:bg-green-100 dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
               >
                 <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
                 <span className="truncate">👷 Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
@@ -830,7 +830,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             ) : (
               <button
                 onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.08] hover:bg-blue-100 dark:hover:bg-primary/[0.08] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
               >
                 <span>👷 Autoasignarme esta incidencia</span>
               </button>
@@ -840,7 +840,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             <>
               <button
                 onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.08] hover:bg-blue-100 dark:hover:bg-primary/[0.08] transition-colors flex items-center justify-between"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
               >
                 <span className="truncate">
                   👷 {currentTechName
@@ -1402,7 +1402,7 @@ export function ChatBot() {
                     onClick={() => setShowAgentSelector(p => !p)}
                     className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] transition-colors ${
                       selectedAgent
-                        ? 'bg-primary/[0.08] text-blue-400 hover:bg-primary/[0.08]'
+                        ? 'bg-primary/[0.15] text-blue-400 hover:bg-primary/[0.15]'
                         : 'hover:bg-background text-muted-foreground hover:text-foreground'
                     }`}
                     title={selectedAgent ? `Modelo: ${availableAgents().find(a => a.id === selectedAgent)?.name || selectedAgent}` : 'Seleccionar modelo IA (Auto)'}
@@ -1469,7 +1469,7 @@ export function ChatBot() {
                   onClick={toggleThinking}
                   className={`p-1.5 rounded-md transition-colors ${
                     thinkingEnabled
-                      ? 'bg-cat-6-tint/[0.08] text-purple-400 hover:bg-cat-6-tint/[0.08]'
+                      ? 'bg-cat-6-tint/[0.15] text-purple-400 hover:bg-cat-6-tint/[0.15]'
                       : 'hover:bg-background text-muted-foreground hover:text-foreground'
                   }`}
                   title={thinkingEnabled ? 'Pensamiento profundo: ACTIVO — click para desactivar' : 'Activar pensamiento profundo'}

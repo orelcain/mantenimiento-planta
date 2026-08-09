@@ -198,9 +198,9 @@ export function TendenciaWeightCard({
       {trendForecastView && (() => {
         const projSeverity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
         const projBadgeClass =
-          projSeverity === 'critical' ? 'border-red-500/[0.25] text-red-600 bg-red-500/[0.08]' :
-          projSeverity === 'warn' ? 'border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.08]' :
-          'border-emerald-500/[0.25] text-emerald-600 bg-emerald-500/[0.08]'
+          projSeverity === 'critical' ? 'border-red-500/[0.25] text-red-600 bg-red-500/[0.15]' :
+          projSeverity === 'warn' ? 'border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.15]' :
+          'border-emerald-500/[0.25] text-emerald-600 bg-emerald-500/[0.15]'
         return (
           <Card>
             <CardHeader>

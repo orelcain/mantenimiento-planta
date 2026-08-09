@@ -43,9 +43,9 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * ActionPlanPanel.
  */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.08]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.08]', label: 'Parcial' }
-  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.08]', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
+  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null
@@ -57,7 +57,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
   const serie = imputacion.porTurno
 
   return (
-    <Card className="border-primary/[0.25] bg-primary/[0.08]">
+    <Card className="border-primary/[0.25] bg-primary/[0.15]">
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
           <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />

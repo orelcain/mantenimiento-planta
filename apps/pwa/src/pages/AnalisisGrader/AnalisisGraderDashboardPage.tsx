@@ -1206,7 +1206,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
       {/* Data notes */}
       {analytics.notes.length > 0 && (
-        <Card className="border-amber-300 bg-amber-500/[0.08]">
+        <Card className="border-amber-300 bg-amber-500/[0.15]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />

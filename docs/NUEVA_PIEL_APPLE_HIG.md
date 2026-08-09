@@ -84,12 +84,17 @@ superficies chicas — puntos de estado, deltas, íconos < 30 px. Para RELLENOS 
 `softenAccentHex()` (decisión Orel 2026-07-19, PRs #240/#248). No se revierte esa
 decisión: se acota a su caso real.
 
-**Regla de la Pill — MEDIDA, no estimada (2026-08-09):** `texto = tono 600` (la variante
-*accesible* de Apple) sobre `fondo = tono 500 al 8%`. Se llegó ahí midiendo, no a ojo:
+**Regla de la Pill — MEDIDA, no estimada (2026-08-09, revisada el mismo día):**
+`texto = tono 600` sobre `fondo = tono 500 al 15%`. Se llegó ahí midiendo, no a ojo:
 
 - el tinte vivo como TEXTO sobre su propio fondo reprueba AA en rojo oscuro (3.51:1);
 - con el tono 600 pero fondo al 14% seguía reprobando el rojo (4.24:1 oscuro / 4.47:1 claro);
-- al 8% cumplen los seis casos (crítica/media/ok × claro/oscuro), peor caso 4.57:1.
+- al 8% cumplían los seis casos, pero **al verlo en pantalla el relleno era casi invisible**
+  en tema claro: pasaba el contraste y fallaba el propósito (agrupar visualmente);
+- se resolvió al revés: fijar el tinte en **15%** —visualmente sólido— y DERIVAR la tinta que
+  cumple AA sobre ese fondo, tono por tono. Los 11 colores (3 semánticos + 8 categóricos)
+  pasan en ambos temas. El azul de marca puro reprueba sobre su propio tinte (3.98:1), así
+  que los chips informativos usan `--brand-ink`, una variante propia.
 
 El 14% que figuraba antes acá era invención propia, no del HIG. Los tres tonos 600
 también se corrigieron contra la medición: el verde accesible de Apple (`#248A3D`) da

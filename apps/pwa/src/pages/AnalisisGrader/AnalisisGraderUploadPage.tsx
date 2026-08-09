@@ -59,11 +59,11 @@ const KIND_LABELS: Record<MatrixFileKind, string> = {
 }
 
 const KIND_COLORS: Record<MatrixFileKind, string> = {
-  PIEZA_PIEZA: 'bg-primary/[0.08] text-primary',
-  PUERTA_0: 'bg-red-500/[0.08] text-red-600',
-  PORC_CALIDAD: 'bg-green-500/[0.08] text-green-600',
-  TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.08] text-cat-6-ink',
-  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.08] text-amber-600',
+  PIEZA_PIEZA: 'bg-primary/[0.15] text-primary',
+  PUERTA_0: 'bg-red-500/[0.15] text-red-600',
+  PORC_CALIDAD: 'bg-green-500/[0.15] text-green-600',
+  TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.15] text-cat-6-ink',
+  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.15] text-amber-600',
   UNKNOWN: 'bg-muted-foreground/[0.10] text-muted-foreground',
 }
 
@@ -390,7 +390,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           disabled={parsing}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-ctl border text-sm font-medium transition-colors',
-            'border-primary/[0.25] text-primary hover:bg-primary/[0.08]',
+            'border-primary/[0.25] text-primary hover:bg-primary/[0.15]',
             parsing && 'opacity-60 cursor-wait',
           )}
         >
@@ -400,7 +400,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           }
           Cargar Excel
           {files.length > 0 && (
-            <Badge className={cn('text-[10px] h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.08] text-primary' : '')}>
+            <Badge className={cn('text-[10px] h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-primary' : '')}>
               {files.length}
             </Badge>
           )}
@@ -415,7 +415,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               setError(null)
               if (inputRef.current) inputRef.current.value = ''
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-red-500 text-xs font-medium hover:bg-red-500/[0.08] transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-red-500 text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
             title="Cancelar — limpia los archivos en cola"
           >
             <X className="h-3 w-3" />
@@ -523,7 +523,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Turno detectado */}
           {turnoRange && (
-            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.08] border border-emerald-500/[0.25] rounded-ctl px-3 py-2">
+            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-ctl px-3 py-2">
               <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
               <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>

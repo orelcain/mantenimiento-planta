@@ -1096,7 +1096,7 @@ export function SensorsPage() {
                             </div>
 
                             {assignedEquip && (
-                              <div className="mt-2 p-2 bg-primary/[0.08] rounded text-xs">
+                              <div className="mt-2 p-2 bg-primary/[0.15] rounded text-xs">
                                 <div className="font-medium text-primary">
                                   {assignedEquip.nombre}
                                 </div>
@@ -1209,7 +1209,7 @@ export function SensorsPage() {
                     <div className="space-y-3">
                     {/* Temperatura */}
                     {displayTelemetry.temperatura && (
-                      <div className="rounded border p-3 bg-cat-4-tint/[0.08]">
+                      <div className="rounded border p-3 bg-cat-4-tint/[0.15]">
                         <div className="flex items-center gap-2 mb-2">
                           <Thermometer className="h-4 w-4 text-cat-4-ink" />
                           <span className="text-sm font-medium">Temperatura</span>
@@ -1232,7 +1232,7 @@ export function SensorsPage() {
 
                     {/* Humedad */}
                     {displayTelemetry.humedad && (
-                      <div className="rounded border p-3 bg-primary/[0.08]">
+                      <div className="rounded border p-3 bg-primary/[0.15]">
                         <div className="flex items-center gap-2 mb-2">
                           <Droplets className="h-4 w-4 text-primary" />
                           <span className="text-sm font-medium">Humedad</span>
@@ -1654,7 +1654,7 @@ export function SensorsPage() {
                   )}
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
-                    <div className="text-xs text-muted-foreground bg-amber-500/[0.08] p-2 rounded border border-amber-200 dark:border-amber-800">
+                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded border border-amber-200 dark:border-amber-800">
                       <AlertTriangle className="inline size-3.5" /> Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
@@ -1747,7 +1747,7 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-primary/[0.08] border border-blue-200 dark:border-blue-800 rounded">
+                    <div className="p-4 text-sm bg-primary/[0.15] border border-blue-200 dark:border-blue-800 rounded">
                       <div className="font-medium text-primary mb-1">
                         <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
                       </div>
@@ -1756,7 +1756,7 @@ export function SensorsPage() {
                       </div>
                     </div>
                   ) : equipment.length === 0 ? (
-                    <div className="p-4 text-sm bg-amber-500/[0.08] border border-amber-200 dark:border-amber-800 rounded">
+                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-amber-200 dark:border-amber-800 rounded">
                       <div className="font-medium text-amber-600 mb-1">
                         <AlertTriangle className="inline size-3.5" /> No hay equipos disponibles
                       </div>
@@ -2043,7 +2043,7 @@ export function SensorsPage() {
                       ) : (
                         <>
                           {filteredEquipment.length > 5 && (
-                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.08] border-b text-primary">
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-primary">
                               <ChevronsDown className="inline size-3.5" /> Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}
@@ -2148,7 +2148,7 @@ export function SensorsPage() {
                     </div>
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
-                      <div className="text-xs text-muted-foreground bg-primary/[0.08] p-2 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded border border-blue-200 dark:border-blue-800">
                         <Lightbulb className="inline size-3.5" /> Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
@@ -2162,7 +2162,7 @@ export function SensorsPage() {
                   )}
 
                   {saveOk && (
-                    <div className="text-sm text-green-600 bg-green-500/[0.08] p-2 rounded border border-green-200 dark:border-green-800">
+                    <div className="text-sm text-green-600 bg-green-500/[0.15] p-2 rounded border border-green-200 dark:border-green-800">
                       ✓ {saveOk}
                     </div>
                   )}

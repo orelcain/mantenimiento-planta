@@ -38,9 +38,9 @@ function fmtHm(sec: number): string {
 /** Mismo código de color por dueño que la cascada del turno. */
 const BUCKET_BG: Record<string, string> = {
   'planificado':    'bg-muted-foreground/[0.10]',
-  'externo':        'bg-amber-500/[0.08]',
-  'mantencion':     'bg-cat-5-tint/[0.08]',
-  'sin-clasificar': 'bg-cat-6-tint/[0.08]',
+  'externo':        'bg-amber-500/[0.15]',
+  'mantencion':     'bg-cat-5-tint/[0.15]',
+  'sin-clasificar': 'bg-cat-6-tint/[0.15]',
 }
 
 /**
@@ -49,9 +49,9 @@ const BUCKET_BG: Record<string, string> = {
  * claro es la convención del repo.
  */
 const COVERAGE_THEME = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.08]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.08]', label: 'Parcial' }
-  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.08]', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
+  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
   const [expanded, setExpanded] = useState(true)
@@ -140,7 +140,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-[8px] px-1 rounded-ctl bg-amber-500/[0.08] text-amber-600 border border-amber-500/[0.25]"
+                    className="shrink-0 text-[8px] px-1 rounded-ctl bg-amber-500/[0.15] text-amber-600 border border-amber-500/[0.25]"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?
@@ -163,7 +163,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
     <div className="mb-4 pb-4 border-b border-border/60">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center gap-2 rounded-ctl border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 hover:bg-primary/[0.08] transition-colors"
+        className="w-full flex items-center gap-2 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 hover:bg-primary/[0.15] transition-colors"
         aria-expanded={expanded}
       >
         {expanded
@@ -225,7 +225,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
               onClick={() => setTreeOpen((v) => !v)}
               className={cn(
                 'text-[10px] px-2 py-0.5 rounded-ctl border transition-colors inline-flex items-center gap-1',
-                treeOpen ? 'bg-primary/[0.08] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                treeOpen ? 'bg-primary/[0.15] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               <HelpCircle className="w-3 h-3" />

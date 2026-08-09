@@ -174,7 +174,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
 
         {/* Resumen ciclo total */}
         {allValid && (
-          <div className="bg-primary/[0.08] border border-primary/[0.25] rounded-ctl p-2 text-xs flex items-center justify-between gap-3">
+          <div className="bg-primary/[0.15] border border-primary/[0.25] rounded-ctl p-2 text-xs flex items-center justify-between gap-3">
             <div>
               <span className="text-muted-foreground">Ciclo total nuevo: </span>
               <span className="font-mono font-semibold text-sky-400">{cycleTotalMs} ms</span>

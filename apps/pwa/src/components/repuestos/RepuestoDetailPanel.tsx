@@ -76,7 +76,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger }: { icon: typeof FileTe
       onClick={onClick}
       className={[
         'flex flex-col items-center gap-1 rounded-card border border-border bg-card px-2 py-2 text-[10px] font-medium transition',
-        danger ? 'text-red-500 hover:bg-red-500/[0.08] hover:border-red-500/[0.25]' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        danger ? 'text-red-500 hover:bg-red-500/[0.15] hover:border-red-500/[0.25]' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       ].join(' ')}
     >
       <Icon className="h-4 w-4" />
@@ -342,7 +342,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
               </button>
             </span>
           ) : (
-            <span className="rounded-ctl bg-amber-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">sin SAP · pieza de despiece</span>
+            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">sin SAP · pieza de despiece</span>
           )}
         </div>
 
@@ -375,7 +375,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             </Button>
           )
         ) : (
-          <div className="mb-3 rounded-card border border-dashed border-amber-500/[0.25] bg-amber-500/[0.08] px-3 py-2">
+          <div className="mb-3 rounded-card border border-dashed border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2">
             <p className="text-[11px] text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
@@ -473,7 +473,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     return (
                       <span
                         key={slug}
-                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.08] px-2 py-1 text-[12px] font-medium text-emerald-600"
+                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-[12px] font-medium text-emerald-600"
                         title={seededOnly ? 'De la lista base (planilla de planta) — se edita en el código' : undefined}
                       >
                         {findMachineBySlug(slug)?.name ?? slug}

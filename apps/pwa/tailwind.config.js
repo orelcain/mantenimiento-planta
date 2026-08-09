@@ -134,6 +134,9 @@ export default {
             },
           ]),
         ),
+        // Tinta de marca para texto SOBRE tinte de marca (el primary puro
+        // reprueba AA sobre su propio tinte al 15% — medido).
+        'brand-ink': 'rgb(var(--brand-ink) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
         input: 'rgb(var(--border) / <alpha-value>)',
         ring: '#5aa6e8',

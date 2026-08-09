@@ -17,19 +17,19 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 const VERDICT_STYLE = {
   ok: {
     border: 'border-emerald-500',
-    bg: 'bg-emerald-500/[0.08]',
+    bg: 'bg-emerald-500/[0.15]',
     numColor: 'text-emerald-400',
     label: 'Línea en buen rendimiento',
   },
   warn: {
     border: 'border-amber-500',
-    bg: 'bg-amber-500/[0.08]',
+    bg: 'bg-amber-500/[0.15]',
     numColor: 'text-amber-400',
     label: 'Línea con oportunidades de mejora',
   },
   critical: {
     border: 'border-red-500',
-    bg: 'bg-red-500/[0.08]',
+    bg: 'bg-red-500/[0.15]',
     numColor: 'text-red-400',
     label: 'Línea con bajo rendimiento',
   },
@@ -43,9 +43,9 @@ const VERDICT_STYLE = {
  *  Umbrales calcados de los ya usados en el resto del módulo: uptime 70/40
  *  (`uptimeTextColor` acá mismo), ritmo 85/50 (`UpstreamMachinesPanel.tsx`). */
 const MACHINE_VERDICT_STYLE = {
-  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/[0.25]', bg: 'bg-emerald-500/[0.08]', label: 'Óptimo' },
-  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/[0.25]',   bg: 'bg-amber-500/[0.08]',   label: 'Regular' },
-  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/[0.25]',      bg: 'bg-red-500/[0.08]',     label: 'Crítico' },
+  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/[0.25]', bg: 'bg-emerald-500/[0.15]', label: 'Óptimo' },
+  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/[0.25]',   bg: 'bg-amber-500/[0.15]',   label: 'Regular' },
+  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/[0.25]',      bg: 'bg-red-500/[0.15]',     label: 'Crítico' },
 } as const
 
 function machineVerdict(uptimePct: number, ratio: number): keyof typeof MACHINE_VERDICT_STYLE {

@@ -92,8 +92,8 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   // arrows unicode), pero el COLOR de texto y el LABEL vienen de helpers
   // compartidos en graderP0Segmentation.ts (consistencia entre componentes).
   const visualByStatus = {
-    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/[0.08]', border: 'border-emerald-500/[0.25]' },
-    worsened: { Icon: TrendingUp,   bg: 'bg-cat-5-tint/[0.08]',    border: 'border-cat-5-tint/[0.25]'    },
+    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]' },
+    worsened: { Icon: TrendingUp,   bg: 'bg-cat-5-tint/[0.15]',    border: 'border-cat-5-tint/[0.25]'    },
     neutral:  { Icon: Minus,        bg: 'bg-muted-foreground/[0.10]',    border: 'border-muted-foreground/[0.10]'    },
   }[v.status]
 
@@ -180,7 +180,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
           )}
           {undetectedChanges > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/[0.08] text-amber-400 border border-amber-500/[0.25] font-medium"
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/[0.15] text-amber-400 border border-amber-500/[0.25] font-medium"
               title={`El sistema detectó ~${undetectedChanges} transiciones de configuración durante el turno que no fueron registradas en tiempo real. Si recordás los cambios reales (qué gate, qué hora), registralos manualmente con el botón "Cambiar gate" para que el análisis segmentado los reconozca.`}
             >
               <AlertTriangle className="w-2.5 h-2.5" />

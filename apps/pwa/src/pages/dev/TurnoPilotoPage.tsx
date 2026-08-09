@@ -319,7 +319,7 @@ export default function TurnoPilotoPage() {
             {/* ── Urgencia primero (§4). Si hay detención AHORA, manda. ── */}
             {worst ? (
               <section className="overflow-hidden rounded-card border border-red-500/35 bg-card">
-                <header className="flex items-center gap-2 bg-red-500/[0.08] px-4 py-2.5">
+                <header className="flex items-center gap-2 bg-red-500/[0.15] px-4 py-2.5">
                   <AlertTriangle className="size-3.5 text-red-600" />
                   <span className="text-[0.68rem] font-bold uppercase tracking-[0.06em] text-red-600">
                     Requiere atención

@@ -92,7 +92,7 @@ export function AnalisisGraderConfigPage() {
       </div>
 
       {/* Aviso de alcance: esto no es de un turno */}
-      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.08] border border-primary/[0.25] text-sm">
+      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
         <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
         <p className="text-muted-foreground">
           <span className="font-medium text-foreground">Estos valores aplican a todos los turnos</span>{' '}

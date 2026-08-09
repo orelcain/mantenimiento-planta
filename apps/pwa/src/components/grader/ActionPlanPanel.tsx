@@ -42,9 +42,9 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-500/[0.08] border-amber-500/[0.25]' },
-  oficina: { label: 'Oficina', icon: Monitor, color: 'text-primary', bg: 'bg-primary/[0.08] border-primary/[0.25]' },
-  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.08] border-cat-6-tint/[0.25]' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-amber-600', bg: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
+  oficina: { label: 'Oficina', icon: Monitor, color: 'text-primary', bg: 'bg-primary/[0.15] border-primary/[0.25]' },
+  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25]' },
 }
 
 const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> = {

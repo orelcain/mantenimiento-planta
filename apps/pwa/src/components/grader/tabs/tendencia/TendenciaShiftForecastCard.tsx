@@ -29,9 +29,9 @@ export function TendenciaShiftForecastCard({
 
   const severity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
   const severityBorder =
-    severity === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.08]' :
-    severity === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.08]' :
-    'border-emerald-500/[0.25] bg-emerald-500/[0.08]'
+    severity === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.15]' :
+    severity === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' :
+    'border-emerald-500/[0.25] bg-emerald-500/[0.15]'
   const severityText =
     severity === 'critical' ? 'text-red-600' :
     severity === 'warn' ? 'text-amber-600' :

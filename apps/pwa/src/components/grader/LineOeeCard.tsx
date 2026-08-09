@@ -121,7 +121,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                 </div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeMachine))}>{pct(calc.oeeMachine)}</div>
               </div>
-              <div className="bg-primary/[0.08] rounded-card px-3 py-2 border border-primary/[0.25]">
+              <div className="bg-primary/[0.15] rounded-card px-3 py-2 border border-primary/[0.25]">
                 <div className="text-[10px] text-sky-800/90 dark:text-sky-300/80 mb-0.5 flex items-center gap-1 flex-wrap">
                   OEE del área (estimado)
                   {calc.sinCalidad && (
@@ -170,7 +170,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                         <span className="tabular-nums text-muted-foreground">{fmtDur(p.min)}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-rose-500' : 'bg-cat-5-tint/[0.08]')} style={{ width: `${w}%` }} />
+                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-rose-500' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${w}%` }} />
                       </div>
                     </div>
                   )

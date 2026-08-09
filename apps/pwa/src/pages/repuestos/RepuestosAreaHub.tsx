@@ -70,9 +70,9 @@ type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
   primary: { text: 'text-primary',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
-  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/[0.08]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
-  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/[0.08]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
-  red:     { text: 'text-red-500',      chip: 'bg-red-500/[0.08]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
+  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/[0.15]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
+  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/[0.15]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
+  red:     { text: 'text-red-500',      chip: 'bg-red-500/[0.15]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
 }
 
 function KpiCard({ value, label, hint, icon: Icon, tone }: {
@@ -1961,7 +1961,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
                                 {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
-                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
@@ -2389,7 +2389,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       key={l.name}
                       className={[
                         'flex items-center gap-2 rounded-card border px-3 py-2 text-xs font-medium transition',
-                        inList ? 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-500' : 'border-border bg-card text-foreground',
+                        inList ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-500' : 'border-border bg-card text-foreground',
                       ].join(' ')}
                     >
                       <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">

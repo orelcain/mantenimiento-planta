@@ -74,9 +74,9 @@ export function GraderResumenRapido({
     p0Status === 'warn'     ? 'border-amber-500/[0.25]' :
                               'border-emerald-500/[0.25]'
   const bgColor =
-    p0Status === 'critical' ? 'bg-red-500/[0.08]' :
-    p0Status === 'warn'     ? 'bg-amber-500/[0.08]' :
-                              'bg-emerald-500/[0.08]'
+    p0Status === 'critical' ? 'bg-red-500/[0.15]' :
+    p0Status === 'warn'     ? 'bg-amber-500/[0.15]' :
+                              'bg-emerald-500/[0.15]'
   const p0Color =
     p0Status === 'critical' ? 'text-red-500' :
     p0Status === 'warn'     ? 'text-amber-500' :
@@ -97,17 +97,17 @@ export function GraderResumenRapido({
           }
           <span className="text-sm font-semibold">Resumen del turno</span>
           {criticals.length > 0 && (
-            <Badge className="bg-red-500/[0.08] text-red-600 border-red-500/[0.25] text-xs font-medium">
+            <Badge className="bg-red-500/[0.15] text-red-600 border-red-500/[0.25] text-xs font-medium">
               {criticals.length} crítico{criticals.length > 1 ? 's' : ''}
             </Badge>
           )}
           {warns.length > 0 && (
-            <Badge className="bg-amber-500/[0.08] text-amber-600 border-amber-500/[0.25] text-xs font-medium">
+            <Badge className="bg-amber-500/[0.15] text-amber-600 border-amber-500/[0.25] text-xs font-medium">
               {warns.length} alerta{warns.length > 1 ? 's' : ''}
             </Badge>
           )}
           {p0Status === 'ok' && insights.length === 0 && (
-            <Badge className="bg-emerald-500/[0.08] text-emerald-600 border-emerald-500/[0.25] text-xs">
+            <Badge className="bg-emerald-500/[0.15] text-emerald-600 border-emerald-500/[0.25] text-xs">
               Todo en orden
             </Badge>
           )}
@@ -262,8 +262,8 @@ export function GraderResumenRapido({
               className={cn(
                 'flex items-start gap-2 rounded-ctl px-3 py-2',
                 insight.severity === 'critical'
-                  ? 'bg-red-500/[0.08] border border-red-500/[0.25]'
-                  : 'bg-amber-500/[0.08] border border-amber-500/[0.25]',
+                  ? 'bg-red-500/[0.15] border border-red-500/[0.25]'
+                  : 'bg-amber-500/[0.15] border border-amber-500/[0.25]',
               )}
             >
               <AlertTriangle
@@ -300,8 +300,8 @@ export function GraderResumenRapido({
                     className={cn(
                       'shrink-0 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center mt-0.5',
                       a.severity === 'critical'
-                        ? 'bg-red-500/[0.08] text-red-600'
-                        : 'bg-amber-500/[0.08] text-amber-600',
+                        ? 'bg-red-500/[0.15] text-red-600'
+                        : 'bg-amber-500/[0.15] text-amber-600',
                     )}
                   >
                     {i + 1}

@@ -29,7 +29,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
   const WeightIcon = weightDir === 'up' ? TrendingUp : weightDir === 'down' ? TrendingDown : Minus
 
   return (
-    <Card className="border-primary/[0.25] bg-primary/[0.08]">
+    <Card className="border-primary/[0.25] bg-primary/[0.15]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-sky-500" />

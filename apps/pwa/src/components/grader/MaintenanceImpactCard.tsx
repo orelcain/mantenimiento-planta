@@ -140,7 +140,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] px-2.5 py-1 text-[11px] font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.08] disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-2.5 py-1 text-[11px] font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.15] disabled:opacity-50"
               title="Descargar reporte PDF de impacto de mantención"
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
@@ -162,7 +162,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
         ) : (
           <>
             {/* Frase de demostración */}
-            <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] px-3 py-2 text-xs text-foreground/90">
+            <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-3 py-2 text-xs text-foreground/90">
               Mantención atendió <span className="font-semibold text-orange-400">{rel!.eventsCount}</span> paros
               ({rel!.fallasCount} fallas · {rel!.intervencionesCount} intervenciones) por{' '}
               <span className="font-semibold">{fmt(rel!.maintenanceDowntimeSec)}</span> en el período.
@@ -233,7 +233,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                       <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">{t.label}</span>
                       <div className="flex-1 h-3 bg-muted rounded-ctl overflow-hidden">
                         <div
-                          className="h-full rounded-ctl bg-cat-4-tint/[0.08] transition-all duration-300"
+                          className="h-full rounded-ctl bg-cat-4-tint/[0.15] transition-all duration-300"
                           style={{ width: `${(t.downtimeSec / maxTrend) * 100}%` }}
                           title={`${fmt(t.downtimeSec)} · ${t.events} eventos`}
                         />

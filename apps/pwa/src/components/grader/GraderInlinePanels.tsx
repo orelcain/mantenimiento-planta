@@ -21,10 +21,10 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       className={cn(
         'p-3 rounded-card border',
         insight.severity === 'critical'
-          ? 'border-red-300 bg-red-500/[0.08]'
+          ? 'border-red-300 bg-red-500/[0.15]'
           : insight.severity === 'warn'
-          ? 'border-amber-300 bg-amber-500/[0.08]'
-          : 'border-blue-200 bg-primary/[0.08]',
+          ? 'border-amber-300 bg-amber-500/[0.15]'
+          : 'border-blue-200 bg-primary/[0.15]',
       )}
     >
       <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
   return (
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
-      <div className="rounded-card border border-blue-200 dark:border-blue-800 bg-primary/[0.08] p-3">
+      <div className="rounded-card border border-blue-200 dark:border-blue-800 bg-primary/[0.15] p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
@@ -88,9 +88,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'p-3 rounded-card border-l-4',
                   c.confidence === 'high'
-                    ? 'border-l-red-500 bg-red-500/[0.08]'
+                    ? 'border-l-red-500 bg-red-500/[0.15]'
                     : c.confidence === 'medium'
-                    ? 'border-l-amber-500 bg-amber-500/[0.08]'
+                    ? 'border-l-amber-500 bg-amber-500/[0.15]'
                     : 'border-l-blue-400 bg-muted',
                 )}
               >
@@ -135,9 +135,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'flex items-start gap-3 p-2.5 rounded-card border',
                   a.priority === 'high'
-                    ? 'border-red-200 dark:border-red-800 bg-red-500/[0.08]'
+                    ? 'border-red-200 dark:border-red-800 bg-red-500/[0.15]'
                     : a.priority === 'medium'
-                    ? 'border-amber-200 dark:border-amber-800 bg-amber-500/[0.08]'
+                    ? 'border-amber-200 dark:border-amber-800 bg-amber-500/[0.15]'
                     : 'border-muted bg-muted',
                 )}
               >
@@ -145,9 +145,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                   className={cn(
                     'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-[10px] font-bold',
                     a.priority === 'high'
-                      ? 'bg-red-500/[0.08] text-red-600'
+                      ? 'bg-red-500/[0.15] text-red-600'
                       : a.priority === 'medium'
-                      ? 'bg-amber-500/[0.08] text-amber-600'
+                      ? 'bg-amber-500/[0.15] text-amber-600'
                       : 'bg-muted text-muted-foreground',
                   )}
                 >
@@ -170,7 +170,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.08] p-3">
+        <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.15] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-2">
             Qu&eacute; verificar ahora
           </p>
@@ -190,7 +190,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.08] rounded-card border border-amber-200 dark:border-amber-800">
+        <div className="p-2.5 bg-amber-500/[0.15] rounded-card border border-amber-200 dark:border-amber-800">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-[11px] text-amber-600">{d}</p>
@@ -232,8 +232,8 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
   return (
     <div className={cn(
       'p-3 rounded-card border',
-      suggestion.impactScore >= 70 ? 'border-red-200 bg-red-500/[0.08]' :
-      suggestion.impactScore >= 40 ? 'border-amber-200 bg-amber-500/[0.08]' :
+      suggestion.impactScore >= 70 ? 'border-red-200 bg-red-500/[0.15]' :
+      suggestion.impactScore >= 40 ? 'border-amber-200 bg-amber-500/[0.15]' :
       'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">

@@ -43,9 +43,9 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
 
           // Responsabilidad por cinta
           const responsibility: Record<GraderBeltId, { icon: string; role: string; accent: string }> = {
-            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.08] border-primary/[0.25]' },
-            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.08] border-amber-500/[0.25]' },
-            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.08] border-amber-500/[0.25]' },
+            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.15] border-primary/[0.25]' },
+            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
+            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
             main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-primary/40' },
           }
           const resp = responsibility[beltId]

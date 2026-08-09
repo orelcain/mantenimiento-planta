@@ -235,7 +235,7 @@ export function AnalisisGraderPeriodoPage() {
           Aparece si todavía hay docs legacy en Firestore del iter 8 donde
           B (noche) se mapeaba incorrectamente a 'Turno tarde'. */}
       {legacyCount !== null && legacyCount > 0 && !migrationResult && (
-        <Card className="border-amber-500/[0.25] bg-amber-500/[0.08]">
+        <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -265,7 +265,7 @@ export function AnalisisGraderPeriodoPage() {
 
       {/* Confirmación post-migración */}
       {migrationResult && (
-        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.08]">
+        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
             <p className="text-sm text-emerald-600">

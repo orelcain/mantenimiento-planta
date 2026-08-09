@@ -130,7 +130,7 @@ export function PuntoCeroClasificacionCard({
                       <tr
                         className={cn(
                           'border-b border-muted/30 hover:bg-muted/20',
-                          i % 2 === 0 && 'bg-muted/[0.08]',
+                          i % 2 === 0 && 'bg-muted/[0.15]',
                           hasRecords && 'cursor-pointer',
                           isExpanded && 'bg-muted/20',
                         )}

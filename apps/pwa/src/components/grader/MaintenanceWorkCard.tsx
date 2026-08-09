@@ -79,7 +79,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
         ) : (
           <>
             {/* Frase-titular: cuenta el ciclo de mejora, no el conteo */}
-            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 text-xs text-foreground/90">
+            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-xs text-foreground/90">
               {maintenanceWorkHeadline(work)}
             </div>
 

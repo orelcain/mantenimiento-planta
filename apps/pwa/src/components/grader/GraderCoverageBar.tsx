@@ -35,9 +35,9 @@ import type { TimelineBucket } from '@/services/grader/types'
 type Tramo = 'produccion' | 'sin-produccion' | 'sin-datos'
 
 const ESTILO: Record<Tramo, { clase: string; label: string }> = {
-  'produccion':     { clase: 'bg-emerald-500/[0.08]', label: 'Con piezas' },
+  'produccion':     { clase: 'bg-emerald-500/[0.15]', label: 'Con piezas' },
   'sin-produccion': { clase: 'bg-muted-foreground/[0.10]',   label: 'Sin piezas (línea parada)' },
-  'sin-datos':      { clase: 'bg-amber-500/[0.08] [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
+  'sin-datos':      { clase: 'bg-amber-500/[0.15] [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
 }
 
 /**

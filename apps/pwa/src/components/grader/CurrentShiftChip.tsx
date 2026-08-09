@@ -238,7 +238,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         type="button"
         onClick={() => navigate(href)}
         className={cn(
-          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.08] hover:bg-amber-500/[0.08] transition-colors text-left',
+          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] hover:bg-amber-500/[0.15] transition-colors text-left',
           className,
         )}
         title={`El horario del ${meta.label} (${live.dateKey}) está activo pero no hay producción registrada en Shoplogix en los últimos ${ACTIVITY_MAX_AGE_MIN} min. Click para ver el detalle igual.`}
@@ -266,7 +266,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
       type="button"
       onClick={() => navigate(href)}
       className={cn(
-        'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.08] hover:bg-emerald-500/[0.08] transition-colors text-left',
+        'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.15] hover:bg-emerald-500/[0.15] transition-colors text-left',
         className,
       )}
       title={`Turno en curso · click para ver el detalle (${live.dateKey})`}

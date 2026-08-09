@@ -52,7 +52,7 @@ export function ConfigDriftBanner({
       <div
         className={cn(
           'flex items-center gap-2.5 rounded-card border border-amber-300 bg-amber-50 px-3.5 py-3',
-          'dark:bg-amber-500/[0.08] dark:border-amber-700',
+          'dark:bg-amber-500/[0.15] dark:border-amber-700',
           className,
         )}
       >
@@ -74,7 +74,7 @@ export function ConfigDriftBanner({
   return (
     <div
       className={cn(
-        'rounded-card border border-amber-300 bg-amber-500/[0.08] dark:border-amber-700',
+        'rounded-card border border-amber-300 bg-amber-500/[0.15] dark:border-amber-700',
         className,
       )}
     >

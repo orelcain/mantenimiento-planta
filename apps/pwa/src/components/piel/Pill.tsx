@@ -17,10 +17,10 @@ import { cn } from '@/lib/utils'
  * El color NUNCA es el único canal (§8): la Pill siempre lleva texto.
  */
 const TONES = {
-  critical: 'text-red-600 bg-red-500/[0.08]',
-  warning: 'text-amber-600 bg-amber-500/[0.08]',
-  ok: 'text-emerald-600 bg-emerald-500/[0.08]',
-  info: 'text-primary bg-primary/[0.08]',
+  critical: 'text-red-600 bg-red-500/[0.15]',
+  warning: 'text-amber-600 bg-amber-500/[0.15]',
+  ok: 'text-emerald-600 bg-emerald-500/[0.15]',
+  info: 'text-brand-ink bg-primary/[0.15]',
   neutral: 'text-muted-foreground bg-muted-foreground/[0.10]',
 } as const
 

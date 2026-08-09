@@ -37,9 +37,9 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
   { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-primary' },
-  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600' },
+  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-600' },
   { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground' },
-  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' },
+  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-600' },
 ] as const
 
 type Categoria = typeof CATEGORIAS[number]['id']
@@ -241,7 +241,7 @@ export function SensorStopsCausePanel({
             />
           </CardTitle>
           {sinCausa.length > 0 && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.08]">
+            <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.15]">
               {sinCausa.length} sin causa · {Math.round(minutosSinCausa)} min
               {piezasSinCausa > 0 && ` · ≈${piezasSinCausa.toLocaleString('es-CL')} pz`}
             </Badge>

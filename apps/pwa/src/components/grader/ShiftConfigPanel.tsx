@@ -22,8 +22,8 @@ type Species = 'coho' | 'salar'
 
 const SPECIES_LABEL: Record<Species, string> = { coho: 'Coho', salar: 'Salar' }
 const SPECIES_CSS: Record<Species, string> = {
-  coho: 'bg-cat-7-tint/[0.08] text-cat-7-ink border-cat-7-tint/[0.25]',
-  salar: 'bg-primary/[0.08] text-primary border-primary/[0.25]',
+  coho: 'bg-cat-7-tint/[0.15] text-cat-7-ink border-cat-7-tint/[0.25]',
+  salar: 'bg-primary/[0.15] text-primary border-primary/[0.25]',
 }
 
 function inferSpecies(breakdown?: Record<string, number>): Species | null {
@@ -153,7 +153,7 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.08] text-amber-600 border border-amber-500/[0.25]">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-amber-600 border border-amber-500/[0.25]">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}
