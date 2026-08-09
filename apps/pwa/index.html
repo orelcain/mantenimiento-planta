@@ -58,9 +58,21 @@
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }
+        // NUEVA PIEL (docs/NUEVA_PIEL_APPLE_HIG.md): opt-in por ?skin=apple (queda
+        // recordado) o localStorage `app-skin`. Sin esto, piel actual intacta.
+        var qs = new URLSearchParams(location.search).get('skin');
+        if (qs) localStorage.setItem('app-skin', qs);
+        var skin = localStorage.getItem('app-skin');
+        if (skin && skin !== 'default') {
+          document.documentElement.setAttribute('data-skin', skin);
+        }
         // theme-color del chrome móvil acorde al tema, antes de que cargue React
         var tc = document.querySelector('meta[name="theme-color"]');
-        if (tc) tc.setAttribute('content', theme === 'dark' ? '#0d1722' : '#d7e5f2');
+        if (tc) {
+          tc.setAttribute('content', skin === 'apple'
+            ? (theme === 'dark' ? '#1c1c1e' : '#f2f2f7')
+            : (theme === 'dark' ? '#0d1722' : '#d7e5f2'));
+        }
       })();
     </script>
   </head>

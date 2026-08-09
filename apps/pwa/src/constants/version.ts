@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.0.0' as const
+export const APP_VERSION = '4.1.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-08-08' as const
+export const VERSION_DATE = '2026-08-09' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Catálogo de variadores, matriz de turnos y auditoría del Centro de Aprendizaje' as const
+export const VERSION_NAME = 'Nueva piel Apple: tokens, primitivos y piloto de turno' as const
 
 /**
  * Nota:

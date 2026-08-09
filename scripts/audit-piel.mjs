@@ -31,8 +31,22 @@ const BASELINE_PATH = join(ROOT, 'scripts', 'audit-piel.baseline.json');
 const UPDATE = process.argv.includes('--update-baseline');
 const VERBOSE = process.argv.includes('--verbose');
 
-// Excepciones legítimas (HMIs/simuladores y visor 3D: oscuros a propósito)
-const EXCLUDE = [/[\\/]hmi[\\/]/i, /Hmi[A-Z]?\w*\.tsx$/, /Visor3D/i, /simulador/i];
+// Excepciones legítimas:
+//  - HMIs/simuladores y visor 3D: oscuros a propósito, no siguen la piel.
+//  - `components/piel/`: los PRIMITIVOS son el único lugar sancionado donde
+//    pueden vivir clases de color semántico. Ese es justamente su trabajo —
+//    concentrar la decisión de color en 5 archivos para que los otros 300 no
+//    la tomen. Si el resto de la app necesita un color de estado, importa
+//    <Pill>/<Button>; no escribe `text-red-600` a mano.
+//  - `pages/dev/`: vitrina de desarrollo, no es UI de producción.
+const EXCLUDE = [
+  /[\\/]hmi[\\/]/i,
+  /Hmi[A-Z]?\w*\.tsx$/,
+  /Visor3D/i,
+  /simulador/i,
+  /[\\/]components[\\/]piel[\\/]/,
+  /[\\/]pages[\\/]dev[\\/]/,
+];
 
 const RULES = [
   {

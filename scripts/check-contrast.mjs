@@ -147,6 +147,54 @@ for (const [name, textHex, colorHex] of [
   }
 }
 
+// ============================================================================
+// NUEVA PIEL — Apple HIG (`[data-skin="apple"]` en index.css)
+// docs/NUEVA_PIEL_APPLE_HIG.md · skill /nueva-piel-apple
+// Estos pares son los que justifican las DESVIACIONES documentadas del HIG:
+// Apple acepta secondaryLabel al 60% y su verde accesible #248A3D, pero ambos
+// reprueban AA medidos contra nuestras superficies. Si alguien "corrige" los
+// tokens de vuelta a los valores literales del HIG, esto lo delata.
+// ============================================================================
+console.log('\n=== NUEVA PIEL (Apple) — CLARO ===')
+const AL = { bg: '#f2f2f7', card: '#ffffff', ink: '#1c1c1e', sub: '#6e6e71', sep: '#c6c6c8' }
+check('ink sobre card', AL.ink, AL.card, 4.5)
+check('ink sobre fondo', AL.ink, AL.bg, 4.5)
+check('secundario sobre card', AL.sub, AL.card, 4.5)
+check('secundario sobre fondo (peor caso)', AL.sub, AL.bg, 4.5)
+check('marca sobre card', '#2E75B6', AL.card, 4.5)
+check('rojo-600 texto sobre fondo', '#d70015', AL.bg, 4.5)
+check('verde-600 texto sobre fondo', '#217e38', AL.bg, 4.5)
+check('naranja-600 texto sobre fondo', '#c93400', AL.bg, 4.5)
+check('separador sobre card (no textual)', AL.sep, AL.card, 1.5)
+
+console.log('\n=== NUEVA PIEL (Apple) — OSCURO (elevado) ===')
+const AD = { bg: '#1c1c1e', card: '#2c2c2e', ink: '#ffffff', sub: '#9f9fa5', sep: '#38383a' }
+check('ink sobre card', AD.ink, AD.card, 4.5)
+check('secundario sobre card', AD.sub, AD.card, 4.5)
+check('secundario sobre fondo', AD.sub, AD.bg, 4.5)
+check('marca adaptativa sobre card', '#5AA0DC', AD.card, 4.5)
+check('rojo-600 texto sobre card', '#ff6961', AD.card, 4.5)
+check('verde-600 texto sobre card', '#30db5b', AD.card, 4.5)
+check('naranja-600 texto sobre card', '#ffb340', AD.card, 4.5)
+// Chips/Pill de la piel nueva. REGLA descubierta al medir (2026-08-09): el tinte
+// vivo como TEXTO sobre su propio fondo al 14% reprueba en rojo oscuro (3.51:1).
+// Por eso la Pill es: texto = tono 600 (variante accesible) · fondo = tono 500 al
+// 8%. El vivo queda para puntos/íconos (no textuales), donde AA no aplica igual.
+for (const [name, ink, tint] of [
+  ['crítica', '#ff6961', '#ff453a'],
+  ['media', '#ffb340', '#ff9f0a'],
+  ['ok', '#30db5b', '#30d158'],
+]) {
+  check(`chip ${name} DARK (texto 600 sobre tinte 8%)`, ink, composite(AD.card, tint, 0.08), 4.5)
+}
+for (const [name, ink, tint] of [
+  ['crítica', '#d70015', '#ff3b30'],
+  ['media', '#c93400', '#ff9500'],
+  ['ok', '#217e38', '#34c759'],
+]) {
+  check(`chip ${name} LIGHT (texto 600 sobre tinte 8%)`, ink, composite(AL.card, tint, 0.08), 4.5)
+}
+
 const fails = results.filter(r => !r.pass)
 console.log(`\n${'='.repeat(60)}\nTotal: ${results.length} · Fallan: ${fails.length}`)
 if (fails.length) {

@@ -99,6 +99,21 @@
   --shift-ramp-3: #1367ac;  --shift-ramp-3-ink: #e6eef6;  /* 5.03:1 */
   --shift-ramp-4: #00509b;  --shift-ramp-4-ink: #e6eef6;  /* 6.84:1 */
   --shift-empty: rgba(49, 64, 80, 0.07);
+
+  /* Familias de acento que consume Tailwind, var-izadas (tailwind.config.js).
+     Motivo: hay ~4.480 usos de `text-red-400`, `bg-amber-500`… repartidos en 306
+     archivos; con las familias apuntando a variables, una piel puede re-teñirlas
+     TODAS sin tocar un solo .tsx. Estos defaults son EXACTAMENTE los valores
+     -50% croma de 2026-07-19, así que la piel actual no cambia ni un byte. */
+  --tw-emerald-400: 108 154 138;  --tw-emerald-500: 98 145 127;  --tw-emerald-600: 91 140 117;
+  --tw-green-400: 119 159 133;    --tw-green-500: 103 149 118;   --tw-green-600: 95 147 104;
+  --tw-red-400: 178 128 127;      --tw-red-500: 176 112 109;     --tw-red-600: 180 98 89;
+  --tw-amber-400: 172 150 110;    --tw-amber-500: 168 140 100;   --tw-amber-600: 174 126 89;
+  --tw-blue-400: 109 163 216;     --tw-blue-500: 74 134 200;
+
+  /* Marca. Var-izada para permitir el acento adaptativo de la piel nueva. */
+  --brand: 46 117 182;              /* #2E75B6 */
+  --brand-foreground: 255 255 255;
 }
 .dark {
   color-scheme: dark;
@@ -152,6 +167,127 @@
   --shift-ramp-3: #4b8fd2;  --shift-ramp-3-ink: #14202c;  /* 4.84:1 */
   --shift-ramp-4: #53a3f0;  --shift-ramp-4-ink: #14202c;  /* 6.18:1 */
   --shift-empty: rgba(157, 176, 194, 0.06);
+}
+
+/* ============================================================================
+   NUEVA PIEL — Apple HIG
+   Normas: docs/NUEVA_PIEL_APPLE_HIG.md · Skill: /nueva-piel-apple
+   ---------------------------------------------------------------------------
+   OPT-IN: se activa con <html data-skin="apple"> (localStorage `app-skin`, o
+   ?skin=apple para probar). SIN el atributo la piel actual queda byte-idéntica
+   — este bloque no puede cambiar producción por sí solo.
+
+   Por qué funciona sin tocar 306 .tsx: la app ya consume estos tokens vía
+   Tailwind (`bg-background`, `bg-card`, `text-muted-foreground`, `border`…),
+   así que redefinir los VALORES repinta miles de usos de una. Lo que no sigue
+   a los tokens (radios sueltos, chips ad-hoc, emojis) es justo lo que mide
+   `scripts/audit-piel.mjs` y se barre módulo a módulo.
+   ============================================================================ */
+:root[data-skin="apple"] {
+  color-scheme: light;
+  /* Fondo/superficie: systemGroupedBackground + secondarySystemGroupedBackground.
+     El lienzo es gris y las tarjetas blancas (al revés de la piel actual). */
+  --background: 242 242 247;        /* #F2F2F7 systemGroupedBackground */
+  --card: 255 255 255;              /* #FFFFFF tarjetas/grupos */
+  /* DESVIACIÓN DELIBERADA del HIG: Apple usa label = #000 puro. Acá se usa
+     #1C1C1E (16.4:1 sobre el card, muy por encima de AA) porque Orel reportó
+     dos veces fatiga por exceso de contraste. Un solo token si se quiere volver
+     al negro puro del HIG. */
+  --foreground: 28 28 30;           /* #1C1C1E label */
+  /* secondaryLabel del HIG es rgba(60,60,67,.60) → aplanado da 3.44:1 sobre
+     blanco y REPRUEBA WCAG AA (este repo audita contraste con script). Se sube
+     a ~.75 de opacidad equivalente → #6E6E71: 5.08:1 sobre card y 4.55:1 sobre el
+     fondo gris (el peor caso, medido — no estimado). Misma familia, AA real. */
+  --muted-foreground: 110 110 113;  /* #6E6E71 */
+  --secondary: 209 209 214;         /* #D1D1D6 systemGray4 */
+  --muted: 229 229 234;             /* #E5E5EA systemGray5 */
+  --accent: 229 229 234;            /* #E5E5EA hover/selección */
+  --border: 198 198 200;            /* #C6C6C8 opaqueSeparator */
+  --sidebar-active: #2E75B6;
+  --sidebar-active-foreground: #ffffff;
+  --sidebar-surface: #ffffff;
+  --panel-surface: #f2f2f7;
+
+  /* Centro de Aprendizaje bajo la piel nueva (mismos nombres, valores Apple) */
+  --lc-bg: #f2f2f7;
+  --lc-bg-panel: #f2f2f7;
+  --lc-surface: #ffffff;
+  --lc-surface-hi: #e5e5ea;
+  --lc-ink: #1c1c1e;
+  --lc-ink-mid: #6f6f72;
+  --lc-ink-lo: #8e8e93;
+  --lc-ink-ghost: #aeaeb2;
+  --lc-border: #c6c6c8;
+  --lc-border-hi: #aeaeb2;
+
+  /* Semánticos: tintes de sistema (§1.4 del doc). Los tonos 400/500 son los
+     vivos de Apple (uso en superficies chicas: puntos, pills, íconos); el 600
+     es la variante ACCESIBLE oficial de Apple, porque es la que el código usa
+     como texto sobre fondo claro y el vivo no llega a 4.5:1. */
+  /* El verde accesible de Apple (#248A3D) queda en 4.40:1 sobre card y 4.14:1
+     sobre el fondo gris — MEDIDO, reprueba AA. Se oscurece al mínimo que cumple
+     en el peor caso: #217E38 → 5.11:1 card / 4.58:1 fondo. */
+  --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 126 56;
+  --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 126 56;
+  --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 215 0 21;
+  --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 201 52 0;
+  --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
+}
+
+:root[data-skin="apple"].dark {
+  color-scheme: dark;
+  /* Dark ELEVADO del HIG (el de iPad/ventanas), NO el negro OLED base: Orel
+     rechazó #000 por dureza. La elevación se comunica por TONO, no por sombra. */
+  --background: 28 28 30;           /* #1C1C1E */
+  --card: 44 44 46;                 /* #2C2C2E */
+  --foreground: 255 255 255;        /* label */
+  --muted-foreground: 159 159 165;  /* #9F9FA5 = secondaryLabel .60 aplanado, 5.9:1 ✓ */
+  --secondary: 72 72 74;            /* #48484A systemGray dark 3 */
+  --muted: 58 58 60;                /* #3A3A3C */
+  --accent: 58 58 60;               /* #3A3A3C */
+  --border: 56 56 58;               /* #38383A opaqueSeparator dark */
+  --sidebar-active: #5AA0DC;
+  --sidebar-active-foreground: #10141a;
+  --sidebar-surface: #2c2c2e;
+  --panel-surface: #1c1c1e;
+
+  --lc-bg: #1c1c1e;
+  --lc-bg-panel: #1c1c1e;
+  --lc-surface: #2c2c2e;
+  --lc-surface-hi: #3a3a3c;
+  --lc-ink: #ffffff;
+  --lc-ink-mid: #9f9fa5;
+  --lc-ink-lo: #8e8e93;
+  --lc-ink-ghost: #636366;
+  --lc-border: #38383a;
+  --lc-border-hi: #48484a;
+
+  /* Tintes dark del sistema; el 600 usa la variante accesible dark de Apple. */
+  --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 219 91;
+  --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 219 91;
+  --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 105 97;
+  --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 179 64;
+  --tw-blue-400: 90 160 220;     --tw-blue-500: 90 160 220;
+
+  /* Acento adaptativo: el #2E75B6 pierde fuerza sobre superficie oscura. */
+  --brand: 90 160 220;              /* #5AA0DC */
+  --brand-foreground: 16 20 26;
+}
+
+/* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que
+   dispare layout — y las curvas de iOS. Todo se apaga con reduced-motion. */
+@keyframes piel-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes piel-sheet-in { from { transform: translateY(100%) } to { transform: none } }
+@keyframes piel-pulse {
+  0%   { transform: scale(.5);  opacity: .7 }
+  70%  { transform: scale(1.5); opacity: 0 }
+  100% { opacity: 0 }
+}
+.piel-fade-in { animation: piel-fade-in .35s ease-out both }
+.piel-sheet-in { animation: piel-sheet-in .5s cubic-bezier(.32, .72, 0, 1) both }
+.piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
+@media (prefers-reduced-motion: reduce) {
+  .piel-fade-in, .piel-sheet-in, .piel-pulse { animation: none !important }
 }
 
 @layer base {
