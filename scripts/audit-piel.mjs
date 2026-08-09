@@ -44,6 +44,13 @@ const EXCLUDE = [
   /Hmi[A-Z]?\w*\.tsx$/,
   /Visor3D/i,
   /simulador/i,
+  // Módulo de mapa: excluido POR CONSISTENCIA con `audit-theme.mjs`, que ya lo
+  // dejaba fuera junto a HMIs y 3D (su editor Leaflet es oscuro a propósito,
+  // con grises literales). Contarlo acá inflaba la deuda con archivos que
+  // nadie va a migrar — y una métrica que incluye lo que no se va a arreglar
+  // deja de servir para decidir.
+  /[\\/]components[\\/]map[\\/]/,
+  /[\\/]pages[\\/](Map\w*|Mapa\w*)\.tsx$/,
   /[\\/]components[\\/]piel[\\/]/,
   /[\\/]pages[\\/]dev[\\/]/,
 ];

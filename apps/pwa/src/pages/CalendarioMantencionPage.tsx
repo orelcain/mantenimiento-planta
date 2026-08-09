@@ -899,9 +899,9 @@ export function CalendarioMantencionPage() {
   }, [dayCols, syncCalendarToFirebase])
 
   const syncIndicator = useMemo(() => {
-    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40' }
-    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40' }
-    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/15 text-red-800 dark:text-red-300 border-red-500/40' }
+    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.08] text-amber-600 border-amber-500/[0.25]' }
+    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.08] text-emerald-600 border-emerald-500/[0.25]' }
+    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.08] text-red-600 border-red-500/[0.25]' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
@@ -1468,9 +1468,9 @@ export function CalendarioMantencionPage() {
 
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
-    if (key === 'A') return 'border-cyan-500/50 bg-cyan-500/15 text-cyan-800 dark:text-cyan-200'
-    if (key === 'B') return 'border-amber-500/50 bg-amber-500/15 text-amber-800 dark:text-amber-200'
-    if (key === 'C') return 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200'
+    if (key === 'A') return 'border-cat-7-tint/[0.25] bg-cat-7-tint/[0.08] text-cat-7-ink'
+    if (key === 'B') return 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600'
+    if (key === 'C') return 'border-cat-6-tint/[0.25] bg-cat-6-tint/[0.08] text-cat-6-ink'
     return 'border-border bg-muted text-foreground'
   }
 
@@ -1751,19 +1751,19 @@ export function CalendarioMantencionPage() {
 
   // ── Helpers vista móvil ──
   function shiftToMobileBadge(shift: string | undefined): { letter: string; cls: string } {
-    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-zinc-400 dark:text-zinc-700' }
+    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-muted-foreground' }
     const s = shift.trim().toUpperCase()
-    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-sky-500/25 text-sky-800 dark:text-sky-300' }
-    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/20 text-amber-800 dark:text-amber-300' }
-    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-zinc-400/50 dark:bg-zinc-700/60 text-zinc-700 dark:text-zinc-400' }
+    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-primary/[0.08] text-primary' }
+    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/[0.08] text-amber-600' }
+    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground' }
     // Detectar por hora de inicio (robusto ante turnos reducidos y variantes)
     const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
     if (startTime) {
-      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-violet-500/25 text-violet-800 dark:text-violet-300' }
-      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/25 text-amber-800 dark:text-amber-200' }
-      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-blue-500/25 text-blue-800 dark:text-blue-300' }
+      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-cat-6-tint/[0.08] text-cat-6-ink' }
+      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/[0.08] text-amber-600' }
+      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-primary/[0.08] text-primary' }
     }
-    return { letter: '·', cls: 'text-zinc-400 dark:text-zinc-700' }
+    return { letter: '·', cls: 'text-muted-foreground' }
   }
 
   // isReducedShift ya definida arriba (línea ~1286)
@@ -1857,7 +1857,7 @@ export function CalendarioMantencionPage() {
                   ? <span className="ml-1 text-[8px] text-yellow-400">● hoy</span>
                   : weekKeys.includes(todayWeekKey) && (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
-                      className="ml-1.5 h-5 px-1.5 text-[9px] font-medium text-yellow-800 dark:text-yellow-300 border border-yellow-500/50 rounded bg-yellow-500/15 active:bg-yellow-500/25 select-none">↩ Ir a hoy</button>
+                      className="ml-1.5 h-5 px-1.5 text-[9px] font-medium text-amber-600 border border-amber-500/[0.25] rounded bg-amber-500/[0.08] active:bg-amber-500/[0.08] select-none">↩ Ir a hoy</button>
                   )
                 }
               </div>
@@ -1895,7 +1895,7 @@ export function CalendarioMantencionPage() {
                 </div>
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
-                    className="shrink-0 h-6 px-1.5 rounded border border-yellow-500/50 bg-yellow-500/15 text-[9px] font-medium text-yellow-800 dark:text-yellow-300 active:bg-yellow-500/25 select-none">↩ Hoy</button>
+                    className="shrink-0 h-6 px-1.5 rounded border border-amber-500/[0.25] bg-amber-500/[0.08] text-[9px] font-medium text-amber-600 active:bg-amber-500/[0.08] select-none">↩ Hoy</button>
                 )}
                 <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
@@ -1939,12 +1939,12 @@ export function CalendarioMantencionPage() {
                   <tr className="bg-muted text-foreground border-b border-border">
                     <th className="sticky left-0 z-[25] bg-muted px-1.5 py-1.5 text-left font-semibold"
                       style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
-                      {mobileEditMode ? <span className="text-emerald-800 dark:text-emerald-300 text-[10px]">✏ Toca un día</span> : <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Técnico</span>}
+                      {mobileEditMode ? <span className="text-emerald-600 text-[10px]">✏ Toca un día</span> : <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Técnico</span>}
                     </th>
                     {weekDays.map((d) => {
                       const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
                       return (
-                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-300' : ''}`}
+                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-amber-500/[0.08] text-amber-600' : ''}`}
                           style={isLandscape ? undefined : { minWidth: 46 }}>
                           <div className="text-[9px] font-normal text-muted-foreground">{shortWeekday(d.dateObj)}</div>
                           <div className="font-bold leading-tight text-foreground">{d.dateObj?.getDate()}</div>
@@ -1974,8 +1974,8 @@ export function CalendarioMantencionPage() {
                     const turnoKey = tech.turno.trim().toUpperCase()
                     const nextTurno = techRows[idx + 1]?.turno.trim().toUpperCase()
                     const isLastOfGroup = nextTurno && nextTurno !== turnoKey
-                    const rowBg = turnoKey === 'A' ? 'bg-cyan-500/10' : turnoKey === 'B' ? 'bg-amber-500/10' : turnoKey === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
-                    const stickyBg = turnoKey === 'A' ? 'bg-cyan-500/20 dark:bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-500/20 dark:bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-500/20 dark:bg-violet-950/60' : 'bg-card'
+                    const rowBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.08]' : turnoKey === 'B' ? 'bg-amber-500/[0.08]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.08]' : idx % 2 === 1 ? 'bg-muted' : ''
+                    const stickyBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.08]' : turnoKey === 'B' ? 'bg-amber-500/[0.08]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.08]' : 'bg-card'
                     const cellPy = isLandscape ? 'py-0' : 'py-1.5'
                     return (
                     <tr key={tech.r} className={`${isLastOfGroup ? 'border-b-2 border-border' : 'border-b border-border/40'} ${rowBg}`}>
@@ -2009,7 +2009,7 @@ export function CalendarioMantencionPage() {
                               onClick={() => openMobileEdit(tech, d)}
                               className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded border text-[10px] font-bold transition-colors ${
                                 isEditing
-                                  ? 'border-emerald-400 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                                  ? 'border-emerald-400 bg-emerald-500/[0.08] text-emerald-600'
                                   : 'border-dashed border-border/60 hover:border-primary/60 active:bg-muted'
                               } ${badge.cls}`}
                             >
@@ -2064,8 +2064,8 @@ export function CalendarioMantencionPage() {
                         } else {
                           // Vista C — reducidos destacados, normales como letra
                           cellContent = isReduced && times ? (
-                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-orange-500/10 border border-orange-500/30`}>
-                              <span className="text-[9px] font-semibold text-orange-800 dark:text-orange-300 leading-tight">{times.start}</span>
+                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-cat-4-tint/[0.08] border border-cat-4-tint/[0.25]`}>
+                              <span className="text-[9px] font-semibold text-cat-4-ink leading-tight">{times.start}</span>
                               <span className="text-[9px] text-orange-400/70 leading-tight">{times.end}</span>
                             </span>
                           ) : (
@@ -2074,7 +2074,7 @@ export function CalendarioMantencionPage() {
                         }
 
                         return (
-                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
+                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-amber-500/[0.08]' : ''}`}>
                             {cellContent}
                           </td>
                         )
@@ -2144,7 +2144,7 @@ export function CalendarioMantencionPage() {
                       const pct = techRows.length > 0 ? count / techRows.length : 0
                       const countCls = pct >= 0.8 ? 'text-emerald-400' : pct >= 0.5 ? 'text-amber-400' : 'text-red-400'
                       return (
-                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
+                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-amber-500/[0.08]' : ''}`}>
                           <span className={`text-[10px] font-bold ${countCls}`}>{count}</span>
                           {isLandscape && libre > 0 && <span className="text-[8px] text-muted-foreground ml-0.5">/{libre}L</span>}
                         </td>
@@ -2165,11 +2165,11 @@ export function CalendarioMantencionPage() {
             {mobileViewMode === 'badges' && !mobileEditMode && (
               <div className="flex items-center gap-2 px-1 flex-wrap">
                 {([
-                  { letter: 'D', cls: 'bg-blue-500/25 text-blue-800 dark:text-blue-300', label: 'Día' },
-                  { letter: 'T', cls: 'bg-amber-500/25 text-amber-800 dark:text-amber-200', label: 'Tarde' },
-                  { letter: 'N', cls: 'bg-violet-500/25 text-violet-800 dark:text-violet-300', label: 'Noche' },
-                  { letter: 'L', cls: 'bg-zinc-400/50 dark:bg-zinc-700/60 text-zinc-700 dark:text-zinc-400', label: 'Libre' },
-                  { letter: 'V', cls: 'bg-sky-500/25 text-sky-800 dark:text-sky-300', label: 'Vac.' },
+                  { letter: 'D', cls: 'bg-primary/[0.08] text-primary', label: 'Día' },
+                  { letter: 'T', cls: 'bg-amber-500/[0.08] text-amber-600', label: 'Tarde' },
+                  { letter: 'N', cls: 'bg-cat-6-tint/[0.08] text-cat-6-ink', label: 'Noche' },
+                  { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground', label: 'Libre' },
+                  { letter: 'V', cls: 'bg-primary/[0.08] text-primary', label: 'Vac.' },
                 ] as const).map(({ letter, cls, label }) => (
                   <div key={letter} className="flex items-center gap-1">
                     <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${cls}`}>{letter}</span>
@@ -2181,7 +2181,7 @@ export function CalendarioMantencionPage() {
             )}
             {mobileViewMode === 'reduced' && !mobileEditMode && (
               <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded border border-orange-500/30 bg-orange-500/10 text-[9px] text-orange-800 dark:text-orange-300">08:00 / 15:00</span>
+                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] text-[9px] text-cat-4-ink">08:00 / 15:00</span>
                 <span className="text-[10px] text-muted-foreground">= turno con reducción horaria</span>
               </div>
             )}
@@ -2619,10 +2619,10 @@ export function CalendarioMantencionPage() {
                     <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-muted px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
-                    <th colSpan={6} className="border-b border-l border-border/30 bg-blue-500/10 dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                    <th colSpan={6} className="border-b border-l border-border/30 bg-primary/[0.08] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-primary">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
                     </th>
-                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-indigo-500/10 dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.08] dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-cat-3-ink">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />Resumen Mensual</span>
                     </th>
                     <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-muted px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
@@ -2631,30 +2631,30 @@ export function CalendarioMantencionPage() {
                     </th>
                   </tr>
                   <tr className="bg-muted">
-                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
+                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-primary/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
                       <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días efectivamente trabajados (turnos asignados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-primary/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-primary/90" title="Días efectivamente trabajados (turnos asignados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-primary/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
-                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-primary/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-primary/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
+                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-cat-3-ink/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
                       <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días efectivamente trabajados en el mes">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-cat-3-ink/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-cat-3-ink/90" title="Días efectivamente trabajados en el mes">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-cat-3-ink/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de vacaciones del mes">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días feriados del mes">Fer.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-cat-3-ink/90" title="Días de vacaciones del mes">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-cat-3-ink/90" title="Días feriados del mes">Fer.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2671,7 +2671,7 @@ export function CalendarioMantencionPage() {
                     const isRisk = wUnder || mUnder
                     const isOvertime = wOver || mOver
                     const zebra = idx % 2 === 1 ? 'bg-muted' : ''
-                    const rowBg = isRisk ? 'bg-red-500/10 dark:bg-red-950/15 hover:bg-red-500/15 dark:hover:bg-red-950/25' : isOvertime ? 'bg-orange-500/10 dark:bg-orange-950/15 hover:bg-orange-500/15 dark:hover:bg-orange-950/25' : `${zebra} hover:bg-muted/50`
+                    const rowBg = isRisk ? 'bg-red-500/[0.08] hover:bg-red-500/[0.08] dark:hover:bg-red-500/[0.08]' : isOvertime ? 'bg-cat-4-tint/[0.08] hover:bg-cat-4-tint/[0.08] dark:hover:bg-cat-4-tint/[0.08]' : `${zebra} hover:bg-muted/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
                         <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
@@ -2694,7 +2694,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${wOver ? 'bg-orange-500' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${wOver ? 'bg-orange-500/15 text-orange-400' : riskW ? 'bg-red-500/15 text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.08] text-orange-400' : riskW ? 'bg-red-500/[0.08] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.08] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2705,12 +2705,12 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-zinc-700">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-800 dark:text-sky-300" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.08] px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-primary" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-800 dark:text-amber-300" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.08] px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-600" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
@@ -2723,7 +2723,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${mOver ? 'bg-orange-500' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${mOver ? 'bg-orange-500/15 text-orange-400' : riskM ? 'bg-red-500/15 text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.08] text-orange-400' : riskM ? 'bg-red-500/[0.08] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.08] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaMonth)}
                             </span>
                           </div>
@@ -2734,17 +2734,17 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-zinc-700">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-800 dark:text-sky-300" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.08] px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-primary" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-800 dark:text-amber-300" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.08] px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-600" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
                           {row.totalVacationDays > 0
-                            ? <span className="font-bold text-sky-800 dark:text-sky-300">{row.totalVacationDays}</span>
+                            ? <span className="font-bold text-primary">{row.totalVacationDays}</span>
                             : <span className="text-zinc-600">0</span>}
                         </td>
                       </tr>
@@ -2792,7 +2792,7 @@ export function CalendarioMantencionPage() {
             <div className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
               Undo {undoStackRef.current.length} · Redo {redoStackRef.current.length}
             </div>
-            <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
+            <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' : 'border-border bg-muted text-muted-foreground'}`}>
               Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
             </div>
           </div>
@@ -2814,7 +2814,7 @@ export function CalendarioMantencionPage() {
                 {dayCols.map((d, idx) => (
                   <th
                     key={`day-${d.c}`}
-                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-400/60 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25] shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2823,7 +2823,7 @@ export function CalendarioMantencionPage() {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-foreground">{d.dayLabel}</span>
-                      {isWeekStart(idx) ? <span className="rounded bg-cyan-500/15 px-1 text-[9px] text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
+                      {isWeekStart(idx) ? <span className="rounded bg-cat-7-tint/[0.08] px-1 text-[9px] text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
                     </div>
                   </th>
                 ))}
@@ -2841,7 +2841,7 @@ export function CalendarioMantencionPage() {
                 {dayCols.map((d, idx) => (
                   <th
                     key={`date-${d.c}`}
-                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-yellow-400/60 font-semibold text-yellow-800 dark:text-yellow-300 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-amber-500/[0.25] font-semibold text-amber-600 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2858,7 +2858,7 @@ export function CalendarioMantencionPage() {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 const dtk = tech.turno.trim().toUpperCase()
-                const dRowBg = dtk === 'A' ? 'bg-cyan-500/10' : dtk === 'B' ? 'bg-amber-500/10' : dtk === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
+                const dRowBg = dtk === 'A' ? 'bg-cat-7-tint/[0.08]' : dtk === 'B' ? 'bg-amber-500/[0.08]' : dtk === 'C' ? 'bg-cat-6-tint/[0.08]' : idx % 2 === 1 ? 'bg-muted' : ''
                 return (
                   <tr key={tech.r} className={`border-b border-border/20 ${dRowBg} ${isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}`}>
                     {visibleMetaIndices.map((gi, vi) => (
@@ -2882,7 +2882,7 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-zinc-600/15' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-300/90' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value}
                           onClick={() => {

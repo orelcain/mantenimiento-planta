@@ -276,15 +276,15 @@ export function SensorsPage() {
     const q = getRssiQuality(rssi, online)
     switch (q) {
       case 'Excelente':
-        return 'text-emerald-600 dark:text-emerald-400'
+        return 'text-emerald-600'
       case 'Buena':
-        return 'text-green-600 dark:text-green-400'
+        return 'text-green-600'
       case 'Regular':
-        return 'text-yellow-600 dark:text-yellow-400'
+        return 'text-amber-600'
       case 'Mala':
-        return 'text-orange-600 dark:text-orange-400'
+        return 'text-cat-4-ink'
       default:
-        return 'text-red-600 dark:text-red-400'
+        return 'text-red-600'
     }
   }
 
@@ -944,11 +944,11 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Online</div>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  <div className="text-2xl font-bold text-green-600">
                     {devices.filter((d) => isDeviceFresh(d, panelNowMs)).length}
                   </div>
                 </div>
-                <Activity className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <Activity className="h-8 w-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
@@ -957,11 +957,11 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Asignados</div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-2xl font-bold text-primary">
                     {devices.filter(d => d.assignedEquipmentId).length}
                   </div>
                 </div>
-                <Link2 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                <Link2 className="h-8 w-8 text-primary" />
               </div>
             </CardContent>
           </Card>
@@ -1035,17 +1035,17 @@ export function SensorsPage() {
                     <div className="mt-1.5 text-xs text-muted-foreground">
                       {filteredDevices.length} de {devices.length} dispositivo(s)
                       {deviceSearch && filteredDevices.length === 0 && (
-                        <span className="text-amber-600 dark:text-amber-400 ml-2">
+                        <span className="text-amber-600 ml-2">
                           • No hay resultados, limpia el filtro
                         </span>
                       )}
                       {usbDevices.length > 0 && (
-                        <span className="text-green-600 dark:text-green-400 ml-2">
+                        <span className="text-green-600 ml-2">
                           • {usbDevices.length} USB detectado(s) 🔌
                         </span>
                       )}
                       {usbError && (
-                        <span className="text-red-600 dark:text-red-400 ml-2">
+                        <span className="text-red-600 ml-2">
                           • {usbError}
                         </span>
                       )}
@@ -1095,11 +1095,11 @@ export function SensorsPage() {
                             </div>
 
                             {assignedEquip && (
-                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
-                                <div className="font-medium text-blue-900 dark:text-blue-100">
+                              <div className="mt-2 p-2 bg-primary/[0.08] rounded text-xs">
+                                <div className="font-medium text-primary">
                                   {assignedEquip.nombre}
                                 </div>
-                                <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                                <div className="text-primary mt-0.5">
                                   {assignedEquip.codigo}
                                 </div>
                               </div>
@@ -1107,7 +1107,7 @@ export function SensorsPage() {
 
                             {!assignedEquip && (
                               <div className="mt-2 text-xs">
-                                <Badge variant="secondary" className="text-amber-600 dark:text-amber-400">
+                                <Badge variant="secondary" className="text-amber-600">
                                   Sin asignar
                                 </Badge>
                               </div>
@@ -1208,9 +1208,9 @@ export function SensorsPage() {
                     <div className="space-y-3">
                     {/* Temperatura */}
                     {displayTelemetry.temperatura && (
-                      <div className="rounded border p-3 bg-orange-50 dark:bg-orange-950/20">
+                      <div className="rounded border p-3 bg-cat-4-tint/[0.08]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <Thermometer className="h-4 w-4 text-cat-4-ink" />
                           <span className="text-sm font-medium">Temperatura</span>
                         </div>
                         <div className="text-2xl font-bold">
@@ -1231,9 +1231,9 @@ export function SensorsPage() {
 
                     {/* Humedad */}
                     {displayTelemetry.humedad && (
-                      <div className="rounded border p-3 bg-blue-50 dark:bg-blue-950/20">
+                      <div className="rounded border p-3 bg-primary/[0.08]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Droplets className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <Droplets className="h-4 w-4 text-primary" />
                           <span className="text-sm font-medium">Humedad</span>
                         </div>
                         <div className="text-2xl font-bold">
@@ -1394,8 +1394,8 @@ export function SensorsPage() {
                       : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800'
                       }`}>
                       <div className={`text-xs font-semibold mb-2 flex items-center gap-1 ${selectedDeviceIsFresh
-                        ? 'text-green-700 dark:text-green-300'
-                        : 'text-amber-700 dark:text-amber-300'
+                        ? 'text-green-600'
+                        : 'text-amber-600'
                         }`}>
                         <Wifi className="h-3 w-3" />
                         {selectedDeviceIsFresh ? 'WiFi Principal (Conectado)' : 'WiFi Principal (Configurada)'}
@@ -1411,7 +1411,7 @@ export function SensorsPage() {
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-green-600" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -1442,7 +1442,7 @@ export function SensorsPage() {
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
-                                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                  <Check className="h-3 w-3 text-green-600" />
                                 ) : (
                                   <Copy className="h-3 w-3 text-muted-foreground" />
                                 )}
@@ -1486,7 +1486,7 @@ export function SensorsPage() {
 
                   {/* Configurar nueva WiFi principal */}
                   <div className="rounded border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-                    <div className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-amber-600 mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Cambiar WiFi Principal
                     </div>
@@ -1571,7 +1571,7 @@ export function SensorsPage() {
                       )}
 
                       {wifiSaveOk && (
-                        <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        <div className="text-sm text-green-600 font-medium">
                           {wifiSaveOk}
                         </div>
                       )}
@@ -1581,7 +1581,7 @@ export function SensorsPage() {
                   {/* WiFi AP Local */}
                   {selectedDevice.apSsid && (
                     <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-                      <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                      <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                         <Wifi className="h-3 w-3" />
                         WiFi Local (Access Point)
                       </div>
@@ -1596,7 +1596,7 @@ export function SensorsPage() {
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-green-600" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -1627,7 +1627,7 @@ export function SensorsPage() {
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
-                                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                  <Check className="h-3 w-3 text-green-600" />
                                 ) : (
                                   <Copy className="h-3 w-3 text-muted-foreground" />
                                 )}
@@ -1653,7 +1653,7 @@ export function SensorsPage() {
                   )}
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
-                    <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
+                    <div className="text-xs text-muted-foreground bg-amber-500/[0.08] p-2 rounded border border-amber-200 dark:border-amber-800">
                       ⚠️ Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
@@ -1723,7 +1723,7 @@ export function SensorsPage() {
                     ) : selectedDevice.assignedEquipmentId ? (
                       <div className="text-muted-foreground">ID: {selectedDevice.assignedEquipmentId}</div>
                     ) : (
-                      <div className="text-amber-600 dark:text-amber-400">Sin asignar</div>
+                      <div className="text-amber-600">Sin asignar</div>
                     )}
                   </div>
                 </div>
@@ -1746,20 +1746,20 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded">
-                      <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    <div className="p-4 text-sm bg-primary/[0.08] border border-blue-200 dark:border-blue-800 rounded">
+                      <div className="font-medium text-primary mb-1">
                         🔄 Cargando equipos...
                       </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <div className="text-xs text-primary">
                         Por favor espera un momento
                       </div>
                     </div>
                   ) : equipment.length === 0 ? (
-                    <div className="p-4 text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded">
-                      <div className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                    <div className="p-4 text-sm bg-amber-500/[0.08] border border-amber-200 dark:border-amber-800 rounded">
+                      <div className="font-medium text-amber-600 mb-1">
                         ⚠️ No hay equipos disponibles
                       </div>
-                      <div className="text-xs text-amber-700 dark:text-amber-300">
+                      <div className="text-xs text-amber-600">
                         Ve a la página de Equipos para agregar equipos a la jerarquía.
                       </div>
                     </div>
@@ -2032,7 +2032,7 @@ export function SensorsPage() {
                         </div>
                       ) : filteredEquipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
-                          <div className="text-amber-600 dark:text-amber-400 font-medium">❌ No se encontraron equipos con esos filtros</div>
+                          <div className="text-amber-600 font-medium">❌ No se encontraron equipos con esos filtros</div>
                           <div className="text-xs text-muted-foreground space-y-1">
                             <div>• Verifica que la combinación de Planta/Sector/Área sea correcta</div>
                             <div>• Prueba cambiar los filtros de Estado o Criticidad</div>
@@ -2042,7 +2042,7 @@ export function SensorsPage() {
                       ) : (
                         <>
                           {filteredEquipment.length > 5 && (
-                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-blue-50 dark:bg-blue-950/30 border-b text-blue-700 dark:text-blue-300">
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.08] border-b text-primary">
                               💡 Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}
@@ -2145,7 +2145,7 @@ export function SensorsPage() {
                     </div>
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
-                      <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground bg-primary/[0.08] p-2 rounded border border-blue-200 dark:border-blue-800">
                         💡 Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
@@ -2159,7 +2159,7 @@ export function SensorsPage() {
                   )}
 
                   {saveOk && (
-                    <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-2 rounded border border-green-200 dark:border-green-800">
+                    <div className="text-sm text-green-600 bg-green-500/[0.08] p-2 rounded border border-green-200 dark:border-green-800">
                       ✓ {saveOk}
                     </div>
                   )}
@@ -2197,7 +2197,7 @@ export function SensorsPage() {
 
                 {selectedDevice.apSsid && (
                   <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Configuración Actual del AP
                     </div>
@@ -2212,7 +2212,7 @@ export function SensorsPage() {
                             title="Copiar SSID"
                           >
                             {copiedField === 'ssid' ? (
-                              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <Check className="h-3 w-3 text-green-600" />
                             ) : (
                               <Copy className="h-3 w-3 text-muted-foreground" />
                             )}
@@ -2243,7 +2243,7 @@ export function SensorsPage() {
                               title="Copiar contraseña"
                             >
                               {copiedField === 'password' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-green-600" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -2260,7 +2260,7 @@ export function SensorsPage() {
 
                 {selectedDevice && (
                   <div className="rounded border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
-                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-2 flex items-center gap-1">
+                    <div className="text-xs font-semibold text-emerald-600 mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Información OTA (WiFi)
                     </div>
@@ -2275,7 +2275,7 @@ export function SensorsPage() {
                             title="Copiar hostname"
                           >
                             {copiedField === 'otaHost' ? (
-                              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <Check className="h-3 w-3 text-green-600" />
                             ) : (
                               <Copy className="h-3 w-3 text-muted-foreground" />
                             )}
@@ -2296,7 +2296,7 @@ export function SensorsPage() {
                           <span className="text-xs text-muted-foreground">Cargando…</span>
                         )}
                         {otaPasswordState === 'error' && (
-                          <span className="text-xs text-red-600 dark:text-red-400">Solo administradores</span>
+                          <span className="text-xs text-red-600">Solo administradores</span>
                         )}
                         {otaPasswordState === 'ok' && (
                           <div className="flex items-center gap-1">
@@ -2307,7 +2307,7 @@ export function SensorsPage() {
                               title="Copiar contraseña OTA"
                             >
                               {copiedField === 'otaPassword' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-green-600" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -2400,16 +2400,16 @@ export function SensorsPage() {
                           </div>
                           <span className={`text-xs font-medium ${
                             apPassword.length < 8
-                              ? 'text-red-600 dark:text-red-400'
+                              ? 'text-red-600'
                               : apPassword.length < 12
-                                ? 'text-yellow-600 dark:text-yellow-400'
-                                : 'text-green-600 dark:text-green-400'
+                                ? 'text-amber-600'
+                                : 'text-green-600'
                           }`}>
                             {apPassword.length < 8 ? 'Débil' : apPassword.length < 12 ? 'Media' : 'Fuerte'}
                           </span>
                         </div>
                         {apPassword.length < 8 && (
-                          <div className="text-xs text-red-600 dark:text-red-400 flex items-start gap-1">
+                          <div className="text-xs text-red-600 flex items-start gap-1">
                             <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                             <span>WPA2 requiere mínimo 8 caracteres</span>
                           </div>
@@ -2438,7 +2438,7 @@ export function SensorsPage() {
                   )}
 
                   {apSaveOk && (
-                    <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                    <div className="text-sm text-green-600 font-medium">
                       {apSaveOk}
                     </div>
                   )}
@@ -2499,7 +2499,7 @@ export function SensorsPage() {
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
                           <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
-                          <p className={sendInterval <= 10 ? 'text-amber-600 dark:text-amber-400' : ''}>
+                          <p className={sendInterval <= 10 ? 'text-amber-600' : ''}>
                             {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
                             {sendInterval <= 10 && ' (alto consumo)'}
                           </p>
@@ -2523,7 +2523,7 @@ export function SensorsPage() {
                       )}
 
                       {intervalSaveOk && (
-                        <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        <div className="text-sm text-green-600 font-medium">
                           {intervalSaveOk}
                         </div>
                       )}

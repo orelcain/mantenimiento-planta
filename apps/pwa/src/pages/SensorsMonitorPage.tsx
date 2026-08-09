@@ -640,8 +640,8 @@ function TrendSparkline({
           {alertLevel !== 'normal' && (
             <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium animate-pulse ${
               alertLevel === 'critical'
-                ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'
-                : 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30'
+                ? 'bg-red-500/[0.08] text-red-400 ring-1 ring-red-500/30'
+                : 'bg-amber-500/[0.08] text-amber-400 ring-1 ring-amber-500/30'
             }`}>
               <AlertTriangle className="h-2.5 w-2.5" />
               {alertLevel === 'critical' ? 'Crítico' : 'Advertencia'}
@@ -805,9 +805,9 @@ function TrendSparkline({
         ref={containerRef}
         className={`w-full rounded-lg overflow-hidden relative select-none transition-colors duration-700 ${
           alertLevel === 'critical'
-            ? 'border-2 border-red-500/50 bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)]'
+            ? 'border-2 border-red-500/[0.25] bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)]'
             : alertLevel === 'warning'
-            ? 'border-2 border-amber-500/40 bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)]'
+            ? 'border-2 border-amber-500/[0.25] bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)]'
             : 'border border-border/20 bg-gradient-to-b from-muted/30 to-muted/5'
         }`}
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
@@ -815,7 +815,7 @@ function TrendSparkline({
         {/* Barra superior de alerta */}
         {alertLevel !== 'normal' && (
           <div className={`absolute top-0 left-0 right-0 h-0.5 z-10 ${
-            alertLevel === 'critical' ? 'bg-red-500 animate-pulse' : 'bg-amber-500/80'
+            alertLevel === 'critical' ? 'bg-red-500 animate-pulse' : 'bg-amber-500/[0.08]'
           }`} />
         )}
         <ReactECharts
@@ -852,10 +852,10 @@ function TrendSparkline({
         {showThresholds && (
           <>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-amber-500/60" /> Advertencia
+              <span className="h-2 w-2 rounded-sm bg-amber-500/[0.08]" /> Advertencia
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-red-500/60" /> Peligro
+              <span className="h-2 w-2 rounded-sm bg-red-500/[0.08]" /> Peligro
             </span>
           </>
         )}
@@ -918,24 +918,24 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {device.deviceId}
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 isFresh
-                  ? 'bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/30'
+                  ? 'bg-emerald-500/[0.08] text-emerald-500 ring-1 ring-emerald-500/30'
                   : 'bg-muted text-muted-foreground ring-1 ring-border'
               }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
                 {isFresh ? 'Online' : 'Offline'}
               </span>
               {alert === 'critical' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-500 ring-1 ring-red-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-red-500 ring-1 ring-red-500/30">
                   <AlertTriangle className="h-3 w-3" /> Crítico
                 </span>
               )}
               {alert === 'warning' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500 ring-1 ring-amber-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-amber-500 ring-1 ring-amber-500/30">
                   <AlertTriangle className="h-3 w-3" /> Warning
                 </span>
               )}
               {backfillStatus?.active && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2 py-0.5 text-[10px] font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                   <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
@@ -957,7 +957,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* KPIs row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
+          <div className="rounded-xl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] p-4">
             <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -967,7 +967,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
             </div>
             <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+          <div className="rounded-xl border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.08] p-4">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -989,7 +989,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
 
         {/* Chart – takes remaining space */}
         {backfillStatus?.active && (
-          <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sky-600 dark:text-sky-400 flex items-center gap-2 text-sm">
+          <div className="rounded-lg border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 text-primary flex items-center gap-2 text-sm">
             <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1068,19 +1068,19 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
               isFresh
-                ? 'bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/30'
+                ? 'bg-emerald-500/[0.08] text-emerald-500 ring-1 ring-emerald-500/30'
                 : 'bg-muted text-muted-foreground ring-1 ring-border'
             }`}>
               <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
               {isFresh ? 'Online' : 'Offline'}
             </span>
             {alert === 'critical' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.08] px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
                 <AlertTriangle className="h-3 w-3" /> Crítico
               </span>
             )}
             {alert === 'warning' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.08] px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
                 <AlertTriangle className="h-3 w-3" /> Warning
               </span>
             )}
@@ -1090,7 +1090,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               </span>
             )}
             {backfillStatus?.active && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2.5 py-0.5 text-xs font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                 <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
               </span>
             )}
@@ -1104,7 +1104,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
+          <div className="rounded-lg border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] p-3">
             <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -1114,7 +1114,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
             </div>
             <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+          <div className="rounded-lg border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.08] p-3">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -1159,7 +1159,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         {backfillStatus?.active && (
-          <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-2 text-sky-600 dark:text-sky-400 flex items-center gap-2 text-xs">
+          <div className="rounded-md border border-primary/[0.25] bg-primary/[0.08] p-2 text-primary flex items-center gap-2 text-xs">
             <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1170,7 +1170,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         )}
 
         {alert !== 'normal' && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700 flex items-center gap-2">
+          <div className="rounded-md border border-amber-500/[0.25] bg-amber-500/[0.08] p-2 text-amber-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Revisar condición anómala y evaluar creación de incidencia.
           </div>
