@@ -598,7 +598,12 @@ function MachineCard({
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                 {ready ? (
                   course ? (
-                    <MetaText>Módulo {machine.modulo ?? '—'}{machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}</MetaText>
+                    <MetaText>
+                      {machine.modulo != null
+                        ? `Módulo ${machine.modulo}${machine.nivel != null ? ` · Nivel ${machine.nivel}` : ''}`
+                        /* Cursos sueltos (sin número de módulo): el programa dice más que "Módulo —". */
+                        : (machine.programa ?? 'Curso')}
+                    </MetaText>
                   ) : (
                     <MetaText>{enabledCount}/4 secciones</MetaText>
                   )

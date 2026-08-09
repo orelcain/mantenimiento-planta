@@ -7,7 +7,7 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import {
-  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes, HeartPulse, ShieldCheck, Cable,
+  BookOpen, Fish, Scissors, Scale, Package, Zap, Boxes, HeartPulse, ShieldCheck, Cable, Tags,
 } from 'lucide-react'
 
 export type LearningSection = 'manual' | 'procedures' | 'flows' | 'diagnosis'
@@ -191,6 +191,17 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Codigo Electrico Nacional NFPA 70 (NEC) 2023 + reglamentos SEC (RIC / RPTD). Estructura y lenguaje del codigo, Articulo 110 y 250, puesta a tierra, protecciones (disyuntor, diferencial, SPD, AFDD), dimensionamiento de conductores (sobrecarga, caida de tension, cortocircuito) y calculo de protecciones.',
     icon: Cable,
     color: '#3f7c78',
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
+  },
+  {
+    slug: 'imputacion-fallas',
+    name: 'Imputacion de Fallas',
+    area: CAPACITACION_AREA,
+    programa: 'Capacitacion interna - Operacion y Mantencion',
+    nivel: 1,
+    description: 'Como clasificar correctamente las detenciones de linea segun la estructura vigente: 6 categorias y 46 causales (Abastecimiento / Servicios, Electrica, Mecanica, MMPP, Operacionales, Paros Programados). La regla causa-vs-efecto, los errores tipicos y que pasa con el dato despues (cascada de perdidas, Pareto, MTTR).',
+    icon: Tags,
+    color: '#6b5b95',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
 ]

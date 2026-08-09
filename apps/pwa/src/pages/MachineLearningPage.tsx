@@ -385,7 +385,7 @@ export function MachineLearningPage() {
         {/* Portada del documento */}
         <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
           <div className="dp-eyebrow">
-            {isCourse ? 'MÓDULO' : 'FICHA TÉCNICA'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area).toUpperCase() : 'REV 2026-07'}
+            {isCourse ? (machine.modulo != null ? 'MÓDULO' : 'CURSO') : 'FICHA TÉCNICA'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area).toUpperCase() : 'REV 2026-07'}
           </div>
           <h1 className="dp-title">{machine.name}</h1>
           <p className="dp-sub">{machine.description}</p>
@@ -395,7 +395,8 @@ export function MachineLearningPage() {
               <div><span className="dp-lbl">Área</span><span className="dp-val">{machine.programa ?? machine.area}</span></div>
               <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
               <div><span className="dp-lbl">Uso</span><span className="dp-val">Estudio</span></div>
-              <div><span className="dp-lbl">Nivel</span><span className="dp-val">{`M${machine.modulo ?? '—'}`}</span></div>
+              {/* Cursos sueltos (sin numero de modulo) muestran el nivel; "M—" no dice nada. */}
+              <div><span className="dp-lbl">Nivel</span><span className="dp-val">{machine.modulo != null ? `M${machine.modulo}` : (machine.nivel != null ? `N${machine.nivel}` : '—')}</span></div>
             </div>
           )}
 
