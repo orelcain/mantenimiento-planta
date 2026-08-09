@@ -662,16 +662,24 @@ export function AnalisisGraderWizardPage() {
   const isManual = lineConfig.manualCapture === true
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-border/50">
-        <div className="flex items-center gap-4 flex-wrap min-w-0">
-          <div>
-            <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
+    // `gap-6` en vez de `space-y-4`: el aire entre secciones es la mitad de lo
+    // que hace que una pantalla se lea como Apple y no como panel denso.
+    <div className="flex flex-col gap-6">
+      {/*
+        Encabezado con TÍTULO GRANDE (rol `display`, §2). Antes era `text-xl` con
+        un ícono al lado y una regla dura debajo — tres cosas que aplastaban la
+        jerarquía: el título competía con los subtítulos de las tarjetas, el
+        ícono delante del H1 no es un patrón de Apple (el título va solo), y la
+        línea divisoria hacía de "techo" pegando el contenido al encabezado.
+        Ahora la separación la da el espacio.
+      */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
               Análisis de Turno
             </h1>
-            <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
+            <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData
                 ? lineConfig.isClassificationPlant === false
                   ? `${lineConfig.label} · eviscerado simplificado — Excel del Marelec`

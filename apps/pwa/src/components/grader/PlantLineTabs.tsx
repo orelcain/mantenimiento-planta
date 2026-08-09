@@ -35,9 +35,15 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
   }
 
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('flex flex-col gap-2', className)}>
       {/* ── Nivel 1: Plantas ── */}
-      <div className="flex gap-1 p-1 bg-muted rounded-card border border-border">
+      {/*
+        Control SEGMENTADO, no una caja con chips adentro. El borde exterior
+        sobraba: en el lenguaje de Apple el segmentado es un riel de relleno
+        suave y el activo es una superficie elevada. Quitar ese borde y el del
+        contenedor es lo que baja la sensación de "caja dentro de caja".
+      */}
+      <div className="flex gap-1 rounded-ctl bg-muted-foreground/10 p-[3px]">
         {PLANTS.map((p) => {
           const isActive = p.id === activePlant
           const soon = isPlantComingSoon(p.id)
@@ -48,9 +54,9 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
               disabled={soon}
               title={soon ? `${p.label} — próximamente` : p.label}
               className={cn(
-                'flex-1 flex flex-col items-center gap-0.5 px-2 py-2 rounded-ctl transition-all text-center',
+                'flex-1 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-[7px] transition-all text-center',
                 isActive
-                  ? 'bg-background shadow-sm ring-1 ring-primary/30'
+                  ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.18)]'
                   : soon
                   ? 'text-muted-foreground/45 cursor-not-allowed bg-muted/15'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer',
@@ -58,8 +64,8 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
             >
               <span
                 className={cn(
-                  'text-xs font-semibold leading-tight',
-                  isActive && 'text-primary',
+                  'text-[0.78rem] font-medium leading-tight',
+                  isActive && 'font-semibold text-foreground',
                   soon && 'text-muted-foreground/60',
                 )}
               >
@@ -87,12 +93,15 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 disabled={area.comingSoon}
                 title={area.comingSoon ? `${area.areaLabel} — próximamente` : area.description}
                 className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-ctl text-xs font-medium border transition-colors',
+                  // Píldoras SIN borde: un borde por chip multiplica las líneas
+                  // en pantalla y es de lo que más ensucia. El estado se
+                  // comunica con relleno, no con contorno.
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.78rem] font-medium transition-colors',
                   isActive
-                    ? 'border-primary/40 bg-primary/20 text-primary'
+                    ? 'bg-primary text-primary-foreground'
                     : area.comingSoon
-                    ? 'border-border/40 bg-muted/15 text-muted-foreground/45 cursor-not-allowed'
-                    : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
+                    ? 'bg-muted-foreground/[0.06] text-muted-foreground/45 cursor-not-allowed'
+                    : 'bg-muted-foreground/10 text-muted-foreground hover:text-foreground',
                 )}
               >
                 {area.areaLabel}
