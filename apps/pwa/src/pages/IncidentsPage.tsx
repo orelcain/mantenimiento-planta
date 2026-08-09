@@ -1,12 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, User, MapPin } from 'lucide-react'
+import { Plus, Search, AlertTriangle, User, MapPin } from 'lucide-react'
 import {
-  Card,
-  CardContent,
-  Button,
-  Input,
-  Badge,
   Select,
   SelectContent,
   SelectItem,
@@ -16,26 +11,15 @@ import {
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import { getMapLocations } from '@/services/maps'
-import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
+import type { IncidentStatus, IncidentPriority } from '@/types'
 import type { MapLocation } from '@/types/maps'
+import { Button, Pill, ListGroup, ListCell, type PillTone } from '@/components/piel'
 import { logger } from '@/lib/logger'
 import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { debounce } from '@/lib/rate-limit'
 import { getUserDisplayNameMap, getUserInfoLabelMap } from '@/services/userDisplay'
-
-const getStatusIcon = (status: IncidentStatus) => {
-  const iconMap: Record<IncidentStatus, any> = {
-    pendiente: Clock,
-    confirmada: CheckCircle,
-    rechazada: XCircle,
-    en_proceso: AlertTriangle,
-    resuelta: CheckCircle,
-    cerrada: CheckCircle,
-  }
-  return iconMap[status]
-}
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: any }> = {
   pendiente: { label: 'Pendiente', variant: 'warning' },
@@ -46,11 +30,13 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: any }> = {
   cerrada: { label: 'Cerrada', variant: 'success' },
 }
 
-const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: string }> = {
-  critica: { label: 'Crítica', className: 'bg-destructive text-destructive-foreground' },
-  alta: { label: 'Alta', className: 'bg-warning text-warning-foreground' },
-  media: { label: 'Media', className: 'bg-primary text-primary-foreground' },
-  baja: { label: 'Baja', className: 'bg-muted text-muted-foreground' },
+/** Prioridad como ESTADO: tono de <Pill>, con la etiqueta siempre visible
+ *  (el color nunca es el único canal). */
+const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; tone: PillTone }> = {
+  critica: { label: 'Crítica', tone: 'critical' },
+  alta: { label: 'Alta', tone: 'warning' },
+  media: { label: 'Media', tone: 'info' },
+  baja: { label: 'Baja', tone: 'neutral' },
 }
 
 export function IncidentsPage() {
@@ -212,177 +198,85 @@ export function IncidentsPage() {
     })
   }, [visibleIncidents])
 
+  /**
+   * Filtros como PÍLDORAS deslizables, no como 12 tarjetas con borde.
+   *
+   * Por qué cambió: la grilla de tarjetas iguales es el patrón que hacía ver la
+   * app "genérica" — ocupaba media pantalla, competía con el contenido y no
+   * dejaba claro que eran FILTROS y no indicadores. En el lenguaje de Apple un
+   * filtro es una píldora en una fila que se desliza (Mail, Fotos, App Store):
+   * ocupa una línea, se lee de un vistazo y el estado activo es evidente.
+   */
+  const filtros: { id: string | null; label: string; value: number; tone?: PillTone }[] = [
+    { id: null, label: 'Todas', value: stats.total },
+    { id: 'pendientes', label: 'Pendientes', value: stats.pendientes, tone: 'warning' },
+    { id: 'criticas', label: 'Críticas', value: stats.criticas, tone: 'critical' },
+    { id: 'confirmadas', label: 'Confirmadas', value: stats.confirmadas, tone: 'info' },
+    { id: 'confirmadas-sin-asignar', label: 'Sin asignar', value: stats.confirmadas_sin_asignar, tone: 'warning' },
+    { id: 'en-proceso', label: 'En proceso', value: stats.enProceso, tone: 'info' },
+    ...(isAdminOrSupervisor
+      ? [{ id: 'por-validar', label: 'Por validar', value: stats.por_validar, tone: 'warning' as PillTone }]
+      : []),
+    { id: 'mis-asignadas', label: 'Mías', value: stats.mis_asignadas },
+    { id: 'mis-resueltas', label: 'Mías resueltas', value: stats.mis_resueltas, tone: 'ok' },
+    { id: 'mis-creadas', label: 'Mías creadas', value: stats.mis_creadas },
+    { id: 'cerradas', label: 'Cerradas', value: stats.cerradas, tone: 'ok' },
+    { id: 'rechazadas', label: 'Rechazadas', value: stats.rechazadas, tone: 'critical' },
+  ]
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="flex flex-col gap-5">
+      {/* Título grande: el rol `display` de la escala (§2). Uno por pantalla. */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-1">
         <div>
-          <h1 className="text-2xl font-bold">Incidencias</h1>
-          <p className="text-muted-foreground">Gestión de mantenimiento correctivo</p>
+          <h1 className="text-[2.05rem] font-bold leading-none tracking-[-0.028em]">Incidencias</h1>
+          <p className="mt-1 text-[0.85rem] text-muted-foreground">
+            {filteredIncidents.length} de {stats.total} · mantenimiento correctivo
+          </p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Incidencia
-        </Button>
+        <div className="ml-auto">
+          <Button onClick={() => setShowForm(true)}>
+            <Plus /> Nueva incidencia
+          </Button>
+        </div>
       </div>
 
-      {/* Stats - Clickeable para filtrar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {/* Total */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-primary/50 ${activeFilter === null ? 'border-primary bg-primary/10' : ''}`}
-          onClick={() => setActiveFilter(null)}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Total</div>
-          </CardContent>
-        </Card>
-
-        {/* Pendientes */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-warning/50 ${activeFilter === 'pendientes' ? 'border-warning bg-warning/10' : ''}`}
-          onClick={() => setActiveFilter('pendientes')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-warning">{stats.pendientes}</div>
-            <div className="text-sm text-muted-foreground">Pendientes</div>
-          </CardContent>
-        </Card>
-
-        {/* Confirmadas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-primary/50 ${activeFilter === 'confirmadas' ? 'border-primary bg-primary/10' : ''}`}
-          onClick={() => setActiveFilter('confirmadas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-primary">{stats.confirmadas}</div>
-            <div className="text-sm text-muted-foreground">Confirmadas</div>
-          </CardContent>
-        </Card>
-
-        {/* Confirmadas Asignadas (En Proceso + Resueltas/PorValidar) */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-blue-400/50 ${activeFilter === 'confirmadas-asignadas' ? 'border-blue-400 bg-blue-400/10' : ''}`}
-          onClick={() => setActiveFilter('confirmadas-asignadas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.confirmadas_asignadas}</div>
-            <div className="text-xs text-muted-foreground">En curso / Resueltas</div>
-          </CardContent>
-        </Card>
-
-        {/* Por Validar (Técnico ha resuelto) - Solo Admin/Supervisor */}
-        {isAdminOrSupervisor && (
-          <Card
-            className={`cursor-pointer transition-all hover:border-violet-500/50 ${activeFilter === 'por-validar' ? 'border-violet-500 bg-violet-500/15' : ''}`}
-            onClick={() => setActiveFilter('por-validar')}
-          >
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-violet-600">{stats.por_validar}</div>
-              <div className="text-xs text-muted-foreground">Por Validar (Cierre Téc.)</div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Mis Asignadas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-violet-400/50 ${activeFilter === 'mis-asignadas' ? 'border-violet-400 bg-violet-400/10' : ''}`}
-          onClick={() => setActiveFilter('mis-asignadas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-violet-600">{stats.mis_asignadas}</div>
-            <div className="text-xs text-muted-foreground">Mis asignadas</div>
-          </CardContent>
-        </Card>
-
-        {/* Mis Resueltas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-green-400/50 ${activeFilter === 'mis-resueltas' ? 'border-green-400 bg-green-400/10' : ''}`}
-          onClick={() => setActiveFilter('mis-resueltas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.mis_resueltas}</div>
-            <div className="text-xs text-muted-foreground">Mis resueltas</div>
-          </CardContent>
-        </Card>
-
-        {/* Mis creadas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-emerald-400/50 ${activeFilter === 'mis-creadas' ? 'border-emerald-400 bg-emerald-400/10' : ''}`}
-          onClick={() => setActiveFilter('mis-creadas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-emerald-600">{stats.mis_creadas}</div>
-            <div className="text-xs text-muted-foreground">Mis creadas</div>
-          </CardContent>
-        </Card>
-
-        {/* Confirmadas Sin Asignar */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-orange-400/50 ${activeFilter === 'confirmadas-sin-asignar' ? 'border-orange-400 bg-orange-400/10' : ''}`}
-          onClick={() => setActiveFilter('confirmadas-sin-asignar')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-500">{stats.confirmadas_sin_asignar}</div>
-            <div className="text-xs text-muted-foreground">Sin Asignar</div>
-          </CardContent>
-        </Card>
-
-        {/* En Proceso */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-blue-500/50 ${activeFilter === 'en-proceso' ? 'border-blue-500 bg-blue-500/15' : ''}`}
-          onClick={() => setActiveFilter('en-proceso')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-500">{stats.enProceso}</div>
-            <div className="text-sm text-muted-foreground">En Proceso</div>
-          </CardContent>
-        </Card>
-
-        {/* Críticas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-destructive/50 ${activeFilter === 'criticas' ? 'border-destructive bg-destructive/10' : ''}`}
-          onClick={() => setActiveFilter('criticas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-destructive">{stats.criticas}</div>
-            <div className="text-sm text-muted-foreground">Críticas</div>
-          </CardContent>
-        </Card>
-
-        {/* Cerradas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-green-500/50 ${activeFilter === 'cerradas' ? 'border-green-500 bg-green-500/15' : ''}`}
-          onClick={() => setActiveFilter('cerradas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.cerradas}</div>
-            <div className="text-sm text-muted-foreground">Cerradas</div>
-          </CardContent>
-        </Card>
-
-        {/* Rechazadas */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-red-500/50 ${activeFilter === 'rechazadas' ? 'border-red-500 bg-red-500/15' : ''}`}
-          onClick={() => setActiveFilter('rechazadas')}
-        >
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{stats.rechazadas}</div>
-            <div className="text-sm text-muted-foreground">Rechazadas</div>
-          </CardContent>
-        </Card>
+      {/* Fila de filtros: una línea que se desliza, en vez de una grilla. */}
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {filtros.map((f) => {
+          const activo = activeFilter === f.id
+          return (
+            <button
+              key={String(f.id)}
+              type="button"
+              onClick={() => setActiveFilter(f.id)}
+              className={[
+                'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[0.8rem] font-medium',
+                'transition-colors duration-150 motion-reduce:transition-none',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                activo
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted-foreground/10 text-muted-foreground hover:text-foreground',
+              ].join(' ')}
+              aria-pressed={activo}
+            >
+              {f.label}
+              <span className={`tabular-nums font-semibold ${activo ? '' : 'text-foreground'}`}>{f.value}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Search - Simplificado */}
       <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar incidencias..."
+        {/* Buscador estilo iOS: relleno suave, sin borde, ícono adentro. */}
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            placeholder="Buscar incidencias…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="h-11 w-full rounded-ctl border-0 bg-muted-foreground/10 pl-9 pr-3 text-[0.9rem] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
           />
         </div>
         
@@ -426,7 +320,7 @@ export function IncidentsPage() {
         
         {(activeFilter || selectedMapLocation !== 'all' || (isAdminOrSupervisor && selectedReporter !== 'all')) && (
           <Button
-            variant="outline"
+            variant="tinted"
             onClick={() => {
               setActiveFilter(null)
               setSelectedMapLocation('all')
@@ -438,31 +332,60 @@ export function IncidentsPage() {
         )}
       </div>
 
-      {/* Incident List */}
-      <div className="space-y-4">
-        {filteredIncidents.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">No hay incidencias</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || activeFilter !== null
-                  ? 'No se encontraron incidencias con los filtros aplicados'
-                  : 'Comienza creando una nueva incidencia'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredIncidents.map((incident) => (
-            <IncidentCard
-              key={incident.id}
-              incident={incident}
-              userInfoLabels={userInfoLabels}
-              onClick={() => setSelectedIncident(incident)}
-            />
-          ))
-        )}
-      </div>
+      {/*
+        La lista pasa de N tarjetas sueltas a UN grupo con celdas. Es el cambio
+        que más ordena la pantalla: antes cada incidencia era una caja con su
+        borde y su sombra —N bordes compitiendo—; ahora es una superficie con
+        separadores insetados, y el ojo recorre una sola columna.
+      */}
+      {filteredIncidents.length === 0 ? (
+        <div className="rounded-card bg-card px-6 py-12 text-center">
+          <AlertTriangle className="mx-auto mb-3 size-9 text-muted-foreground/50" />
+          <p className="text-[0.98rem] font-semibold">No hay incidencias</p>
+          <p className="mx-auto mt-1 max-w-[46ch] text-[0.85rem] text-muted-foreground">
+            {searchQuery || activeFilter !== null
+              ? 'Ninguna coincide con los filtros aplicados. Prueba limpiándolos.'
+              : 'Cuando registres la primera, aparecerá acá.'}
+          </p>
+        </div>
+      ) : (
+        <ListGroup>
+          {filteredIncidents.map((incident) => {
+            const st = STATUS_CONFIG[incident.status] || STATUS_CONFIG['pendiente']
+            const pr = PRIORITY_CONFIG[incident.prioridad] || PRIORITY_CONFIG['media']
+            const quien =
+              userInfoLabels[incident.asignadoA || ''] ||
+              userInfoLabels[incident.creadoPor || incident.reportadoPor || ''] ||
+              null
+            return (
+              <ListCell
+                key={incident.id}
+                title={incident.titulo}
+                subtitle={
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate">{st.label}</span>
+                    {quien && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span className="truncate">{quien}</span>
+                      </>
+                    )}
+                    {(incident.fotos?.length || 0) > 0 && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>{incident.fotos?.length} foto(s)</span>
+                      </>
+                    )}
+                  </span>
+                }
+                trailing={<Pill tone={pr.tone}>{pr.label}</Pill>}
+                value={formatRelativeTime(incident.createdAt)}
+                onClick={() => setSelectedIncident(incident)}
+              />
+            )
+          })}
+        </ListGroup>
+      )}
 
       {/* Form Modal */}
       {showForm && (
@@ -484,69 +407,3 @@ export function IncidentsPage() {
   )
 }
 
-function IncidentCard({
-  incident,
-  userInfoLabels,
-  onClick,
-}: {
-  incident: Incident
-  userInfoLabels: Record<string, string>
-  onClick: () => void
-}) {
-  const statusConfig = STATUS_CONFIG[incident.status] || STATUS_CONFIG['pendiente']
-  const priorityConfig = PRIORITY_CONFIG[incident.prioridad] || PRIORITY_CONFIG['media']
-  const StatusIcon = getStatusIcon(incident.status) || getStatusIcon('pendiente')
-
-  return (
-    <Card
-      className="cursor-pointer hover:border-primary/50 transition-colors"
-      onClick={onClick}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant={statusConfig.variant} className="gap-1">
-                <StatusIcon className="h-3 w-3" />
-                {statusConfig.label}
-              </Badge>
-              <Badge className={priorityConfig.className}>
-                {priorityConfig.label}
-              </Badge>
-            </div>
-            <h3 className="font-medium truncate" title={incident.titulo}>{incident.titulo}</h3>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {incident.descripcion}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
-              {(incident.creadoPor || incident.reportadoPor) && (
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  Creado por:{' '}
-                  <span className="font-medium">
-                    {userInfoLabels[incident.creadoPor || incident.reportadoPor] || incident.creadoPor || incident.reportadoPor}
-                  </span>
-                </span>
-              )}
-              {incident.asignadoA && (
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  Asignado a:{' '}
-                  <span className="font-medium">
-                    {userInfoLabels[incident.asignadoA] || incident.asignadoA}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="text-right text-sm text-muted-foreground shrink-0">
-            <div>{formatRelativeTime(incident.createdAt)}</div>
-            {(incident.fotos?.length || 0) > 0 && (
-              <div className="text-xs mt-1">{incident.fotos?.length || 0} foto(s)</div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
