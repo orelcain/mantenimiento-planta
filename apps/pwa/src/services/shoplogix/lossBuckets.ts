@@ -15,12 +15,14 @@
  *  - `fuera-turno`: "Planned Downtime" = relleno post-turno de Shoplogix
  *    capturado por la ventana de consulta. No es tiempo del turno.
  *
- * Las reglas se calcaron de los reasons REALES de julio 2026 (Yal, Firestore):
- * COLACION, CUMPLIMIENTO CUOTA, AJUSTE MANTENIMIENTO, FALTA MMPP, CINTAS,
- * Micro Detencion, EJERCICIO COMPENSATORIO, CAMBIO TURNO, ENERGIA. Shoplogix
- * puede renombrar causales (ya pasó con "Planned Downtime"/"DETENCION
- * PROGRAMADA") — el match es por substring case-insensitive y todo lo que no
- * calce cae en `sin-clasificar` para que se note y se agregue la regla.
+ * El dueño se decide con el árbol OFICIAL de imputación (`imputacionTaxonomy`),
+ * el mismo que se le enseña a los supervisores en la capacitación de imputación
+ * de fallas. Antes las reglas eran 12 substrings calcados a mano de los reasons
+ * de julio 2026; cubrían 14 de las 46 hojas del árbol y todo lo demás caía en
+ * `sin-clasificar` (LOGICA, BOMBAS, MOTORES, CONTRASTACION, ATASCAMIENTO, AIRE…).
+ *
+ * Lo que no calza con el árbol sigue cayendo en `sin-clasificar` a propósito:
+ * es la señal de que apareció una causal nueva y hay que agregarla al árbol.
  *
  * Con esta clasificación se arma la CASCADA del turno:
  *   turno real → −planificado = techo de máquina → −externo −mantención
@@ -28,6 +30,7 @@
  */
 
 import type { StateAggregate } from '@/services/grader/shoplogixStateAggregates'
+import { categoriaLabel, matchImputacion, normalizeReason } from './imputacionTaxonomy'
 
 export type LossBucket =
   | 'produccion'
@@ -37,28 +40,19 @@ export type LossBucket =
   | 'sin-clasificar'
   | 'fuera-turno'
 
-interface BucketRule {
-  bucket: Exclude<LossBucket, 'produccion'>
-  /** Substrings (lowercase) que deben aparecer en el reason del state. */
-  match: string[]
-}
-
-/** Reglas por reason — la primera que calce gana. Editable al aparecer causales nuevas. */
-const REASON_RULES: BucketRule[] = [
-  { bucket: 'fuera-turno',  match: ['planned downtime', 'detencion programada', 'detención programada'] },
-  { bucket: 'planificado',  match: ['colacion', 'colación'] },
-  { bucket: 'planificado',  match: ['ejercicio compensatorio'] },
-  { bucket: 'planificado',  match: ['cambio turno', 'cambio de turno'] },
-  { bucket: 'planificado',  match: ['charla', 'reunion', 'reunión'] },
-  { bucket: 'planificado',  match: ['aseo', 'limpieza', 'sanitiz'] },
-  { bucket: 'externo',      match: ['falta mmpp', 'mmpp', 'materia prima'] },
-  { bucket: 'externo',      match: ['cumplimiento cuota', 'cuota'] },
-  { bucket: 'externo',      match: ['falta personal'] },
-  // ENERGIA = corte de suministro eléctrico (confirmado por Orel 2026-07-22)
-  // → pérdida externa, no es frente de Mantención.
-  { bucket: 'externo',      match: ['energia', 'energía'] },
-  { bucket: 'mantencion',   match: ['ajuste mantenimiento', 'mantencion', 'mantención'] },
-  { bucket: 'mantencion',   match: ['cintas', 'cinta'] },
+/**
+ * Causales que NO están en el árbol del curso pero llegaron alguna vez desde
+ * Shoplogix. Se consultan solo si el árbol no reconoció el reason, para no
+ * mandar a `sin-clasificar` algo que antes sí se clasificaba.
+ *
+ * OJO con el aseo: el árbol tiene "Retraso aseo" (una pérdida operacional: el
+ * aseo no terminó a tiempo). Un "ASEO" a secas es la pausa acordada y sigue
+ * siendo `planificado`. Son cosas distintas y el orden lo respeta — el árbol
+ * captura "RETRASO ASEO" antes de que esta regla vea "ASEO".
+ */
+const LEGACY_RULES: Array<{ bucket: Exclude<LossBucket, 'produccion'>; match: string[] }> = [
+  { bucket: 'planificado', match: ['CHARLA', 'ASEO', 'LIMPIEZA', 'SANITIZ'] },
+  { bucket: 'externo',     match: ['FALTA PERSONAL'] },
 ]
 
 /**
@@ -66,19 +60,22 @@ const REASON_RULES: BucketRule[] = [
  *
  * Orden de decisión:
  *  1. uptime → produccion.
- *  2. reason calza una regla → ese bucket (aplica a break y downtime por igual:
- *     un "FALTA MMPP" es externo aunque venga como type downtime).
- *  3. "Micro Detencion" sin reason → mantencion (interferencias de equipo).
- *  4. downtime sin causal → sin-clasificar (es exactamente lo que el filtro
+ *  2. reason calza el árbol oficial → el bucket de esa hoja (aplica a break y
+ *     downtime por igual: un "FALTA MMPP" es externo aunque venga como downtime).
+ *  3. reason calza una regla legacy → ese bucket.
+ *  4. "Micro Detencion" sin reason → mantencion (interferencias de equipo).
+ *  5. downtime sin causal → sin-clasificar (es exactamente lo que el filtro
  *     "Sin anotar" del calendario persigue — no disfrazarlo de avería).
- *  5. resto (break/setup desconocido) → sin-clasificar.
+ *  6. resto (break/setup desconocido) → sin-clasificar.
  */
 export function classifyLossState(s: { type: string; name?: string; reason?: string }): LossBucket {
   if (s.type === 'uptime') return 'produccion'
-  const reason = (s.reason ?? '').toLowerCase().trim()
+  const reason = normalizeReason(s.reason)
   if (reason) {
-    for (const rule of REASON_RULES) {
-      if (rule.match.some((m) => reason.includes(m))) return rule.bucket
+    const m = matchImputacion(reason)
+    if (m.bucket) return m.bucket
+    for (const rule of LEGACY_RULES) {
+      if (rule.match.some((k) => reason.includes(k))) return rule.bucket
     }
     return 'sin-clasificar'
   }
@@ -104,7 +101,21 @@ export interface LossCascade {
   /** Uso real / techo (0-1). El uptime "honesto" que pedía la cascada. */
   usoReal: number
   /** Detalle por causal, ordenado por impacto. */
-  items: Array<{ bucket: LossBucket; name: string; reason: string; durationSec: number; count: number }>
+  items: LossCascadeItem[]
+}
+
+export interface LossCascadeItem {
+  bucket: LossBucket
+  name: string
+  reason: string
+  durationSec: number
+  count: number
+  /** Etiqueta oficial de la causal en el árbol ('Lógica'), o null si no se reconoció. */
+  causal: string | null
+  /** Categoría del árbol ('Eléctrica'), 'Eléctrica o Mecánica' si el dato no distingue. */
+  categoria: string | null
+  /** true cuando la hoja existe en 2 categorías y el reason plano no permite decidir. */
+  ambigua: boolean
 }
 
 /**
@@ -121,7 +132,17 @@ export function cascadeFromAggregates(aggs: StateAggregate[]): LossCascade {
     const bucket = classifyLossState(a)
     sums[bucket] += a.durationSec
     if (bucket !== 'produccion' && bucket !== 'fuera-turno' && a.durationSec > 0) {
-      items.push({ bucket, name: a.name, reason: a.reason, durationSec: a.durationSec, count: a.count })
+      const m = matchImputacion(a.reason)
+      items.push({
+        bucket,
+        name: a.name,
+        reason: a.reason,
+        durationSec: a.durationSec,
+        count: a.count,
+        causal: m.leaf?.label ?? null,
+        categoria: m.leaf ? categoriaLabel(m.leaf) : null,
+        ambigua: m.ambigua,
+      })
     }
   }
   const techoSec =
