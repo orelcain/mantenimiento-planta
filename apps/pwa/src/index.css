@@ -282,9 +282,17 @@
   --muted: 229 229 234;             /* #E5E5EA systemGray5 */
   --accent: 229 229 234;            /* #E5E5EA hover/selección */
   --border: 198 198 200;            /* #C6C6C8 opaqueSeparator */
-  --sidebar-active: #2E75B6;
-  --sidebar-active-foreground: #ffffff;
-  --sidebar-surface: #ffffff;
+  /* ── EL SHELL (docs §4) ───────────────────────────────────────────────────
+     Lo que faltaba y por lo que la app "no se parecía a Apple" por mucho que se
+     cambiaran los tokens de las páginas: el marco. En macOS el ítem activo de
+     una barra lateral NO es un bloque sólido de color — es una píldora TINTADA
+     con el texto y el ícono en el acento. El bloque sólido es justo lo que
+     hace ver "plantilla".
+     La barra lateral además es una superficie DISTINTA del contenido (más
+     apagada), no una columna con borde duro. */
+  --sidebar-active: rgba(46, 117, 182, 0.12);
+  --sidebar-active-foreground: #2a6aa6;
+  --sidebar-surface: #ededf2;
   --panel-surface: #f2f2f7;
 
   /* Centro de Aprendizaje bajo la piel nueva (mismos nombres, valores Apple) */
@@ -337,9 +345,9 @@
   --muted: 58 58 60;                /* #3A3A3C */
   --accent: 58 58 60;               /* #3A3A3C */
   --border: 56 56 58;               /* #38383A opaqueSeparator dark */
-  --sidebar-active: #5AA0DC;
-  --sidebar-active-foreground: #10141a;
-  --sidebar-surface: #2c2c2e;
+  --sidebar-active: rgba(90, 160, 220, 0.18);
+  --sidebar-active-foreground: #71ade1;
+  --sidebar-surface: #161618;
   --panel-surface: #1c1c1e;
 
   --lc-bg: #1c1c1e;

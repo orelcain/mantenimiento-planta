@@ -571,10 +571,14 @@ export function MainLayout() {
                         onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
                         className={({ isActive }) =>
                           cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                            // Píldora INSETADA (mx-1), no fila a sangre: es lo
+                            // que separa una barra lateral de macOS de una lista
+                            // de links. El ícono acompaña al texto en el acento.
+                            'mx-1 flex items-center gap-2.5 rounded-ctl px-2.5 py-2 text-sm font-medium transition-colors',
+                            '[&_svg]:size-[18px]',
                             isActive
                               ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-active-foreground)]'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              : 'text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground'
                           )
                         }
                       >
@@ -676,7 +680,7 @@ export function MainLayout() {
           <aside
             role="navigation"
             aria-label="Menú principal"
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-surface)] border-r"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-surface)]"
           >
             <div className="flex flex-col h-full">
               {/* Logo */}
@@ -726,10 +730,12 @@ export function MainLayout() {
                             onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
                             className={({ isActive }) =>
                               cn(
-                                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                                // Mismo tratamiento que la barra de escritorio.
+                                'mx-1 flex items-center gap-2.5 rounded-ctl px-2.5 py-2 text-sm font-medium transition-colors',
+                                '[&_svg]:size-[18px]',
                                 isActive
                                   ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-active-foreground)]'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground'
                               )
                             }
                           >
