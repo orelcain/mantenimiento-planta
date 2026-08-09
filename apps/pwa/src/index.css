@@ -274,6 +274,22 @@
   --brand-foreground: 16 20 26;
 }
 
+/* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que
+   dispare layout — y las curvas de iOS. Todo se apaga con reduced-motion. */
+@keyframes piel-fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes piel-sheet-in { from { transform: translateY(100%) } to { transform: none } }
+@keyframes piel-pulse {
+  0%   { transform: scale(.5);  opacity: .7 }
+  70%  { transform: scale(1.5); opacity: 0 }
+  100% { opacity: 0 }
+}
+.piel-fade-in { animation: piel-fade-in .35s ease-out both }
+.piel-sheet-in { animation: piel-sheet-in .5s cubic-bezier(.32, .72, 0, 1) both }
+.piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
+@media (prefers-reduced-motion: reduce) {
+  .piel-fade-in, .piel-sheet-in, .piel-pulse { animation: none !important }
+}
+
 @layer base {
   * {
     @apply border-border;

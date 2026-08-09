@@ -77,6 +77,10 @@ const CatalogoPublicPage = lazyWithReload(() => import('@/pages/CatalogoPublicPa
 const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPage').then((mod) => ({ default: mod.HmiKnuroPublicPage })))
 const HmiBombeoS2PublicPage = lazyWithReload(() => import('@/pages/HmiBombeoS2PublicPage').then((mod) => ({ default: mod.HmiBombeoS2PublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
+// Vitrina de la NUEVA PIEL (docs/NUEVA_PIEL_APPLE_HIG.md). Página de desarrollo:
+// sin datos, sin sidebar y fuera del menú — existe para ver los primitivos con
+// contenido real y comparar piel/tema durante la migración.
+const PielShowcasePage = lazyWithReload(() => import('@/pages/dev/PielShowcasePage'))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const Visor3DInteractivePlataformaPontonPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractivePlataformaPontonPage').then((mod) => ({ default: mod.Visor3DInteractivePlataformaPontonPage })))
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
@@ -278,6 +282,16 @@ export function App() {
               <PublicRoute>
                 <LoginPage />
               </PublicRoute>
+            }
+          />
+
+          {/* Vitrina de la nueva piel — solo desarrollo, no enlazada en el menú */}
+          <Route
+            path="/dev/piel"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <PielShowcasePage />
+              </Suspense>
             }
           />
 
