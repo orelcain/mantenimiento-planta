@@ -52,7 +52,19 @@ la memoria de alguien. Dos funciones nuevas, con criterios deliberadamente disti
 - **Sin índice nuevo**: el trigger y el recordatorio reusan
   `(plantId, maquina, fecha desc, createdAt desc)` que ya existe. El recordatorio hace 3 queries
   de `limit 1` en vez de una con `where fecha >=`, justamente para no pedir un índice más.
-- Estado: EN REVISIÓN — PR abierto. **Al mergear, las functions se despliegan solas.**
+- **El primer deploy quedó en ROJO y hay que saber por qué (aplica a toda function nueva):** un
+  `onDocumentCreated('col/{id}', fn)` **sin `region` explícita** lo crea firebase-functions v7 en
+  la región de la BASE DE DATOS (`southamerica-west1`), no en us-central1. Las dos funciones
+  quedaron desplegadas y operativas, pero el paso final del deploy falló con *"could not set up
+  cleanup policy in location southamerica-west1"* → **exit 1**. O sea: CI en rojo con las
+  funciones andando, que es la peor combinación porque esconde el próximo fallo de verdad.
+  Fix (#410): forma con objeto `{ document, region: 'us-central1' }`, igual que
+  `onShoplogixShiftStarted`. Y **hubo que borrar la función de la región vieja a mano**
+  (`firebase functions:delete onProtocoloBaader142Created --region southamerica-west1 --force`)
+  porque cambiar de región implica borrar+crear y el CI corre `--non-interactive` sin `--force`.
+  Verificado después: `functions:list` no deja nada en southamerica-west1 y las dos funciones
+  figuran en us-central1; deploy en verde.
+- Estado: HECHO — #409 y #410 mergeados y desplegados.
 - Sigue: la primera alerta real se verá cuando se guarde una lectura. Para probar el trigger sin
   esperar al viernes, basta guardar una lectura con `E82x-C` sobre 30 y ver si llega el mensaje.
 
