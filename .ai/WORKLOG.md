@@ -13,6 +13,44 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-09 - claude - El aviso del protocolo NUNCA llegaba: topic de Telegram roto
+
+Verificación end-to-end del circuito recién desplegado, contra producción. Encontró un bug que
+tsc, eslint, los 18 tests y el deploy en verde no podían ver.
+
+**Lo que ya estaba bien (verificado, no asumido):** la colección tenía **1 lectura, escrita por
+Danilo** desde la app el 08-08 a las 13:38 — o sea la **regla de Firestore y el índice compuesto
+ya estaban probados con uso real**, que era justo lo que quedaba pendiente. Pero ese doc es
+ANTERIOR al despliegue de las functions (09-08 16:57), así que el trigger nunca había corrido.
+
+**Cómo se probó el trigger sin ensuciar el grupo:** crear una lectura **sana** (todos los
+contadores en 0). El trigger corre, evalúa, no encuentra nada y no manda mensaje; el log
+`protocolo baader142: baader-n3 sin alertas` es la prueba de que está enganchado. Después, una
+con alerta (`fecha: '1999-01-01'` para que sea inconfundiblemente una prueba) para probar el
+envío. **Ese segundo caso destapó el bug.**
+
+**El bug:** Telegram devolvía `400 "Bad Request: message thread not found"` — el topic `equipos`
+apunta a un hilo que ya no existe en el grupo. Y como `sendTelegramMessage` **loguea sin lanzar**,
+la función terminaba en verde (`1 alerta(s) en baader-n3`) con el mensaje perdido. Todos los
+viernes habría fallado en silencio.
+
+**Dos arreglos (#412):**
+1. `sendTelegramMessage` reintenta **sin topic** (hilo principal del grupo) cuando el error es
+   "thread not found". Arregla de raíz el problema para cualquier función cuyo topic alguien
+   borre — la línea ~2649 también usa `equipos` y muy probablemente venía fallando igual.
+2. Las dos funciones del protocolo pasan a `getTopicId('general')`, que tiene uso diario
+   verificado (Grader y Shoplogix mandan ahí). **Topics sanos: general, incidencias, repuestos.**
+
+**Evidencia del antes y después**, misma prueba, mismo doc:
+- 17:50:36 → `E ... 400 message thread not found` + `1 alerta(s) en baader-n3` (mensaje perdido)
+- 18:02:04 → `1 alerta(s) en baader-n3`, **sin error** (mensaje enviado)
+
+Los docs de prueba se borraron; la colección queda con la lectura real de Danilo, intacta.
+
+- Estado: HECHO — #412 mergeado y desplegado.
+- Sigue: confirmar visualmente en el grupo que llegó el aviso de prueba (fecha 1999) y avisar al
+  equipo que era una prueba técnica.
+
 ## 2026-08-09 - claude - El protocolo de las Baader 142 ahora sale a buscar a la persona
 
 El módulo Perilla 5 ya dejaba registrar los 13 contadores y ver la tendencia, pero había que
