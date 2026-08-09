@@ -123,9 +123,15 @@ interface KPICardProps {
   note?: string
 }
 
+/**
+ * Un KPI dentro de una tarjeta es un BLOQUE DE TEXTO con aire, no otra tarjeta.
+ * Antes cada baldosa traía su propio `border` + fondo: eso es lo que producía el
+ * efecto "caja dentro de caja" que hacía ver la pantalla como panel denso.
+ * La separación ahora la da la grilla, no el contorno.
+ */
 function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   return (
-    <div className="bg-muted rounded-card px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors">
+    <div className="px-1 py-1.5">
       <div className="flex items-center justify-between gap-1 mb-1">
         <div className="text-[10px] font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
@@ -215,7 +221,7 @@ export function PlantKPIBoard({
   if (!enabled) return null
 
   return (
-    <Card className="border-border">
+    <Card className="border-0 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -373,7 +379,7 @@ export function PlantKPIBoard({
                 barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <div
-                className="bg-muted rounded-card px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors"
+                className="px-1 py-1.5"
                 title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
                 <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
@@ -394,7 +400,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 text-[10px] text-ink-warn/90 bg-amber-500/[0.06] border border-amber-500/[0.25] rounded-ctl px-2 py-1.5">
+              <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-[10px] text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
@@ -422,7 +428,7 @@ export function PlantKPIBoard({
                 <div
                   key={m.machineid}
                   className={cn(
-                    'flex items-center gap-2 text-[11px] bg-muted rounded-ctl px-2 py-1 border border-border',
+                    'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-[11px]',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}

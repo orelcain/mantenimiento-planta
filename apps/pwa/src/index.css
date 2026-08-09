@@ -139,6 +139,12 @@
      `-card`, `-panel`— y el VALOR de cada una es una variable, para que la piel
      actual conserve sus proporciones y la nueva traiga la geometría de Apple.
      Sin esto, unificar habría cambiado el aspecto de ~1.600 elementos en prod. */
+  /* Borde de TARJETA, separado del borde general. En la piel actual vale lo
+     mismo que `--border` (nada cambia); en la piel Apple vale el color de la
+     propia tarjeta, o sea: invisible. Esa es la diferencia entre "tarjeta con
+     contorno" y "tarjeta que flota", que es lo que define el look de Apple. */
+  --card-edge: 88 94 100;           /* = --border en la piel actual */
+
   --r-ctl: 0.5rem;                  /* controles: botón, input, chip cuadrado */
   --r-card: 0.75rem;                /* tarjeta / grupo de lista */
   --r-panel: 1rem;                  /* contenedor grande, sheet, modal */
@@ -223,6 +229,7 @@
   --shift-ramp-3: #4b8fd2;  --shift-ramp-3-ink: #14202c;  /* 4.84:1 */
   --shift-ramp-4: #53a3f0;  --shift-ramp-4-ink: #14202c;  /* 6.18:1 */
   --shift-empty: rgba(157, 176, 194, 0.06);
+  --card-edge: 34 56 74;            /* = --border oscuro de la piel actual */
 
   /* Tinta adaptativa en oscuro: los -400 mate de julio, sin cambios. */
   --ink-crit: 178 128 127;
@@ -328,9 +335,12 @@
   --ink-ok: 33 125 56;
   --ink-info: 42 106 166;
 
+  --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
+
   --r-ctl: 10px;
   --r-card: 14px;
   --r-panel: 18px;
+  --card-edge: 44 44 46;            /* = --card oscuro */
 }
 
 :root[data-skin="apple"].dark {
