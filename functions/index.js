@@ -8000,3 +8000,113 @@ exports.onStockConteoCreated = onDocumentCreated('stockAuditLog/{logId}', async 
     { topicId: repTopicId }
   )
 })
+
+// ═══════════════════════════════════════════════════════════════════
+// PROTOCOLO BAADER 142 — recordatorio semanal y alerta de tendencia
+// ═══════════════════════════════════════════════════════════════════
+// El módulo Perilla 5 ya deja registrar los 13 contadores del Upgrade Kit y ver
+// la tendencia, pero hay que acordarse de ir a mirarla. Estas dos funciones hacen
+// que el dato salga a buscar a la persona: sin esto, la promesa de "intervenir
+// antes de que la máquina pare" depende de que alguien se acuerde.
+// La lógica (umbrales, tendencia, redacción) vive aparte y con tests:
+// functions/baader142/protocoloAlertas.js
+const protocoloAlertas = require('./baader142/protocoloAlertas')
+
+const PROTOCOLO_COL = 'baader142Protocolo'
+
+/** Fecha de Santiago en YYYY-MM-DD (las lecturas se guardan con la fecha local). */
+function fechaChile(offsetDias = 0) {
+  const d = new Date(Date.now() + offsetDias * 86_400_000)
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d)
+}
+
+/** Las dos lecturas anteriores de una máquina: con tres puntos se puede decir
+ *  "sube dos seguidas", que es el criterio de tendencia. */
+async function lecturasPreviasBaader(plantId, maquina, excluirId) {
+  const snap = await db.collection(PROTOCOLO_COL)
+    .where('plantId', '==', plantId || 'chonchi')
+    .where('maquina', '==', maquina)
+    .orderBy('fecha', 'desc')
+    .orderBy('createdAt', 'desc')
+    .limit(3)
+    .get()
+  return snap.docs
+    .filter((d) => d.id !== excluirId)   // la recién creada ya aparece en la query
+    .map((d) => d.data())
+    .slice(0, 2)
+}
+
+/**
+ * Lectura nueva del protocolo → se evalúa contra el historial de ESA máquina y se
+ * avisa solo si hay algo que mirar. Silencio cuando está sana: un canal que avisa
+ * siempre se deja de leer.
+ */
+exports.onProtocoloBaader142Created = onDocumentCreated(
+  `${PROTOCOLO_COL}/{lecturaId}`,
+  async (event) => {
+    const actual = event.data?.data()
+    if (!actual || !actual.maquina) return
+
+    let previas = []
+    try {
+      previas = await lecturasPreviasBaader(actual.plantId, actual.maquina, event.params.lecturaId)
+    } catch (err) {
+      // Sin historial se evalúa igual: los umbrales absolutos no lo necesitan.
+      logger.warn('protocolo baader142: no se pudo leer el historial', err)
+    }
+
+    const ev = protocoloAlertas.evaluarLectura(actual, previas)
+    const msg = protocoloAlertas.componerAlerta(ev)
+    if (!msg) {
+      logger.info(`protocolo baader142: ${actual.maquina} sin alertas`)
+      return
+    }
+
+    const topicId = getTopicId('equipos')
+    await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
+    logger.info(`protocolo baader142: ${ev.alertas.length} alerta(s) en ${actual.maquina}`)
+  }
+)
+
+/**
+ * Viernes 16:30 — recordatorio de registrar el protocolo antes de terminar el turno.
+ * Solo manda mensaje si falta alguna de las tres máquinas; si están todas, calla.
+ */
+exports.recordatorioProtocoloBaader142 = onSchedule(
+  { schedule: '30 16 * * 5', timeZone: 'America/Santiago', region: 'us-central1' },
+  async () => {
+    const desde = fechaChile(-7)
+    const registradas = []
+    const ultimaFecha = {}
+
+    // Una query por máquina (3 en total): reusa el índice que ya existe en vez de
+    // pedir uno nuevo solo para esto.
+    for (const id of Object.keys(protocoloAlertas.MAQUINAS)) {
+      try {
+        const snap = await db.collection(PROTOCOLO_COL)
+          .where('plantId', '==', 'chonchi')
+          .where('maquina', '==', id)
+          .orderBy('fecha', 'desc')
+          .orderBy('createdAt', 'desc')
+          .limit(1)
+          .get()
+        const ultima = snap.docs[0]?.data()
+        if (!ultima) continue
+        ultimaFecha[id] = ultima.fecha
+        if (ultima.fecha >= desde) registradas.push(id)
+      } catch (err) {
+        logger.warn(`protocolo baader142: no se pudo consultar ${id}`, err)
+      }
+    }
+
+    const msg = protocoloAlertas.componerRecordatorio(registradas, ultimaFecha)
+    if (!msg) {
+      logger.info('protocolo baader142: las tres máquinas registradas, sin recordatorio')
+      return
+    }
+    const topicId = getTopicId('equipos')
+    await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
+  }
+)

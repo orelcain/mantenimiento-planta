@@ -13,6 +13,49 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-09 - claude - El protocolo de las Baader 142 ahora sale a buscar a la persona
+
+El módulo Perilla 5 ya dejaba registrar los 13 contadores y ver la tendencia, pero había que
+acordarse de ir a mirarla. Sin esto, la promesa de "intervenir ANTES de que pare" dependía de
+la memoria de alguien. Dos funciones nuevas, con criterios deliberadamente distintos:
+
+- **`recordatorioProtocoloBaader142`** (`onSchedule '30 16 * * 5'`, America/Santiago): viernes
+  16:30, antes de que termine el turno. **Solo manda mensaje si falta registrar alguna de las
+  tres máquinas**; si están todas, calla — un aviso que llega siempre se deja de leer (mismo
+  criterio que el verificador de arranque de turno). Lista las que faltan con la fecha de su
+  última lectura y repite la regla de no resetear.
+- **`onProtocoloBaader142Created`** (trigger `onDocumentCreated`): al guardar una lectura la
+  evalúa contra las dos anteriores de ESA máquina y avisa solo si hay algo que mirar.
+- Ambas al grupo de mantención, topic `equipos`.
+
+**Los tres criterios de alerta, y por qué cada uno:**
+1. `umbral` — la tasa llegó a intervenir (30) o crítico (100). Es el ESTADO, no el movimiento:
+   aunque no haya subido esta semana, sigue sin arreglarse (el mensaje lo dice: "Igual que la
+   lectura anterior: sigue sin corregirse").
+2. `tendencia` — subió en las dos últimas lecturas seguidas. **Se exige además llegar a
+   "vigilar" (5)**, porque 0 → 1 → 2 por mil es ruido, no una tendencia; sin ese piso, el aviso
+   se volvería ruido y nadie lo leería a la tercera semana.
+3. `falla-dura` — paró con las correcciones en cero. No es desgaste: es inductivo, cable o
+   bloqueo, y el mensaje manda a mirar el inductivo (B1…B5), no la correa. Avisa aunque la tasa
+   sea baja, porque la máquina ya se detuvo.
+
+- **La lógica vive aparte y con tests**: `functions/baader142/protocoloAlertas.js` (funciones
+  puras sobre datos ya leídos) + `__tests__/protocoloAlertas.test.js`, **18 tests, todos verdes**
+  con `node --test`. Se sigue el patrón de `functions/shoplogix/`, no el index monolítico.
+  ⚠ **Esos tests NO corren en CI**: el vitest de `apps/pwa` solo incluye `src/**`, así que los
+  12 tests de shoplogix tampoco corren. Deuda preexistente del repo, no la introduce este PR;
+  se corrieron a mano y queda anotado.
+- **Verificación mirando, no solo asserts**: `__tests__/previewMensajes.js` imprime los 7
+  mensajes renderizados (sin HTML) para revisar la redacción antes de soltarla al grupo. Ahí se
+  confirmó que el caso "más pescados con las mismas correcciones" NO dispara alerta, porque
+  compara tasas y no totales — un test que solo mirara el total habría dado un falso positivo.
+- **Sin índice nuevo**: el trigger y el recordatorio reusan
+  `(plantId, maquina, fecha desc, createdAt desc)` que ya existe. El recordatorio hace 3 queries
+  de `limit 1` en vez de una con `where fecha >=`, justamente para no pedir un índice más.
+- Estado: EN REVISIÓN — PR abierto. **Al mergear, las functions se despliegan solas.**
+- Sigue: la primera alerta real se verá cuando se guarde una lectura. Para probar el trigger sin
+  esperar al viernes, basta guardar una lectura con `E82x-C` sobre 30 y ver si llega el mensaje.
+
 ## 2026-08-08 - claude - Perilla 5: notas compartidas, tema claro/oscuro y menos cascarón
 
 Segunda tanda de feedback de Orel sobre el módulo.
