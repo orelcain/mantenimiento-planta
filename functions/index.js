@@ -8043,8 +8043,12 @@ async function lecturasPreviasBaader(plantId, maquina, excluirId) {
  * avisa solo si hay algo que mirar. Silencio cuando está sana: un canal que avisa
  * siempre se deja de leer.
  */
+// `region` explícita: sin ella, firebase-functions v7 crea la función en la región
+// de la base de datos (southamerica-west1) y el deploy termina en error al no poder
+// configurar la política de limpieza de artefactos de esa región nueva. El resto de
+// los triggers del repo corren en us-central1 aunque su trigger sea de la BD chilena.
 exports.onProtocoloBaader142Created = onDocumentCreated(
-  `${PROTOCOLO_COL}/{lecturaId}`,
+  { document: `${PROTOCOLO_COL}/{lecturaId}`, region: 'us-central1' },
   async (event) => {
     const actual = event.data?.data()
     if (!actual || !actual.maquina) return
