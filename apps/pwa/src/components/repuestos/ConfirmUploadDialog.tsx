@@ -55,7 +55,7 @@ export function ConfirmUploadDialog({
             <div
               key={src}
               className={[
-                'overflow-hidden rounded-lg border border-border bg-muted',
+                'overflow-hidden rounded-card border border-border bg-muted',
                 previews.length === 1 ? 'mx-auto max-h-44 w-auto' : 'aspect-square',
               ].join(' ')}
             >
@@ -63,14 +63,14 @@ export function ConfirmUploadDialog({
             </div>
           ))}
           {previews.length > 6 && (
-            <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
+            <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border text-xs text-muted-foreground">
               +{previews.length - 6} más
             </div>
           )}
         </div>
 
         {/* Destino */}
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+        <div className="rounded-card border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
           <div className="flex items-center gap-2 font-medium text-foreground">
             <Package className="h-4 w-4 shrink-0 text-primary" />
             <span className="truncate">{repuestoName}</span>

@@ -144,9 +144,11 @@ export default {
         sm: '0.25rem',
         // Escala ÚNICA de la nueva piel (docs/NUEVA_PIEL_APPLE_HIG.md §3).
         // Reemplaza la mezcla rounded/-sm/-md/-lg/-xl en TODO componente nuevo.
-        ctl: '10px',    // controles: botón, input, segmented, chip cuadrado
-        card: '14px',   // tarjeta / grupo de lista
-        panel: '18px',  // contenedor grande, sheet, modal
+        // Valores por VARIABLE: la piel actual conserva sus proporciones y la
+        // nueva trae la geometría Apple. Ver index.css para el porqué.
+        ctl: 'var(--r-ctl)',      // controles: botón, input, segmented, chip
+        card: 'var(--r-card)',    // tarjeta / grupo de lista
+        panel: 'var(--r-panel)',  // contenedor grande, sheet, modal
       },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)

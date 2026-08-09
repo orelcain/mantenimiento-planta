@@ -368,7 +368,7 @@ export function TechnicalSpecsModal({
           </div>
 
           {/* Datos Comunes */}
-          <div className="space-y-3 p-3 bg-blue-500/15 rounded-lg border border-blue-500/20">
+          <div className="space-y-3 p-3 bg-primary/[0.08] rounded-card border border-primary/[0.25]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -396,7 +396,7 @@ export function TechnicalSpecsModal({
 
           {/* Campos Específicos del Tipo */}
           {Object.keys(currentTemplate.fields).length > 0 && (
-            <div className="space-y-3 p-3 bg-muted rounded-lg border border-border">
+            <div className="space-y-3 p-3 bg-muted rounded-card border border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon className={`h-3.5 w-3.5 ${currentTemplate.color}`} />
@@ -443,7 +443,7 @@ export function TechnicalSpecsModal({
             </div>
 
             {specs.customFields.length === 0 ? (
-              <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-lg">
+              <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-card">
                 No hay campos personalizados
               </div>
             ) : (

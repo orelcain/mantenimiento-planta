@@ -177,7 +177,7 @@ export function RepuestoGalleryModal({
           {!readOnly && (
             <div
               onClick={() => !uploading && fileInputRef.current?.click()}
-              className={`border-2 border-dashed border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+              className={`border-2 border-dashed border-muted-foreground/25 hover:border-primary/[0.25] hover:bg-muted/10 rounded-card p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
                 uploading ? 'opacity-50 pointer-events-none' : ''
               }`}
             >
@@ -209,7 +209,7 @@ export function RepuestoGalleryModal({
                 {gallery.map((img, idx) => (
                   <div
                     key={img.id}
-                    className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer"
+                    className="group relative aspect-square bg-muted rounded-card overflow-hidden border border-border cursor-pointer"
                     onClick={() => setLightboxIndex(idx)}
                   >
                     <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" loading="lazy" />
@@ -250,7 +250,7 @@ export function RepuestoGalleryModal({
                     </div>
 
                     {/* Type badge */}
-                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded text-[10px] text-white font-medium uppercase">
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded-ctl text-[10px] text-white font-medium uppercase">
                       {TYPE_LABELS[img.type] || img.type}
                     </div>
                   </div>

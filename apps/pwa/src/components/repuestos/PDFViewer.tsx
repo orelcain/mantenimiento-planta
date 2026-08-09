@@ -382,7 +382,7 @@ export function PDFViewer({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">
+      <div className="flex items-center justify-center h-96 bg-gray-100 rounded-card">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Cargando PDF...</p>
@@ -393,7 +393,7 @@ export function PDFViewer({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-96 bg-red-50 rounded-lg">
+      <div className="flex items-center justify-center h-96 bg-red-50 rounded-card">
         <div className="text-center text-red-600">
           <p className="font-semibold">❌ {error}</p>
           <p className="text-sm mt-2">Verifica que el archivo PDF sea accesible</p>
@@ -411,7 +411,7 @@ export function PDFViewer({
           <button
             onClick={prevPage}
             disabled={pageNum <= 1}
-            className="p-2 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-ctl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -421,7 +421,7 @@ export function PDFViewer({
           <button
             onClick={nextPage}
             disabled={pageNum >= numPages}
-            className="p-2 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-ctl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -429,19 +429,19 @@ export function PDFViewer({
 
         {/* Zoom */}
         <div className="flex items-center gap-2">
-          <button onClick={zoomOut} className="p-2 rounded hover:bg-gray-200">
+          <button onClick={zoomOut} className="p-2 rounded-ctl hover:bg-gray-200">
             <ZoomOut className="w-5 h-5" />
           </button>
           <select
             value={zoomMode}
             onChange={(e) => setZoomMode(e.target.value as ZoomMode)}
-            className="px-2 py-1 text-sm border rounded"
+            className="px-2 py-1 text-sm border rounded-ctl"
           >
             <option value="fit-width">Ajustar ancho</option>
             <option value="fit-page">Ajustar página</option>
             <option value="custom">{Math.round(customZoom * 100)}%</option>
           </select>
-          <button onClick={zoomIn} className="p-2 rounded hover:bg-gray-200">
+          <button onClick={zoomIn} className="p-2 rounded-ctl hover:bg-gray-200">
             <ZoomIn className="w-5 h-5" />
           </button>
         </div>
@@ -452,7 +452,7 @@ export function PDFViewer({
             <select
               value={drawingShape}
               onChange={(e) => setDrawingShape(e.target.value as any)}
-              className="px-2 py-1 text-sm border rounded"
+              className="px-2 py-1 text-sm border rounded-ctl"
             >
               <option value="rectangulo">Rectángulo</option>
               <option value="circulo">Círculo</option>
@@ -464,7 +464,7 @@ export function PDFViewer({
                 const color = MARKER_COLORS.find(c => c.value === e.target.value);
                 if (color) setDrawingColor(color);
               }}
-              className="px-2 py-1 text-sm border rounded"
+              className="px-2 py-1 text-sm border rounded-ctl"
             >
               {MARKER_COLORS.map(c => (
                 <option key={c.value} value={c.value} style={{ backgroundColor: c.value }}>

@@ -8,7 +8,7 @@ function Tip({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <span className="relative group/tip">
       {children}
-      <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 z-50 shadow-lg border border-border">
+      <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-ctl bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 z-50 shadow-lg border border-border">
         {label}
       </span>
     </span>
@@ -75,7 +75,7 @@ function RepuestoThumbnail({ rep, onPreview, onOpenGallery }: {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onOpenGallery?.(rep) }}
-        className="h-11 w-11 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
+        className="h-11 w-11 rounded-card bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
         title="Agregar imagen"
       >
         <Camera className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary/60 transition-colors" />
@@ -85,7 +85,7 @@ function RepuestoThumbnail({ rep, onPreview, onOpenGallery }: {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onPreview?.(img.url, rep.textoBreve || rep.codigoSAP || 'Repuesto', allImages) }}
-      className="relative h-11 w-11 rounded-lg overflow-hidden shrink-0 ring-1 ring-border hover:ring-primary/50 transition-all cursor-pointer group"
+      className="relative h-11 w-11 rounded-card overflow-hidden shrink-0 ring-1 ring-border hover:ring-primary/50 transition-all cursor-pointer group"
     >
       <img
         src={img.url}
@@ -131,7 +131,7 @@ function QuickImagePreview({ url, name, allImages, onClose, onAddPhoto }: {
 
         {/* Imagen con zoom + paneo */}
         <div
-          className="overflow-hidden rounded-xl max-h-[70vh] cursor-grab active:cursor-grabbing"
+          className="overflow-hidden rounded-card max-h-[70vh] cursor-grab active:cursor-grabbing"
           onWheel={e => { e.preventDefault(); setZoom(z => Math.max(0.5, Math.min(5, z + (e.deltaY > 0 ? -0.3 : 0.3)))) }}
           onMouseMove={e => { if (e.buttons === 1 && zoom > 1) { setPanX(p => p + e.movementX); setPanY(p => p + e.movementY) } }}
         >
@@ -172,13 +172,13 @@ function QuickImagePreview({ url, name, allImages, onClose, onAddPhoto }: {
           <div className="flex items-center gap-2 mt-3">
             {images.map((img, i) => (
               <button key={img.url} onClick={() => goTo(i)}
-                className={`h-10 w-10 rounded-lg overflow-hidden ring-2 transition-all ${idx === i ? 'ring-primary' : 'ring-transparent hover:ring-white/30'}`}>
+                className={`h-10 w-10 rounded-card overflow-hidden ring-2 transition-all ${idx === i ? 'ring-primary' : 'ring-transparent hover:ring-white/30'}`}>
                 <img src={img.url} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
             {onAddPhoto && (
               <button onClick={onAddPhoto}
-                className="h-10 w-10 rounded-lg border-2 border-dashed border-white/20 hover:border-white/40 flex items-center justify-center text-white/40 hover:text-white/60 transition-colors">
+                className="h-10 w-10 rounded-card border-2 border-dashed border-white/20 hover:border-white/40 flex items-center justify-center text-white/40 hover:text-white/60 transition-colors">
                 <Camera className="h-4 w-4" />
               </button>
             )}
@@ -270,7 +270,7 @@ export function RepuestosTable({
 
   if (repuestos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border rounded-xl bg-muted gap-3">
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border rounded-card bg-muted gap-3">
         <Package className="h-10 w-10 text-muted-foreground/30" />
         <span>No hay repuestos en esta máquina.</span>
       </div>
@@ -294,7 +294,7 @@ export function RepuestosTable({
               key={rep.id}
               id={`repuesto-${rep.id}`}
               onClick={() => onViewDetail?.(rep)}
-              className={`bg-card border rounded-xl p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/[0.08]' : ''}`}
+              className={`bg-card border rounded-card p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/[0.08]' : ''}`}
             >
               <div className="flex gap-2.5 items-start">
                 {/* Thumbnail compacto */}
@@ -313,11 +313,11 @@ export function RepuestosTable({
                   </div>
                   {/* Badges inline */}
                   <div className="flex items-center gap-1 mt-1 flex-wrap">
-                    <span className="text-[9px] font-mono text-primary bg-primary/[0.08] px-1 py-0 rounded">{rep.codigoSAP || 'S/C'}</span>
-                    {rep.codigoFabricante && <span className="text-[9px] font-mono text-cat-6-ink bg-cat-6-tint/[0.08] px-1 py-0 rounded">{rep.codigoFabricante}</span>}
-                    {rep.tipo && <span className={`text-[8px] px-1 py-0 rounded font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
+                    <span className="text-[9px] font-mono text-primary bg-primary/[0.08] px-1 py-0 rounded-ctl">{rep.codigoSAP || 'S/C'}</span>
+                    {rep.codigoFabricante && <span className="text-[9px] font-mono text-cat-6-ink bg-cat-6-tint/[0.08] px-1 py-0 rounded-ctl">{rep.codigoFabricante}</span>}
+                    {rep.tipo && <span className={`text-[8px] px-1 py-0 rounded-ctl font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
                     {(rep as EquipmentRepuesto).source && (
-                      <span className={`text-[8px] px-1 py-0 rounded font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.08] text-emerald-600' : 'bg-primary/[0.08] text-primary'}`}>
+                      <span className={`text-[8px] px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.08] text-emerald-600' : 'bg-primary/[0.08] text-primary'}`}>
                         {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Comp.'}
                       </span>
                     )}
@@ -350,7 +350,7 @@ export function RepuestosTable({
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden sm:block overflow-auto rounded-xl border bg-card shadow-sm">
+      <div className="hidden sm:block overflow-auto rounded-card border bg-card shadow-sm">
         <table className="min-w-full divide-y divide-border">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-muted">
@@ -380,7 +380,7 @@ export function RepuestosTable({
                   </td>
                   {/* Código SAP */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
-                    <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-ctl">
                       {rep.codigoSAP || '—'}
                     </span>
                   </td>
@@ -397,12 +397,12 @@ export function RepuestosTable({
                           <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
                         ) : null}
                         {rep.tipo && (
-                          <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
+                          <span className={`inline-block text-[9px] px-1 py-0 rounded-ctl font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
                             {rep.tipo}
                           </span>
                         )}
                         {(rep as EquipmentRepuesto).source && (
-                          <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.08] text-emerald-600' : 'bg-primary/[0.08] text-primary'}`}>
+                          <span className={`inline-block text-[9px] px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.08] text-emerald-600' : 'bg-primary/[0.08] text-primary'}`}>
                             {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Compartido'}
                           </span>
                         )}
@@ -411,7 +411,7 @@ export function RepuestosTable({
                         <ImageIcon className="h-3.5 w-3.5 text-primary/60 shrink-0" />
                       )}
                       {onToggleFavorite && (
-                        <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded hover:bg-amber-500/[0.08] transition-colors">
+                        <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded-ctl hover:bg-amber-500/[0.08] transition-colors">
                           <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-amber-600 fill-yellow-400' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
                         </button>
                       )}
@@ -421,7 +421,7 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {rep.codigoFabricante ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-ctl">
                           {rep.codigoFabricante}
                         </span>
                         {onSearchInManual && (
@@ -483,7 +483,7 @@ export function RepuestosTable({
                       {onSearchInManual && rep.codigoFabricante && (
                         <Tip label="Buscar en Manual">
                           <button onClick={() => onSearchInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-cat-6-ink/60 hover:text-purple-400 hover:bg-cat-6-tint/[0.08] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-cat-6-ink/60 hover:text-purple-400 hover:bg-cat-6-tint/[0.08] transition-colors">
                             <BookOpen className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -491,7 +491,7 @@ export function RepuestosTable({
                       {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Ver en Manual">
                           <button onClick={() => onViewInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-green-600/60 hover:text-green-400 hover:bg-green-500/[0.08] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-green-600/60 hover:text-green-400 hover:bg-green-500/[0.08] transition-colors">
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -499,7 +499,7 @@ export function RepuestosTable({
                       {isAdmin && onEditAnnotation && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Editar ubicación">
                           <button onClick={() => onEditAnnotation(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-amber-600/60 hover:text-yellow-400 hover:bg-amber-500/[0.08] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-amber-600/60 hover:text-yellow-400 hover:bg-amber-500/[0.08] transition-colors">
                             <Pencil className="h-3 w-3" />
                           </button>
                         </Tip>
@@ -514,7 +514,7 @@ export function RepuestosTable({
                       {onEdit && (
                         <Tip label="Editar repuesto">
                           <button onClick={() => onEdit(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -522,7 +522,7 @@ export function RepuestosTable({
                       {onRelocate && (
                         <Tip label="Reubicar">
                           <button onClick={() => onRelocate(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-amber-600/60 hover:text-amber-400 hover:bg-amber-500/[0.08] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-amber-600/60 hover:text-amber-400 hover:bg-amber-500/[0.08] transition-colors">
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -530,7 +530,7 @@ export function RepuestosTable({
                       {onDelete && (
                         <Tip label="Eliminar">
                           <button onClick={() => onDelete(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </Tip>

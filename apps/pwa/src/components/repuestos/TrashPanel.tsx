@@ -177,7 +177,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
               return (
                 <div
                   key={item.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-card border border-border bg-card hover:bg-muted/30 transition-colors"
                 >
                   <div className="shrink-0 mt-0.5">
                     <Icon className="h-4 w-4 text-muted-foreground" />
@@ -185,7 +185,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.documentLabel}</p>
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-ctl bg-muted text-[10px] font-medium">
                         {collectionLabel(item.originalCollection)}
                       </span>
                       <span>{item.deletedByName}</span>
@@ -201,14 +201,14 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => { setRestoreTarget(item); setDeleteTarget(null); setClave(''); setClaveError('') }}
-                      className="p-1.5 rounded-md hover:bg-primary/10 text-primary transition-colors"
+                      className="p-1.5 rounded-ctl hover:bg-primary/10 text-primary transition-colors"
                       title="Restaurar"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => { setDeleteTarget(item); setRestoreTarget(null); setClave(''); setClaveError('') }}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors"
+                      className="p-1.5 rounded-ctl hover:bg-destructive/10 text-destructive transition-colors"
                       title="Eliminar permanente"
                     >
                       <X className="h-3.5 w-3.5" />

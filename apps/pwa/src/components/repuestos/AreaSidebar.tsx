@@ -104,7 +104,7 @@ function EquipmentRow({
         {hasChildren ? (
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v) }}
-            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
+            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl hover:bg-muted"
             aria-label={expanded ? 'Colapsar sub-equipos' : 'Expandir sub-equipos'}
           >
             <ChevronRight className={['h-4 w-4 transition-transform', expanded ? 'rotate-90' : ''].join(' ')} />
@@ -124,7 +124,7 @@ function EquipmentRow({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleEquipFav(leaf) }}
             className={[
-              'shrink-0 rounded p-1 transition',
+              'shrink-0 rounded-ctl p-1 transition',
               // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
               isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
             ].join(' ')}
@@ -192,7 +192,7 @@ function AreaRow({
         {hasChildren ? (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleNode(node.id) }}
-            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
+            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-ctl hover:bg-muted"
             aria-label={isOpen ? 'Colapsar' : 'Expandir'}
           >
             {node.isLoading
@@ -224,7 +224,7 @@ function AreaRow({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleAreaFav(node.id) }}
             className={[
-              'shrink-0 rounded p-1 transition',
+              'shrink-0 rounded-ctl p-1 transition',
               // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
               isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
             ].join(' ')}
@@ -391,7 +391,7 @@ export function AreaSidebar({
           {onToggleFavoritesOnly && (
             <button
               onClick={onToggleFavoritesOnly}
-              className={['rounded p-1 transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              className={['rounded-ctl p-1 transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
               title={favoritesOnly ? 'Ver todo' : 'Ver solo favoritos (áreas y equipos)'}
               aria-label="Solo favoritos"
             >
@@ -399,16 +399,16 @@ export function AreaSidebar({
             </button>
           )}
           {onCollapseAll && (
-            <button onClick={onCollapseAll} className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Contraer todas las ramas" aria-label="Contraer todo">
+            <button onClick={onCollapseAll} className="rounded-ctl p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Contraer todas las ramas" aria-label="Contraer todo">
               <ChevronsDownUp className="h-4 w-4" />
             </button>
           )}
           {onToggleCollapse && (
-            <button onClick={onToggleCollapse} className="hidden rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block" title="Contraer panel de áreas" aria-label="Contraer áreas">
+            <button onClick={onToggleCollapse} className="hidden rounded-ctl p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block" title="Contraer panel de áreas" aria-label="Contraer áreas">
               <ChevronsLeft className="h-4 w-4" />
             </button>
           )}
-          <button onClick={onMobileClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
+          <button onClick={onMobileClose} className="rounded-ctl p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -422,12 +422,12 @@ export function AreaSidebar({
               value={equipSearch}
               onChange={(e) => setEquipSearch(e.target.value)}
               placeholder="Buscar equipo en toda la planta…"
-              className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-7 text-xs text-foreground outline-none transition-colors focus:border-primary/50"
+              className="h-8 w-full rounded-ctl border border-input bg-background pl-8 pr-7 text-xs text-foreground outline-none transition-colors focus:border-primary/50"
             />
             {equipSearch && (
               <button
                 onClick={() => setEquipSearch('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-ctl p-0.5 text-muted-foreground transition hover:text-foreground"
                 aria-label="Limpiar búsqueda de equipo"
               >
                 <X className="h-3.5 w-3.5" />
@@ -457,7 +457,7 @@ export function AreaSidebar({
                     key={eq.id}
                     onClick={() => handlePickEquipment(eq)}
                     className={[
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                      'flex w-full items-center gap-2 rounded-ctl px-2 py-1.5 text-left transition-colors',
                       isSel ? 'bg-primary/10 text-primary' : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground',
                     ].join(' ')}
                     title={eq.nombre}

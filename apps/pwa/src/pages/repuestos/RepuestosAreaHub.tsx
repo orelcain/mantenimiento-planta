@@ -70,9 +70,9 @@ type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
   primary: { text: 'text-primary',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
-  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/15',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
-  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/15',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
-  red:     { text: 'text-red-500',      chip: 'bg-red-500/15',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
+  emerald: { text: 'text-emerald-500',  chip: 'bg-emerald-500/[0.08]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
+  amber:   { text: 'text-amber-500',    chip: 'bg-amber-500/[0.08]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
+  red:     { text: 'text-red-500',      chip: 'bg-red-500/[0.08]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
 }
 
 function KpiCard({ value, label, hint, icon: Icon, tone }: {
@@ -80,7 +80,7 @@ function KpiCard({ value, label, hint, icon: Icon, tone }: {
 }) {
   const t = KPI_TONE[tone]
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3 transition-colors hover:border-foreground/15 sm:p-4">
+    <div className="relative overflow-hidden rounded-card border border-border bg-card p-3 transition-colors hover:border-foreground/15 sm:p-4">
       {/* tinte sutil de estado */}
       <div className={['pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent', t.glow].join(' ')} />
       <div className="relative flex items-start justify-between gap-3">
@@ -88,7 +88,7 @@ function KpiCard({ value, label, hint, icon: Icon, tone }: {
           <div className={['text-2xl font-bold leading-none tracking-tight tabular-nums sm:text-[27px]', t.text].join(' ')}>{value}</div>
           <div className="mt-1.5 truncate text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</div>
         </div>
-        <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset', t.chip, t.ring].join(' ')}>
+        <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-card ring-1 ring-inset', t.chip, t.ring].join(' ')}>
           <Icon className={['h-[18px] w-[18px]', t.text].join(' ')} strokeWidth={2.25} />
         </div>
       </div>
@@ -1485,7 +1485,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:gap-2 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
-            className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
+            className="shrink-0 rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
             aria-label="Abrir áreas"
           >
             <Menu className="h-5 w-5" />
@@ -1519,7 +1519,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               {adminTools.map((t) => {
                 const Icon = t.icon
                 return (
-                  <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                     <Icon className="h-4 w-4" />
                     {t.badge ? (
                       <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{t.badge}</span>
@@ -1532,7 +1532,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {/* Herramientas admin: overflow en móvil (<sm) */}
           {isAdmin && (
             <div className="relative sm:hidden">
-              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                 <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{trashCount}</span>
@@ -1541,14 +1541,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               {adminMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setAdminMenuOpen(false)} />
-                  <div className="absolute left-0 z-50 mt-1 w-56 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-card p-1 shadow-xl">
+                  <div className="absolute left-0 z-50 mt-1 w-56 max-w-[calc(100vw-1.5rem)] rounded-card border border-border bg-card p-1 shadow-xl">
                     {adminTools.map((t) => {
                       const Icon = t.icon
                       return (
                         <button
                           key={t.key}
                           onClick={() => { t.onClick(); setAdminMenuOpen(false) }}
-                          className="flex w-full items-center gap-2.5 rounded px-2.5 py-2.5 text-left text-sm text-foreground hover:bg-muted/50"
+                          className="flex w-full items-center gap-2.5 rounded-ctl px-2.5 py-2.5 text-left text-sm text-foreground hover:bg-muted/50"
                         >
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="flex-1">{t.label}</span>
@@ -1568,12 +1568,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Favoritos de equipos (listas con nombre) — colapsada por defecto + gestionable por admin (G2) */}
           {(equipFavLists.length > 0 || isAdmin) && (
-            <div className="mb-5 rounded-xl border border-border bg-muted p-3">
+            <div className="mb-5 rounded-card border border-border bg-muted p-3">
               <button
                 onClick={() => setFavBarOpen((v) => !v)}
                 className="flex w-full items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
               >
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-700 dark:text-amber-400" /> Favoritos de equipos
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-600" /> Favoritos de equipos
                 {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
                 <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
               </button>
@@ -1599,7 +1599,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <span className="tabular-nums text-muted-foreground/60">({list.machineIds.length})</span>
                           </button>
                           {isAdmin && (
-                            <button onClick={() => deleteEquipList(list.name)} title="Eliminar lista" className="rounded p-0.5 text-muted-foreground/40 hover:text-red-400">
+                            <button onClick={() => deleteEquipList(list.name)} title="Eliminar lista" className="rounded-ctl p-0.5 text-muted-foreground/40 hover:text-red-400">
                               <Trash2 className="h-3 w-3" />
                             </button>
                           )}
@@ -1837,18 +1837,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             </div>
 
             {repuestosBusy ? (
-              <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-hidden rounded-card border border-border">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-0">
-                    <div className="h-3 w-20 shrink-0 animate-pulse rounded bg-muted" />
-                    <div className="h-3 flex-1 animate-pulse rounded bg-muted" />
-                    <div className="hidden h-3 w-24 animate-pulse rounded bg-muted sm:block" />
-                    <div className="h-3 w-12 shrink-0 animate-pulse rounded bg-muted" />
+                    <div className="h-3 w-20 shrink-0 animate-pulse rounded-ctl bg-muted" />
+                    <div className="h-3 flex-1 animate-pulse rounded-ctl bg-muted" />
+                    <div className="hidden h-3 w-24 animate-pulse rounded-ctl bg-muted sm:block" />
+                    <div className="h-3 w-12 shrink-0 animate-pulse rounded-ctl bg-muted" />
                   </div>
                 ))}
               </div>
             ) : filteredRep.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+              <div className="rounded-card border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
                 {!selectedAreaId && !showingAll
                   ? 'Selecciona un área en la izquierda.'
                   : areaRepuestos.length === 0
@@ -1856,7 +1856,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     : 'Sin resultados para los filtros aplicados.'}
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-hidden rounded-card border border-border">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="border-b border-border bg-muted text-left">
@@ -1907,7 +1907,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               {fotos.length > 0 && fotos[0] ? (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRowLightbox(fotos) }}
-                                  className="group relative block h-9 w-9 overflow-hidden rounded-md ring-1 ring-border transition hover:ring-primary/60"
+                                  className="group relative block h-9 w-9 overflow-hidden rounded-ctl ring-1 ring-border transition hover:ring-primary/60"
                                   title="Ver fotos"
                                   aria-label="Ver fotos del repuesto"
                                 >
@@ -1917,7 +1917,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   )}
                                 </button>
                               ) : (
-                                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-border" title="Sin foto">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-ctl border border-dashed border-border" title="Sin foto">
                                   <ImageOff className="h-3.5 w-3.5 text-muted-foreground/30" />
                                 </div>
                               )}
@@ -1928,7 +1928,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   {r.codigoSAP}
                                   <button
                                     onClick={(e) => { e.stopPropagation(); copySapFromRow(r.rowKey, r.codigoSAP) }}
-                                    className="rounded p-0.5 text-muted-foreground/40 transition hover:text-primary"
+                                    className="rounded-ctl p-0.5 text-muted-foreground/40 transition hover:text-primary"
                                     title="Copiar SAP"
                                     aria-label="Copiar código SAP"
                                   >
@@ -1947,7 +1947,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 {r.clase && (
                                   <span
                                     className={[
-                                      'shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground',
+                                      'shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground',
                                       // "Repuesto" es la clase del ~75% de las filas: en
                                       // móvil es ruido puro — solo se muestran las
                                       // distintas (insumo/herramienta/químico…).
@@ -1961,7 +1961,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
                                 {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
-                                    className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
@@ -2008,7 +2008,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   onBlur={() => saveApodos(r)}
                                   disabled={savingApodos}
                                   placeholder="apodos, separados por coma"
-                                  className="w-full rounded border border-primary/50 bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                                  className="w-full rounded-ctl border border-primary/50 bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                                 />
                               ) : (
                                 <button
@@ -2036,12 +2036,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
-                              <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
+                              <span className="inline-block rounded-ctl bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
                             <td className="px-3 py-2">
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
-                                className={['rounded p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                className={['rounded-ctl p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-600' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
                                 title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                                 aria-label="Favorito"
                               >
@@ -2065,14 +2065,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     <button
                       onClick={() => setRepPage((p) => Math.max(0, p - 1))}
                       disabled={page <= 0}
-                      className="flex h-7 w-7 items-center justify-center rounded border border-border disabled:opacity-40 hover:bg-muted"
+                      className="flex h-7 w-7 items-center justify-center rounded-ctl border border-border disabled:opacity-40 hover:bg-muted"
                       aria-label="Anterior"
                     ><ChevronLeft className="h-4 w-4" /></button>
                     <span className="tabular-nums">{page + 1} / {totalPages}</span>
                     <button
                       onClick={() => setRepPage((p) => Math.min(totalPages - 1, p + 1))}
                       disabled={page >= totalPages - 1}
-                      className="flex h-7 w-7 items-center justify-center rounded border border-border disabled:opacity-40 hover:bg-muted"
+                      className="flex h-7 w-7 items-center justify-center rounded-ctl border border-border disabled:opacity-40 hover:bg-muted"
                       aria-label="Siguiente"
                     ><ChevronRight className="h-4 w-4" /></button>
                     <Select value={String(repPageSize)} onValueChange={(v) => setRepPageSize(Number(v))}>
@@ -2160,7 +2160,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <button
                 key={`${s.machineId}:${s.repuesto.id}`}
                 onClick={() => { setActionTarget({ kind: equipoPicker.kind, source: s }); setEquipoPicker(null) }}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
+                className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
               >
                 <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
                 <span className="truncate">{s.machineName}</span>
@@ -2180,7 +2180,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
           <button
             onClick={() => { setCreateTransversal(true); setCreateTargetEquipos(null); setCreateEquipoSel(new Set()); setCreatePicker(false); setCreateEquipoQuery(''); setCreateOpen(true) }}
-            className="flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
+            className="flex w-full items-center gap-2 rounded-card border border-primary/40 bg-primary/5 px-3 py-2 text-left transition hover:bg-primary/10"
           >
             <Boxes className="h-4 w-4 shrink-0 text-primary" />
             <span className="flex min-w-0 flex-col">
@@ -2225,9 +2225,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button
                     key={g.key}
                     onClick={() => setCreateEquipoSel((prev) => { const n = new Set(prev); if (checked) n.delete(g.key); else n.add(g.key); return n })}
-                    className={['flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', checked ? 'border-primary/50 bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-primary/40'].join(' ')}
+                    className={['flex w-full items-center gap-2 rounded-card border px-3 py-2 text-left text-sm transition', checked ? 'border-primary/50 bg-primary/10' : 'border-border bg-card hover:bg-muted hover:border-primary/40'].join(' ')}
                   >
-                    <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
+                    <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-ctl border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
                       {checked && <Check className="h-3 w-3" />}
                     </span>
                     <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
@@ -2311,7 +2311,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   key={e.id}
                   disabled={asignarEquipoSaving}
                   onClick={() => handleAsignarEquipo(e)}
-                  className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40 disabled:opacity-50"
+                  className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40 disabled:opacity-50"
                 >
                   <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
                   <span className="min-w-0 flex-1 truncate">{e.alias || e.nombre}</span>
@@ -2349,7 +2349,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 <button
                   key={m.slug}
                   onClick={() => { handleToggleComun(m.slug); setComunPickerOpen(false) }}
-                  className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40"
+                  className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40"
                 >
                   <Wrench className="h-4 w-4 shrink-0 text-emerald-500" />
                   <span className="min-w-0 flex-1 truncate">{m.name}</span>
@@ -2388,8 +2388,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     <div
                       key={l.name}
                       className={[
-                        'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
-                        inList ? 'border-amber-400/40 bg-amber-400/10 text-amber-500' : 'border-border bg-card text-foreground',
+                        'flex items-center gap-2 rounded-card border px-3 py-2 text-xs font-medium transition',
+                        inList ? 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-500' : 'border-border bg-card text-foreground',
                       ].join(' ')}
                     >
                       <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">
@@ -2400,7 +2400,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       </button>
                       <button
                         onClick={() => deleteList(l.name)}
-                        className="rounded p-0.5 text-muted-foreground/50 hover:text-destructive"
+                        className="rounded-ctl p-0.5 text-muted-foreground/50 hover:text-destructive"
                         title="Eliminar lista"
                         aria-label="Eliminar lista"
                       >
@@ -2523,9 +2523,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <button
                 key={l.name}
                 onClick={() => favEquipPicker && addEquipToList(l.name, favEquipPicker.machineId, favEquipPicker.displayName)}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
+                className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
               >
-                <Star className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
+                <Star className="h-3.5 w-3.5 shrink-0 text-amber-600" />
                 <span className="flex-1 truncate">{l.name}</span>
                 <span className="text-[10px] text-muted-foreground tabular-nums">{l.machineIds.length}</span>
               </button>

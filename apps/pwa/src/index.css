@@ -111,6 +111,17 @@
   --tw-amber-400: 172 150 110;    --tw-amber-500: 168 140 100;   --tw-amber-600: 174 126 89;
   --tw-blue-400: 109 163 216;     --tw-blue-500: 74 134 200;
 
+  /* ── ESCALA ÚNICA DE RADIOS (docs §3) ────────────────────────────────────
+     La app mezclaba 6 variantes (650 `rounded`, 565 `-lg`, 304 `-md`, 90 `-xl`,
+     62 `-sm`, 5 `-2xl`): eso es lo que hace que "todo se vea casi igual pero
+     desordenado". El barrido las colapsa a tres clases —`rounded-ctl`,
+     `-card`, `-panel`— y el VALOR de cada una es una variable, para que la piel
+     actual conserve sus proporciones y la nueva traiga la geometría de Apple.
+     Sin esto, unificar habría cambiado el aspecto de ~1.600 elementos en prod. */
+  --r-ctl: 0.5rem;                  /* controles: botón, input, chip cuadrado */
+  --r-card: 0.75rem;                /* tarjeta / grupo de lista */
+  --r-panel: 1rem;                  /* contenedor grande, sheet, modal */
+
   /* Marca. Var-izada para permitir el acento adaptativo de la piel nueva. */
   --brand: 46 117 182;              /* #2E75B6 */
   --brand-foreground: 255 255 255;
@@ -265,6 +276,11 @@
   --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 215 0 21;
   --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 201 52 0;
   --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
+
+  /* Geometría Apple: más redondeada y con más salto entre niveles. */
+  --r-ctl: 10px;
+  --r-card: 14px;
+  --r-panel: 18px;
 }
 
 :root[data-skin="apple"].dark {

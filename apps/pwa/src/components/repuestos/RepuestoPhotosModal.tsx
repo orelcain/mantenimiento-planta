@@ -218,7 +218,7 @@ export function RepuestoPhotosModal({
 
               {fotosReales.length === 0 ? (
                 <div
-                  className="flex h-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-muted-foreground/60 cursor-pointer hover:border-primary/40 hover:text-muted-foreground transition"
+                  className="flex h-24 flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border text-muted-foreground/60 cursor-pointer hover:border-primary/40 hover:text-muted-foreground transition"
                   onClick={() => canEdit && inputRef.current?.click()}
                 >
                   {canEdit ? (
@@ -238,7 +238,7 @@ export function RepuestoPhotosModal({
                   {fotosReales.map((foto, idx) => (
                     <div
                       key={foto.id || `real-${idx}`}
-                      className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                      className="group relative aspect-square overflow-hidden rounded-card border border-border bg-muted"
                     >
                       <img
                         src={foto.url}
@@ -255,7 +255,7 @@ export function RepuestoPhotosModal({
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(foto) }}
                             disabled={deletingId === foto.id}
-                            className="rounded bg-black/60 p-1 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                            className="rounded-ctl bg-black/60 p-1 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
                             title="Eliminar foto"
                           >
                             {deletingId === foto.id ? (
@@ -268,7 +268,7 @@ export function RepuestoPhotosModal({
                       </div>
                       {/* Badge principal */}
                       {foto.esPrincipal && (
-                        <span className="absolute bottom-1 left-1 rounded bg-primary/80 px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
+                        <span className="absolute bottom-1 left-1 rounded-ctl bg-primary/80 px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
                           Principal
                         </span>
                       )}
@@ -279,7 +279,7 @@ export function RepuestoPhotosModal({
                     <button
                       onClick={() => inputRef.current?.click()}
                       disabled={uploading}
-                      className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground/50 transition hover:border-primary/40 hover:text-primary/60"
+                      className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border text-muted-foreground/50 transition hover:border-primary/40 hover:text-primary/60"
                     >
                       {uploading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -305,7 +305,7 @@ export function RepuestoPhotosModal({
                   {imagenesManual.map((img, idx) => (
                     <div
                       key={`manual-${idx}`}
-                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
+                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-card border border-border bg-muted"
                       onClick={() => {
                         if (!img.url) return
                         const i = allPhotoUrls.indexOf(img.url)
@@ -343,7 +343,7 @@ export function RepuestoPhotosModal({
                   {gallery.map((img, idx) => (
                     <div
                       key={img.id || `gallery-${idx}`}
-                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-border bg-muted"
+                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-card border border-border bg-muted"
                       onClick={() => {
                         if (!img.url) return
                         const i = allPhotoUrls.indexOf(img.url)

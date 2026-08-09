@@ -19,7 +19,7 @@ interface Props {
 
 interface Edit { stock: string; pasillo: string; estante: string; nivel: string }
 
-const INPUT = 'w-full px-2 py-1.5 text-sm bg-muted border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
+const INPUT = 'w-full px-2 py-1.5 text-sm bg-muted border border-border rounded-ctl focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
 const faltaUbicacion = (i: BodegaMergedItem) => !i.pasillo && !i.estante && !i.nivel && !i.ubicacionBodega
 const faltaStock = (i: BodegaMergedItem) => !i.bodegaId || (i.stockActual ?? 0) === 0
@@ -94,14 +94,14 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-card border border-border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary" />
             <h3 className="text-base font-bold">Carga rápida — stock y ubicación</h3>
           </div>
-          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="rounded-ctl p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar"><X className="h-4 w-4" /></button>
         </div>
 
         {/* Toolbar */}
@@ -110,8 +110,8 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filtrar por SAP, nombre o tipo…" className={`${INPUT} pl-8`} />
           </div>
-          <label className="flex cursor-pointer select-none items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
-            <input type="checkbox" checked={soloFaltantes} onChange={(e) => setSoloFaltantes(e.target.checked)} className="rounded" />
+          <label className="flex cursor-pointer select-none items-center gap-2 rounded-ctl border border-border px-3 py-1.5 text-sm">
+            <input type="checkbox" checked={soloFaltantes} onChange={(e) => setSoloFaltantes(e.target.checked)} className="rounded-ctl" />
             Solo faltantes
           </label>
           <span className="text-xs text-muted-foreground">{visible.length} ítems · {pendientes} sin ubicación · {saved.size} guardados</span>
@@ -133,7 +133,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
               const isSaved = saved.has(item.codigoSAP)
               const isSaving = saving.has(item.codigoSAP)
               return (
-                <div key={item.codigoSAP} className="grid grid-cols-2 items-center gap-2 rounded-md px-3 py-1.5 hover:bg-muted/40 sm:grid-cols-[1fr_70px_88px_88px_72px_28px]">
+                <div key={item.codigoSAP} className="grid grid-cols-2 items-center gap-2 rounded-ctl px-3 py-1.5 hover:bg-muted/40 sm:grid-cols-[1fr_70px_88px_88px_72px_28px]">
                   <div className="col-span-2 min-w-0 sm:col-span-1">
                     <div className="truncate text-sm font-medium text-foreground" title={item.textoBreve}>{item.textoBreve || '(sin nombre)'}</div>
                     <div className="font-mono text-[10px] text-muted-foreground">SAP {item.codigoSAP}{item.tipo ? ` · ${item.tipo}` : ''}</div>
@@ -187,7 +187,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-border px-5 py-2.5 text-xs text-muted-foreground">
           <span>Se guarda solo al salir del campo o con Enter (Enter salta a la fila siguiente).</span>
-          <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground hover:bg-muted">Listo</button>
+          <button onClick={onClose} className="rounded-ctl border border-border px-3 py-1.5 font-medium text-foreground hover:bg-muted">Listo</button>
         </div>
       </div>
     </div>

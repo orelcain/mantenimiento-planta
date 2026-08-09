@@ -50,7 +50,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
       {mainPhoto ? (
         <button
           onClick={() => setLightbox({ idx: 0, zoom: 1, panX: 0, panY: 0 })}
-          className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-xl ring-1 ring-border transition-all hover:ring-primary/50 sm:h-14 sm:w-14"
+          className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-card ring-1 ring-border transition-all hover:ring-primary/50 sm:h-14 sm:w-14"
         >
           <img src={mainPhoto} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-110" loading="lazy" />
           {photos.length > 1 && (
@@ -58,7 +58,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
           )}
         </button>
       ) : (
-        <label className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-all sm:h-14 sm:w-14 ${
+        <label className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-card border-2 border-dashed transition-all sm:h-14 sm:w-14 ${
           uploading ? 'border-primary/50 bg-primary/5' : 'cursor-pointer border-border hover:border-primary/50 hover:bg-primary/5'
         }`}>
           {uploading ? (
@@ -81,7 +81,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
               <X className="h-4 w-4" />
             </button>
 
-            <div className="max-h-[75vh] cursor-grab overflow-hidden rounded-xl active:cursor-grabbing"
+            <div className="max-h-[75vh] cursor-grab overflow-hidden rounded-card active:cursor-grabbing"
               onWheel={(e) => { e.preventDefault(); setLightbox((prev) => prev ? { ...prev, zoom: Math.max(0.5, Math.min(5, prev.zoom + (e.deltaY > 0 ? -0.3 : 0.3))) } : null) }}
               onMouseMove={(e) => { if (e.buttons === 1 && lightbox.zoom > 1) setLightbox((prev) => prev ? { ...prev, panX: prev.panX + e.movementX, panY: prev.panY + e.movementY } : null) }}
             >
@@ -111,12 +111,12 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
             <div className="mt-3 flex items-center gap-2">
               {photos.map((url, i) => (
                 <button key={url} onClick={() => setLightbox((prev) => prev ? { ...prev, idx: i, zoom: 1, panX: 0, panY: 0 } : null)}
-                  className={`h-12 w-12 overflow-hidden rounded-lg ring-2 transition-all ${lightbox.idx === i ? 'ring-primary' : 'ring-transparent hover:ring-white/30'}`}>
+                  className={`h-12 w-12 overflow-hidden rounded-card ring-2 transition-all ${lightbox.idx === i ? 'ring-primary' : 'ring-transparent hover:ring-white/30'}`}>
                   <img src={url} alt="" className="h-full w-full object-cover" />
                 </button>
               ))}
               {isAdmin && (
-                <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-white/20 transition-colors hover:border-white/40">
+                <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-card border-2 border-dashed border-white/20 transition-colors hover:border-white/40">
                   <Plus className="h-4 w-4 text-white/40" />
                   <input type="file" accept="image/*" capture="environment" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
@@ -124,7 +124,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
               )}
               {isAdmin && (
                 <button onClick={() => handleDelete(photos[lightbox.idx]!)}
-                  className="ml-2 h-8 rounded-lg bg-red-500/20 dark:bg-red-500/10 px-3 text-[10px] font-medium text-red-700 dark:text-red-400 transition-colors hover:bg-red-500/30">
+                  className="ml-2 h-8 rounded-card bg-red-500/[0.08] px-3 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-500/[0.08]">
                   Eliminar
                 </button>
               )}

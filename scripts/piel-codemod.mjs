@@ -141,6 +141,25 @@ for (const file of files) {
   s = s.replace(bordRe, (_m, fam) => BORDER[fam])
   if (nBord) applied.push(`${nBord} bordes translúcidos → borde de tinte`)
 
+  // 5) RADIOS → escala única de 3 clases. Es el cambio MÁS VISIBLE de la piel:
+  //    la mezcla de 6 variantes es lo que hace que la app se vea "casi igual
+  //    pero desordenada". El valor de cada clase es una variable por piel, así
+  //    que esto no altera producción (ver index.css).
+  //    `rounded-full` y las direccionales (`rounded-t-lg`) NO se tocan: el
+  //    lookahead `(?!-)` las deja fuera a propósito.
+  const RADII = [
+    [/\brounded-(?:sm|md)\b(?!-)/g, 'rounded-ctl'],
+    [/\brounded-(?:lg|xl)\b(?!-)/g, 'rounded-card'],
+    [/\brounded-(?:2xl|3xl)\b(?!-)/g, 'rounded-panel'],
+    [/\brounded\b(?!-)/g, 'rounded-ctl'],   // el `rounded` pelado, al final
+  ]
+  let nRad = 0
+  for (const [re, to] of RADII) {
+    nRad += count(re)
+    s = s.replace(re, to)
+  }
+  if (nRad) applied.push(`${nRad} radios → escala única (ctl/card/panel)`)
+
   // Lo que queda sin mapear: SE REPORTA, no se toca. Suele ser color en datos,
   // gradientes o casos que piden criterio (y por eso no van en un codemod).
   const leftoverRe = new RegExp(`\\b(?:text|bg|border|ring|fill|stroke)-(?:${FAMS})-\\d{2,3}`, 'g')
