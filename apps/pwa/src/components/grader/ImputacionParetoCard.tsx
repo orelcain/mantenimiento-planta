@@ -43,10 +43,15 @@ const BUCKET_BG: Record<string, string> = {
   'sin-clasificar': 'bg-violet-500/60',
 }
 
+/**
+ * El tono -400 solo tiene contraste sobre fondo oscuro: medido en el navegador,
+ * el porcentaje daba 2,1:1 en tema claro (AA pide 4,5:1). La variante -800 para
+ * claro es la convención del repo.
+ */
 const COVERAGE_THEME = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-400', bar: 'bg-emerald-500/70', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-400', bar: 'bg-amber-500/70', label: 'Parcial' }
-  : { text: 'text-rose-400', bar: 'bg-rose-500/70', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-emerald-800 dark:text-emerald-400', bar: 'bg-emerald-500/70', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-amber-800 dark:text-amber-400', bar: 'bg-amber-500/70', label: 'Parcial' }
+  : { text: 'text-rose-800 dark:text-rose-400', bar: 'bg-rose-500/70', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
   const [expanded, setExpanded] = useState(true)
@@ -135,7 +140,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-[8px] px-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                    className="shrink-0 text-[8px] px-1 rounded bg-amber-500/15 text-amber-800 dark:text-amber-400 border border-amber-500/25"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?
@@ -208,7 +213,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
           )}
 
           {sinCausalSec > 0 && (
-            <p className="text-[10px] text-violet-400/80">
+            <p className="text-[10px] text-violet-800 dark:text-violet-400">
               ⚠ {fmtHm(sinCausalSec)} de detención llegaron sin causal. Anotarlas en Shoplogix es lo
               único que permite atacar la causa: sin causal, ese tiempo no se puede atribuir a nadie.
             </p>

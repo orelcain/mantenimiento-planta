@@ -25,6 +25,7 @@ import {
   type ClassifiableState,
 } from '@/services/grader/shoplogixMaintenance'
 import { deserializeStateAggregates } from '@/services/grader/shoplogixStateAggregates'
+import { paretoByCategoria } from '@/services/shoplogix/imputacionPareto'
 
 /**
  * Formatea segundos en forma compacta ("6h 18m"). Vivia en
@@ -82,6 +83,35 @@ export interface PeriodMonthlyStats {
   bestShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
   worstShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
   unscheduled: { cycles: number; uptimeSec: number; daysWithData: number }
+  /**
+   * Cobertura de imputación del período: cuánto del tiempo detenido llegó con
+   * causal anotada en Shoplogix.
+   *
+   * No mide a Mantención — mide si los turnos quedaron documentados. Es el
+   * número que la capacitación de imputación tiene que mover: en julio 2026 Yal
+   * iba en 97% y Chonchi en 0% (255 turnos-máquina, 52 h detenidas, ninguna
+   * causal). Sin causal, ese tiempo no se puede atribuir a nadie y cualquier
+   * análisis de causa raíz se hace sobre media historia.
+   *
+   * `null` cuando ningún turno del período trae `stateAggregates` (esquema
+   * legacy): 0% se leería como "no imputaron", que es distinto de "no se midió".
+   */
+  imputacion: PeriodImputacion | null
+}
+
+export interface PeriodImputacion {
+  /** Tiempo detenido del período (sin uptime ni Planned Downtime). */
+  totalSec: number
+  /** Del total, cuánto llegó con una causal del árbol oficial. */
+  imputadoSec: number
+  /** imputadoSec / totalSec (0-1). */
+  cobertura: number
+  /** Serie cronológica por turno — sirve para ver si la imputación mejora. */
+  porTurno: Array<{ dateKey: string; shiftId: string; cobertura: number; totalSec: number }>
+  /** Categorías del árbol del período, por impacto. */
+  topCategorias: Array<{ label: string; durationSec: number }>
+  /** Turnos considerados (los que traen agregados). */
+  turnos: number
 }
 
 export function computePeriodMonthlyStats(
@@ -105,6 +135,13 @@ export function computePeriodMonthlyStats(
 
   const perMachine = new Map<string, PeriodMonthlyStats['perMachineMonth'][number]>()
 
+  // Imputación: se acumulan los agregados de estados de TODO el período para el
+  // total, y se calcula turno a turno para la serie. Sale de `stateAggregates`
+  // del doc padre, así que no cuesta ni una lectura extra de Firestore.
+  const aggsPeriodo: Array<{ type: string; name?: string; reason?: string; durationSec?: number }> = []
+  const impPorTurno: PeriodImputacion['porTurno'] = []
+  let turnosConAgregados = 0
+
   for (const s of ranked) {
     totalCycles += s.cycles
     totalUptimeSec += s.uptimeSec
@@ -120,6 +157,24 @@ export function computePeriodMonthlyStats(
     const entry = { dateKey: s.dateKey, shiftId: s.shiftId, uptimePct: pct, totalCycles: s.cycles }
     if (!best || pct > best.uptimePct) best = entry
     if (!worst || pct < worst.uptimePct) worst = entry
+
+    // Imputación del turno. Solo cuentan los turnos que traen agregados: los
+    // legacy (esquema v1) no se pueden medir, y meterlos como 0% diría
+    // "no imputaron" cuando la verdad es "no lo sabemos".
+    const aggsTurno = s.machines.flatMap(m => deserializeStateAggregates(m.stateAggregates) ?? [])
+    if (s.machines.some(m => Array.isArray(m.stateAggregates))) {
+      turnosConAgregados++
+      aggsPeriodo.push(...aggsTurno)
+      const pTurno = paretoByCategoria(aggsTurno)
+      if (pTurno.totalSec > 0) {
+        impPorTurno.push({
+          dateKey: s.dateKey,
+          shiftId: s.shiftId,
+          cobertura: pTurno.cobertura,
+          totalSec: pTurno.totalSec,
+        })
+      }
+    }
 
     for (const m of s.machines) {
       let acc = perMachine.get(m.machineid)
@@ -158,6 +213,24 @@ export function computePeriodMonthlyStats(
     acc.avgUptimePct = acc.shiftCount > 0 ? acc.avgUptimePct / acc.shiftCount : 0
   }
 
+  const pPeriodo = turnosConAgregados > 0 ? paretoByCategoria(aggsPeriodo) : null
+  const imputacion: PeriodImputacion | null = pPeriodo
+    ? {
+      totalSec: pPeriodo.totalSec,
+      imputadoSec: pPeriodo.imputadoSec,
+      cobertura: pPeriodo.cobertura,
+      // Cronológico: la serie existe para ver si la imputación MEJORA, y para
+      // eso el orden tiene que ser el del calendario, no el del ranking.
+      porTurno: impPorTurno.sort((a, b) =>
+        a.dateKey === b.dateKey ? a.shiftId.localeCompare(b.shiftId) : a.dateKey.localeCompare(b.dateKey),
+      ),
+      topCategorias: pPeriodo.categorias
+        .filter(c => c.durationSec > 0)
+        .map(c => ({ label: c.label, durationSec: c.durationSec })),
+      turnos: turnosConAgregados,
+    }
+    : null
+
   return {
     totalCycles,
     avgUptimePct: ranked.length > 0 ? sumUptimePct / ranked.length : 0,
@@ -172,6 +245,7 @@ export function computePeriodMonthlyStats(
     daysWithData: days.size,
     bestShift: best,
     worstShift: worst,
+    imputacion,
     unscheduled: {
       cycles: uns.reduce((a, s) => a + s.cycles, 0),
       uptimeSec: uns.reduce((a, s) => a + s.uptimeSec, 0),
