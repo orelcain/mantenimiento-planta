@@ -55,6 +55,7 @@ import { resolvePanelWindow } from './shiftTimelineHelpers'
 import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { LossCascadeCard } from './LossCascadeCard'
+import { ImputacionParetoCard } from './ImputacionParetoCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
@@ -1520,6 +1521,13 @@ export function UpstreamMachinesPanel({
                 cuántas piezas costó cada causal. Ver LossCascadeCard. */}
             {snapshot && snapshot.machines.length > 0 && (
               <LossCascadeCard machines={snapshot.machines} graderTotalPieces={graderTotalPieces} />
+            )}
+
+            {/* Las mismas pérdidas leídas con el árbol oficial de imputación:
+                de qué TIPO fue el tiempo perdido y, sobre todo, cuánto llegó
+                con causal anotada. Ver ImputacionParetoCard. */}
+            {snapshot && snapshot.machines.length > 0 && (
+              <ImputacionParetoCard machines={snapshot.machines} />
             )}
 
             {snapshot && snapshot.machines.length > 0 && (

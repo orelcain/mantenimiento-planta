@@ -15,9 +15,15 @@ describe('classifyLossState — reasons reales de julio 2026', () => {
   it('uptime → produccion', () => {
     expect(classifyLossState({ type: 'uptime' })).toBe('produccion')
   })
-  it('Planned Downtime (y alias legacy) → fuera-turno', () => {
+  it('Planned Downtime → fuera-turno (relleno post-turno de Shoplogix)', () => {
     expect(classifyLossState({ type: 'break', reason: 'Planned Downtime' })).toBe('fuera-turno')
-    expect(classifyLossState({ type: 'break', reason: 'DETENCION PROGRAMADA' })).toBe('fuera-turno')
+  })
+  it('DETENCION PROGRAMADA → planificado, NO fuera-turno', () => {
+    // Antes se trataba como alias de Planned Downtime y se descartaba del
+    // cálculo. Firestore muestra que conviven en el mismo mes (feb-2026 Yal:
+    // 1.902 min de DETENCION PROGRAMADA junto a 17.955 de Planned Downtime),
+    // así que nunca fue un renombre: es un paro programado real.
+    expect(classifyLossState({ type: 'break', reason: 'DETENCION PROGRAMADA' })).toBe('planificado')
   })
   it('COLACION / EJERCICIO COMPENSATORIO / CAMBIO TURNO → planificado', () => {
     expect(classifyLossState({ type: 'break', reason: 'COLACION' })).toBe('planificado')
@@ -37,6 +43,45 @@ describe('classifyLossState — reasons reales de julio 2026', () => {
   it('downtime sin causal o reason desconocido → sin-clasificar (nunca se esconde)', () => {
     expect(classifyLossState({ type: 'downtime', name: 'Detencion', reason: '' })).toBe('sin-clasificar')
     expect(classifyLossState({ type: 'break', reason: 'CAUSAL NUEVA QUE NADIE VIO' })).toBe('sin-clasificar')
+  })
+
+  // ── Causales que ANTES caían en sin-clasificar por no tener regla ──────────
+  it('fallas de equipo del árbol → mantencion', () => {
+    for (const r of ['LOGICA', 'BOMBAS', 'MOTORES', 'BALANZAS', 'GRADER', 'CORREAS', 'PUNTO CERO', 'KNURO']) {
+      expect(classifyLossState({ type: 'downtime', reason: r })).toBe('mantencion')
+    }
+  })
+  it('servicios y MMPP del árbol → externo', () => {
+    for (const r of ['AIRE', 'AGUA', 'SAP', 'INNOVA', 'FLOW ICE', 'ATASCAMIENTO', 'MATERIA PRIMA INACTIVA']) {
+      expect(classifyLossState({ type: 'downtime', reason: r })).toBe('externo')
+    }
+  })
+  it('operacionales del árbol → externo, salvo los de mantención', () => {
+    expect(classifyLossState({ type: 'downtime', reason: 'CONTRASTACION' })).toBe('externo')
+    expect(classifyLossState({ type: 'downtime', reason: 'AJUSTE OPERADOR' })).toBe('externo')
+    expect(classifyLossState({ type: 'downtime', reason: 'LIBERACION' })).toBe('externo')
+    expect(classifyLossState({ type: 'downtime', reason: 'TRABAJOS CONTRATISTAS / PROPIOS' })).toBe('mantencion')
+  })
+  it('RETRASO ASEO es pérdida operacional; un ASEO a secas sigue siendo pausa acordada', () => {
+    expect(classifyLossState({ type: 'downtime', reason: 'RETRASO ASEO' })).toBe('externo')
+    expect(classifyLossState({ type: 'break', reason: 'ASEO' })).toBe('planificado')
+  })
+  it('REUNION INICIO TURNO → planificado', () => {
+    expect(classifyLossState({ type: 'break', reason: 'REUNION INICIO TURNO' })).toBe('planificado')
+  })
+})
+
+describe('items de la cascada traen causal y categoría del árbol', () => {
+  it('etiqueta la causal y avisa cuando el dato no distingue eléctrica de mecánica', () => {
+    const c = cascadeFromAggregates([
+      agg('downtime', 'Detencion', 'LOGICA', 3600),
+      agg('downtime', 'Detencion', 'BOMBAS', 1800),
+      agg('downtime', 'Detencion', 'CAUSAL RARA', 600),
+    ])
+    const [logica, bombas, rara] = c.items
+    expect(logica).toMatchObject({ causal: 'Lógica', categoria: 'Eléctrica', ambigua: false })
+    expect(bombas).toMatchObject({ causal: 'Bombas', categoria: 'Eléctrica o Mecánica', ambigua: true })
+    expect(rara).toMatchObject({ causal: null, categoria: null, ambigua: false })
   })
 })
 
