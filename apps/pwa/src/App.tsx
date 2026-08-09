@@ -81,6 +81,9 @@ const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor
 // sin datos, sin sidebar y fuera del menú — existe para ver los primitivos con
 // contenido real y comparar piel/tema durante la migración.
 const PielShowcasePage = lazyWithReload(() => import('@/pages/dev/PielShowcasePage'))
+// Pantalla PILOTO: Análisis de Turno con la piel nueva y datos reales. Convive
+// con AnalisisGraderTurnoPage (producción, intacta) para poder compararlas.
+const TurnoPilotoPage = lazyWithReload(() => import('@/pages/dev/TurnoPilotoPage'))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const Visor3DInteractivePlataformaPontonPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractivePlataformaPontonPage').then((mod) => ({ default: mod.Visor3DInteractivePlataformaPontonPage })))
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
@@ -292,6 +295,17 @@ export function App() {
               <Suspense fallback={<LoadingScreen />}>
                 <PielShowcasePage />
               </Suspense>
+            }
+          />
+
+          <Route
+            path="/dev/turno-piloto"
+            element={
+              <PrivateRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <TurnoPilotoPage />
+                </Suspense>
+              </PrivateRoute>
             }
           />
 

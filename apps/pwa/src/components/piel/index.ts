@@ -20,4 +20,5 @@ export {
   type ListCellProps,
 } from './GroupedList'
 export { Sheet, type SheetProps } from './Sheet'
+export { StatRing, type StatRingProps } from './StatRing'
 export { TabBar, type TabBarProps, type TabItem } from './TabBar'
