@@ -37,7 +37,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
   return (
     <div className={cn('space-y-1.5', className)}>
       {/* ── Nivel 1: Plantas ── */}
-      <div className="flex gap-1 p-1 bg-muted rounded-lg border border-border">
+      <div className="flex gap-1 p-1 bg-muted rounded-card border border-border">
         {PLANTS.map((p) => {
           const isActive = p.id === activePlant
           const soon = isPlantComingSoon(p.id)
@@ -48,7 +48,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
               disabled={soon}
               title={soon ? `${p.label} — próximamente` : p.label}
               className={cn(
-                'flex-1 flex flex-col items-center gap-0.5 px-2 py-2 rounded-md transition-all text-center',
+                'flex-1 flex flex-col items-center gap-0.5 px-2 py-2 rounded-ctl transition-all text-center',
                 isActive
                   ? 'bg-background shadow-sm ring-1 ring-primary/30'
                   : soon
@@ -66,7 +66,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 {p.label}
               </span>
               {soon && (
-                <span className="inline-flex items-center text-[9px] leading-none mt-0.5 px-1 py-0.5 rounded bg-muted-foreground/10 text-muted-foreground/70 font-medium uppercase tracking-wide">
+                <span className="inline-flex items-center text-[9px] leading-none mt-0.5 px-1 py-0.5 rounded-ctl bg-muted-foreground/10 text-muted-foreground/70 font-medium uppercase tracking-wide">
                   próx.
                 </span>
               )}
@@ -87,7 +87,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 disabled={area.comingSoon}
                 title={area.comingSoon ? `${area.areaLabel} — próximamente` : area.description}
                 className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium border transition-colors',
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-ctl text-xs font-medium border transition-colors',
                   isActive
                     ? 'border-primary/40 bg-primary/20 text-primary'
                     : area.comingSoon
@@ -97,7 +97,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
               >
                 {area.areaLabel}
                 {area.comingSoon && (
-                  <span className="text-[8px] leading-none px-1 py-0.5 rounded bg-muted-foreground/10 uppercase tracking-wide">
+                  <span className="text-[8px] leading-none px-1 py-0.5 rounded-ctl bg-muted-foreground/10 uppercase tracking-wide">
                     próx.
                   </span>
                 )}

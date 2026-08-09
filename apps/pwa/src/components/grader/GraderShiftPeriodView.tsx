@@ -72,7 +72,7 @@ export function GraderShiftPeriodView({
   }, [shifts])
 
   const chip = (active: boolean) => cn(
-    'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors',
+    'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-ctl border transition-colors',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
     active
       ? 'bg-primary text-primary-foreground border-primary font-semibold'
@@ -120,7 +120,7 @@ export function GraderShiftPeriodView({
           </div>
         )}
 
-        <div className="inline-flex rounded-md border border-border overflow-hidden" role="group" aria-label="Indicador">
+        <div className="inline-flex rounded-ctl border border-border overflow-hidden" role="group" aria-label="Indicador">
           {MATRIX_KPIS.map(k => (
             <button
               key={k.id}
@@ -208,7 +208,7 @@ export function GraderShiftPeriodView({
       </div>
 
       {error && (
-        <div className="rounded-md border px-3 py-2 text-xs"
+        <div className="rounded-ctl border px-3 py-2 text-xs"
              style={{ borderColor: 'var(--lc-crit)', color: 'var(--lc-crit)' }}>
           {error}
         </div>
@@ -221,7 +221,7 @@ export function GraderShiftPeriodView({
         </div>
       )}
       {onlyOutOfShift && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <div className="rounded-ctl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Mostrando solo producción <b className="text-foreground">fuera de turno</b>:{' '}
           <b className="text-foreground font-mono">{outOfShift.cycles.toLocaleString('es-CL')}</b> ciclos en{' '}
           {outOfShift.count} registro{outOfShift.count === 1 ? '' : 's'} — el{' '}

@@ -895,7 +895,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
               type="button"
               onClick={() => toggleLayer(key)}
               className={cn(
-                'px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors',
+                'px-2.5 py-1 rounded-ctl text-[11px] font-medium border transition-colors',
                 layers[key]
                   ? 'border-transparent text-white'
                   : 'bg-background border-border text-muted-foreground hover:bg-muted/50',
@@ -908,7 +908,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           <button
             type="button"
             onClick={() => setShowLegend((v) => !v)}
-            className="px-2 py-1 rounded-md text-[10px] font-medium border border-border text-muted-foreground hover:bg-muted/50 ml-auto"
+            className="px-2 py-1 rounded-ctl text-[10px] font-medium border border-border text-muted-foreground hover:bg-muted/50 ml-auto"
           >
             {showLegend ? 'Ocultar leyenda' : 'Leyenda'}
           </button>
@@ -926,7 +926,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                   </span>
                 ))}
                 <span className="flex items-center gap-1 text-muted-foreground">
-                  <span className="w-6 h-[2px] rounded" style={{ backgroundColor: '#fbbf24' }} />prom (50)
+                  <span className="w-6 h-[2px] rounded-ctl" style={{ backgroundColor: '#fbbf24' }} />prom (50)
                 </span>
               </div>
             )}
@@ -935,7 +935,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                 <span className="text-muted-foreground font-semibold">Errores:</span>
                 {stats.uniqueErrors.map((err) => (
                   <span key={err} className="flex items-center gap-1">
-                    <span className="w-2 h-0.5 rounded" style={{ backgroundColor: getErrorColor(err) }} />
+                    <span className="w-2 h-0.5 rounded-ctl" style={{ backgroundColor: getErrorColor(err) }} />
                     {err}
                   </span>
                 ))}
@@ -944,9 +944,9 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             {layers.p0pct && (
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                 <span className="text-muted-foreground font-semibold">P0%:</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded" style={{ backgroundColor: '#ef4444' }} />instantáneo (5min)</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded border-b border-dashed" style={{ borderColor: '#fb923c' }} />acumulado turno</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[1px] rounded" style={{ backgroundColor: 'rgba(16,185,129,0.5)', borderTop: '1px dotted rgba(16,185,129,0.5)' }} />target 2%</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl" style={{ backgroundColor: '#ef4444' }} />instantáneo (5min)</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl border-b border-dashed" style={{ borderColor: '#fb923c' }} />acumulado turno</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[1px] rounded-ctl" style={{ backgroundColor: 'rgba(16,185,129,0.5)', borderTop: '1px dotted rgba(16,185,129,0.5)' }} />target 2%</span>
               </div>
             )}
             {layers.gates && stats.uniqueGates.length > 0 && (
@@ -954,7 +954,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                 <span className="text-muted-foreground font-semibold">Gates:</span>
                 {stats.uniqueGates.map((g) => (
                   <span key={g} className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GATE_PALETTE[(g - 1) % GATE_PALETTE.length] }} />
+                    <span className="w-2 h-2 rounded-ctl" style={{ backgroundColor: GATE_PALETTE[(g - 1) % GATE_PALETTE.length] }} />
                     G{g}
                   </span>
                 ))}

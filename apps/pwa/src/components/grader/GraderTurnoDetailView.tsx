@@ -314,12 +314,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     <div className="space-y-4" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* ── Navegación entre turnos (mas visible + swipe) ──────────── */}
       {sortedAllTurns.length > 1 && (
-        <div className="flex items-center justify-between bg-muted rounded-lg px-2 py-1.5">
+        <div className="flex items-center justify-between bg-muted rounded-card px-2 py-1.5">
           <button
             type="button"
             disabled={!prevTurn}
             onClick={() => prevTurn && goToTurn(prevTurn)}
-            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <ChevronLeft className="h-5 w-5" />
             <span className="hidden sm:inline">{prevTurn ? `${prevTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${prevTurn.dateKey.slice(5)} ${prevTurn.shiftId.replace('Turno ', '')}` : ''}</span>
@@ -332,7 +332,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             type="button"
             disabled={!nextTurn}
             onClick={() => nextTurn && goToTurn(nextTurn)}
-            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <span className="hidden sm:inline">{nextTurn ? `${nextTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}</span>
             <span className="sm:hidden">{nextTurn ? 'Siguiente' : 'Final'}</span>
@@ -369,12 +369,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-[10px] bg-red-500/15 text-red-600 border-red-500/30">
+                    <Badge className="text-[10px] bg-red-500/[0.08] text-red-600 border-red-500/[0.25]">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-[10px] bg-red-500/15 text-red-600 border-red-500/30">
+                    <Badge className="text-[10px] bg-red-500/[0.08] text-red-600 border-red-500/[0.25]">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -521,8 +521,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         variant="outline"
                         className={cn(
                           'text-[9px] py-0',
-                          c.pct >= 50 ? 'border-red-500/40 text-red-500' :
-                          c.pct >= 25 ? 'border-amber-500/40 text-amber-500' :
+                          c.pct >= 50 ? 'border-red-500/[0.25] text-red-500' :
+                          c.pct >= 25 ? 'border-amber-500/[0.25] text-amber-500' :
                           'border-muted-foreground/30 text-muted-foreground'
                         )}
                       >
@@ -669,14 +669,14 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
-              const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/15'
-                : sev === 'warn' ? 'border-amber-400/40 bg-amber-500/15'
-                : 'border-blue-400/30 bg-blue-500/15'
+              const borderCls = sev === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.08]'
+                : sev === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.08]'
+                : 'border-primary/[0.25] bg-primary/[0.08]'
               const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 : <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
               return (
-                <div key={ins.id} className={cn('rounded-lg border p-3 space-y-1.5', borderCls)}>
+                <div key={ins.id} className={cn('rounded-card border p-3 space-y-1.5', borderCls)}>
                   <div className="flex items-start gap-2">
                     {icon}
                     <p className="text-xs font-semibold">{ins.title}</p>
@@ -915,7 +915,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             </p>
           )}
           {aiError && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-300 text-sm">
+            <div className="p-3 rounded-card bg-red-500/[0.08] border border-red-300 text-sm">
               <div className="flex items-center gap-2 text-red-600">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de análisis IA</span>

@@ -19,7 +19,7 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
   return (
     <div
       className={cn(
-        'p-3 rounded-lg border',
+        'p-3 rounded-card border',
         insight.severity === 'critical'
           ? 'border-red-300 bg-red-500/[0.08]'
           : insight.severity === 'warn'
@@ -61,7 +61,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
   return (
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
-      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-primary/[0.08] p-3">
+      <div className="rounded-card border border-blue-200 dark:border-blue-800 bg-primary/[0.08] p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
@@ -86,7 +86,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               <div
                 key={i}
                 className={cn(
-                  'p-3 rounded-lg border-l-4',
+                  'p-3 rounded-card border-l-4',
                   c.confidence === 'high'
                     ? 'border-l-red-500 bg-red-500/[0.08]'
                     : c.confidence === 'medium'
@@ -133,7 +133,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               <div
                 key={i}
                 className={cn(
-                  'flex items-start gap-3 p-2.5 rounded-lg border',
+                  'flex items-start gap-3 p-2.5 rounded-card border',
                   a.priority === 'high'
                     ? 'border-red-200 dark:border-red-800 bg-red-500/[0.08]'
                     : a.priority === 'medium'
@@ -170,7 +170,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div className="rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.08] p-3">
+        <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.08] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-2">
             Qu&eacute; verificar ahora
           </p>
@@ -179,7 +179,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               <label key={i} className="flex items-start gap-2.5 cursor-pointer group">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                  className="mt-1 h-4 w-4 rounded-ctl border-emerald-400 text-emerald-600 focus:ring-emerald-500 shrink-0"
                 />
                 <span className="text-sm group-hover:text-foreground transition-colors">{c}</span>
               </label>
@@ -190,7 +190,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.08] rounded-lg border border-amber-200 dark:border-amber-800">
+        <div className="p-2.5 bg-amber-500/[0.08] rounded-card border border-amber-200 dark:border-amber-800">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-[11px] text-amber-600">{d}</p>
@@ -231,7 +231,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
 
   return (
     <div className={cn(
-      'p-3 rounded-lg border',
+      'p-3 rounded-card border',
       suggestion.impactScore >= 70 ? 'border-red-200 bg-red-500/[0.08]' :
       suggestion.impactScore >= 40 ? 'border-amber-200 bg-amber-500/[0.08]' :
       'border-muted bg-muted',

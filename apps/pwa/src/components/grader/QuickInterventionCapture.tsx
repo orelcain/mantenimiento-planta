@@ -372,7 +372,7 @@ export function QuickInterventionCapture({
                     type="button"
                     onClick={() => setTipo(t.id)}
                     className={cn(
-                      'flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border text-xs font-medium transition-colors',
+                      'flex items-center justify-center gap-1.5 px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                       active
                         ? 'border-primary/50 bg-primary/20 text-primary'
                         : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -398,7 +398,7 @@ export function QuickInterventionCapture({
                     type="button"
                     onClick={() => setSeveridad(s.id)}
                     className={cn(
-                      'flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border text-xs font-medium transition-colors',
+                      'flex items-center justify-center gap-1.5 px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                       active ? s.active : 'border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
@@ -426,7 +426,7 @@ export function QuickInterventionCapture({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-md px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -463,7 +463,7 @@ export function QuickInterventionCapture({
         <CardContent className="space-y-3">
           {/* Tira de KPIs */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5">
+            <div className="rounded-ctl border border-primary/30 bg-primary/10 px-3 py-1.5">
               <span className="text-lg font-bold text-primary tabular-nums">{kpi.totalMes}</span>
               <span className="text-[11px] text-muted-foreground ml-1.5">este mes</span>
             </div>
@@ -493,7 +493,7 @@ export function QuickInterventionCapture({
                   ? (equipoLabelById.get(e.equipmentId) ?? 'Equipo')
                   : null
                 return (
-                <li key={e.id} className="flex items-start gap-2.5 rounded-md border border-border bg-background px-2.5 py-2">
+                <li key={e.id} className="flex items-start gap-2.5 rounded-ctl border border-border bg-background px-2.5 py-2">
                   <span className={cn('h-2 w-2 rounded-full shrink-0 mt-1.5', SEV_DOT[e.severidad] ?? 'bg-muted')} />
                   <div className="min-w-0 flex-1">
                     {equipoLabel && (
@@ -521,7 +521,7 @@ export function QuickInterventionCapture({
                     type="button"
                     onClick={() => setEditingEntry(e)}
                     title="Editar intervención"
-                    className="shrink-0 p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    className="shrink-0 p-1 rounded-ctl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -564,7 +564,7 @@ export function QuickInterventionCapture({
               </Button>
 
               {insightsError && (
-                <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-md px-2.5 py-2">
+                <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span className="break-words">{insightsError}</span>
                 </div>
@@ -574,7 +574,7 @@ export function QuickInterventionCapture({
                 <div className="space-y-3 pt-1">
                   {/* Riesgo + resumen */}
                   <div className="flex items-start gap-2 flex-wrap">
-                    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold', RIESGO_STYLE[insights.riesgo].cls)}>
+                    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-ctl border text-xs font-semibold', RIESGO_STYLE[insights.riesgo].cls)}>
                       <Activity className="h-3 w-3" />
                       {RIESGO_STYLE[insights.riesgo].label}
                     </span>
@@ -593,7 +593,7 @@ export function QuickInterventionCapture({
                     <div className="space-y-1.5">
                       <p className="text-[11px] font-medium text-muted-foreground">Patrones recurrentes</p>
                       {insights.patrones.map((p, i) => (
-                        <div key={i} className="rounded-md border border-border bg-background px-2.5 py-2">
+                        <div key={i} className="rounded-ctl border border-border bg-background px-2.5 py-2">
                           <p className="text-xs text-foreground flex items-start gap-1.5">
                             <span className="text-amber-400 font-semibold tabular-nums shrink-0">×{p.frecuencia}</span>
                             <span className="break-words">{p.descripcion}</span>
@@ -625,7 +625,7 @@ export function QuickInterventionCapture({
 
                   {/* Próxima acción preventiva */}
                   {insights.proximaAccion && (
-                    <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2">
+                    <div className="rounded-ctl border border-primary/30 bg-primary/10 px-2.5 py-2">
                       <p className="text-[11px] font-medium text-primary flex items-center gap-1.5">
                         <Lightbulb className="h-3.5 w-3.5" /> Próxima acción preventiva (RCM)
                       </p>

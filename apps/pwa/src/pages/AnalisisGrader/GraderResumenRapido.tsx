@@ -70,13 +70,13 @@ export function GraderResumenRapido({
 
   // Colores según estado P0
   const borderColor =
-    p0Status === 'critical' ? 'border-red-500/40' :
-    p0Status === 'warn'     ? 'border-amber-500/40' :
-                              'border-emerald-500/30'
+    p0Status === 'critical' ? 'border-red-500/[0.25]' :
+    p0Status === 'warn'     ? 'border-amber-500/[0.25]' :
+                              'border-emerald-500/[0.25]'
   const bgColor =
-    p0Status === 'critical' ? 'bg-red-500/10' :
-    p0Status === 'warn'     ? 'bg-amber-500/10' :
-                              'bg-emerald-500/10'
+    p0Status === 'critical' ? 'bg-red-500/[0.08]' :
+    p0Status === 'warn'     ? 'bg-amber-500/[0.08]' :
+                              'bg-emerald-500/[0.08]'
   const p0Color =
     p0Status === 'critical' ? 'text-red-500' :
     p0Status === 'warn'     ? 'text-amber-500' :
@@ -86,7 +86,7 @@ export function GraderResumenRapido({
   const dominant = kpis.dominantCalibre
 
   return (
-    <div className={cn('rounded-lg border px-4 py-4 space-y-4', borderColor, bgColor)}>
+    <div className={cn('rounded-card border px-4 py-4 space-y-4', borderColor, bgColor)}>
 
       {/* ─── Encabezado ─── */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -97,17 +97,17 @@ export function GraderResumenRapido({
           }
           <span className="text-sm font-semibold">Resumen del turno</span>
           {criticals.length > 0 && (
-            <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 text-xs font-medium">
+            <Badge className="bg-red-500/[0.08] text-red-600 border-red-500/[0.25] text-xs font-medium">
               {criticals.length} crítico{criticals.length > 1 ? 's' : ''}
             </Badge>
           )}
           {warns.length > 0 && (
-            <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs font-medium">
+            <Badge className="bg-amber-500/[0.08] text-amber-600 border-amber-500/[0.25] text-xs font-medium">
               {warns.length} alerta{warns.length > 1 ? 's' : ''}
             </Badge>
           )}
           {p0Status === 'ok' && insights.length === 0 && (
-            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs">
+            <Badge className="bg-emerald-500/[0.08] text-emerald-600 border-emerald-500/[0.25] text-xs">
               Todo en orden
             </Badge>
           )}
@@ -195,7 +195,7 @@ export function GraderResumenRapido({
       )}
 
       {/* ─── Velocidades de cintas ─── */}
-      <div className="bg-background border border-border rounded-md overflow-hidden">
+      <div className="bg-background border border-border rounded-ctl overflow-hidden">
         <button
           type="button"
           onClick={() => setBeltSpeedsOpen((o) => !o)}
@@ -260,10 +260,10 @@ export function GraderResumenRapido({
             <div
               key={insight.id}
               className={cn(
-                'flex items-start gap-2 rounded px-3 py-2',
+                'flex items-start gap-2 rounded-ctl px-3 py-2',
                 insight.severity === 'critical'
-                  ? 'bg-red-500/10 border border-red-500/20'
-                  : 'bg-amber-500/8 border border-amber-500/20',
+                  ? 'bg-red-500/[0.08] border border-red-500/[0.25]'
+                  : 'bg-amber-500/[0.08] border border-amber-500/[0.25]',
               )}
             >
               <AlertTriangle
@@ -276,8 +276,8 @@ export function GraderResumenRapido({
                 <p className={cn(
                   'text-xs font-semibold',
                   insight.severity === 'critical'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-amber-600 dark:text-amber-400',
+                    ? 'text-red-600'
+                    : 'text-amber-600',
                 )}>
                   {insight.title}
                 </p>
@@ -300,8 +300,8 @@ export function GraderResumenRapido({
                     className={cn(
                       'shrink-0 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center mt-0.5',
                       a.severity === 'critical'
-                        ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
-                        : 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
+                        ? 'bg-red-500/[0.08] text-red-600'
+                        : 'bg-amber-500/[0.08] text-amber-600',
                     )}
                   >
                     {i + 1}
@@ -313,7 +313,7 @@ export function GraderResumenRapido({
           )}
         </div>
       ) : (
-        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium text-center py-1">
+        <p className="text-sm text-emerald-600 font-medium text-center py-1">
           Sin alertas activas — operación dentro de parámetros normales.
         </p>
       )}

@@ -37,10 +37,10 @@ function fmtHm(sec: number): string {
 
 /** Mismo código de color por dueño que la cascada del turno. */
 const BUCKET_BG: Record<string, string> = {
-  'planificado':    'bg-slate-500/60',
-  'externo':        'bg-amber-500/70',
-  'mantencion':     'bg-rose-500/70',
-  'sin-clasificar': 'bg-violet-500/60',
+  'planificado':    'bg-muted-foreground/[0.10]',
+  'externo':        'bg-amber-500/[0.08]',
+  'mantencion':     'bg-cat-5-tint/[0.08]',
+  'sin-clasificar': 'bg-cat-6-tint/[0.08]',
 }
 
 /**
@@ -49,9 +49,9 @@ const BUCKET_BG: Record<string, string> = {
  * claro es la convención del repo.
  */
 const COVERAGE_THEME = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-800 dark:text-emerald-400', bar: 'bg-emerald-500/70', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-800 dark:text-amber-400', bar: 'bg-amber-500/70', label: 'Parcial' }
-  : { text: 'text-rose-800 dark:text-rose-400', bar: 'bg-rose-500/70', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.08]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.08]', label: 'Parcial' }
+  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.08]', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
   const [expanded, setExpanded] = useState(true)
@@ -92,7 +92,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
           onClick={() => setOpenCat((k) => (k === cat.key ? null : cat.key))}
           aria-expanded={isOpen}
           className={cn(
-            'w-full grid grid-cols-[minmax(108px,172px)_1fr_auto_14px] items-center gap-2 rounded px-1.5 py-1 text-left transition-colors',
+            'w-full grid grid-cols-[minmax(108px,172px)_1fr_auto_14px] items-center gap-2 rounded-ctl px-1.5 py-1 text-left transition-colors',
             vacia ? 'opacity-45 cursor-default' : 'hover:bg-accent',
             isOpen && 'bg-accent',
           )}
@@ -107,11 +107,11 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
               <span className="text-[9px] text-muted-foreground tabular-nums">{cat.causales.length}</span>
             )}
           </span>
-          <span className="flex h-3.5 rounded-sm overflow-hidden bg-muted/60" style={{ width: `${(cat.durationSec / maxSec) * 100}%` }}>
+          <span className="flex h-3.5 rounded-ctl overflow-hidden bg-muted/60" style={{ width: `${(cat.durationSec / maxSec) * 100}%` }}>
             {cat.porDueno.map((d) => (
               <span
                 key={d.bucket}
-                className={BUCKET_BG[d.bucket] ?? 'bg-slate-500/60'}
+                className={BUCKET_BG[d.bucket] ?? 'bg-muted-foreground/[0.10]'}
                 style={{ width: `${(d.durationSec / cat.durationSec) * 100}%` }}
                 title={`${LOSS_BUCKET_META[d.bucket as keyof typeof LOSS_BUCKET_META]?.label ?? d.bucket}: ${fmtHm(d.durationSec)}`}
               />
@@ -136,11 +136,11 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
           <div className="pl-3 sm:pl-[180px] pr-1 pb-1.5 space-y-0.5">
             {cat.causales.map((c) => (
               <div key={c.label} className="flex items-center gap-2 text-[11px] border-b border-border/40 last:border-0 py-0.5">
-                <span className={cn('w-1.5 h-3 rounded-sm shrink-0', BUCKET_BG[c.bucket] ?? 'bg-slate-500/60')} />
+                <span className={cn('w-1.5 h-3 rounded-ctl shrink-0', BUCKET_BG[c.bucket] ?? 'bg-muted-foreground/[0.10]')} />
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-[8px] px-1 rounded bg-amber-500/15 text-amber-800 dark:text-amber-400 border border-amber-500/25"
+                    className="shrink-0 text-[8px] px-1 rounded-ctl bg-amber-500/[0.08] text-amber-600 border border-amber-500/[0.25]"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?
@@ -163,7 +163,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
     <div className="mb-4 pb-4 border-b border-border/60">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center gap-2 rounded-md border border-sky-500/25 bg-sky-500/5 px-3 py-2 hover:bg-sky-500/10 transition-colors"
+        className="w-full flex items-center gap-2 rounded-ctl border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 hover:bg-primary/[0.08] transition-colors"
         aria-expanded={expanded}
       >
         {expanded
@@ -187,7 +187,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
       {expanded && (
         <div className="mt-2 space-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-            <span className={cn('px-1.5 py-0.5 rounded border', theme.text, 'border-current/30')}>{theme.label}</span>
+            <span className={cn('px-1.5 py-0.5 rounded-ctl border', theme.text, 'border-current/30')}>{theme.label}</span>
             <span className="tabular-nums">
               <b className="text-foreground/85 font-mono">{fmtHm(pareto.imputadoSec)}</b> con causal
             </span>
@@ -213,7 +213,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
           )}
 
           {sinCausalSec > 0 && (
-            <p className="text-[10px] text-violet-800 dark:text-violet-400">
+            <p className="text-[10px] text-cat-6-ink">
               ⚠ {fmtHm(sinCausalSec)} de detención llegaron sin causal. Anotarlas en Shoplogix es lo
               único que permite atacar la causa: sin causal, ese tiempo no se puede atribuir a nadie.
             </p>
@@ -224,8 +224,8 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
               type="button"
               onClick={() => setTreeOpen((v) => !v)}
               className={cn(
-                'text-[10px] px-2 py-0.5 rounded border transition-colors inline-flex items-center gap-1',
-                treeOpen ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                'text-[10px] px-2 py-0.5 rounded-ctl border transition-colors inline-flex items-center gap-1',
+                treeOpen ? 'bg-primary/[0.08] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               <HelpCircle className="w-3 h-3" />
@@ -237,7 +237,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 {leavesByCategoria().map((cat) => {
                   const usadasCat = cat.hojas.filter((h) => usadas.has(h.label)).length
                   return (
-                    <div key={cat.categoria} className="rounded border border-border bg-muted/30 px-2 py-1.5">
+                    <div key={cat.categoria} className="rounded-ctl border border-border bg-muted/30 px-2 py-1.5">
                       <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-border/60">
                         <span className="text-[10px] font-semibold truncate">{cat.label}</span>
                         <span className="text-[9px] text-muted-foreground font-mono tabular-nums shrink-0">

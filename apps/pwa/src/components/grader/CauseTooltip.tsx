@@ -72,7 +72,7 @@ export function CauseTooltip({ meta }: Props) {
           ref={tooltipRef}
           role="tooltip"
           className={cn(
-            'absolute z-30 w-72 sm:w-80 rounded-lg border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed',
+            'absolute z-30 w-72 sm:w-80 rounded-card border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed',
             'right-0 top-6',
           )}
           onClick={(e) => e.stopPropagation()}

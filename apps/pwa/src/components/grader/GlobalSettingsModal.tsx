@@ -289,16 +289,16 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </div>
 
               {/* Preview visual de los umbrales */}
-              <div className="rounded-md border border-border bg-muted p-3">
+              <div className="rounded-ctl border border-border bg-muted p-3">
                 <p className="text-[11px] text-muted-foreground mb-2 font-medium">Vista previa de colores</p>
                 <div className="flex items-center gap-3 text-xs flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-emerald-500/[0.08] text-emerald-600 font-medium">
                     ✓ OK — bajo {alertThreshold}%
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/15 text-amber-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-amber-500/[0.08] text-amber-600 font-medium">
                     ⚠ Alerta — {alertThreshold}–{criticalThreshold}%
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/15 text-red-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-red-500/[0.08] text-red-600 font-medium">
                     ✕ Crítico — sobre {criticalThreshold}%
                   </span>
                 </div>
@@ -311,7 +311,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </p>
 
               {/* Umbrales de duración */}
-              <div className="border border-border rounded-md p-3 space-y-3">
+              <div className="border border-border rounded-ctl p-3 space-y-3">
                 <p className="text-xs font-semibold text-foreground">Umbrales de duración</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   {([ ['microMinSec', 'Mín. tiempo muerto (s)', 'ej: 60'],
@@ -336,7 +336,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </div>
 
               {/* Colación */}
-              <div className="border border-border rounded-md p-3 space-y-3">
+              <div className="border border-border rounded-ctl p-3 space-y-3">
                 <p className="text-xs font-semibold text-foreground">Auto-tag Colación</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
@@ -411,7 +411,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                   {pauseTags.map(tag => (
                     <div
                       key={tag.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:bg-muted/20"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-ctl border border-border hover:bg-muted/20"
                     >
                       <span className="text-base leading-none w-6 text-center">{tag.emoji}</span>
                       <span className="flex-1 text-sm">{tag.label}</span>
@@ -436,7 +436,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
 
               {/* Formulario agregar nuevo tag */}
               {isAdmin && (
-                <div className="border border-border rounded-md p-3 space-y-2">
+                <div className="border border-border rounded-ctl p-3 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Nuevo tag</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -524,7 +524,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </div>
 
               {isCustomRanges && (
-                <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">
+                <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-600">
                   Personalizado
                 </Badge>
               )}

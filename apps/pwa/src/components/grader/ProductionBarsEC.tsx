@@ -284,11 +284,11 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
   }), [rangeStart, rangeEnd, seriesData, maxValue, expected, threshold, lotMarkLines])
 
   if (intervals.length === 0) {
-    return <div className="h-16 rounded bg-slate-800/40" />
+    return <div className="h-16 rounded-ctl bg-muted-foreground/[0.10]" />
   }
 
   return (
-    <div className="h-16 rounded bg-card border border-border dark:bg-slate-950/60 dark:border-slate-800">
+    <div className="h-16 rounded-ctl bg-card border border-border dark:bg-muted-foreground/[0.10] dark:border-slate-800">
       <ReactECharts
         ref={echartsRef}
         option={option}

@@ -247,14 +247,14 @@ export function ProductoTab({
             const delayClose = physicalConfig.flipperDelayCloseMs    ?? 150
             const cycleTotal = delayOpen + minOpen + delayClose
             return (
-              <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
+              <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
                   {onOpenZ2Capture && (
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-[10px] border border-primary/[0.25] text-primary rounded px-1.5 py-0.5 hover:bg-primary/[0.08] transition-colors"
+                      className="inline-flex items-center gap-1 text-[10px] border border-primary/[0.25] text-primary rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.08] transition-colors"
                     >
                       📟 Leer Z2
                     </button>
@@ -295,10 +295,10 @@ export function ProductoTab({
           })()}
 
           {/* Sub-card B: Reset mecánico cilindro */}
-          <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
+          <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center rounded border px-1 py-0.5 text-[10px] bg-amber-500/[0.08] text-amber-600 whitespace-nowrap">⚠ Estimado</span>
+              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-[10px] bg-amber-500/[0.08] text-amber-600 whitespace-nowrap">⚠ Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>
@@ -319,7 +319,7 @@ export function ProductoTab({
           </div>
 
           {/* Sub-card C: Paleta flipper física */}
-          <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
+          <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <p className="text-xs font-semibold text-violet-400">Paleta flipper física</p>
             <div>
               <Label className="text-xs">Largo paleta (mm)</Label>
@@ -353,7 +353,7 @@ export function ProductoTab({
 
           {/* Timing flipper */}
           {minOpenTimeSec != null && (
-            <div className="p-3 rounded-lg bg-primary/[0.08] border border-primary/[0.25] space-y-1">
+            <div className="p-3 rounded-card bg-primary/[0.08] border border-primary/[0.25] space-y-1">
               <p className="font-medium text-primary">Timing flipper calculado</p>
               <p className="text-muted-foreground">
                 Apertura mínima (paleta pasa):{' '}
@@ -373,7 +373,7 @@ export function ProductoTab({
           )}
 
           {/* Análisis pockets */}
-          <div className="p-3 rounded-lg bg-primary/[0.08] border border-primary/[0.25] space-y-1">
+          <div className="p-3 rounded-card bg-primary/[0.08] border border-primary/[0.25] space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="font-medium text-primary">
                 Análisis pockets ({physicalConfig.pocketCount} activos)
@@ -441,7 +441,7 @@ export function ProductoTab({
             const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
             const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
             return (
-              <div className="p-2 rounded bg-muted border border-border dark:bg-muted-foreground/[0.10] dark:border-muted-foreground/[0.10] text-[10px] space-y-1">
+              <div className="p-2 rounded-ctl bg-muted border border-border dark:bg-muted-foreground/[0.10] dark:border-muted-foreground/[0.10] text-[10px] space-y-1">
                 <p className="font-medium text-muted-foreground">
                   {s.label} · {scientific} · FishBase ID {fishBaseId}
                 </p>

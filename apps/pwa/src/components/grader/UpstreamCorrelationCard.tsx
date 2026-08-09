@@ -37,13 +37,13 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:      { bg: 'bg-rose-500/15 dark:bg-rose-950/40',    border: 'border-rose-500/40 dark:border-rose-900/60',    text: 'text-rose-800 dark:text-rose-300',    icon: AlertTriangle, label: 'Causa upstream' },
-  upstream_majority:    { bg: 'bg-amber-500/15 dark:bg-amber-950/40',   border: 'border-amber-500/40 dark:border-amber-900/60',   text: 'text-amber-800 dark:text-amber-300',   icon: AlertTriangle, label: 'Upstream parcial' },
-  upstream_single:      { bg: 'bg-muted dark:bg-slate-900/60',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
+  upstream_global:      { bg: 'bg-cat-5-tint/[0.08]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_majority:    { bg: 'bg-amber-500/[0.08]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-amber-600',   icon: AlertTriangle, label: 'Upstream parcial' },
+  upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
   // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
-  coincidental_planned: { bg: 'bg-cyan-500/15 dark:bg-cyan-950/30',    border: 'border-cyan-500/40 dark:border-cyan-900/40',    text: 'text-cyan-800 dark:text-cyan-300',    icon: Info,          label: 'Coincidencia programada' },
-  no_correlation:       { bg: 'bg-emerald-500/15 dark:bg-emerald-950/30', border: 'border-emerald-500/40 dark:border-emerald-900/40', text: 'text-emerald-800 dark:text-emerald-400', icon: CheckCircle2,  label: 'Interna' },
+  coincidental_planned: { bg: 'bg-cat-7-tint/[0.08]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
+  no_correlation:       { bg: 'bg-emerald-500/[0.08]', border: 'border-emerald-500/[0.25] dark:border-emerald-500/[0.25]', text: 'text-emerald-600', icon: CheckCircle2,  label: 'Interna' },
 }
 
 function CorrelationRow({ corr, expanded, onToggle }: {
@@ -58,7 +58,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
     <div className="py-2">
       <button
         onClick={onToggle}
-        className={`w-full flex items-center gap-2 text-left p-2 rounded border ${s.bg} ${s.border} group`}
+        className={`w-full flex items-center gap-2 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
         aria-expanded={expanded}
       >
         {expanded
@@ -160,7 +160,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
           {summary.upstreamCaused > 0 && (
             <div
-              className="flex items-center gap-1.5 text-xs text-rose-800 dark:text-rose-300 tabular-nums"
+              className="flex items-center gap-1.5 text-xs text-cat-5-ink tabular-nums"
               title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -192,7 +192,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           <>
             {/* Breakdown por máquina — qué Baader atender primero */}
             {summary.byMachine.length > 0 && (
-              <div className="mb-3 p-2 rounded border border-border/80 bg-muted/40">
+              <div className="mb-3 p-2 rounded-ctl border border-border/80 bg-muted/40">
                 <div className="text-[10px] text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Factory className="w-3 h-3" />
                   Impacto por máquina (paros del Grader donde la máquina contribuyó)
@@ -211,7 +211,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     return (
                       <div
                         key={m.machineid}
-                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-800 dark:text-rose-300' : 'text-muted-foreground'}`}
+                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
                       >
                         <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>

@@ -85,8 +85,8 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                         return (
                           <td key={c} className={cn(
                             'py-2 px-2 text-center',
-                            isMax && 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-300',
-                            cell && cell.pct >= 20 && !isMax && 'bg-blue-50/50 dark:bg-blue-900/10',
+                            isMax && 'bg-primary/[0.08] ring-1 ring-blue-300',
+                            cell && cell.pct >= 20 && !isMax && 'bg-primary/[0.08]',
                           )}>
                             {cell ? (
                               <div>

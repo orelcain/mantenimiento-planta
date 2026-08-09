@@ -203,7 +203,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
   if (!live) {
     return (
       <div className={cn(
-        'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-border/40 bg-muted/30 text-muted-foreground',
+        'inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-ctl border border-border/40 bg-muted/30 text-muted-foreground',
         className,
       )}>
         <Clock className="h-3 w-3 shrink-0" />
@@ -238,7 +238,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         type="button"
         onClick={() => navigate(href)}
         className={cn(
-          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/12 hover:bg-amber-500/18 transition-colors text-left',
+          'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.08] hover:bg-amber-500/[0.08] transition-colors text-left',
           className,
         )}
         title={`El horario del ${meta.label} (${live.dateKey}) está activo pero no hay producción registrada en Shoplogix en los últimos ${ACTIVITY_MAX_AGE_MIN} min. Click para ver el detalle igual.`}
@@ -248,7 +248,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
           <ShiftIcon className={cn('h-3.5 w-3.5 opacity-70', meta.textColorClass)} />
         </span>
         <span className="flex flex-col leading-tight min-w-0">
-          <span className="text-xs font-medium text-amber-800 dark:text-amber-200/90">
+          <span className="text-xs font-medium text-amber-600/90">
             Programado · {meta.label}
           </span>
           <span className="text-[10px] text-amber-700/80 dark:text-amber-300/70">
@@ -266,17 +266,17 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
       type="button"
       onClick={() => navigate(href)}
       className={cn(
-        'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors text-left',
+        'group inline-flex items-center gap-2 px-2.5 py-1.5 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.08] hover:bg-emerald-500/[0.08] transition-colors text-left',
         className,
       )}
       title={`Turno en curso · click para ver el detalle (${live.dateKey})`}
     >
       <span className="flex items-center gap-1 shrink-0">
-        <Activity className="h-3 w-3 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+        <Activity className="h-3 w-3 text-emerald-600 animate-pulse" />
         <ShiftIcon className={cn('h-3.5 w-3.5', meta.textColorClass)} />
       </span>
       <span className="flex flex-col leading-tight min-w-0">
-        <span className="text-xs font-medium text-emerald-900 dark:text-emerald-100">
+        <span className="text-xs font-medium text-emerald-600">
           En curso · {meta.label}
         </span>
         <span className="text-[10px] text-emerald-700/90 dark:text-emerald-300/80 tabular-nums">

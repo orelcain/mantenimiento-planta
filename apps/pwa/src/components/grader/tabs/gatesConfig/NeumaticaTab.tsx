@@ -142,7 +142,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
               return (
                 <tr key={gateNum} className="border-b hover:bg-muted/30">
                   <td className="py-1 px-2 text-center">
-                    <span className="inline-flex items-center rounded border px-1 py-0.5 text-xs">{gateNum}</span>
+                    <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-xs">{gateNum}</span>
                   </td>
                   <td className="py-1 px-2">
                     <Input type="number" step="0.5" min="0.5" max="30"

@@ -92,8 +92,8 @@ export function AnalisisGraderConfigPage() {
       </div>
 
       {/* Aviso de alcance: esto no es de un turno */}
-      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-sky-500/10 border border-sky-500/30 text-sm">
-        <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-sky-600 dark:text-sky-400" />
+      <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.08] border border-primary/[0.25] text-sm">
+        <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
         <p className="text-muted-foreground">
           <span className="font-medium text-foreground">Estos valores aplican a todos los turnos</span>{' '}
           de {plantLineCfg.label}, pasados y futuros: cambiar uno acá recalcula cómo se lee cualquier
@@ -123,7 +123,7 @@ export function AnalisisGraderConfigPage() {
           <button
             key={id}
             onClick={() => setModalTab(id)}
-            className="text-left rounded-lg border border-border bg-card p-3 hover:bg-muted/40 transition-colors"
+            className="text-left rounded-card border border-border bg-card p-3 hover:bg-muted/40 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Icon className="w-4 h-4 text-muted-foreground shrink-0" />

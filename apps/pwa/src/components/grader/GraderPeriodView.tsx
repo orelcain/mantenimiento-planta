@@ -564,7 +564,7 @@ export function GraderPeriodView({ data }: Props) {
               </p>
               {visibleRangeLabel && (
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-600 dark:text-purple-400">
+                  <Badge variant="outline" className="text-[10px] border-cat-6-tint/[0.25] text-cat-6-ink">
                     🔍 Filtrado a zoom: {visibleRangeLabel}
                   </Badge>
                   <span className="text-[10px] text-muted-foreground">
@@ -573,7 +573,7 @@ export function GraderPeriodView({ data }: Props) {
                   <button
                     type="button"
                     onClick={handleResetZoom}
-                    className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                    className="text-[10px] text-cat-6-ink hover:underline"
                   >
                     limpiar
                   </button>
@@ -652,7 +652,7 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-emerald-500/30 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/15 transition-colors"
+              className="border-emerald-500/[0.25] bg-emerald-500/[0.08] cursor-pointer hover:bg-emerald-500/[0.08] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -671,7 +671,7 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-red-500/30 bg-red-500/10 cursor-pointer hover:bg-red-500/15 transition-colors"
+              className="border-red-500/[0.25] bg-red-500/[0.08] cursor-pointer hover:bg-red-500/[0.08] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -693,9 +693,9 @@ export function GraderPeriodView({ data }: Props) {
 
       {/* ── Panel de insights automáticos ───────────────────────────────── */}
       {insights && (
-        <Card className="border-blue-500/20 bg-blue-500/10">
+        <Card className="border-primary/[0.25] bg-primary/[0.08]">
           <CardHeader className="pb-1">
-            <CardTitle className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <CardTitle className="text-sm text-primary flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Insights automáticos · {insights.totalDays} días analizados
             </CardTitle>
@@ -703,7 +703,7 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               {/* Tendencia */}
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
+              <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
@@ -719,7 +719,7 @@ export function GraderPeriodView({ data }: Props) {
                 </p>
               </div>
               {/* Días críticos */}
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
+              <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
                 <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-emerald-600')}>
                   {insights.criticalCount} / {insights.totalDays}
@@ -731,7 +731,7 @@ export function GraderPeriodView({ data }: Props) {
               </div>
               {/* Día vs Noche */}
               {insights.diaAvg !== null && insights.nocheAvg !== null && (
-                <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <div className="rounded-card border border-border bg-background px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Día vs Noche (prom.)</p>
                   <p className="font-semibold text-sm">
                     <span className="text-amber-500">{insights.diaAvg}%</span>
@@ -749,7 +749,7 @@ export function GraderPeriodView({ data }: Props) {
               )}
               {/* Mejor semana */}
               {insights.bestWeekStart && (
-                <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <div className="rounded-card border border-border bg-background px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
                   <p className="font-semibold text-sm text-emerald-600">{insights.bestWeekAvg}% P0 prom.</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -784,7 +784,7 @@ export function GraderPeriodView({ data }: Props) {
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="inline-flex items-center gap-1 rounded border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
+                className="inline-flex items-center gap-1 rounded-ctl border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
               >
                 <RotateCcw className="h-3 w-3" />
                 Reset zoom
@@ -830,7 +830,7 @@ export function GraderPeriodView({ data }: Props) {
                   <span className="inline-block w-3 h-0.5" style={{ background: CRITICAL_LINE }} /> Critical ≥3.5%
                 </span>
                 {hourlySeries.length > 0 && (
-                  <span className="text-purple-600 dark:text-purple-400">
+                  <span className="text-cat-6-ink">
                     💡 Haz zoom ≤ 2 días para ver drill-down horario
                   </span>
                 )}
@@ -932,7 +932,7 @@ export function GraderPeriodView({ data }: Props) {
               <div
                 key={g.shiftId}
                 className={cn(
-                  'rounded-lg border px-4 py-3',
+                  'rounded-card border px-4 py-3',
                   p0StatusBorderClass(p0StatusFromPct(g.p0PctWeighted)),
                 )}
               >
@@ -948,11 +948,11 @@ export function GraderPeriodView({ data }: Props) {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                  <div className="rounded bg-background px-2 py-1">
+                  <div className="rounded-ctl bg-background px-2 py-1">
                     <p className="text-muted-foreground">Piezas</p>
                     <p className="font-semibold">{formatNumber(g.totalPieces)}</p>
                   </div>
-                  <div className="rounded bg-background px-2 py-1">
+                  <div className="rounded-ctl bg-background px-2 py-1">
                     <p className="text-muted-foreground">P0 pz</p>
                     <p className="font-semibold">{formatNumber(g.totalP0Pieces)}</p>
                   </div>
@@ -971,7 +971,7 @@ export function GraderPeriodView({ data }: Props) {
             <button
               type="button"
               onClick={() => exportToCSV(sortedShifts, range.label)}
-              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/50 rounded px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/50 rounded-ctl px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
             >
               <Download className="h-3 w-3" />
               Exportar CSV
@@ -1025,8 +1025,8 @@ export function GraderPeriodView({ data }: Props) {
                         variant="outline"
                         className={cn(
                           'text-[10px]',
-                          s.shiftId === 'Turno día'   && 'border-amber-500/40 text-amber-600',
-                          s.shiftId === 'Turno noche' && 'border-indigo-500/40 text-indigo-600',
+                          s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-amber-600',
+                          s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-indigo-600',
                         )}
                       >
                         {shiftShortName(s.shiftId)}
@@ -1066,7 +1066,7 @@ export function GraderPeriodView({ data }: Props) {
                   type="button"
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ‹ Anterior
                 </button>
@@ -1077,7 +1077,7 @@ export function GraderPeriodView({ data }: Props) {
                   type="button"
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente ›
                 </button>

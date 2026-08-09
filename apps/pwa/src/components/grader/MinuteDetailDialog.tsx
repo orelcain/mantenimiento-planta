@@ -381,7 +381,7 @@ export function MinuteDetailDialog({
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
             {/* Minuto sin rechazos — mensaje positivo cuando todo llegó a destino. */}
             {breakdown.total > 0 && breakdown.p0 === 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-500/30 bg-emerald-500/15 text-xs text-emerald-800 dark:text-emerald-300">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.08] text-xs text-emerald-600">
                 <span className="text-base leading-none">✓</span>
                 <span>Sin rechazos este minuto — las {breakdown.total} piezas llegaron a destino.</span>
               </div>
@@ -391,10 +391,10 @@ export function MinuteDetailDialog({
             {breakdown.p0 > 0 && breakdown.topP0Cause && (
               <div
                 className={cn(
-                  'flex items-start gap-2 px-3 py-2 rounded-md border text-xs',
-                  breakdown.p0Status === 'critical' && 'border-rose-500/40 bg-rose-500/15',
-                  breakdown.p0Status === 'alert'    && 'border-amber-500/40 bg-amber-500/15',
-                  breakdown.p0Status === 'ok'       && 'border-emerald-500/30 bg-emerald-500/15',
+                  'flex items-start gap-2 px-3 py-2 rounded-ctl border text-xs',
+                  breakdown.p0Status === 'critical' && 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.08]',
+                  breakdown.p0Status === 'alert'    && 'border-amber-500/[0.25] bg-amber-500/[0.08]',
+                  breakdown.p0Status === 'ok'       && 'border-emerald-500/[0.25] bg-emerald-500/[0.08]',
                 )}
                 title={MATRIX_P0_CAUSES[breakdown.topP0Cause.id].description}
               >
@@ -419,7 +419,7 @@ export function MinuteDetailDialog({
             )}
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-500/30 bg-amber-500/15 text-xs text-amber-800 dark:text-amber-200">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.08] text-xs text-amber-600">
                 <span className="text-base leading-none">ℹ️</span>
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
@@ -444,16 +444,16 @@ export function MinuteDetailDialog({
                     <div
                       key={gate}
                       className={cn(
-                        'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm border',
+                        'flex items-center gap-2 px-3 py-1.5 rounded-ctl text-sm border',
                         isP0
-                          ? 'border-orange-500/40 bg-orange-500/15'
+                          ? 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08]'
                           : 'border-border bg-muted',
                       )}
                     >
                       <span
                         className={cn(
-                          'inline-flex items-center justify-center w-12 h-6 rounded-md text-xs font-semibold shrink-0',
-                          isP0 ? 'bg-orange-500/20 text-orange-800 dark:text-orange-300' : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+                          'inline-flex items-center justify-center w-12 h-6 rounded-ctl text-xs font-semibold shrink-0',
+                          isP0 ? 'bg-cat-4-tint/[0.08] text-cat-4-ink' : 'bg-emerald-500/[0.08] text-emerald-600',
                         )}
                       >
                         {isP0 ? 'P0' : `G${gate}`}
@@ -523,7 +523,7 @@ export function MinuteDetailDialog({
               <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Piezas ({records.length})
               </h3>
-              <div className="border border-border rounded-md overflow-hidden">
+              <div className="border border-border rounded-ctl overflow-hidden">
                 <table className="w-full text-xs">
                   <thead className="bg-muted">
                     <tr className="text-muted-foreground">
@@ -572,7 +572,7 @@ export function MinuteDetailDialog({
                           key={`${r.ts}-${i}`}
                           className={cn(
                             'border-t border-border/40 hover:bg-muted/20',
-                            r.gate === 0 && 'bg-orange-500/10',
+                            r.gate === 0 && 'bg-cat-4-tint/[0.08]',
                           )}
                         >
                           <td className="px-2 py-1 tabular-nums text-muted-foreground">{fmtTimeWithSec(r.ts)}</td>

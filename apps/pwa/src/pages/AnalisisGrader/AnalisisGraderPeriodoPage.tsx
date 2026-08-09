@@ -235,12 +235,12 @@ export function AnalisisGraderPeriodoPage() {
           Aparece si todavía hay docs legacy en Firestore del iter 8 donde
           B (noche) se mapeaba incorrectamente a 'Turno tarde'. */}
       {legacyCount !== null && legacyCount > 0 && !migrationResult && (
-        <Card className="border-amber-500/40 bg-amber-500/15">
+        <Card className="border-amber-500/[0.25] bg-amber-500/[0.08]">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="text-sm min-w-0">
-                <p className="font-medium text-amber-700 dark:text-amber-400">
+                <p className="font-medium text-amber-600">
                   {legacyCount} turno{legacyCount !== 1 ? 's' : ''} legacy con etiqueta "Turno tarde" detectado{legacyCount !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -265,10 +265,10 @@ export function AnalisisGraderPeriodoPage() {
 
       {/* Confirmación post-migración */}
       {migrationResult && (
-        <Card className="border-emerald-500/40 bg-emerald-500/15">
+        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.08]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="text-sm text-emerald-600">
               <span className="font-medium">Migración completa:</span>{' '}
               {migrationResult.processed} turnos procesados ·{' '}
               {migrationResult.merged} fusionados con noche existente ·{' '}
@@ -291,7 +291,7 @@ export function AnalisisGraderPeriodoPage() {
                 type="button"
                 onClick={() => handlePresetClick(p.key)}
                 className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium border transition-colors',
+                  'px-3 py-1.5 rounded-ctl text-xs font-medium border transition-colors',
                   activePreset === p.key
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background border-border hover:bg-muted/50',
@@ -304,7 +304,7 @@ export function AnalisisGraderPeriodoPage() {
               type="button"
               onClick={() => setCustomOpen((o) => !o)}
               className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-medium border transition-colors',
+                'px-3 py-1.5 rounded-ctl text-xs font-medium border transition-colors',
                 activePreset === 'custom'
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-background border-border hover:bg-muted/50',
@@ -326,7 +326,7 @@ export function AnalisisGraderPeriodoPage() {
               <button
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(-1) : handleMonthStep(-1)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
                 title={activePreset === 'week' ? 'Semana anterior' : 'Mes anterior'}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -336,7 +336,7 @@ export function AnalisisGraderPeriodoPage() {
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(0 - weekOffset) : handleMonthStep(0 - monthOffset)}
                 disabled={(activePreset === 'week' && weekOffset === 0) || (activePreset === 'month' && monthOffset === 0)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={activePreset === 'week' ? 'Volver a semana actual' : 'Volver al mes actual'}
               >
                 <Circle className="h-3 w-3" />
@@ -346,7 +346,7 @@ export function AnalisisGraderPeriodoPage() {
                 type="button"
                 onClick={() => activePreset === 'week' ? handleWeekStep(1) : handleMonthStep(1)}
                 disabled={(activePreset === 'week' && weekOffset >= 0) || (activePreset === 'month' && monthOffset >= 0)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-ctl text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={activePreset === 'week' ? 'Semana siguiente' : 'Mes siguiente'}
               >
                 Siguiente
@@ -369,14 +369,14 @@ export function AnalisisGraderPeriodoPage() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="border rounded px-2 py-1 text-xs bg-background [color-scheme:dark]"
+                className="border rounded-ctl px-2 py-1 text-xs bg-background [color-scheme:dark]"
               />
               <label className="text-xs text-muted-foreground">Hasta:</label>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="border rounded px-2 py-1 text-xs bg-background [color-scheme:dark]"
+                className="border rounded-ctl px-2 py-1 text-xs bg-background [color-scheme:dark]"
               />
               <Button size="sm" onClick={handleApplyCustom} disabled={!customStart || !customEnd || customStart > customEnd}>
                 Aplicar

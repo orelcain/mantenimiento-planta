@@ -294,7 +294,7 @@ export function LossCascadeCard({
           desplegar" (Orel 2026-07-22). */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 group rounded-md border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 hover:bg-primary/[0.08] transition-colors"
+        className="w-full flex items-center gap-2 group rounded-ctl border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 hover:bg-primary/[0.08] transition-colors"
         aria-expanded={expanded}
       >
         {expanded
@@ -331,7 +331,7 @@ export function LossCascadeCard({
               type="button"
               onClick={() => setCalcOpen((v) => !v)}
               className={cn(
-                'text-[10px] px-2 py-0.5 rounded border transition-colors',
+                'text-[10px] px-2 py-0.5 rounded-ctl border transition-colors',
                 calcOpen ? 'bg-primary/[0.08] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
@@ -339,7 +339,7 @@ export function LossCascadeCard({
             </button>
           </div>
           {calcOpen && (
-            <div className="rounded border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 text-[11px] space-y-1 font-mono tabular-nums">
+            <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 text-[11px] space-y-1 font-mono tabular-nums">
               <div>
                 <span className="text-muted-foreground">Turno (Σ máq) = tiempo rastreado por Shoplogix en el turno × 3 Baader (procesando + pausas + paros + setup; colación incluida hasta el paso siguiente) = </span>
                 <b>{fmtHm(turnoSec)}</b>
@@ -373,17 +373,17 @@ export function LossCascadeCard({
               pérdidas por magnitud) — mismo criterio que la Cascada del mes.
               Los grupos de pérdida son BOTONES: click filtra la lista abajo. */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-[11px]">
-            <div className="rounded bg-muted/40 px-2 py-1.5" title="Suma del tiempo rastreado por Shoplogix en el turno, de las 3 máquinas (procesando + pausas + paros + setup).">
+            <div className="rounded-ctl bg-muted/40 px-2 py-1.5" title="Suma del tiempo rastreado por Shoplogix en el turno, de las 3 máquinas (procesando + pausas + paros + setup).">
               <div className="text-muted-foreground text-[9px] uppercase">Turno (Σ máq)</div>
               <div className="font-mono tabular-nums">{fmtHm(turnoSec)}</div>
               <div className="text-[9px] text-muted-foreground/60">100%</div>
             </div>
-            <div className="rounded bg-primary/[0.08] px-2 py-1.5" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir. Es un subtotal (no se suma con las demás celdas).">
+            <div className="rounded-ctl bg-primary/[0.08] px-2 py-1.5" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir. Es un subtotal (no se suma con las demás celdas).">
               <div className="text-sky-400 text-[9px] uppercase">= Techo máquina</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.techoSec)}</div>
               <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.techoSec).toFixed(1)}% del turno · subtotal</div>
             </div>
-            <div className="rounded bg-emerald-500/[0.08] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
+            <div className="rounded-ctl bg-emerald-500/[0.08] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
               <div className="text-emerald-400 text-[9px] uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
               <div className="text-[9px] text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.produccionSec).toFixed(1)}% del turno</div>
@@ -394,7 +394,7 @@ export function LossCascadeCard({
                 key={c.id}
                 type="button"
                 onClick={() => { setFilter((f) => (f === c.id ? 'all' : c.id)); setCauseMachine(null) }}
-                className={cn('rounded px-2 py-1.5 text-left transition-shadow hover:ring-1', c.bg, c.ringHover, filter === c.id && c.ringActive)}
+                className={cn('rounded-ctl px-2 py-1.5 text-left transition-shadow hover:ring-1', c.bg, c.ringHover, filter === c.id && c.ringActive)}
                 title={c.tip}
               >
                 <div className={cn('text-[9px] uppercase', c.text)}>{c.label}</div>
@@ -444,7 +444,7 @@ export function LossCascadeCard({
                     const pctOfOwnDenom = ownDenomSec > 0 ? (sec / ownDenomSec) * 100 : 0
                     const bigPct = activeBucket == null ? m.cascade.usoReal * 100 : shareOfGroup
                     return (
-                      <div key={m.machineid} className="rounded bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
+                      <div key={m.machineid} className="rounded-ctl bg-muted/40 border border-border px-2 py-1.5 text-[11px]">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-foreground/85">{m.name}</span>
                           <span className={cn('font-mono tabular-nums', theme.text)}>{bigPct.toFixed(0)}%</span>
@@ -479,8 +479,8 @@ export function LossCascadeCard({
           })()}
 
           {causeMachine ? (
-            <div className="flex items-center gap-2 text-[11px] rounded border border-amber-500/[0.25] bg-amber-500/[0.08] px-2 py-1.5">
-              <span className="w-2 h-2 rounded-sm shrink-0 bg-amber-400" />
+            <div className="flex items-center gap-2 text-[11px] rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.08] px-2 py-1.5">
+              <span className="w-2 h-2 rounded-ctl shrink-0 bg-amber-400" />
               <span>
                 Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
                 <span className="text-muted-foreground"> · mira las bandas amarillas en el Gantt de esa máquina y en la velocidad upstream</span>
@@ -488,14 +488,14 @@ export function LossCascadeCard({
               <button
                 type="button"
                 onClick={() => setCauseMachine(null)}
-                className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
+                className="ml-auto text-[10px] px-1.5 py-0.5 rounded-ctl border border-border text-muted-foreground hover:bg-accent transition-colors"
               >
                 ✕ quitar
               </button>
             </div>
           ) : filter !== 'all' && (
-            <div className="flex items-center gap-2 text-[11px] rounded border border-border bg-muted/40 px-2 py-1.5">
-              <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[filter] ?? 'bg-muted-foreground/[0.10]')} />
+            <div className="flex items-center gap-2 text-[11px] rounded-ctl border border-border bg-muted/40 px-2 py-1.5">
+              <span className={cn('w-2 h-2 rounded-ctl shrink-0', BUCKET_COLOR[filter] ?? 'bg-muted-foreground/[0.10]')} />
               <span>
                 Filtrando: <b>{filter === 'planificado' ? 'Planificado' : filterMeta?.label ?? filter}</b>
                 <span className="text-muted-foreground tabular-nums"> · {filtered.length} causal{filtered.length === 1 ? '' : 'es'} · {fmtHm(filterSec)}{filter !== 'planificado' ? ` · ≈ ${filterPz.toLocaleString('es-CL')} pz` : ' (fuera del techo, sin costo en piezas)'}</span>
@@ -503,7 +503,7 @@ export function LossCascadeCard({
               <button
                 type="button"
                 onClick={() => { setFilter('all'); setCauseMachine(null) }}
-                className="ml-auto text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-accent transition-colors"
+                className="ml-auto text-[10px] px-1.5 py-0.5 rounded-ctl border border-border text-muted-foreground hover:bg-accent transition-colors"
               >
                 ✕ quitar filtro
               </button>
@@ -528,10 +528,10 @@ export function LossCascadeCard({
                   pérdida (31-jul: 3.282 "perdidas" cuando 774 salieron igual). */}
               {filter === 'all' && recuperadas > 0 && (
                 <div
-                  className="mb-1.5 flex items-center gap-2 text-[11px] rounded px-2 py-1 bg-cat-6-tint/[0.08] border border-cat-6-tint/[0.25] cursor-help"
+                  className="mb-1.5 flex items-center gap-2 text-[11px] rounded-ctl px-2 py-1 bg-cat-6-tint/[0.08] border border-cat-6-tint/[0.25] cursor-help"
                   title={`${MANUAL_LINE_LABEL}: la planta procesó ${manual!.manualPieces.toLocaleString('es-CL')} piezas por fuera de las Baader. ${MANUAL_LINE_TOOLTIP}`}
                 >
-                  <span className="w-2 h-2 rounded-sm shrink-0 bg-cat-6-tint/[0.08]" />
+                  <span className="w-2 h-2 rounded-ctl shrink-0 bg-cat-6-tint/[0.08]" />
                   <span className="truncate text-violet-300">Recuperadas por la línea manual</span>
                   <span className="ml-auto shrink-0 tabular-nums text-violet-300">
                     −{recuperadas.toLocaleString('es-CL')} pz
@@ -546,7 +546,7 @@ export function LossCascadeCard({
                   const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
                   return (
                     <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                      <span className={cn('w-2 h-2 rounded-sm shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-muted-foreground/[0.10]')} />
+                      <span className={cn('w-2 h-2 rounded-ctl shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-muted-foreground/[0.10]')} />
                       <span className="truncate">{c.label}</span>
                       <span className="text-[9px] text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
                       {/* Qué Baader(s) aportó esta causal — antes se perdía al
@@ -566,7 +566,7 @@ export function LossCascadeCard({
                                   : { bucket: c.bucket, label: c.label, machine: mn },
                               )}
                               className={cn(
-                                'text-[8px] px-1 rounded bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
+                                'text-[8px] px-1 rounded-ctl bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
                                 active ? 'border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.08]' : 'border-border/60 text-muted-foreground/80',
                               )}
                               title={`Ver solo los eventos de "${c.label}" en ${mn}`}
@@ -598,7 +598,7 @@ export function LossCascadeCard({
               <div className="space-y-0.5 opacity-70">
                 {plannedCauses.map((c) => (
                   <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-[11px]">
-                    <span className="w-2 h-2 rounded-sm shrink-0 bg-muted-foreground/[0.10]" />
+                    <span className="w-2 h-2 rounded-ctl shrink-0 bg-muted-foreground/[0.10]" />
                     <span className="truncate">{c.label}</span>
                     <span className="text-[9px] text-muted-foreground shrink-0">Personas (acordado)</span>
                     <span className="text-[9px] text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>

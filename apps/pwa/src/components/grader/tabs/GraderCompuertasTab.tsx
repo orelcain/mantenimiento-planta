@@ -60,7 +60,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
   return (
     <>
       {/* Allocation Score KPI */}
-      <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted">
+      <div className="flex items-center gap-3 p-3 rounded-card border bg-muted">
         <div className={cn(
           'text-2xl font-bold',
           analytics.allocationScore >= 80 ? 'text-emerald-600' :
@@ -93,11 +93,11 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 <div
                   key={i}
                   className={cn(
-                    'p-3 rounded-lg border flex items-start gap-3',
+                    'p-3 rounded-card border flex items-start gap-3',
                     gb.severity === 'critical'
-                      ? 'border-red-300 bg-red-50 dark:bg-red-900/10'
+                      ? 'border-red-300 bg-red-500/[0.08]'
                       : gb.severity === 'warn'
-                      ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/10'
+                      ? 'border-amber-300 bg-amber-500/[0.08]'
                       : 'border-muted bg-muted',
                   )}
                 >
@@ -223,8 +223,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   {analytics.gateAdvancedStats.map((gs) => (
                     <tr key={gs.gateNumber} className={cn(
                       'border-b hover:bg-muted/30',
-                      gs.cv > 0.15 && 'bg-amber-50/50 dark:bg-amber-900/5',
-                      gs.mismatchPct > 30 && 'bg-red-50/50 dark:bg-red-900/5',
+                      gs.cv > 0.15 && 'bg-amber-500/[0.08]',
+                      gs.mismatchPct > 30 && 'bg-red-500/[0.08]',
                     )}>
                       <td className="py-2 px-2 font-medium">Gate {gs.gateNumber}</td>
                       <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString('es-CL')}</td>
@@ -325,7 +325,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   Margen OK (s) <InfoTooltip {...getTooltipProps('threshold.timingOk')} iconSize={10} />
                 </label>
                 <input type="number" step="0.05" min="0.1" max="2"
-                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded-ctl"
                   value={errorThresholds?.timingMarginOkSec ?? 0.5}
                   onChange={(e) => onThresholdsChange({ timingMarginOkSec: Number(e.target.value) })}
                 />
@@ -335,7 +335,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   Margen Warn (s) <InfoTooltip {...getTooltipProps('threshold.timingWarn')} iconSize={10} />
                 </label>
                 <input type="number" step="0.05" min="0" max="1"
-                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded-ctl"
                   value={errorThresholds?.timingMarginWarnSec ?? 0.15}
                   onChange={(e) => onThresholdsChange({ timingMarginWarnSec: Number(e.target.value) })}
                 />
@@ -345,7 +345,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   Sobrecarga Warn (%) <InfoTooltip {...getTooltipProps('threshold.overloadWarn')} iconSize={10} />
                 </label>
                 <input type="number" step="5" min="10" max="80"
-                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded-ctl"
                   value={errorThresholds?.gateOverloadWarnPct ?? 35}
                   onChange={(e) => onThresholdsChange({ gateOverloadWarnPct: Number(e.target.value) })}
                 />
@@ -355,7 +355,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   Sobrecarga Critical (%) <InfoTooltip {...getTooltipProps('threshold.overloadCritical')} iconSize={10} />
                 </label>
                 <input type="number" step="5" min="20" max="100"
-                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded-ctl"
                   value={errorThresholds?.gateOverloadCriticalPct ?? 50}
                   onChange={(e) => onThresholdsChange({ gateOverloadCriticalPct: Number(e.target.value) })}
                 />
@@ -367,7 +367,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
 
       {/* ── Semáforo timing + desglose neumático por gate ───────────────── */}
       {timingSignals.length > 0 && (
-        <Card className="border-sky-500/30">
+        <Card className="border-primary/[0.25]">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4 text-sky-500" />
@@ -417,14 +417,14 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 <tbody>
                   {timingSignals.map((t) => {
                     const color =
-                      t.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' :
-                      t.status === 'warn' ? 'text-amber-600 dark:text-amber-400' :
-                      t.status === 'critical' ? 'text-red-600 dark:text-red-400' :
+                      t.status === 'ok' ? 'text-emerald-600' :
+                      t.status === 'warn' ? 'text-amber-600' :
+                      t.status === 'critical' ? 'text-red-600' :
                       'text-muted-foreground'
                     const bg =
-                      t.status === 'ok' ? 'bg-emerald-500/10' :
-                      t.status === 'warn' ? 'bg-amber-500/10' :
-                      t.status === 'critical' ? 'bg-red-500/10' :
+                      t.status === 'ok' ? 'bg-emerald-500/[0.08]' :
+                      t.status === 'warn' ? 'bg-amber-500/[0.08]' :
+                      t.status === 'critical' ? 'bg-red-500/[0.08]' :
                       ''
                     const label =
                       t.status === 'ok' ? 'OK' :
@@ -433,9 +433,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       'INACTIVO'
                     const pb = t.pneumaticBreakdown
                     const pEffColor = pb
-                      ? pb.effectivePressureBar >= 5 ? 'text-emerald-600 dark:text-emerald-400'
-                        : pb.effectivePressureBar >= 3 ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-red-600 dark:text-red-400'
+                      ? pb.effectivePressureBar >= 5 ? 'text-emerald-600'
+                        : pb.effectivePressureBar >= 3 ? 'text-amber-600'
+                        : 'text-red-600'
                       : ''
                     return (
                       <tr key={t.gateNumber} className={cn('border-b hover:bg-muted/30', bg)} title={t.hint}>
@@ -491,7 +491,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
 
       {/* ── Asignación óptima de calibres a gates (iter 19 / P0.5) ──────── */}
       {optimalAssignment.length > 0 && (
-        <Card className="border-purple-500/30">
+        <Card className="border-cat-6-tint/[0.25]">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Target className="h-4 w-4 text-purple-500" />
@@ -521,7 +521,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       key={o.gateNumber}
                       className={cn(
                         'border-b hover:bg-muted/30',
-                        !o.isMatch && o.suggestedCalibre != null && 'bg-purple-500/10',
+                        !o.isMatch && o.suggestedCalibre != null && 'bg-cat-6-tint/[0.08]',
                       )}
                     >
                       <td className="py-2 px-2 font-medium">Gate {o.gateNumber}</td>
@@ -544,8 +544,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                             className={cn(
                               'text-[10px]',
                               o.isMatch
-                                ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
-                                : 'border-purple-500/40 text-purple-600 dark:text-purple-400',
+                                ? 'border-emerald-500/[0.25] text-emerald-600'
+                                : 'border-cat-6-tint/[0.25] text-cat-6-ink',
                             )}
                           >
                             {o.suggestedCalibre}

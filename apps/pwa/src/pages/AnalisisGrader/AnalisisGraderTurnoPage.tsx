@@ -1460,7 +1460,7 @@ export function AnalisisGraderTurnoPage() {
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
       {/* M18 — Banner offline */}
       {!isOnline && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/[0.08] border border-amber-500/[0.25] text-amber-400 text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.08] border border-amber-500/[0.25] text-amber-400 text-sm">
           <WifiOff className="w-4 h-4 shrink-0" />
           <span>
             Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
@@ -1699,7 +1699,7 @@ export function AnalisisGraderTurnoPage() {
               Mobile: texto en línea propia (basis-full) para evitar comprimirse
               en una columna vertical de 1 palabra cuando los botones le roban
               ancho. Desktop: una sola línea con todos los elementos. */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-primary/[0.08] border border-primary/[0.25] text-primary text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.08] border border-primary/[0.25] text-primary text-sm">
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
@@ -1807,7 +1807,7 @@ export function AnalisisGraderTurnoPage() {
             </p>
 
             {/* Shoplogix — automático */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-cat-6-tint/[0.08] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.08] dark:border-cat-6-tint/[0.25]">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.08] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.08] dark:border-cat-6-tint/[0.25]">
               <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cat-6-ink">Shoplogix — Evisceradoras Baader 142</p>
@@ -1822,7 +1822,7 @@ export function AnalisisGraderTurnoPage() {
             </div>
 
             {/* Grader — manual */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/[0.08] border border-primary/[0.25]">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.08] border border-primary/[0.25]">
               <Upload className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Grader Matrix — Informe de turno</p>
@@ -1846,7 +1846,7 @@ export function AnalisisGraderTurnoPage() {
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/[0.08] border border-amber-500/[0.25] dark:bg-amber-500/[0.08] dark:border-amber-500/[0.25]">
+              <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.08] border border-amber-500/[0.25] dark:bg-amber-500/[0.08] dark:border-amber-500/[0.25]">
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-amber-600">Marel HG — Corta-cabeza</p>
@@ -1981,7 +1981,7 @@ export function AnalisisGraderTurnoPage() {
               historial → ajustes del turno. Antes estaban repartidos a lo largo
               de toda la página, separados por diez bloques de otra cosa. */}
           {activeView === 'gates' && (
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-primary/[0.08] border border-primary/[0.25] text-sm">
+            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.08] border border-primary/[0.25] text-sm">
               <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
               <p className="text-muted-foreground flex-1">
                 Acá se ajusta <span className="font-medium text-foreground">este turno</span>. La
@@ -2213,7 +2213,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
           {activeView === 'resumen' && summary && isAdmin && (
-            <div className="rounded-lg border border-border bg-muted p-3 space-y-2">
+            <div className="rounded-card border border-border bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Compartir turno</span>
@@ -2232,12 +2232,12 @@ export function AnalisisGraderTurnoPage() {
               {shareUrl && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                    <code className="flex-1 truncate rounded-ctl bg-muted px-2 py-1 text-[11px] text-muted-foreground">
                       {shareUrl}
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded bg-amber-500/[0.08] hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.08] hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -2262,7 +2262,7 @@ export function AnalisisGraderTurnoPage() {
                   </div>
                   {/* QR code para escanear desde celular */}
                   <div className="flex items-start gap-3 pt-1">
-                    <div className="rounded-lg border border-border/40 bg-white p-1.5">
+                    <div className="rounded-card border border-border/40 bg-white p-1.5">
                       <QRCodeSVG value={shareUrl} size={100} level="M" includeMargin={false} />
                     </div>
                     <div className="flex flex-col justify-center gap-1 pt-1">

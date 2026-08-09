@@ -37,9 +37,9 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
   { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-primary' },
-  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300' },
-  { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-slate-500/50 bg-slate-500/15 text-slate-700 dark:text-slate-300' },
-  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600' },
+  { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground' },
+  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' },
 ] as const
 
 type Categoria = typeof CATEGORIAS[number]['id']
@@ -241,7 +241,7 @@ export function SensorStopsCausePanel({
             />
           </CardTitle>
           {sinCausa.length > 0 && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10">
+            <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.08]">
               {sinCausa.length} sin causa · {Math.round(minutosSinCausa)} min
               {piezasSinCausa > 0 && ` · ≈${piezasSinCausa.toLocaleString('es-CL')} pz`}
             </Badge>
@@ -266,8 +266,8 @@ export function SensorStopsCausePanel({
             <div
               key={stop.key}
               className={cn(
-                'rounded-md border px-2.5 py-2 text-xs',
-                causaTexto ? 'border-border bg-muted/50' : 'border-amber-500/30 bg-amber-500/[0.06]',
+                'rounded-ctl border px-2.5 py-2 text-xs',
+                causaTexto ? 'border-border bg-muted/50' : 'border-amber-500/[0.25] bg-amber-500/[0.06]',
               )}
             >
               <div className="flex items-center gap-2 flex-wrap">
@@ -294,10 +294,10 @@ export function SensorStopsCausePanel({
                       </Badge>
                     )}
                     <span className="truncate max-w-[14rem]" title={causaTexto}>{causaTexto}</span>
-                    {anotada && <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                    {anotada && <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />}
                   </span>
                 ) : (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/40 text-amber-700 dark:text-amber-300">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/[0.25] text-amber-600">
                     sin causa
                   </Badge>
                 )}
@@ -337,7 +337,7 @@ export function SensorStopsCausePanel({
                           type="button"
                           onClick={() => setCategoria(c.id)}
                           className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] transition-colors',
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-ctl border text-[11px] transition-colors',
                             activa ? c.cls : 'border-border text-muted-foreground hover:text-foreground',
                           )}
                         >
@@ -360,7 +360,7 @@ export function SensorStopsCausePanel({
                   )}
 
                   {error && (
-                    <p className="text-[11px] text-rose-600 dark:text-rose-400">{error}</p>
+                    <p className="text-[11px] text-cat-5-ink">{error}</p>
                   )}
 
                   <div className="flex justify-end gap-1.5">

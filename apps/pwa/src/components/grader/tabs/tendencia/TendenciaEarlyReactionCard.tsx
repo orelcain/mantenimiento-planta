@@ -87,11 +87,11 @@ export function TendenciaEarlyReactionCard({
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-md border bg-muted/20">
+        <div className="rounded-ctl border bg-muted/20">
           <button
             type="button"
             onClick={() => onToggleThresholds()}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors rounded-md"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors rounded-ctl"
           >
             <div className="flex items-center gap-2">
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showThresholds && 'rotate-180')} />
@@ -149,7 +149,7 @@ export function TendenciaEarlyReactionCard({
             <div key={`trend-auto-${action.gateNumber}`} className="flex items-start justify-between gap-2 text-xs">
               <p>• {action.text}</p>
               {action.isApplied ? (
-                <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-600">
+                <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-emerald-600">
                   Aplicada
                 </Badge>
               ) : (
@@ -188,7 +188,7 @@ export function TendenciaEarlyReactionCard({
                 const run = trendAIRuns[0]
                 if (!run) return null
                 return (
-                  <div className="rounded-md border bg-muted/20 p-2 space-y-1.5">
+                  <div className="rounded-ctl border bg-muted/20 p-2 space-y-1.5">
                     <p className="text-[11px] text-muted-foreground font-medium">
                       Última corrida · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -223,12 +223,12 @@ export function TendenciaEarlyReactionCard({
                   {showAIHistory && (
                     <div className="space-y-2 mt-2">
                       {trendAIConsistency && (
-                        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5">
+                        <div className="flex flex-wrap items-center gap-2 rounded-ctl border bg-muted/20 px-2 py-1.5">
                           <Badge variant="outline" className={cn(
                             'text-[10px]',
-                            trendAIConsistency.level === 'alta' && 'border-emerald-500/40 text-emerald-600',
-                            trendAIConsistency.level === 'media' && 'border-amber-500/40 text-amber-600',
-                            trendAIConsistency.level === 'baja' && 'border-red-500/40 text-red-600',
+                            trendAIConsistency.level === 'alta' && 'border-emerald-500/[0.25] text-emerald-600',
+                            trendAIConsistency.level === 'media' && 'border-amber-500/[0.25] text-amber-600',
+                            trendAIConsistency.level === 'baja' && 'border-red-500/[0.25] text-red-600',
                           )}>
                             Consistencia: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
                           </Badge>
@@ -236,7 +236,7 @@ export function TendenciaEarlyReactionCard({
                         </div>
                       )}
                       {trendAIDiffRows.length > 0 && (
-                        <div className="rounded-md border bg-muted/20 p-2">
+                        <div className="rounded-ctl border bg-muted/20 p-2">
                           <p className="text-[11px] font-medium mb-1">Comparación corrida anterior vs actual</p>
                           <div className="overflow-x-auto">
                             <table className="w-full text-[11px]">
@@ -263,10 +263,10 @@ export function TendenciaEarlyReactionCard({
                                     <td className="py-1 px-1.5">
                                       <Badge variant="outline" className={cn(
                                         'text-[10px]',
-                                        row.changeType === 'igual' && 'border-emerald-500/40 text-emerald-600',
-                                        row.changeType === 'ajustada' && 'border-amber-500/40 text-amber-600',
-                                        row.changeType === 'nueva' && 'border-sky-500/40 text-sky-600',
-                                        row.changeType === 'eliminada' && 'border-red-500/40 text-red-600',
+                                        row.changeType === 'igual' && 'border-emerald-500/[0.25] text-emerald-600',
+                                        row.changeType === 'ajustada' && 'border-amber-500/[0.25] text-amber-600',
+                                        row.changeType === 'nueva' && 'border-primary/[0.25] text-sky-600',
+                                        row.changeType === 'eliminada' && 'border-red-500/[0.25] text-red-600',
                                       )}>
                                         {row.changeType}
                                       </Badge>
@@ -279,7 +279,7 @@ export function TendenciaEarlyReactionCard({
                         </div>
                       )}
                       {trendAIRuns.slice(1).map((run) => (
-                        <div key={run.id} className="rounded-md border bg-muted/20 p-2 space-y-1.5">
+                        <div key={run.id} className="rounded-ctl border bg-muted/20 p-2 space-y-1.5">
                           <p className="text-[11px] text-muted-foreground">
                             {run.runLabel} · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                           </p>

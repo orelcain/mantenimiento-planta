@@ -181,7 +181,7 @@ export function PuntoCeroPatronesCard({
           <div className="md:col-span-2">
             <label className="text-[11px] text-muted-foreground block mb-1">Causa</label>
             <select
-              className="w-full bg-background border rounded px-2 py-1.5 text-xs"
+              className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs"
               value={selectedCauseLabel ?? ''}
               onChange={(e) => onSelectedCauseLabelChange(e.target.value || null)}
             >
@@ -195,11 +195,11 @@ export function PuntoCeroPatronesCard({
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-1">Desde</label>
-            <input type="time" className="w-full bg-background border rounded px-2 py-1.5 text-xs" value={timeFilterFrom} onChange={(e) => onTimeFilterFromChange(e.target.value)} />
+            <input type="time" className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs" value={timeFilterFrom} onChange={(e) => onTimeFilterFromChange(e.target.value)} />
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-1">Hasta</label>
-            <input type="time" className="w-full bg-background border rounded px-2 py-1.5 text-xs" value={timeFilterTo} onChange={(e) => onTimeFilterToChange(e.target.value)} />
+            <input type="time" className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs" value={timeFilterTo} onChange={(e) => onTimeFilterToChange(e.target.value)} />
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-1">Intervalo (min)</label>
@@ -235,7 +235,7 @@ export function PuntoCeroPatronesCard({
         ) : (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="border rounded p-3">
+              <div className="border rounded-ctl p-3">
                 <p className="text-xs font-medium mb-2">% por calibre</p>
                 <div className="w-full" style={{ height: Math.max(180, patternByCalibre.length * 34) }}>
                   <Bar
@@ -254,7 +254,7 @@ export function PuntoCeroPatronesCard({
                 </div>
               </div>
 
-              <div className="border rounded p-3">
+              <div className="border rounded-ctl p-3">
                 <p className="text-xs font-medium mb-2">% por calidad</p>
                 <div className="w-full" style={{ height: Math.max(180, patternByQuality.length * 34) }}>
                   <Bar
@@ -274,7 +274,7 @@ export function PuntoCeroPatronesCard({
               </div>
             </div>
 
-            <div className="border rounded p-3">
+            <div className="border rounded-ctl p-3">
               <div className="flex items-center justify-between mb-2 gap-2">
                 <p className="text-xs font-medium">Patrón por intervalo ({patternIntervalMinutes} min)</p>
                 <p className="text-[10px] text-muted-foreground">Click fija · arrastra compara · X quita</p>
@@ -333,7 +333,7 @@ export function PuntoCeroPatronesCard({
                 </svg>
 
                 {pinnedPatternPoints.map((pin) => (
-                  <div key={pin.id} className="absolute z-20 w-56 rounded border bg-card/95 shadow-sm p-2 text-[11px] select-none" style={{ left: pin.x, top: pin.y }}>
+                  <div key={pin.id} className="absolute z-20 w-56 rounded-ctl border bg-card/95 shadow-sm p-2 text-[11px] select-none" style={{ left: pin.x, top: pin.y }}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-semibold">{pin.label}</p>
@@ -357,7 +357,7 @@ export function PuntoCeroPatronesCard({
               </div>
             </div>
 
-            <div className="border rounded p-3">
+            <div className="border rounded-ctl p-3">
               <p className="text-xs font-medium mb-1">Evolución % acumulado por causa (sobre total del turno)</p>
               <p className="text-[10px] text-muted-foreground mb-2">
                 Inicia en 0% y muestra cómo evoluciona cada causa en el turno. El último punto debe cuadrar con el % total final.

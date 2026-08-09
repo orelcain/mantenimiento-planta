@@ -23,13 +23,13 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
   const p0Dir = cmp.delta.p0 > 0 ? 'up' : cmp.delta.p0 < 0 ? 'down' : 'flat'
   const weightDir = cmp.delta.avgWeightPct > 0 ? 'up' : cmp.delta.avgWeightPct < 0 ? 'down' : 'flat'
   // Para P0, subir es malo (rojo), bajar es bueno (verde)
-  const p0Color = p0Dir === 'up' ? 'text-red-600 dark:text-red-400' : p0Dir === 'down' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
-  const weightColor = weightDir === 'up' ? 'text-blue-600 dark:text-blue-400' : weightDir === 'down' ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
+  const p0Color = p0Dir === 'up' ? 'text-red-600' : p0Dir === 'down' ? 'text-emerald-600' : 'text-muted-foreground'
+  const weightColor = weightDir === 'up' ? 'text-primary' : weightDir === 'down' ? 'text-cat-4-ink' : 'text-muted-foreground'
   const P0Icon = p0Dir === 'up' ? TrendingUp : p0Dir === 'down' ? TrendingDown : Minus
   const WeightIcon = weightDir === 'up' ? TrendingUp : weightDir === 'down' ? TrendingDown : Minus
 
   return (
-    <Card className="border-sky-500/40 bg-sky-500/10">
+    <Card className="border-primary/[0.25] bg-primary/[0.08]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-sky-500" />
@@ -42,7 +42,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* P0 */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Punto Cero</p>
             <div className="flex items-baseline gap-1.5">
               <p className="text-xl font-bold tabular-nums">{cmp.current.p0.toFixed(2)}%</p>
@@ -56,7 +56,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
             </p>
           </div>
           {/* Piezas */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Piezas</p>
             <p className="text-xl font-bold tabular-nums">{cmp.current.pieces.toLocaleString('es-CL')}</p>
             <p className="text-[10px] text-muted-foreground">
@@ -67,7 +67,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
             </p>
           </div>
           {/* Peso promedio */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Peso promedio</p>
             <div className="flex items-baseline gap-1.5">
               <p className="text-xl font-bold tabular-nums">{cmp.current.avgWeight.toFixed(0)} g</p>
@@ -81,14 +81,14 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
             </p>
           </div>
           {/* Calibre dominante */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Calibre dominante</p>
             <p className="text-xl font-bold tabular-nums">{cmp.current.calibre}</p>
             <p className="text-[10px] text-muted-foreground">
               {cmp.siblingLabel}: {cmp.sibling.calibre}
             </p>
             {cmp.current.calibre !== cmp.sibling.calibre && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Diferente</p>
+              <p className="text-[10px] text-amber-600 font-medium">Diferente</p>
             )}
           </div>
         </div>

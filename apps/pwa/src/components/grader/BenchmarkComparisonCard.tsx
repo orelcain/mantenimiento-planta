@@ -28,20 +28,20 @@ const VERDICT_CONFIG = {
   better: {
     label: 'Mejor que la temporada',
     Icon: TrendingDown,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-500/[0.08] border-emerald-200 dark:border-emerald-800',
   },
   similar: {
     label: 'Similar a la temporada',
     Icon: Minus,
-    color: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
+    color: 'text-amber-600',
+    bg: 'bg-amber-500/[0.08] border-amber-200 dark:border-amber-800',
   },
   worse: {
     label: 'Por encima del histórico',
     Icon: TrendingUp,
-    color: 'text-red-600 dark:text-red-400',
-    bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+    color: 'text-red-600',
+    bg: 'bg-red-500/[0.08] border-red-200 dark:border-red-800',
   },
 }
 
@@ -71,7 +71,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Veredicto global */}
-        <div className={cn('flex items-start gap-3 p-3 rounded-lg border', bg)}>
+        <div className={cn('flex items-start gap-3 p-3 rounded-card border', bg)}>
           <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', color)} />
           <div className="space-y-0.5">
             <p className={cn('font-semibold text-sm', color)}>{label}</p>
@@ -87,9 +87,9 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                 className={cn(
                   'font-mono font-medium',
                   overallDelta < 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-emerald-600'
                     : overallDelta > 0
-                      ? 'text-red-600 dark:text-red-400'
+                      ? 'text-red-600'
                       : 'text-muted-foreground',
                 )}
               >
@@ -125,9 +125,9 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                   className={cn(
                     'w-16 text-right font-mono',
                     delta < -2
-                      ? 'text-emerald-600 dark:text-emerald-400'
+                      ? 'text-emerald-600'
                       : delta > 2
-                        ? 'text-red-600 dark:text-red-400'
+                        ? 'text-red-600'
                         : 'text-muted-foreground',
                   )}
                 >

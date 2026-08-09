@@ -84,7 +84,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
 
   return (
     <div
-      className="rounded-md border border-border/80 bg-muted/80 backdrop-blur-sm p-3 space-y-2"
+      className="rounded-ctl border border-border/80 bg-muted/80 backdrop-blur-sm p-3 space-y-2"
       role="region"
       aria-label="Detalle de estado seleccionado"
     >
@@ -92,7 +92,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className="w-3 h-3 rounded-sm shrink-0 ring-1 ring-slate-900/50"
+            className="w-3 h-3 rounded-ctl shrink-0 ring-1 ring-slate-900/50"
             style={{ backgroundColor: softenAccentHex(state.color) }}
           />
           <StateIcon type={state.type} />
@@ -103,7 +103,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
                 {TYPE_LABEL[state.type] ?? state.type}
               </Badge>
               {state.isCurrent && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-800 dark:border-emerald-900 dark:bg-emerald-500/[0.08] dark:text-emerald-300">
                   En curso
                 </Badge>
               )}

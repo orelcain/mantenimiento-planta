@@ -4,9 +4,9 @@ import { ChevronDown, Fish, CalendarDays, BarChart3, Ruler, ClipboardList, Video
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
-  warning:     { border: 'border-red-500/40',    bg: 'bg-red-500/15',    badge: 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400',    dot: 'bg-red-400'    },
-  recommended: { border: 'border-amber-500/40',  bg: 'bg-amber-500/15',  badge: 'bg-amber-500/20 text-amber-700 dark:text-amber-400', dot: 'bg-amber-400'  },
-  info:        { border: 'border-sky-500/30',     bg: 'bg-sky-500/8',     badge: 'bg-sky-500/20 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400',    dot: 'bg-sky-400'    },
+  warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.08]',    badge: 'bg-red-500/[0.08] text-red-600',    dot: 'bg-red-400'    },
+  recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.08]',  badge: 'bg-amber-500/[0.08] text-amber-600', dot: 'bg-amber-400'  },
+  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.08]',     badge: 'bg-primary/[0.08] text-primary',    dot: 'bg-sky-400'    },
 } as const
 
 const CONFIDENCE_LABELS = {
@@ -37,7 +37,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
   const hasApply = typeof s.suggestedValue === 'number'
 
   return (
-    <div className={cn('rounded-lg border text-xs overflow-hidden', style.border, style.bg)}>
+    <div className={cn('rounded-card border text-xs overflow-hidden', style.border, style.bg)}>
       {/* Header (siempre visible) */}
       <button
         type="button"
@@ -52,7 +52,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
             <span className="text-muted-foreground">{s.currentValue} {s.unit}</span>
             <span className="text-muted-foreground">→</span>
             <span className="font-semibold text-foreground">{s.suggestedValue} {typeof s.suggestedValue === 'number' ? s.unit : ''}</span>
-            <span className={cn('ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium', style.badge)}>
+            <span className={cn('ml-auto text-[10px] px-1.5 py-0.5 rounded-ctl font-medium', style.badge)}>
               {(() => { const Icon = SOURCE_ICONS[s.source]; return Icon ? <Icon className="inline size-3" /> : null })()} {s.sourceLabel}
             </span>
           </div>
@@ -91,7 +91,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
           {s.formula && (
             <div>
               <p className="font-semibold text-muted-foreground mb-1"><FlaskConical className="inline size-3" /> Fórmula</p>
-              <pre className="font-mono text-[10px] text-foreground/80 whitespace-pre-wrap bg-black/20 rounded p-2">{s.formula}</pre>
+              <pre className="font-mono text-[10px] text-foreground/80 whitespace-pre-wrap bg-black/20 rounded-ctl p-2">{s.formula}</pre>
             </div>
           )}
 
@@ -115,7 +115,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.applyFn}
-                className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors"
               >
                 Aplicar
               </button>
@@ -124,7 +124,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.ignoreFn}
-                className="px-3 py-1.5 rounded border border-slate-600 hover:bg-slate-700 text-muted-foreground text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl border border-slate-600 hover:bg-slate-700 text-muted-foreground text-xs transition-colors"
               >
                 Ignorar
               </button>

@@ -125,7 +125,7 @@ interface KPICardProps {
 
 function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   return (
-    <div className="bg-muted rounded-lg px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors">
+    <div className="bg-muted rounded-card px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors">
       <div className="flex items-center justify-between gap-1 mb-1">
         <div className="text-[10px] font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
@@ -232,13 +232,13 @@ export function PlantKPIBoard({
           </CardTitle>
 
           {/* Selector Día / Semana / Mes */}
-          <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+          <div className="flex gap-0.5 bg-muted rounded-ctl p-0.5">
             {PERIODS.map(p => (
               <button
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
                 className={cn(
-                  'px-2 py-0.5 text-[11px] font-medium rounded transition-colors',
+                  'px-2 py-0.5 text-[11px] font-medium rounded-ctl transition-colors',
                   period === p.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -373,7 +373,7 @@ export function PlantKPIBoard({
                 barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <div
-                className="bg-muted rounded-lg px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors"
+                className="bg-muted rounded-card px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors"
                 title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
                 <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
@@ -394,7 +394,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 text-[10px] text-amber-800 dark:text-amber-300/90 bg-amber-500/[0.06] border border-amber-500/20 rounded-md px-2 py-1.5">
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-600/90 bg-amber-500/[0.06] border border-amber-500/[0.25] rounded-ctl px-2 py-1.5">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
@@ -422,7 +422,7 @@ export function PlantKPIBoard({
                 <div
                   key={m.machineid}
                   className={cn(
-                    'flex items-center gap-2 text-[11px] bg-muted rounded px-2 py-1 border border-border',
+                    'flex items-center gap-2 text-[11px] bg-muted rounded-ctl px-2 py-1 border border-border',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}

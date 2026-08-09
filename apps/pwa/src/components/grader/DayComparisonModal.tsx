@@ -150,13 +150,13 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* Shift headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-1">
           <div className="text-right">
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/40 bg-amber-500/20">
+            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/[0.25] bg-amber-500/[0.08]">
               <Sun className="h-3 w-3" /> {dia.shiftId}
             </Badge>
           </div>
           <div className="w-12" /> {/* spacer */}
           <div className="text-left">
-            <Badge variant="outline" className="gap-1 text-indigo-700 dark:text-indigo-400 border-indigo-500/40 bg-indigo-500/20 dark:bg-indigo-500/10">
+            <Badge variant="outline" className="gap-1 text-cat-3-ink border-cat-3-tint/[0.25] bg-cat-3-tint/[0.08]">
               <Moon className="h-3 w-3" /> {noche.shiftId}
             </Badge>
           </div>
@@ -412,7 +412,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
           const sign = noche.pointZeroPct > dia.pointZeroPct ? '+' : ''
           const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-emerald-600'
           return (
-            <div className="rounded-lg bg-muted/50 p-2.5 text-center text-[11px] text-muted-foreground">
+            <div className="rounded-card bg-muted/50 p-2.5 text-center text-[11px] text-muted-foreground">
               Noche vs Día: P0{' '}
               <span className={cn('font-bold', color)}>{sign}{deltaP0}%</span>
               {noche.pointZeroPct > dia.pointZeroPct

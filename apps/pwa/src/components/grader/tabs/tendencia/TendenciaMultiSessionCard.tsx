@@ -20,12 +20,12 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
   const m = multiSessionInsightsView
   const p0Better = m.deltaP0 < 0
   const p0Worse = m.deltaP0 > 0
-  const p0Color = p0Better ? 'text-emerald-600 dark:text-emerald-400' : p0Worse ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
-  const p0BgClass = p0Better ? 'bg-emerald-500/10 border-emerald-500/40' : p0Worse ? 'bg-red-500/10 border-red-500/40' : 'bg-muted/20'
+  const p0Color = p0Better ? 'text-emerald-600' : p0Worse ? 'text-red-600' : 'text-muted-foreground'
+  const p0BgClass = p0Better ? 'bg-emerald-500/[0.08] border-emerald-500/[0.25]' : p0Worse ? 'bg-red-500/[0.08] border-red-500/[0.25]' : 'bg-muted/20'
   const percentileLabel = m.percentileP0 >= 75 ? 'peor 25%' : m.percentileP0 >= 50 ? 'peor 50%' : m.percentileP0 >= 25 ? 'mejor 50%' : 'mejor 25%'
 
   return (
-    <Card className="border-violet-500/40 bg-violet-500/5">
+    <Card className="border-cat-6-tint/[0.25] bg-cat-6-tint/[0.08]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Brain className="h-4 w-4 text-violet-500" />
@@ -38,7 +38,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
       <CardContent className="space-y-3">
         {/* Resumen vs promedio histórico */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div className={cn('p-2.5 rounded-md border', p0BgClass)}>
+          <div className={cn('p-2.5 rounded-ctl border', p0BgClass)}>
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">P0 vs promedio</p>
             <p className={cn('text-lg font-bold tabular-nums', p0Color)}>
               {m.deltaP0 >= 0 ? '+' : ''}{m.deltaP0.toFixed(2)} pp
@@ -47,14 +47,14 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
               hist. {m.avgP0.toFixed(2)}% · posición {percentileLabel}
             </p>
           </div>
-          <div className="p-2.5 rounded-md border bg-muted/20">
+          <div className="p-2.5 rounded-ctl border bg-muted/20">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Piezas vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaPieces >= 0 ? '+' : ''}{m.deltaPieces.toLocaleString('es-CL')}
             </p>
             <p className="text-[10px] text-muted-foreground">hist. {m.avgPieces.toLocaleString('es-CL')}</p>
           </div>
-          <div className="p-2.5 rounded-md border bg-muted/20">
+          <div className="p-2.5 rounded-ctl border bg-muted/20">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Peso vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaWeight >= 0 ? '+' : ''}{m.deltaWeight.toFixed(0)} g
@@ -74,9 +74,9 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
                   <div
                     key={re.error}
                     className={cn(
-                      'flex items-center justify-between gap-2 p-1.5 rounded border text-xs',
+                      'flex items-center justify-between gap-2 p-1.5 rounded-ctl border text-xs',
                       isInCurrent
-                        ? 'border-amber-500/50 bg-amber-500/10'
+                        ? 'border-amber-500/[0.25] bg-amber-500/[0.08]'
                         : 'border-border bg-muted/10',
                     )}
                   >
@@ -92,7 +92,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
               })}
             </div>
             {m.recurrentInCurrent.length > 0 && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5">
+              <p className="text-[10px] text-amber-600 mt-1.5">
                 ⚠ {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
               </p>
             )}

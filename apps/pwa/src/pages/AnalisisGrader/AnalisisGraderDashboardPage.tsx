@@ -1197,7 +1197,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           </Button>
         </div>
         {saveError && (
-          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-3 py-2 flex items-start gap-2">
+          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-ctl px-3 py-2 flex items-start gap-2">
             <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <span>Error al guardar: {saveError}</span>
           </div>
@@ -1206,11 +1206,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
       {/* Data notes */}
       {analytics.notes.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-900/10">
+        <Card className="border-amber-300 bg-amber-500/[0.08]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <div className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
+              <div className="text-xs text-amber-600 space-y-0.5">
                 {analytics.notes.map((n, i) => (
                   <p key={i}>{n}</p>
                 ))}

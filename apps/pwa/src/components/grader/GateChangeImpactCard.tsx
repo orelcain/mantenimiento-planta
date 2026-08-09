@@ -165,9 +165,9 @@ export function GateChangeImpactCard({
                   {/* Delta badge */}
                   {!inProgress && delta !== null && (
                     <span className={cn(
-                      'flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
-                      improved  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                        : worsened ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400'
+                      'flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-ctl font-semibold shrink-0',
+                      improved  ? 'bg-emerald-500/[0.08] text-emerald-600'
+                        : worsened ? 'bg-red-500/[0.08] text-red-600'
                           : 'bg-muted text-muted-foreground',
                     )}>
                       {improved  ? <TrendingDown className="w-2.5 h-2.5" />

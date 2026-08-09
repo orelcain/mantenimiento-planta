@@ -28,10 +28,10 @@ export const SPECIES_ALLOMETRY = {
 /** Badge de estado de calibración para parámetros físicos */
 export function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
-    return <Badge className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 whitespace-nowrap">✓ Verificado</Badge>
+    return <Badge className="text-[10px] bg-green-500/[0.08] text-green-600 whitespace-nowrap">✓ Verificado</Badge>
   if (status === 'estimated')
-    return <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">⚠ Estimado</Badge>
-  return <Badge className="text-[10px] bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 whitespace-nowrap">? Falta</Badge>
+    return <Badge className="text-[10px] bg-amber-500/[0.08] text-amber-600 whitespace-nowrap">⚠ Estimado</Badge>
+  return <Badge className="text-[10px] bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap">? Falta</Badge>
 }
 
 /**
@@ -85,7 +85,7 @@ export function BeltVisualizer({
   const ticks = Array.from({ length: Math.floor(maxCm / 50) + 1 }, (_, i) => i * 50)
 
   return (
-    <div className="mt-3 p-3 rounded-lg bg-slate-900/60 border border-slate-700/50">
+    <div className="mt-3 p-3 rounded-card bg-muted-foreground/[0.10] border border-muted-foreground/[0.10]">
       <div className="flex items-center justify-between mb-2 text-[10px] text-muted-foreground">
         <span className="font-medium text-sky-300">Diagrama de distancias (escala real)</span>
         <span>cinta <span className="font-mono text-foreground">{speedMps.toFixed(2)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{secondsBetweenFish.toFixed(2)} s</span></span>
@@ -242,7 +242,7 @@ export interface BatchStats {
 export function BatchStatsCard({ stats }: { stats: BatchStats | null }) {
   if (!stats) return null
   return (
-    <div className="mb-4 p-3 rounded-lg bg-muted/50 border grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
+    <div className="mb-4 p-3 rounded-card bg-muted/50 border grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
       <div className="text-center">
         <p className="text-muted-foreground">Piezas</p>
         <p className="font-mono font-medium">{stats.n.toLocaleString('es-CL')}</p>
@@ -322,7 +322,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
           className={cn('mt-1 font-mono', auto && hasData && 'opacity-60 pr-14')}
         />
         {auto && hasData && (
-          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0 pointer-events-none">
+          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-500/[0.08] text-emerald-600 px-1.5 py-0 pointer-events-none">
             Auto
           </Badge>
         )}
@@ -334,7 +334,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
             <button
               type="button"
               onClick={() => onChange(suggested)}
-              className="underline text-sky-700 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+              className="underline text-primary hover:text-sky-800 dark:hover:text-sky-300"
             >
               Aplicar
             </button>

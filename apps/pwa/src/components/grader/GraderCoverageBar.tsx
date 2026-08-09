@@ -35,9 +35,9 @@ import type { TimelineBucket } from '@/services/grader/types'
 type Tramo = 'produccion' | 'sin-produccion' | 'sin-datos'
 
 const ESTILO: Record<Tramo, { clase: string; label: string }> = {
-  'produccion':     { clase: 'bg-emerald-500/70', label: 'Con piezas' },
-  'sin-produccion': { clase: 'bg-slate-500/45',   label: 'Sin piezas (línea parada)' },
-  'sin-datos':      { clase: 'bg-amber-500/25 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
+  'produccion':     { clase: 'bg-emerald-500/[0.08]', label: 'Con piezas' },
+  'sin-produccion': { clase: 'bg-muted-foreground/[0.10]',   label: 'Sin piezas (línea parada)' },
+  'sin-datos':      { clase: 'bg-amber-500/[0.08] [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
 }
 
 /**
@@ -158,7 +158,7 @@ export function GraderCoverageBar({
   const faltaExcel = (faltaExcelMin ?? 0) > 0
 
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 space-y-1.5">
+    <div className="rounded-card border border-border bg-card px-3 py-2 space-y-1.5">
       <div className="flex items-center gap-2 flex-wrap text-[11px]">
         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
         <span className="font-medium">Cobertura del Excel</span>
@@ -179,7 +179,7 @@ export function GraderCoverageBar({
           PIEZAS) quedaban pegadas, del mismo alto, y se leían como una sola
           cosa en dos partes. Las horas dejan claro que acá el eje es tiempo. */}
       <div className="relative">
-        <div className="flex h-2.5 rounded-sm overflow-hidden bg-muted" role="img"
+        <div className="flex h-2.5 rounded-ctl overflow-hidden bg-muted" role="img"
           aria-label={`El Excel cubre el ${cubiertoPct.toFixed(0)}% de lo producido`}>
           {tramos.map((t) => (
             <div
@@ -221,13 +221,13 @@ export function GraderCoverageBar({
       </div>
 
       {faltaExcel ? (
-        <p className="text-[10px] text-amber-600 dark:text-amber-400/90">
+        <p className="text-[10px] text-amber-600/90">
           Las Baader produjeron <b>{fmtDurationMin(faltaExcelMin ?? sinDatosMin)}</b> que el Excel no cubre.
           Esas piezas todavía no están contadas.
         </p>
       ) : (
         <p
-          className="text-[10px] text-emerald-600 dark:text-emerald-400/90 cursor-help"
+          className="text-[10px] text-emerald-600/90 cursor-help"
           title={`El pescado va Baader → Grader, así que entre ambas fuentes solo hay minutos de tránsito (se toleran ${TRANSITO_MIN}). Que el Excel arranque después no es dato faltante: es cuando llegó la primera pieza.`}
         >
           El Excel cubre toda la producción del turno.

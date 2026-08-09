@@ -220,7 +220,7 @@ export function GateChangeModal({
                     key={n}
                     onClick={() => selectGate(n)}
                     className={cn(
-                      'relative rounded-md py-2 text-xs font-semibold transition-colors border',
+                      'relative rounded-ctl py-2 text-xs font-semibold transition-colors border',
                       isSelected
                         ? 'bg-primary text-primary-foreground border-primary'
                         : isActive
@@ -244,7 +244,7 @@ export function GateChangeModal({
           {selectedGate && selectedGateData && (
             <div className="space-y-3 pt-1 border-t border-border/40">
               {/* Preview actual → nuevo */}
-              <div className="flex items-center gap-2 text-xs bg-muted rounded-md px-3 py-2">
+              <div className="flex items-center gap-2 text-xs bg-muted rounded-ctl px-3 py-2">
                 <span className="text-muted-foreground">G{selectedGate} actual:</span>
                 <span className="font-medium">{selectedGateData.assignedCalibre}</span>
                 <span className={cn('font-medium', qualityColorTextClass(selectedGateData.assignedQuality))}>
@@ -270,7 +270,7 @@ export function GateChangeModal({
                       key={c}
                       onClick={() => setNewCalibre(c)}
                       className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                        'text-xs px-2.5 py-1 rounded-ctl border transition-colors',
                         newCalibre === c
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'border-border bg-muted hover:bg-accent text-foreground',
@@ -291,7 +291,7 @@ export function GateChangeModal({
                       key={q}
                       onClick={() => setNewQuality(q)}
                       className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                        'text-xs px-2.5 py-1 rounded-ctl border transition-colors',
                         newQuality === q
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'border-border bg-muted hover:bg-accent',
@@ -316,7 +316,7 @@ export function GateChangeModal({
                         key={c}
                         onClick={() => setNewConservation(newConservation === c ? '' : c)}
                         className={cn(
-                          'text-[11px] px-2 py-0.5 rounded-md border transition-colors',
+                          'text-[11px] px-2 py-0.5 rounded-ctl border transition-colors',
                           newConservation === c
                             ? 'bg-primary text-primary-foreground border-primary'
                             : 'border-border bg-muted hover:bg-accent text-muted-foreground',
@@ -335,7 +335,7 @@ export function GateChangeModal({
                         key={p}
                         onClick={() => setNewProduct(newProduct === p ? '' : p)}
                         className={cn(
-                          'text-[11px] px-2 py-0.5 rounded-md border transition-colors',
+                          'text-[11px] px-2 py-0.5 rounded-ctl border transition-colors',
                           newProduct === p
                             ? 'bg-primary text-primary-foreground border-primary'
                             : 'border-border bg-muted hover:bg-accent text-muted-foreground',
@@ -354,8 +354,8 @@ export function GateChangeModal({
                   <button
                     onClick={() => setNewActive(v => !v)}
                     className={cn(
-                      'text-xs px-2.5 py-1 rounded-md border transition-colors',
-                      newActive ? 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/20' : 'border-border text-muted-foreground hover:bg-muted',
+                      'text-xs px-2.5 py-1 rounded-ctl border transition-colors',
+                      newActive ? 'bg-green-500/[0.08] text-green-600 border-green-500/[0.25]' : 'border-border text-muted-foreground hover:bg-muted',
                     )}
                   >
                     {newActive ? '✓ Activar gate' : 'Mantener inactivo'}

@@ -27,7 +27,7 @@ function Kpi({ label, value, sub, icon, valueColor }: {
   label: string; value: string; sub: string; icon: React.ReactNode; valueColor?: string
 }) {
   return (
-    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
+    <div className="rounded-card border border-border bg-muted px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">{icon}{label}</div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
@@ -79,7 +79,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
         ) : (
           <>
             {/* Frase-titular: cuenta el ciclo de mejora, no el conteo */}
-            <div className="rounded-lg border border-sky-500/30 bg-sky-500/15 px-3 py-2 text-xs text-foreground/90">
+            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.08] px-3 py-2 text-xs text-foreground/90">
               {maintenanceWorkHeadline(work)}
             </div>
 

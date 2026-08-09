@@ -60,12 +60,12 @@ export function TendenciaWeightCard({
                   : 'Modo detallado: incluye media móvil y bandas ±1σ'}
               </p>
             </div>
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5 shrink-0">
+            <div className="inline-flex rounded-ctl border bg-muted/30 p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => onSetWeightChartMode('simple')}
                 className={cn(
-                  'px-2.5 py-1 text-[11px] rounded transition-colors',
+                  'px-2.5 py-1 text-[11px] rounded-ctl transition-colors',
                   weightChartMode === 'simple'
                     ? 'bg-background shadow-sm font-medium'
                     : 'text-muted-foreground hover:text-foreground',
@@ -77,7 +77,7 @@ export function TendenciaWeightCard({
                 type="button"
                 onClick={() => onSetWeightChartMode('detailed')}
                 className={cn(
-                  'px-2.5 py-1 text-[11px] rounded transition-colors',
+                  'px-2.5 py-1 text-[11px] rounded-ctl transition-colors',
                   weightChartMode === 'detailed'
                     ? 'bg-background shadow-sm font-medium'
                     : 'text-muted-foreground hover:text-foreground',
@@ -198,9 +198,9 @@ export function TendenciaWeightCard({
       {trendForecastView && (() => {
         const projSeverity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
         const projBadgeClass =
-          projSeverity === 'critical' ? 'border-red-500/60 text-red-600 dark:text-red-400 bg-red-500/10' :
-          projSeverity === 'warn' ? 'border-amber-500/60 text-amber-600 dark:text-amber-400 bg-amber-500/10' :
-          'border-emerald-500/60 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+          projSeverity === 'critical' ? 'border-red-500/[0.25] text-red-600 bg-red-500/[0.08]' :
+          projSeverity === 'warn' ? 'border-amber-500/[0.25] text-amber-600 bg-amber-500/[0.08]' :
+          'border-emerald-500/[0.25] text-emerald-600 bg-emerald-500/[0.08]'
         return (
           <Card>
             <CardHeader>
@@ -212,7 +212,7 @@ export function TendenciaWeightCard({
                   </p>
                 </div>
                 <div className={cn(
-                  'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-lg border-2 shrink-0',
+                  'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-card border-2 shrink-0',
                   projBadgeClass,
                 )}>
                   <p className="text-[9px] uppercase tracking-wide opacity-80">P0 al cierre</p>

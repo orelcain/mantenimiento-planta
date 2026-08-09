@@ -43,9 +43,9 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
 
           // Responsabilidad por cinta
           const responsibility: Record<GraderBeltId, { icon: string; role: string; accent: string }> = {
-            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-blue-500/15 border-blue-500/30' },
-            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/15 border-amber-500/30' },
-            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/20 border-amber-500/40' },
+            zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.08] border-primary/[0.25]' },
+            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.08] border-amber-500/[0.25]' },
+            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.08] border-amber-500/[0.25]' },
             main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-primary/40' },
           }
           const resp = responsibility[beltId]
@@ -125,9 +125,9 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                       variant="outline"
                       className={cn(
                         'text-[10px]',
-                        ratio >= 2 ? 'border-green-500/40 text-green-700 dark:text-green-400' :
-                        ratio >= 1.2 ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' :
-                        'border-red-500/40 text-red-700 dark:text-red-400',
+                        ratio >= 2 ? 'border-green-500/[0.25] text-green-600' :
+                        ratio >= 1.2 ? 'border-amber-500/[0.25] text-amber-600' :
+                        'border-red-500/[0.25] text-red-600',
                       )}
                     >
                       ×{ratio.toFixed(2)} vs {getBeltLabel(prevBeltId!)}

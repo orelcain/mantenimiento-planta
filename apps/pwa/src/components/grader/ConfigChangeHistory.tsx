@@ -76,7 +76,7 @@ interface RowProps {
 function VerdictBadge({ v }: { v: SegmentVerdict }) {
   if (v.status === 'insufficient-data') {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted rounded px-2 py-1 mt-1">
+      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted rounded-ctl px-2 py-1 mt-1">
         <Hourglass className="w-3 h-3" />
         Esperando más datos
         {v.afterPieces > 0 && (
@@ -92,9 +92,9 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   // arrows unicode), pero el COLOR de texto y el LABEL vienen de helpers
   // compartidos en graderP0Segmentation.ts (consistencia entre componentes).
   const visualByStatus = {
-    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
-    worsened: { Icon: TrendingUp,   bg: 'bg-rose-500/20',    border: 'border-rose-500/30'    },
-    neutral:  { Icon: Minus,        bg: 'bg-zinc-500/20',    border: 'border-zinc-500/30'    },
+    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/[0.08]', border: 'border-emerald-500/[0.25]' },
+    worsened: { Icon: TrendingUp,   bg: 'bg-cat-5-tint/[0.08]',    border: 'border-cat-5-tint/[0.25]'    },
+    neutral:  { Icon: Minus,        bg: 'bg-muted-foreground/[0.10]',    border: 'border-muted-foreground/[0.10]'    },
   }[v.status]
 
   const color = verdictColor(v.status)
@@ -102,7 +102,7 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   const sign = v.delta > 0 ? '+' : ''
   return (
     <div
-      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
+      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded-ctl px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
       title={`Antes ${v.beforePct.toFixed(2)}% → Después ${v.afterPct.toFixed(2)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
     >
       <visualByStatus.Icon className={cn('w-3 h-3', color)} />
@@ -180,7 +180,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
           )}
           {undetectedChanges > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium"
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/[0.08] text-amber-400 border border-amber-500/[0.25] font-medium"
               title={`El sistema detectó ~${undetectedChanges} transiciones de configuración durante el turno que no fueron registradas en tiempo real. Si recordás los cambios reales (qué gate, qué hora), registralos manualmente con el botón "Cambiar gate" para que el análisis segmentado los reconozca.`}
             >
               <AlertTriangle className="w-2.5 h-2.5" />

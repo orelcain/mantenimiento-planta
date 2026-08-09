@@ -43,9 +43,9 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * ActionPlanPanel.
  */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-800 dark:text-emerald-400', bar: 'bg-emerald-500/70', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-800 dark:text-amber-400', bar: 'bg-amber-500/70', label: 'Parcial' }
-  : { text: 'text-rose-800 dark:text-rose-400', bar: 'bg-rose-500/70', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.08]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.08]', label: 'Parcial' }
+  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.08]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null
@@ -57,7 +57,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
   const serie = imputacion.porTurno
 
   return (
-    <Card className="border-sky-500/25 bg-sky-500/5">
+    <Card className="border-primary/[0.25] bg-primary/[0.08]">
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
           <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />
@@ -65,7 +65,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
             Imputación del período
           </p>
           <span
-            className={cn('text-[9px] px-1.5 rounded border border-current/30 ml-auto', th.text)}
+            className={cn('text-[9px] px-1.5 rounded-ctl border border-current/30 ml-auto', th.text)}
             title="Del tiempo detenido del período, cuánto llegó con una causal anotada en Shoplogix. No mide a Mantención: mide si los turnos quedaron documentados."
           >
             {th.label}
@@ -102,8 +102,8 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                 {tend && (
                   <span className={cn(
                     'tabular-nums',
-                    tend.dir === 'sube' ? 'text-emerald-800 dark:text-emerald-400'
-                    : tend.dir === 'baja' ? 'text-rose-800 dark:text-rose-400' : '',
+                    tend.dir === 'sube' ? 'text-emerald-600'
+                    : tend.dir === 'baja' ? 'text-cat-5-ink' : '',
                   )}>
                     {tend.dir === 'sube' ? '▲' : tend.dir === 'baja' ? '▼' : '='}{' '}
                     {tend.dir === 'estable'
@@ -136,7 +136,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
             {imputacion.topCategorias.slice(0, 5).map((c) => (
               <span
                 key={c.label}
-                className="text-[9px] px-1.5 py-px rounded bg-muted border border-border text-muted-foreground tabular-nums"
+                className="text-[9px] px-1.5 py-px rounded-ctl bg-muted border border-border text-muted-foreground tabular-nums"
               >
                 {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
               </span>

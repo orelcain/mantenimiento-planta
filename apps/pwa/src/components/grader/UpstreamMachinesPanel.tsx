@@ -271,7 +271,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
           >
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
-              className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-slate-900/60"
+              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-slate-900/60"
               style={{ backgroundColor: softenAccentHex(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
@@ -615,7 +615,7 @@ function StateTimeline({
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
 
   if (totalMs <= 0 || shift.states.length === 0) {
-    return <div className="h-5 rounded-md bg-muted/60" />
+    return <div className="h-5 rounded-ctl bg-muted/60" />
   }
 
   return (
@@ -624,7 +624,7 @@ function StateTimeline({
           con el chart Grader y los demás Gantts del mismo turno (Fase 2 del
           Synchronized Timeline). Mantiene el rendering visual del HTML viejo
           pero con interactividad nativa de ECharts. */}
-      <div className="rounded-md overflow-hidden bg-muted/60 border border-border/70 shadow-inner">
+      <div className="rounded-ctl overflow-hidden bg-muted/60 border border-border/70 shadow-inner">
         <StateTimelineEC
           shift={shift}
           windowStart={windowStart}
@@ -862,7 +862,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
   const accent = MACHINE_ACCENT[machineIndex % MACHINE_ACCENT.length]!
 
   return (
-    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-md border-l-4', accent.bg, accent.border)}>
+    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-ctl border-l-4', accent.bg, accent.border)}>
       {/* Row header — clickeable para expandir */}
       <button
         onClick={onToggle}
@@ -1037,7 +1037,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           {analisis.eventos.length > 0 && (
             <div className="mt-2">
               <div className="text-muted-foreground mb-1">Análisis del turno ({analisis.eventos.length} eventos)</div>
-              <div className="max-h-64 overflow-y-auto rounded border border-border/60">
+              <div className="max-h-64 overflow-y-auto rounded-ctl border border-border/60">
                 <table className="w-full text-[10px] tabular-nums">
                   <thead className="text-muted-foreground sticky top-0 bg-muted/95 backdrop-blur">
                     <tr>
@@ -1061,7 +1061,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
                           <td className="px-2 py-1 text-right text-foreground whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
                           <td className="px-2 py-1">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
-                              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                              <span className="w-2 h-2 rounded-ctl shrink-0" style={{ background: color }} />
                               <span className="text-foreground truncate">{motivo}</span>
                             </span>
                           </td>
@@ -1336,7 +1336,7 @@ export function UpstreamMachinesPanel({
                     `Click para acotarlo a las horas con producción.`)
               }
               className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded border shrink-0 transition-colors',
+                'text-[10px] px-1.5 py-0.5 rounded-ctl border shrink-0 transition-colors',
                 framedOnProduction
                   ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -1430,7 +1430,7 @@ export function UpstreamMachinesPanel({
                     filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
                   }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))
                 }}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded border border-border hover:border-foreground/30"
+                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-ctl border border-border hover:border-foreground/30"
                 title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
               >
                 <Download className="w-3 h-3" />
@@ -1484,7 +1484,7 @@ export function UpstreamMachinesPanel({
                     onClick={() => setShowRateGap((v) => !v)}
                     title="Apila sobre cada barra lo que faltó para llegar al objetivo de ese tramo."
                     className={cn(
-                      'text-[10px] px-1.5 py-0.5 rounded border transition-colors',
+                      'text-[10px] px-1.5 py-0.5 rounded-ctl border transition-colors',
                       showRateGap
                         ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.08] text-cat-5-ink'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',

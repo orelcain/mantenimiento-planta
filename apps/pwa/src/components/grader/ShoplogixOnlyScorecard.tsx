@@ -17,19 +17,19 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 const VERDICT_STYLE = {
   ok: {
     border: 'border-emerald-500',
-    bg: 'bg-emerald-500/15',
+    bg: 'bg-emerald-500/[0.08]',
     numColor: 'text-emerald-400',
     label: 'Línea en buen rendimiento',
   },
   warn: {
     border: 'border-amber-500',
-    bg: 'bg-amber-500/15',
+    bg: 'bg-amber-500/[0.08]',
     numColor: 'text-amber-400',
     label: 'Línea con oportunidades de mejora',
   },
   critical: {
     border: 'border-red-500',
-    bg: 'bg-red-500/15',
+    bg: 'bg-red-500/[0.08]',
     numColor: 'text-red-400',
     label: 'Línea con bajo rendimiento',
   },
@@ -43,9 +43,9 @@ const VERDICT_STYLE = {
  *  Umbrales calcados de los ya usados en el resto del módulo: uptime 70/40
  *  (`uptimeTextColor` acá mismo), ritmo 85/50 (`UpstreamMachinesPanel.tsx`). */
 const MACHINE_VERDICT_STYLE = {
-  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', label: 'Óptimo' },
-  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/40',   bg: 'bg-amber-500/10',   label: 'Regular' },
-  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/40',      bg: 'bg-red-500/10',     label: 'Crítico' },
+  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/[0.25]', bg: 'bg-emerald-500/[0.08]', label: 'Óptimo' },
+  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/[0.25]',   bg: 'bg-amber-500/[0.08]',   label: 'Regular' },
+  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/[0.25]',      bg: 'bg-red-500/[0.08]',     label: 'Crítico' },
 } as const
 
 function machineVerdict(uptimePct: number, ratio: number): keyof typeof MACHINE_VERDICT_STYLE {
@@ -146,7 +146,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           {shiftWindow?.status === 'closed' && (
             <Badge variant="outline" className="text-xs px-2 py-0">CERRADO</Badge>
           )}
-          <Badge variant="outline" className="text-xs px-2 py-0 text-sky-400 border-sky-500/40">
+          <Badge variant="outline" className="text-xs px-2 py-0 text-sky-400 border-primary/[0.25]">
             Solo Shoplogix
           </Badge>
         </div>
@@ -176,9 +176,9 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 reporta el sensor: son dos números distintos. */}
             {plannedTargetPieces != null && plannedTargetPieces > 0 && (() => {
               const pct = (totalCycles / plannedTargetPieces) * 100
-              const cls = pct >= 95 ? 'text-emerald-600 dark:text-emerald-400'
-                : pct >= 75 ? 'text-amber-600 dark:text-amber-400'
-                : 'text-rose-600 dark:text-rose-400'
+              const cls = pct >= 95 ? 'text-emerald-600'
+                : pct >= 75 ? 'text-amber-600'
+                : 'text-cat-5-ink'
               return (
                 <div className="text-[11px] mt-1 flex items-center gap-1 flex-wrap">
                   <span className={cn('font-semibold tabular-nums', cls)}>{pct.toFixed(0)}%</span>
@@ -297,7 +297,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                   ? `${machineShortLabel(m.machineType)} ${idx + 1}`
                   : machineShortLabel(m.machineType)
                 return (
-                  <div key={m.machineid} className={cn('rounded-md border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
+                  <div key={m.machineid} className={cn('rounded-ctl border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
                     <div className="flex items-center justify-between gap-1 mb-1">
                       <div className="text-[11px] text-muted-foreground truncate" title={shortMachineName(m.machineName)}>
                         <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>

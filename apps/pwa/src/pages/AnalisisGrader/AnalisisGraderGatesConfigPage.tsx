@@ -86,14 +86,14 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   if (status === 'idle') return null
   if (status === 'saving') {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 dark:text-amber-400 font-medium">
+      <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 font-medium">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
         Guardando…
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 dark:text-emerald-400 font-medium">
+    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
       Guardado
     </span>
@@ -559,7 +559,7 @@ export function AnalisisGraderGatesConfigPage({
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
-                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                  ? 'border-emerald-500 text-emerald-600'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/40',
               )}
             >
@@ -586,7 +586,7 @@ export function AnalisisGraderGatesConfigPage({
             {shiftDocId && (
               <div className="flex items-center gap-2">
                 {hasShiftThresholdsOverride ? (
-                  <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">Override de este turno</Badge>
+                  <Badge className="text-[10px] bg-primary/[0.08] text-blue-400 border-primary/[0.25]">Override de este turno</Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] text-muted-foreground">Global de planta</Badge>
                 )}
@@ -695,7 +695,7 @@ export function AnalisisGraderGatesConfigPage({
                     setSavingShiftThresholds(false)
                   }
                 }}
-                className="text-xs h-7 border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
+                className="text-xs h-7 border-primary/[0.25] text-primary hover:bg-primary/[0.08]"
               >
                 {savingShiftThresholds && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
                 {hasShiftThresholdsOverride ? 'Actualizar override de este turno' : 'Guardar solo para este turno'}
@@ -765,7 +765,7 @@ export function AnalisisGraderGatesConfigPage({
                     />
                   </div>
                   {shift.quota && shift.quota.value > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
                       Cuota: {shift.quota.value.toLocaleString('es-CL')} {shift.quota.unit === 'kg' ? 'kg' : 'pz'}
                     </span>
                   )}
@@ -773,9 +773,9 @@ export function AnalisisGraderGatesConfigPage({
               ))}
             </div>
             {shiftGapMinutes > 0 && (
-              <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/15 border border-amber-500/30 px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.08] border border-amber-500/[0.25] px-3 py-2">
                 <span className="text-amber-400 mt-px">⚠</span>
-                <p className="text-xs text-amber-800 dark:text-amber-300">
+                <p className="text-xs text-amber-600">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
                   Revisa que los horarios cubran el período operativo completo.
                 </p>
@@ -819,7 +819,7 @@ export function AnalisisGraderGatesConfigPage({
         <CardContent>
           {/* Templates panel */}
           {showTemplates && (
-            <div className="mb-4 p-3 rounded-lg bg-muted/50 space-y-2">
+            <div className="mb-4 p-3 rounded-card bg-muted/50 space-y-2">
               <p className="text-sm font-medium">Plantillas guardadas</p>
               {templates.length === 0 && (
                 <p className="text-xs text-muted-foreground">No hay plantillas guardadas.</p>
@@ -828,14 +828,14 @@ export function AnalisisGraderGatesConfigPage({
                 <div
                   key={t.id}
                   className={cn(
-                    'flex items-center justify-between p-2 rounded bg-background',
+                    'flex items-center justify-between p-2 rounded-ctl bg-background',
                     activeTemplateName === t.name && 'ring-2 ring-primary/50',
                   )}
                 >
                   <div>
                     <span className="text-sm font-medium">{t.name}</span>
                     {activeTemplateName === t.name && (
-                      <Badge className="ml-2 text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      <Badge className="ml-2 text-[10px] bg-green-500/[0.08] text-green-600">
                         Activa
                       </Badge>
                     )}
@@ -985,12 +985,12 @@ export function AnalisisGraderGatesConfigPage({
             {!tabbed && <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />}
             Rangos de Peso por Calibre
             {hasShiftOverride && (
-              <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+              <Badge className="text-[10px] bg-primary/[0.08] text-primary">
                 Override de este turno
               </Badge>
             )}
             {!hasShiftOverride && isCustomRanges && (
-              <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+              <Badge className="text-[10px] bg-amber-500/[0.08] text-amber-600">
                 Global personalizado
               </Badge>
             )}
@@ -1045,7 +1045,7 @@ export function AnalisisGraderGatesConfigPage({
                 <div className="space-y-1.5">
                   {shiftRangesDraft.map((r, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">
-                      <span className="text-xs font-mono px-2 py-1.5 bg-muted rounded border border-border truncate">{r.calibre}</span>
+                      <span className="text-xs font-mono px-2 py-1.5 bg-muted rounded-ctl border border-border truncate">{r.calibre}</span>
                       <Input
                         type="number"
                         value={r.minGrams}

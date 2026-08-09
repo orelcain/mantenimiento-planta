@@ -74,7 +74,7 @@ function KpiCard({
   valueColor?: string
 }) {
   return (
-    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
+    <div className="rounded-card border border-border bg-muted px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
         {icon}
         {label}
@@ -173,9 +173,9 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
       <div key={e.id} className="flex items-center gap-2">
         <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
         <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
-        <div className="flex-1 h-2.5 bg-muted rounded-sm overflow-hidden">
+        <div className="flex-1 h-2.5 bg-muted rounded-ctl overflow-hidden">
           <div
-            className="h-full rounded-sm transition-all duration-300"
+            className="h-full rounded-ctl transition-all duration-300"
             style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
           />
         </div>
@@ -211,7 +211,7 @@ function PauseAnnotationPanel({
 
   if (pending.length === 0) {
     return (
-      <p className="mt-2 text-[11px] text-green-600 dark:text-green-400">
+      <p className="mt-2 text-[11px] text-green-600">
         ✓ Todas las pausas del período están clasificadas.
       </p>
     )
@@ -247,7 +247,7 @@ function PauseAnnotationPanel({
             <span className="w-10 shrink-0 text-muted-foreground/60 truncate">{item.shiftId.replace('Turno ', '')}</span>
             <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{durLabel}</span>
             <select
-              className="flex-1 h-6 rounded border border-border bg-background text-[11px] px-1"
+              className="flex-1 h-6 rounded-ctl border border-border bg-background text-[11px] px-1"
               value={selections[key] ?? ''}
               onChange={e => setSelections(s => ({ ...s, [key]: e.target.value }))}
               disabled={isSaving}
@@ -260,7 +260,7 @@ function PauseAnnotationPanel({
             <button
               onClick={() => void handleSave(item)}
               disabled={!selections[key] || isSaving}
-              className="shrink-0 px-2 h-6 rounded text-[11px] bg-amber-500/80 text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
+              className="shrink-0 px-2 h-6 rounded-ctl text-[11px] bg-amber-500/[0.08] text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
             >
               {isSaving ? '…' : 'OK'}
             </button>
@@ -573,9 +573,9 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                   <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
                     {d.label}
                   </span>
-                  <div className="flex-1 h-3 bg-muted rounded-sm overflow-hidden">
+                  <div className="flex-1 h-3 bg-muted rounded-ctl overflow-hidden">
                     <div
-                      className="h-full rounded-sm bg-amber-500/60 transition-all duration-300"
+                      className="h-full rounded-ctl bg-amber-500/[0.08] transition-all duration-300"
                       style={{ width: `${d.pct}%` }}
                       title={fmtSec(d.sec)}
                     />
@@ -620,7 +620,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                 </p>
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-500/50 transition-all duration-150"
+                    className="h-full bg-amber-500/[0.08] transition-all duration-150"
                     style={{ width: `${(loadProgress.current / loadProgress.total) * 100}%` }}
                   />
                 </div>
@@ -637,7 +637,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
               <div className="mt-3 pt-2 border-t border-border/20">
                 <button
                   onClick={() => setAnnotationOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors"
+                  className="flex items-center gap-1.5 text-[11px] text-amber-600 hover:text-amber-500 transition-colors"
                 >
                   {annotationOpen
                     ? <ChevronUp className="w-3 h-3" />

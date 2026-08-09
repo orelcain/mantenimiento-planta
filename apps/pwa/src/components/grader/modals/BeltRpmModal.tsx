@@ -205,7 +205,7 @@ export function BeltRpmModal({
                     min={0}
                     max={max ?? 9999}
                     className={cn(
-                      'w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+                      'w-full rounded-ctl border border-input bg-background px-3 py-2 text-sm',
                       'placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring',
                       'tabular-nums',
                     )}
@@ -219,7 +219,7 @@ export function BeltRpmModal({
 
                 {/* m/s calculado */}
                 <div className={cn(
-                  'w-24 text-right text-sm tabular-nums rounded-md px-2.5 py-2 border',
+                  'w-24 text-right text-sm tabular-nums rounded-ctl px-2.5 py-2 border',
                   mps !== null
                     ? 'border-border bg-muted text-foreground'
                     : 'border-border/30 bg-transparent text-muted-foreground/30',
@@ -252,7 +252,7 @@ export function BeltRpmModal({
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="ej. Bajé velocidad por lote pequeño…"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-ctl border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         </div>

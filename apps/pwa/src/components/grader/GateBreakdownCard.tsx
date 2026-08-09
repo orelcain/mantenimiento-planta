@@ -386,9 +386,9 @@ export function GateBreakdownCard({
               </div>
 
               {/* Barra coloreada por status */}
-              <div className="flex-1 h-4 rounded-sm bg-muted overflow-hidden">
+              <div className="flex-1 h-4 rounded-ctl bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-sm transition-all duration-300"
+                  className="h-full rounded-ctl transition-all duration-300"
                   style={{
                     width: `${barPct}%`,
                     backgroundColor: barColor + (isTop ? 'dd' : '70'),
@@ -416,9 +416,9 @@ export function GateBreakdownCard({
                 <span className="text-xs font-semibold text-orange-400 tabular-nums">P0</span>
               </div>
               <div className="w-32 shrink-0 text-[11px] text-orange-400/70">Rechazo</div>
-              <div className="flex-1 h-4 rounded-sm bg-muted overflow-hidden">
+              <div className="flex-1 h-4 rounded-ctl bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-sm bg-cat-4-tint/[0.08]"
+                  className="h-full rounded-ctl bg-cat-4-tint/[0.08]"
                   style={{ width: `${(pointZeroPieces / maxPieces) * 100}%` }}
                 />
               </div>
@@ -445,7 +445,7 @@ export function GateBreakdownCard({
             {showAnalysis && (
               <div className="space-y-3 pt-1">
                 {/* Tabla de grupos */}
-                <div className="rounded-md border border-border overflow-hidden text-xs">
+                <div className="rounded-ctl border border-border overflow-hidden text-xs">
                   <table className="w-full">
                     <thead className="bg-muted text-muted-foreground">
                       <tr>
@@ -512,7 +512,7 @@ export function GateBreakdownCard({
                         <div
                           key={i}
                           className={cn(
-                            'flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-xs transition-colors',
+                            'flex items-start gap-2.5 px-3 py-2.5 rounded-ctl border text-xs transition-colors',
                             isTop
                               ? 'border-red-500/[0.25] bg-red-500/[0.08]'
                               : 'border-amber-500/[0.25] bg-amber-500/[0.08]',

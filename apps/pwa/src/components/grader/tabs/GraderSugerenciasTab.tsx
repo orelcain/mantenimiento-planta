@@ -85,14 +85,14 @@ export function GraderSugerenciasTab({
           )}
 
           {aiError && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-300 text-sm">
+            <div className="p-3 rounded-card bg-red-500/[0.08] border border-red-300 text-sm">
               <div className="flex items-center gap-2 text-red-600">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de parseo IA</span>
               </div>
               <p className="mt-1 text-xs text-red-500">{aiError}</p>
               {aiRawText && (
-                <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-40">
+                <pre className="mt-2 p-2 bg-muted rounded-ctl text-xs overflow-auto max-h-40">
                   {aiRawText}
                 </pre>
               )}

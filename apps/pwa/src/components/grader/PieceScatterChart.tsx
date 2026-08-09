@@ -182,7 +182,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
   if (processed.length < MIN_PIECES) return null
 
   return (
-    <Card className="border-border bg-card dark:border-slate-800 dark:bg-slate-950/50">
+    <Card className="border-border bg-card dark:border-slate-800 dark:bg-muted-foreground/[0.10]">
       <CardContent className="py-3 px-4">
         {/* Header — clic para expandir/colapsar */}
         <button
@@ -212,7 +212,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
             return (
               <span
                 key={cause}
-                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border tabular-nums"
+                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl border tabular-nums"
                 style={{
                   borderColor: color.replace('0.85)', '0.35)'),
                   color: color.replace('0.85)', '1)'),

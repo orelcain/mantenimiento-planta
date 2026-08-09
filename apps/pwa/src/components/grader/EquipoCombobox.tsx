@@ -49,12 +49,12 @@ export function EquipoCombobox({ options, value, onChange, placeholder, classNam
           onFocus={() => { setOpen(true); setQuery('') }}
           onChange={(e) => { setOpen(true); setQuery(e.target.value) }}
           onBlur={() => { blurTimer.current = setTimeout(close, 150) }}
-          className="w-full pl-8 pr-8 py-2 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+          className="w-full pl-8 pr-8 py-2 text-sm rounded-ctl border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
       </div>
       {open && (
-        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg py-1">
+        <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-ctl border border-border bg-popover text-popover-foreground shadow-lg py-1">
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-xs text-muted-foreground">Sin coincidencias</li>
           ) : (

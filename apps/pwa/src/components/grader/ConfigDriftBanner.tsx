@@ -51,13 +51,13 @@ export function ConfigDriftBanner({
     return (
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3',
-          'dark:bg-amber-950/30 dark:border-amber-700',
+          'flex items-center gap-2.5 rounded-card border border-amber-300 bg-amber-50 px-3.5 py-3',
+          'dark:bg-amber-500/[0.08] dark:border-amber-700',
           className,
         )}
       >
-        <Loader2 className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400 animate-spin" aria-hidden />
-        <span className="text-[13px] text-amber-900 dark:text-amber-200">
+        <Loader2 className="w-[18px] h-[18px] text-amber-600 animate-spin" aria-hidden />
+        <span className="text-[13px] text-amber-600">
           Actualizando el desglose con la configuración de gates nueva…
         </span>
       </div>
@@ -74,7 +74,7 @@ export function ConfigDriftBanner({
   return (
     <div
       className={cn(
-        'rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700',
+        'rounded-card border border-amber-300 bg-amber-500/[0.08] dark:border-amber-700',
         className,
       )}
     >
@@ -84,13 +84,13 @@ export function ConfigDriftBanner({
         aria-expanded={open}
         className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left"
       >
-        <AlertTriangle className="w-[18px] h-[18px] text-amber-600 dark:text-amber-400 flex-shrink-0" aria-hidden />
-        <span className="flex-1 text-[13px] leading-snug text-amber-900 dark:text-amber-200">
+        <AlertTriangle className="w-[18px] h-[18px] text-amber-600 flex-shrink-0" aria-hidden />
+        <span className="flex-1 text-[13px] leading-snug text-amber-600">
           {changedAfterAnalysis
             ? 'Las gates cambiaron después de este análisis — el desglose de abajo no se recalculó.'
             : 'El desglose de abajo no corresponde a la configuración de gates actual.'}
         </span>
-        <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 whitespace-nowrap">
+        <span className="flex items-center gap-1 text-xs text-amber-600 whitespace-nowrap">
           {open ? 'Ocultar' : 'Ver detalle'}
           {open
             ? <ChevronUp className="w-3.5 h-3.5" aria-hidden />
@@ -99,7 +99,7 @@ export function ConfigDriftBanner({
       </button>
 
       {open && (
-        <div className="px-3.5 pb-3.5 pt-3 border-t border-amber-300/70 dark:border-amber-700/70">
+        <div className="px-3.5 pb-3.5 pt-3 border-t border-amber-500/[0.25] dark:border-amber-500/[0.25]">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
@@ -108,7 +108,7 @@ export function ConfigDriftBanner({
                 <th className="text-right font-normal pb-1.5 pl-3">config actual</th>
               </tr>
             </thead>
-            <tbody className="text-amber-900 dark:text-amber-200">
+            <tbody className="text-amber-600">
               {drift.causes.map(({ cause, saved, current }) => (
                 <tr key={cause}>
                   <td className="py-0.5">{causeLabel(cause)}</td>
@@ -116,7 +116,7 @@ export function ConfigDriftBanner({
                   <td
                     className={cn(
                       'py-0.5 pl-3 text-right font-mono tabular-nums',
-                      saved !== current && 'font-medium text-amber-700 dark:text-amber-300',
+                      saved !== current && 'font-medium text-amber-600',
                     )}
                   >
                     {current}

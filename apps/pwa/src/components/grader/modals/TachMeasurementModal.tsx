@@ -130,7 +130,7 @@ export function TachMeasurementModal({
                 type="button"
                 onClick={() => setMethod('linear')}
                 className={cn(
-                  'rounded border text-xs px-2 py-1.5 text-left',
+                  'rounded-ctl border text-xs px-2 py-1.5 text-left',
                   method === 'linear' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                 )}
               >
@@ -142,7 +142,7 @@ export function TachMeasurementModal({
                 onClick={() => setMethod('shaft')}
                 disabled={!effectiveMpsPerRpm}
                 className={cn(
-                  'rounded border text-xs px-2 py-1.5 text-left',
+                  'rounded-ctl border text-xs px-2 py-1.5 text-left',
                   method === 'shaft' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                   !effectiveMpsPerRpm && 'opacity-50 cursor-not-allowed',
                 )}
@@ -202,7 +202,7 @@ export function TachMeasurementModal({
 
           {/* Comparación con actual */}
           {validNum && beltMps > 0 && (
-            <div className="bg-muted rounded p-2 text-xs space-y-1">
+            <div className="bg-muted rounded-ctl p-2 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Medido:</span>
                 <span className="font-mono font-medium">{beltMps.toFixed(3)} m/s</span>
@@ -213,9 +213,9 @@ export function TachMeasurementModal({
                   variant="outline"
                   className={cn(
                     'text-[10px] font-mono',
-                    Math.abs(deltaPct) < 3 ? 'border-green-500/40 text-green-700 dark:text-green-400' :
-                    Math.abs(deltaPct) < 10 ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' :
-                    'border-red-500/40 text-red-700 dark:text-red-400',
+                    Math.abs(deltaPct) < 3 ? 'border-green-500/[0.25] text-green-600' :
+                    Math.abs(deltaPct) < 10 ? 'border-amber-500/[0.25] text-amber-600' :
+                    'border-red-500/[0.25] text-red-600',
                   )}
                 >
                   {delta >= 0 ? '+' : ''}{delta.toFixed(3)} m/s ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
@@ -230,7 +230,7 @@ export function TachMeasurementModal({
               type="checkbox"
               checked={applyToConfig}
               onChange={(e) => setApplyToConfig(e.target.checked)}
-              className="rounded"
+              className="rounded-ctl"
             />
             Aplicar como velocidad actual (marca como <strong>verificada</strong>)
           </label>

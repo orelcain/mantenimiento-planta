@@ -84,11 +84,43 @@ const NV = '(?<![\\w:-])'
  */
 const NO_VARIANT = '(?<![\w:-])'
 
+/**
+ * Aplica una regla SOLO dentro de literales de cadena ('…', "…", `…`).
+ *
+ * Por qué existe: las clases de Tailwind siempre viven dentro de una cadena,
+ * pero el resto del archivo es código. Sin esta barrera, la regla del `rounded`
+ * pelado reescribió una VARIABLE llamada `rounded` y dejó
+ * `const rounded-ctl = Math.round(value)` — código que ni siquiera parsea.
+ * Lo pilló el typecheck de los 111 archivos del Grader, no un test.
+ *
+ * Se ignoran los comentarios (`//` y `/* … *\/`): ahí puede haber ejemplos de
+ * clases que no deben migrarse, y de paso se respeta la documentación.
+ */
+function replaceInStrings(source, re, replacer) {
+  // Trocea en: comentario de línea | comentario de bloque | cadena | resto.
+  const TOKEN = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|('(?:[^'\\\n]|\\.)*')|("(?:[^"\\\n]|\\.)*")|(`(?:[^`\\]|\\.)*`)/g
+  let out = '', last = 0, hits = 0, m
+  while ((m = TOKEN.exec(source)) !== null) {
+    out += source.slice(last, m.index)
+    const tok = m[0]
+    const isString = Boolean(m[3] || m[4] || m[5])
+    if (isString) {
+      out += tok.replace(re, (...a) => { hits++; return replacer(...a) })
+    } else {
+      out += tok // comentarios: intactos
+    }
+    last = m.index + tok.length
+  }
+  out += source.slice(last)
+  return { out, hits }
+}
+
 for (const file of files) {
   const src = readFileSync(file, 'utf8')
   let s = src
   const applied = []
-  const count = (re) => (src.match(re) ?? []).length
+  // Cuenta solo lo que de verdad se va a reemplazar (dentro de cadenas).
+  const count = (re) => replaceInStrings(s, re, (m) => m).hits
 
   // 0) El CHIP de 4 clases: `bg-X-100 text-X-700 dark:bg-X-900/30 dark:text-X-300`.
   //    Va primero porque las reglas de abajo lo partirían en dos mitades y
@@ -97,7 +129,7 @@ for (const file of files) {
     NO_VARIANT + `bg-(${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? text-(?:${FAMS})-\\d{2,3} ` +
     `dark:bg-(?:${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? dark:text-(?:${FAMS})-\\d{2,3}`, 'g')
   const nChip4 = count(chip4Re)
-  s = s.replace(chip4Re, (_m, fam) => `${TINT[fam]} ${INK[fam]}`)
+  s = replaceInStrings(s, chip4Re, (_m, fam) => `${TINT[fam]} ${INK[fam]}`).out
   if (nChip4) applied.push(`${nChip4} chips de 4 clases → tinte + tono adaptativo`)
 
   // 0b) Banner de alerta que solo existe en CLARO (`bg-X-50 border border-X-200
@@ -107,14 +139,14 @@ for (const file of files) {
   const alertRe = new RegExp(
     NO_VARIANT + `bg-(${FAMS})-50 border border-(?:${FAMS})-200 text-(?:${FAMS})-800`, 'g')
   const nAlert = count(alertRe)
-  s = s.replace(alertRe, (_m, fam) => `${TINT[fam]} border ${BORDER[fam]} ${INK[fam]}`)
+  s = replaceInStrings(s, alertRe, (_m, fam) => `${TINT[fam]} border ${BORDER[fam]} ${INK[fam]}`).out
   if (nAlert) applied.push(`${nAlert} banners claro-only → adaptativos (arregla tema oscuro)`)
 
   // 1) El par claro/oscuro colapsa a UN tono adaptativo. Es el patrón dominante
   //    (247 casos en la app) y el que más ruido quita: dos clases → una.
   const pairRe = new RegExp(NO_VARIANT + `text-(${FAMS})-\\d{2,3} dark:text-(?:${FAMS})-\\d{2,3}`, 'g')
   const nPairs = count(pairRe)
-  s = s.replace(pairRe, (_m, fam) => INK[fam])
+  s = replaceInStrings(s, pairRe, (_m, fam) => INK[fam]).out
   if (nPairs) applied.push(`${nPairs} pares claro/oscuro → tono adaptativo`)
 
   // 2) Fondo: el PAR claro/oscuro se colapsa junto. Ojo — este orden importa:
@@ -124,13 +156,13 @@ for (const file of files) {
   const bgPairRe = new RegExp(
     NO_VARIANT + `bg-(${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? dark:bg-(?:${FAMS})-\\d{2,3}(?:\\/\\d{1,3})?`, 'g')
   const nBgPairs = count(bgPairRe)
-  s = s.replace(bgPairRe, (_m, fam) => TINT[fam])
+  s = replaceInStrings(s, bgPairRe, (_m, fam) => TINT[fam]).out
   if (nBgPairs) applied.push(`${nBgPairs} pares de fondo claro/oscuro → tinte 8%`)
 
   // 3) Fondo translúcido suelto (sin par) → el 8% MEDIDO de la Pill.
   const tintRe = new RegExp(`\\bbg-(${FAMS})-\\d{2,3}\\/\\d{1,3}`, 'g')
   const nTints = count(tintRe)
-  s = s.replace(tintRe, (_m, fam) => TINT[fam])
+  s = replaceInStrings(s, tintRe, (_m, fam) => TINT[fam]).out
   if (nTints) applied.push(`${nTints} fondos translúcidos → tinte 8%`)
 
   // 4) Bordes: SOLO los que ya eran translúcidos. Un `border-amber-500` sólido
@@ -138,7 +170,7 @@ for (const file of files) {
   //    bajarlo al 25% lo apagaría — eso es criterio, no mecánica.
   const bordRe = new RegExp(`\\bborder-(${FAMS})-\\d{2,3}\\/\\d{1,3}`, 'g')
   const nBord = count(bordRe)
-  s = s.replace(bordRe, (_m, fam) => BORDER[fam])
+  s = replaceInStrings(s, bordRe, (_m, fam) => BORDER[fam]).out
   if (nBord) applied.push(`${nBord} bordes translúcidos → borde de tinte`)
 
   // 5) RADIOS → escala única de 3 clases. Es el cambio MÁS VISIBLE de la piel:
@@ -156,7 +188,7 @@ for (const file of files) {
   let nRad = 0
   for (const [re, to] of RADII) {
     nRad += count(re)
-    s = s.replace(re, to)
+    s = replaceInStrings(s, re, () => to).out
   }
   if (nRad) applied.push(`${nRad} radios → escala única (ctl/card/panel)`)
 

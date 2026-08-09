@@ -25,9 +25,9 @@ interface TurnoOficialChipProps {
 
 
 const LEVEL_STYLES: Record<'ok' | 'warn' | 'critical', string> = {
-  ok:       'border-emerald-500/40 text-emerald-400',
-  warn:     'border-amber-500/40 text-amber-400',
-  critical: 'border-red-500/40 text-red-400',
+  ok:       'border-emerald-500/[0.25] text-emerald-400',
+  warn:     'border-amber-500/[0.25] text-amber-400',
+  critical: 'border-red-500/[0.25] text-red-400',
 }
 
 export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialChipProps) {
@@ -47,7 +47,7 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
       {currentJob?.name && (
         <Badge
           variant="outline"
-          className="text-[10px] px-1.5 py-0 gap-1 border-cyan-500/40 text-cyan-400"
+          className="text-[10px] px-1.5 py-0 gap-1 border-cat-7-tint/[0.25] text-cyan-400"
           title={currentJob.jobMaxRunRate ? `Máx ${currentJob.jobMaxRunRate} pph` : 'Especie en curso'}
         >
           <Fish className="w-3 h-3" />

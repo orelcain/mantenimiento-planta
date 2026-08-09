@@ -208,7 +208,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
                   key={n}
                   onClick={() => toggleGate(n)}
                   className={cn(
-                    'w-7 h-6 text-[10px] font-semibold rounded transition-all border',
+                    'w-7 h-6 text-[10px] font-semibold rounded-ctl transition-all border',
                     selected
                       ? 'opacity-100 border-transparent'
                       : 'opacity-25 border-border/30 bg-transparent',

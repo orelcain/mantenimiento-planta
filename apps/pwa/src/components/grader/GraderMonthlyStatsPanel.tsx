@@ -188,7 +188,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
-            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-sky-700 dark:text-sky-400' : 'text-muted-foreground'}`}>
+            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-primary' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
@@ -197,8 +197,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             </p>
             {slxStats && (
               <p className={`text-[10px] mt-0.5 ${
-                slxStats.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-400'
-                : slxStats.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400'
+                slxStats.avgUptimePct >= 70 ? 'text-emerald-600'
+                : slxStats.avgUptimePct >= 40 ? 'text-amber-600' : 'text-cat-5-ink'
               }`}>
                 {slxStats.avgUptimePct.toFixed(0)}% uptime
               </p>
@@ -209,30 +209,30 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Fila 2: Mejor / Peor turno ── */}
       <div className="grid grid-cols-2 gap-2">
-        <Card className={`border-emerald-500/20 bg-emerald-500/15 ${!best ? 'opacity-40' : ''}`}>
+        <Card className={`border-emerald-500/[0.25] bg-emerald-500/[0.08] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <p className="text-[11px] text-emerald-600 font-medium">
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
+            <p className="text-lg font-bold text-emerald-600 leading-none tabular-nums">
               {best?.value ?? '—'}
             </p>
             {best && <p className="text-[10px] text-muted-foreground mt-0.5">{best.date}</p>}
           </CardContent>
         </Card>
 
-        <Card className={`border-rose-500/20 bg-rose-500/15 ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-cat-5-tint/[0.25] bg-cat-5-tint/[0.08] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
-              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+              <p className="text-[11px] text-cat-5-ink font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+            <p className="text-lg font-bold text-cat-5-ink leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
             {worst && <p className="text-[10px] text-muted-foreground mt-0.5">{worst.date}</p>}
@@ -299,7 +299,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           concreta para pedirle a planta que configure ese turno si el bloque
           se repite seguido. Se oculta si el mes no tuvo nada fuera de turno. */}
       {slxStats && slxStats.unscheduled.cycles > 0 && (
-        <Card className="border-slate-500/25 bg-slate-500/10">
+        <Card className="border-muted-foreground/[0.10] bg-muted-foreground/[0.10]">
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
@@ -371,7 +371,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-amber-500/70 transition-all"
+                    className="h-full rounded-full bg-amber-500/[0.08] transition-all"
                     style={{ width: `${barPct.toFixed(1)}%` }}
                   />
                 </div>

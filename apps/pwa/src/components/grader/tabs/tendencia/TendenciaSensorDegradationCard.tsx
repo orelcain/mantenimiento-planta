@@ -17,7 +17,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
   if (!sensorDegradationView || sensorDegradationView.degradations.length === 0) return null
 
   return (
-    <Card className="border-amber-500/40 bg-amber-500/5">
+    <Card className="border-amber-500/[0.25] bg-amber-500/[0.08]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -36,8 +36,8 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
               <div
                 key={deg.error}
                 className={cn(
-                  'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-md border',
-                  isCritical ? 'border-red-500/50 bg-red-500/10' : 'border-amber-500/40 bg-amber-500/5',
+                  'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-ctl border',
+                  isCritical ? 'border-red-500/[0.25] bg-red-500/[0.08]' : 'border-amber-500/[0.25] bg-amber-500/[0.08]',
                 )}
               >
                 <div className="min-w-0 flex-1">
@@ -47,8 +47,8 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                       className={cn(
                         'text-[10px] shrink-0',
                         isCritical
-                          ? 'border-red-500/60 text-red-600 dark:text-red-400'
-                          : 'border-amber-500/60 text-amber-600 dark:text-amber-400',
+                          ? 'border-red-500/[0.25] text-red-600'
+                          : 'border-amber-500/[0.25] text-amber-600',
                       )}
                     >
                       {isCritical ? 'CRÍTICO' : 'ALERTA'}
@@ -69,8 +69,8 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                       <div key={idx} className="flex flex-col items-center gap-0.5" title={`Q${idx + 1}: ${q} piezas`}>
                         <div
                           className={cn(
-                            'w-4 rounded-sm transition-all',
-                            isCritical ? 'bg-red-500/70' : 'bg-amber-500/70',
+                            'w-4 rounded-ctl transition-all',
+                            isCritical ? 'bg-red-500/[0.08]' : 'bg-amber-500/[0.08]',
                           )}
                           style={{ height: `${Math.max(heightPct, 4)}%` }}
                         />
