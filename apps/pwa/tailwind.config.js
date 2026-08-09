@@ -123,6 +123,17 @@ export default {
           DEFAULT: '#c08e5f',
           foreground: '#000000',
         },
+        // Paleta CATEGÓRICA (index.css). Se consume por el primitivo <Tag>,
+        // no a mano: `text-cat-3-ink` suelto vuelve a dispersar la decisión.
+        ...Object.fromEntries(
+          Array.from({ length: 8 }, (_, i) => [
+            `cat-${i + 1}`,
+            {
+              ink: `rgb(var(--cat-${i + 1}-ink) / <alpha-value>)`,
+              tint: `rgb(var(--cat-${i + 1}-tint) / <alpha-value>)`,
+            },
+          ]),
+        ),
         border: 'rgb(var(--border) / <alpha-value>)',
         input: 'rgb(var(--border) / <alpha-value>)',
         ring: '#5aa6e8',

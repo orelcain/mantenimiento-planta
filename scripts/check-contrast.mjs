@@ -195,6 +195,27 @@ for (const [name, ink, tint] of [
   check(`chip ${name} LIGHT (texto 600 sobre tinte 8%)`, ink, composite(AL.card, tint, 0.08), 4.5)
 }
 
+// ── Paleta CATEGÓRICA (index.css, docs §1.6) ────────────────────────────────
+// Existe porque la app usa color para CATEGORIZAR (tipo de repuesto, causal,
+// área), no solo para dar estado. Cada tono se lee sobre su propio tinte al 8%.
+// Dos hubo que corregirlos contra la medición: índigo oscuro (3.78:1) y teal
+// claro (4.41:1). Si alguien los "redondea" a los valores de Apple, esto falla.
+console.log('\n=== PALETA CATEGÓRICA — CLARO / OSCURO ===')
+const CATS = [
+  ['1 azul', '#0040dd', '#007aff', '#409cff', '#0a84ff'],
+  ['2 verde', '#217e38', '#34c759', '#30db5b', '#30d158'],
+  ['3 índigo', '#3634a3', '#5856d6', '#8f8cff', '#5e5ce6'],
+  ['4 naranja', '#c93400', '#ff9500', '#ffb340', '#ff9f0a'],
+  ['5 rosa', '#d30f45', '#ff2d55', '#ff6482', '#ff375f'],
+  ['6 púrpura', '#8944ab', '#af52de', '#da8fff', '#bf5af2'],
+  ['7 teal', '#0c7e78', '#30b0c7', '#5de7df', '#40c8e0'],
+  ['8 café', '#7f5539', '#a2845e', '#c3a084', '#ac8e68'],
+]
+for (const [name, inkL, tintL, inkD, tintD] of CATS) {
+  check(`cat ${name} CLARO`, inkL, composite('#ffffff', tintL, 0.08), 4.5)
+  check(`cat ${name} OSCURO`, inkD, composite('#2c2c2e', tintD, 0.08), 4.5)
+}
+
 const fails = results.filter(r => !r.pass)
 console.log(`\n${'='.repeat(60)}\nTotal: ${results.length} · Fallan: ${fails.length}`)
 if (fails.length) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LayoutGrid, Plus, Settings2, GraduationCap, MoreHorizontal } from 'lucide-react'
-import { Button, Pill, ListGroup, ListCell, CellIcon, Sheet, TabBar } from '@/components/piel'
+import { Button, Pill, Tag, ListGroup, ListCell, CellIcon, Sheet, TabBar } from '@/components/piel'
 
 /**
  * Vitrina VIVA de la nueva piel: `/dev/piel`.
@@ -151,6 +151,23 @@ export default function PielShowcasePage() {
             <Pill tone="info">Programada</Pill>
             <Pill tone="neutral" dot>Sin programar</Pill>
             <Pill tone="ok" dot="pulse">En vivo</Pill>
+          </div>
+        </Section>
+
+        <Section
+          title="Tag (categórico)"
+          hint="Hermano de Pill, trabajo distinto: Pill dice ESTADO (hay bueno y malo), Tag dice CATEGORÍA (no hay orden). Un rodamiento en rojo semántico se leería como alerta."
+        >
+          <div className="flex flex-wrap items-center gap-2.5 rounded-card bg-card p-5">
+            <Tag tone={1}>RODAMIENTO</Tag>
+            <Tag tone={2}>SELLO/JUNTA</Tag>
+            <Tag tone={3}>ELÉCTRICO</Tag>
+            <Tag tone={4}>CORREA</Tag>
+            <Tag tone={5}>MOTOR</Tag>
+            <Tag tone={6}>SENSOR</Tag>
+            <Tag tone={7}>VÁLVULA</Tag>
+            <Tag tone={8}>FILTRO</Tag>
+            <Tag>TORNILLERÍA</Tag>
           </div>
         </Section>
 
