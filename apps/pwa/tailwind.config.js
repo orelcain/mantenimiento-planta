@@ -28,12 +28,41 @@ export default {
         // 2ª pasada 2026-07-19: también los -600 (el semáforo del calendario
         // histórico, badges PP/P0 y botones de borrar usaban red-600 stock y
         // seguían brillando; los -600 son la mitad "claro" del mismo semáforo).
-        emerald: { ...colors.emerald, 400: '#6c9a8a', 500: '#62917f', 600: '#5b8c75' },
-        green: { ...colors.green, 400: '#779f85', 500: '#679576', 600: '#5f9368' },
-        red: { ...colors.red, 400: '#b2807f', 500: '#b0706d', 600: '#b46259' },
-        amber: { ...colors.amber, 400: '#ac966e', 500: '#a88c64', 600: '#ae7e59' },
+        // 3ª pasada 2026-08-09 (NUEVA PIEL): estos tonos pasan de hex fijo a
+        // VARIABLE CSS (index.css). Los valores por defecto en `:root` son los
+        // mismos -50% croma de arriba —byte-idénticos, la piel actual no cambia—
+        // pero ahora una piel puede re-teñir los ~4.480 usos de estas clases sin
+        // tocar 306 .tsx (ver docs/NUEVA_PIEL_APPLE_HIG.md §1.4 y `[data-skin]`).
+        emerald: {
+          ...colors.emerald,
+          400: 'rgb(var(--tw-emerald-400) / <alpha-value>)',
+          500: 'rgb(var(--tw-emerald-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-emerald-600) / <alpha-value>)',
+        },
+        green: {
+          ...colors.green,
+          400: 'rgb(var(--tw-green-400) / <alpha-value>)',
+          500: 'rgb(var(--tw-green-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-green-600) / <alpha-value>)',
+        },
+        red: {
+          ...colors.red,
+          400: 'rgb(var(--tw-red-400) / <alpha-value>)',
+          500: 'rgb(var(--tw-red-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-red-600) / <alpha-value>)',
+        },
+        amber: {
+          ...colors.amber,
+          400: 'rgb(var(--tw-amber-400) / <alpha-value>)',
+          500: 'rgb(var(--tw-amber-500) / <alpha-value>)',
+          600: 'rgb(var(--tw-amber-600) / <alpha-value>)',
+        },
         yellow: { ...colors.yellow, 400: '#d9bc4a' },
-        blue: { ...colors.blue, 400: '#6da3d8', 500: '#4a86c8' },
+        blue: {
+          ...colors.blue,
+          400: 'rgb(var(--tw-blue-400) / <alpha-value>)',
+          500: 'rgb(var(--tw-blue-500) / <alpha-value>)',
+        },
         violet: { ...colors.violet, 400: '#a190d6', 500: '#7d68c4' },
         cyan: { ...colors.cyan, 400: '#56b8cc' },
         sky: { ...colors.sky, 400: '#57a9d3' },
@@ -54,8 +83,11 @@ export default {
           foreground: 'rgb(var(--foreground) / <alpha-value>)',
         },
         primary: {
-          DEFAULT: '#2E75B6',
-          foreground: '#ffffff',
+          // Acento de marca ADAPTATIVO: #2E75B6 en claro, #5AA0DC en oscuro bajo la
+          // piel nueva (el azul puro se apaga sobre superficie oscura). Default =
+          // #2E75B6 en ambos temas, igual que siempre.
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          foreground: 'rgb(var(--brand-foreground) / <alpha-value>)',
           50: '#eaf3fb',
           100: '#cfe2f3',
           200: '#9DC3E6',
@@ -99,6 +131,11 @@ export default {
         lg: '0.75rem',
         md: '0.5rem',
         sm: '0.25rem',
+        // Escala ÚNICA de la nueva piel (docs/NUEVA_PIEL_APPLE_HIG.md §3).
+        // Reemplaza la mezcla rounded/-sm/-md/-lg/-xl en TODO componente nuevo.
+        ctl: '10px',    // controles: botón, input, segmented, chip cuadrado
+        card: '14px',   // tarjeta / grupo de lista
+        panel: '18px',  // contenedor grande, sheet, modal
       },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)
