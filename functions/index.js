@@ -8038,6 +8038,22 @@ function fechaChile(offsetDias = 0) {
   }).format(d)
 }
 
+/**
+ * Manda el aviso del protocolo al DM del bot Y al grupo.
+ *
+ * Por qué a los dos: los avisos operativos que la jefatura lee de verdad llegan al
+ * chat privado con @antarfood_mant_bot (es el default de Shoplogix), mientras que
+ * el equipo de turno vive en el grupo. Mandando solo al grupo, el aviso existía
+ * pero nadie lo miraba; mandando solo al DM, el equipo no se entera.
+ */
+function enviarAvisoProtocolo(msg) {
+  const topicId = getTopicId('general')
+  return Promise.all([
+    sendTelegramMessage(msg, ARIA_ADMIN_CHAT_ID),
+    sendTelegramMessage(msg, undefined, topicId ? { topicId } : {}),
+  ])
+}
+
 /** Las dos lecturas anteriores de una máquina: con tres puntos se puede decir
  *  "sube dos seguidas", que es el criterio de tendencia. */
 async function lecturasPreviasBaader(plantId, maquina, excluirId) {
@@ -8084,11 +8100,7 @@ exports.onProtocoloBaader142Created = onDocumentCreated(
       return
     }
 
-    // 'general' y no 'equipos': el topic de equipos apunta a un hilo que ya no
-    // existe en el grupo (Telegram responde 400 "message thread not found") y el
-    // aviso se perdía sin que nadie se enterara. Verificado en producción.
-    const topicId = getTopicId('general')
-    await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
+    await enviarAvisoProtocolo(msg)
     logger.info(`protocolo baader142: ${ev.alertas.length} alerta(s) en ${actual.maquina}`)
   }
 )
@@ -8129,8 +8141,6 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
       logger.info('protocolo baader142: las tres máquinas registradas, sin recordatorio')
       return
     }
-    // Ver la nota del trigger: el topic 'equipos' está roto en el grupo.
-    const topicId = getTopicId('general')
-    await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
+    await enviarAvisoProtocolo(msg)
   }
 )
