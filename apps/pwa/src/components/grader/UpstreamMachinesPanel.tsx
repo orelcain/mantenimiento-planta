@@ -353,10 +353,10 @@ function ShiftAvailabilityBar({
       <Timer className="w-3 h-3 shrink-0" />
       {/* Barra apilada — overflow-hidden recorta los divs al borde redondeado */}
       <div className="flex h-2 w-14 rounded-full overflow-hidden bg-muted/60 shrink-0">
-        {upPct    > 0 && <div className="h-full bg-emerald-500/75" style={{ width: `${upPct}%`    }} />}
-        {breakPct > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${breakPct}%` }} />}
-        {downPct  > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${downPct}%`  }} />}
-        {setupPct > 0 && <div className="h-full bg-violet-500/60"  style={{ width: `${setupPct}%` }} />}
+        {upPct    > 0 && <div className="h-full bg-emerald-500/[0.08]" style={{ width: `${upPct}%`    }} />}
+        {breakPct > 0 && <div className="h-full bg-amber-500/[0.08]"   style={{ width: `${breakPct}%` }} />}
+        {downPct  > 0 && <div className="h-full bg-cat-5-tint/[0.08]"    style={{ width: `${downPct}%`  }} />}
+        {setupPct > 0 && <div className="h-full bg-cat-6-tint/[0.08]"  style={{ width: `${setupPct}%` }} />}
       </div>
       <span className="tabular-nums">{fmtPct(shiftRuntime)}</span>
     </span>
@@ -681,7 +681,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
     <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
       <Badge
         variant="outline"
-        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.08] border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title="Tiempo total procesando (suma de las 3 Baaders)"
       >
         ▲ {fmtDurationSec(totals.uptimeSec)}
@@ -689,7 +689,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          className="bg-cat-5-tint/[0.08] border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           ⏸ {fmtDurationSec(totals.downtimeSec)}
@@ -698,7 +698,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          className="bg-amber-500/[0.08] border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
           ☕ {fmtDurationSec(totals.breakSec)}
@@ -721,7 +721,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       <Badge
         variant="outline"
-        className="bg-muted border-border text-muted-foreground dark:bg-slate-900/60 dark:border-slate-700 dark:text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] dark:border-slate-700 dark:text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title={
           `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
           `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`
@@ -734,21 +734,21 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.08] border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-amber-500/[0.08] border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-cat-5-tint/[0.08] border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -770,9 +770,9 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // `bg` = tinte tenue del color de acento (10%) mezclado sobre la superficie
 // normal — "que se vea rápido" sin tener que leer el borde (Orel 2026-07-23).
 const MACHINE_ACCENT = [
-  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-sky-500/10' },
-  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-violet-500/10' },
-  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/10' },
+  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-primary/[0.08]' },
+  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-cat-6-tint/[0.08]' },
+  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/[0.08]' },
 ] as const
 
 function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, windowEnd, microAlert }: {
@@ -882,7 +882,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             </Badge>
           )}
           {microAlert && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-900/70 bg-amber-950/50 text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
               <AlertTriangle className="w-3 h-3" /> Atención
             </Badge>
           )}
@@ -906,7 +906,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
         {isZoomActive && (
           <Badge
             variant="outline"
-            className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+            className="bg-cat-6-tint/[0.08] border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
             title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
           >
             <span>✂</span> del rango
@@ -1302,14 +1302,14 @@ export function UpstreamMachinesPanel({
               <span className="sm:hidden">{lineLabel ? `Línea ${lineLabel}` : 'Línea'}</span>
             </span>
             {snapshot && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400 shrink-0">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-cat-6-tint/[0.25] text-violet-400 shrink-0">
                 {snapshot.machines.length} máq
               </Badge>
             )}
             {dataSource === 'demo' && (
               <Badge
                 variant="outline"
-                className="text-[10px] px-1.5 py-0 h-4 border-amber-700/60 text-amber-400 bg-amber-950/30"
+                className="text-[10px] px-1.5 py-0 h-4 border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.08]"
                 title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
               >
                 DEMO
@@ -1357,7 +1357,7 @@ export function UpstreamMachinesPanel({
             {isLineZoomActive && (
               <Badge
                 variant="outline"
-                className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+                className="bg-cat-6-tint/[0.08] border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
                 title="KPIs recalculados sólo del rango temporal visible"
               >
                 <span>✂</span> del rango
@@ -1369,7 +1369,7 @@ export function UpstreamMachinesPanel({
             {correlationSummary && correlationSummary.upstreamCaused > 0 && (
               <Badge
                 variant="outline"
-                className="bg-orange-950/60 border-orange-800 text-orange-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-4-tint/[0.08] border-orange-800 text-orange-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
                   `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
@@ -1396,7 +1396,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-rose-950/60 border-rose-800 text-rose-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-5-tint/[0.08] border-rose-800 text-rose-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
@@ -1486,7 +1486,7 @@ export function UpstreamMachinesPanel({
                     className={cn(
                       'text-[10px] px-1.5 py-0.5 rounded border transition-colors',
                       showRateGap
-                        ? 'border-rose-500/45 bg-rose-500/12 text-rose-700 dark:text-rose-300'
+                        ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.08] text-cat-5-ink'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >

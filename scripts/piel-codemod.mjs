@@ -64,15 +64,55 @@ const BORDER = Object.fromEntries(
 
 const FAMS = Object.keys(INK).join('|')
 
+/**
+ * Guarda contra prefijos de variante. La mitad "clara" de un par NO puede venir
+ * con `hover:` / `focus:` / `group-hover:` / `md:`: si viene, no es el estado
+ * base, y absorber el `dark:` vecino le roba el fondo en REPOSO en tema oscuro.
+ *
+ * Lo detectó la revisión del diff, no un test: `hover:bg-red-500/20
+ * dark:bg-red-500/10` colapsaba a un solo `hover:` y el elemento perdía su
+ * fondo de reposo. Por eso el barrido se revisa archivo por archivo.
+ */
+const NV = '(?<![\\w:-])'
+
+/**
+ * Guarda contra prefijos de variante. La mitad "clara" de un par NO puede venir
+ * con `hover:`/`focus:`/`group-hover:`: si viene, no es el estado base, y
+ * absorber el `dark:` vecino le roba el fondo en reposo en tema oscuro.
+ * (Lo pilló la revision del diff: `hover:bg-red-500/20 dark:bg-red-500/10`
+ * colapsaba a un solo `hover:` y el elemento perdia su fondo.)
+ */
+const NO_VARIANT = '(?<![\w:-])'
+
 for (const file of files) {
   const src = readFileSync(file, 'utf8')
   let s = src
   const applied = []
   const count = (re) => (src.match(re) ?? []).length
 
+  // 0) El CHIP de 4 clases: `bg-X-100 text-X-700 dark:bg-X-900/30 dark:text-X-300`.
+  //    Va primero porque las reglas de abajo lo partirían en dos mitades y
+  //    dejarían el fondo claro huérfano (el bug que el dry-run pilló antes).
+  const chip4Re = new RegExp(
+    NO_VARIANT + `bg-(${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? text-(?:${FAMS})-\\d{2,3} ` +
+    `dark:bg-(?:${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? dark:text-(?:${FAMS})-\\d{2,3}`, 'g')
+  const nChip4 = count(chip4Re)
+  s = s.replace(chip4Re, (_m, fam) => `${TINT[fam]} ${INK[fam]}`)
+  if (nChip4) applied.push(`${nChip4} chips de 4 clases → tinte + tono adaptativo`)
+
+  // 0b) Banner de alerta que solo existe en CLARO (`bg-X-50 border border-X-200
+  //     text-X-800`, sin ninguna variante dark:). Hoy en tema oscuro se ve como
+  //     una franja clara: no es solo deuda de piel, es un bug de tema. Migrarlo
+  //     lo arregla de paso.
+  const alertRe = new RegExp(
+    NO_VARIANT + `bg-(${FAMS})-50 border border-(?:${FAMS})-200 text-(?:${FAMS})-800`, 'g')
+  const nAlert = count(alertRe)
+  s = s.replace(alertRe, (_m, fam) => `${TINT[fam]} border ${BORDER[fam]} ${INK[fam]}`)
+  if (nAlert) applied.push(`${nAlert} banners claro-only → adaptativos (arregla tema oscuro)`)
+
   // 1) El par claro/oscuro colapsa a UN tono adaptativo. Es el patrón dominante
   //    (247 casos en la app) y el que más ruido quita: dos clases → una.
-  const pairRe = new RegExp(`\\btext-(${FAMS})-\\d{2,3} dark:text-(?:${FAMS})-\\d{2,3}`, 'g')
+  const pairRe = new RegExp(NO_VARIANT + `text-(${FAMS})-\\d{2,3} dark:text-(?:${FAMS})-\\d{2,3}`, 'g')
   const nPairs = count(pairRe)
   s = s.replace(pairRe, (_m, fam) => INK[fam])
   if (nPairs) applied.push(`${nPairs} pares claro/oscuro → tono adaptativo`)
@@ -82,7 +122,7 @@ for (const file of files) {
   //    claro solo, y en tema oscuro la tarjeta quedaba blanca. El dry-run lo
   //    delató antes de aplicarlo; por eso el par se reemplaza de una pieza.
   const bgPairRe = new RegExp(
-    `\\bbg-(${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? dark:bg-(?:${FAMS})-\\d{2,3}(?:\\/\\d{1,3})?`, 'g')
+    NO_VARIANT + `bg-(${FAMS})-\\d{2,3}(?:\\/\\d{1,3})? dark:bg-(?:${FAMS})-\\d{2,3}(?:\\/\\d{1,3})?`, 'g')
   const nBgPairs = count(bgPairRe)
   s = s.replace(bgPairRe, (_m, fam) => TINT[fam])
   if (nBgPairs) applied.push(`${nBgPairs} pares de fondo claro/oscuro → tinte 8%`)

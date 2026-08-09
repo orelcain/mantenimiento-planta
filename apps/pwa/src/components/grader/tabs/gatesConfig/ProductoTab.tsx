@@ -80,10 +80,10 @@ export function ProductoTab({
     : null
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
-    ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/40'
+    ? 'bg-red-500/[0.08] text-red-600 border-red-500/[0.25]'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
-      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-      : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+      ? 'bg-amber-500/[0.08] text-amber-400 border-amber-500/[0.25]'
+      : 'bg-emerald-500/[0.08] text-emerald-400 border-emerald-500/[0.25]'
   const verdictEmoji = overlapping ? '🔴' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? '🟡' : '🟢'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
@@ -129,12 +129,12 @@ export function ProductoTab({
                 className={cn('h-8 text-xs w-28 font-mono', medianWeightG != null && 'opacity-70')}
               />
               {medianSource === 'excel' && (
-                <Badge className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0">
+                <Badge className="text-[10px] bg-emerald-500/[0.08] text-emerald-600 px-1.5 py-0">
                   Excel · {(medianWeightG! / 1000).toFixed(2)} kg
                 </Badge>
               )}
               {medianSource === 'manual' && (
-                <Badge className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 px-1.5 py-0">
+                <Badge className="text-[10px] bg-primary/[0.08] text-primary px-1.5 py-0">
                   Manual
                 </Badge>
               )}
@@ -142,8 +142,8 @@ export function ProductoTab({
                 <Badge className={cn(
                   'text-[10px] px-1.5 py-0',
                   historicalMedianG.fromCalendar
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                    ? 'bg-emerald-500/[0.08] text-emerald-600'
+                    : 'bg-amber-500/[0.08] text-amber-600',
                 )}>
                   {historicalMedianG.fromCalendar ? '📅 ' : ''}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
                 </Badge>
@@ -247,14 +247,14 @@ export function ProductoTab({
             const delayClose = physicalConfig.flipperDelayCloseMs    ?? 150
             const cycleTotal = delayOpen + minOpen + delayClose
             return (
-              <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
+              <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
                   {onOpenZ2Capture && (
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-[10px] border border-sky-500/30 text-sky-700 dark:text-sky-400 rounded px-1.5 py-0.5 hover:bg-sky-500/10 transition-colors"
+                      className="inline-flex items-center gap-1 text-[10px] border border-primary/[0.25] text-primary rounded px-1.5 py-0.5 hover:bg-primary/[0.08] transition-colors"
                     >
                       📟 Leer Z2
                     </button>
@@ -282,7 +282,7 @@ export function ProductoTab({
                       </div>
                     </div>
                   ))}
-                  <div className="flex justify-between border-t border-slate-700/50 pt-1.5 mt-1">
+                  <div className="flex justify-between border-t border-muted-foreground/[0.10] pt-1.5 mt-1">
                     <span className="font-semibold text-foreground text-xs">Ciclo total</span>
                     <span className="font-mono font-bold text-sky-400 text-xs">{cycleTotal} ms</span>
                   </div>
@@ -295,10 +295,10 @@ export function ProductoTab({
           })()}
 
           {/* Sub-card B: Reset mecánico cilindro */}
-          <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
+          <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center rounded border px-1 py-0.5 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">⚠ Estimado</span>
+              <span className="inline-flex items-center rounded border px-1 py-0.5 text-[10px] bg-amber-500/[0.08] text-amber-600 whitespace-nowrap">⚠ Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>
@@ -319,7 +319,7 @@ export function ProductoTab({
           </div>
 
           {/* Sub-card C: Paleta flipper física */}
-          <div className="rounded-lg border border-border bg-muted dark:border-slate-700/50 dark:bg-slate-950/60 p-3 space-y-2">
+          <div className="rounded-lg border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <p className="text-xs font-semibold text-violet-400">Paleta flipper física</p>
             <div>
               <Label className="text-xs">Largo paleta (mm)</Label>
@@ -336,7 +336,7 @@ export function ProductoTab({
               <p className="text-[10px] text-muted-foreground mt-1">Medido: 475 mm. Desde eje hasta extremo.</p>
             </div>
             {minOpenTimeSec != null && (
-              <div className="text-[10px] text-muted-foreground pt-1 border-t border-slate-700/50">
+              <div className="text-[10px] text-muted-foreground pt-1 border-t border-muted-foreground/[0.10]">
                 Apertura mínima calculada:{' '}
                 <span className="font-mono text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
               </div>
@@ -353,8 +353,8 @@ export function ProductoTab({
 
           {/* Timing flipper */}
           {minOpenTimeSec != null && (
-            <div className="p-3 rounded-lg bg-sky-500/15 border border-sky-500/20 space-y-1">
-              <p className="font-medium text-sky-700 dark:text-sky-300">Timing flipper calculado</p>
+            <div className="p-3 rounded-lg bg-primary/[0.08] border border-primary/[0.25] space-y-1">
+              <p className="font-medium text-primary">Timing flipper calculado</p>
               <p className="text-muted-foreground">
                 Apertura mínima (paleta pasa):{' '}
                 <span className="font-mono font-medium text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
@@ -373,9 +373,9 @@ export function ProductoTab({
           )}
 
           {/* Análisis pockets */}
-          <div className="p-3 rounded-lg bg-sky-500/15 border border-sky-500/20 space-y-1">
+          <div className="p-3 rounded-lg bg-primary/[0.08] border border-primary/[0.25] space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <p className="font-medium text-sky-700 dark:text-sky-300">
+              <p className="font-medium text-primary">
                 Análisis pockets ({physicalConfig.pocketCount} activos)
               </p>
               <InfoTooltip
@@ -441,7 +441,7 @@ export function ProductoTab({
             const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
             const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
             return (
-              <div className="p-2 rounded bg-muted border border-border dark:bg-slate-800/60 dark:border-slate-700/40 text-[10px] space-y-1">
+              <div className="p-2 rounded bg-muted border border-border dark:bg-muted-foreground/[0.10] dark:border-muted-foreground/[0.10] text-[10px] space-y-1">
                 <p className="font-medium text-muted-foreground">
                   {s.label} · {scientific} · FishBase ID {fishBaseId}
                 </p>

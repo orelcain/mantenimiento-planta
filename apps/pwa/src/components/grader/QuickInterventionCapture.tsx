@@ -58,9 +58,9 @@ const TIPOS: { id: InterventionTipo; label: string; icon: typeof Wrench }[] = [
 ]
 
 const SEVERIDADES: { id: InterventionSeveridad; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' },
-  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/20 text-amber-800 dark:text-amber-300' },
-  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/20 text-red-800 dark:text-red-300' },
+  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' },
+  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600' },
+  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.08] text-red-600' },
 ]
 
 const TIPO_LABEL: Record<string, string> = {
@@ -70,10 +70,10 @@ const TIPO_LABEL: Record<string, string> = {
 const SEV_DOT: Record<string, string> = { verde: 'bg-emerald-500', amarillo: 'bg-amber-500', rojo: 'bg-red-500' }
 
 const RIESGO_STYLE: Record<AreaInsights['riesgo'], { label: string; cls: string }> = {
-  bajo: { label: 'Riesgo bajo', cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' },
-  medio: { label: 'Riesgo medio', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300' },
-  alto: { label: 'Riesgo alto', cls: 'border-orange-500/40 bg-orange-500/10 text-orange-800 dark:text-orange-300' },
-  critico: { label: 'Riesgo crítico', cls: 'border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-300' },
+  bajo: { label: 'Riesgo bajo', cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600' },
+  medio: { label: 'Riesgo medio', cls: 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600' },
+  alto: { label: 'Riesgo alto', cls: 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.08] text-cat-4-ink' },
+  critico: { label: 'Riesgo crítico', cls: 'border-red-500/[0.25] bg-red-500/[0.08] text-red-600' },
 }
 
 /** Turno best-effort por hora local (las líneas manuales no tienen schedule Grader). */
@@ -308,7 +308,7 @@ export function QuickInterventionCapture({
               type="button" size="sm" variant="outline"
               disabled={!canAnalyze || busy}
               onClick={handleRefine}
-              className="border-sky-500/30 text-sky-800 dark:text-sky-300 hover:bg-sky-500/10"
+              className="border-primary/[0.25] text-primary hover:bg-primary/[0.08]"
               title="Corrige la transcripción de voz (errores fonéticos, muletillas)"
             >
               {refining ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
@@ -426,7 +426,7 @@ export function QuickInterventionCapture({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-red-800 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-md px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -512,8 +512,8 @@ export function QuickInterventionCapture({
                     {/* SAP */}
                     <div className="flex flex-wrap items-center gap-1 mt-1">
                       {e.sapOrden
-                        ? <Badge variant="outline" className="text-[9px] text-sky-800 dark:text-sky-300 border-sky-500/40">OT {e.sapOrden}</Badge>
-                        : <Badge variant="outline" className="text-[9px] text-amber-800 dark:text-amber-300 border-amber-500/40">SAP pendiente</Badge>}
+                        ? <Badge variant="outline" className="text-[9px] text-primary border-primary/[0.25]">OT {e.sapOrden}</Badge>
+                        : <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-500/[0.25]">SAP pendiente</Badge>}
                       {e.sapAviso && <Badge variant="outline" className="text-[9px] text-muted-foreground border-border/50">Aviso {e.sapAviso}</Badge>}
                     </div>
                   </div>
@@ -564,7 +564,7 @@ export function QuickInterventionCapture({
               </Button>
 
               {insightsError && (
-                <div className="flex items-start gap-2 text-xs text-red-800 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+                <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.08] border border-red-500/[0.25] rounded-md px-2.5 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span className="break-words">{insightsError}</span>
                 </div>
@@ -599,7 +599,7 @@ export function QuickInterventionCapture({
                             <span className="break-words">{p.descripcion}</span>
                           </p>
                           {p.recomendacion && (
-                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300/80 mt-1 flex items-start gap-1">
+                            <p className="text-[11px] text-emerald-600/80 mt-1 flex items-start gap-1">
                               <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
                               <span className="break-words">{p.recomendacion}</span>
                             </p>
@@ -615,7 +615,7 @@ export function QuickInterventionCapture({
                       <p className="text-[11px] font-medium text-muted-foreground">Equipos / componentes a vigilar</p>
                       <div className="flex flex-wrap gap-1.5">
                         {insights.equiposAVigilar.map((eq, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] font-normal text-amber-800 dark:text-amber-300 border-amber-500/30">
+                          <Badge key={i} variant="outline" className="text-[10px] font-normal text-amber-600 border-amber-500/[0.25]">
                             {eq}
                           </Badge>
                         ))}

@@ -304,10 +304,10 @@ export function GateBreakdownCard({
           <span
             className={cn(
               'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium cursor-default',
-              diagnosis.color === 'emerald' && 'border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-              diagnosis.color === 'amber'   && 'border-amber-500/40 bg-amber-500/20 text-amber-700 dark:text-amber-400',
-              diagnosis.color === 'blue'    && 'border-blue-500/40 bg-blue-500/20 text-blue-700 dark:text-blue-400',
-              diagnosis.color === 'zinc'    && 'border-zinc-500/40 bg-zinc-500/20 text-zinc-700 dark:text-zinc-400',
+              diagnosis.color === 'emerald' && 'border-emerald-500/[0.25] bg-emerald-500/[0.08] text-emerald-600',
+              diagnosis.color === 'amber'   && 'border-amber-500/[0.25] bg-amber-500/[0.08] text-amber-600',
+              diagnosis.color === 'blue'    && 'border-primary/[0.25] bg-primary/[0.08] text-primary',
+              diagnosis.color === 'zinc'    && 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground',
             )}
             title={diagnosis.detail}
           >
@@ -329,19 +329,19 @@ export function GateBreakdownCard({
         {calibreGroups.length > 0 && (
           <div className="flex items-center gap-2 pb-1 flex-wrap">
             {kpi.saturado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 dark:bg-red-500/10 border border-red-500/30 text-[11px] font-medium text-red-700 dark:text-red-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/[0.08] border border-red-500/[0.25] text-[11px] font-medium text-red-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
               </span>
             )}
             {kpi.optimo > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/[0.25] text-[11px] font-medium text-emerald-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 {kpi.optimo} óptimo{kpi.optimo > 1 ? 's' : ''}
               </span>
             )}
             {kpi.sobredimensionado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.08] border border-amber-500/[0.25] text-[11px] font-medium text-amber-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 {kpi.sobredimensionado} sobredim.
               </span>
@@ -418,7 +418,7 @@ export function GateBreakdownCard({
               <div className="w-32 shrink-0 text-[11px] text-orange-400/70">Rechazo</div>
               <div className="flex-1 h-4 rounded-sm bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-sm bg-orange-500/50"
+                  className="h-full rounded-sm bg-cat-4-tint/[0.08]"
                   style={{ width: `${(pointZeroPieces / maxPieces) * 100}%` }}
                 />
               </div>
@@ -514,16 +514,16 @@ export function GateBreakdownCard({
                           className={cn(
                             'flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-xs transition-colors',
                             isTop
-                              ? 'border-red-500/30 bg-red-500/15'
-                              : 'border-amber-500/20 bg-amber-500/15',
+                              ? 'border-red-500/[0.25] bg-red-500/[0.08]'
+                              : 'border-amber-500/[0.25] bg-amber-500/[0.08]',
                           )}
                         >
                           {/* Número de prioridad */}
                           <span className={cn(
                             'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5',
                             isTop
-                              ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400'
-                              : 'bg-amber-500/15 text-amber-400',
+                              ? 'bg-red-500/[0.08] text-red-600'
+                              : 'bg-amber-500/[0.08] text-amber-400',
                           )}>
                             {i + 1}
                           </span>
