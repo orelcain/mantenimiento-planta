@@ -37,13 +37,18 @@ export type ImputacionCategoria =
   | 'operacional'
   | 'programado'
 
-export const CATEGORIA_META: Record<ImputacionCategoria, { label: string; short: string }> = {
-  abastecimiento: { label: 'Falla Abastecimiento / Servicios', short: 'Abastecimiento' },
-  electrica:      { label: 'Falla Eléctrica',                  short: 'Eléctrica' },
-  mecanica:       { label: 'Falla Mecánica',                   short: 'Mecánica' },
-  mmpp:           { label: 'MMPP',                             short: 'MMPP' },
-  operacional:    { label: 'Operacionales',                    short: 'Operacional' },
-  programado:     { label: 'Paros Programados',                short: 'Programado' },
+/**
+ * `label` es el nombre usable en una fila de tabla; `oficial` es el título
+ * textual del curso (se muestra en la vista del árbol, donde hay espacio);
+ * `short` es para chips.
+ */
+export const CATEGORIA_META: Record<ImputacionCategoria, { label: string; oficial: string; short: string }> = {
+  abastecimiento: { label: 'Abastecimiento / Servicios', oficial: 'Falla Abastecimiento / Servicios', short: 'Abastecimiento' },
+  electrica:      { label: 'Falla Eléctrica',            oficial: 'Falla Eléctrica',                  short: 'Eléctrica' },
+  mecanica:       { label: 'Falla Mecánica',             oficial: 'Falla Mecánica',                   short: 'Mecánica' },
+  mmpp:           { label: 'MMPP',                       oficial: 'MMPP',                             short: 'MMPP' },
+  operacional:    { label: 'Operacionales',              oficial: 'Operacionales',                    short: 'Operacional' },
+  programado:     { label: 'Paros Programados',          oficial: 'Paros Programados',                short: 'Programado' },
 }
 
 export interface ImputacionLeaf {
@@ -184,6 +189,19 @@ export function matchImputacion(rawReason: string | undefined | null): Imputacio
 export function categoriaLabel(leaf: ImputacionLeaf | null): string {
   if (!leaf || leaf.categorias.length === 0) return 'Sin clasificar'
   return leaf.categorias.map((c) => CATEGORIA_META[c].short).join(' o ')
+}
+
+/**
+ * El árbol dibujable: cada categoría con sus hojas, incluidas las que viven en
+ * dos categorías (aparecen en ambas, como en el curso). Sirve para la vista de
+ * referencia — 46 nodos en total.
+ */
+export function leavesByCategoria(): Array<{ categoria: ImputacionCategoria; label: string; hojas: ImputacionLeaf[] }> {
+  return (Object.keys(CATEGORIA_META) as ImputacionCategoria[]).map((categoria) => ({
+    categoria,
+    label: CATEGORIA_META[categoria].oficial,
+    hojas: IMPUTACION_LEAVES.filter((l) => l.categorias.includes(categoria)),
+  }))
 }
 
 /**
