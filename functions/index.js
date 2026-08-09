@@ -117,16 +117,32 @@ async function sendTelegramMessage(text, chatId, opts = {}) {
     payload.message_thread_id = opts.topicId
   }
 
-  try {
+  const enviar = async (body) => {
     const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     })
+    return { ok: response.ok, status: response.status, err: response.ok ? null : await response.text() }
+  }
 
-    if (!response.ok) {
-      const err = await response.text()
-      logger.error('Telegram sendMessage error', { status: response.status, err })
+  try {
+    let r = await enviar(payload)
+
+    // Un topic borrado del grupo devuelve 400 "message thread not found" y el
+    // mensaje se pierde EN SILENCIO (esto no lanza). Pasó de verdad con el topic
+    // de equipos: la alerta se evaluaba bien y nunca llegaba a nadie. Antes de
+    // darlo por perdido, se reintenta en el hilo principal del grupo.
+    if (!r.ok && payload.message_thread_id && /thread not found/i.test(r.err || '')) {
+      logger.warn('Telegram: el topic no existe, se reintenta en el hilo principal', {
+        topicId: payload.message_thread_id,
+      })
+      const { message_thread_id: _omitido, ...sinTopic } = payload
+      r = await enviar(sinTopic)
+    }
+
+    if (!r.ok) {
+      logger.error('Telegram sendMessage error', { status: r.status, err: r.err })
     }
   } catch (error) {
     logger.error('Telegram fetch error', error)
@@ -8068,7 +8084,10 @@ exports.onProtocoloBaader142Created = onDocumentCreated(
       return
     }
 
-    const topicId = getTopicId('equipos')
+    // 'general' y no 'equipos': el topic de equipos apunta a un hilo que ya no
+    // existe en el grupo (Telegram responde 400 "message thread not found") y el
+    // aviso se perdía sin que nadie se enterara. Verificado en producción.
+    const topicId = getTopicId('general')
     await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
     logger.info(`protocolo baader142: ${ev.alertas.length} alerta(s) en ${actual.maquina}`)
   }
@@ -8110,7 +8129,8 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
       logger.info('protocolo baader142: las tres máquinas registradas, sin recordatorio')
       return
     }
-    const topicId = getTopicId('equipos')
+    // Ver la nota del trigger: el topic 'equipos' está roto en el grupo.
+    const topicId = getTopicId('general')
     await sendTelegramMessage(msg, undefined, topicId ? { topicId } : {})
   }
 )
