@@ -37,9 +37,9 @@ if (files.length === 0) {
  *  - neutros: tokens de texto.
  */
 const INK = {
-  red: 'text-red-600', amber: 'text-amber-600', emerald: 'text-emerald-600',
-  green: 'text-green-600', yellow: 'text-amber-600',
-  blue: 'text-primary', sky: 'text-primary',
+  red: 'text-ink-crit', amber: 'text-ink-warn', emerald: 'text-ink-ok',
+  green: 'text-ink-ok', yellow: 'text-ink-warn',
+  blue: 'text-ink-info', sky: 'text-ink-info',
   indigo: 'text-cat-3-ink', violet: 'text-cat-6-ink', purple: 'text-cat-6-ink',
   orange: 'text-cat-4-ink', teal: 'text-cat-7-ink', cyan: 'text-cat-7-ink',
   rose: 'text-cat-5-ink', pink: 'text-cat-5-ink',

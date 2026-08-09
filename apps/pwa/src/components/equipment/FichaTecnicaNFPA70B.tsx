@@ -32,16 +32,19 @@ const CRITICIDAD: Record<Equipment['criticidad'], { nivel: string; label: string
   baja: { nivel: 'C', label: 'Baja', cls: 'border-emerald-500 text-emerald-600' },
 }
 
-const CONDICION: Record<1 | 2 | 3, { emoji: string; label: string }> = {
-  1: { emoji: '🟢', label: 'Condición 1 · como nuevo' },
-  2: { emoji: '🟡', label: 'Condición 2 · con desvíos' },
-  3: { emoji: '🔴', label: 'Condición 3 · acción requerida' },
+/** La condición NFPA es un ESTADO: va como punto de color + texto, nunca como
+ *  emoji (que cambia de forma por sistema operativo y no hereda el tema). El
+ *  color no es el único canal — la etiqueta siempre acompaña. */
+const CONDICION: Record<1 | 2 | 3, { dot: string; label: string }> = {
+  1: { dot: 'bg-ink-ok', label: 'Condición 1 · como nuevo' },
+  2: { dot: 'bg-ink-warn', label: 'Condición 2 · con desvíos' },
+  3: { dot: 'bg-ink-crit', label: 'Condición 3 · acción requerida' },
 }
 
 const SEVERIDAD: Record<MaintenanceLogEntry['severidad'], string> = {
-  verde: '🟢',
-  amarillo: '🟡',
-  rojo: '🔴',
+  verde: 'bg-ink-ok',
+  amarillo: 'bg-ink-warn',
+  rojo: 'bg-ink-crit',
 }
 
 const TIPOS: { value: MaintenanceLogEntry['tipo']; label: string }[] = [
@@ -76,7 +79,7 @@ function emptyDraft(equipment: Pick<Equipment, 'nombre' | 'tipo'>): EntryDraft {
 
 const CHK_ESTADO: { value: ChecklistResultado['estado']; label: string; on: string }[] = [
   { value: 'ok', label: '✓', on: 'bg-emerald-500 text-white' },
-  { value: 'obs', label: '⚠', on: 'bg-amber-500 text-white' },
+  { value: 'obs', label: 'Obs.', on: 'bg-amber-500 text-white' },
   { value: 'na', label: '–', on: 'bg-muted text-foreground' },
 ]
 
@@ -502,7 +505,7 @@ export function FichaTecnicaNFPA70B({
                     size="sm"
                     onClick={() => set({ condicion: ficha.condicion === c ? undefined : c })}
                   >
-                    {CONDICION[c].emoji} {c}
+                    <span className={`inline-block size-2 rounded-full ${CONDICION[c].dot}`} /> {c}
                   </Button>
                 ))}
               </div>
@@ -511,7 +514,7 @@ export function FichaTecnicaNFPA70B({
                 Condición actual:{' '}
                 {ficha.condicion ? (
                   <span className="font-medium text-foreground">
-                    {CONDICION[ficha.condicion].emoji} {CONDICION[ficha.condicion].label}
+                    <span className={`inline-block size-2 rounded-full ${CONDICION[ficha.condicion].dot}`} /> {CONDICION[ficha.condicion].label}
                   </span>
                 ) : (
                   <span className="italic">por evaluar</span>
@@ -546,7 +549,7 @@ export function FichaTecnicaNFPA70B({
           {!editing && (
             <div className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-dashed p-2.5">
               <span className="text-xs text-muted-foreground">
-                💡 Próxima inspección sugerida:{' '}
+                Próxima inspección sugerida:{' '}
                 <span className="font-medium text-foreground">{sugeridaFecha.toLocaleDateString()}</span> — criticidad{' '}
                 {crit.nivel} × condición {ficha.condicion ?? '—'} → {sugeridaDias} d desde {refFecha.toLocaleDateString()}
               </span>
@@ -634,12 +637,12 @@ export function FichaTecnicaNFPA70B({
                       size="sm"
                       onClick={() => setDraft((d) => ({ ...d, severidad: s }))}
                     >
-                      {SEVERIDAD[s]} {s}
+                      <span className={`inline-block size-2 rounded-full ${SEVERIDAD[s]}`} /> {s}
                     </Button>
                   ))}
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  🟢 Condición 1 · como nuevo, sin alertas — 🟡 Condición 2 · con desvíos, requiere atención — 🔴 Condición 3 ·
+                  Condición 1 · como nuevo, sin alertas — Condición 2 · con desvíos, requiere atención — Condición 3 ·
                   acción correctiva requerida.
                 </p>
               </div>
@@ -713,7 +716,7 @@ export function FichaTecnicaNFPA70B({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  ✓ conforme · ⚠ observación · – no evaluado/N/A. En medición anota el valor (se resalta si sale del rango
+                  Conforme · Observación · No evaluado (N/A). En medición anota el valor (se resalta si sale del rango
                   sugerido). Solo se guardan las tareas evaluadas o con valor. Rangos = sugeridos (afinar con el fabricante).
                 </p>
               </div>
@@ -784,7 +787,7 @@ export function FichaTecnicaNFPA70B({
                             variant={editDraft.severidad === s ? 'default' : 'outline'}
                             onClick={() => setEditDraft((d) => ({ ...d, severidad: s }))}
                           >
-                            {SEVERIDAD[s]} {s}
+                            <span className={`inline-block size-2 rounded-full ${SEVERIDAD[s]}`} /> {s}
                           </Button>
                         ))}
                       </div>
@@ -806,7 +809,7 @@ export function FichaTecnicaNFPA70B({
                 }
                 return (
                   <div key={e.key} className="flex items-start gap-3 py-2 border-t first:border-t-0">
-                    <span className="text-sm leading-5">{SEVERIDAD[e.severidad]}</span>
+                    <span className={`inline-block size-2 rounded-full ${SEVERIDAD[e.severidad]}`} aria-label={e.severidad} />
                     <span className="text-xs text-muted-foreground min-w-[88px]">{e.fecha.toLocaleDateString()}</span>
                     <span className="text-sm flex-1 min-w-0">
                       <span className="font-semibold">{e.tipoLabel}</span>

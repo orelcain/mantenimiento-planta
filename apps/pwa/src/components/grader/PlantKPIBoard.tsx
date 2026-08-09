@@ -394,7 +394,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 text-[10px] text-amber-600/90 bg-amber-500/[0.06] border border-amber-500/[0.25] rounded-ctl px-2 py-1.5">
+              <div className="flex items-start gap-1.5 text-[10px] text-ink-warn/90 bg-amber-500/[0.06] border border-amber-500/[0.25] rounded-ctl px-2 py-1.5">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}

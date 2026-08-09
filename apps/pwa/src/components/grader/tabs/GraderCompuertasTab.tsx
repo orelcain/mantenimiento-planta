@@ -63,8 +63,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
       <div className="flex items-center gap-3 p-3 rounded-card border bg-muted">
         <div className={cn(
           'text-2xl font-bold',
-          analytics.allocationScore >= 80 ? 'text-emerald-600' :
-          analytics.allocationScore >= 60 ? 'text-amber-600' : 'text-red-600',
+          analytics.allocationScore >= 80 ? 'text-ink-ok' :
+          analytics.allocationScore >= 60 ? 'text-ink-warn' : 'text-ink-crit',
         )}>
           {analytics.allocationScore ?? '—'}
         </div>
@@ -118,7 +118,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         <Badge variant="destructive" className="text-[10px]">-{gb.gap} gate(s)</Badge>
                       )}
                       {gb.gap < 0 && (
-                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">
+                        <Badge variant="outline" className="text-[10px] text-ink-ok border-emerald-300">
                           +{-gb.gap} extra
                         </Badge>
                       )}
@@ -233,8 +233,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       <td className="py-2 px-2 text-right">
                         <span className={cn(
                           'font-medium',
-                          gs.cv > 0.2 && 'text-red-600',
-                          gs.cv > 0.15 && gs.cv <= 0.2 && 'text-amber-600',
+                          gs.cv > 0.2 && 'text-ink-crit',
+                          gs.cv > 0.15 && gs.cv <= 0.2 && 'text-ink-warn',
                         )}>
                           {(gs.cv * 100).toFixed(1)}%
                         </span>
@@ -248,8 +248,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       <td className="py-2 px-2 text-right">
                         <span className={cn(
                           'font-medium',
-                          gs.mismatchPct > 30 && 'text-red-600',
-                          gs.mismatchPct > 15 && gs.mismatchPct <= 30 && 'text-amber-600',
+                          gs.mismatchPct > 30 && 'text-ink-crit',
+                          gs.mismatchPct > 15 && gs.mismatchPct <= 30 && 'text-ink-warn',
                         )}>
                           {gs.mismatchPct.toFixed(1)}%
                         </span>
@@ -417,9 +417,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 <tbody>
                   {timingSignals.map((t) => {
                     const color =
-                      t.status === 'ok' ? 'text-emerald-600' :
-                      t.status === 'warn' ? 'text-amber-600' :
-                      t.status === 'critical' ? 'text-red-600' :
+                      t.status === 'ok' ? 'text-ink-ok' :
+                      t.status === 'warn' ? 'text-ink-warn' :
+                      t.status === 'critical' ? 'text-ink-crit' :
                       'text-muted-foreground'
                     const bg =
                       t.status === 'ok' ? 'bg-emerald-500/[0.15]' :
@@ -433,9 +433,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       'INACTIVO'
                     const pb = t.pneumaticBreakdown
                     const pEffColor = pb
-                      ? pb.effectivePressureBar >= 5 ? 'text-emerald-600'
-                        : pb.effectivePressureBar >= 3 ? 'text-amber-600'
-                        : 'text-red-600'
+                      ? pb.effectivePressureBar >= 5 ? 'text-ink-ok'
+                        : pb.effectivePressureBar >= 3 ? 'text-ink-warn'
+                        : 'text-ink-crit'
                       : ''
                     return (
                       <tr key={t.gateNumber} className={cn('border-b hover:bg-muted/30', bg)} title={t.hint}>
@@ -481,7 +481,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   <span>·</span>
                   <span>Reset plano: {(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s</span>
                   <span>·</span>
-                  <span className="italic text-amber-600">Configurar neumática en "Configurar compuertas" para desglose per-gate.</span>
+                  <span className="italic text-ink-warn">Configurar neumática en "Configurar compuertas" para desglose per-gate.</span>
                 </>
               )}
             </div>
@@ -544,7 +544,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                             className={cn(
                               'text-[10px]',
                               o.isMatch
-                                ? 'border-emerald-500/[0.25] text-emerald-600'
+                                ? 'border-emerald-500/[0.25] text-ink-ok'
                                 : 'border-cat-6-tint/[0.25] text-cat-6-ink',
                             )}
                           >

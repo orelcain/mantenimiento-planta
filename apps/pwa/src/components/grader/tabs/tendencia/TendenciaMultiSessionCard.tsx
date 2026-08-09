@@ -20,7 +20,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
   const m = multiSessionInsightsView
   const p0Better = m.deltaP0 < 0
   const p0Worse = m.deltaP0 > 0
-  const p0Color = p0Better ? 'text-emerald-600' : p0Worse ? 'text-red-600' : 'text-muted-foreground'
+  const p0Color = p0Better ? 'text-ink-ok' : p0Worse ? 'text-ink-crit' : 'text-muted-foreground'
   const p0BgClass = p0Better ? 'bg-emerald-500/[0.15] border-emerald-500/[0.25]' : p0Worse ? 'bg-red-500/[0.15] border-red-500/[0.25]' : 'bg-muted/20'
   const percentileLabel = m.percentileP0 >= 75 ? 'peor 25%' : m.percentileP0 >= 50 ? 'peor 50%' : m.percentileP0 >= 25 ? 'mejor 50%' : 'mejor 25%'
 
@@ -92,7 +92,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
               })}
             </div>
             {m.recurrentInCurrent.length > 0 && (
-              <p className="text-[10px] text-amber-600 mt-1.5">
+              <p className="text-[10px] text-ink-warn mt-1.5">
                 ⚠ {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
               </p>
             )}

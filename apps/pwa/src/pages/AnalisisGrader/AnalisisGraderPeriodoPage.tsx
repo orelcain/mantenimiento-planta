@@ -240,7 +240,7 @@ export function AnalisisGraderPeriodoPage() {
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="text-sm min-w-0">
-                <p className="font-medium text-amber-600">
+                <p className="font-medium text-ink-warn">
                   {legacyCount} turno{legacyCount !== 1 ? 's' : ''} legacy con etiqueta "Turno tarde" detectado{legacyCount !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -268,13 +268,13 @@ export function AnalisisGraderPeriodoPage() {
         <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <p className="text-sm text-emerald-600">
+            <p className="text-sm text-ink-ok">
               <span className="font-medium">Migración completa:</span>{' '}
               {migrationResult.processed} turnos procesados ·{' '}
               {migrationResult.merged} fusionados con noche existente ·{' '}
               {migrationResult.renamed} renombrados
               {migrationResult.errors > 0 && (
-                <span className="text-red-600 ml-2">· {migrationResult.errors} errores</span>
+                <span className="text-ink-crit ml-2">· {migrationResult.errors} errores</span>
               )}
             </p>
           </CardContent>

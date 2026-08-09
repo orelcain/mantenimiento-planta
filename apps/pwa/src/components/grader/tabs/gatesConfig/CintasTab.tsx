@@ -125,9 +125,9 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                       variant="outline"
                       className={cn(
                         'text-[10px]',
-                        ratio >= 2 ? 'border-green-500/[0.25] text-green-600' :
-                        ratio >= 1.2 ? 'border-amber-500/[0.25] text-amber-600' :
-                        'border-red-500/[0.25] text-red-600',
+                        ratio >= 2 ? 'border-green-500/[0.25] text-ink-ok' :
+                        ratio >= 1.2 ? 'border-amber-500/[0.25] text-ink-warn' :
+                        'border-red-500/[0.25] text-ink-crit',
                       )}
                     >
                       ×{ratio.toFixed(2)} vs {getBeltLabel(prevBeltId!)}
@@ -164,7 +164,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
-        <span className="text-amber-600 font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k.
+        <span className="text-ink-warn font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k.
         Defaults operativos: grading {GRADING_BELT_DEFAULT_MPS} m/s · Z-belt {Z_BELT_DEFAULT_MPS} m/s.
         Para verificar en planta usa el <strong>tachómetro SKF</strong> en cada cinta y registra la medición (FASE 5).
       </p>

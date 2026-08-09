@@ -160,8 +160,8 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                     className={cn(
                       'text-[10px] font-mono shrink-0',
                       Math.abs(delta) === 0 ? 'border-muted text-muted-foreground' :
-                      Math.abs(delta) <= 50 ? 'border-amber-500/[0.25] text-amber-600' :
-                      'border-red-500/[0.25] text-red-600',
+                      Math.abs(delta) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' :
+                      'border-red-500/[0.25] text-ink-crit',
                     )}
                   >
                     {delta >= 0 ? '+' : ''}{delta}
@@ -184,7 +184,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                 variant="outline"
                 className={cn(
                   'text-[10px] font-mono',
-                  Math.abs(deltaCycleMs) <= 50 ? 'border-amber-500/[0.25] text-amber-600' : 'border-red-500/[0.25] text-red-600',
+                  Math.abs(deltaCycleMs) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' : 'border-red-500/[0.25] text-ink-crit',
                 )}
               >
                 Δ {deltaCycleMs >= 0 ? '+' : ''}{deltaCycleMs} ms vs actual

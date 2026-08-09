@@ -30,7 +30,7 @@ export function SuggestionsPanel({ suggestions }: Props) {
         <span className={cn(
           'text-[10px] px-2 py-0.5 rounded-full font-medium',
           warnings.length > 0
-            ? 'bg-red-500/[0.15] text-red-600'
+            ? 'bg-red-500/[0.15] text-ink-crit'
             : 'bg-amber-500/[0.15] text-amber-400',
         )}>
           {countLabel}

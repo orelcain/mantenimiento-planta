@@ -1573,7 +1573,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 onClick={() => setFavBarOpen((v) => !v)}
                 className="flex w-full items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
               >
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-600" /> Favoritos de equipos
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-ink-warn" /> Favoritos de equipos
                 {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
                 <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
               </button>
@@ -1961,7 +1961,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
                                 {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
-                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-semibold text-ink-ok"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
@@ -2041,7 +2041,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <td className="px-3 py-2">
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
-                                className={['rounded-ctl p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-600' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                className={['rounded-ctl p-0.5 transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
                                 title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                                 aria-label="Favorito"
                               >
@@ -2525,7 +2525,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 onClick={() => favEquipPicker && addEquipToList(l.name, favEquipPicker.machineId, favEquipPicker.displayName)}
                 className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
               >
-                <Star className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <Star className="h-3.5 w-3.5 shrink-0 text-ink-warn" />
                 <span className="flex-1 truncate">{l.name}</span>
                 <span className="text-[10px] text-muted-foreground tabular-nums">{l.machineIds.length}</span>
               </button>

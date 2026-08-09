@@ -46,9 +46,9 @@ export function TopActionsCard({ attribution }: Props) {
                   ? 'text-red-500'
                   : 'text-zinc-400'
               const valueColor = improved
-                ? 'text-emerald-600'
+                ? 'text-ink-ok'
                 : worsened
-                  ? 'text-red-600'
+                  ? 'text-ink-crit'
                   : 'text-muted-foreground'
 
               return (
@@ -83,8 +83,8 @@ export function TopActionsCard({ attribution }: Props) {
                   className={cn(
                     'font-mono font-medium',
                     avgImprovementPerAction < 0
-                      ? 'text-emerald-600'
-                      : 'text-red-600',
+                      ? 'text-ink-ok'
+                      : 'text-ink-crit',
                   )}
                 >
                   {avgImprovementPerAction >= 0 ? '+' : ''}

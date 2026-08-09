@@ -153,7 +153,7 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-amber-600 border border-amber-500/[0.25]">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25]">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}

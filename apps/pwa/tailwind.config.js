@@ -137,6 +137,14 @@ export default {
         // Tinta de marca para texto SOBRE tinte de marca (el primary puro
         // reprueba AA sobre su propio tinte al 15% — medido).
         'brand-ink': 'rgb(var(--brand-ink) / <alpha-value>)',
+        // TINTA ADAPTATIVA: reemplaza el patrón `text-X-700 dark:text-X-400`
+        // por UNA clase que ya cambia con el tema. No usar los -600 para esto:
+        // esos tienen dueño (la decisión de julio de bajar croma) y reutilizarlos
+        // lavó los colores de producción.
+        'ink-crit': 'rgb(var(--ink-crit) / <alpha-value>)',
+        'ink-warn': 'rgb(var(--ink-warn) / <alpha-value>)',
+        'ink-ok': 'rgb(var(--ink-ok) / <alpha-value>)',
+        'ink-info': 'rgb(var(--ink-info) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
         input: 'rgb(var(--border) / <alpha-value>)',
         ring: '#5aa6e8',

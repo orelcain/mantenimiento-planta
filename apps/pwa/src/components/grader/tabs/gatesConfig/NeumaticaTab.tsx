@@ -167,7 +167,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
                     {(tTotal * 1000).toFixed(0)}ms
                   </td>
                   <td className={cn('py-1 px-2 text-right tabular-nums font-mono text-xs',
-                    pEff >= 5 ? 'text-emerald-600' : pEff >= 3 ? 'text-amber-600' : 'text-red-600',
+                    pEff >= 5 ? 'text-ink-ok' : pEff >= 3 ? 'text-ink-warn' : 'text-ink-crit',
                   )}>
                     {pEff.toFixed(1)}
                   </td>

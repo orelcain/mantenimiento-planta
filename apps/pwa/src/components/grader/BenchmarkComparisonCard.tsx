@@ -28,19 +28,19 @@ const VERDICT_CONFIG = {
   better: {
     label: 'Mejor que la temporada',
     Icon: TrendingDown,
-    color: 'text-emerald-600',
+    color: 'text-ink-ok',
     bg: 'bg-emerald-500/[0.15] border-emerald-200 dark:border-emerald-800',
   },
   similar: {
     label: 'Similar a la temporada',
     Icon: Minus,
-    color: 'text-amber-600',
+    color: 'text-ink-warn',
     bg: 'bg-amber-500/[0.15] border-amber-200 dark:border-amber-800',
   },
   worse: {
     label: 'Por encima del histórico',
     Icon: TrendingUp,
-    color: 'text-red-600',
+    color: 'text-ink-crit',
     bg: 'bg-red-500/[0.15] border-red-200 dark:border-red-800',
   },
 }
@@ -87,9 +87,9 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                 className={cn(
                   'font-mono font-medium',
                   overallDelta < 0
-                    ? 'text-emerald-600'
+                    ? 'text-ink-ok'
                     : overallDelta > 0
-                      ? 'text-red-600'
+                      ? 'text-ink-crit'
                       : 'text-muted-foreground',
                 )}
               >
@@ -125,9 +125,9 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
                   className={cn(
                     'w-16 text-right font-mono',
                     delta < -2
-                      ? 'text-emerald-600'
+                      ? 'text-ink-ok'
                       : delta > 2
-                        ? 'text-red-600'
+                        ? 'text-ink-crit'
                         : 'text-muted-foreground',
                   )}
                 >

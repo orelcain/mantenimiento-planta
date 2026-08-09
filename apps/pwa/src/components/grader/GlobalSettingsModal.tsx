@@ -292,13 +292,13 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               <div className="rounded-ctl border border-border bg-muted p-3">
                 <p className="text-[11px] text-muted-foreground mb-2 font-medium">Vista previa de colores</p>
                 <div className="flex items-center gap-3 text-xs flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-emerald-500/[0.15] text-emerald-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-emerald-500/[0.15] text-ink-ok font-medium">
                     ✓ OK — bajo {alertThreshold}%
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-amber-500/[0.15] text-amber-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-medium">
                     ⚠ Alerta — {alertThreshold}–{criticalThreshold}%
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-red-500/[0.15] text-red-600 font-medium">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-red-500/[0.15] text-ink-crit font-medium">
                     ✕ Crítico — sobre {criticalThreshold}%
                   </span>
                 </div>
@@ -524,7 +524,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </div>
 
               {isCustomRanges && (
-                <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-600">
+                <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-ink-warn">
                   Personalizado
                 </Badge>
               )}

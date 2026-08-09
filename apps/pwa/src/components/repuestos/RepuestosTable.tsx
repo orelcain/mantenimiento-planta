@@ -46,8 +46,8 @@ const formatNumber = (value: number) =>
 function tipoBadgeClass(tipo: string): string {
   const t = tipo.toUpperCase()
   if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-primary'
-  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-green-600'
-  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-red-600'
+  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-ink-ok'
+  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-ink-crit'
   if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-cat-6-tint/[0.15] text-cat-6-ink'
   if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-muted-foreground/[0.10] text-muted-foreground'
   if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
@@ -307,7 +307,7 @@ export function RepuestosTable({
                     <p className="font-medium text-foreground text-[13px] leading-tight line-clamp-1 flex-1">{rep.textoBreve || rep.descripcion || 'Sin nombre'}</p>
                     {onToggleFavorite && (
                       <button onClick={e => { e.stopPropagation(); onToggleFavorite(rep.id) }} className="shrink-0 p-0.5">
-                        <Star className={`h-3.5 w-3.5 ${favoriteIds?.has(rep.id) ? 'text-amber-600 fill-yellow-400' : 'text-muted-foreground/20'}`} />
+                        <Star className={`h-3.5 w-3.5 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/20'}`} />
                       </button>
                     )}
                   </div>
@@ -317,7 +317,7 @@ export function RepuestosTable({
                     {rep.codigoFabricante && <span className="text-[9px] font-mono text-cat-6-ink bg-cat-6-tint/[0.15] px-1 py-0 rounded-ctl">{rep.codigoFabricante}</span>}
                     {rep.tipo && <span className={`text-[8px] px-1 py-0 rounded-ctl font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
                     {(rep as EquipmentRepuesto).source && (
-                      <span className={`text-[8px] px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-emerald-600' : 'bg-primary/[0.15] text-primary'}`}>
+                      <span className={`text-[8px] px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-primary'}`}>
                         {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Comp.'}
                       </span>
                     )}
@@ -402,7 +402,7 @@ export function RepuestosTable({
                           </span>
                         )}
                         {(rep as EquipmentRepuesto).source && (
-                          <span className={`inline-block text-[9px] px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-emerald-600' : 'bg-primary/[0.15] text-primary'}`}>
+                          <span className={`inline-block text-[9px] px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-primary'}`}>
                             {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Compartido'}
                           </span>
                         )}
@@ -412,7 +412,7 @@ export function RepuestosTable({
                       )}
                       {onToggleFavorite && (
                         <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded-ctl hover:bg-amber-500/[0.15] transition-colors">
-                          <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-amber-600 fill-yellow-400' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
+                          <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
                         </button>
                       )}
                     </div>
@@ -464,7 +464,7 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5 max-w-[200px]">
                     {rep.observaciones ? (
                       <div className="flex items-start gap-1">
-                        <MessageSquareText className="h-3 w-3 text-amber-600/60 shrink-0 mt-0.5" />
+                        <MessageSquareText className="h-3 w-3 text-ink-warn/60 shrink-0 mt-0.5" />
                         <span className="text-xs text-muted-foreground line-clamp-2" title={rep.observaciones}>
                           {rep.observaciones}
                         </span>
@@ -491,7 +491,7 @@ export function RepuestosTable({
                       {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Ver en Manual">
                           <button onClick={() => onViewInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-green-600/60 hover:text-green-400 hover:bg-green-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-ok/60 hover:text-green-400 hover:bg-green-500/[0.15] transition-colors">
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -499,7 +499,7 @@ export function RepuestosTable({
                       {isAdmin && onEditAnnotation && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Editar ubicación">
                           <button onClick={() => onEditAnnotation(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-amber-600/60 hover:text-yellow-400 hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-yellow-400 hover:bg-amber-500/[0.15] transition-colors">
                             <Pencil className="h-3 w-3" />
                           </button>
                         </Tip>
@@ -522,7 +522,7 @@ export function RepuestosTable({
                       {onRelocate && (
                         <Tip label="Reubicar">
                           <button onClick={() => onRelocate(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-amber-600/60 hover:text-amber-400 hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-amber-400 hover:bg-amber-500/[0.15] transition-colors">
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                           </button>
                         </Tip>

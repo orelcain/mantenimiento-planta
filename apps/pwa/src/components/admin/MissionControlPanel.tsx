@@ -102,7 +102,7 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
         </button>
         <button
           onClick={() => onDelete(c.id!)}
-          className="p-0.5 rounded hover:bg-red-500/[0.15] dark:bg-red-500/[0.15] text-red-600"
+          className="p-0.5 rounded hover:bg-red-500/[0.15] dark:bg-red-500/[0.15] text-ink-crit"
           title="Eliminar corrección"
         >
           <Trash2 className="h-3 w-3" />
@@ -642,9 +642,9 @@ export function MissionControlPanel() {
                 <div key={agent.id} className="flex items-center gap-1">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
                     agent.status === 'online'
-                      ? 'border-green-500/[0.25] bg-green-500/[0.15] text-green-600'
+                      ? 'border-green-500/[0.25] bg-green-500/[0.15] text-ink-ok'
                       : agent.status === 'rate-limited'
-                      ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-600'
+                      ? 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn'
                       : 'border-border bg-muted text-muted-foreground'
                   }`}>
                     <span>{agent.emoji}</span>

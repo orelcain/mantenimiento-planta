@@ -1263,8 +1263,8 @@ export function ShiftTimelineView({
             <span
               className={cn(
                 'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium',
-                coverage.pct >= 95 && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-600',
-                coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-600',
+                coverage.pct >= 95 && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok',
+                coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn',
                 coverage.pct < 85 && 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] text-cat-4-ink',
                 canAnnotate && coverage.unclassifiedMin > 0 && 'cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity',
               )}

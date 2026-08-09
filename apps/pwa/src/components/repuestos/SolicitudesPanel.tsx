@@ -28,9 +28,9 @@ interface Props {
 }
 
 const ESTADO_META: Record<SolicitudEstado, { label: string; cls: string }> = {
-  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/[0.15] text-amber-600' },
+  pendiente: { label: 'Pendiente', cls: 'bg-amber-500/[0.15] text-ink-warn' },
   aprobada: { label: 'Aprobada', cls: 'bg-primary/[0.15] text-primary' },
-  entregada: { label: 'Entregada', cls: 'bg-emerald-500/[0.15] text-emerald-600' },
+  entregada: { label: 'Entregada', cls: 'bg-emerald-500/[0.15] text-ink-ok' },
 }
 
 const ACCION_LABEL: Record<Exclude<SolicitudEstado, 'entregada'>, string> = {
@@ -157,7 +157,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                             {ACCION_LABEL[s.estado as Exclude<SolicitudEstado, 'entregada'>]}
                           </Button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-ok">
                             <Check className="h-3.5 w-3.5" /> Lista
                           </span>
                         )}

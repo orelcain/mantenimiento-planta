@@ -220,7 +220,7 @@ export function RepuestoFormModal({
 
           {/* Aviso de duplicado (no bloquea: solo advierte) */}
           {duplicate && (
-            <div className="flex items-start gap-2 rounded-card border border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2 text-xs text-amber-600">
+            <div className="flex items-start gap-2 rounded-card border border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2 text-xs text-ink-warn">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 Ya existe un material parecido: <span className="font-semibold">{duplicate.textoBreve}</span>

@@ -345,7 +345,7 @@ export function GraderLotesTab({
                   <div key={action.gateNumber} className="flex items-start justify-between gap-2">
                     <p>• {action.text}</p>
                     {action.canApply && action.isApplied && (
-                      <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-emerald-600">
+                      <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-ink-ok">
                         Aplicada
                       </Badge>
                     )}

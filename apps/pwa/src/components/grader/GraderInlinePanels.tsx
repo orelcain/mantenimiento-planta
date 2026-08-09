@@ -100,8 +100,8 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     variant="outline"
                     className={cn(
                       'text-[9px] shrink-0',
-                      c.confidence === 'high' && 'text-red-600 border-red-300',
-                      c.confidence === 'medium' && 'text-amber-600 border-amber-300',
+                      c.confidence === 'high' && 'text-ink-crit border-red-300',
+                      c.confidence === 'medium' && 'text-ink-warn border-amber-300',
                     )}
                   >
                     {confidenceLabel[c.confidence] || c.confidence}
@@ -145,9 +145,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                   className={cn(
                     'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-[10px] font-bold',
                     a.priority === 'high'
-                      ? 'bg-red-500/[0.15] text-red-600'
+                      ? 'bg-red-500/[0.15] text-ink-crit'
                       : a.priority === 'medium'
-                      ? 'bg-amber-500/[0.15] text-amber-600'
+                      ? 'bg-amber-500/[0.15] text-ink-warn'
                       : 'bg-muted text-muted-foreground',
                   )}
                 >
@@ -171,7 +171,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
         <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.15] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
           <div className="space-y-1.5">
@@ -179,7 +179,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               <label key={i} className="flex items-start gap-2.5 cursor-pointer group">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 rounded-ctl border-emerald-400 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                  className="mt-1 h-4 w-4 rounded-ctl border-emerald-400 text-ink-ok focus:ring-emerald-500 shrink-0"
                 />
                 <span className="text-sm group-hover:text-foreground transition-colors">{c}</span>
               </label>
@@ -191,9 +191,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
         <div className="p-2.5 bg-amber-500/[0.15] rounded-card border border-amber-200 dark:border-amber-800">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1">Advertencias</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
-            <p key={i} className="text-[11px] text-amber-600">{d}</p>
+            <p key={i} className="text-[11px] text-ink-warn">{d}</p>
           ))}
         </div>
       )}
@@ -211,12 +211,12 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     add: 'Agregar',
   }
   const typeColors: Record<string, string> = {
-    correction: 'text-amber-600 border-amber-300',
+    correction: 'text-ink-warn border-amber-300',
     optimization: 'text-purple-600 border-purple-300',
     investigate: 'text-sky-600 border-sky-300',
     swap: 'text-purple-600 border-purple-300',
     reassign: 'text-blue-600 border-blue-300',
-    add: 'text-green-600 border-green-300',
+    add: 'text-ink-ok border-green-300',
   }
   const typeIcons: Record<string, string> = {
     correction: '🏷️',

@@ -158,8 +158,8 @@ export function PuntoCeroClasificacionCard({
                         <td className="py-2 px-2 text-right tabular-nums">
                           <span className={cn(
                             'font-semibold',
-                            c.pctOfPointZero >= 50 && 'text-red-600',
-                            c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
+                            c.pctOfPointZero >= 50 && 'text-ink-crit',
+                            c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-ink-warn',
                           )}>
                             {c.pctOfPointZero}%
                           </span>

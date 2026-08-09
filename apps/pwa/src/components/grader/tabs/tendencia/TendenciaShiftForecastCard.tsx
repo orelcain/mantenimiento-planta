@@ -33,9 +33,9 @@ export function TendenciaShiftForecastCard({
     severity === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' :
     'border-emerald-500/[0.25] bg-emerald-500/[0.15]'
   const severityText =
-    severity === 'critical' ? 'text-red-600' :
-    severity === 'warn' ? 'text-amber-600' :
-    'text-emerald-600'
+    severity === 'critical' ? 'text-ink-crit' :
+    severity === 'warn' ? 'text-ink-warn' :
+    'text-ink-ok'
   const severityLabel =
     severity === 'critical' ? 'CRÍTICO' :
     severity === 'warn' ? 'ALERTA' :

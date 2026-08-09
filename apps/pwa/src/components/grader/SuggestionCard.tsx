@@ -4,8 +4,8 @@ import { ChevronDown, Fish, CalendarDays, BarChart3, Ruler, ClipboardList, Video
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
-  warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-red-600',    dot: 'bg-red-400'    },
-  recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-amber-600', dot: 'bg-amber-400'  },
+  warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
+  recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
   info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-primary',    dot: 'bg-sky-400'    },
 } as const
 

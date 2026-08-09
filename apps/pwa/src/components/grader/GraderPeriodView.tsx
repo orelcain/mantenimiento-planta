@@ -663,7 +663,7 @@ export function GraderPeriodView({ data }: Props) {
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold tabular-nums text-emerald-600">
+                <p className="text-2xl font-bold tabular-nums text-ink-ok">
                   {visibleStats.minP0Day.p0Pct}%
                 </p>
               </CardContent>
@@ -707,7 +707,7 @@ export function GraderPeriodView({ data }: Props) {
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
-                  insights.trendDir === 'better' && 'text-emerald-600',
+                  insights.trendDir === 'better' && 'text-ink-ok',
                   insights.trendDir === 'worse'  && 'text-red-500',
                   insights.trendDir === 'stable' && 'text-muted-foreground',
                 )}>
@@ -721,7 +721,7 @@ export function GraderPeriodView({ data }: Props) {
               {/* Días críticos */}
               <div className="rounded-card border border-border bg-background px-3 py-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
-                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-emerald-600')}>
+                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-ink-ok')}>
                   {insights.criticalCount} / {insights.totalDays}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -751,7 +751,7 @@ export function GraderPeriodView({ data }: Props) {
               {insights.bestWeekStart && (
                 <div className="rounded-card border border-border bg-background px-3 py-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
-                  <p className="font-semibold text-sm text-emerald-600">{insights.bestWeekAvg}% P0 prom.</p>
+                  <p className="font-semibold text-sm text-ink-ok">{insights.bestWeekAvg}% P0 prom.</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     semana del {formatShortDate(insights.bestWeekStart)}
                   </p>
@@ -1025,7 +1025,7 @@ export function GraderPeriodView({ data }: Props) {
                         variant="outline"
                         className={cn(
                           'text-[10px]',
-                          s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-amber-600',
+                          s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-ink-warn',
                           s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-indigo-600',
                         )}
                       >

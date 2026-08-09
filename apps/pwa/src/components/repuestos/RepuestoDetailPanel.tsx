@@ -342,7 +342,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
               </button>
             </span>
           ) : (
-            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">sin SAP · pieza de despiece</span>
+            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-ink-warn">sin SAP · pieza de despiece</span>
           )}
         </div>
 
@@ -473,7 +473,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     return (
                       <span
                         key={slug}
-                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-[12px] font-medium text-emerald-600"
+                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-[12px] font-medium text-ink-ok"
                         title={seededOnly ? 'De la lista base (planilla de planta) — se edita en el código' : undefined}
                       >
                         {findMachineBySlug(slug)?.name ?? slug}
@@ -630,7 +630,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                   {item.ultimoConteoAt ? (
                     <>Contado el {fmtDate(item.ultimoConteoAt)}{item.ultimoConteoPor ? ` · por ${item.ultimoConteoPor}` : ''}</>
                   ) : (
-                    <span className="text-amber-600">Nunca contado — el stock viene de la importación</span>
+                    <span className="text-ink-warn">Nunca contado — el stock viene de la importación</span>
                   )}
                 </div>
                 <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1.5" onClick={() => { setConteoVal(String(item.stockActual ?? 0)); setContando(true) }}>

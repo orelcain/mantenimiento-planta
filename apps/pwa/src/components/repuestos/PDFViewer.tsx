@@ -394,7 +394,7 @@ export function PDFViewer({
   if (error) {
     return (
       <div className="flex items-center justify-center h-96 bg-red-50 rounded-card">
-        <div className="text-center text-red-600">
+        <div className="text-center text-ink-crit">
           <p className="font-semibold">❌ {error}</p>
           <p className="text-sm mt-2">Verifica que el archivo PDF sea accesible</p>
         </div>

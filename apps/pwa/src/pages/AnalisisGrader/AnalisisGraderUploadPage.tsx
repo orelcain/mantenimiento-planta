@@ -60,10 +60,10 @@ const KIND_LABELS: Record<MatrixFileKind, string> = {
 
 const KIND_COLORS: Record<MatrixFileKind, string> = {
   PIEZA_PIEZA: 'bg-primary/[0.15] text-primary',
-  PUERTA_0: 'bg-red-500/[0.15] text-red-600',
-  PORC_CALIDAD: 'bg-green-500/[0.15] text-green-600',
+  PUERTA_0: 'bg-red-500/[0.15] text-ink-crit',
+  PORC_CALIDAD: 'bg-green-500/[0.15] text-ink-ok',
   TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.15] text-cat-6-ink',
-  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.15] text-amber-600',
+  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.15] text-ink-warn',
   UNKNOWN: 'bg-muted-foreground/[0.10] text-muted-foreground',
 }
 
@@ -524,7 +524,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           {/* Turno detectado */}
           {turnoRange && (
             <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-ctl px-3 py-2">
-              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <CheckCircle className="h-3.5 w-3.5 text-ink-ok shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
               <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>
             </div>
@@ -532,7 +532,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Aviso Puerta 0 faltante */}
           {hasPiezaPieza && files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && (
-            <p className="text-[11px] text-amber-600 flex items-center gap-1">
+            <p className="text-[11px] text-ink-warn flex items-center gap-1">
               <Info className="h-3 w-3" />
               Sin Puerta 0: el desglose de errores será inferido desde los pesos
             </p>

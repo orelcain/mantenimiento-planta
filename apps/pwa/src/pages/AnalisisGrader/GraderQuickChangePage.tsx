@@ -167,7 +167,7 @@ export function GraderQuickChangePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-red-500/[0.15] text-red-600 border-red-500/[0.25] text-[10px]">EN VIVO</Badge>
+                    <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-[10px]">EN VIVO</Badge>
                   </div>
                   {shiftStart && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
@@ -190,7 +190,7 @@ export function GraderQuickChangePage() {
 
           {/* Feedback de cambios guardados */}
           {savedCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-card bg-emerald-500/[0.15] border border-emerald-500/[0.25] text-sm text-emerald-600">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-card bg-emerald-500/[0.15] border border-emerald-500/[0.25] text-sm text-ink-ok">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               {savedCount === 1
                 ? 'Cambio registrado exitosamente'

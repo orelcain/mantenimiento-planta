@@ -23,7 +23,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
   const p0Dir = cmp.delta.p0 > 0 ? 'up' : cmp.delta.p0 < 0 ? 'down' : 'flat'
   const weightDir = cmp.delta.avgWeightPct > 0 ? 'up' : cmp.delta.avgWeightPct < 0 ? 'down' : 'flat'
   // Para P0, subir es malo (rojo), bajar es bueno (verde)
-  const p0Color = p0Dir === 'up' ? 'text-red-600' : p0Dir === 'down' ? 'text-emerald-600' : 'text-muted-foreground'
+  const p0Color = p0Dir === 'up' ? 'text-ink-crit' : p0Dir === 'down' ? 'text-ink-ok' : 'text-muted-foreground'
   const weightColor = weightDir === 'up' ? 'text-primary' : weightDir === 'down' ? 'text-cat-4-ink' : 'text-muted-foreground'
   const P0Icon = p0Dir === 'up' ? TrendingUp : p0Dir === 'down' ? TrendingDown : Minus
   const WeightIcon = weightDir === 'up' ? TrendingUp : weightDir === 'down' ? TrendingDown : Minus
@@ -88,7 +88,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
               {cmp.siblingLabel}: {cmp.sibling.calibre}
             </p>
             {cmp.current.calibre !== cmp.sibling.calibre && (
-              <p className="text-[10px] text-amber-600 font-medium">Diferente</p>
+              <p className="text-[10px] text-ink-warn font-medium">Diferente</p>
             )}
           </div>
         </div>

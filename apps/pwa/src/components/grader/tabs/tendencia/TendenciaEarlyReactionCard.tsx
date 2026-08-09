@@ -149,7 +149,7 @@ export function TendenciaEarlyReactionCard({
             <div key={`trend-auto-${action.gateNumber}`} className="flex items-start justify-between gap-2 text-xs">
               <p>• {action.text}</p>
               {action.isApplied ? (
-                <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-emerald-600">
+                <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-ink-ok">
                   Aplicada
                 </Badge>
               ) : (
@@ -226,9 +226,9 @@ export function TendenciaEarlyReactionCard({
                         <div className="flex flex-wrap items-center gap-2 rounded-ctl border bg-muted/20 px-2 py-1.5">
                           <Badge variant="outline" className={cn(
                             'text-[10px]',
-                            trendAIConsistency.level === 'alta' && 'border-emerald-500/[0.25] text-emerald-600',
-                            trendAIConsistency.level === 'media' && 'border-amber-500/[0.25] text-amber-600',
-                            trendAIConsistency.level === 'baja' && 'border-red-500/[0.25] text-red-600',
+                            trendAIConsistency.level === 'alta' && 'border-emerald-500/[0.25] text-ink-ok',
+                            trendAIConsistency.level === 'media' && 'border-amber-500/[0.25] text-ink-warn',
+                            trendAIConsistency.level === 'baja' && 'border-red-500/[0.25] text-ink-crit',
                           )}>
                             Consistencia: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
                           </Badge>
@@ -263,10 +263,10 @@ export function TendenciaEarlyReactionCard({
                                     <td className="py-1 px-1.5">
                                       <Badge variant="outline" className={cn(
                                         'text-[10px]',
-                                        row.changeType === 'igual' && 'border-emerald-500/[0.25] text-emerald-600',
-                                        row.changeType === 'ajustada' && 'border-amber-500/[0.25] text-amber-600',
+                                        row.changeType === 'igual' && 'border-emerald-500/[0.25] text-ink-ok',
+                                        row.changeType === 'ajustada' && 'border-amber-500/[0.25] text-ink-warn',
                                         row.changeType === 'nueva' && 'border-primary/[0.25] text-sky-600',
-                                        row.changeType === 'eliminada' && 'border-red-500/[0.25] text-red-600',
+                                        row.changeType === 'eliminada' && 'border-red-500/[0.25] text-ink-crit',
                                       )}>
                                         {row.changeType}
                                       </Badge>

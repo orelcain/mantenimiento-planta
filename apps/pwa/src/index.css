@@ -111,6 +111,27 @@
   --tw-amber-400: 172 150 110;    --tw-amber-500: 168 140 100;   --tw-amber-600: 174 126 89;
   --tw-blue-400: 109 163 216;     --tw-blue-500: 74 134 200;
 
+  /* ── TINTA ADAPTATIVA (--ink-*) ───────────────────────────────────────────
+     Nace de un ERROR: el barrido colapsó `text-X-700 dark:text-X-400` en un
+     único `text-X-600`, y en la piel ACTUAL eso lavó los colores (el verde
+     claro pasó de #047857 a #5b8c75). Un token no puede servir a dos amos:
+     los `-600` ya tenían dueño (la decisión de julio de bajar croma), así que
+     la tinta del barrido vive aparte.
+     Aquí los valores reproducen EXACTAMENTE el par original: el -700 de
+     Tailwind en claro y el -400 (mate) en oscuro. La piel actual vuelve a
+     verse como antes; la nueva usa sus propios valores medidos. */
+  --ink-crit: 185 28 28;      /* red-700   */
+  --ink-warn: 180 83 9;       /* amber-700 */
+  --ink-ok: 4 120 87;         /* emerald-700 */
+  --ink-info: 29 78 216;      /* blue-700  */
+
+  /* Categóricos en la piel ACTUAL (claro): los -700 de Tailwind, para que el
+     barrido no cambie el aspecto de producción. Los valores Apple viven en el
+     bloque [data-skin="apple"]. */
+  --cat-1-ink: 29 78 216;    --cat-2-ink: 21 128 61;    --cat-3-ink: 67 56 202;
+  --cat-4-ink: 194 65 12;    --cat-5-ink: 190 18 60;    --cat-6-ink: 109 40 217;
+  --cat-7-ink: 15 118 110;   --cat-8-ink: 180 83 9;
+
   /* ── ESCALA ÚNICA DE RADIOS (docs §3) ────────────────────────────────────
      La app mezclaba 6 variantes (650 `rounded`, 565 `-lg`, 304 `-md`, 90 `-xl`,
      62 `-sm`, 5 `-2xl`): eso es lo que hace que "todo se vea casi igual pero
@@ -141,14 +162,14 @@
      Los 8 pasan AA sobre su propio tinte en ambos temas — medido, y vigilado
      en `scripts/check-contrast.mjs`. Dos hubo que corregirlos: el índigo
      oscuro (3.78:1) y el teal claro (4.41:1). */
-  --cat-1-ink: 0 100 209;      --cat-1-tint: 0 122 255;     /* azul     */
-  --cat-2-ink: 33 125 56;     --cat-2-tint: 52 199 89;     /* verde    */
-  --cat-3-ink: 88 86 214;     --cat-3-tint: 88 86 214;     /* índigo   */
-  --cat-4-ink: 158 92 0;      --cat-4-tint: 255 149 0;     /* naranja  */
-  --cat-5-ink: 199 35 66;     --cat-5-tint: 255 45 85;     /* rosa     */
-  --cat-6-ink: 147 69 186;    --cat-6-tint: 175 82 222;    /* púrpura  */
-  --cat-7-ink: 32 118 133;    --cat-7-tint: 48 176 199;    /* teal     */
-  --cat-8-ink: 126 103 73;     --cat-8-tint: 162 132 94;    /* café     */
+  --cat-1-tint: 0 122 255;     /* azul     */
+  --cat-2-tint: 52 199 89;     /* verde    */
+  --cat-3-tint: 88 86 214;     /* índigo   */
+  --cat-4-tint: 255 149 0;     /* naranja  */
+  --cat-5-tint: 255 45 85;     /* rosa     */
+  --cat-6-tint: 175 82 222;    /* púrpura  */
+  --cat-7-tint: 48 176 199;    /* teal     */
+  --cat-8-tint: 162 132 94;    /* café     */
 }
 .dark {
   color-scheme: dark;
@@ -202,6 +223,17 @@
   --shift-ramp-3: #4b8fd2;  --shift-ramp-3-ink: #14202c;  /* 4.84:1 */
   --shift-ramp-4: #53a3f0;  --shift-ramp-4-ink: #14202c;  /* 6.18:1 */
   --shift-empty: rgba(157, 176, 194, 0.06);
+
+  /* Tinta adaptativa en oscuro: los -400 mate de julio, sin cambios. */
+  --ink-crit: 178 128 127;
+  --ink-warn: 172 150 110;
+  --ink-ok: 108 154 138;
+  --ink-info: 109 163 216;
+
+  /* Categóricos en la piel ACTUAL (oscuro): los -400 que ya usaba la app. */
+  --cat-1-ink: 109 163 216;  --cat-2-ink: 119 159 133;  --cat-3-ink: 137 146 209;
+  --cat-4-ink: 251 146 60;   --cat-5-ink: 224 125 140;  --cat-6-ink: 161 144 214;
+  --cat-7-ink: 86 184 204;   --cat-8-ink: 172 150 110;
 
   /* Paleta categórica en oscuro: NO es el claro invertido. La tinta usa los
      tonos vivos (que sobre superficie oscura son los legibles) y el tinte el
@@ -283,6 +315,11 @@
   --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
 
   /* Geometría Apple: más redondeada y con más salto entre niveles. */
+  --ink-crit: 196 45 37;      /* medido sobre tinte 15% */
+  --ink-warn: 158 92 0;
+  --ink-ok: 33 125 56;
+  --ink-info: 42 106 166;
+
   --r-ctl: 10px;
   --r-card: 14px;
   --r-panel: 18px;
@@ -327,6 +364,10 @@
   --brand: 90 160 220;              /* #5AA0DC */
   --brand-foreground: 16 20 26;
   --brand-ink: 113 173 225;         /* #71ade1 */
+  --ink-crit: 255 119 111;
+  --ink-warn: 255 159 10;
+  --ink-ok: 48 209 88;
+  --ink-info: 113 173 225;
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que

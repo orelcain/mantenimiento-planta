@@ -54,8 +54,8 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">Gate {gateNum}</span>
                 <div className="flex items-center gap-1">
-                  {isCritical && <Badge className="text-[9px] px-1 py-0 bg-red-500/[0.15] text-red-600">Crítico</Badge>}
-                  {isWarning && <Badge className="text-[9px] px-1 py-0 bg-amber-500/[0.15] text-amber-600">Ajustado</Badge>}
+                  {isCritical && <Badge className="text-[9px] px-1 py-0 bg-red-500/[0.15] text-ink-crit">Crítico</Badge>}
+                  {isWarning && <Badge className="text-[9px] px-1 py-0 bg-amber-500/[0.15] text-ink-warn">Ajustado</Badge>}
                   <Button
                     size="sm"
                     variant="ghost"

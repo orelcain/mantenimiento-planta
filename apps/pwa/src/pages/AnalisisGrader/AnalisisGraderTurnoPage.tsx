@@ -1546,7 +1546,7 @@ export function AnalisisGraderTurnoPage() {
               variant="outline"
               size="sm"
               onClick={() => setNextPauseOpen(true)}
-              className="gap-1.5 text-amber-600 border-amber-500/[0.25] hover:bg-amber-500/[0.15]"
+              className="gap-1.5 text-ink-warn border-amber-500/[0.25] hover:bg-amber-500/[0.15]"
               title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
             >
               <Tag className="w-3.5 h-3.5" />
@@ -1849,7 +1849,7 @@ export function AnalisisGraderTurnoPage() {
               <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-amber-500/[0.25] dark:bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-amber-600">Marel HG — Corta-cabeza</p>
+                  <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>

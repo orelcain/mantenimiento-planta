@@ -689,9 +689,9 @@ export function AnalisisGraderWizardPage() {
             <Badge
               variant="outline"
               className={
-                autosaveState === 'saved' ? 'text-emerald-600 border-emerald-500/[0.25]' :
+                autosaveState === 'saved' ? 'text-ink-ok border-emerald-500/[0.25]' :
                 autosaveState === 'saving' ? 'text-sky-600 border-primary/[0.25]' :
-                autosaveState === 'error' ? 'text-amber-600 border-amber-500/[0.25]' :
+                autosaveState === 'error' ? 'text-ink-warn border-amber-500/[0.25]' :
                 'text-muted-foreground border-muted'
               }
             >
@@ -764,8 +764,8 @@ export function AnalisisGraderWizardPage() {
       {savedToCalendar && (
         <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-            <p className="text-sm text-emerald-600 font-medium">
+            <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
+            <p className="text-sm text-ink-ok font-medium">
               Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
             </p>
           </CardContent>
@@ -774,9 +774,9 @@ export function AnalisisGraderWizardPage() {
       {saveError && (
         <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 text-ink-crit shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-red-600 font-medium">No se pudo guardar el turno</p>
+              <p className="text-sm text-ink-crit font-medium">No se pudo guardar el turno</p>
               <p className="text-xs text-red-700/90 dark:text-red-200/80 mt-0.5 break-words">{saveError}</p>
               <p className="text-[11px] text-red-700/70 dark:text-red-200/60 mt-1">
                 El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
@@ -785,7 +785,7 @@ export function AnalisisGraderWizardPage() {
             <Button
               size="sm"
               variant="ghost"
-              className="text-red-600 hover:bg-red-500/[0.15] shrink-0"
+              className="text-ink-crit hover:bg-red-500/[0.15] shrink-0"
               onClick={() => setSaveError(null)}
             >
               Cerrar

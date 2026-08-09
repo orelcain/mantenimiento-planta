@@ -49,8 +49,8 @@ const BUCKET_BG: Record<string, string> = {
  * claro es la convención del repo.
  */
 const COVERAGE_THEME = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
   : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
@@ -140,7 +140,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-[8px] px-1 rounded-ctl bg-amber-500/[0.15] text-amber-600 border border-amber-500/[0.25]"
+                    className="shrink-0 text-[8px] px-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25]"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?

@@ -304,8 +304,8 @@ export function GateBreakdownCard({
           <span
             className={cn(
               'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium cursor-default',
-              diagnosis.color === 'emerald' && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-600',
-              diagnosis.color === 'amber'   && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-600',
+              diagnosis.color === 'emerald' && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok',
+              diagnosis.color === 'amber'   && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn',
               diagnosis.color === 'blue'    && 'border-primary/[0.25] bg-primary/[0.15] text-primary',
               diagnosis.color === 'zinc'    && 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground',
             )}
@@ -329,19 +329,19 @@ export function GateBreakdownCard({
         {calibreGroups.length > 0 && (
           <div className="flex items-center gap-2 pb-1 flex-wrap">
             {kpi.saturado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/[0.15] border border-red-500/[0.25] text-[11px] font-medium text-red-600">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/[0.15] border border-red-500/[0.25] text-[11px] font-medium text-ink-crit">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
               </span>
             )}
             {kpi.optimo > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.15] border border-emerald-500/[0.25] text-[11px] font-medium text-emerald-600">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.15] border border-emerald-500/[0.25] text-[11px] font-medium text-ink-ok">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 {kpi.optimo} óptimo{kpi.optimo > 1 ? 's' : ''}
               </span>
             )}
             {kpi.sobredimensionado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.15] border border-amber-500/[0.25] text-[11px] font-medium text-amber-600">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.15] border border-amber-500/[0.25] text-[11px] font-medium text-ink-warn">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                 {kpi.sobredimensionado} sobredim.
               </span>
@@ -522,7 +522,7 @@ export function GateBreakdownCard({
                           <span className={cn(
                             'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5',
                             isTop
-                              ? 'bg-red-500/[0.15] text-red-600'
+                              ? 'bg-red-500/[0.15] text-ink-crit'
                               : 'bg-amber-500/[0.15] text-amber-400',
                           )}>
                             {i + 1}

@@ -176,8 +176,8 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 reporta el sensor: son dos números distintos. */}
             {plannedTargetPieces != null && plannedTargetPieces > 0 && (() => {
               const pct = (totalCycles / plannedTargetPieces) * 100
-              const cls = pct >= 95 ? 'text-emerald-600'
-                : pct >= 75 ? 'text-amber-600'
+              const cls = pct >= 95 ? 'text-ink-ok'
+                : pct >= 75 ? 'text-ink-warn'
                 : 'text-cat-5-ink'
               return (
                 <div className="text-[11px] mt-1 flex items-center gap-1 flex-wrap">

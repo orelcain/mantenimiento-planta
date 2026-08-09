@@ -1527,7 +1527,7 @@ export function SensorsMonitorPage() {
 
       {error && (
         <Card className="border-red-400">
-          <CardContent className="py-4 text-sm text-red-600">Error de monitoreo: {error}</CardContent>
+          <CardContent className="py-4 text-sm text-ink-crit">Error de monitoreo: {error}</CardContent>
         </Card>
       )}
 

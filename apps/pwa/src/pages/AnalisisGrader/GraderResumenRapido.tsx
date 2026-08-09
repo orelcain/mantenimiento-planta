@@ -97,17 +97,17 @@ export function GraderResumenRapido({
           }
           <span className="text-sm font-semibold">Resumen del turno</span>
           {criticals.length > 0 && (
-            <Badge className="bg-red-500/[0.15] text-red-600 border-red-500/[0.25] text-xs font-medium">
+            <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-xs font-medium">
               {criticals.length} crítico{criticals.length > 1 ? 's' : ''}
             </Badge>
           )}
           {warns.length > 0 && (
-            <Badge className="bg-amber-500/[0.15] text-amber-600 border-amber-500/[0.25] text-xs font-medium">
+            <Badge className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25] text-xs font-medium">
               {warns.length} alerta{warns.length > 1 ? 's' : ''}
             </Badge>
           )}
           {p0Status === 'ok' && insights.length === 0 && (
-            <Badge className="bg-emerald-500/[0.15] text-emerald-600 border-emerald-500/[0.25] text-xs">
+            <Badge className="bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25] text-xs">
               Todo en orden
             </Badge>
           )}
@@ -276,8 +276,8 @@ export function GraderResumenRapido({
                 <p className={cn(
                   'text-xs font-semibold',
                   insight.severity === 'critical'
-                    ? 'text-red-600'
-                    : 'text-amber-600',
+                    ? 'text-ink-crit'
+                    : 'text-ink-warn',
                 )}>
                   {insight.title}
                 </p>
@@ -300,8 +300,8 @@ export function GraderResumenRapido({
                     className={cn(
                       'shrink-0 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center mt-0.5',
                       a.severity === 'critical'
-                        ? 'bg-red-500/[0.15] text-red-600'
-                        : 'bg-amber-500/[0.15] text-amber-600',
+                        ? 'bg-red-500/[0.15] text-ink-crit'
+                        : 'bg-amber-500/[0.15] text-ink-warn',
                     )}
                   >
                     {i + 1}
@@ -313,7 +313,7 @@ export function GraderResumenRapido({
           )}
         </div>
       ) : (
-        <p className="text-sm text-emerald-600 font-medium text-center py-1">
+        <p className="text-sm text-ink-ok font-medium text-center py-1">
           Sin alertas activas — operación dentro de parámetros normales.
         </p>
       )}

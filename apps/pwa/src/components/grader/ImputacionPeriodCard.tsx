@@ -43,8 +43,8 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * ActionPlanPanel.
  */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-600', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-600', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
   : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
@@ -102,7 +102,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                 {tend && (
                   <span className={cn(
                     'tabular-nums',
-                    tend.dir === 'sube' ? 'text-emerald-600'
+                    tend.dir === 'sube' ? 'text-ink-ok'
                     : tend.dir === 'baja' ? 'text-cat-5-ink' : '',
                   )}>
                     {tend.dir === 'sube' ? '▲' : tend.dir === 'baja' ? '▼' : '='}{' '}

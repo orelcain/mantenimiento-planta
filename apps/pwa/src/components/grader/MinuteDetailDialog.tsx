@@ -381,7 +381,7 @@ export function MinuteDetailDialog({
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
             {/* Minuto sin rechazos — mensaje positivo cuando todo llegó a destino. */}
             {breakdown.total > 0 && breakdown.p0 === 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.15] text-xs text-emerald-600">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-emerald-500/[0.25] bg-emerald-500/[0.15] text-xs text-ink-ok">
                 <span className="text-base leading-none">✓</span>
                 <span>Sin rechazos este minuto — las {breakdown.total} piezas llegaron a destino.</span>
               </div>
@@ -419,7 +419,7 @@ export function MinuteDetailDialog({
             )}
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-xs text-amber-600">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-xs text-ink-warn">
                 <span className="text-base leading-none">ℹ️</span>
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
@@ -453,7 +453,7 @@ export function MinuteDetailDialog({
                       <span
                         className={cn(
                           'inline-flex items-center justify-center w-12 h-6 rounded-ctl text-xs font-semibold shrink-0',
-                          isP0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-emerald-500/[0.15] text-emerald-600',
+                          isP0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-emerald-500/[0.15] text-ink-ok',
                         )}
                       >
                         {isP0 ? 'P0' : `G${gate}`}

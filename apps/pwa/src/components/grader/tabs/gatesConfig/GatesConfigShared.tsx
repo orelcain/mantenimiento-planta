@@ -28,9 +28,9 @@ export const SPECIES_ALLOMETRY = {
 /** Badge de estado de calibración para parámetros físicos */
 export function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
-    return <Badge className="text-[10px] bg-green-500/[0.15] text-green-600 whitespace-nowrap">✓ Verificado</Badge>
+    return <Badge className="text-[10px] bg-green-500/[0.15] text-ink-ok whitespace-nowrap">✓ Verificado</Badge>
   if (status === 'estimated')
-    return <Badge className="text-[10px] bg-amber-500/[0.15] text-amber-600 whitespace-nowrap">⚠ Estimado</Badge>
+    return <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</Badge>
   return <Badge className="text-[10px] bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap">? Falta</Badge>
 }
 
@@ -322,7 +322,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
           className={cn('mt-1 font-mono', auto && hasData && 'opacity-60 pr-14')}
         />
         {auto && hasData && (
-          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-500/[0.15] text-emerald-600 px-1.5 py-0 pointer-events-none">
+          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0 pointer-events-none">
             Auto
           </Badge>
         )}

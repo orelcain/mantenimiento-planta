@@ -213,9 +213,9 @@ export function TachMeasurementModal({
                   variant="outline"
                   className={cn(
                     'text-[10px] font-mono',
-                    Math.abs(deltaPct) < 3 ? 'border-green-500/[0.25] text-green-600' :
-                    Math.abs(deltaPct) < 10 ? 'border-amber-500/[0.25] text-amber-600' :
-                    'border-red-500/[0.25] text-red-600',
+                    Math.abs(deltaPct) < 3 ? 'border-green-500/[0.25] text-ink-ok' :
+                    Math.abs(deltaPct) < 10 ? 'border-amber-500/[0.25] text-ink-warn' :
+                    'border-red-500/[0.25] text-ink-crit',
                   )}
                 >
                   {delta >= 0 ? '+' : ''}{delta.toFixed(3)} m/s ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)

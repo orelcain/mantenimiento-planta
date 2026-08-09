@@ -107,7 +107,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </Select>
                   </div>
                 )}
-                {hasDiscrepancy && <Badge className="text-[10px] bg-amber-500/[0.15] text-amber-600">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
+                {hasDiscrepancy && <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
                 <span className="ml-auto font-mono font-semibold">{belt.speedMps.toFixed(3)} m/s actual</span>
               </div>
               <table className="w-full">
@@ -223,7 +223,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
               {/* Cuando hay tacómetro y VFD: derivar el factor effectiveMpsPerRpm */}
               {belt.vfd?.measuredBeltMps && belt.vfd?.vfdCurrentRpm && (
                 <div className="mt-2 p-2 rounded-ctl bg-green-500/[0.15] border border-green-500/[0.25]">
-                  <span className="text-xs text-green-600 font-medium">
+                  <span className="text-xs text-ink-ok font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>
                   <Button size="sm" variant="outline" className="ml-2 h-6 text-[10px] px-2 text-green-700 border-green-400"

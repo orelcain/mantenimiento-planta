@@ -273,14 +273,14 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
               {existe === undefined ? null : existe ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-emerald-600"
+                  className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-ink-ok"
                   title={existe.textoBreve || 'Ya está en el maestro'}
                 >
                   <CircleCheck className="h-3 w-3" />
                   {existe.codigoSAP ? `En repuestos · SAP ${existe.codigoSAP}` : 'En repuestos · sin SAP'}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+                <span className="inline-flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-ink-warn">
                   <CirclePlus className="h-3 w-3" /> No está en repuestos
                 </span>
               )}

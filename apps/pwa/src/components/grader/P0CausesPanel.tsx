@@ -67,7 +67,7 @@ const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
   cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cyan-400',     bar: 'bg-cyan-500'  },
   emerald: { badge: 'bg-emerald-500/[0.15] text-emerald-400', bar: 'bg-emerald-500' },
   amber:   { badge: 'bg-amber-500/[0.15] text-amber-400',   bar: 'bg-amber-500' },
-  brown:   { badge: 'bg-amber-500/[0.15] text-amber-600', bar: 'bg-amber-800' },
+  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-amber-800' },
   blue:    { badge: 'bg-primary/[0.15] text-blue-400',     bar: 'bg-blue-500'  },
   zinc:    FALLBACK_COLOR,
 }

@@ -211,7 +211,7 @@ function PauseAnnotationPanel({
 
   if (pending.length === 0) {
     return (
-      <p className="mt-2 text-[11px] text-green-600">
+      <p className="mt-2 text-[11px] text-ink-ok">
         ✓ Todas las pausas del período están clasificadas.
       </p>
     )
@@ -637,7 +637,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
               <div className="mt-3 pt-2 border-t border-border/20">
                 <button
                   onClick={() => setAnnotationOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-[11px] text-amber-600 hover:text-amber-500 transition-colors"
+                  className="flex items-center gap-1.5 text-[11px] text-ink-warn hover:text-amber-500 transition-colors"
                 >
                   {annotationOpen
                     ? <ChevronUp className="w-3 h-3" />

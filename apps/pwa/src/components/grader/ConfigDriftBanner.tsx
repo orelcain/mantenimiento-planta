@@ -56,8 +56,8 @@ export function ConfigDriftBanner({
           className,
         )}
       >
-        <Loader2 className="w-[18px] h-[18px] text-amber-600 animate-spin" aria-hidden />
-        <span className="text-[13px] text-amber-600">
+        <Loader2 className="w-[18px] h-[18px] text-ink-warn animate-spin" aria-hidden />
+        <span className="text-[13px] text-ink-warn">
           Actualizando el desglose con la configuración de gates nueva…
         </span>
       </div>
@@ -84,13 +84,13 @@ export function ConfigDriftBanner({
         aria-expanded={open}
         className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left"
       >
-        <AlertTriangle className="w-[18px] h-[18px] text-amber-600 flex-shrink-0" aria-hidden />
-        <span className="flex-1 text-[13px] leading-snug text-amber-600">
+        <AlertTriangle className="w-[18px] h-[18px] text-ink-warn flex-shrink-0" aria-hidden />
+        <span className="flex-1 text-[13px] leading-snug text-ink-warn">
           {changedAfterAnalysis
             ? 'Las gates cambiaron después de este análisis — el desglose de abajo no se recalculó.'
             : 'El desglose de abajo no corresponde a la configuración de gates actual.'}
         </span>
-        <span className="flex items-center gap-1 text-xs text-amber-600 whitespace-nowrap">
+        <span className="flex items-center gap-1 text-xs text-ink-warn whitespace-nowrap">
           {open ? 'Ocultar' : 'Ver detalle'}
           {open
             ? <ChevronUp className="w-3.5 h-3.5" aria-hidden />
@@ -108,7 +108,7 @@ export function ConfigDriftBanner({
                 <th className="text-right font-normal pb-1.5 pl-3">config actual</th>
               </tr>
             </thead>
-            <tbody className="text-amber-600">
+            <tbody className="text-ink-warn">
               {drift.causes.map(({ cause, saved, current }) => (
                 <tr key={cause}>
                   <td className="py-0.5">{causeLabel(cause)}</td>
@@ -116,7 +116,7 @@ export function ConfigDriftBanner({
                   <td
                     className={cn(
                       'py-0.5 pl-3 text-right font-mono tabular-nums',
-                      saved !== current && 'font-medium text-amber-600',
+                      saved !== current && 'font-medium text-ink-warn',
                     )}
                   >
                     {current}

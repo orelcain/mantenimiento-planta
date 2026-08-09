@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff } from 'lucide-react'
+import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
@@ -405,7 +405,7 @@ function MessageBubble({
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
             <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-lg space-y-1.5">
-              <div className="text-[11px] font-medium text-amber-600">
+              <div className="text-[11px] font-medium text-ink-warn">
                 ✏️ ¿Cuál era la respuesta correcta?
               </div>
               <textarea
@@ -507,11 +507,11 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
 /** Badge pequeño que muestra qué agente generó una respuesta */
 function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/chatbot').ChatMessage['agentInfo']> }) {
   const taskLabels: Record<string, string> = {
-    reasoning: '🧠 razonamiento',
-    analysis: '📊 análisis',
-    code: '💻 código',
-    speed: '⚡ rápido',
-    general: '🔄 general',
+    reasoning: 'razonamiento',
+    analysis: 'análisis',
+    code: 'código',
+    speed: 'rápido',
+    general: 'general',
     vision: '👁️ visión',
   }
   return (
@@ -529,13 +529,13 @@ function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/c
       {agentInfo.thinkingUsed && (
         <>
           <span>·</span>
-          <span className="text-purple-400">🧠 deep think</span>
+          <span className="inline-flex items-center gap-1 text-cat-6-ink"><Brain className="size-3" /> deep think</span>
         </>
       )}
       {agentInfo.fallbackUsed && (
         <>
           <span>·</span>
-          <span className="text-amber-500">⚠ fallback</span>
+          <span className="inline-flex items-center gap-1 text-ink-warn"><AlertTriangle className="size-3" /> fallback</span>
         </>
       )}
     </div>
@@ -544,11 +544,11 @@ function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/c
 
 // ─── Sugerencias rápidas (inicio) ───────────────────────────────────
 const QUICK_SUGGESTIONS = [
-  '🔧 Reportar una falla',
+  'Reportar una falla',
   '¿Incidencias abiertas?',
   '¿Qué repuestos tenemos?',
   '¿Estado de los equipos?',
-  '📊 Resumen de la planta',
+  'Resumen de la planta',
   '📋 Historial de ARIA',
 ]
 
@@ -738,8 +738,8 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
   return (
     <div className="px-3 py-2 border-t border-amber-300 bg-amber-500/[0.15] dark:border-amber-700">
       <div className="flex items-center gap-2 mb-1.5">
-        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-        <span className="text-xs text-amber-600 flex-1 font-medium">
+        <AlertTriangle className="w-4 h-4 text-ink-warn flex-shrink-0" />
+        <span className="text-xs text-ink-warn flex-1 font-medium">
           Borrador de incidencia ({completed}/{total} campos)
         </span>
       </div>
@@ -748,7 +748,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
         {fields.map(f => (
           <div key={f.key} className="flex-1 flex flex-col items-center gap-0.5">
             <div className={`w-full h-1.5 rounded-full ${f.done ? 'bg-green-500' : 'bg-muted-foreground/[0.10]'}`} />
-            <span className={`text-[9px] ${f.done ? 'text-green-600' : 'text-muted-foreground'}`}>{f.label}</span>
+            <span className={`text-[9px] ${f.done ? 'text-ink-ok' : 'text-muted-foreground'}`}>{f.label}</span>
           </div>
         ))}
       </div>
@@ -760,7 +760,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-amber-300 dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-100 dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
           >
             <span className="truncate">
-              🏭 {pendingData?.equipmentName
+              <Factory className="inline size-3.5" /> {pendingData?.equipmentName
                 ? `Equipo: ${pendingData.equipmentName as string}`
                 : 'Seleccionar equipo...'}
             </span>
@@ -774,7 +774,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                   type="text"
                   value={equipmentSearch}
                   onChange={e => setEquipmentSearch(e.target.value)}
-                  placeholder="🔍 Buscar equipo..."
+                  placeholder="Buscar equipo…"
                   className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                   autoFocus
                 />
@@ -824,15 +824,15 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                 onClick={() => { onAssignTechnician('', '') }}
                 className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-green-300 dark:border-green-600 bg-green-500/[0.15] hover:bg-green-100 dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
               >
-                <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                <span className="truncate">👷 Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
+                <CheckCircle className="w-3.5 h-3.5 text-ink-ok flex-shrink-0" />
+                <span className="truncate"><HardHat className="inline size-3" /> Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
               </button>
             ) : (
               <button
                 onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
                 className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
               >
-                <span>👷 Autoasignarme esta incidencia</span>
+                <span className="inline-flex items-center gap-1"><HardHat className="size-3" /> Autoasignarme esta incidencia</span>
               </button>
             )
           ) : (
@@ -843,7 +843,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                 className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
               >
                 <span className="truncate">
-                  👷 {currentTechName
+                  <HardHat className="inline size-3" /> {currentTechName
                     ? `Asignado: ${currentTechName}`
                     : 'Asignar técnico (opcional)...'}
                 </span>
@@ -856,7 +856,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                       type="text"
                       value={techSearch}
                       onChange={e => setTechSearch(e.target.value)}
-                      placeholder="🔍 Buscar técnico..."
+                      placeholder="Buscar técnico…"
                       className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                       autoFocus
                     />
@@ -880,7 +880,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                         )}
                         {filteredTechs.map((t) => {
                           const fullName = `${t.nombre} ${t.apellido}`.trim()
-                          const rolLabel = t.rol === 'admin' ? '🔑' : t.rol === 'supervisor' ? '📋' : '🔧'
+                          const RolIcon = t.rol === 'admin' ? KeyRound : t.rol === 'supervisor' ? ClipboardList : Wrench
                           return (
                             <button
                               key={t.id}
@@ -889,7 +889,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                                 currentTechId === t.id ? 'bg-primary/10 font-medium' : ''
                               }`}
                             >
-                              <span className="flex-shrink-0">{rolLabel}</span>
+                              <RolIcon className="size-3 shrink-0 text-muted-foreground" />
                               <span className="truncate flex-1" title={fullName}>{fullName}</span>
                               <span className="text-[9px] text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
                             </button>
@@ -1344,7 +1344,7 @@ export function ChatBot() {
     if (trimmed === '/mis' || trimmed.startsWith('/mis ')) {
       // #5 v2.60 — Show saved templates
       const tpls = getTemplates()
-      if (tpls.length === 0) return [{ label: '(Sin plantillas guardadas — usa ⭐ para guardar)', value: '', isTemplate: false, templateId: '' }]
+      if (tpls.length === 0) return [{ label: '(Sin plantillas guardadas — usa la estrella para guardar)', value: '', isTemplate: false, templateId: '' }]
       return tpls.map(t => ({ label: `⭐ ${t.label}`, value: t.text, isTemplate: true, templateId: t.id }))
     }
     if (trimmed.startsWith('/')) {
@@ -1353,7 +1353,7 @@ export function ChatBot() {
         .map(sc => ({ label: `${sc.cmd} — ${sc.desc}`, value: sc.cmd, isTemplate: false, templateId: '' }))
     }
     if (trimmed.length === 0 && showRecents) {
-      return getRecentSearches().map(s => ({ label: `🕐 ${s}`, value: s, isTemplate: false, templateId: '' }))
+      return getRecentSearches().map(s => ({ label: s, value: s, isTemplate: false, templateId: '' }))
     }
     return []
   })()
@@ -1387,9 +1387,9 @@ export function ChatBot() {
                 <h3 className="text-sm font-semibold">ARIA — Asistente de Planta</h3>
                 <p className="text-[10px] text-muted-foreground">
                   {pendingAction?.status === 'confirming'
-                    ? '⚡ Acción pendiente de confirmación'
+                    ? 'Acción pendiente de confirmación'
                     : thinkingEnabled
-                      ? '🧠 Pensamiento profundo · IA'
+                      ? 'Pensamiento profundo · IA'
                       : 'IA · Datos en tiempo real'}
                 </p>
               </div>
@@ -1425,7 +1425,7 @@ export function ChatBot() {
                           !selectedAgent ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
                         }`}
                       >
-                        <span className="w-5 text-center">🔄</span>
+                        <span className="w-5 text-center"><RefreshCw className="inline size-3.5" /></span>
                         <div className="flex-1 text-left">
                           <div>Auto <span className="text-muted-foreground">(ARIA elige)</span></div>
                         </div>
@@ -1477,7 +1477,7 @@ export function ChatBot() {
                   <Brain className="w-4 h-4" />
                 </button>
               )}
-              {/* 👁 Ver — mostrar/ocultar el avatar de video de ARIA */}
+              {/* Ver — mostrar/ocultar el avatar de video de ARIA */}
               <button
                 onClick={() => setAvatarShow(v => !v)}
                 className={`p-1.5 rounded-md transition-colors ${
@@ -1489,7 +1489,7 @@ export function ChatBot() {
               >
                 {avatarShow ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
-              {/* 🔊 Escuchar — auto-leer las respuestas de ARIA en voz alta */}
+              {/* Escuchar — auto-leer las respuestas de ARIA en voz alta */}
               <button
                 onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
                 className={`p-1.5 rounded-md transition-colors ${
@@ -1609,13 +1609,13 @@ export function ChatBot() {
             {showDropdown && dropdownItems.length > 0 && (
               <div className="absolute bottom-full left-0 right-0 mx-3 mb-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
                 {input.trim().toLowerCase().startsWith('/mis') && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">⭐ Mis plantillas guardadas</div>
+                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Star className="inline size-3" /> Mis plantillas guardadas</div>
                 )}
                 {input.trim().startsWith('/') && !input.trim().toLowerCase().startsWith('/mis') && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">⚡ Comandos rápidos</div>
+                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Zap className="inline size-3" /> Comandos rápidos</div>
                 )}
                 {!input.trim().startsWith('/') && showRecents && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">🕐 Búsquedas recientes</div>
+                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Clock className="inline size-3" /> Búsquedas recientes</div>
                 )}
                 {dropdownItems.map((item, i) => (
                   <div key={i} className="flex items-center hover:bg-muted transition-colors">
@@ -1753,7 +1753,7 @@ export function ChatBot() {
                 }}
                 disabled={!input.trim() || input.trim().startsWith('/') || isLoading}
                 className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-amber-500 hover:bg-muted/80 disabled:opacity-30 transition-colors"
-                title="Guardar como plantilla (⭐)"
+                title="Guardar como plantilla"
               >
                 <Star className="w-4 h-4" />
               </button>

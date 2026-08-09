@@ -166,8 +166,8 @@ export function GateChangeImpactCard({
                   {!inProgress && delta !== null && (
                     <span className={cn(
                       'flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-ctl font-semibold shrink-0',
-                      improved  ? 'bg-emerald-500/[0.15] text-emerald-600'
-                        : worsened ? 'bg-red-500/[0.15] text-red-600'
+                      improved  ? 'bg-emerald-500/[0.15] text-ink-ok'
+                        : worsened ? 'bg-red-500/[0.15] text-ink-crit'
                           : 'bg-muted text-muted-foreground',
                     )}>
                       {improved  ? <TrendingDown className="w-2.5 h-2.5" />

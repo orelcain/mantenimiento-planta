@@ -369,12 +369,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-[10px] bg-red-500/[0.15] text-red-600 border-red-500/[0.25]">
+                    <Badge className="text-[10px] bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-[10px] bg-red-500/[0.15] text-red-600 border-red-500/[0.25]">
+                    <Badge className="text-[10px] bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -916,7 +916,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           )}
           {aiError && (
             <div className="p-3 rounded-card bg-red-500/[0.15] border border-red-300 text-sm">
-              <div className="flex items-center gap-2 text-red-600">
+              <div className="flex items-center gap-2 text-ink-crit">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de análisis IA</span>
               </div>

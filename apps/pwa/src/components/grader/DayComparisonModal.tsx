@@ -150,7 +150,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* Shift headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-1">
           <div className="text-right">
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/[0.25] bg-amber-500/[0.15]">
+            <Badge variant="outline" className="gap-1 text-ink-warn border-amber-500/[0.25] bg-amber-500/[0.15]">
               <Sun className="h-3 w-3" /> {dia.shiftId}
             </Badge>
           </div>
@@ -410,7 +410,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {(() => {
           const deltaP0 = (noche.pointZeroPct - dia.pointZeroPct).toFixed(2)
           const sign = noche.pointZeroPct > dia.pointZeroPct ? '+' : ''
-          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-emerald-600'
+          const color = noche.pointZeroPct > dia.pointZeroPct ? 'text-red-500' : 'text-ink-ok'
           return (
             <div className="rounded-card bg-muted/50 p-2.5 text-center text-[11px] text-muted-foreground">
               Noche vs Día: P0{' '}

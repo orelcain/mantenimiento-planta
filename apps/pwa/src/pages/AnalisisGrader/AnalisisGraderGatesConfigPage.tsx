@@ -86,14 +86,14 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   if (status === 'idle') return null
   if (status === 'saving') {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+      <span className="inline-flex items-center gap-1 text-[10px] text-ink-warn font-medium">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
         Guardando…
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+    <span className="inline-flex items-center gap-1 text-[10px] text-ink-ok font-medium">
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
       Guardado
     </span>
@@ -559,7 +559,7 @@ export function AnalisisGraderGatesConfigPage({
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
-                  ? 'border-emerald-500 text-emerald-600'
+                  ? 'border-emerald-500 text-ink-ok'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/40',
               )}
             >
@@ -775,7 +775,7 @@ export function AnalisisGraderGatesConfigPage({
             {shiftGapMinutes > 0 && (
               <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-3 py-2">
                 <span className="text-amber-400 mt-px">⚠</span>
-                <p className="text-xs text-amber-600">
+                <p className="text-xs text-ink-warn">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
                   Revisa que los horarios cubran el período operativo completo.
                 </p>
@@ -835,7 +835,7 @@ export function AnalisisGraderGatesConfigPage({
                   <div>
                     <span className="text-sm font-medium">{t.name}</span>
                     {activeTemplateName === t.name && (
-                      <Badge className="ml-2 text-[10px] bg-green-500/[0.15] text-green-600">
+                      <Badge className="ml-2 text-[10px] bg-green-500/[0.15] text-ink-ok">
                         Activa
                       </Badge>
                     )}
@@ -990,7 +990,7 @@ export function AnalisisGraderGatesConfigPage({
               </Badge>
             )}
             {!hasShiftOverride && isCustomRanges && (
-              <Badge className="text-[10px] bg-amber-500/[0.15] text-amber-600">
+              <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn">
                 Global personalizado
               </Badge>
             )}

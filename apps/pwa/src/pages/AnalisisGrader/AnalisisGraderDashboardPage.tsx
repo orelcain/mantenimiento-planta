@@ -243,9 +243,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
   const getPointZeroTextClass = useCallback((pct: number): string => {
     const severity = getPointZeroSeverity(pct)
-    if (severity === 'critical') return 'text-red-600'
-    if (severity === 'warn') return 'text-amber-600'
-    return 'text-emerald-600'
+    if (severity === 'critical') return 'text-ink-crit'
+    if (severity === 'warn') return 'text-ink-warn'
+    return 'text-ink-ok'
   }, [getPointZeroSeverity])
 
   const getPointZeroBarColor = useCallback((pct: number): string => {
@@ -919,10 +919,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   }, [analytics.lotAnalysis])
 
   const getCvSignal = useCallback((cv: number) => {
-    if (cv >= 20) return { emoji: '🔴', label: 'alta', cls: 'text-red-600', bar: 'rgba(239,68,68,0.75)' }
-    if (cv >= 12) return { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600', bar: 'rgba(245,158,11,0.75)' }
+    if (cv >= 20) return { emoji: '🔴', label: 'alta', cls: 'text-ink-crit', bar: 'rgba(239,68,68,0.75)' }
+    if (cv >= 12) return { emoji: '🟠', label: 'media-alta', cls: 'text-ink-warn', bar: 'rgba(245,158,11,0.75)' }
     if (cv >= 8) return { emoji: '🟡', label: 'media', cls: 'text-yellow-500', bar: 'rgba(234,179,8,0.75)' }
-    return { emoji: '🟢', label: 'baja', cls: 'text-emerald-600', bar: 'rgba(16,185,129,0.75)' }
+    return { emoji: '🟢', label: 'baja', cls: 'text-ink-ok', bar: 'rgba(16,185,129,0.75)' }
   }, [])
 
   const lotDispersionView = useMemo(() => {
@@ -1209,8 +1209,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         <Card className="border-amber-300 bg-amber-500/[0.15]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <div className="text-xs text-amber-600 space-y-0.5">
+              <Info className="h-4 w-4 text-ink-warn mt-0.5 shrink-0" />
+              <div className="text-xs text-ink-warn space-y-0.5">
                 {analytics.notes.map((n, i) => (
                   <p key={i}>{n}</p>
                 ))}
@@ -1500,9 +1500,9 @@ function KPICard({
               variant="outline"
               className={cn(
                 'text-[9px] px-1.5 py-0 h-4 ml-auto',
-                statusBadge.severity === 'critical' && 'text-red-600 border-red-300',
-                statusBadge.severity === 'warn' && 'text-amber-600 border-amber-300',
-                statusBadge.severity === 'ok' && 'text-emerald-600 border-emerald-300',
+                statusBadge.severity === 'critical' && 'text-ink-crit border-red-300',
+                statusBadge.severity === 'warn' && 'text-ink-warn border-amber-300',
+                statusBadge.severity === 'ok' && 'text-ink-ok border-emerald-300',
               )}
             >
               {statusBadge.label}
@@ -1512,8 +1512,8 @@ function KPICard({
         <p
           className={cn(
             'text-xl font-bold tabular-nums leading-tight',
-            severity === 'critical' && 'text-red-600',
-            severity === 'warn' && 'text-amber-600',
+            severity === 'critical' && 'text-ink-crit',
+            severity === 'warn' && 'text-ink-warn',
           )}
         >
           {value}

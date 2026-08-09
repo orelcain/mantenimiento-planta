@@ -218,9 +218,9 @@ export function ShiftQuotaCard({
 
   const verdictTextClass =
     progressPct >= 100 ? 'text-emerald-400'
-    : progressPct >= 90 ? 'text-emerald-600'
-    : progressPct >= 50 ? 'text-amber-600'
-    : 'text-red-600'
+    : progressPct >= 90 ? 'text-ink-ok'
+    : progressPct >= 50 ? 'text-ink-warn'
+    : 'text-ink-crit'
 
   const isClosed = shiftWindow.status === 'closed'
   const cumplio = isClosed && progressPct >= 100
@@ -237,7 +237,7 @@ export function ShiftQuotaCard({
           </span>
           {usingFallback && (
             <span
-              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-emerald-600 border border-emerald-500/[0.25] cursor-help"
+              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-emerald-500/[0.25] cursor-help"
               title="No hay Excel del Grader cargado aún. Se muestra avance estimado desde ciclos Baader (Shoplogix), que será reemplazado por la cifra real cuando se cargue el Excel."
             >
               <Radio className="w-2.5 h-2.5 animate-pulse" />
@@ -245,7 +245,7 @@ export function ShiftQuotaCard({
             </span>
           )}
           {cumplio && (
-            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-emerald-600 border border-emerald-500/[0.25]">
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-emerald-500/[0.25]">
               <CheckCircle2 className="w-2.5 h-2.5" />
               Cumplido
             </span>
@@ -329,7 +329,7 @@ export function ShiftQuotaCard({
                 title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
-                <div className="text-[11px] text-amber-600 leading-tight">
+                <div className="text-[11px] text-ink-warn leading-tight">
                   <span className="font-semibold tabular-nums">
                     {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
                   </span>

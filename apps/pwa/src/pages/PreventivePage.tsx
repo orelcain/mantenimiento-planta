@@ -1021,7 +1021,7 @@ function TaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-red-600 px-4 py-3 rounded-md">
+          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-md">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1075,7 +1075,7 @@ function TaskDialog({
             </SelectContent>
           </Select>
           {errors.equipmentId && (
-            <p className="text-sm text-red-600">{errors.equipmentId}</p>
+            <p className="text-sm text-ink-crit">{errors.equipmentId}</p>
           )}
         </div>
 
@@ -1099,7 +1099,7 @@ function TaskDialog({
               </SelectContent>
             </Select>
             {errors.tipo && (
-              <p className="text-sm text-red-600">{errors.tipo}</p>
+              <p className="text-sm text-ink-crit">{errors.tipo}</p>
             )}
           </div>
 
@@ -1123,7 +1123,7 @@ function TaskDialog({
               </SelectContent>
             </Select>
             {errors.frecuenciaDias && (
-              <p className="text-sm text-red-600">{errors.frecuenciaDias}</p>
+              <p className="text-sm text-ink-crit">{errors.frecuenciaDias}</p>
             )}
           </div>
         </div>
@@ -1137,7 +1137,7 @@ function TaskDialog({
             required
           />
           {errors.nombre && (
-            <p className="text-sm text-red-600">{errors.nombre}</p>
+            <p className="text-sm text-ink-crit">{errors.nombre}</p>
           )}
         </div>
 
@@ -1150,7 +1150,7 @@ function TaskDialog({
             rows={2}
           />
           {errors.descripcion && (
-            <p className="text-sm text-red-600">{errors.descripcion}</p>
+            <p className="text-sm text-ink-crit">{errors.descripcion}</p>
           )}
         </div>
 
@@ -1165,7 +1165,7 @@ function TaskDialog({
             required
           />
           {errors.proximaEjecucion && (
-            <p className="text-sm text-red-600">{errors.proximaEjecucion}</p>
+            <p className="text-sm text-ink-crit">{errors.proximaEjecucion}</p>
           )}
         </div>
 
@@ -1203,7 +1203,7 @@ function TaskDialog({
             Agregar tarea
           </Button>
           {errors.checklist && (
-            <p className="text-sm text-red-600">{errors.checklist}</p>
+            <p className="text-sm text-ink-crit">{errors.checklist}</p>
           )}
         </div>
 
@@ -1226,7 +1226,7 @@ function TaskDialog({
             </SelectContent>
           </Select>
           {errors.asignadoA && (
-            <p className="text-sm text-red-600">{errors.asignadoA}</p>
+            <p className="text-sm text-ink-crit">{errors.asignadoA}</p>
           )}
         </div>
 
@@ -1322,7 +1322,7 @@ function ExecuteTaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-red-600 px-4 py-3 rounded-md">
+          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-md">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1373,7 +1373,7 @@ function ExecuteTaskDialog({
             ))}
           </div>
           {errors.checklistCompletado && (
-            <p className="text-sm text-red-600">{errors.checklistCompletado}</p>
+            <p className="text-sm text-ink-crit">{errors.checklistCompletado}</p>
           )}
         </div>
 
@@ -1386,7 +1386,7 @@ function ExecuteTaskDialog({
             min={1}
           />
           {errors.duracionMinutos && (
-            <p className="text-sm text-red-600">{errors.duracionMinutos}</p>
+            <p className="text-sm text-ink-crit">{errors.duracionMinutos}</p>
           )}
         </div>
 
@@ -1399,7 +1399,7 @@ function ExecuteTaskDialog({
             rows={3}
           />
           {errors.observaciones && (
-            <p className="text-sm text-red-600">{errors.observaciones}</p>
+            <p className="text-sm text-ink-crit">{errors.observaciones}</p>
           )}
         </div>
 

@@ -221,13 +221,13 @@ export function GraderCoverageBar({
       </div>
 
       {faltaExcel ? (
-        <p className="text-[10px] text-amber-600/90">
+        <p className="text-[10px] text-ink-warn/90">
           Las Baader produjeron <b>{fmtDurationMin(faltaExcelMin ?? sinDatosMin)}</b> que el Excel no cubre.
           Esas piezas todavía no están contadas.
         </p>
       ) : (
         <p
-          className="text-[10px] text-emerald-600/90 cursor-help"
+          className="text-[10px] text-ink-ok/90 cursor-help"
           title={`El pescado va Baader → Grader, así que entre ambas fuentes solo hay minutos de tránsito (se toleran ${TRANSITO_MIN}). Que el Excel arranque después no es dato faltante: es cuando llegó la primera pieza.`}
         >
           El Excel cubre toda la producción del turno.

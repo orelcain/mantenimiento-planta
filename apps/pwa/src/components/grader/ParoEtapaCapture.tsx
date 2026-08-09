@@ -200,7 +200,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 text-xs text-red-600 bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
+          <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /><span className="break-words">{error}</span>
           </div>
         )}

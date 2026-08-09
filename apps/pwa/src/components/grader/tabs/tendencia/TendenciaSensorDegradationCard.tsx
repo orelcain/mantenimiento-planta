@@ -47,8 +47,8 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                       className={cn(
                         'text-[10px] shrink-0',
                         isCritical
-                          ? 'border-red-500/[0.25] text-red-600'
-                          : 'border-amber-500/[0.25] text-amber-600',
+                          ? 'border-red-500/[0.25] text-ink-crit'
+                          : 'border-amber-500/[0.25] text-ink-warn',
                       )}
                     >
                       {isCritical ? 'CRÍTICO' : 'ALERTA'}

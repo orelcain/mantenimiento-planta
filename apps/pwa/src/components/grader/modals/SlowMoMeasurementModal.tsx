@@ -186,9 +186,9 @@ export function SlowMoMeasurementModal({
                     variant="outline"
                     className={cn(
                       'text-[10px] font-mono',
-                      Math.abs(deltaMs) < 50 ? 'border-green-500/[0.25] text-green-600' :
-                      Math.abs(deltaMs) < 150 ? 'border-amber-500/[0.25] text-amber-600' :
-                      'border-red-500/[0.25] text-red-600',
+                      Math.abs(deltaMs) < 50 ? 'border-green-500/[0.25] text-ink-ok' :
+                      Math.abs(deltaMs) < 150 ? 'border-amber-500/[0.25] text-ink-warn' :
+                      'border-red-500/[0.25] text-ink-crit',
                     )}
                   >
                     {deltaMs >= 0 ? '+' : ''}{deltaMs.toFixed(0)} ms

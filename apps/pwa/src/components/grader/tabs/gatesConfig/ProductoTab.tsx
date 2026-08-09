@@ -80,7 +80,7 @@ export function ProductoTab({
     : null
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
-    ? 'bg-red-500/[0.15] text-red-600 border-red-500/[0.25]'
+    ? 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
       ? 'bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25]'
       : 'bg-emerald-500/[0.15] text-emerald-400 border-emerald-500/[0.25]'
@@ -129,7 +129,7 @@ export function ProductoTab({
                 className={cn('h-8 text-xs w-28 font-mono', medianWeightG != null && 'opacity-70')}
               />
               {medianSource === 'excel' && (
-                <Badge className="text-[10px] bg-emerald-500/[0.15] text-emerald-600 px-1.5 py-0">
+                <Badge className="text-[10px] bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0">
                   Excel · {(medianWeightG! / 1000).toFixed(2)} kg
                 </Badge>
               )}
@@ -142,8 +142,8 @@ export function ProductoTab({
                 <Badge className={cn(
                   'text-[10px] px-1.5 py-0',
                   historicalMedianG.fromCalendar
-                    ? 'bg-emerald-500/[0.15] text-emerald-600'
-                    : 'bg-amber-500/[0.15] text-amber-600',
+                    ? 'bg-emerald-500/[0.15] text-ink-ok'
+                    : 'bg-amber-500/[0.15] text-ink-warn',
                 )}>
                   {historicalMedianG.fromCalendar ? '📅 ' : ''}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
                 </Badge>
@@ -298,7 +298,7 @@ export function ProductoTab({
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-[10px] bg-amber-500/[0.15] text-amber-600 whitespace-nowrap">⚠ Estimado</span>
+              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-[10px] bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>
