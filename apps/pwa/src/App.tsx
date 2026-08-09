@@ -300,12 +300,15 @@ export function App() {
 
           <Route
             path="/dev/turno-piloto"
+            // Sin PrivateRoute a propósito: quien no tenga sesión ve el estado
+            // vacío (Firestore es quien protege los datos, con sus reglas — el
+            // guard de ruta era solo UX). Así el piloto se puede revisar con
+            // ?fixture=1 sin credenciales, que es lo que bloqueó dos veces la
+            // verificación visual de la piel.
             element={
-              <PrivateRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <TurnoPilotoPage />
                 </Suspense>
-              </PrivateRoute>
             }
           />
 

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { Button, Pill, ListGroup, ListCell, CellIcon, Sheet, StatRing } from '@/components/piel'
+import { AlertTriangle, CheckCircle2, LayoutGrid, Settings2, GraduationCap, MoreHorizontal, Plus } from 'lucide-react'
+import { Button, Pill, ListGroup, ListCell, CellIcon, Sheet, StatRing, TabBar } from '@/components/piel'
+import { MachineHub } from './piloto/MachineHub'
+import { FIXTURE_PARAM, fixtureShift, fixtureSummary } from './piloto/fixture'
 import { PLANT_LINES, getPlantLineConfig } from '@/config/plantLines'
 import { loadLatestActiveShift, type LatestShift } from '@/services/grader/turnoKpis'
 import { getDailySummary } from '@/services/grader/graderDailySummary.service'
@@ -73,12 +75,31 @@ function initials(name: string): string {
 export default function TurnoPilotoPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const cfg = useMemo(() => getPlantLineConfig(searchParams.get('linea') ?? ''), [searchParams])
+  const useFixture = searchParams.get(FIXTURE_PARAM) === '1'
 
   const [latest, setLatest] = useState<LatestShift | null>(null)
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [detail, setDetail] = useState<UpstreamMachineShift | null>(null)
+  /**
+   * Navegación de la estructura nueva (§4): 4 tabs + ＋ central. `hub` es la
+   * ficha de máquina abierta (push sobre el tab de Máquinas); cuando está
+   * seteada, tapa el contenido del tab — igual que un push nativo.
+   */
+  const [tab, setTab] = useState<'turno' | 'maquinas' | 'aprender' | 'mas'>('turno')
+  const [hub, setHub] = useState<UpstreamMachineShift | null>(null)
+  /** Máquina precargada al registrar incidencia (null = registro sin contexto). */
+  const [incidentFor, setIncidentFor] = useState<UpstreamMachineShift | null>(null)
+  const [incidentOpen, setIncidentOpen] = useState(false)
+
+  const openMachine = (m: UpstreamMachineShift) => {
+    setTab('maquinas')
+    setHub(m)
+  }
+  const openIncident = (m: UpstreamMachineShift | null) => {
+    setIncidentFor(m)
+    setIncidentOpen(true)
+  }
 
   useEffect(() => {
     let alive = true
@@ -86,6 +107,14 @@ export default function TurnoPilotoPage() {
     setError(null)
     setLatest(null)
     setSummary(null)
+    // Modo fixture: permite revisar el diseño sin sesión (ver piloto/fixture.ts).
+    // Va acompañado SIEMPRE del banner de abajo; sin él, no se activa.
+    if (useFixture) {
+      setLatest(fixtureShift())
+      setSummary(fixtureSummary())
+      setLoading(false)
+      return
+    }
     loadLatestActiveShift(cfg.plantSlug)
       .then(async (ls) => {
         if (!alive) return
@@ -100,7 +129,7 @@ export default function TurnoPilotoPage() {
     return () => {
       alive = false
     }
-  }, [cfg.plantSlug, cfg.id])
+  }, [cfg.plantSlug, cfg.id, useFixture])
 
   // Tiempo real: una vez conocido el turno, el snapshot manda sobre la carga inicial.
   const { snapshot, syncedAt } = useUpstreamLineSnapshot(
@@ -164,8 +193,35 @@ export default function TurnoPilotoPage() {
     : []
   const cascadeTotal = cascadeParts.reduce((a, p) => a + p.sec, 0)
 
+  // La lista de máquinas se muestra en Turno y en su propio tab: se define una
+  // vez para que ambas rutas no se desincronicen.
+  const machinesList = (
+    <ListGroup
+      title={`Máquinas · ${machines.length - downNow.length} de ${machines.length} operando`}
+      footer="Datos en vivo de Shoplogix. Toca una máquina para abrir su ficha."
+    >
+      {rows.map(({ m, now, cpm }) => (
+        <ListCell
+          key={m.machineid}
+          leading={
+            <CellIcon className={now.down ? 'bg-red-500' : now.idle ? 'bg-muted-foreground' : 'bg-emerald-500'}>
+              {initials(m.machineName)}
+            </CellIcon>
+          }
+          title={m.machineName}
+          subtitle={now.label}
+          value={cpm > 0 ? `${cpm.toFixed(1)} pz/min` : '—'}
+          valueSub={fmtInt(m.totalCycles)}
+          onClick={() => openMachine(m)}
+        />
+      ))}
+    </ListGroup>
+  )
+
   return (
-    <div className="min-h-screen bg-background pb-16 text-foreground">
+    // pb-36: la tab bar es `fixed` y tapaba el último elemento de la página
+    // (el CTA del hub quedaba a medias detrás). El colchón es su alto + aire.
+    <div className="min-h-screen bg-background pb-36 text-foreground">
       <header className="sticky top-0 z-50 flex flex-wrap items-center gap-3 border-b border-border bg-card/80 px-5 py-3 backdrop-blur-xl">
         <span className="text-[0.8rem] font-semibold">
           ANTARFOOD <span className="font-normal text-muted-foreground">· Piloto de la piel</span>
@@ -196,7 +252,25 @@ export default function TurnoPilotoPage() {
         </div>
       </header>
 
+      {/* Banner innegociable del modo fixture: el repo ya tuvo cifras demo
+          confundidas con reales. Si hay datos sintéticos, se dicen. */}
+      {useFixture && (
+        <div className="bg-red-500/[0.14] px-4 py-2 text-center text-[0.78rem] font-semibold text-red-600">
+          DATOS DE PRUEBA — no provienen de planta. Quita <code>?fixture=1</code> de la URL para ver
+          datos reales.
+        </div>
+      )}
+
       <main className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6">
+        {/* La ficha de máquina TAPA el tab, como un push nativo. */}
+        {hub ? (
+          <MachineHub
+            machine={hub}
+            onBack={() => setHub(null)}
+            onNewIncident={() => openIncident(hub)}
+          />
+        ) : tab === 'turno' ? (
+          <>
         {/* ── Título grande ───────────────────────────────────────────── */}
         <div className="flex flex-wrap items-end gap-x-3 gap-y-1 px-1">
           <h1 className="text-[2.05rem] font-bold leading-none tracking-[-0.028em]">
@@ -262,10 +336,10 @@ export default function TurnoPilotoPage() {
                   </p>
                 </div>
                 <div className="flex gap-2 px-4 pb-4">
-                  <Button className="flex-1" onClick={() => setDetail(worst.m)}>
-                    Ver detalle
+                  <Button className="flex-1" onClick={() => openMachine(worst.m)}>
+                    Ver máquina
                   </Button>
-                  <Button variant="tinted" className="flex-1" onClick={() => setDetail(worst.m)}>
+                  <Button variant="tinted" className="flex-1" onClick={() => openIncident(worst.m)}>
                     Registrar incidencia
                   </Button>
                 </div>
@@ -337,63 +411,99 @@ export default function TurnoPilotoPage() {
               </section>
             )}
 
-            {/* ── Máquinas ─────────────────────────────────────────────── */}
-            <ListGroup
-              title={`Máquinas · ${machines.length - downNow.length} de ${machines.length} operando`}
-              footer="Datos en vivo de Shoplogix. Toca una máquina para ver su detalle."
-            >
-              {rows.map(({ m, now, cpm }) => (
-                <ListCell
-                  key={m.machineid}
-                  leading={
-                    <CellIcon className={now.down ? 'bg-red-500' : now.idle ? 'bg-muted-foreground' : 'bg-emerald-500'}>
-                      {initials(m.machineName)}
-                    </CellIcon>
-                  }
-                  title={m.machineName}
-                  subtitle={now.label}
-                  value={cpm > 0 ? `${cpm.toFixed(1)} pz/min` : '—'}
-                  valueSub={fmtInt(m.totalCycles)}
-                  onClick={() => setDetail(m)}
-                />
-              ))}
-            </ListGroup>
+            {machinesList}
           </>
+        )}
+          </>
+        ) : tab === 'maquinas' ? (
+          <>
+            <h1 className="px-1 text-[2.05rem] font-bold leading-none tracking-[-0.028em]">Máquinas</h1>
+            {machines.length > 0 ? (
+              machinesList
+            ) : (
+              <div className="rounded-card bg-card p-8 text-center text-[0.85rem] text-muted-foreground">
+                Sin máquinas en el turno actual de {cfg.label} {cfg.areaLabel}.
+              </div>
+            )}
+          </>
+        ) : (
+          // Tabs aún no migrados: se declaran, no se fingen. Mostrar una pantalla
+          // vacía sería peor que decir qué va a vivir acá.
+          <div className="rounded-card bg-card px-5 py-8 text-center">
+            <p className="text-[0.95rem] font-semibold">
+              {tab === 'aprender' ? 'Aprender' : 'Más'}
+            </p>
+            <p className="mx-auto mt-1 max-w-[42ch] text-[0.85rem] text-muted-foreground">
+              {tab === 'aprender'
+                ? 'Cursos, fichas de equipo y catálogo de variadores. Hoy son módulos del menú; se migran en el barrido.'
+                : 'Bodega global, tableros, administración y ajustes. Todo lo que no describe a una máquina ni al turno.'}
+            </p>
+          </div>
         )}
       </main>
 
-      {/* Detalle en Sheet, no en modal centrado (§5.4). */}
+      {/*
+        Registrar incidencia: el gesto más frecuente, siempre a un toque desde el
+        ＋ central. Si se entra desde una máquina, llega PRECARGADA — que es la
+        mitad del ahorro de tiempo en planta. Acá solo se muestra el contexto que
+        se heredaría; el formulario real se conecta en el barrido.
+      */}
       <Sheet
-        open={Boolean(detail)}
-        onClose={() => setDetail(null)}
-        title={detail?.machineName}
-        description={detail ? machineNow(detail).label : undefined}
+        open={incidentOpen}
+        onClose={() => setIncidentOpen(false)}
+        title="Nueva incidencia"
+        description={
+          incidentFor
+            ? `Se registrará en ${incidentFor.machineName}, precargada desde su ficha.`
+            : 'Sin máquina seleccionada: se pedirá elegirla en el formulario.'
+        }
         actions={
           <>
-            <Button variant="tinted" onClick={() => setDetail(null)}>
-              Cerrar
+            <Button variant="tinted" onClick={() => setIncidentOpen(false)}>
+              Cancelar
             </Button>
-            <Button onClick={() => setDetail(null)}>Registrar incidencia</Button>
+            <Button onClick={() => setIncidentOpen(false)}>Continuar</Button>
           </>
         }
       >
-        {detail && (
-          <div className="flex flex-col gap-2">
-            {[
-              ['Ciclos del turno', fmtInt(detail.totalCycles)],
-              ['Esperados', fmtInt(detail.expectedTotalCycles)],
-              ['Tiempo produciendo', fmtMin(detail.shiftRuntimeBreakdown?.uptimeSec)],
-              ['Detención', fmtMin(detail.shiftRuntimeBreakdown?.downtimeSec)],
-              ['Setup', fmtMin(detail.shiftRuntimeBreakdown?.setupSec)],
-            ].map(([l, v]) => (
-              <div key={l} className="flex justify-between border-b border-border py-1.5 text-[0.85rem] last:border-b-0">
-                <span className="text-muted-foreground">{l}</span>
-                <b className="font-semibold tabular-nums">{v}</b>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-col gap-2">
+          {[
+            ['Máquina', incidentFor?.machineName ?? 'Por seleccionar'],
+            ['Estado actual', incidentFor ? machineNow(incidentFor).label : '—'],
+            ['Turno', latest ? `${latest.shiftId} · ${latest.dateKey}` : '—'],
+            ['Línea', `${cfg.label} ${cfg.areaLabel}`],
+          ].map(([l, v]) => (
+            <div key={l} className="flex justify-between gap-4 border-b border-border py-1.5 text-[0.85rem] last:border-b-0">
+              <span className="shrink-0 text-muted-foreground">{l}</span>
+              <b className="truncate font-semibold">{v}</b>
+            </div>
+          ))}
+        </div>
       </Sheet>
+
+      {/* Tab bar fija: la navegación de §4, con el ＋ central. */}
+      <div className="fixed inset-x-0 bottom-0 z-40">
+        <div className="mx-auto max-w-3xl">
+          <TabBar
+            activeId={tab}
+            onSelect={(id) => {
+              setHub(null) // salir de la ficha al cambiar de tab, como iOS
+              setTab(id as typeof tab)
+            }}
+            center={{
+              label: 'Registrar incidencia',
+              icon: <Plus />,
+              onClick: () => openIncident(hub),
+            }}
+            items={[
+              { id: 'turno', label: 'Turno', icon: <LayoutGrid /> },
+              { id: 'maquinas', label: 'Máquinas', icon: <Settings2 /> },
+              { id: 'aprender', label: 'Aprender', icon: <GraduationCap /> },
+              { id: 'mas', label: 'Más', icon: <MoreHorizontal /> },
+            ]}
+          />
+        </div>
+      </div>
     </div>
   )
 }
