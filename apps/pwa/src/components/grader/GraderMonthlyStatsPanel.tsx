@@ -13,6 +13,7 @@ import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
+import { ImputacionPeriodCard } from './ImputacionPeriodCard'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -334,6 +335,15 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Fila 3.6: Cobertura de imputación del período ──
+          Cuánto del tiempo detenido llegó con causal anotada, y si eso está
+          mejorando turno a turno. Es el número que la capacitación de
+          imputación tiene que mover; sin causal, el tiempo perdido no se le
+          puede atribuir a nadie. Se oculta si el período no trae agregados. */}
+      {slxStats?.imputacion && (
+        <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ── */}
