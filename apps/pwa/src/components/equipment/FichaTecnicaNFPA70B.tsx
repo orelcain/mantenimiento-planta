@@ -820,7 +820,7 @@ export function FichaTecnicaNFPA70B({
                       {e.texto}
                       {e.checklist && e.checklist.length > 0 && (
                         <span className="ml-1 text-caption text-muted-foreground">
-                          · {e.checklist.filter((t) => t.estado === 'ok').length}✓ {e.checklist.filter((t) => t.estado === 'obs').length}⚠
+                          · {e.checklist.filter((t) => t.estado === 'ok').length} ok · {e.checklist.filter((t) => t.estado === 'obs').length} obs
                         </span>
                       )}
                     </span>

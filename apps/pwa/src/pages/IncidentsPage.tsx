@@ -302,7 +302,7 @@ export function IncidentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las ubicaciones</SelectItem>
-              <SelectItem value="with-map">📍 Con marcador</SelectItem>
+              <SelectItem value="with-map"><span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Con marcador</span></SelectItem>
               <SelectItem value="without-map">Sin marcador</SelectItem>
               {mapLocations.map(loc => (
                 <SelectItem key={loc.id} value={loc.id}>

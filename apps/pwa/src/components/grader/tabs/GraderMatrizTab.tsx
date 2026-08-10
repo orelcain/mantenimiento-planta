@@ -33,7 +33,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
               analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-ink-ok border-emerald-300',
             )}>
               Concentración: {
-                analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta ⚠' :
+                analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta' :
                 analytics.matrixEnhanced.globalHHI > 0.25 ? 'Media' : 'Baja ✓'
               }
               <InfoTooltip {...getTooltipProps('matrix.hhi')} iconSize={11} className="ml-1" />

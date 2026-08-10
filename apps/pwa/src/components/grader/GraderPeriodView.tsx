@@ -27,7 +27,7 @@ import {
   Filler,
 } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
-import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw, Clock, Download } from 'lucide-react'
+import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw, Clock, Download, Search, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPeriodAggregate'
 import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
@@ -565,7 +565,7 @@ export function GraderPeriodView({ data }: Props) {
               {visibleRangeLabel && (
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                   <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-cat-6-ink">
-                    🔍 Filtrado a zoom: {visibleRangeLabel}
+                    <Search className="inline h-3 w-3" /> Filtrado a zoom: {visibleRangeLabel}
                   </Badge>
                   <span className="text-caption text-muted-foreground">
                     {visibleStats.daysCount} día{visibleStats.daysCount !== 1 ? 's' : ''} · {visibleStats.shiftsCount} turno{visibleStats.shiftsCount !== 1 ? 's' : ''}
@@ -831,7 +831,7 @@ export function GraderPeriodView({ data }: Props) {
                 </span>
                 {hourlySeries.length > 0 && (
                   <span className="text-cat-6-ink">
-                    💡 Haz zoom ≤ 2 días para ver drill-down horario
+                    <Lightbulb className="inline h-3 w-3" /> Haz zoom ≤ 2 días para ver drill-down horario
                   </span>
                 )}
               </>

@@ -1013,7 +1013,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     const base = getTooltipProps('lot.stdDev')
     return {
       ...base,
-      text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
+      text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto. Semáforo por CV: verde <8%, amarillo 8-11.9%, naranjo 12-19.9%, rojo ≥20%.',
       example: 'Pase el mouse sobre cada valor σ de la fila para ver su explicación exacta con datos reales de ese lote.',
     }
   }, [])
@@ -1022,7 +1022,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     const base = getTooltipProps('wt.stdDev')
     return {
       ...base,
-      text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
+      text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila. Semáforo por CV: verde <8%, amarillo 8-11.9%, naranjo 12-19.9%, rojo ≥20%.',
       example: 'Pase el mouse sobre cada valor σ del intervalo para ver su explicación exacta con datos reales de esa fila.',
     }
   }, [])

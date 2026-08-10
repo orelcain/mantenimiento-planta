@@ -21,7 +21,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, ListTree, HelpCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, ListTree, HelpCircle, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { paretoByCategoria, SIN_CAUSAL, type ParetoCategoria } from '@/services/shoplogix/imputacionPareto'
 import { leavesByCategoria, TOTAL_HOJAS_CURSO } from '@/services/shoplogix/imputacionTaxonomy'
@@ -214,7 +214,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
 
           {sinCausalSec > 0 && (
             <p className="text-caption text-cat-6-ink">
-              ⚠ {fmtHm(sinCausalSec)} de detención llegaron sin causal. Anotarlas en Shoplogix es lo
+              <AlertTriangle className="inline h-3 w-3" /> {fmtHm(sinCausalSec)} de detención llegaron sin causal. Anotarlas en Shoplogix es lo
               único que permite atacar la causa: sin causal, ese tiempo no se puede atribuir a nadie.
             </p>
           )}

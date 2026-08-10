@@ -10,7 +10,7 @@ import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestion
 import { fmt } from '@/lib/format'
 import { logger } from '@/lib/logger'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, Trash2, ChevronDown, Settings2, RotateCcw, Loader2 } from 'lucide-react'
+import { Save, FolderOpen, Trash2, ChevronDown, Settings2, RotateCcw, Loader2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -774,7 +774,7 @@ export function AnalisisGraderGatesConfigPage({
             </div>
             {shiftGapMinutes > 0 && (
               <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] px-3 py-2">
-                <span className="text-amber-400 mt-px">⚠</span>
+                <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-400" />
                 <p className="text-xs text-ink-warn">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
                   Revisa que los horarios cubran el período operativo completo.

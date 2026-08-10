@@ -4,15 +4,13 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { 
-  X, 
+import { X, 
   Undo, 
   Type, 
   MousePointer,
   Pencil,
   Download,
-  Trash2
-} from 'lucide-react'
+  Trash2, Lightbulb } from 'lucide-react'
 
 type Point = { x: number; y: number }
 
@@ -392,12 +390,12 @@ export function PhotoAnnotationEditor({
 
             {tool === 'polygon' && currentShape.length > 0 && (
               <div className="mt-2 text-sm text-muted-foreground">
-                💡 Clic en el primer punto (verde) para cerrar la forma
+                <Lightbulb className="inline h-3 w-3" /> Clic en el primer punto (verde) para cerrar la forma
               </div>
             )}
             {placingText && (
               <div className="mt-2 text-sm text-muted-foreground">
-                💡 Haz clic en la imagen para colocar el texto
+                <Lightbulb className="inline h-3 w-3" /> Haz clic en la imagen para colocar el texto
               </div>
             )}
           </CardContent>

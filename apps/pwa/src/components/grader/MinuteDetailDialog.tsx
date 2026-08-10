@@ -15,6 +15,7 @@
  * esa barra, y confirma qué piezas fallaron, su peso, y a qué gate iban.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Check, Info, Siren } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -399,7 +400,7 @@ export function MinuteDetailDialog({
                 title={MATRIX_P0_CAUSES[breakdown.topP0Cause.id].description}
               >
                 <span className="text-base leading-none">
-                  {breakdown.p0Status === 'critical' ? '🚨' : breakdown.p0Status === 'alert' ? '⚠️' : '✓'}
+                  {breakdown.p0Status === 'critical' ? <Siren className="inline h-4 w-4" aria-label="Crítico" /> : breakdown.p0Status === 'alert' ? <AlertTriangle className="inline h-4 w-4" aria-label="Alerta" /> : <Check className="inline h-4 w-4" aria-label="OK" />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className={cn('font-medium flex items-center gap-1.5 flex-wrap', p0StatusColor(breakdown.p0Status))}>
@@ -420,7 +421,7 @@ export function MinuteDetailDialog({
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
               <div className="flex items-start gap-2 px-3 py-2 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-xs text-ink-warn">
-                <span className="text-base leading-none">ℹ️</span>
+                <Info className="h-4 w-4 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
                   <div className="text-amber-800/90 dark:text-amber-200/80 mt-0.5">

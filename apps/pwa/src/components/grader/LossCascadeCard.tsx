@@ -34,7 +34,7 @@ import {
   MANUAL_LINE_LABEL,
   MANUAL_LINE_TOOLTIP,
 } from '@/services/grader/graderManualLine'
-import { ChevronDown, ChevronRight, Scale } from 'lucide-react'
+import { ChevronDown, ChevronRight, Scale, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cascadeFromStates, classifyLossState, LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
@@ -615,7 +615,7 @@ export function LossCascadeCard({
 
           {totals.sinClasificarSec > 0 && filter === 'all' && (
             <p className="text-caption text-violet-400/80">
-              ⚠ {fmtHm(totals.sinClasificarSec)} sin clasificar — causal desconocida o sin anotar en Shoplogix.
+              <AlertTriangle className="inline h-3 w-3" /> {fmtHm(totals.sinClasificarSec)} sin clasificar — causal desconocida o sin anotar en Shoplogix.
               Anotarla permite asignarle dueño (y sacarla de la duda).
             </p>
           )}

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { computeBeltSpeedFromVfd } from '@/services/grader/graderAnalytics'
@@ -107,7 +108,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </Select>
                   </div>
                 )}
-                {hasDiscrepancy && <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
+                {hasDiscrepancy && <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn gap-1"><AlertTriangle className="h-3 w-3" />Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
                 <span className="ml-auto font-mono font-semibold">{belt.speedMps.toFixed(3)} m/s actual</span>
               </div>
               <table className="w-full">

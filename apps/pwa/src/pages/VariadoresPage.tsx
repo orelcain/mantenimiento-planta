@@ -22,7 +22,7 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp, Hourglass } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
 import { getIncidents, resolveIncident } from '@/services/incidents'
@@ -2125,7 +2125,7 @@ export function VariadoresPage() {
                   >
                     <h3 className="m-0 font-mono text-sm font-semibold tracking-[-0.01em]" style={{ color: C.aquaBright }}>
                       {m.modelo}
-                      {m.porConfirmar && <span className="ml-2" style={{ color: C.warn }}>⏳</span>}
+                      {m.porConfirmar && <Hourglass className="ml-2 inline h-3 w-3" style={{ color: C.warn }} aria-label="Por confirmar" />}
                     </h3>
                     <dl
                       className="grid grid-cols-3 gap-px overflow-hidden rounded-ctl"

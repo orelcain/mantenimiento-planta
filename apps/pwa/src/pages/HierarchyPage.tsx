@@ -358,7 +358,7 @@ export function HierarchyPage() {
     const willCascadeDelete = isEmpresa || hasChildren
 
     const confirmMessage = willCascadeDelete
-      ? `⚠️ ADVERTENCIA: Vas a eliminar "${node.nombre}" y TODA su jerarquía descendiente.\n\n¿Estás seguro? Esta acción NO se puede deshacer.`
+      ? `ADVERTENCIA: Vas a eliminar "${node.nombre}" y TODA su jerarquía descendiente.\n\n¿Estás seguro? Esta acción NO se puede deshacer.`
       : `¿Eliminar "${node.nombre}"? Esta acción no se puede deshacer.`
     
     if (!confirm(confirmMessage)) {

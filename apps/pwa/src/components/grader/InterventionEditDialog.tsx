@@ -8,6 +8,7 @@ import { Loader2, Trash2, Save, AlertTriangle } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Button, Input, Textarea, Badge,
 } from '@/components/ui'
+import { CondLeyenda } from '@/components/equipment/CondDot'
 import { cn } from '@/lib/utils'
 import { EquipoCombobox, AREA_LEVEL, type ComboOption } from './EquipoCombobox'
 import { updateMaintenanceLogEntry, deleteMaintenanceLogEntry } from '@/services/maintenanceLog'
@@ -161,7 +162,7 @@ export function InterventionEditDialog({
             </div>
             <p className="text-caption text-muted-foreground leading-relaxed">
               Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
-              {' '}🟢 <b>1</b> como nuevo ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
+              {' '}<CondLeyenda detalle={{ 1: 'como nuevo', 2: 'con desvíos, requiere seguimiento', 3: 'acción correctiva inmediata / fuera de servicio' }} />.
             </p>
           </div>
 

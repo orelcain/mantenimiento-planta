@@ -93,7 +93,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
             </div>
             {m.recurrentInCurrent.length > 0 && (
               <p className="text-caption text-ink-warn mt-1.5">
-                ⚠ {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
+                <AlertTriangle className="inline h-3 w-3" /> {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
               </p>
             )}
           </div>

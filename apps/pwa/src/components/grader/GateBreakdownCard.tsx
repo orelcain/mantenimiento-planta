@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
+import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight, AlertTriangle } from 'lucide-react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import {
   gateStatusFromRatio,
@@ -576,7 +576,7 @@ export function GateBreakdownCard({
                               'mt-1 text-caption italic',
                               isTop ? 'text-red-400/70' : 'text-amber-400/70',
                             )}>
-                              ⚠ {s.cautela}
+                              <AlertTriangle className="inline h-3 w-3" /> {s.cautela}
                             </div>
                           </div>
 

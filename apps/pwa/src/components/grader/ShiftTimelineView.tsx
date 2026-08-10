@@ -796,7 +796,7 @@ export function ShiftTimelineView({
     })
 
     // Marcadores Baader — usados SOLO para enriquecer el tooltip del chart
-    // con la sección "⚠ Upstream parado". El sub-grid visual fue retirado
+    // con la sección "Upstream parado". El sub-grid visual fue retirado
     // tras feedback del usuario (no aportaba en el formato compacto). La
     // visualización detallada vive en UpstreamMachinesPanel sincronizado
     // por zoom.

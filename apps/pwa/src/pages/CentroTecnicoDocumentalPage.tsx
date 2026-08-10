@@ -48,6 +48,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { useCtdEquipos } from '@/hooks/useCtdEquipos'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
+import { CondDot } from '@/components/equipment/CondDot'
 import { TableroExpediente } from '@/components/equipment/TableroExpediente'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
@@ -55,8 +56,6 @@ import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
 import {
   BUCKETS,
-  COND_COLOR,
-  COND_LABEL,
   CRIT,
   CRIT_INFO,
   ESTADO,
@@ -1397,22 +1396,6 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
 }
 
 /** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
-/**
- * Punto del semáforo de condición. El `title` lleva la etiqueta completa: el color
- * nunca es el único canal (§13).
- */
-function CondDot({ cond }: { cond: 1 | 2 | 3 }) {
-  return (
-    <span
-      className="inline-block size-2.5 shrink-0 rounded-full align-middle"
-      style={{ background: COND_COLOR[cond] }}
-      title={COND_LABEL[cond]}
-      role="img"
-      aria-label={COND_LABEL[cond]}
-    />
-  )
-}
-
 function OtBadge({ ot }: { ot?: OtCount }) {
   if (!ot || ot.abiertas === 0) return null
   const danger = ot.vencidas > 0

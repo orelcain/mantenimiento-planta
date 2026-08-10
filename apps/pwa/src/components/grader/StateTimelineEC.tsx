@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
+import { Clock, Timer } from 'lucide-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
@@ -370,8 +371,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           <b>{cause}</b>
         </div>
         <div style={{ color: '#9ca3af' }}>{typeLabel}</div>
-        <div>⏱ <b>{fmtDurationSec(st.durationSec)}</b></div>
-        <div>🕐 {fmtTime(st.startAt)} – {fmtTime(st.endAt)}</div>
+        <div className="flex items-center gap-1"><Timer className="h-3 w-3 shrink-0" /><b>{fmtDurationSec(st.durationSec)}</b></div>
+        <div className="flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" />{fmtTime(st.startAt)} – {fmtTime(st.endAt)}</div>
       </div>
     )
   })() : null
