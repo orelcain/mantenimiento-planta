@@ -89,6 +89,21 @@ function currentStateOf(states) {
   return ordered.find(s => s.isCurrent === true) ?? ordered[ordered.length - 1]
 }
 
+/**
+ * ¿Este state es el relleno "Planned Downtime" de fuera del turno?
+ *
+ * Shoplogix rellena con él las horas que la ventana de consulta captura de más
+ * (la planta simplemente no estaba operando). No es una detención de la línea:
+ * meterlo en el denominador del "% produciendo" lo hunde solo, y listarlo entre
+ * las detenciones del turno hace que el primer lugar del ranking sea "no
+ * estábamos trabajando". Visto en vivo el 10-ago: el % cayó de 72% a 58% al
+ * entrar 2 h 41 min de Planned Downtime posteriores al cierre.
+ */
+function esPlannedDowntime(state) {
+  return /planned\s*downtime/i.test(String(state?.reason || '')) ||
+         /planned\s*downtime/i.test(String(state?.name || ''))
+}
+
 /** 'produciendo' | 'detenida' | 'sin-datos' según el state vigente. */
 function statusOf(state) {
   if (!state) return 'sin-datos'
@@ -446,7 +461,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     let sec = 0
     for (const m of machines) {
       for (const st of extras.get(m.id)?.states || []) {
-        if (st.type === tipo) sec += st.durationSec || 0
+        if (st.type === tipo && !esPlannedDowntime(st)) sec += st.durationSec || 0
       }
     }
     return sec
@@ -526,6 +541,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   for (const m of machines) {
     for (const s of m.states || []) {
       if (s.type === 'uptime') continue
+      if (esPlannedDowntime(s)) continue
       const reason = (s.reason || s.name || 'Sin razón').trim()
       const prev = stopAcc.get(reason) || { reason, sec: 0, count: 0 }
       prev.sec += s.durationSec || 0
