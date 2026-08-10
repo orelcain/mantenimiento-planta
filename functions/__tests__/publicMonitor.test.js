@@ -341,3 +341,116 @@ test('el patch de un monitor de línea reapunta el turno; el de un turno fijo no
   assert.equal(fijo.shiftDocId, undefined, 'un link de turno fijo no debe reapuntar')
   assert.equal(fijo.live.totalPieces, 3000)
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `ensureLineMonitor`: el link que se manda por Telegram al arrancar el turno.
+//
+// La invariante que importa es que el TOKEN NO CAMBIE: el mensaje de Telegram
+// de ayer y el QR impreso tienen que seguir abriendo la misma pantalla. Un
+// "creo uno nuevo cada arranque" pasaría todos los tests de contenido y aun así
+// rompería lo único que hace útil al link.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { ensureLineMonitor } = require('../publicMonitor')
+
+/** db falso con la colección de monitores en memoria + los turnos del stub. */
+function fakeMonitorsDb(monitors, shiftsDb = null) {
+  const store = { ...monitors }
+  return {
+    collection: (name) => {
+      if (name === 'publicShiftMonitors') {
+        return {
+          where: () => ({
+            get: async () => ({
+              docs: Object.entries(store).map(([id, data]) => ({
+                id,
+                data: () => data,
+                ref: { set: async (patch) => { store[id] = { ...store[id], ...patch } } },
+              })),
+            }),
+          }),
+          doc: (id) => ({ set: async (d) => { store[id] = d } }),
+        }
+      }
+      return shiftsDb ? shiftsDb.collection(name) : { listDocuments: async () => [] }
+    },
+    doc: (path) => (shiftsDb ? shiftsDb.doc(path) : { get: async () => ({ exists: false }) }),
+    getAll: async (...refs) => (shiftsDb ? shiftsDb.getAll(...refs) : []),
+    _store: store,
+  }
+}
+
+const enDias = (n) => new Date(Date.now() + n * 86_400_000).toISOString()
+
+test('ensureLineMonitor reusa el token vigente en vez de crear otro', async () => {
+  const vence = enDias(20)
+  const db = fakeMonitorsDb({
+    'tok-viejo': { scope: 'line|filete', expiresAt: vence },
+  })
+
+  const res = await ensureLineMonitor(db, 'filete', { ttlDays: 30 })
+
+  assert.equal(res.token, 'tok-viejo', 'el QR impreso tiene que seguir sirviendo')
+  assert.equal(res.created, false)
+  assert.equal(Object.keys(db._store).length, 1, 'no debe aparecer un token nuevo')
+  assert.equal(db._store['tok-viejo'].expiresAt, vence, 'con vigencia de sobra no se reescribe')
+})
+
+test('ensureLineMonitor renueva la vigencia cuando queda poca, sin cambiar el token', async () => {
+  const db = fakeMonitorsDb({
+    'tok-porvencer': { scope: 'line|filete', expiresAt: enDias(2) },
+  })
+
+  const res = await ensureLineMonitor(db, 'filete', { ttlDays: 30 })
+
+  assert.equal(res.token, 'tok-porvencer')
+  assert.ok(db._store['tok-porvencer'].expiresAt > enDias(25), 'debió extenderse a ~30 días')
+})
+
+test('ensureLineMonitor ignora los vencidos y crea uno nuevo', async () => {
+  const w = nowWall()
+  const vigenteId = `${dk(w)}_Turno Dia`
+  const shifts = fakeShiftsDb(
+    { [vigenteId]: { shiftId: 'Turno Dia', scheduledStart: hoy(Math.max(0, w.getUTCHours() - 1)), scheduledEnd: new Date(w.getTime() + 3600_000), machines: [{ totalCycles: 10 }] } },
+    { [vigenteId]: [{
+      machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+      totalCycles: 10, shiftRuntime: 1,
+      shiftRuntimeBreakdown: { uptimeSec: 600, downtimeSec: 0, breakSec: 0 },
+      intervals: intervals(hoy(Math.max(0, w.getUTCHours() - 1)).getTime(), 2, 5),
+      states: [],
+    }] },
+  )
+  const db = fakeMonitorsDb({ 'tok-vencido': { scope: 'line|filete', expiresAt: enDias(-1) } }, shifts)
+
+  const res = await ensureLineMonitor(db, 'filete', { ttlDays: 30, meta: { areaLabel: 'Filete' } })
+
+  assert.equal(res.created, true)
+  assert.notEqual(res.token, 'tok-vencido')
+  const nuevo = db._store[res.token]
+  assert.equal(nuevo.mode, 'line')
+  assert.equal(nuevo.scope, 'line|filete')
+  assert.equal(nuevo.shiftDocId, vigenteId, 'nace apuntando al turno vigente')
+  assert.equal(nuevo.live.totalPieces, 10)
+})
+
+test('ensureLineMonitor se queda con el que vence más tarde si hay varios', async () => {
+  const db = fakeMonitorsDb({
+    'tok-a': { scope: 'line|filete', expiresAt: enDias(3) },
+    'tok-b': { scope: 'line|filete', expiresAt: enDias(25) },
+  })
+  const res = await ensureLineMonitor(db, 'filete', { ttlDays: 30 })
+  assert.equal(res.token, 'tok-b')
+})
+
+test('el brief de inicio lleva el link solo cuando hay uno', () => {
+  const brief = require('../shoplogix/turnoBrief')
+  const url = 'https://x/monitor/abc'
+
+  const con = brief.componerBriefInicioTurno({ plantLabel: 'Filete', shiftId: 'Turno Dia', officialSchedule: null, currentJob: null, officialTargets: null, monitorUrl: url })
+  assert.ok(con.includes(url))
+  assert.ok(/sin login/i.test(con), 'hay que decir que el link es compartible')
+
+  const sin = brief.componerBriefInicioTurno({ plantLabel: 'Filete', shiftId: 'Turno Dia', officialSchedule: null, currentJob: null, officialTargets: null })
+  assert.ok(!sin.includes('monitor'), 'sin link no debe quedar una línea colgando')
+  assert.ok(!/\n\n$/.test(sin), 'ni una línea en blanco al final')
+})

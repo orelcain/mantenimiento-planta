@@ -6982,8 +6982,8 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
     const title = `🟢 Proceso iniciado · ${plantLabel}`
     const body  = `${shiftId} ha arrancado`
 
+    // FCM push (canal existente — siempre activo por defecto)
     if (eligibleIds.length > 0) {
-      // FCM push (canal existente — siempre activo por defecto)
       if (config.channels.push) {
         const tokens = await getTokensForUsers(eligibleIds)
         if (tokens.length > 0) {
@@ -6993,10 +6993,25 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
           logger.info(`[onShoplogixShiftStarted] FCM enviado`, { eligible: eligibleIds.length, tokens: tokens.length })
         }
       }
-      // Telegram (canal opcional) — brief enriquecido con el rollup oficial
-      // (horario/especie/target quedan en el doc padre desde el sync que crea
-      // el turno vigente; si faltan, el composer degrada a las 2 líneas de antes)
+    }
+
+    // Telegram va FUERA del gate de `eligibleIds`: ese gate son las
+    // preferencias de push de los usuarios de la app, y el mensaje de Telegram
+    // llega al chat del admin o al grupo. Que alguien apague su push no puede
+    // dejar sin link a Control de Producción.
+    {
+      // Link del monitor público, para reenviar a Control de Producción. Se
+      // resuelve ANTES de componer el mensaje porque va dentro del brief.
+      // Va por su propio flag (`monitorLink.enabled`) y no por
+      // `channels.telegram`: así una línea recibe el link sin que se le abra
+      // todo el canal de alertas (el caso de Filete, que es justamente donde
+      // más se pide el monitor).
+      const monitorUrl = await resolveMonitorUrlForPlant(plant, config)
+
       if (config.channels.telegram) {
+        // Brief enriquecido con el rollup oficial (horario/especie/target quedan
+        // en el doc padre desde el sync que crea el turno vigente; si faltan, el
+        // composer degrada a las 2 líneas de antes).
         const officialSchedule = data.officialSchedule?.start && data.officialSchedule?.end
           ? {
               start: data.officialSchedule.start.toDate?.() ?? data.officialSchedule.start,
@@ -7011,7 +7026,15 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
             officialSchedule,
             currentJob: data.currentJob ?? null,
             officialTargets: data.officialTargetsByMachineId ?? null,
+            monitorUrl,
           }),
+        )
+      } else if (monitorUrl) {
+        // Sin canal de alertas abierto: igual se manda el link solo, que es lo
+        // pedido. Un mensaje corto, no el brief completo.
+        await sendShoplogixTelegram(
+          config,
+          turnoBriefMod.componerAvisoMonitor({ plantLabel, shiftId, monitorUrl }),
         )
       }
     }
@@ -7069,6 +7092,46 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 const notifConfigMod = require('./shoplogix/notifConfig')
 const shoplogixMachinesMod = require('./shoplogix/machines')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
+
+/** Base pública de la PWA (GitHub Pages). Los links de Telegram son absolutos. */
+const APP_PUBLIC_BASE = 'https://orelcain.github.io/mantenimiento-planta'
+
+/**
+ * URL del monitor público de una línea, para meterla en el aviso de arranque.
+ *
+ * Reusa SIEMPRE el mismo token mientras siga vigente (ver `ensureLineMonitor`):
+ * el link que llega hoy por Telegram es el mismo que llegó ayer, así que quien
+ * lo guardó o lo imprimió en un QR no tiene que volver a pedirlo.
+ *
+ * Nunca tumba el aviso de arranque: ante cualquier error devuelve null y el
+ * mensaje sale sin la línea del link.
+ */
+async function resolveMonitorUrlForPlant(plantSlug, config) {
+  if (!config?.monitorLink?.enabled) return null
+  try {
+    const maquinas = shoplogixMachinesMod.PLANT_MACHINES[plantSlug] || []
+    const res = await publicMonitorMod.ensureLineMonitor(db, plantSlug, {
+      ttlDays: config.monitorLink.ttlDays || 30,
+      meta: {
+        plantLineId:     SHOPLOGIX_PLANT_LINE_ID[plantSlug] ?? null,
+        // Solo el área: repetirla como `lineLabel` dejaba "Filete · Filete" en
+        // la cabecera del monitor.
+        areaLabel:       SHOPLOGIX_PLANT_LABEL[plantSlug] ?? plantSlug,
+        lineLabel:       null,
+        // Con una sola máquina instrumentada su nombre ES el de la línea
+        // (Filete = "Baader 200 · Línea 1"); con varias, la etiqueta genérica.
+        machineKindLong: maquinas.length === 1 ? maquinas[0].name : null,
+        targetPieces:    shoplogixMachinesMod.PLANT_SHIFT_TARGET_PIECES[plantSlug] ?? null,
+      },
+    })
+    if (!res) return null
+    if (res.created) logger.info('[publicShiftMonitor] link de línea creado por el arranque de turno', { plantSlug, token: res.token })
+    return `${APP_PUBLIC_BASE}/monitor/${res.token}`
+  } catch (err) {
+    logger.error('[publicShiftMonitor] no se pudo resolver el link de línea', { plantSlug, error: err.message })
+    return null
+  }
+}
 
 async function getShoplogixNotifConfig(plantSlug) {
   try {
