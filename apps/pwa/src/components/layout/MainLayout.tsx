@@ -28,8 +28,6 @@ import {
   Droplets,
   BookOpen,
   GraduationCap,
-  Upload,
-  History,
   Shield,
   FolderArchive,
 } from 'lucide-react'
@@ -436,37 +434,27 @@ export function MainLayout() {
     }
   }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Bottom nav: 3 fijas + 2 contextuales según módulo activo
+  /**
+   * Barra inferior con destinos FIJOS (Constitución §18, §20, §61).
+   *
+   * Antes las pestañas eran CONTEXTUALES: cambiaban según el módulo en el que
+   * estuvieras. Eso rompe el modelo mental — en iOS una tab bar es un mapa
+   * estable de la app: siempre los mismos destinos, siempre en el mismo orden.
+   * Si cambian bajo el dedo, deja de ser navegación y pasa a ser una barra de
+   * acciones. La §18 lo pide explícito: "extremadamente predecible".
+   *
+   * Cinco es el máximo de la §20, y el quinto es "Más", que abre el cajón con
+   * el resto de módulos. Incidencias entra sí o sí por la §55: la información
+   * crítica no se esconde detrás de menús.
+   */
   type BottomNavItem = { name: string; href: string; icon: React.ElementType; module?: AppModule }
   const fixedTabs: BottomNavItem[] = [
-    { name: 'Inicio',   href: '/',           icon: LayoutDashboard, module: 'dashboard' },
-    { name: 'Equipos',  href: '/equipment',  icon: Wrench,          module: 'equipos' },
+    { name: 'Inicio',      href: '/',           icon: LayoutDashboard, module: 'dashboard' },
+    { name: 'Incidencias', href: '/incidents',  icon: AlertTriangle,   module: 'incidencias' },
+    { name: 'Equipos',     href: '/equipment',  icon: Wrench,          module: 'equipos' },
+    { name: 'Repuestos',   href: '/repuestos',  icon: Package,         module: 'repuestos' },
   ]
-  const contextualTabsMap: Record<string, BottomNavItem[]> = {
-    '/analisis-grader': [
-      { name: 'Grader',    href: '/analisis-grader',          icon: Upload },
-      { name: 'Historial', href: '/analisis-grader/periodo',  icon: History },
-    ],
-    '/repuestos': [
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-    ],
-    '/equipment': [
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-    ],
-    '/incidents': [
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-    ],
-  }
-  const defaultContextual: BottomNavItem[] = [
-    { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-    { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-  ]
-  const activeContext = Object.keys(contextualTabsMap).find(prefix => location.pathname.startsWith(prefix))
-  const contextualTabs = (activeContext ? contextualTabsMap[activeContext] : undefined) ?? defaultContextual
-  const bottomNavItems = [...fixedTabs, ...contextualTabs]
+  const bottomNavItems = [...fixedTabs]
     .filter(item => !item.module || canSee(item.module))
     // Respetar la misma visibilidad que el sidebar: si el href está oculto
     // (dev no activado o producción ocultada), sacarlo también del bottom nav.
@@ -1219,7 +1207,9 @@ export function MainLayout() {
       {/* Oculto en home (/) — el home mobile tiene su propio botón de menú arriba */}
       <nav
         className={cn(
-          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border',
+          // §36: la translucidez es para el CROMO de navegación — este es su
+          // sitio. §38: separador de 1 px casi invisible, no un borde marcado.
+          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/80 backdrop-blur-xl border-t border-border/40',
           location.pathname === '/' && 'hidden',
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -1236,23 +1226,26 @@ export function MainLayout() {
                 to={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:scale-95 relative',
+                  // §16: 44px mínimo de área táctil (uso con guantes).
+                  'flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium transition-colors active:scale-[0.97] relative',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
                 aria-label={item.name}
               >
-                {isActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />}
-                <item.icon className={cn('h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.5px]')} />
+                {/* La barrita superior era un patrón de Material Design. En iOS
+                    el estado activo se comunica con el COLOR del ícono y del
+                    texto, y con más peso de trazo — nada más (§17). */}
+                <item.icon className={cn('h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.4px]')} />
                 <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
               </NavLink>
             )
           })}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium text-muted-foreground transition-colors active:scale-95"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium text-muted-foreground transition-colors active:scale-[0.97]"
             aria-label="Más opciones"
           >
-            <Menu className="h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
+            <Menu className="h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
             <span className="[@media(max-height:500px)]:hidden">Más</span>
           </button>
         </div>
