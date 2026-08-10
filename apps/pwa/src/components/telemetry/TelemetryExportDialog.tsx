@@ -396,13 +396,13 @@ export function TelemetryExportDialog(props: {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1h">⏱️ {presetLabel('1h')}</SelectItem>
-                  <SelectItem value="6h">🕐 {presetLabel('6h')}</SelectItem>
-                  <SelectItem value="12h">🕛 {presetLabel('12h')}</SelectItem>
-                  <SelectItem value="24h">📅 {presetLabel('24h')}</SelectItem>
-                  <SelectItem value="48h">📆 {presetLabel('48h')}</SelectItem>
-                  <SelectItem value="7d">📊 {presetLabel('7d')}</SelectItem>
-                  <SelectItem value="custom">🧾 {presetLabel('custom')}</SelectItem>
+                  <SelectItem value="1h">{presetLabel('1h')}</SelectItem>
+                  <SelectItem value="6h">{presetLabel('6h')}</SelectItem>
+                  <SelectItem value="12h">{presetLabel('12h')}</SelectItem>
+                  <SelectItem value="24h">{presetLabel('24h')}</SelectItem>
+                  <SelectItem value="48h">{presetLabel('48h')}</SelectItem>
+                  <SelectItem value="7d">{presetLabel('7d')}</SelectItem>
+                  <SelectItem value="custom">{presetLabel('custom')}</SelectItem>
                 </SelectContent>
               </Select>
               {resolvedRange && (

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
+import { AlertTriangle, CalendarDays, MonitorSmartphone } from 'lucide-react'
 import { Badge, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { InfoTooltip } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -84,7 +85,6 @@ export function ProductoTab({
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
       ? 'bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25]'
       : 'bg-emerald-500/[0.15] text-emerald-400 border-emerald-500/[0.25]'
-  const verdictEmoji = overlapping ? '🔴' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? '🟡' : '🟢'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
@@ -145,7 +145,7 @@ export function ProductoTab({
                     ? 'bg-emerald-500/[0.15] text-ink-ok'
                     : 'bg-amber-500/[0.15] text-ink-warn',
                 )}>
-                  {historicalMedianG.fromCalendar ? '📅 ' : ''}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
+                  {historicalMedianG.fromCalendar && <CalendarDays className='mr-1 inline h-3 w-3' />}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
                 </Badge>
               )}
               {medianSource === null && (
@@ -157,7 +157,7 @@ export function ProductoTab({
 
         {physicalConfig.species && !medianWeightG && historicalMedianG && !historicalMedianG.fromCalendar && (
           <p className="text-caption text-muted-foreground">
-            💡 Haz click en una tarjeta de turno del calendario para usar datos específicos.
+            Haz click en una tarjeta de turno del calendario para usar datos específicos.
           </p>
         )}
 
@@ -219,7 +219,7 @@ export function ProductoTab({
             'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border',
             verdictColor,
           )}>
-            {verdictEmoji} {verdictText}
+            {verdictText}
           </span>
           <span className="text-caption text-muted-foreground">
             ratio pez/paso: <span className="font-mono">{lengthToSpacingRatio.toFixed(2)}</span>
@@ -256,7 +256,7 @@ export function ProductoTab({
                       onClick={onOpenZ2Capture}
                       className="inline-flex items-center gap-1 text-caption border border-primary/[0.25] text-primary rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
                     >
-                      📟 Leer Z2
+                      <MonitorSmartphone className="h-3 w-3" />Leer Z2
                     </button>
                   )}
                 </div>
@@ -298,7 +298,7 @@ export function ProductoTab({
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</span>
+              <span className="inline-flex items-center gap-1 rounded-ctl border px-1 py-0.5 text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap"><AlertTriangle className="h-3 w-3" />Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>
@@ -421,13 +421,13 @@ export function ProductoTab({
             </p>
             {overlapping && (
               <p className="text-caption text-red-500">
-                ⚠ El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
+                El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
                 Con {pocketCountAlt} pockets el gap sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>
             )}
             {!overlapping && lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn && (
               <p className="text-caption text-amber-500">
-                ⚠ Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
+                Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>
             )}
             <p className="text-caption text-muted-foreground">

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
+  Braces,
+  Building2,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -9,6 +11,9 @@ import {
   Download,
   Edit2,
   FileDown,
+  FileText,
+  Table2,
+  Wrench,
   Grid3X3,
   Image as ImageIcon,
   List,
@@ -455,7 +460,7 @@ export function EquipmentPage() {
         estado: 'en_mantenimiento',
       })
 
-      const noteText = `⚙️ Mantenimiento ${maintenanceType === 'local' ? 'Local' : 'Externo'}${
+      const noteText = `Mantenimiento ${maintenanceType === 'local' ? 'Local' : 'Externo'}${
         maintenanceResponsible ? ` - ${maintenanceResponsible}` : ''
       }${maintenanceNotes ? `\n${maintenanceNotes}` : ''}`
 
@@ -680,7 +685,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           usa el enlace "Ver detalles completos" arriba.
 `
 
-      const subject = `🔧 Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
+      const subject = `Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
       
       // mailto: solo soporta texto plano, no HTML
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textBody)}`
@@ -1082,9 +1087,15 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="operativo">✓ Operativo</SelectItem>
-                  <SelectItem value="en_mantenimiento">⚙ En Mantenimiento</SelectItem>
-                  <SelectItem value="fuera_servicio">✗ Fuera de Servicio</SelectItem>
+                  <SelectItem value="operativo">
+                    <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5" />Operativo</span>
+                  </SelectItem>
+                  <SelectItem value="en_mantenimiento">
+                    <span className="inline-flex items-center gap-2"><Settings className="h-3.5 w-3.5" />En Mantenimiento</span>
+                  </SelectItem>
+                  <SelectItem value="fuera_servicio">
+                    <span className="inline-flex items-center gap-2"><XCircle className="h-3.5 w-3.5" />Fuera de Servicio</span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {filteredEquipment.length > 0 && (
@@ -1124,9 +1135,15 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                       <SelectValue placeholder="Cambiar estado..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="operativo">✓ Operativo</SelectItem>
-                      <SelectItem value="en_mantenimiento">⚙ En Mantenimiento</SelectItem>
-                      <SelectItem value="fuera_servicio">✗ Fuera de Servicio</SelectItem>
+                      <SelectItem value="operativo">
+                        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5" />Operativo</span>
+                      </SelectItem>
+                      <SelectItem value="en_mantenimiento">
+                        <span className="inline-flex items-center gap-2"><Settings className="h-3.5 w-3.5" />En Mantenimiento</span>
+                      </SelectItem>
+                      <SelectItem value="fuera_servicio">
+                        <span className="inline-flex items-center gap-2"><XCircle className="h-3.5 w-3.5" />Fuera de Servicio</span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -1397,8 +1414,12 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="local">🔧 Local (Departamento de Mantenimiento)</SelectItem>
-                    <SelectItem value="externo">🏢 Externo (Servicio Tercerizado)</SelectItem>
+                    <SelectItem value="local">
+                      <span className="inline-flex items-center gap-2"><Wrench className="h-3.5 w-3.5" />Local (Departamento de Mantenimiento)</span>
+                    </SelectItem>
+                    <SelectItem value="externo">
+                      <span className="inline-flex items-center gap-2"><Building2 className="h-3.5 w-3.5" />Externo (Servicio Tercerizado)</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1593,9 +1614,15 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pdf">📄 PDF/Texto (para imprimir o copiar)</SelectItem>
-                    <SelectItem value="csv">📊 CSV (para Excel)</SelectItem>
-                    <SelectItem value="json">💾 JSON (para sistemas)</SelectItem>
+                    <SelectItem value="pdf">
+                      <span className="inline-flex items-center gap-2"><FileText className="h-3.5 w-3.5" />PDF/Texto (para imprimir o copiar)</span>
+                    </SelectItem>
+                    <SelectItem value="csv">
+                      <span className="inline-flex items-center gap-2"><Table2 className="h-3.5 w-3.5" />CSV (para Excel)</span>
+                    </SelectItem>
+                    <SelectItem value="json">
+                      <span className="inline-flex items-center gap-2"><Braces className="h-3.5 w-3.5" />JSON (para sistemas)</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

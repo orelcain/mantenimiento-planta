@@ -21,6 +21,7 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
+  Wrench,
 } from 'lucide-react'
 import {
   Card,
@@ -34,6 +35,7 @@ import {
   Switch,
   Label,
 } from '@/components/ui'
+import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store'
 import type { User, UserRole } from '@/types'
@@ -66,6 +68,7 @@ type TabType = 'roles' | 'users'
 
 export function PermissionsManagerV2() {
   const { user: currentUser } = useAuthStore()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<TabType>('roles')
   const [isInitializing, setIsInitializing] = useState(false)
 
@@ -74,10 +77,10 @@ export function PermissionsManagerV2() {
     setIsInitializing(true)
     try {
       await initializeDefaultRoles(currentUser.id)
-      alert('✅ Roles inicializados correctamente')
+      toast({ title: 'Roles inicializados' })
     } catch (error) {
       logger.error('Error inicializando roles', error instanceof Error ? error : new Error(String(error)))
-      alert('❌ Error inicializando roles')
+      toast({ title: 'No se pudieron inicializar los roles', variant: 'destructive' })
     } finally {
       setIsInitializing(false)
     }
@@ -148,6 +151,7 @@ export function PermissionsManagerV2() {
 
 function RolePermissionsTab() {
   const { user: currentUser } = useAuthStore()
+  const { toast } = useToast()
   const [selectedRole, setSelectedRole] = useState<UserRole>('tecnico')
   const [permissions, setPermissions] = useState<PermissionsMap>({})
   const [originalPermissions, setOriginalPermissions] = useState<PermissionsMap>({})
@@ -220,10 +224,10 @@ function RolePermissionsTab() {
       await saveRolePermissions(selectedRole, permissions, currentUser.id)
       setOriginalPermissions(permissions)
       logger.info('Permisos de rol guardados', { rol: selectedRole })
-      alert('✅ Permisos guardados correctamente')
+      toast({ title: 'Permisos guardados' })
     } catch (error) {
       logger.error('Error guardando permisos', error instanceof Error ? error : new Error(String(error)))
-      alert('❌ Error al guardar permisos')
+      toast({ title: 'No se pudieron guardar los permisos', variant: 'destructive' })
     } finally {
       setIsSaving(false)
     }
@@ -261,11 +265,11 @@ function RolePermissionsTab() {
       {/* Selector de rol */}
       <div className="flex flex-wrap gap-2">
         {(['admin', 'supervisor', 'tecnico', 'usuario'] as UserRole[]).map(role => {
-          const roleLabels = {
-            admin: '👑 Administrador',
-            supervisor: '👔 Supervisor',
-            tecnico: '🔧 Técnico',
-            usuario: '👤 Usuario',
+          const roleLabels: Record<UserRole, string> = {
+            admin: 'Administrador',
+            supervisor: 'Supervisor',
+            tecnico: 'Técnico',
+            usuario: 'Usuario',
           }
           return (
             <button
@@ -377,6 +381,7 @@ function RolePermissionsTab() {
 
 function UserPermissionsTab() {
   const { user: currentUser } = useAuthStore()
+  const { toast } = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -489,10 +494,10 @@ function UserPermissionsTab() {
       }
       setOriginalOverride({ active: overrideActive, perms: overridePermissions })
       logger.info('Override guardado', { userId: selectedUser.id })
-      alert('✅ Permisos personalizados guardados')
+      toast({ title: 'Permisos personalizados guardados' })
     } catch (error) {
       logger.error('Error guardando override', error instanceof Error ? error : new Error(String(error)))
-      alert('❌ Error al guardar')
+      toast({ title: 'No se pudieron guardar los permisos', variant: 'destructive' })
     } finally {
       setIsSaving(false)
     }
@@ -563,8 +568,9 @@ function UserPermissionsTab() {
                 </div>
                 <span className="text-sm text-muted-foreground">{user.email}</span>
                 {user.permissionsOverride?.activo && (
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    🔧 Override activo
+                  <Badge variant="outline" className="mt-1 flex w-fit items-center gap-1 text-xs">
+                    <Wrench className="h-3 w-3" />
+                    Override activo
                   </Badge>
                 )}
               </button>

@@ -20,6 +20,7 @@ import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
   TrendingUp, TrendingDown, Timer, Gauge, Pause, AlertTriangle, Download, MessageSquare,
+  Coffee, PauseCircle, Scissors, WifiOff,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -338,14 +339,15 @@ function ShiftAvailabilityBar({
   const downPct  = (breakdown.downtimeSec / productive) * 100
   const setupPct = (breakdown.setupSec    / productive) * 100
 
+  // Tooltip nativo del navegador: texto plano, alineado por columnas.
   const tooltip = [
-    `↑ Uptime:     ${fmtDurationSec(breakdown.uptimeSec)} (${upPct.toFixed(0)}%)`,
-    `⏸ Breaks:     ${fmtDurationSec(breakdown.breakSec)} (${breakPct.toFixed(0)}%)`,
-    `✕ Downtime:   ${fmtDurationSec(breakdown.downtimeSec)} (${downPct.toFixed(0)}%)`,
+    `Uptime:     ${fmtDurationSec(breakdown.uptimeSec)} (${upPct.toFixed(0)}%)`,
+    `Breaks:     ${fmtDurationSec(breakdown.breakSec)} (${breakPct.toFixed(0)}%)`,
+    `Downtime:   ${fmtDurationSec(breakdown.downtimeSec)} (${downPct.toFixed(0)}%)`,
     breakdown.setupSec > 0
-      ? `⚙ Setup:      ${fmtDurationSec(breakdown.setupSec)} (${setupPct.toFixed(0)})%`
+      ? `Setup:      ${fmtDurationSec(breakdown.setupSec)} (${setupPct.toFixed(0)})%`
       : null,
-    `─ Post-turno: ${fmtDurationSec(breakdown.plannedDowntimeSec)} (excluido)`,
+    `Post-turno: ${fmtDurationSec(breakdown.plannedDowntimeSec)} (excluido)`,
   ].filter(Boolean).join('\n')
 
   return (
@@ -689,19 +691,21 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5"
+          className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
-          ⏸ {fmtDurationSec(totals.downtimeSec)}
+          <PauseCircle className="h-3 w-3" />
+          {fmtDurationSec(totals.downtimeSec)}
         </Badge>
       )}
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5"
+          className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
-          ☕ {fmtDurationSec(totals.breakSec)}
+          <Coffee className="h-3 w-3" />
+          {fmtDurationSec(totals.breakSec)}
         </Badge>
       )}
     </div>
@@ -909,7 +913,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
             title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
           >
-            <span>✂</span> del rango
+            <Scissors className="h-3 w-3" /> del rango
           </Badge>
         )}
       </div>
@@ -1360,7 +1364,7 @@ export function UpstreamMachinesPanel({
                 className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
                 title="KPIs recalculados sólo del rango temporal visible"
               >
-                <span>✂</span> del rango
+                <Scissors className="h-3 w-3" /> del rango
               </Badge>
             )}
             {/* F5b — Badge paros coincidentes: aparece cuando ≥1 paro del
@@ -1458,7 +1462,10 @@ export function UpstreamMachinesPanel({
 
             {empty && (
               <div className="text-xs text-muted-foreground py-3 space-y-1">
-                <p>📡 <strong className="text-foreground">Sin datos Shoplogix para este turno.</strong></p>
+                <p className="flex items-center gap-1.5">
+                  <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                  <strong className="text-foreground">Sin datos Shoplogix para este turno.</strong>
+                </p>
                 <p className="text-muted-foreground">
                   {plantSlug === 'filete'
                     ? 'Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, paros y micro-detenciones de la línea.'
@@ -1495,8 +1502,11 @@ export function UpstreamMachinesPanel({
                   )}
                 </div>
                 {slxWindowMismatch && (
-                  <p className="text-caption text-rose-400/70 mb-1">
-                    ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
+                  <p className="mb-1 flex items-start gap-1 text-caption text-rose-400/70">
+                    <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                    <span>
+                      Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
+                    </span>
                   </p>
                 )}
                 {/* data-axis-* expone el rango EFECTIVO que dibuja el chart.
