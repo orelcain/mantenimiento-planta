@@ -22,6 +22,7 @@ import { useParams } from 'react-router-dom'
 import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, PauseCircle, Radio, Repeat, RefreshCw, Timer } from 'lucide-react'
 import {
   subscribePublicShiftMonitor,
+  trackMonitorUsage,
   type PublicShiftMonitorDoc,
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
@@ -233,6 +234,16 @@ export function PublicShiftMonitorPage() {
     setIdx(nuevo >= 0 ? nuevo : 0)
     if (nuevo < 0) vistaIdRef.current = vistas[0]!.shiftDocId
   }, [vistas])
+
+  // Telemetría anónima de uso (ver `trackMonitorUsage`). Se engancha una sola
+  // vez por token; el ref le deja consultar en qué turno está parado el usuario
+  // sin re-suscribirse en cada navegación.
+  const idxRef = useRef(0)
+  idxRef.current = idx
+  useEffect(() => {
+    if (!token || status !== 'ok') return
+    return trackMonitorUsage(token, () => idxRef.current > 0)
+  }, [token, status])
 
   const vista = vistas[idx] ?? null
   const live = vista?.live ?? null
@@ -560,6 +571,11 @@ export function PublicShiftMonitorPage() {
             Link válido hasta {new Date(data.expiresAt).toLocaleString('es-CL', {
               day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
             })}
+          </p>
+          {/* Decirlo es parte de hacerlo bien: se cuenta el uso, no a la gente. */}
+          <p className="text-white/25">
+            Se cuentan las aperturas de forma anónima, para saber si la pantalla sirve.
+            No se registra quién la abre.
           </p>
         </footer>
       </main>

@@ -172,3 +172,121 @@ export function subscribePublicShiftMonitor(
     (err) => onError(err instanceof Error ? err : new Error(String(err))),
   )
 }
+
+// ─── Telemetría de uso (anónima) ─────────────────────────────────────────────
+
+/** Cada cuánto late la pantalla pública mientras está a la vista. */
+const HEARTBEAT_SEC = 120
+
+const PING_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/publicMonitorPing'
+const VIEWER_KEY = 'monitorViewerId'
+
+/**
+ * Identificador ALEATORIO del navegador, para poder contar dispositivos
+ * distintos sin saber quién los usa. No se deriva de nada del aparato ni de la
+ * persona; borrar los datos del navegador lo reinicia.
+ */
+function getViewerId(): string {
+  try {
+    const guardado = localStorage.getItem(VIEWER_KEY)
+    if (guardado) return guardado
+    const nuevo = crypto.randomUUID()
+    localStorage.setItem(VIEWER_KEY, nuevo)
+    return nuevo
+  } catch {
+    // Navegador sin localStorage (modo privado estricto): id efímero. Contará
+    // como un dispositivo nuevo cada vez, y es preferible a no contar nada.
+    return crypto.randomUUID()
+  }
+}
+
+async function enviarPing(token: string, event: 'open' | 'ping', extra: { secs?: number; viewingPast?: boolean }) {
+  try {
+    await fetch(PING_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // `keepalive` para que el último latido salga aunque se cierre la pestaña.
+      keepalive: true,
+      body: JSON.stringify({ token, viewerId: getViewerId(), event, ...extra }),
+    })
+  } catch {
+    // La telemetría JAMÁS puede romper la pantalla de quien vino a mirar piezas.
+  }
+}
+
+/**
+ * Registra el uso del monitor: una apertura al entrar y un latido cada 2 min
+ * mientras la pestaña está visible (si está en segundo plano no se cuenta como
+ * tiempo mirado, que es lo honesto).
+ *
+ * @param viewingPastRef — función que dice si en ese momento se está mirando un
+ *   turno anterior, para saber si el deslizamiento se usa.
+ * @returns función de limpieza
+ */
+export function trackMonitorUsage(token: string, viewingPastRef: () => boolean): () => void {
+  void enviarPing(token, 'open', { viewingPast: viewingPastRef() })
+
+  let visibleDesde = document.visibilityState === 'visible' ? Date.now() : null
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      visibleDesde = Date.now()
+    } else if (visibleDesde) {
+      const secs = Math.round((Date.now() - visibleDesde) / 1000)
+      visibleDesde = null
+      if (secs > 5) void enviarPing(token, 'ping', { secs, viewingPast: viewingPastRef() })
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
+  const id = setInterval(() => {
+    if (document.visibilityState !== 'visible' || !visibleDesde) return
+    const secs = Math.round((Date.now() - visibleDesde) / 1000)
+    visibleDesde = Date.now()
+    if (secs > 5) void enviarPing(token, 'ping', { secs, viewingPast: viewingPastRef() })
+  }, HEARTBEAT_SEC * 1000)
+
+  return () => {
+    clearInterval(id)
+    document.removeEventListener('visibilitychange', onVisibility)
+    if (visibleDesde) {
+      const secs = Math.round((Date.now() - visibleDesde) / 1000)
+      if (secs > 5) void enviarPing(token, 'ping', { secs, viewingPast: viewingPastRef() })
+    }
+  }
+}
+
+export interface MonitorUsageStats {
+  opens: number
+  viewersCount: number
+  secondsViewed: number
+  firstOpenAt: number | null
+  lastOpenAt: number | null
+  devices: { movil?: number; escritorio?: number }
+  shiftViews: { actual?: number; anteriores?: number }
+  byDay: Record<string, { opens: number; secs: number; viewers: string[] }>
+  byHour: Record<string, number>
+  viewers: Record<string, { firstSeen: number; lastSeen: number; opens?: number; secs?: number; device?: string }>
+}
+
+/**
+ * Estadísticas de uso del link. Solo para gente de la app (las reglas exigen
+ * sesión): quien abre el link mira el turno, no quiénes más lo abrieron.
+ */
+export function subscribeMonitorStats(
+  token: string,
+  onUpdate: (stats: MonitorUsageStats | null) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'publicShiftMonitorStats', token),
+    (snap) => onUpdate(snap.exists() ? (snap.data() as MonitorUsageStats) : null),
+    () => onUpdate(null),
+  )
+}
+
+/** Dispositivos con actividad en los últimos `min` minutos. */
+export function contarMirandoAhora(stats: MonitorUsageStats | null, min = 10): number {
+  if (!stats?.viewers) return 0
+  const corte = Date.now() - min * 60_000
+  return Object.values(stats.viewers).filter(v => (v.lastSeen || 0) >= corte).length
+}
