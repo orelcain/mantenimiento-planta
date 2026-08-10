@@ -1088,7 +1088,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
               {/* Comentarios sin evento que calce — nunca se descartan. */}
               {analisis.orphans.length > 0 && (
                 <div className="mt-1.5 space-y-0.5">
-                  <div className="flex items-center gap-1 text-caption text-amber-500/80">
+                  <div className="flex items-center gap-1 text-caption text-ink-warn">
                     <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
                     Comentarios sin evento asociado
                   </div>

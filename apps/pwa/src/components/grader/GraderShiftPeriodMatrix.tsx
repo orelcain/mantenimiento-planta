@@ -344,7 +344,7 @@ export function GraderShiftPeriodMatrix({
         {hovered && tipPos && (
           <div
             role="tooltip"
-            className="fixed z-50 pointer-events-none rounded-md border border-border bg-card
+            className="fixed z-50 pointer-events-none rounded-ctl border border-border bg-card
                        shadow-lg px-3 py-2 text-xs leading-relaxed"
             style={{
               left: Math.max(8, Math.min(tipPos.x - 110, window.innerWidth - 228)),
@@ -434,7 +434,7 @@ export function GraderShiftPeriodMatrix({
                 <button
                   type="button"
                   onClick={() => onOpenShift(focused)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground
+                  className="px-2.5 py-1 text-xs font-semibold rounded-ctl bg-primary text-primary-foreground
                              hover:opacity-90 transition-opacity
                              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >

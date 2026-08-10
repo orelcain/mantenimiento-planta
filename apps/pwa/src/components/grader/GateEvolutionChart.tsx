@@ -183,7 +183,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
             piezas/min por gate
           </span>
           {configChanges.length > 0 && (
-            <span className="text-caption text-amber-400/70">
+            <span className="text-caption text-ink-warn">
               {configChanges.length} cambio{configChanges.length > 1 ? 's' : ''} marcado{configChanges.length > 1 ? 's' : ''}
             </span>
           )}

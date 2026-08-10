@@ -333,9 +333,9 @@ export function ShiftQuotaCard({
                   <span className="font-semibold tabular-nums">
                     {Math.round(discrepancy.missing).toLocaleString('es-CL')} piezas sin confirmar
                   </span>
-                  <span className="text-amber-400/70"> · </span>
+                  <span className="text-ink-warn"> · </span>
                   <span className="tabular-nums">{discrepancy.pct.toFixed(1)}% delta</span>
-                  <span className="block text-amber-400/70 mt-0.5">
+                  <span className="block text-ink-warn mt-0.5">
                     Shoplogix: {discrepancy.shopTotal.toLocaleString('es-CL')} ciclos · Grader: {Math.round(current).toLocaleString('es-CL')} pz
                   </span>
                 </div>

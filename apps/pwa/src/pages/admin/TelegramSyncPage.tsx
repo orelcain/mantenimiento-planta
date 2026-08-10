@@ -204,7 +204,7 @@ export function TelegramSyncPage() {
             <div>Solicitada por: <span className="text-foreground">{config.ordenSolicitadaPor ?? '—'}</span></div>
           </div>
           {!online && (
-            <p className="text-xs text-amber-400/90 pt-1">
+            <p className="text-xs text-ink-warn pt-1">
               El PC de mantención parece apagado. Las órdenes quedan guardadas y se ejecutan
               cuando encienda — no se pierde ningún mensaje de Telegram.
             </p>

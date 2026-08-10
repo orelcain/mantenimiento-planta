@@ -51,7 +51,7 @@ function CorridaRow({ corrida }: { corrida: PowerBIExportCorrida }) {
       <span className="flex-1 truncate">
         {corrida.ok ? 'Export OK' : (corrida.error ?? 'Error')}
         {corrida.ok && corrida.refreshOk !== null && (
-          <span className={corrida.refreshOk ? 'text-emerald-400/90' : 'text-amber-400/90'}>
+          <span className={corrida.refreshOk ? 'text-ink-ok' : 'text-ink-warn'}>
             {corrida.refreshOk ? ' · refresh OK' : ' · refresh falló'}
           </span>
         )}
@@ -158,7 +158,7 @@ export function PowerBIExportPage() {
             <div>Solicitada por: <span className="text-foreground">{config.ordenSolicitadaPor ?? '—'}</span></div>
           </div>
           {!online && (
-            <p className="text-xs text-amber-400/90 pt-1">
+            <p className="text-xs text-ink-warn pt-1">
               El PC de mantención parece apagado. La orden queda guardada y se ejecuta
               cuando encienda.
             </p>

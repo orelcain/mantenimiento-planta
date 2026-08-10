@@ -561,7 +561,7 @@ export function GateBreakdownCard({
                             <div className="text-caption mt-0.5 tabular-nums">
                               <span className="text-muted-foreground/60">Esperado:</span>{' '}
                               <span className={cn(
-                                s.estimate.improvesDestination ? 'text-emerald-400' : 'text-amber-400/80',
+                                s.estimate.improvesDestination ? 'text-emerald-400' : 'text-ink-warn',
                               )}>
                                 {s.toLabel} {s.estimate.destBeforeRatio.toFixed(1)}× → {s.estimate.destAfterRatio.toFixed(1)}×
                               </span>
@@ -569,12 +569,12 @@ export function GateBreakdownCard({
                                 <span className="text-emerald-400 ml-1">(óptimo ✓)</span>
                               )}
                               {!s.estimate.improvesDestination && s.estimate.destAfterStatus === 'saturado' && (
-                                <span className="text-amber-400/80 ml-1">(sigue saturado — considerar mover 2 gates)</span>
+                                <span className="text-ink-warn ml-1">(sigue saturado — considerar mover 2 gates)</span>
                               )}
                             </div>
                             <div className={cn(
                               'mt-1 text-caption italic',
-                              isTop ? 'text-red-400/70' : 'text-amber-400/70',
+                              isTop ? 'text-ink-crit' : 'text-ink-warn',
                             )}>
                               <AlertTriangle className="inline h-3 w-3" /> {s.cautela}
                             </div>

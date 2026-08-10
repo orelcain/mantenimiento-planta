@@ -66,8 +66,8 @@ export function LearningAdminPage() {
       </button>
 
       <div className="flex items-center gap-3 mb-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-card bg-primary-400/10 border border-border">
-          <GraduationCap className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+        <div className="flex items-center justify-center w-12 h-12 rounded-card bg-primary/[0.15] border border-border">
+          <GraduationCap className="h-6 w-6 text-brand-ink" />
         </div>
         <div>
           <h1 className="text-2xl font-bold">Administrar contenido</h1>
@@ -81,10 +81,10 @@ export function LearningAdminPage() {
       <div className="mt-6 p-4 rounded-card border" style={{ background: LC.aquaSoft, borderColor: LC.border }}>
         <p className="text-sm" style={{ color: LC.inkMid }}>
           Carga contenido por máquina en cuatro secciones:{' '}
-          <strong className="text-primary-600 dark:text-primary-400">Procedimientos</strong> (paso a paso),{' '}
-          <strong className="text-primary-600 dark:text-primary-400">Manual</strong>,{' '}
-          <strong className="text-primary-600 dark:text-primary-400">Flujos</strong> y{' '}
-          <strong className="text-primary-600 dark:text-primary-400">Diagnóstico</strong> (síntoma → causas → solución).
+          <strong className="text-brand-ink">Procedimientos</strong> (paso a paso),{' '}
+          <strong className="text-brand-ink">Manual</strong>,{' '}
+          <strong className="text-brand-ink">Flujos</strong> y{' '}
+          <strong className="text-brand-ink">Diagnóstico</strong> (síntoma → causas → solución).
           Los diagnósticos alimentan la búsqueda por síntoma del Centro de Aprendizaje.
         </p>
       </div>
@@ -162,7 +162,7 @@ function MachineAdminCard({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+        <div className="flex items-center gap-1 text-xs font-medium text-brand-ink">
           <Edit3 className="h-3.5 w-3.5" />
           {total === 0 ? 'Iniciar' : 'Editar'}
         </div>

@@ -150,7 +150,7 @@ export function MapLocationSelector({
               )}
 
               {error && (
-                <div className="flex items-center gap-2 p-4 bg-destructive/10 text-destructive rounded-lg">
+                <div className="flex items-center gap-2 p-4 bg-destructive/10 text-destructive rounded-card">
                   <AlertCircle className="h-5 w-5" />
                   {error}
                 </div>
@@ -172,7 +172,7 @@ export function MapLocationSelector({
                       onClick={() => handleSelectLocation(location)}
                       disabled={loadingMap}
                       className={cn(
-                        'w-full p-4 text-left border rounded-lg transition-all',
+                        'w-full p-4 text-left border rounded-card transition-all',
                         'hover:border-primary hover:bg-primary/5',
                         'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                         'disabled:opacity-50 disabled:cursor-not-allowed',

@@ -387,7 +387,7 @@ export function LossCascadeCard({
               <div className="text-emerald-400 text-caption uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
               <div className="text-caption text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.produccionSec).toFixed(1)}% del turno</div>
-              <div className="text-caption text-emerald-400/70 tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
+              <div className="text-caption text-ink-ok tabular-nums">{(usoReal * 100).toFixed(1)}% del techo</div>
             </div>
             {lossCells.map((c) => (
               <button

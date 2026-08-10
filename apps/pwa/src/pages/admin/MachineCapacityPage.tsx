@@ -179,7 +179,7 @@ export function MachineCapacityPage() {
           Las 3 Baader 142 no son iguales: las Evisceradoras 1 y 2 son el modelo nuevo
           (tope 16 pz/min) y la 3 es la antigua (19 pz/min).
         </p>
-        <p className="text-xs text-amber-400/80 flex items-center gap-1 mt-1">
+        <p className="text-xs text-ink-warn flex items-center gap-1 mt-1">
           <AlertTriangle className="w-3 h-3" />
           Cada guardado requiere confirmación de contraseña, aunque la sesión esté abierta.
         </p>

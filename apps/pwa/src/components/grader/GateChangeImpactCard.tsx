@@ -150,7 +150,7 @@ export function GateChangeImpactCard({
                   <span className={cn(
                     'text-caption tabular-nums shrink-0 w-14 text-right',
                     inProgress
-                      ? 'text-amber-400/70 italic text-caption'
+                      ? 'text-ink-warn italic text-caption'
                       : seg.p0After === null
                         ? 'text-muted-foreground/30'
                         : improved ? 'text-emerald-400'

@@ -58,7 +58,7 @@ export function TurnoTiemposLine({
     && new Date(prodIni).toISOString().slice(0, 10) !== new Date(progIni).toISOString().slice(0, 10)
 
   return (
-    <div className="mt-2 mx-1 px-3 py-1.5 rounded-md border border-border bg-card
+    <div className="mt-2 mx-1 px-3 py-1.5 rounded-ctl border border-border bg-card
                     flex items-center gap-x-4 gap-y-1 flex-wrap text-[11px]">
       <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
 

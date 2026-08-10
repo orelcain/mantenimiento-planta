@@ -122,10 +122,10 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
                     <span className="font-medium text-muted-foreground mr-1.5">{step.order}.</span>
                     {step.instruction}
                     {step.note && (
-                      <span className="block text-amber-400/80 not-italic mt-0.5"><AlertTriangle className="inline h-3 w-3" /> {step.note}</span>
+                      <span className="block text-ink-warn not-italic mt-0.5"><AlertTriangle className="inline h-3 w-3" /> {step.note}</span>
                     )}
                     {step.requiresTool && (
-                      <span className="block text-blue-400/80 mt-0.5">
+                      <span className="block text-ink-info mt-0.5">
                         <Wrench className="inline h-3 w-3" /> {step.requiresTool.join(', ')}
                       </span>
                     )}

@@ -90,7 +90,7 @@ export function GraderShiftPeriodView({
             <button
               type="button" aria-label="Mes anterior"
               onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
                          text-muted-foreground hover:bg-accent transition-colors
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -102,7 +102,7 @@ export function GraderShiftPeriodView({
             <button
               type="button" aria-label="Mes siguiente"
               onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
                          text-muted-foreground hover:bg-accent transition-colors
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -111,7 +111,7 @@ export function GraderShiftPeriodView({
             <button
               type="button"
               onClick={() => { const n = new Date(); onMonthChange(new Date(n.getFullYear(), n.getMonth(), 1)) }}
-              className="px-2 py-1 text-[11px] rounded-md border border-border text-muted-foreground
+              className="px-2 py-1 text-[11px] rounded-ctl border border-border text-muted-foreground
                          hover:bg-accent transition-colors ml-0.5
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -158,7 +158,7 @@ export function GraderShiftPeriodView({
           </button>
         ) : outOfShift.cycles > 0 ? (
           <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-ctl border
                        border-dashed border-border text-muted-foreground cursor-help"
             title={`${outOfShift.cycles.toLocaleString('es-CL')} ciclos ocurrieron fuera de las ventanas de turno configuradas en Shoplogix; ya están sumados a sus turnos (marcados como "+N fuera de horario").`}
           >
@@ -182,7 +182,7 @@ export function GraderShiftPeriodView({
               onClick={() => onExport('png')}
               disabled={exporting !== null || shifts.length === 0}
               title="Descargar el comparativo del mes como imagen (PNG)"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
                          text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -195,7 +195,7 @@ export function GraderShiftPeriodView({
               onClick={() => onExport('pdf')}
               disabled={exporting !== null || shifts.length === 0}
               title="Descargar el comparativo del mes como PDF"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border
+              className="h-8 w-8 inline-flex items-center justify-center rounded-ctl border border-border
                          text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40
                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -214,7 +214,7 @@ export function GraderShiftPeriodView({
         </div>
       )}
       {slxDegraded && !error && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground
+        <div className="rounded-ctl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground
                         inline-flex items-center gap-2">
           <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Shoplogix no respondió: se muestran solo los turnos con Excel del Grader cargado.

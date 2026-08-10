@@ -299,7 +299,7 @@ export function PlantKPIBoard({
               const SIGNIFICANT_CYCLES_THRESHOLD = 100
               if (totalCycles >= SIGNIFICANT_CYCLES_THRESHOLD) return null
               return (
-                <p className="text-caption text-amber-400/90 flex items-start gap-1 pb-0.5">
+                <p className="text-caption text-ink-warn flex items-start gap-1 pb-0.5">
                   <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                   <span>
                     Período sin producción significativa ({totalCycles.toLocaleString('es-CL')} ciclos totales).
