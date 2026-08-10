@@ -121,7 +121,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
               {getShiftMeta(t.shiftId).shortLabel}{' '}
               {t.downtimeSec > 0
                 ? fmtDurationSec(t.downtimeSec)
-                : <span className="text-emerald-500/80">sin paros</span>}
+                : <span className="text-ink-ok">sin paros</span>}
             </span>
           ))}
         </span>

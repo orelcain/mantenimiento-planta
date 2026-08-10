@@ -54,6 +54,9 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
               disabled={soon}
               title={soon ? `${p.label} — próximamente` : p.label}
               className={cn(
+                // El 7px es a propósito y NO debe pasar a `rounded-ctl` (10px):
+                // en un control segmentado el radio INTERIOR va menor que el del
+                // contenedor para que las esquinas aniden, que es como lo hace iOS.
                 'flex-1 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-[7px] transition-all text-center',
                 isActive
                   ? 'bg-card shadow-[0_1px_3px_rgba(0,0,0,0.18)]'

@@ -331,7 +331,7 @@ function MessageBubble({
         {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
       </div>
 
-      <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+      <div className={`max-w-[85%] rounded-card px-3 py-2 text-sm leading-relaxed ${
         isUser ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground'
       }`}>
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(msg.content)) }} />
@@ -369,7 +369,7 @@ function MessageBubble({
             {!isUser && msg.content.length > 30 && 'speechSynthesis' in window && (
               <button
                 onClick={handleSpeak}
-                className={`p-0.5 rounded hover:bg-background/50 transition-colors ${isSpeaking ? 'text-primary' : ''}`}
+                className={`p-0.5 rounded-ctl hover:bg-background/50 transition-colors ${isSpeaking ? 'text-primary' : ''}`}
                 title={isSpeaking ? 'Detener lectura' : 'Leer en voz alta'}
               >
                 {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
@@ -392,7 +392,7 @@ function MessageBubble({
                   </button>
                   <button
                     onClick={() => handleFeedback('negative')}
-                    className={`p-0.5 rounded hover:bg-background/50 transition-colors ${showCorrection ? 'text-amber-500' : ''}`}
+                    className={`p-0.5 rounded-ctl hover:bg-background/50 transition-colors ${showCorrection ? 'text-amber-500' : ''}`}
                     title="Respuesta incorrecta — corregir"
                   >
                     <ThumbsDown className="w-3 h-3" />

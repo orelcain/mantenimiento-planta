@@ -244,7 +244,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         title={`El horario del ${meta.label} (${live.dateKey}) está activo pero no hay producción registrada en Shoplogix en los últimos ${ACTIVITY_MAX_AGE_MIN} min. Click para ver el detalle igual.`}
       >
         <span className="flex items-center gap-1 shrink-0">
-          <PauseCircle className="h-3 w-3 text-ink-warn/80 dark:text-amber-400/80" />
+          <PauseCircle className="h-3 w-3 text-ink-warn/80" />
           <ShiftIcon className={cn('h-3.5 w-3.5 opacity-70', meta.textColorClass)} />
         </span>
         <span className="flex flex-col leading-tight min-w-0">
@@ -255,7 +255,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
             {upstream.loading ? 'Verificando producción…' : 'Sin actividad detectada'}
           </span>
         </span>
-        <ChevronRight className="h-3.5 w-3.5 text-ink-warn/40 group-hover:text-ink-warn dark:text-amber-400/40 dark:group-hover:text-amber-400 transition-colors shrink-0" />
+        <ChevronRight className="h-3.5 w-3.5 text-ink-warn/40 group-hover:text-ink-warn transition-colors shrink-0" />
       </button>
     )
   }
@@ -283,7 +283,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
           {elapsedLabel} transcurridos{progressPct != null ? ` · ${progressPct}%` : ''}
         </span>
       </span>
-      <ChevronRight className="h-3.5 w-3.5 text-ink-ok/60 group-hover:text-ink-ok dark:text-emerald-400/60 dark:group-hover:text-emerald-400 transition-colors shrink-0" />
+      <ChevronRight className="h-3.5 w-3.5 text-ink-ok/60 group-hover:text-ink-ok transition-colors shrink-0" />
     </button>
   )
 }

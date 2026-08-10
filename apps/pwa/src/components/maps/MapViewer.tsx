@@ -373,10 +373,10 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
   return (
     <div className={cn('relative flex flex-col', className)}>
       {/* Contenedor del mapa con overflow hidden */}
-      <div className="relative flex-1 min-h-0 overflow-hidden bg-muted rounded-lg touch-none">
+      <div className="relative flex-1 min-h-0 overflow-hidden bg-muted rounded-card touch-none">
         {/* Controles de zoom optimizados para móvil */}
         {showControls && (
-          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
+          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-card p-1 shadow-md">
             <Button
               variant="ghost"
               size="icon"
@@ -409,7 +409,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
 
       {/* Indicador de modo edición */}
       {editable && (
-        <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-xs px-2 py-1 rounded-md shadow-md flex items-center gap-1">
+        <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-xs px-2 py-1 rounded-ctl shadow-md flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           Toca para colocar marcador
         </div>
@@ -417,7 +417,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
 
       {/* Indicador de navegación - ocultar cuando hay marcador pendiente */}
       {editable && !pendingPosition && (
-        <div className="absolute bottom-2 left-2 z-10 bg-background/80 text-muted-foreground text-xs px-2 py-1 rounded-md flex items-center gap-1">
+        <div className="absolute bottom-2 left-2 z-10 bg-background/80 text-muted-foreground text-xs px-2 py-1 rounded-ctl flex items-center gap-1">
           <Hand className="h-3 w-3" />
           Arrastra para mover
         </div>
@@ -485,7 +485,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
                   </span>
                 )}
                 {marker.label && (
-                  <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 text-xs px-1 rounded whitespace-nowrap shadow">
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 text-xs px-1 rounded-ctl whitespace-nowrap shadow">
                     {marker.label}
                   </span>
                 )}

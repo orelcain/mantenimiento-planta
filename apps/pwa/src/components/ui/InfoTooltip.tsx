@@ -186,7 +186,7 @@ export function InfoTooltip({
         }}
       >
         <Icon
-          className="text-blue-600/80 dark:text-blue-400/80 hover:text-ink-info dark:hover:text-ink-info transition-colors duration-150"
+          className="text-ink-info hover:text-ink-info dark:hover:text-ink-info transition-colors duration-150"
           style={{ width: iconSize, height: iconSize }}
         />
       </span>

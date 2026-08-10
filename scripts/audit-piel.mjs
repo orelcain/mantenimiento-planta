@@ -76,7 +76,13 @@ const RULES = [
   {
     key: 'radiosFueraEscala',
     label: 'Radios fuera de la escala única (usar tokens de radio)',
-    re: /\brounded(?:-(?:sm|md|lg|xl|2xl|3xl))?\b(?!-)/g,
+    // El `rounded` pelado tiene un homónimo en JS: `const rounded = Math.round(v)`
+    // en ShiftQuotaCard. Sin guarda, la métrica reportaba para siempre 2
+    // violaciones fantasma que nadie debía "arreglar" — y de hecho el codemod ya
+    // llegó a reescribir una variable así una vez. La guarda pide que NO venga
+    // precedido de `.`/declaración ni seguido de `=`, `.`, `(` o `,`, que es
+    // como se usa un identificador y nunca como se escribe una clase.
+    re: /(?<![\w.$])(?<!\b(?:const|let|var)\s)rounded(?:-(?:sm|md|lg|xl|2xl|3xl))?\b(?!-)(?!\s*[=.,()])/g,
   },
   {
     // Constitución §7 (no cards dentro de cards) + §38 (separar con espacio,

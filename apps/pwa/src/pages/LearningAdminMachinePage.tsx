@@ -127,7 +127,7 @@ export function LearningAdminMachinePage() {
               }}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
-                  ? 'border-ring text-primary-600 dark:text-primary-400'
+                  ? 'border-ring text-brand-ink'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -325,7 +325,7 @@ function ProcedureForm({
           </label>
           <button
             onClick={addStep}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+            className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir paso
@@ -337,7 +337,7 @@ function ProcedureForm({
             <div key={index} className="p-3 rounded-card border border-border bg-card/50">
               <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-1">
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-xs">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/[0.15] text-brand-ink font-bold text-xs">
                     {step.order}
                   </span>
                   <div className="flex flex-col">
@@ -464,7 +464,7 @@ function StepImageUploader({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl disabled:opacity-50"
         >
           {uploading ? (
             <>
@@ -782,7 +782,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
         <label className="text-xs font-semibold tracking-wider text-muted-foreground">Autoevaluación</label>
         <button
           onClick={addQuestion}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+          className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           Añadir pregunta
@@ -796,7 +796,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
           {items.map((q, qi) => (
             <div key={qi} className="space-y-2.5 rounded-card border border-border bg-background p-3">
               <div className="flex items-start gap-2">
-                <span className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary-400/15 text-caption font-bold text-primary-600 dark:text-primary-400">
+                <span className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/[0.15] text-caption font-bold text-brand-ink">
                   {qi + 1}
                 </span>
                 <textarea
@@ -850,7 +850,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                 ))}
                 <button
                   onClick={() => addOption(qi)}
-                  className="inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10"
+                  className="inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium text-brand-ink hover:bg-primary/[0.15]"
                 >
                   <Plus className="h-3 w-3" /> Añadir opción
                 </button>
@@ -985,7 +985,7 @@ function EditableTextList({
         <label className="text-xs font-semibold tracking-wider text-muted-foreground">{label}</label>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+          className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           {addLabel}
@@ -994,7 +994,7 @@ function EditableTextList({
       <div className="space-y-2">
         {items.map((item, index) => (
           <div key={index} className="flex items-start gap-2">
-            <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption">
+            <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-primary/[0.15] text-brand-ink font-bold text-caption">
               {index + 1}
             </span>
             <textarea
@@ -1064,7 +1064,7 @@ function ManualImagesEditor({
         <button
           type="button"
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+          className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           Agregar referencia
@@ -1106,7 +1106,7 @@ function ManualImagesEditor({
                   className="px-3 py-2 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-ctl px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10">
+                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-ctl px-2 py-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15]">
                     <ImagePlus className="h-3.5 w-3.5" />
                     {uploadingIndex === index ? 'Subiendo...' : 'Subir imagen'}
                     <input
@@ -1309,7 +1309,7 @@ function FlowForm({
           </label>
           <button
             onClick={addAction}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+            className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir acción
@@ -1320,7 +1320,7 @@ function FlowForm({
           {flow.actions.map((action, index) => (
             <div key={index} className="flex items-start gap-2">
               <div className="flex flex-col items-center pt-1.5">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/[0.15] text-brand-ink font-bold text-caption">
                   {index + 1}
                 </span>
                 <div className="flex flex-col">
@@ -1520,7 +1520,7 @@ function DiagnosisForm({
           </label>
           <button
             onClick={addCause}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
+            className="flex items-center gap-1 text-xs font-medium text-brand-ink hover:bg-primary/[0.15] px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir causa
@@ -1768,7 +1768,7 @@ function ComponentPhotoForm({
               {photo.points.map((pt, i) => (
                 <div key={pt.id} className="p-3 rounded-card border border-border bg-card/50">
                   <div className="flex items-start gap-2">
-                    <span className="flex items-center justify-center w-6 h-6 mt-1 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption flex-shrink-0">
+                    <span className="flex items-center justify-center w-6 h-6 mt-1 rounded-full bg-primary/[0.15] text-brand-ink font-bold text-caption flex-shrink-0">
                       {i + 1}
                     </span>
                     <div className="flex-1 space-y-2 min-w-0">

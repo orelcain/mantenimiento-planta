@@ -165,7 +165,7 @@ export function GraderPublicTokenPage() {
           {' · '}
           <button
             onClick={() => navigate('/login')}
-            className="text-amber-400/60 hover:text-amber-400 transition-colors underline"
+            className="text-ink-warn hover:text-amber-400 transition-colors underline"
           >
             acceder al sistema completo
           </button>

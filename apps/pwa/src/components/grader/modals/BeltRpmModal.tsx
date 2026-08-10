@@ -237,7 +237,7 @@ export function BeltRpmModal({
               )}
 
               {!calibrated && (
-                <p className="text-caption text-amber-400/70 pl-0.5">
+                <p className="text-caption text-ink-warn pl-0.5">
                   Calibrá effectiveMpsPerRpm en Config Física → Cintas
                 </p>
               )}

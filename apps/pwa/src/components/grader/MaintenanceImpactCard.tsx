@@ -212,7 +212,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             {/* Micro-detenciones — aparte, poco accionables */}
             {rel!.microCount > 0 && (
               <div className="flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-caption text-muted-foreground">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400/70" />
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ink-warn" />
                 <span>
                   Aparte: <span className="tabular-nums font-medium text-foreground">{rel!.microCount.toLocaleString('es-CL')}</span> micro-detenciones
                   (interferencias &lt;5min, MTTR {fmt(rel!.mttrMicroSec)}) por {fmt(rel!.microSec)} — poco accionables individualmente, no inflan el MTTR macro.
