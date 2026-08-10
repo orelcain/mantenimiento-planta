@@ -13,6 +13,29 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - `Unscheduled` ganaba como turno vigente del monitor
+
+Encontrado **verificando en produccion** justo despues del deploy anterior: el monitor de linea de
+Filete estaba mostrando `2026-08-10_Unscheduled` con **623 pz** como si fuera el turno, mientras el
+`Turno Dia` real llevaba **4.915**. Ganaba por horario (su ventana arranca antes y termina despues)
+y pasaba el filtro porque tenia mas de 50 ciclos.
+
+El umbral de 50 venia de la PWA, pero **desde que el monitor rescata las piezas fuera de horario ya
+no aplica**: esas 623 piezas YA se suman al turno real, asi que elegir el bucket como turno las
+mostraba dos veces y con la etiqueta equivocada. Ahora `Unscheduled` no puede ser el turno vigente
+nunca; solo se acepta si la linea no tiene NINGUN turno con nombre en hoy/ayer y aun asi hubo
+proceso (mejor produccion mal etiquetada que una pantalla vacia teniendo datos).
+
+Vale como recordatorio de la regla que ya estaba escrita para la PWA —*nunca caer a `Unscheduled`
+como fallback de un turno nombrado*— y de que **un cambio puede invalidar un umbral que llevaba
+meses siendo correcto**.
+
+- Archivos: `functions/publicMonitor.js`, `functions/__tests__/publicMonitor.test.js`.
+- Verificacion: 192 tests functions (2 nuevos con el escenario exacto) en verde. Tras el fix,
+  `resolveCurrentShiftDocId` contra prod devuelve chonchi → `Turno 2`, yal → `Turno 2`,
+  filete → `Turno Dia`.
+- Estado: HECHO (mergeado)
+
 ## 2026-08-10 - claude - Deslizar a turnos anteriores desde el link publico
 
 Pedido de Orel. El link mostraba solo el turno vigente; ahora publica ademas los **6 turnos
