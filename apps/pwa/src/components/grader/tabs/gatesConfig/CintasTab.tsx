@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Label } from '@/components/ui'
 import { InfoTooltip } from '@/components/ui/InfoTooltip'
-import { Gauge } from 'lucide-react'
+import { Gauge, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BELT_FLOW_ORDER, getBeltLabel, GRADING_BELT_DEFAULT_MPS, Z_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
@@ -164,7 +164,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
-        <span className="text-ink-warn font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k.
+        <span className="text-ink-warn font-medium"><AlertTriangle className="inline h-3 w-3" /> Estimado</span> = derivado de unidades Z2 × factor k.
         Defaults operativos: grading {GRADING_BELT_DEFAULT_MPS} m/s · Z-belt {Z_BELT_DEFAULT_MPS} m/s.
         Para verificar en planta usa el <strong>tachómetro SKF</strong> en cada cinta y registra la medición (FASE 5).
       </p>

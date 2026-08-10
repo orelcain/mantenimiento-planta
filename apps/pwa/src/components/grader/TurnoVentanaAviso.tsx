@@ -15,7 +15,7 @@
  * Está fuera de la página para poder verificarlo sin sesión: la vista de turno
  * vive detrás de login.
  */
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Clock } from 'lucide-react'
 import { formatGapMinutes } from '@/services/grader/graderShiftWindow'
 import { cn } from '@/lib/utils'
 
@@ -70,7 +70,7 @@ export function TurnoVentanaAviso({
           className="rounded-ctl border border-border px-3 py-2 text-xs text-muted-foreground"
           data-testid="aviso-arranque-anticipado"
         >
-          ⏱ El turno arrancó{' '}
+          <Clock className="inline h-3 w-3" /> El turno arrancó{' '}
           <b className="text-foreground">{formatGapMinutes(earlyStartMin)}</b>{' '}
           antes de su horario declarado en Shoplogix. Esa producción está incluida.
         </div>

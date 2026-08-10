@@ -227,7 +227,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
           onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
         )}
       >
-        🚧 en desarrollo
+        en desarrollo
       </button>
     )
   }
@@ -375,7 +375,7 @@ export function MobileHomeGrid() {
         {/* Nombre */}
         <div className="flex-1 min-w-0">
           <p className="text-xs text-muted-foreground">{getGreeting()}</p>
-          <h2 className="text-lg font-semibold leading-tight truncate">{firstName} 👋</h2>
+          <h2 className="text-lg font-semibold leading-tight truncate">{firstName}</h2>
         </div>
 
         {/* Badge de rol */}

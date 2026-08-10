@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, Check } from 'lucide-react'
+import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, Check, Trash2, Sparkles, Save } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -338,7 +338,7 @@ export function Baader200LearningPage() {
               <div key={entry.id ?? i} className="text-xs rounded-card border border-border p-2 space-y-0.5 hover:bg-muted/40 transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <span className={cn('font-semibold truncate', entry.action === 'delete' ? 'text-red-400' : entry.action === 'create' ? 'text-blue-400' : 'text-emerald-400')}>
-                    {entry.action === 'delete' ? '🗑' : entry.action === 'create' ? '✨' : '💾'} {entry.sectionTitle}
+                    {entry.action === 'delete' ? <Trash2 className="inline h-3 w-3" aria-label="Borrado" /> : entry.action === 'create' ? <Sparkles className="inline h-3 w-3" aria-label="Creado" /> : <Save className="inline h-3 w-3" aria-label="Guardado" />} {entry.sectionTitle}
                   </span>
                   <span className="text-caption text-muted-foreground flex-shrink-0">
                     {entry.timestamp.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}

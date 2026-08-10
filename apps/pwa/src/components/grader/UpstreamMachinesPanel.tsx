@@ -81,7 +81,7 @@ interface Props {
   } | null
   /**
    * Paros del Grader (≥5min) — usados para detectar paros coincidentes con
-   * paros upstream y mostrar badge "⚠ N coincidencias" en el header (F5b).
+   * paros upstream y mostrar badge "N coincidencias" en el header (F5b).
    */
   pauses?: GraderPause[]
   /**

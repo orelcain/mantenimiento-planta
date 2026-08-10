@@ -105,6 +105,11 @@ for (const file of walk(SRC)) {
   if (EXCLUDE.some(re => re.test(rel))) continue;
   const lines = readFileSync(file, 'utf8').split('\n');
   lines.forEach((line, i) => {
+    // Un COMENTARIO no es interfaz. Se saltan porque si no la métrica reporta
+    // violaciones fantasma: 14 de los 17 emojis que quedaban vivían en comentarios
+    // que documentan la UI (a veces citando texto que ya cambió). "Arreglarlos"
+    // no mejora ni una pantalla, y el ruido esconde los que sí importan.
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
     for (const rule of RULES) {
       const m = line.match(rule.re);
       if (m) {

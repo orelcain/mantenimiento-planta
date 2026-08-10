@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import type { Annotation3D, Point3D } from '@/types/models3d'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { Camera, Check, ChevronDown, ChevronUp } from 'lucide-react'
 
 const DESC_LIMIT = 80
 
@@ -61,10 +61,10 @@ export function AnnotationListItems({ annotations, onFocus, compact }: Props) {
                   {ann.title}
                 </span>
                 {ann.status === 'resolved' && (
-                  <span className="text-emerald-500 text-[10px]">✓</span>
+                  <Check className="size-2.5 text-emerald-500" aria-label="Resuelta" />
                 )}
                 {(ann.photos?.length ?? 0) > 0 && (
-                  <span className="text-muted-foreground text-[10px]">📷{ann.photos!.length}</span>
+                  <span className="inline-flex items-center gap-0.5 text-caption text-muted-foreground"><Camera className="size-2.5" />{ann.photos!.length}</span>
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">

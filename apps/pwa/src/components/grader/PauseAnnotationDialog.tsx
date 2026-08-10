@@ -26,7 +26,7 @@ import {
   Label,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Loader2, Clock, History, ChevronDown, Download, TrendingDown } from 'lucide-react'
+import { Loader2, Clock, History, ChevronDown, Download, TrendingDown, Pencil, CloudOff } from 'lucide-react'
 import type { Pause, PauseHistoryEntry, TimelineBucket } from '@/services/grader/types'
 import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
@@ -359,7 +359,7 @@ export function PauseAnnotationDialog({
               {/* M4: chip trazabilidad rango ajustado */}
               {pause.adjustedBy && (
                 <span className="inline-flex items-center gap-1 text-xs text-sky-400 mt-1">
-                  ✏ Rango ajustado por <span className="font-medium">{pause.adjustedBy}</span>
+                  <Pencil className="inline h-3 w-3" /> Rango ajustado por <span className="font-medium">{pause.adjustedBy}</span>
                 </span>
               )}
               {/* Iter 2: contexto P0% antes/durante para clasificar el motivo */}
@@ -447,7 +447,7 @@ export function PauseAnnotationDialog({
           {/* M18 — aviso offline */}
           {!isOnline && (
             <p className="text-xs text-amber-400 flex items-center gap-1.5">
-              ⚡ Sin conexión — el cambio se guardará localmente y se sincronizará al reconectarse.
+              <CloudOff className="inline h-3 w-3" /> Sin conexión — el cambio se guardará localmente y se sincronizará al reconectarse.
             </p>
           )}
 

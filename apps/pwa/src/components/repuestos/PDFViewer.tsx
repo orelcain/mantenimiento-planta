@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, MapPin } from 'lucide-react';
 import type { VinculoManual } from '@/types/vinculos';
 import { logger } from '@/lib/logger';
 import { getCachedPdf } from '@/services/pdfCache';
@@ -395,7 +395,7 @@ export function PDFViewer({
     return (
       <div className="flex items-center justify-center h-96 bg-red-50 rounded-card">
         <div className="text-center text-ink-crit">
-          <p className="font-semibold">❌ {error}</p>
+          <p className="flex items-center justify-center gap-1.5 font-semibold"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>
           <p className="text-sm mt-2">Verifica que el archivo PDF sea accesible</p>
         </div>
       </div>
@@ -545,7 +545,7 @@ export function PDFViewer({
       {/* Info de marcadores */}
       {markersOnPage.length > 0 && (
         <div className="p-2 bg-blue-50 text-sm text-blue-800 border-t">
-          📍 {markersOnPage.length} marcador{markersOnPage.length > 1 ? 'es' : ''} en esta página
+          <MapPin className="inline h-3 w-3" /> {markersOnPage.length} marcador{markersOnPage.length > 1 ? 'es' : ''} en esta página
         </div>
       )}
     </div>

@@ -20,6 +20,7 @@ import {
   Loader2, CheckCircle2, ClipboardList, AlertTriangle,
   Brain, TrendingUp, Lightbulb, Pencil, FileText,
 } from 'lucide-react'
+import { CondLeyenda } from '@/components/equipment/CondDot'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -410,7 +411,7 @@ export function QuickInterventionCapture({
             </div>
             <p className="text-caption text-muted-foreground leading-relaxed">
               Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
-              {' '}🟢 <b>1</b> como nuevo, sin alertas ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
+              {' '}<CondLeyenda detalle={{ 1: 'como nuevo, sin alertas', 2: 'con desvíos, requiere seguimiento', 3: 'acción correctiva inmediata / fuera de servicio' }} />.
             </p>
           </div>
 

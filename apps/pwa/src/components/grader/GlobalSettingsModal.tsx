@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { Settings2, Save, Loader2, Plus, Trash2, RotateCcw, Archive } from 'lucide-react'
+import { Settings2, Save, Loader2, Plus, Trash2, RotateCcw, Archive, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -296,7 +296,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                     ✓ OK — bajo {alertThreshold}%
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-medium">
-                    ⚠ Alerta — {alertThreshold}–{criticalThreshold}%
+                    <AlertTriangle className="inline h-3 w-3" /> Alerta — {alertThreshold}–{criticalThreshold}%
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-red-500/[0.15] text-ink-crit font-medium">
                     ✕ Crítico — sobre {criticalThreshold}%
@@ -453,7 +453,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                       <Input
                         value={newTag.emoji}
                         onChange={e => setNewTag(t => ({ ...t, emoji: e.target.value }))}
-                        placeholder="🏷️"
+                        placeholder="Etiqueta"
                         className="h-7 text-xs mt-1"
                       />
                     </div>

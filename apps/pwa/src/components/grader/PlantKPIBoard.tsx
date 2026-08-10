@@ -444,7 +444,7 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
-                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
+                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   <span
@@ -462,7 +462,7 @@ export function PlantKPIBoard({
                   </span>
                   <span
                     className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}
-                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico${kpis.machines.length > 1 ? '\n\n⚠ NO comparable entre máquinas: cada una se mide contra su propio target y no todas tienen la misma capacidad. Para comparar, usar piezas perdidas.' : ''}`}
+                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico${kpis.machines.length > 1 ? '\n\nNO comparable entre máquinas: cada una se mide contra su propio target y no todas tienen la misma capacidad. Para comparar, usar piezas perdidas.' : ''}`}
                   >
                     P {pct(m.performance, 0)}
                   </span>

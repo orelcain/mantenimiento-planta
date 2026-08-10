@@ -90,7 +90,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'map',
     title: 'Mapa de Planta',
-    description: 'Vista visual de las zonas de la planta. Los colores indican el estado: verde sin problemas, azul medio, 🟠 Alto, 🔴 Crítico.',
+    description: 'Vista visual de las zonas de la planta. Los colores indican el estado: verde sin problemas, azul medio, naranjo alto, rojo crítico.',
     icon: Map,
   },
   {

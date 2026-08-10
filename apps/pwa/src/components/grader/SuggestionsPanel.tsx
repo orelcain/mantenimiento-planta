@@ -1,3 +1,4 @@
+import { Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 import { SuggestionCard } from './SuggestionCard'
@@ -25,7 +26,7 @@ export function SuggestionsPanel({ suggestions }: Props) {
       {/* Header */}
       <div className="flex items-center gap-2">
         <span className={cn('text-xs font-semibold', headerColor)}>
-          🧠 Sugerencias del punto cero
+          <Brain className="inline h-3.5 w-3.5" /> Sugerencias del punto cero
         </span>
         <span className={cn(
           'text-caption px-2 py-0.5 rounded-full font-medium',

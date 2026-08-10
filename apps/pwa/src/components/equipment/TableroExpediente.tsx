@@ -14,6 +14,7 @@ import {
   SelectValue,
   Textarea,
 } from '@/components/ui'
+import { CondDot } from '@/components/equipment/CondDot'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
 import {
@@ -267,7 +268,7 @@ export function TableroExpediente({ equipment }: { equipment: Equipment }) {
                           <span className="text-xs text-muted-foreground min-w-[24px]">{c.numero}</span>
                           <span className="flex-1">{c.cargaNombre || c.descripcion || '—'}</span>
                           <span className="text-xs text-muted-foreground">{c.ratingA ? `${c.ratingA} A` : ''} {c.conductorCalibre ?? ''}</span>
-                          <span>{c.condicion === 1 ? '🟢' : c.condicion === 2 ? '🟡' : '🔴'}</span>
+                          <CondDot cond={(c.condicion === 1 || c.condicion === 2 ? c.condicion : 3) as 1 | 2 | 3} />
                         </div>
                       ))}
                     </div>

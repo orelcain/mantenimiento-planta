@@ -8,7 +8,7 @@
  * máquinas instrumentadas a través de TODOS ellos.
  */
 import { useEffect, useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, PauseCircle, Coffee } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   listShiftInfosForDay,
@@ -99,11 +99,11 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
       <span className="text-rose-400 tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
-        ⏸ {fmtDurationSec(totals.downtimeSec)} detenidas
+        <PauseCircle className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {totals.breakSec > 0 && (
         <span className="text-amber-400 tabular-nums" title="Pausas programadas (colación/reunión), todos los turnos">
-          ☕ {fmtDurationSec(totals.breakSec)}
+          <Coffee className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.breakSec)}
         </span>
       )}
       {/* Desglose por turno. Antes salía como "T2 0 s · T1 9 h 31 min": códigos
