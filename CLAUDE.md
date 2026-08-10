@@ -542,6 +542,26 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 - CI status: 4/4 workflows 🟢
 - Seguridad: 26 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
 
+## Cambios recientes (sesión 2026-08-05 — Checklist de escalabilidad SaaS, PR #254 mergeado)
+
+Sesión corta, solo documentación (sin cambios de código de la app, sin bump de versión).
+- Se pidió opinión sobre un post de IG "qué le falta a tu app antes de producción" (connection
+  pooling, caché, índices, logs/monitoreo, etc.) aplicado a este repo.
+- Auditoría real del código (no genérica): índices Firestore ⚠️ parcial (25 compuestos pero
+  134 `getDocs()` vs solo 18 archivos con `limit()`), listeners `onSnapshot` sin límite en
+  `incidents.ts`/`photoEvidence.ts`/`permissions.ts` ⚠️, caché client-side solo puntual
+  (`useGlobalEquipmentSearch` TTL 5min + `pdfCache.ts`) ✅ parcial, manejo de errores en
+  servicios Firestore ❌ (0 try/catch en `incidents.ts` pese a escrituras), logs/monitoreo en
+  producción ❌ (sin Sentry/Firebase Performance Monitoring), Cloud Functions sin `minInstances`
+  ⚠️, sin rate limiting en `firestore.rules` ❌. Bundle/code-splitting ✅ preparado (lazy por
+  página + manualChunks).
+- Conclusión: esta PWA es de uso interno (una planta, decenas de usuarios) — no necesita nada
+  de esto hoy. Pero el diagnóstico se guardó como referencia para **proyectos futuros con más
+  usuarios/externos** (ej. la app NFPA/NEC que se está construyendo para Google).
+- **Nuevo archivo**: `.ai/CHECKLIST_ESCALABILIDAD_SAAS.md` — checklist accionable de los 6
+  puntos reales a revisar antes de lanzar una app Firebase a 100+ usuarios, + qué viene
+  resuelto gratis por el stack. Referenciar desde ahí al arrancar cualquier app nueva.
+
 ## Cambios recientes (sesión 2026-05-22 — Sistema de diseño AquaChile + IBM Plex, 6 commits `0b5b0215..34042a1f`)
 
 Transformación anti "IA genérica". Ver sección **"Sistema de diseño — IBM Plex + AquaChile"** arriba.

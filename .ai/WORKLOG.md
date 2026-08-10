@@ -236,6 +236,21 @@ quería anotar sobre las figuras, y el layout no cuadraba en su iPhone 16 Pro.
   base del 08-08; pedir a Danilo los datos pendientes del handoff (SM1/SM2 en pos.5, código del
   excavador A de la N1, test de persistencia de contadores, kit de N2/N3).
 
+## 2026-08-05 - claude - Checklist de escalabilidad SaaS (docs, no toca la app)
+
+- Hecho: auditoría de preparación de este repo para 100+ usuarios concurrentes (a raíz de
+  una consulta del usuario, no de una tarea de TASKS.md). Diagnóstico real con evidencia:
+  índices Firestore parcial, listeners `onSnapshot` sin `limit()` en incidents/photoEvidence,
+  caché client-side solo puntual, 0 try/catch en `incidents.ts`, sin monitoreo de producción,
+  Cloud Functions sin `minInstances`, sin rate limiting en rules. Conclusión: esta PWA (uso
+  interno, una planta) no lo necesita hoy, pero se documentó como checklist reutilizable para
+  proyectos futuros con más usuarios (ej. app NFPA/NEC).
+- Archivos: `.ai/CHECKLIST_ESCALABILIDAD_SAAS.md` (nuevo), `CLAUDE.md` (sección Cambios recientes).
+- Verificación: N/A — cambio 100% documental, sin tsc/eslint/preview.
+- Estado: HECHO — PR #254 mergeado a `main`.
+- Sigue: nada pendiente de esta sesión. El checklist queda para consultarlo cuando arranque
+  un proyecto SaaS/multi-usuario nuevo.
+
 ## 2026-08-05 - claude - El sync captura el arranque anticipado del turno (FASE 2)
 
 - Cierra lo que la fase 1 (#373) solo podia AVISAR: ahora los ciclos de antes de las 08:00 entran en el turno que les corresponde.
