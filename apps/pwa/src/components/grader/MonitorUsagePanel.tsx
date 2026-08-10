@@ -57,6 +57,13 @@ export function MonitorUsagePanel({ stats }: { stats: MonitorUsageStats | null }
   }
 
   const ahora = contarMirandoAhora(stats)
+  // Los más recientes primero; se listan pocos para no convertir la tarjeta en
+  // una tabla — el total ya está arriba.
+  const todos = Object.entries(stats.viewers ?? {})
+    .map(([id, v]) => ({ id, opens: v.opens ?? 0, secs: v.secs ?? 0, lastSeen: v.lastSeen, device: v.device }))
+    .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
+  const aparatos = todos.slice(0, 5)
+  const sobran = Math.max(0, todos.length - aparatos.length)
   const maxDia = Math.max(...dias.map(d => d.opens), 1)
   const movil = stats.devices?.movil ?? 0
   const escritorio = stats.devices?.escritorio ?? 0
@@ -75,6 +82,34 @@ export function MonitorUsagePanel({ stats }: { stats: MonitorUsageStats | null }
           </span>
         )}
       </div>
+
+      {/* Detalle por aparato: sin esto no se distingue "una persona que abrió
+          12 veces" de "12 personas que abrieron una vez", que es justo lo que
+          hay que saber para decir si la pantalla se usa o no. */}
+      {aparatos.length > 0 && (
+        <ul className="space-y-0.5">
+          {aparatos.map((a, i) => (
+            <li key={a.id} className="flex items-center gap-2 text-[11px]">
+              <span className="text-muted-foreground/60">
+                {a.device === 'movil' ? <Smartphone className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+              </span>
+              <span className="text-muted-foreground">Aparato {i + 1}</span>
+              <span className="tabular-nums text-foreground">
+                {a.opens} {a.opens === 1 ? 'apertura' : 'aperturas'}
+              </span>
+              {a.secs > 0 && (
+                <span className="tabular-nums text-muted-foreground/70">· {fmtDuracion(a.secs)}</span>
+              )}
+              <span className="ml-auto tabular-nums text-muted-foreground/60">{fmtHace(a.lastSeen)}</span>
+            </li>
+          ))}
+          {sobran > 0 && (
+            <li className="text-[11px] text-muted-foreground/50">
+              +{sobran} {sobran === 1 ? 'aparato más' : 'aparatos más'}
+            </li>
+          )}
+        </ul>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span>Última vez {fmtHace(stats.lastOpenAt)}</span>

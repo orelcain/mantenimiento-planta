@@ -13,6 +13,7 @@ import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
 
 const VERDICT_STYLE = {
   ok: {
@@ -67,10 +68,20 @@ interface Props {
   shiftWindow: ShiftTimeWindow | null
   shiftLabel: string
   dateKey: string
+  /**
+   * Piezas que la línea hizo fuera del horario del turno (ver
+   * `useShiftOutsidePieces`). Shoplogix las manda a otro bucket y sin esto el
+   * número grande muestra menos producción de la que hubo.
+   */
+  outside?: { pieces: number; ranges: Array<{ from: Date; to: Date; pieces: number; kind: 'antes' | 'despues' }> }
 }
 
-export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey, plannedTargetPieces }: Props) {
-  const totalCycles = snapshot.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0)
+export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, dateKey, plannedTargetPieces, outside }: Props) {
+  const cyclesEnTurno = snapshot.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0)
+  const outsidePieces = outside?.pieces ?? 0
+  // El número grande es la JORNADA: lo que la línea produjo, sin importar dónde
+  // lo archivó Shoplogix. El desglose va abajo para que cuadre con sus reportes.
+  const totalCycles = cyclesEnTurno + outsidePieces
   const isClosed = shiftWindow?.status === 'closed' || shiftWindow?.status == null
 
   const avgUptime =
@@ -171,6 +182,22 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
             <div className="text-xs tracking-wider text-muted-foreground mt-1">
               ciclos · línea total
             </div>
+            {outsidePieces > 0 && (
+              <div className="text-caption mt-1 flex items-center gap-x-1.5 gap-y-0.5 flex-wrap">
+                <span className="tabular-nums text-muted-foreground">
+                  {cyclesEnTurno.toLocaleString('es-CL')} en el turno
+                </span>
+                <span className="text-muted-foreground/40">+</span>
+                <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 tabular-nums text-amber-800 dark:text-amber-200">
+                  {outsidePieces.toLocaleString('es-CL')} fuera del horario
+                </span>
+                {(outside?.ranges ?? []).map(r => (
+                  <span key={r.from.toISOString()} className="tabular-nums text-muted-foreground/70">
+                    ({r.kind === 'antes' ? 'antes: ' : ''}{fmtTime(r.from.getTime())}–{fmtTime(r.to.getTime())})
+                  </span>
+                ))}
+              </div>
+            )}
             {/* Cumplimiento vs lo PLANIFICADO por producción. Se rotula como
                 "planificadas" para no confundirlo con el target de cadencia que
                 reporta el sensor: son dos números distintos. */}

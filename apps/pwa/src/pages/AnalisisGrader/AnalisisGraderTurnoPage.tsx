@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, ExternalLink, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -77,6 +77,7 @@ import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
+import { useShiftOutsidePieces } from '@/hooks/useShiftOutsidePieces'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -356,6 +357,31 @@ export function AnalisisGraderTurnoPage() {
 
   // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
+  // Piezas que Shoplogix dejó fuera de la ventana del turno (mismo criterio que
+  // el monitor público y la matriz, para que los tres números coincidan).
+  const outsidePieces = useShiftOutsidePieces(
+    upstreamLine.snapshot?.dateKey ?? null, plantLineCfg.plantSlug, upstreamLine.snapshot,
+  )
+
+  /** Primera y última pieza REALES del sensor, con la cola incluida. */
+  const operacionReal = useMemo(() => {
+    let ini = Infinity
+    let fin = -Infinity
+    for (const m of upstreamLine.snapshot?.machines ?? []) {
+      for (const iv of m.intervals) {
+        if (iv.cycles <= 0) continue
+        ini = Math.min(ini, iv.startAt.getTime())
+        fin = Math.max(fin, iv.endAt.getTime())
+      }
+    }
+    for (const r of outsidePieces.ranges) {
+      ini = Math.min(ini, r.from.getTime())
+      fin = Math.max(fin, r.to.getTime())
+    }
+    return Number.isFinite(ini) && fin > ini
+      ? { start: new Date(ini).toISOString(), end: new Date(fin).toISOString() }
+      : { start: null, end: null }
+  }, [upstreamLine.snapshot, outsidePieces])
 
   // URL al wizard preservando el `?linea=` actual. Sin esto, cargar Excel
   // desde un turno de Yal envía al wizard sin planta → guarda el doc en la
@@ -1694,11 +1720,15 @@ export function AnalisisGraderTurnoPage() {
           encabezado de la tarjeta y a los "131 min" sueltos: eran seis medidas
           de tiempo repartidas por la pantalla, sin decir contra qué se medía
           cada una — y dos de ellas casi iguales con números distintos. */}
+      {/* Sin Grader (Filete) el "Produjo" salía vacío y la única hora visible
+          era la programada — que en el turno del 10-ago decía 15:30 cuando la
+          línea siguió hasta las 16:30. Se cae a la ventana REAL del sensor,
+          incluyendo la cola de después del cierre. */}
       <TurnoTiemposLine
         programadoStart={shiftWindow?.startAt}
         programadoEnd={shiftWindow?.endAt}
-        produjoStart={summary?.startAt}
-        produjoEnd={summary?.endAt}
+        produjoStart={summary?.startAt ?? operacionReal.start}
+        produjoEnd={summary?.endAt ?? operacionReal.end}
         minutosActivos={summary?.durationMinutes ?? null}
       />
 
@@ -1759,6 +1789,7 @@ export function AnalisisGraderTurnoPage() {
             shiftWindow={shiftWindow}
             shiftLabel={shiftLabel}
             dateKey={dateKey}
+            outside={outsidePieces}
           />
 
           {/* Banner informativo con acción de carga + refresh.
@@ -2486,6 +2517,18 @@ export function AnalisisGraderTurnoPage() {
                   {monitorCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                   {monitorCopied ? 'Copiado' : 'Copiar'}
                 </button>
+                {/* Abrir, no solo compartir: quien genera el link también quiere
+                    mirarlo, y copiar-pegar para eso es absurdo. */}
+                <a
+                  href={monitorUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 flex items-center gap-1 rounded bg-muted hover:bg-accent text-[11px] px-2 py-1 transition-colors"
+                  title="Abrir el monitor en una pestaña nueva"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Abrir
+                </a>
                 <button
                   onClick={() => void handleRevokeMonitor()}
                   disabled={monitorBusy}

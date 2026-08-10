@@ -545,9 +545,9 @@ export function LossCascadeCard({
                 {techoCauses.map((c) => {
                   const meta = LOSS_BUCKET_META[c.bucket as keyof typeof LOSS_BUCKET_META]
                   return (
-                    <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-caption">
+                    <div key={`${c.bucket}-${c.label}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption">
                       <span className={cn('w-2 h-2 rounded-ctl shrink-0', BUCKET_COLOR[c.bucket] ?? 'bg-muted-foreground/[0.10]')} />
-                      <span className="truncate">{c.label}</span>
+                      <span className="truncate min-w-0">{c.label}</span>
                       <span className="text-caption text-muted-foreground shrink-0">{meta?.owner ?? ''}</span>
                       {/* Qué Baader(s) aportó esta causal — antes se perdía al
                           sumar las 3 máquinas (Orel: "¿en qué Baader fue?").
@@ -578,10 +578,10 @@ export function LossCascadeCard({
                       </span>
                       <span className="text-caption text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                       <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
-                      <span className="font-mono tabular-nums text-muted-foreground/60 w-14 text-right shrink-0 text-caption">
+                      <span className="font-mono tabular-nums text-muted-foreground/60 sm:w-14 text-right shrink-0 text-caption">
                         {pctOfTecho(c.sec).toFixed(1)}%
                       </span>
-                      <span className="font-mono tabular-nums text-muted-foreground w-20 text-right shrink-0">
+                      <span className="font-mono tabular-nums text-muted-foreground sm:w-20 text-right shrink-0">
                         ≈ {c.piezas.toLocaleString('es-CL')} pz
                       </span>
                     </div>
@@ -597,16 +597,18 @@ export function LossCascadeCard({
               </p>
               <div className="space-y-0.5 opacity-70">
                 {plannedCauses.map((c) => (
-                  <div key={`${c.bucket}-${c.label}`} className="flex items-center gap-2 text-caption">
+                  <div key={`${c.bucket}-${c.label}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption">
                     <span className="w-2 h-2 rounded-ctl shrink-0 bg-muted-foreground/[0.10]" />
-                    <span className="truncate">{c.label}</span>
+                    <span className="truncate min-w-0">{c.label}</span>
                     <span className="text-caption text-muted-foreground shrink-0">Personas (acordado)</span>
                     <span className="text-caption text-muted-foreground/60 tabular-nums shrink-0">×{c.count}</span>
                     <span className="ml-auto font-mono tabular-nums shrink-0">{fmtHm(c.sec)}</span>
-                    <span className="font-mono tabular-nums text-muted-foreground/60 w-14 text-right shrink-0 text-caption">
+                    <span className="font-mono tabular-nums text-muted-foreground/60 sm:w-14 text-right shrink-0 text-caption">
                       {pctOfTurno(c.sec).toFixed(1)}%
                     </span>
-                    <span className="w-20 shrink-0" />
+                    {/* Columna fantasma para alinear con la fila de arriba; en
+                        móvil no existe, si no empuja el wrap una línea de más. */}
+                    <span className="hidden sm:block sm:w-20 shrink-0" />
                   </div>
                 ))}
               </div>

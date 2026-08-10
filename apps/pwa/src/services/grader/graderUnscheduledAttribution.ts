@@ -71,6 +71,43 @@ export function intervalKey(iv: CycleInterval): string {
   return `${iv.machineid ?? ''}|${iv.startAt.getTime()}`
 }
 
+/** Corte entre dos tramos de producción fuera de turno. */
+const TRAMO_GAP_MS = 15 * 60 * 1000
+
+/**
+ * Piezas mínimas para que un tramo fuera de turno cuente como producción.
+ *
+ * Bajo esto es ruido: higiene, prueba de línea, giro en vacío. El mismo umbral
+ * que usa el monitor público (`functions/publicMonitor.js`), para que la matriz
+ * y el link compartido no den números distintos del mismo turno. Caso que lo
+ * fijó: 6 piezas sueltas a las 06:10 del 10-ago en Filete, hora y media antes
+ * del turno, contra 505 piezas de producción real después del cierre.
+ */
+export const OUTSIDE_MIN_PIECES = 20
+
+/** Agrupa tramos contiguos (corte cuando pasan más de 15 min sin piezas). */
+export function agruparTramos(intervals: readonly CycleInterval[]): Array<{
+  start: number; end: number; pieces: number; intervals: CycleInterval[]
+}> {
+  const orden = [...intervals]
+    .filter(iv => iv.cycles > 0)
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+
+  const tramos: Array<{ start: number; end: number; pieces: number; intervals: CycleInterval[] }> = []
+  for (const iv of orden) {
+    const t = iv.startAt.getTime()
+    const ultimo = tramos[tramos.length - 1]
+    if (ultimo && t - ultimo.end <= TRAMO_GAP_MS) {
+      ultimo.end = Math.max(ultimo.end, t)
+      ultimo.pieces += iv.cycles
+      ultimo.intervals.push(iv)
+    } else {
+      tramos.push({ start: t, end: t, pieces: iv.cycles, intervals: [iv] })
+    }
+  }
+  return tramos
+}
+
 export interface UnscheduledAttribution {
   /** Ciclos sumados a cada turno, por `key`. */
   byShiftKey: Map<string, number>
@@ -80,6 +117,8 @@ export interface UnscheduledAttribution {
   total: number
   /** Ciclos descartados por estar ya contados en el doc de un turno. */
   duplicated: number
+  /** Ciclos descartados por venir en tramos demasiado chicos (ruido). */
+  noise: number
 }
 
 /**
@@ -112,9 +151,30 @@ export function attributeUnscheduledCycles(
 
   const usable = candidates.filter(c => !c.unscheduled && c.start && c.end)
 
+  // Primero se descartan los repetidos, y recién después se agrupa: un tramo de
+  // ruido no debe quedar "grande" por arrastrar minutos que ya estaban contados.
+  const nuevos: CycleInterval[] = []
   for (const iv of intervals) {
     if (!(iv.cycles > 0)) continue
     if (alreadyCounted?.has(intervalKey(iv))) { duplicated += iv.cycles; continue }
+    nuevos.push(iv)
+  }
+
+  // El umbral de ruido solo aplica FUERA de las ventanas de turno. Un ciclo que
+  // cae DENTRO del horario es del turno sin discusión, por suelto que esté —
+  // filtrarlo ahí perdía producción legítima (dos tests reales lo fijaron).
+  const dentro = (iv: CycleInterval) => {
+    const t = iv.startAt.getTime()
+    return usable.some(c => t >= c.start!.getTime() && t < c.end!.getTime())
+  }
+  let noise = 0
+  const utiles: CycleInterval[] = nuevos.filter(dentro)
+  for (const t of agruparTramos(nuevos.filter(iv => !dentro(iv)))) {
+    if (t.pieces < OUTSIDE_MIN_PIECES) noise += t.pieces
+    else utiles.push(...t.intervals)
+  }
+
+  for (const iv of utiles) {
     total += iv.cycles
     const t = iv.startAt.getTime()
 
@@ -140,7 +200,7 @@ export function attributeUnscheduledCycles(
     else unattributed += iv.cycles
   }
 
-  return { byShiftKey, unattributed, total, duplicated }
+  return { byShiftKey, unattributed, total, duplicated, noise }
 }
 
 /**
