@@ -990,10 +990,10 @@ export function ShiftTimelineView({
           // busca por el label de tiempo del punto hovereado (no por índice).
           const metaBucket = typeof time === 'string' ? bucketByLabel.get(time) : undefined
           if (metaBucket?.lot) {
-            lines.push(`<span style="color:#8b5cf6">📦</span> Lote: <b>${metaBucket.lot}</b>`)
+            lines.push(`Lote: <b>${metaBucket.lot}</b>`)
           }
           if (metaBucket?.dominantCalibre) {
-            lines.push(`<span style="color:#6366f1">📏</span> Calibre: ${metaBucket.dominantCalibre}`)
+            lines.push(`Calibre: ${metaBucket.dominantCalibre}`)
           }
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
@@ -1015,7 +1015,7 @@ export function ShiftTimelineView({
                 else { byReason.set(b.reason, { count: 1, totalMin: b.durationMin, color: b.color }) }
               }
               const sorted = [...byReason.entries()].sort(([, a], [, b]) => b.totalMin - a.totalMin)
-              lines.push('<span style="color:#94a3b8">⚠ Upstream parado:</span>')
+              lines.push('<span style="color:#94a3b8">Upstream parado:</span>')
               for (const [reason, info] of sorted.slice(0, 4)) {
                 const machinesLabel = info.count === 1 ? '1 Baader' : `${info.count} Baaders`
                 lines.push(`&nbsp;&nbsp;<span style="color:${info.color}">▮</span> <b>${reason}</b> · ${machinesLabel}`)

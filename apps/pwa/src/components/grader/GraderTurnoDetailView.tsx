@@ -17,7 +17,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ArrowRight, ChevronLeft, ChevronRight, Clock, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Clock, Brain, Loader2, Moon, Sun, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -52,6 +52,13 @@ ChartJS.register(
 
 /** Duración defensiva: si durationMinutes > 1440 (anomalía por merge),
  *  deriva de endAt–startAt con máximo de 720 min (12h = turno completo). */
+/** Sol o luna según el turno. El `aria-label` dice cuál — el ícono solo no lo dice. */
+function TurnoIcon({ shiftId, className = 'h-3.5 w-3.5' }: { shiftId: string; className?: string }) {
+  const esDia = shiftId.includes('día')
+  const Icon = esDia ? Sun : Moon
+  return <Icon className={cn('shrink-0', className)} aria-label={esDia ? 'Turno de día' : 'Turno de noche'} />
+}
+
 function safeMinutes(summary: { durationMinutes?: number; startAt?: string; endAt?: string }): number | undefined {
   const dm = summary.durationMinutes
   if (dm == null || dm <= 0) return undefined
@@ -322,7 +329,10 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <ChevronLeft className="h-5 w-5" />
-            <span className="hidden sm:inline">{prevTurn ? `${prevTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${prevTurn.dateKey.slice(5)} ${prevTurn.shiftId.replace('Turno ', '')}` : ''}</span>
+            <span className="hidden items-center gap-1 sm:inline-flex">
+              {prevTurn && <TurnoIcon shiftId={prevTurn.shiftId} />}
+              {prevTurn ? `${prevTurn.dateKey.slice(5)} ${prevTurn.shiftId.replace('Turno ', '')}` : ''}
+            </span>
             <span className="sm:hidden">Anterior</span>
           </button>
           <span className="text-xs text-muted-foreground tabular-nums font-medium">
@@ -334,7 +344,10 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             onClick={() => nextTurn && goToTurn(nextTurn)}
             className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
-            <span className="hidden sm:inline">{nextTurn ? `${nextTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}</span>
+            <span className="hidden items-center gap-1 sm:inline-flex">
+              {nextTurn && <TurnoIcon shiftId={nextTurn.shiftId} />}
+              {nextTurn ? `${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}
+            </span>
             <span className="sm:hidden">{nextTurn ? 'Siguiente' : 'Final'}</span>
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -347,7 +360,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
               <p className="text-xs font-medium text-muted-foreground tracking-wide flex items-center gap-1.5">
-                <span className="text-base">{summary.shiftId.includes('día') ? '☀️' : '🌙'}</span>
+                <TurnoIcon shiftId={summary.shiftId} className="h-4 w-4" />
                 {summary.shiftId} · {summary.totalPieces.toLocaleString('es-CL')} piezas
               </p>
               <h2 className="text-xl font-bold capitalize mt-0.5">

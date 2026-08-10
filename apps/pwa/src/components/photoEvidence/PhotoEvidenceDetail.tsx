@@ -531,7 +531,7 @@ export function PhotoEvidenceDetail({
                             }}
                             maxPhotos={10}
                             disabled={isSaving}
-                            label="📷 Foto ANTES (este par)"
+                            label="Foto ANTES (este par)"
                             description="Puedes agregar varias fotos. Click para seleccionar"
                             selectedPhotoId={selectedBeforePhotoId ?? undefined}
                             onSelectPhotoId={(id) => setSelectedBeforePhotoId(id)}
@@ -557,7 +557,7 @@ export function PhotoEvidenceDetail({
                             }}
                             maxPhotos={10}
                             disabled={isSaving}
-                            label="📷 Foto DESPUÉS (este par)"
+                            label="Foto DESPUÉS (este par)"
                             description="Puedes agregar varias fotos. Click para seleccionar"
                             selectedPhotoId={selectedAfterPhotoId ?? undefined}
                             onSelectPhotoId={(id) => setSelectedAfterPhotoId(id)}
@@ -604,7 +604,7 @@ export function PhotoEvidenceDetail({
 
                         {pairUbicacionSource === 'general' && (
                           <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
-                            {evidence.hierarchyPath ? `📍 ${evidence.hierarchyPath}` : 'Sin ubicación general'}
+                            {evidence.hierarchyPath ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{evidence.hierarchyPath}</span> : 'Sin ubicación general'}
                           </p>
                         )}
 
@@ -618,7 +618,7 @@ export function PhotoEvidenceDetail({
                             />
                             {(pairUbicacionPath || pairUbicacion.trim()) && (
                               <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
-                                📍 {pairUbicacionPath || pairUbicacion.trim()}
+                                <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{pairUbicacionPath || pairUbicacion.trim()}</span>
                               </p>
                             )}
                           </>

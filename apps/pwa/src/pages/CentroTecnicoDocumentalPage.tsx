@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  AlertTriangle,
   BookOpen,
+  CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Copy,
+  DollarSign,
   Download,
   Edit2,
   FolderArchive,
@@ -16,6 +20,7 @@ import {
   QrCode,
   Star,
   Trash2,
+  User,
   Wrench,
   X,
   Zap,
@@ -50,7 +55,8 @@ import { useRepuestosDeEquipo } from '@/hooks/repuestos/useRepuestosDeEquipo'
 import { logger } from '@/lib/logger'
 import {
   BUCKETS,
-  COND_EMOJI,
+  COND_COLOR,
+  COND_LABEL,
   CRIT,
   CRIT_INFO,
   ESTADO,
@@ -814,7 +820,7 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
             <span className="text-caption font-normal text-muted-foreground">(historial NFPA 70B)</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            Actual: {condActual ? `${COND_EMOJI[condActual]} Cond. ${condActual}` : '—'}
+            Actual: {condActual ? `Cond. ${condActual}` : '—'}
           </div>
         </div>
 
@@ -828,7 +834,11 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
               <ReactECharts option={condOption} style={{ height: 150, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
             </div>
             <div className="flex items-center justify-between text-caption text-muted-foreground">
-              <span>🟢 Cond 1 (mejor) · 🟡 2 · 🔴 3 (peor)</span>
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1"><CondDot cond={1} />Cond 1 (mejor)</span>
+                <span className="inline-flex items-center gap-1"><CondDot cond={2} />2</span>
+                <span className="inline-flex items-center gap-1"><CondDot cond={3} />3 (peor)</span>
+              </span>
               <span>{serie.length} registro(s)</span>
             </div>
           </>
@@ -1084,8 +1094,12 @@ function MetricChart({
             {pct != null ? `${delta >= 0 ? '+' : ''}${pct.toFixed(0)}%` : `${delta >= 0 ? '+' : ''}${fmtNum(delta)} ${campo.unidad}`}
           </span>{' '}
           <span className="text-muted-foreground">en {periodo}</span>
-          {sobreLimite && <span className="ml-1">⚠ sobre el límite NFPA</span>}
-          {bajoLimite && <span className="ml-1">⚠ bajo el mínimo NFPA</span>}
+          {sobreLimite && (
+            <span className="ml-1 inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3" />sobre el límite NFPA</span>
+          )}
+          {bajoLimite && (
+            <span className="ml-1 inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3" />bajo el mínimo NFPA</span>
+          )}
         </div>
       )}
       <ReactECharts option={option} style={{ height: 240, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
@@ -1383,6 +1397,22 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
 }
 
 /** Chip de órdenes de trabajo abiertas del equipo (rojo si hay vencidas). */
+/**
+ * Punto del semáforo de condición. El `title` lleva la etiqueta completa: el color
+ * nunca es el único canal (§13).
+ */
+function CondDot({ cond }: { cond: 1 | 2 | 3 }) {
+  return (
+    <span
+      className="inline-block size-2.5 shrink-0 rounded-full align-middle"
+      style={{ background: COND_COLOR[cond] }}
+      title={COND_LABEL[cond]}
+      role="img"
+      aria-label={COND_LABEL[cond]}
+    />
+  )
+}
+
 function OtBadge({ ot }: { ot?: OtCount }) {
   if (!ot || ot.abiertas === 0) return null
   const danger = ot.vencidas > 0
@@ -2243,10 +2273,22 @@ function ExpedienteDialog({
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
                               <span>{WO_TIPOS.find((t) => t.value === wo.tipo)?.label ?? wo.tipo}</span>
                               <span className={wp.cls}>● {wp.label}</span>
-                              {wo.asignadoA && <span>👤 {wo.asignadoA}</span>}
-                              {wo.fechaProgramada && <span>📅 {new Date(wo.fechaProgramada).toLocaleDateString()}</span>}
-                              {wo.fechaCierre && <span>✓ {new Date(wo.fechaCierre).toLocaleDateString()}</span>}
-                              {typeof wo.costo === 'number' && <span>💲 {formatCosto(wo.costo)}</span>}
+                              {wo.asignadoA && (
+                                <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{wo.asignadoA}</span>
+                              )}
+                              {wo.fechaProgramada && (
+                                <span className="inline-flex items-center gap-1" title="Programada">
+                                  <CalendarDays className="h-3 w-3" />{new Date(wo.fechaProgramada).toLocaleDateString()}
+                                </span>
+                              )}
+                              {wo.fechaCierre && (
+                                <span className="inline-flex items-center gap-1" title="Cerrada">
+                                  <CheckCircle2 className="h-3 w-3" />{new Date(wo.fechaCierre).toLocaleDateString()}
+                                </span>
+                              )}
+                              {typeof wo.costo === 'number' && (
+                                <span className="inline-flex items-center gap-1"><DollarSign className="h-3 w-3" />{formatCosto(wo.costo)}</span>
+                              )}
                             </div>
                             {canEdit && wo.estado !== 'cerrada' && wo.estado !== 'cancelada' && (
                               <div className="flex items-center gap-1 pt-0.5">
@@ -2520,7 +2562,7 @@ function AgendaInspecciones({
                       className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/40 cursor-pointer"
                     >
                       <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
-                      <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : '—'}</span>
+                      <span className="w-6 text-center">{cond ? <CondDot cond={cond} /> : '—'}</span>
                       <span className="flex-1 min-w-0 truncate">
                         {e.nombre} <span className="text-caption text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
@@ -2594,7 +2636,7 @@ function CtdEquipoCard({
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
-          {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
+          {cond ? <CondDot cond={cond} /> : null}
           <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
           <OtBadge ot={ot} />
         </div>
@@ -2660,7 +2702,7 @@ function CtdEquipoRow({
         {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
-          {cond ? <span>{COND_EMOJI[cond]}</span> : null}
+          {cond ? <CondDot cond={cond} /> : null}
           <Badge variant="outline" className={`${est.cls}`}>{est.label}</Badge>
           <OtBadge ot={ot} />
           <button
@@ -2678,7 +2720,7 @@ function CtdEquipoRow({
 
       <div className="hidden md:flex items-center gap-3 shrink-0 text-sm">
         <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
-        <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : <span className="text-muted-foreground">—</span>}</span>
+        <span className="w-6 text-center">{cond ? <CondDot cond={cond} /> : <span className="text-muted-foreground">—</span>}</span>
         <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
         <span className="w-12 text-right"><OtBadge ot={ot} /></span>
         <button

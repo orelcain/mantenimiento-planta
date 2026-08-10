@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Tag, FileText } from 'lucide-react'
+import { MapPin, Tag, FileText, Lightbulb } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -173,8 +173,9 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
               disabled={isLoading}
             />
             {hierarchyPath && (
-              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
-                📍 {hierarchyPath}
+              <p className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {hierarchyPath}
               </p>
             )}
           </div>
@@ -201,16 +202,19 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
               onPhotosChange={setPhotos}
               maxPhotos={10}
               disabled={isLoading}
-              label="📷 Fotos ANTES (problema)"
+              label="Fotos ANTES (problema)"
               description="Sube las fotos del problema o incidencia a documentar"
             />
           </div>
 
           {/* Info */}
           <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-card">
-            <p>
-              <strong>💡 Consejo:</strong> Las fotos "DESPUÉS" se pueden agregar posteriormente
+            <p className="flex items-start gap-1.5">
+              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+              <strong>Consejo:</strong> Las fotos "DESPUÉS" se pueden agregar posteriormente
               cuando se corrija el problema. Esto te permite comparar el antes y después.
+              </span>
             </p>
           </div>
 

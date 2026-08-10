@@ -564,7 +564,7 @@ export function AnalisisGraderTurnoPage() {
   // P1-2 — Toast al reconectar (false → true)
   useEffect(() => {
     if (!prevIsOnline.current && isOnline) {
-      toast({ title: '✅ Conexión restablecida', description: 'Cambios sincronizados.' })
+      toast({ title: 'Conexión restablecida', description: 'Cambios sincronizados.' })
     }
     prevIsOnline.current = isOnline
   }, [isOnline, toast])
@@ -1411,7 +1411,7 @@ export function AnalisisGraderTurnoPage() {
       // El onSnapshot de useUpstreamLineSnapshot actualiza el snapshot automáticamente
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      toast({ title: '⚠️ Sin datos Shoplogix', description: msg, variant: 'destructive' })
+      toast({ title: 'Sin datos Shoplogix', description: msg, variant: 'destructive' })
     } finally {
       setSlxSyncing(false)
     }

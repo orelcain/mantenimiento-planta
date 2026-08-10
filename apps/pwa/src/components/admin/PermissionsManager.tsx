@@ -10,6 +10,7 @@ import {
   Spinner,
   Badge,
 } from '@/components/ui'
+import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@/types'
 
@@ -83,6 +84,7 @@ const CATEGORY_LABELS: Record<Permission['category'], { label: string; icon: Luc
 }
 
 export function PermissionsManager() {
+  const { toast } = useToast()
   const [selectedRole, setSelectedRole] = useState<UserRole>('tecnico')
   const [permissions, setPermissions] = useState<Record<UserRole, string[]>>(DEFAULT_PERMISSIONS)
   const [isLoading, setIsLoading] = useState(false)
@@ -129,11 +131,11 @@ export function PermissionsManager() {
       // TODO: Guardar en Firestore en producción
       localStorage.setItem('custom_permissions', JSON.stringify(permissions))
       logger.info('Permisos guardados', { permissions })
-      alert('✅ Permisos guardados correctamente')
+      toast({ title: 'Permisos guardados' })
       setHasChanges(false)
     } catch (error) {
       logger.error('Error guardando permisos', error instanceof Error ? error : new Error(String(error)))
-      alert('❌ Error al guardar permisos')
+      toast({ title: 'No se pudieron guardar los permisos', variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -196,7 +198,7 @@ export function PermissionsManager() {
           >
             {role === 'admin' && 'Admin'}
             {role === 'supervisor' && 'Supervisor'}
-            {role === 'tecnico' && '🔧 Técnico'}
+            {role === 'tecnico' && 'Técnico'}
             {role === 'usuario' && 'Usuario'}
             <Badge variant="secondary" className="ml-2">
               {rolePerms.length}/{ALL_PERMISSIONS.length}

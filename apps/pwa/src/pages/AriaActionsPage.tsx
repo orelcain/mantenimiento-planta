@@ -11,10 +11,15 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  ClipboardList,
+  Compass,
   RefreshCw,
   ArrowLeft,
   Filter,
+  Search,
   TrendingUp,
+  Wrench,
+  type LucideIcon,
 } from 'lucide-react'
 import { collection, getDocs, query, orderBy, limit, where } from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
@@ -55,13 +60,15 @@ function ActionRow({ action, onViewIncident }: {
   action: ActionLogEntry
   onViewIncident: (id: string) => void
 }) {
-  const typeLabels: Record<string, string> = {
-    create_incident: '📋 Incidencia Creada',
-    update_incident_status: '🔄 Estado Actualizado',
-    search_equipment: '🔍 Búsqueda Equipo',
-    search_repuestos: '🔧 Búsqueda Repuesto',
-    navigate: '🧭 Navegación',
+  const typeLabels: Record<string, { icon: LucideIcon; label: string }> = {
+    create_incident: { icon: ClipboardList, label: 'Incidencia creada' },
+    update_incident_status: { icon: RefreshCw, label: 'Estado actualizado' },
+    search_equipment: { icon: Search, label: 'Búsqueda de equipo' },
+    search_repuestos: { icon: Wrench, label: 'Búsqueda de repuesto' },
+    navigate: { icon: Compass, label: 'Navegación' },
   }
+  const tipo = typeLabels[action.actionType]
+  const TipoIcon = tipo?.icon
 
   const typeColors: Record<string, string> = {
     create_incident: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-primary/[0.15]',
@@ -87,8 +94,9 @@ function ActionRow({ action, onViewIncident }: {
       </div>
 
       {/* Type badge */}
-      <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${typeColors[action.actionType] || 'text-muted-foreground bg-muted'}`}>
-        {typeLabels[action.actionType] || action.actionType}
+      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${typeColors[action.actionType] || 'text-muted-foreground bg-muted'}`}>
+        {TipoIcon && <TipoIcon className="h-3 w-3" />}
+        {tipo?.label ?? action.actionType}
       </span>
 
       {/* Description */}

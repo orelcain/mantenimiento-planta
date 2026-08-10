@@ -27,7 +27,22 @@ export const ESTADO: Record<Equipment['estado'], { label: string; cls: string }>
   fuera_servicio: { label: 'Fuera de servicio', cls: 'border-red-500 text-red-600' },
 }
 
-export const COND_EMOJI: Record<1 | 2 | 3, string> = { 1: '🟢', 2: '🟡', 3: '🔴' }
+/**
+ * Color del semáforo de condición (1 mejor → 3 peor).
+ * Es un color de dato, no una clase de Tailwind: lo consumen tanto el punto de la
+ * UI (`<CondDot>`) como los tooltips de ECharts, que son HTML plano.
+ */
+export const COND_COLOR: Record<1 | 2 | 3, string> = {
+  1: 'rgb(16,185,129)',
+  2: 'rgb(234,179,8)',
+  3: 'rgb(239,68,68)',
+}
+
+export const COND_LABEL: Record<1 | 2 | 3, string> = {
+  1: 'Condición 1 (mejor)',
+  2: 'Condición 2',
+  3: 'Condición 3 (peor)',
+}
 
 export const WO_ESTADO: Record<WorkOrder['estado'], { label: string; cls: string }> = {
   abierta: { label: 'Abierta', cls: 'border-blue-500 text-blue-600' },

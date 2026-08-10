@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff } from 'lucide-react'
+import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
@@ -86,8 +86,8 @@ function formatLine(text: string): string {
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded-ctl text-xs">$1</code>')
     // #7 — Links internos clickeables
-    .replace(/\[\[equipo:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="equipment" data-name="$1">🔧 $1</a>')
-    .replace(/\[\[incidencia:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="incident" data-name="$1">🎫 $1</a>')
+    .replace(/\[\[equipo:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="equipment" data-name="$1">$1</a>')
+    .replace(/\[\[incidencia:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="incident" data-name="$1">$1</a>')
     .replace(/\[\[ir:(.+?)\|(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="navigate" data-route="$1">$2</a>')
 }
 
@@ -405,8 +405,9 @@ function MessageBubble({
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
             <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card space-y-1.5">
-              <div className="text-caption font-medium text-ink-warn">
-                ✏️ ¿Cuál era la respuesta correcta?
+              <div className="flex items-center gap-1 text-caption font-medium text-ink-warn">
+                <Pencil className="size-3 shrink-0" />
+                ¿Cuál era la respuesta correcta?
               </div>
               <textarea
                 value={correctionText}
@@ -512,7 +513,7 @@ function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/c
     code: 'código',
     speed: 'rápido',
     general: 'general',
-    vision: '👁️ visión',
+    vision: 'visión',
   }
   return (
     <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground opacity-70 flex-wrap">
@@ -549,7 +550,7 @@ const QUICK_SUGGESTIONS = [
   '¿Qué repuestos tenemos?',
   '¿Estado de los equipos?',
   'Resumen de la planta',
-  '📋 Historial de ARIA',
+  'Historial de ARIA',
 ]
 
 function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
@@ -918,7 +919,8 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
           onClick={onModify}
           className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
         >
-          ✏️ Modificar
+          <Pencil className="size-3" />
+          Modificar
         </button>
         <button
           onClick={onCancel}
@@ -1345,7 +1347,7 @@ export function ChatBot() {
       // #5 v2.60 — Show saved templates
       const tpls = getTemplates()
       if (tpls.length === 0) return [{ label: '(Sin plantillas guardadas — usa la estrella para guardar)', value: '', isTemplate: false, templateId: '' }]
-      return tpls.map(t => ({ label: `⭐ ${t.label}`, value: t.text, isTemplate: true, templateId: t.id }))
+      return tpls.map(t => ({ label: t.label, value: t.text, isTemplate: true, templateId: t.id }))
     }
     if (trimmed.startsWith('/')) {
       return SLASH_COMMANDS
@@ -1631,9 +1633,10 @@ export function ChatBot() {
                           setInput('')
                         }
                       }}
-                      className="flex-1 text-left px-3 py-2 text-xs truncate"
+                      className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs"
                     >
-                      {item.label}
+                      {item.isTemplate && <Star className="size-3 shrink-0 text-amber-500" aria-label="Plantilla guardada" />}
+                      <span className="truncate">{item.label}</span>
                     </button>
                     {item.isTemplate && (
                       <button

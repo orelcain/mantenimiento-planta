@@ -272,10 +272,23 @@ export function TendenciaWeightCard({
           <CardTitle className="text-sm">Detalle por Intervalo</CardTitle>
           <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
-            <span>🟢 &lt;8%</span>
-            <span>🟡 8-11.9%</span>
-            <span>🟠 12-19.9%</span>
-            <span>🔴 ≥20%</span>
+            {/* Los puntos salen de getCvSignal con un valor de muestra por tramo:
+                así la leyenda no puede desincronizarse de los umbrales reales. */}
+            {[
+              { muestra: 5, texto: '<8%' },
+              { muestra: 10, texto: '8-11.9%' },
+              { muestra: 15, texto: '12-19.9%' },
+              { muestra: 25, texto: '≥20%' },
+            ].map(({ muestra, texto }) => (
+              <span key={texto} className="inline-flex items-center gap-1">
+                <i
+                  className="inline-block size-2 shrink-0 rounded-full"
+                  style={{ background: getCvSignal(muestra).bar }}
+                  aria-hidden
+                />
+                {texto}
+              </span>
+            ))}
           </p>
         </CardHeader>
         <CardContent>
