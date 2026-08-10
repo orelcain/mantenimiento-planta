@@ -1531,6 +1531,21 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS DE TURNO — Monitor público en vivo (link/QR sin sesión)
+    // Espejo de solo lectura del avance de un turno para Control de Producción:
+    // piezas, cadencia (pz/min y pz/h), estado y paros de la línea. Lo escribe
+    // SIEMPRE el Admin SDK (callables createPublicShiftMonitor /
+    // revokePublicShiftMonitor + trigger de refresco) — nunca el cliente, para
+    // que el payload público no pueda inflarse con datos no destinados a salir.
+    // Lectura abierta A PROPÓSITO pero acotada a links vigentes: el reloj lo
+    // pone el servidor, así que un link vencido deja de ser legible aunque el
+    // doc siga existiendo. Ver functions/publicMonitor.js.
+    match /publicShiftMonitors/{token} {
+      allow read: if resource.data.expiresAt is string
+        && timestamp.value(resource.data.expiresAt) > request.time;
+      allow write: if false;
+    }
+
     // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
     match /flipperZ2Captures/{captureId} {
       allow read: if isNotAnonymous();

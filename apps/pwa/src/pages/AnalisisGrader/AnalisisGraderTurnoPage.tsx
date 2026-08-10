@@ -10,12 +10,13 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
+import { createPublicShiftMonitor, revokePublicShiftMonitor, MONITOR_TTL_CHOICES, type MonitorTtlHours } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -613,6 +614,16 @@ export function AnalisisGraderTurnoPage() {
   const [shareToken, setShareToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [revoking, setRevoking] = useState(false)
+
+  // ── Monitor público en vivo (link/QR para Control de Producción) ──────────
+  // Distinto del "Compartir turno" de arriba: aquel congela un snapshot del
+  // Grader; este publica el avance del turno y se refresca solo con cada sync.
+  const [monitorUrl, setMonitorUrl] = useState<string | null>(null)
+  const [monitorToken, setMonitorToken] = useState<string | null>(null)
+  const [monitorTtl, setMonitorTtl] = useState<MonitorTtlHours>(24)
+  const [monitorBusy, setMonitorBusy] = useState(false)
+  const [monitorCopied, setMonitorCopied] = useState(false)
+  const [monitorError, setMonitorError] = useState<string | null>(null)
 
   // ── IA (FASE 16) ─────────────────────────────────────────────────────────
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
@@ -1448,6 +1459,49 @@ export function AnalisisGraderTurnoPage() {
     })
   }, [shareUrl])
 
+  // ── Monitor público en vivo ───────────────────────────────────────────────
+  // Se manda el dateKey/shiftId del snapshot GANADOR, no los de la URL: el
+  // Grader etiqueta "Turno día" y Shoplogix puede haber escrito "Turno 2".
+  // Con la etiqueta de la URL el backend buscaría un doc que no existe.
+  const handleCreateMonitor = useCallback(async () => {
+    const slx = upstreamLine.snapshot
+    if (!slx || upstreamLine.source !== 'firestore') return
+    setMonitorBusy(true)
+    setMonitorError(null)
+    try {
+      const { token } = await createPublicShiftMonitor({
+        plantSlug:       plantLineCfg.plantSlug,
+        dateKey:         slx.dateKey,
+        shiftId:         slx.shiftId,
+        plantLineId:     plantLineCfg.id,
+        areaLabel:       plantLineCfg.areaLabel,
+        lineLabel:       plantLineCfg.label,
+        machineKindLong: plantLineCfg.machineKind?.long,
+        targetPieces:    plantLineCfg.shiftTargetPieces,
+        ttlHours:        monitorTtl,
+      })
+      const base = `${window.location.origin}${import.meta.env.BASE_URL}`
+      setMonitorToken(token)
+      setMonitorUrl(`${base}monitor/${token}`)
+    } catch (err) {
+      setMonitorError(err instanceof Error ? err.message : 'No se pudo generar el link')
+    } finally {
+      setMonitorBusy(false)
+    }
+  }, [upstreamLine.snapshot, upstreamLine.source, plantLineCfg, monitorTtl])
+
+  const handleRevokeMonitor = useCallback(async () => {
+    if (!monitorToken) return
+    setMonitorBusy(true)
+    try {
+      await revokePublicShiftMonitor(monitorToken)
+    } catch { /* si falla la red igual se limpia la UI: el link vence solo */ }
+    setMonitorToken(null)
+    setMonitorUrl(null)
+    setMonitorCopied(false)
+    setMonitorBusy(false)
+  }, [monitorToken])
+
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   // groupId único por turno: garantiza que múltiples instancias del provider
@@ -2210,6 +2264,100 @@ export function AnalisisGraderTurnoPage() {
           {/* Nota: el contador de cambios de config (FASE 27) ya vive en
               el badge del panel ConfigChangeHistory de arriba — eliminado
               para evitar duplicación con conteos divergentes. */}
+
+          {/* Monitor en vivo — link/QR sin sesión para Control de Producción.
+              No depende del Grader (por eso sirve en Filete, que no tiene Excel
+              ni P0%): la fuente es el turno de Shoplogix ya sincronizado. */}
+          {activeView === 'resumen' && isSupervisor && plantLineCfg.shoplogixEnabled
+            && upstreamLine.source === 'firestore' && upstreamLine.snapshot && (
+            <div className="rounded-card border border-border bg-muted p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-sky-500" />
+                <span className="text-sm font-medium">Monitor en vivo (link / QR)</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Comparte el avance de piezas de {plantLineCfg.machineKind?.long ?? 'la línea'} con
+                Control de Producción: piezas del turno, pz/min, pz/hora, horario y detenciones.
+                Sin login y solo lectura — se actualiza solo con cada sync.
+              </p>
+
+              {!monitorUrl && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-[11px] text-muted-foreground" htmlFor="monitor-ttl">
+                    Vigencia
+                  </label>
+                  <select
+                    id="monitor-ttl"
+                    value={monitorTtl}
+                    onChange={(e) => setMonitorTtl(Number(e.target.value) as MonitorTtlHours)}
+                    className="h-7 rounded border border-border bg-background px-2 text-xs"
+                  >
+                    {MONITOR_TTL_CHOICES.map(h => (
+                      <option key={h} value={h}>
+                        {h < 24 ? `${h} horas` : h === 24 ? '1 día' : `${h / 24} días`}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-7 text-xs"
+                    onClick={() => void handleCreateMonitor()}
+                    disabled={monitorBusy}
+                  >
+                    {monitorBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Generar link'}
+                  </Button>
+                </div>
+              )}
+
+              {monitorError && <p className="text-[11px] text-destructive">{monitorError}</p>}
+
+              {monitorUrl && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 truncate rounded bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                      {monitorUrl}
+                    </code>
+                    <button
+                      onClick={() => {
+                        void navigator.clipboard.writeText(monitorUrl).then(() => {
+                          setMonitorCopied(true)
+                          setTimeout(() => setMonitorCopied(false), 2000)
+                        })
+                      }}
+                      className="shrink-0 flex items-center gap-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] px-2 py-1 transition-colors"
+                      title="Copiar link"
+                    >
+                      {monitorCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {monitorCopied ? 'Copiado' : 'Copiar'}
+                    </button>
+                    <button
+                      onClick={() => void handleRevokeMonitor()}
+                      disabled={monitorBusy}
+                      className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
+                      title="Revocar el link (deja de funcionar para todos)"
+                    >
+                      {monitorBusy ? '…' : 'Revocar'}
+                    </button>
+                  </div>
+                  <div className="flex items-start gap-3 pt-1">
+                    <div className="rounded-card border border-border/40 bg-white p-1.5">
+                      <QRCodeSVG value={monitorUrl} size={116} level="M" includeMargin={false} />
+                    </div>
+                    <div className="flex flex-col justify-center gap-1 pt-1">
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <QrCode className="w-3 h-3" />
+                        Escanear con el celular
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        Vence en {monitorTtl < 24 ? `${monitorTtl} horas` : monitorTtl === 24 ? '1 día' : `${monitorTtl / 24} días`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
           {activeView === 'resumen' && summary && isAdmin && (

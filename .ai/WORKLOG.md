@@ -13,6 +13,63 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Monitor publico de turno en vivo (link/QR sin sesion)
+
+Control de Produccion necesitaba seguir el avance de piezas de la Baader 200 de Filete sin entrar
+a Shoplogix ni tener cuenta en la PWA. Se agrega un link/QR **de solo lectura** que se actualiza
+solo: `/monitor/{token}`.
+
+**Que muestra:** piezas acumuladas del turno (con avance vs la meta de 5.000 pz de Filete),
+**pz/min y pz/hora**, cadencia de los ultimos 30 min, % de tiempo produciendo, **turno + dia +
+horario programado**, ventana real de produccion (primera->ultima pieza), estado actual
+(produciendo/detenida con la razon y desde cuando), barras de piezas por tramo de 5 min y el
+top de detenciones del turno. Sin comentarios de operador (texto libre que puede traer nombres).
+
+**Arquitectura — por que un espejo y no lectura directa:** `shoplogix/**` exige `isNotAnonymous()`
+y abrirla expondria todos los turnos de todas las plantas. En cambio se publica un doc espejo
+`publicShiftMonitors/{token}` que escribe SIEMPRE el Admin SDK (`write: if false` en rules) y que
+lee cualquiera **solo mientras no venza** (`timestamp.value(expiresAt) > request.time`, reloj del
+servidor). Lo refresca un trigger enganchado al **doc padre** del turno — no a `machines/{id}` —
+porque el padre se escribe una vez por ciclo de sync y la subcoleccion dispara un evento por
+maquina (3 en Eviscerado) que compondrian el mismo payload. Frescura efectiva: ~5 min.
+
+**Bug encontrado y corregido con datos reales (turno del 10-ago EN CURSO):** el turno vivo se
+anunciaba como **"Turno cerrado"**. Causa: en Filete el `scheduledEnd` se DERIVA del ultimo
+intervalo sincronizado, o sea que siempre queda unos minutos en el pasado (fin derivado 14:36 con
+la linea produciendo a las 14:40). Fix: margen de 30 min **y** exigir que ninguna maquina este en
+uptime. Hay test que falla si se revierte cualquiera de las dos condiciones (verificado mutando el
+codigo, no asumido).
+
+**Gotcha de UI reusable:** el root de la app corre a 85% (13,6px), asi que **`text-xs` renderiza a
+10,2px reales** — por debajo del piso de 11px de la piel nueva. En esta pantalla los tamanos van en
+px explicitos. `capitalize` de Tailwind ademas capitaliza CADA palabra ("Lunes, 10 De Agosto"):
+usar `first-letter:uppercase`.
+
+- Hecho: `functions/publicMonitor.js` (composicion del payload) + callables
+  `createPublicShiftMonitor`/`revokePublicShiftMonitor` + trigger
+  `onShoplogixShiftWrittenPublicMonitor`; regla `publicShiftMonitors`; pagina publica
+  `/monitor/:token`; bloque "Monitor en vivo (link/QR)" en Analisis de Turno (visible para
+  supervisor/admin en cualquier linea con Shoplogix, **no depende del Grader** — por eso sirve en
+  Filete); vigencia elegible 12 h / 1 d / 3 d / 7 d y revocacion; `scripts/public-monitor-probe.js`
+  para inspeccionar el payload antes de exponerlo.
+- Archivos: `functions/publicMonitor.js`, `functions/index.js`,
+  `functions/__tests__/publicMonitor.test.js`, `firestore.rules`,
+  `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`, `apps/pwa/src/App.tsx`,
+  `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`,
+  `scripts/public-monitor-probe.js`.
+- Verificacion: `tsc --noEmit` limpio; eslint sin errores nuevos; **1.104 tests PWA** y **170 tests
+  functions** en verde (6 nuevos); build de produccion OK (chunk publico 11,6 kB / 3,7 kB gzip, sin
+  echarts); payload contrastado contra el turno REAL de Filete del 10-ago (3.727 pz, 9,3 pz/min,
+  557 pz/h, 73% produciendo, 350 pz en los ultimos 30 min = 11,7 pz/min); vista revisada en el
+  preview a 375px y 1280px, sin scroll horizontal, y la pantalla de "link no disponible" probada
+  contra Firestore real (permission-denied => mensaje claro, no pantalla en blanco).
+- Estado: HECHO (mergeado)
+- Sigue: **falta el unico tramo que no se puede probar sin sesion de usuario**: apretar "Generar
+  link" desde la app como supervisor (el callable). Verificado en cambio el resto del circuito en
+  produccion tras el deploy. Idea futura: link "de linea" que siga el turno vigente en vez de uno
+  fijo, para no regenerarlo cada dia.
+
 ## 2026-08-09 - claude - El aviso del protocolo NUNCA llegaba: topic de Telegram roto
 
 Verificación end-to-end del circuito recién desplegado, contra producción. Encontró un bug que
