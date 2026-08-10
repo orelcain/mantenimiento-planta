@@ -190,7 +190,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.15] rounded-card border border-amber-200 dark:border-amber-800">
+        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-amber-800">
           <p className="text-caption font-semibold tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-caption text-ink-warn">{d}</p>

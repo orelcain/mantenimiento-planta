@@ -115,13 +115,13 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
           <>
             {/* OEE Baader → línea */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-muted rounded-card px-3 py-2 border border-border">
+              <div className="bg-muted rounded-card px-3 py-2">
                 <div className="text-caption text-muted-foreground mb-0.5">
                   OEE de la máquina{machineLabel ? ` · ${machineLabel}` : ''}
                 </div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeMachine))}>{pct(calc.oeeMachine)}</div>
               </div>
-              <div className="bg-primary/[0.15] rounded-card px-3 py-2 border border-primary/[0.25]">
+              <div className="bg-primary/[0.15] rounded-card px-3 py-2">
                 <div className="text-caption text-sky-800/90 dark:text-sky-300/80 mb-0.5 flex items-center gap-1 flex-wrap">
                   OEE del área (estimado)
                   {calc.sinCalidad && (

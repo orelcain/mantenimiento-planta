@@ -209,7 +209,7 @@ export function RepuestoGalleryModal({
                 {gallery.map((img, idx) => (
                   <div
                     key={img.id}
-                    className="group relative aspect-square bg-muted rounded-card overflow-hidden border border-border cursor-pointer"
+                    className="group relative aspect-square bg-muted rounded-card overflow-hidden cursor-pointer"
                     onClick={() => setLightboxIndex(idx)}
                   >
                     <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" loading="lazy" />

@@ -73,6 +73,15 @@ const RULES = [
     re: /\brounded(?:-(?:sm|md|lg|xl|2xl|3xl))?\b(?!-)/g,
   },
   {
+    // Constitución §7 (no cards dentro de cards) + §38 (separar con espacio,
+    // no con línea). Una sub-superficie se marca con RELLENO **o** con borde,
+    // nunca con los dos: eso es el "doble marcado" que produce la sensación de
+    // caja dentro de caja. El relleno gana, porque separa sin sumar línea.
+    key: 'cajasDobleMarcadas',
+    label: 'Cajas con relleno Y borde (elegir uno — §7/§38)',
+    re: /(?:bg-(?:muted|card|background)|bg-[a-z0-9-]+\/\[0\.[0-9]+\])\s+rounded-(?:ctl|card|panel)[^"']*?\s+border\s+border-/g,
+  },
+  {
     key: 'chipsTranslucidos',
     label: 'Chips translúcidos bg-*/NN (usar Pill o systemFill)',
     re: /\b(?:bg|border|text)-[a-z]+-\d{2,3}\/\d{1,3}\b/g,

@@ -868,7 +868,7 @@ export function MainLayout() {
           <div className="hidden lg:flex items-center gap-3">
             {(pendingWrites > 0 || lastSyncLabel) && (
               <button
-                className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl border border-amber-500/[0.25] hover:bg-amber-500/[0.15] transition-colors"
+                className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl hover:bg-amber-500/[0.15] transition-colors"
                 title={pendingSummary || lastSyncLabel || undefined}
                 onClick={() => setShowSyncPanel((prev) => !prev)}
               >

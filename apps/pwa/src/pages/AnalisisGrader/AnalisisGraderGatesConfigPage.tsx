@@ -1045,7 +1045,7 @@ export function AnalisisGraderGatesConfigPage({
                 <div className="space-y-1.5">
                   {shiftRangesDraft.map((r, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">
-                      <span className="text-xs font-mono px-2 py-1.5 bg-muted rounded-ctl border border-border truncate">{r.calibre}</span>
+                      <span className="text-xs font-mono px-2 py-1.5 bg-muted rounded-ctl truncate">{r.calibre}</span>
                       <Input
                         type="number"
                         value={r.minGrams}

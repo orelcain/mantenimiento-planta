@@ -555,14 +555,14 @@ export function MissionControlPanel() {
 
               {/* Desglose de métricas */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded-ctl border border-green-500/[0.25]">
+                <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded-ctl">
                   <MessageSquare className="h-3.5 w-3.5 text-green-500" />
                   <div>
                     <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
                     <div className="text-caption text-muted-foreground">Respuestas marcadas útiles</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded-ctl border border-red-500/[0.25]">
+                <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded-ctl">
                   <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                   <div>
                     <div className="font-medium">{learningStats.negativeFeedback} negativos</div>

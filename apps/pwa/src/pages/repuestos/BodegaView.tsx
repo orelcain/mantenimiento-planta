@@ -492,7 +492,7 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
           )}
         </div>
 
-        <div className="bg-muted rounded-card p-3 border border-border">
+        <div className="bg-muted rounded-card p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
             <span>Progreso</span>
             <span>{conteos.length > 0 ? Math.round((contados.length / conteos.length) * 100) : 0}%</span>
@@ -2205,7 +2205,7 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             </div>
 
             {saving && (
-              <div className="bg-muted rounded-card p-3 border border-border">
+              <div className="bg-muted rounded-card p-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Procesando…</span><span>{progress}%</span></div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
               </div>
@@ -2313,7 +2313,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
               </div>
             </div>
             {saving && (
-              <div className="bg-muted rounded-card p-3 border border-border">
+              <div className="bg-muted rounded-card p-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Configurando…</span><span>{progress}%</span></div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
               </div>
