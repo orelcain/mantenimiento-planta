@@ -736,7 +736,7 @@ function TrendSparkline({
         <div className="flex items-center gap-2 flex-wrap">
           {showTemp && (
             <div className="flex items-center gap-1">
-              <span className="text-caption text-cat-4-ink">°C</span>
+              <span className="text-caption text-muted-foreground">°C</span>
               <select
                 value={tempInterval ?? 'auto'}
                 onChange={(e) => setTempInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
@@ -755,7 +755,7 @@ function TrendSparkline({
           )}
           {showHum && (
             <div className="flex items-center gap-1">
-              <span className="text-caption text-cat-7-ink">%</span>
+              <span className="text-caption text-muted-foreground">%</span>
               <select
                 value={humInterval ?? 'auto'}
                 onChange={(e) => setHumInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
@@ -935,7 +935,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
                 </span>
               )}
               {backfillStatus?.active && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-ink-info ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                   <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
@@ -1090,7 +1090,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               </span>
             )}
             {backfillStatus?.active && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-info ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                 <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
               </span>
             )}

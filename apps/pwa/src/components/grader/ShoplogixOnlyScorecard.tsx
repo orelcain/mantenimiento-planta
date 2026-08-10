@@ -146,7 +146,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           {shiftWindow?.status === 'closed' && (
             <Badge variant="outline" className="text-xs px-2 py-0">CERRADO</Badge>
           )}
-          <Badge variant="outline" className="text-xs px-2 py-0 text-sky-400 border-primary/[0.25]">
+          <Badge variant="outline" className="text-xs px-2 py-0 text-ink-info border-primary/[0.25]">
             Solo Shoplogix
           </Badge>
         </div>

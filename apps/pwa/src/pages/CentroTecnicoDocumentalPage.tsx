@@ -1860,7 +1860,7 @@ function ExpedienteDialog({
                   aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
                   className="shrink-0 p-0.5"
                 >
-                  <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+                  <Star className={`h-4 w-4 ${isFavorite ? 'text-ink-warn fill-current' : 'text-muted-foreground'}`} />
                 </button>
                 <h2 className="text-lg font-bold truncate">{equipment.nombre}</h2>
               </div>
@@ -2610,7 +2610,7 @@ function CtdEquipoCard({
           aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
           className="absolute top-1 right-1 p-1 rounded-ctl bg-black/40"
         >
-          <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-white'}`} />
+          <Star className={`h-4 w-4 ${isFavorite ? 'text-ink-warn fill-current' : 'text-white'}`} />
         </button>
       </div>
       <CardContent className="p-3 space-y-1.5">
@@ -2668,7 +2668,7 @@ function CtdEquipoRow({
         aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
         className="shrink-0 p-1 -m-1"
       >
-        <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
+        <Star className={`h-4 w-4 ${isFavorite ? 'text-ink-warn fill-current' : 'text-muted-foreground'}`} />
       </button>
 
       <div className={`shrink-0 overflow-hidden rounded-ctl bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>

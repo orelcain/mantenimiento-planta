@@ -249,7 +249,7 @@ export function ProductoTab({
             return (
               <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
+                  <p className="text-xs font-semibold text-ink-info">Ciclo flipper software Z2</p>
                   {onOpenZ2Capture && (
                     <button
                       type="button"
@@ -284,7 +284,7 @@ export function ProductoTab({
                   ))}
                   <div className="flex justify-between border-t border-muted-foreground/[0.10] pt-1.5 mt-1">
                     <span className="font-semibold text-foreground text-xs">Ciclo total</span>
-                    <span className="font-mono font-bold text-sky-400 text-xs">{cycleTotal} ms</span>
+                    <span className="font-mono font-bold text-ink-info text-xs">{cycleTotal} ms</span>
                   </div>
                 </div>
                 <p className="text-caption text-muted-foreground/60">

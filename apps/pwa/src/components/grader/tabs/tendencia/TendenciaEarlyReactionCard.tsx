@@ -265,7 +265,7 @@ export function TendenciaEarlyReactionCard({
                                         'text-caption',
                                         row.changeType === 'igual' && 'border-emerald-500/[0.25] text-ink-ok',
                                         row.changeType === 'ajustada' && 'border-amber-500/[0.25] text-ink-warn',
-                                        row.changeType === 'nueva' && 'border-primary/[0.25] text-sky-600',
+                                        row.changeType === 'nueva' && 'border-primary/[0.25] text-ink-info',
                                         row.changeType === 'eliminada' && 'border-red-500/[0.25] text-ink-crit',
                                       )}>
                                         {row.changeType}

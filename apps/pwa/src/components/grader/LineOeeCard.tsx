@@ -50,7 +50,7 @@ function fmtDur(min: number): string {
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
   if (v >= 0.85) return 'text-emerald-400'
-  if (v >= 0.65) return 'text-sky-400'
+  if (v >= 0.65) return 'text-ink-info'
   if (v >= 0.50) return 'text-amber-400'
   return 'text-cat-5-ink'
 }
@@ -94,7 +94,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
     <Card className={cn('border-primary/[0.25]', className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <GitMerge className="h-4 w-4 text-sky-400" />
+          <GitMerge className="h-4 w-4 text-ink-info" />
           OEE del área (estimado)
           <InfoTooltip
             text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + paros de etapa registrados)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUn paro de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de ese paro. Así el mismo minuto no se castiga dos veces.\n\nESTIMADO: mejora a medida que registrás paros de etapa.'}
@@ -122,7 +122,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeMachine))}>{pct(calc.oeeMachine)}</div>
               </div>
               <div className="bg-primary/[0.15] rounded-card px-3 py-2">
-                <div className="text-caption text-sky-800/90 dark:text-sky-300/80 mb-0.5 flex items-center gap-1 flex-wrap">
+                <div className="text-caption text-ink-info mb-0.5 flex items-center gap-1 flex-wrap">
                   OEE del área (estimado)
                   {calc.sinCalidad && (
                     <span

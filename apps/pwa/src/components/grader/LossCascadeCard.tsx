@@ -298,9 +298,9 @@ export function LossCascadeCard({
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown className="w-4 h-4 text-sky-400 shrink-0" />
-          : <ChevronRight className="w-4 h-4 text-sky-400 shrink-0" />}
-        <Scale className="w-4 h-4 text-sky-400 shrink-0" />
+          ? <ChevronDown className="w-4 h-4 text-ink-info shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-ink-info shrink-0" />}
+        <Scale className="w-4 h-4 text-ink-info shrink-0" />
         <span className="text-footnote font-semibold text-foreground/90">
           Cascada del turno
         </span>
@@ -332,7 +332,7 @@ export function LossCascadeCard({
               onClick={() => setCalcOpen((v) => !v)}
               className={cn(
                 'text-caption px-2 py-0.5 rounded-ctl border transition-colors',
-                calcOpen ? 'bg-primary/[0.15] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                calcOpen ? 'bg-primary/[0.15] text-ink-info border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               ¿cómo se calcula?
@@ -346,7 +346,7 @@ export function LossCascadeCard({
               </div>
               <div>
                 <span className="text-muted-foreground">Techo de máquina = turno − planificado = </span>
-                {fmtHm(turnoSec)} − {fmtHm(totals.planificadoSec)} = <b className="text-sky-400">{fmtHm(totals.techoSec)}</b>
+                {fmtHm(turnoSec)} − {fmtHm(totals.planificadoSec)} = <b className="text-ink-info">{fmtHm(totals.techoSec)}</b>
               </div>
               <div>
                 <span className="text-muted-foreground">Uso real = procesando ÷ techo = </span>
@@ -379,7 +379,7 @@ export function LossCascadeCard({
               <div className="text-caption text-muted-foreground/60">100%</div>
             </div>
             <div className="rounded-ctl bg-primary/[0.15] px-2 py-1.5" title="Techo real de máquina = turno − planificado. El denominador honesto: todo este tiempo la máquina PODÍA producir. Es un subtotal (no se suma con las demás celdas).">
-              <div className="text-sky-400 text-caption uppercase">= Techo máquina</div>
+              <div className="text-ink-info text-caption uppercase">= Techo máquina</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.techoSec)}</div>
               <div className="text-caption text-muted-foreground/60 tabular-nums">{pctOfTurno(totals.techoSec).toFixed(1)}% del turno · subtotal</div>
             </div>

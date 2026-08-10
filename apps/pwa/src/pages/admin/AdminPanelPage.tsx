@@ -121,7 +121,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Sincronización Telegram',
     description: 'Baja lo nuevo del grupo de mantención a las carpetas de equipo y alimenta la bandeja de novedades. Orden inmediata o periodicidad automática.',
     icon: <Send className="w-5 h-5" />,
-    iconColor: 'text-sky-400',
+    iconColor: 'text-ink-info',
     section: 'config',
   },
   {
@@ -129,7 +129,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Actualizar Power BI',
     description: 'Exporta los KPIs de Mantención a OneDrive empresa y refresca el dataset en Power BI Service. Para tener datos frescos antes de una reunión.',
     icon: <BarChart3 className="w-5 h-5" />,
-    iconColor: 'text-yellow-400',
+    iconColor: 'text-ink-warn',
     section: 'config',
   },
   {

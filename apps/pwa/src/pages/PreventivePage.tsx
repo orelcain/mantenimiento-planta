@@ -325,7 +325,7 @@ export function PreventivePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-500/[0.15] rounded-card">
-                <Clock className="h-5 w-5 text-yellow-500" />
+                <Clock className="h-5 w-5 text-ink-warn" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Próximos 7 días</p>
@@ -569,7 +569,7 @@ export function PreventivePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="h-5 w-5 text-yellow-500" />
+                <Clock className="h-5 w-5 text-ink-warn" />
                 Próximos 7 días ({upcomingTasks.length})
               </CardTitle>
             </CardHeader>

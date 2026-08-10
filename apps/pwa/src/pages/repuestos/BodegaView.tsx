@@ -1460,7 +1460,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
           )}
           <div className="shrink-0" onClick={e => e.stopPropagation()}>
             <button onClick={onToggleWatch} className="-m-1 p-1.5 rounded-ctl hover:bg-amber-500/[0.15] transition-colors">
-              <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
+              <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-ink-warn fill-current' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
             </button>
           </div>
         </div>

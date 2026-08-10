@@ -41,7 +41,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
       <Card>
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-sky-500" /> Trabajo de Mantención (TPM)
+            <Wrench className="w-4 h-4 text-ink-info" /> Trabajo de Mantención (TPM)
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-6 flex items-center gap-2 text-sm text-muted-foreground">
@@ -65,7 +65,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
     <Card>
       <CardHeader className="pb-2 pt-4">
         <CardTitle className="text-sm flex items-center gap-2 min-w-0">
-          <Wrench className="w-4 h-4 shrink-0 text-sky-500" />
+          <Wrench className="w-4 h-4 shrink-0 text-ink-info" />
           <span className="truncate">Trabajo de Mantención (TPM)</span>
           <span className="text-caption font-normal text-muted-foreground ml-1 hidden sm:inline">
             del correctivo a la prevención

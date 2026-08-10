@@ -198,7 +198,7 @@ export function HelpModal() {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-yellow-500" />
+            <Lightbulb className="h-5 w-5 text-ink-warn" />
             Centro de Ayuda
           </DialogTitle>
         </DialogHeader>

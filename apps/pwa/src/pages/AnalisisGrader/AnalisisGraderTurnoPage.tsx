@@ -1823,7 +1823,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* Grader — manual */}
             <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25]">
-              <Upload className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+              <Upload className="w-4 h-4 text-ink-info mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Grader Matrix — Informe de turno</p>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -1834,7 +1834,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-primary/[0.25] text-sky-400 hover:bg-sky-950 shrink-0 mt-0.5"
+                  className="h-7 text-xs border-primary/[0.25] text-ink-info hover:bg-sky-950 shrink-0 mt-0.5"
                   onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
@@ -1989,7 +1989,7 @@ export function AnalisisGraderTurnoPage() {
                 y se editan en{' '}
                 <button
                   onClick={() => navigate(`/analisis-grader/config?linea=${plantLineCfg.id}`)}
-                  className="font-medium text-primary underline underline-offset-2 hover:text-sky-600"
+                  className="font-medium text-primary underline underline-offset-2 hover:text-ink-info"
                 >
                   Configuración del Grader
                 </button>.
@@ -2064,7 +2064,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-caption text-muted-foreground hover:text-sky-400 px-2"
+                  className="h-6 text-caption text-muted-foreground hover:text-ink-info px-2"
                   onClick={handleSlxRefresh}
                   disabled={slxSyncing}
                   title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}

@@ -297,7 +297,7 @@ export function SensorsPage() {
       case 'Buena':
         return 'bg-green-500'
       case 'Regular':
-        return 'bg-yellow-500'
+        return 'bg-amber-500'
       case 'Mala':
         return 'bg-orange-500'
       default:
@@ -2396,7 +2396,7 @@ export function SensorsPage() {
                                 apPassword.length < 8
                                   ? 'w-1/3 bg-red-500'
                                   : apPassword.length < 12
-                                    ? 'w-2/3 bg-yellow-500'
+                                    ? 'w-2/3 bg-amber-500'
                                     : 'w-full bg-green-500'
                               }`}
                             />

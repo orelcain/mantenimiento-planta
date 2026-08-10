@@ -1754,7 +1754,7 @@ function EquipmentCard({
                     }}
                     title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
                   >
-                    <Star className={`${favIconSizeClassName} ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+                    <Star className={`${favIconSizeClassName} ${favorite ? 'text-ink-warn fill-current' : ''}`} />
                   </Button>
                 </div>
               </div>
@@ -1838,7 +1838,7 @@ function EquipmentCard({
               }}
               title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
             >
-              <Star className={`${favIconSizeClassName} ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+              <Star className={`${favIconSizeClassName} ${favorite ? 'text-ink-warn fill-current' : ''}`} />
             </Button>
           </div>
         </div>
@@ -1982,7 +1982,7 @@ function EquipmentDetailDialog({
               onClick={onToggleFavorite}
               title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
             >
-              <Star className={`h-5 w-5 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+              <Star className={`h-5 w-5 ${favorite ? 'text-ink-warn fill-current' : ''}`} />
             </Button>
           </DialogTitle>
         </DialogHeader>
