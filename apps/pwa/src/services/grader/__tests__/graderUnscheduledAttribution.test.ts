@@ -181,3 +181,50 @@ describe('sin datos para repartir no toca nada', () => {
     expect(out.every(s => s.attributedCycles === undefined)).toBe(true)
   })
 })
+
+describe('doble conteo: los minutos que el turno YA tiene no se suman otra vez', () => {
+  // Caso real Filete 10-ago-2026. El doc del turno guarda intervals MÁS ALLÁ de
+  // su propio cierre (15:30) y Shoplogix repite esos mismos minutos dentro de
+  // `Unscheduled`: 15:30=47 y 15:35=65 estaban idénticos en los dos docs. Sin
+  // dedupe, esas 112 piezas se contaban dos veces.
+  const turno = shift({
+    dateKey: '2026-08-10', shiftId: 'Turno Dia', cycles: 4410,
+    start: wall('2026-08-10T07:45:00'), end: wall('2026-08-10T15:30:00'),
+  })
+  const uns = shift({
+    dateKey: '2026-08-10', shiftId: 'Unscheduled', cycles: 617, unscheduled: true,
+    start: wall('2026-08-10T00:00:00'), end: wall('2026-08-11T00:00:00'),
+  })
+
+  const ivm = (hhmm: string, cycles: number): CycleInterval =>
+    ({ startAt: wall(`2026-08-10T${hhmm}:00`), cycles, machineid: 'b200' })
+
+  // Los dos primeros son los repetidos; los tres siguientes son producción real
+  // posterior al cierre, que sí debe sumarse.
+  const intervals = [ivm('15:30', 47), ivm('15:35', 65), ivm('15:40', 62), ivm('15:45', 52), ivm('15:50', 50)]
+  const yaContados = new Set(['b200|' + wall('2026-08-10T15:30:00').getTime(),
+                              'b200|' + wall('2026-08-10T15:35:00').getTime()])
+
+  it('descarta los repetidos y atribuye solo lo nuevo', () => {
+    const res = attributeUnscheduledCycles(intervals, [turno], yaContados)
+    expect(res.duplicated).toBe(112)
+    expect(res.byShiftKey.get(turno.key)).toBe(164)   // 62 + 52 + 50
+    expect(res.unattributed).toBe(0)
+  })
+
+  it('sin las claves del turno se cuentan de más (lo que pasaba antes)', () => {
+    const res = attributeUnscheduledCycles(intervals, [turno])
+    expect(res.byShiftKey.get(turno.key)).toBe(276)   // 164 + las 112 repetidas
+  })
+
+  it('el total del turno sube solo con lo que de verdad falta', () => {
+    const out = applyUnscheduledAttribution(
+      [turno, uns],
+      new Map([[uns.key, intervals]]),
+      new Map([['2026-08-10', yaContados]]),
+    )
+    const t = out.find(s => s.shiftId === 'Turno Dia')!
+    expect(t.cycles).toBe(4574)          // 4.410 + 164, no 4.686
+    expect(t.attributedCycles).toBe(164)
+  })
+})

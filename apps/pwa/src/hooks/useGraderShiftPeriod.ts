@@ -33,7 +33,7 @@ import {
 } from '@/services/grader/graderShiftPeriod'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { applyUnscheduledAttribution, type CycleInterval } from '@/services/grader/graderUnscheduledAttribution'
-import { loadUnscheduledIntervalsForKeys } from '@/services/grader/graderUnscheduledLoad'
+import { loadUnscheduledIntervalsForKeys, loadCountedKeysForDate } from '@/services/grader/graderUnscheduledLoad'
 
 export interface UseGraderShiftPeriodOptions {
   /** Año del mes a mostrar. */
@@ -133,18 +133,43 @@ export function useGraderShiftPeriod(
     [base],
   )
 
+  // Minutos que los turnos de esos días YA tienen contados: sin esto se suman
+  // dos veces los tramos que Shoplogix reporta en el turno Y en Unscheduled.
+  // Solo se leen los turnos de los días CON Unscheduled (1-3 docs por día), no
+  // los del mes entero.
+  const [countedKeys, setCountedKeys] = useState<Map<string, Set<string>>>(new Map())
+
   useEffect(() => {
-    if (!unsKeys) { setUnsIntervals(new Map()); return }
+    if (!unsKeys) { setUnsIntervals(new Map()); setCountedKeys(new Map()); return }
     let alive = true
-    loadUnscheduledIntervalsForKeys(unsKeys.split('|'), plantSlug).then(m => {
+    const keys = unsKeys.split('|')
+
+    loadUnscheduledIntervalsForKeys(keys, plantSlug).then(m => {
       if (alive) setUnsIntervals(m)
     })
+
+    const fechas = [...new Set(keys.map(k => k.slice(0, 10)))]
+    Promise.all(fechas.map(async dateKey => {
+      // `shiftId`, no un corte de `key`: la key es `${dateKey}__${shiftId}` con
+      // DOS guiones bajos y el doc de Firestore lleva uno solo.
+      const delDia = base
+        .filter(s => s.dateKey === dateKey && !s.unscheduled)
+        .map(s => s.shiftId)
+      if (delDia.length === 0) return [dateKey, new Set<string>()] as const
+      return [dateKey, await loadCountedKeysForDate(dateKey, delDia, plantSlug)] as const
+    })).then(entries => {
+      if (alive) setCountedKeys(new Map(entries))
+    })
+
     return () => { alive = false }
+    // `base` cambia de identidad en cada carga; las fechas relevantes las fija
+    // `unsKeys`, que es el disparador correcto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unsKeys, plantSlug])
 
   const shifts = useMemo(
-    () => applyUnscheduledAttribution(base, unsIntervals),
-    [base, unsIntervals],
+    () => applyUnscheduledAttribution(base, unsIntervals, countedKeys),
+    [base, unsIntervals, countedKeys],
   )
   const rows = useMemo(() => periodShiftRows(shifts), [shifts])
   const byKey = useMemo(() => indexPeriodShiftsByRow(shifts), [shifts])

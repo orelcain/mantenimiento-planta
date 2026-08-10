@@ -13,6 +13,36 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - La MATRIZ contaba dos veces las piezas del borde del turno
+
+Mismo bug que se corrigio en el monitor (#434), ahora en la matriz de turnos, que es donde se mira
+el mes completo. Shoplogix reporta algunos minutos en el doc del turno Y dentro de `Unscheduled`;
+la atribucion los sumaba igual. Caso real 10-ago Filete: 15:30=47 y 15:35=65 identicos en los dos
+docs → **112 piezas contadas dos veces**. La celda decia 5.033 y ahora dice **4.921**.
+
+`attributeUnscheduledCycles` acepta ahora las claves `machineid|epochMs` que los turnos del dia YA
+tienen contadas y descarta esos tramos (`duplicated` queda en el resultado, auditable). Las claves
+las carga `loadCountedKeysForDate` **solo de los dias que tienen Unscheduled** — 1-3 docs por dia,
+no los ~80 turnos del mes, respetando la nota de costo que ya tenia el modulo.
+
+⚠ **Bug propio que costo una vuelta**: para armar la ruta del doc use `s.key.slice(11)`, pero la
+key es `${dateKey}__${shiftId}` con DOS guiones bajos y el doc de Firestore lleva UNO. Resultado:
+la ruta no existia, el `catch` devolvia un set vacio y el dedupe no hacia nada — con todo en verde.
+Se detecto **mirando la matriz en el navegador**: seguia diciendo 5.033. Ahora usa `s.shiftId`.
+
+**Diferencia intencional con el monitor**: la matriz marca 4.921 y el monitor 4.915. Son las 6
+piezas de higiene de las 06:10. El monitor descarta tramos <20 piezas (decision de Orel de hoy); la
+matriz atribuye todo (decision de Orel del 03-ago: *ningun ciclo queda sin turno*). Las dos reglas
+conviven a proposito; si algun dia se quieren iguales, es el mismo umbral en los dos lados.
+
+- Archivos: `apps/pwa/src/services/grader/graderUnscheduledAttribution.ts`,
+  `apps/pwa/src/services/grader/graderUnscheduledLoad.ts`, `apps/pwa/src/hooks/useGraderShiftPeriod.ts`,
+  `apps/pwa/src/services/grader/__tests__/graderUnscheduledAttribution.test.ts`.
+- Verificacion: **1.107 tests del PWA** (3 nuevos, incluido uno que fija el comportamiento ANTERIOR
+  para dejar el bug documentado) y 202 de functions en verde; tsc y eslint limpios. En el navegador
+  con datos reales: la celda del 10-ago bajo de 5.033 a 4.921.
+- Estado: HECHO (mergeado)
+
 ## 2026-08-10 - claude - Tres arreglos de la pantalla publica vistos por Orel
 
 Los tres los detecto Orel mirando la pantalla, no los tests:

@@ -62,6 +62,13 @@ export const MAX_ADJACENCY_MIN = Number.POSITIVE_INFINITY
 export interface CycleInterval {
   startAt: Date
   cycles: number
+  /** Máquina que lo produjo. Junto al timestamp identifica el tramo sin ambigüedad. */
+  machineid?: string
+}
+
+/** Clave de un tramo: la misma que usa `loadCountedKeysForDate`. */
+export function intervalKey(iv: CycleInterval): string {
+  return `${iv.machineid ?? ''}|${iv.startAt.getTime()}`
 }
 
 export interface UnscheduledAttribution {
@@ -71,6 +78,8 @@ export interface UnscheduledAttribution {
   unattributed: number
   /** Total procesado, para poder comprobar que no se perdió ni se duplicó nada. */
   total: number
+  /** Ciclos descartados por estar ya contados en el doc de un turno. */
+  duplicated: number
 }
 
 /**
@@ -84,19 +93,28 @@ export interface UnscheduledAttribution {
  *   4. Ninguno: queda sin atribuir.
  *
  * `candidates` deben ser turnos del período que NO sean Unscheduled.
+ *
+ * `alreadyCounted` trae los tramos que los turnos del día YA incluyen en su
+ * total (ver `loadCountedKeysForDate`): esos se descartan enteros. Shoplogix
+ * reporta algunos minutos en el doc del turno Y en `Unscheduled` —verificado el
+ * 10-ago-2026 en Filete, 112 piezas idénticas en ambos—, y sumarlos otra vez
+ * infla el turno y el mes con producción que no existió.
  */
 export function attributeUnscheduledCycles(
   intervals: readonly CycleInterval[],
   candidates: readonly PeriodShift[],
+  alreadyCounted?: ReadonlySet<string>,
 ): UnscheduledAttribution {
   const byShiftKey = new Map<string, number>()
   let unattributed = 0
   let total = 0
+  let duplicated = 0
 
   const usable = candidates.filter(c => !c.unscheduled && c.start && c.end)
 
   for (const iv of intervals) {
     if (!(iv.cycles > 0)) continue
+    if (alreadyCounted?.has(intervalKey(iv))) { duplicated += iv.cycles; continue }
     total += iv.cycles
     const t = iv.startAt.getTime()
 
@@ -122,7 +140,7 @@ export function attributeUnscheduledCycles(
     else unattributed += iv.cycles
   }
 
-  return { byShiftKey, unattributed, total }
+  return { byShiftKey, unattributed, total, duplicated }
 }
 
 /**
@@ -136,6 +154,7 @@ export function attributeUnscheduledCycles(
 export function applyUnscheduledAttribution(
   shifts: readonly PeriodShift[],
   intervalsByUnscheduledKey: ReadonlyMap<string, readonly CycleInterval[]>,
+  countedKeysByDate?: ReadonlyMap<string, ReadonlySet<string>>,
 ): PeriodShift[] {
   if (intervalsByUnscheduledKey.size === 0) return [...shifts]
 
@@ -160,7 +179,7 @@ export function applyUnscheduledAttribution(
     const candidates = sameDay.length > 0
       ? sameDay
       : shifts.filter(s => !s.unscheduled)
-    const res = attributeUnscheduledCycles(intervals, candidates)
+    const res = attributeUnscheduledCycles(intervals, candidates, countedKeysByDate?.get(uns.dateKey))
     for (const [k, v] of res.byShiftKey) added.set(k, (added.get(k) ?? 0) + v)
     restByKey.set(unsKey, res.unattributed)
   }
