@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, MapPin } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, MapPin, PenLine, ClipboardList, Search } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -452,7 +452,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Ubicación jerárquica - Solo en modo creación */}
           {!isEditMode && (
             <div className="space-y-1">
-              <Label className="text-sm font-medium">📍 Ubicación *</Label>
+              <Label className="flex items-center gap-1.5 text-body font-medium"><MapPin className="size-4 text-muted-foreground" /> Ubicación *</Label>
               
               <div 
                 className="border rounded-card p-3 bg-muted hover:bg-accent cursor-pointer transition-colors flex items-center justify-between group"
@@ -618,7 +618,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
           {/* Prioridad - Botones compactos */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">⚠️ Prioridad *</Label>
+            <Label className="flex items-center gap-1.5 text-body font-medium"><AlertTriangle className="size-4 text-muted-foreground" /> Prioridad *</Label>
             <div className="grid grid-cols-4 gap-2">
               {PRIORITY_OPTIONS.map((opt) => (
                 <button
@@ -666,7 +666,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
           {/* Título con Mic y Magia */}
           <div className="space-y-2">
-            <Label htmlFor="titulo" className="text-sm font-medium">📝 Título *</Label>
+            <Label htmlFor="titulo" className="flex items-center gap-1.5 text-body font-medium"><PenLine className="size-4 text-muted-foreground" /> Título *</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <SpeechTextarea
@@ -700,7 +700,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Descripción */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="descripcion" className="text-sm font-medium">📋 Descripción *</Label>
+              <Label htmlFor="descripcion" className="flex items-center gap-1.5 text-body font-medium"><ClipboardList className="size-4 text-muted-foreground" /> Descripción *</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -727,7 +727,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               name="descripcion"
               value={formData.descripcion}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              placeholder="Describe el problema con detalle... (o usa el micrófono 🎤)"
+              placeholder="Describe el problema con detalle…"
               rows={3}
               className="text-base"
               required
@@ -741,7 +741,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {!isEditMode && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
+                <Label className="flex items-center gap-1.5 text-body font-medium"><Search className="size-4 text-muted-foreground" /> Síntomas (opcional)</Label>
                 <div className="flex items-center gap-2">
                    {/* Botón Mágico para Síntomas */}
                    <Button
@@ -869,7 +869,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Fotos - Solo en modo creación */}
           {!isEditMode && (
             <div className="space-y-2">
-              <Label className="text-sm font-medium">📷 Fotos (máx. 5)</Label>
+              <Label className="flex items-center gap-1.5 text-body font-medium"><Camera className="size-4 text-muted-foreground" /> Fotos (máx. 5)</Label>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                 {photoPreview.map((preview, index) => (
                   <div key={index} className="relative aspect-square group">
