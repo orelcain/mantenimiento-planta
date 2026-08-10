@@ -5,7 +5,8 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
+import { Disclosure } from '@/components/piel'
+import { TrendingDown, TrendingUp, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
@@ -348,19 +349,20 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
 
-      {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ── */}
+      {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
+          §22 divulgación progresiva: el desglose completo es DETALLE, no dato de
+          entrada. Plegado deja el total —que es lo que responde "¿cuánto P0
+          hubo?"— y el reparto por causa se abre solo si se está investigando.
+          Antes eran ~8 filas con barra siempre a la vista compitiendo con los
+          KPIs del turno. */}
       {stats && stats.causas.length > 0 && (
-        <Card>
-          <CardContent className="py-2 px-3 space-y-1.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-              <p className="text-caption font-semibold text-muted-foreground tracking-wide">
-                Causas P0 del mes
-              </p>
-              <p className="text-caption text-muted-foreground/60 ml-auto tabular-nums">
-                {stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz P0
-              </p>
-            </div>
+        <Disclosure
+          title="Causas P0 del mes"
+          summary={`${stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz`}
+          defaultOpen={false}
+          storageKey="grader-causas-p0"
+        >
+          <div className="space-y-1.5">
             {stats.causas.map(({ error, pieces, pct, barPct }) => (
               <div key={error} className="space-y-0.5">
                 <div className="flex items-baseline justify-between gap-2">
@@ -379,8 +381,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </Disclosure>
       )}
 
     </div>
