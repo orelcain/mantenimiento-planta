@@ -1194,7 +1194,7 @@ export function PredictivePage() {
                         <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(displayReadings.length, 60)})</div>
                         <Sparkline
                           points={displayReadings.slice(-60).map((r) => r.temperature)}
-                          colorClass="stroke-orange-500"
+                          colorClass="stroke-cat-4-ink"
                         />
                         <div className="mt-1 text-xs text-muted-foreground">
                           Último: {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
@@ -1206,7 +1206,7 @@ export function PredictivePage() {
                         <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(displayReadings.length, 60)})</div>
                         <Sparkline
                           points={displayReadings.slice(-60).map((r) => r.humidity)}
-                          colorClass="stroke-sky-500"
+                          colorClass="stroke-ink-info"
                         />
                         <div className="mt-1 text-xs text-muted-foreground">
                           Último: {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)

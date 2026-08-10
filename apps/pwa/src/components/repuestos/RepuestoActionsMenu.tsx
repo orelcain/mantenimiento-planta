@@ -75,7 +75,7 @@ export function RepuestoActionsMenu({
 
             {onViewGallery && (
               <DropdownMenuItem onClick={() => onViewGallery(repuesto)} className="gap-2 cursor-pointer">
-                <Camera className="h-4 w-4 text-indigo-500" />
+                <Camera className="h-4 w-4 text-cat-3-ink" />
                 <span>Galería</span>
                 {hasGallery && (
                   <span className="ml-auto text-caption text-muted-foreground">{repuesto.gallery?.length}</span>

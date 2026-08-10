@@ -74,7 +74,7 @@ function ActionRow({ action, onViewIncident }: {
     create_incident: 'text-blue-600 bg-blue-500/[0.15] dark:text-blue-400 dark:bg-primary/[0.15]',
     update_incident_status: 'text-amber-600 bg-amber-500/[0.15] dark:text-amber-400 dark:bg-amber-500/[0.15]',
     search_equipment: 'text-green-600 bg-emerald-500/[0.15] dark:text-green-400 dark:bg-green-500/[0.15]',
-    search_repuestos: 'text-cat-6-ink bg-purple-50 dark:text-cat-6-ink dark:bg-cat-6-tint/[0.15]',
+    search_repuestos: 'text-cat-6-ink bg-cat-6-tint/[0.15]',
     navigate: 'text-muted-foreground bg-muted dark:text-muted-foreground dark:bg-muted-foreground/[0.10]',
   }
 

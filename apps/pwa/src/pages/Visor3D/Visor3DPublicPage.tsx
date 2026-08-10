@@ -505,7 +505,7 @@ export function Visor3DPublicPage() {
               <p className="text-[10px] text-muted-foreground">
                 <span className="text-green-400">●</span> vértice &nbsp;
                 <span className="text-blue-400">●</span> arista &nbsp;
-                <span className="text-gray-400">●</span> superficie
+                <span className="text-muted-foreground">●</span> superficie
               </p>
             </div>
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">

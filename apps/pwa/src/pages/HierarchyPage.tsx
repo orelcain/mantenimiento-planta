@@ -1003,7 +1003,7 @@ export function HierarchyPage() {
               </p>
             )}
             {debouncedSearch && matchCount === 0 && (
-              <p className="text-xs text-orange-600">
+              <p className="text-xs text-cat-4-ink">
                 No se encontraron resultados para "{debouncedSearch}"
               </p>
             )}

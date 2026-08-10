@@ -295,7 +295,7 @@ export function FailureAnalysis() {
             <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto w-[95%] rounded-card">
                 <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="flex items-center gap-2 text-xl">
-                        <AlertTriangle className="h-6 w-6 text-orange-500" />
+                        <AlertTriangle className="h-6 w-6 text-cat-4-ink" />
                         Incidencias: <span className="text-primary">"{selectedSymptom}"</span>
                     </DialogTitle>
                 </DialogHeader>

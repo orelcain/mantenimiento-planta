@@ -315,7 +315,7 @@ export function MissionControlPanel() {
           <div className="text-xs text-muted-foreground">Tasa Éxito</div>
         </div>
         <div className="p-3 bg-muted/50 rounded-card text-center col-span-2 md:col-span-1">
-          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-cat-4-ink' : 'text-green-500'}`}>
             ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : totalCostUsd.toFixed(2)}
           </div>
           <div className="text-xs text-muted-foreground">Costo Est. USD</div>
@@ -389,7 +389,7 @@ export function MissionControlPanel() {
                   {(() => {
                     const cost = costSummary.find(c => c.agentId === agent.id)?.estimatedCostUsd || 0
                     return cost > 0 ? (
-                      <div className="text-orange-500 font-mono text-caption">
+                      <div className="text-cat-4-ink font-mono text-caption">
                         ${cost < 0.01 ? '<0.01' : cost.toFixed(3)}
                       </div>
                     ) : null
@@ -464,7 +464,7 @@ export function MissionControlPanel() {
                       </span>
                     )}
                     {(log.estimatedCostUsd ?? 0) > 0 && (
-                      <span className="text-orange-500 text-caption font-mono">
+                      <span className="text-cat-4-ink text-caption font-mono">
                         ${(log.estimatedCostUsd ?? 0).toFixed(4)}
                       </span>
                     )}

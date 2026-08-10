@@ -92,7 +92,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className="w-3 h-3 rounded-ctl shrink-0 ring-1 ring-slate-900/50"
+            className="w-3 h-3 rounded-ctl shrink-0 ring-1 ring-foreground/50"
             style={{ backgroundColor: softenAccentHex(state.color) }}
           />
           <StateIcon type={state.type} />

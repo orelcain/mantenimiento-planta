@@ -230,7 +230,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={`border-0 bg-cat-5-tint/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
-              <TrendingUp className="w-3 h-3 text-rose-500" />
+              <TrendingUp className="w-3 h-3 text-cat-5-ink" />
               <p className="text-caption text-cat-5-ink font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>

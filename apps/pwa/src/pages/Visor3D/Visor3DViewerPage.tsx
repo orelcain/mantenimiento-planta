@@ -667,7 +667,7 @@ export function Visor3DViewerPage() {
               <p className="text-xs text-muted-foreground">
                 Snap: <span className="text-green-400">●</span> vértice &nbsp;
                 <span className="text-blue-400">●</span> arista &nbsp;
-                <span className="text-gray-400">●</span> superficie
+                <span className="text-muted-foreground">●</span> superficie
                 &nbsp;— Unidad:&nbsp;
                 {(['mm', 'cm', 'm'] as DimensionUnit[]).map((u, i) => (
                   <span key={u}>

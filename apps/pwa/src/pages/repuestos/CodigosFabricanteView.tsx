@@ -306,7 +306,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 {p.codigoSap && (
                   <button
                     onClick={() => copiar(p.codigoSap!)}
-                    className="inline-flex items-center gap-1 rounded-ctl bg-cat-6-tint/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-violet-600 hover:bg-cat-6-tint/[0.15] dark:text-cat-6-ink"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-cat-6-tint/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-cat-6-ink hover:bg-cat-6-tint/[0.15] dark:text-cat-6-ink"
                     title="Código SAP ya creado para esta pieza — clic para copiar"
                   >
                     SAP: {p.codigoSap}

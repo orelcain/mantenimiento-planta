@@ -170,7 +170,7 @@ export function PuntoCeroPatronesCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
-          <Activity className="h-4 w-4 text-cyan-500" />
+          <Activity className="h-4 w-4 text-cat-7-ink" />
           Patrones Punto Cero (Causa + Horario)
           <InfoTooltip {...getTooltipProps('pz.pivote')} />
         </CardTitle>

@@ -272,7 +272,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
           >
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
-              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-slate-900/60"
+              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60"
               style={{ backgroundColor: softenAccentHex(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
@@ -691,7 +691,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           <PauseCircle className="h-3 w-3" />
@@ -752,7 +752,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink tabular-nums text-caption px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -774,8 +774,8 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // `bg` = tinte tenue del color de acento (10%) mezclado sobre la superficie
 // normal — "que se vea rápido" sin tener que leer el borde (Orel 2026-07-23).
 const MACHINE_ACCENT = [
-  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-primary/[0.15]' },
-  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-cat-6-tint/[0.15]' },
+  { border: 'border-l-blue-500/70',    dot: 'bg-ink-info',    bg: 'bg-primary/[0.15]' },
+  { border: 'border-l-violet-500/70', dot: 'bg-cat-6-tint', bg: 'bg-cat-6-tint/[0.15]' },
   { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/[0.15]' },
 ] as const
 
@@ -910,7 +910,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
         {isZoomActive && (
           <Badge
             variant="outline"
-            className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
+            className="bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25] text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
             title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
           >
             <Scissors className="h-3 w-3" /> del rango
@@ -1361,7 +1361,7 @@ export function UpstreamMachinesPanel({
             {isLineZoomActive && (
               <Badge
                 variant="outline"
-                className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
+                className="bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25] text-cat-6-ink text-caption px-1.5 py-0.5 h-5 gap-1"
                 title="KPIs recalculados sólo del rango temporal visible"
               >
                 <Scissors className="h-3 w-3" /> del rango
@@ -1373,7 +1373,7 @@ export function UpstreamMachinesPanel({
             {correlationSummary && correlationSummary.upstreamCaused > 0 && (
               <Badge
                 variant="outline"
-                className="bg-cat-4-tint/[0.15] border-orange-800 text-orange-300 text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-4-tint/[0.15] border-cat-4-tint/[0.25] text-cat-4-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
                   `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
@@ -1400,7 +1400,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-cat-5-tint/[0.15] border-rose-800 text-rose-300 text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-5-tint/[0.15] border-cat-5-tint/[0.25] text-cat-5-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +

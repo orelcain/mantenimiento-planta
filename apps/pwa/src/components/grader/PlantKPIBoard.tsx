@@ -318,7 +318,7 @@ export function PlantKPIBoard({
                 valueColor={oeeColor(kpis.oee)}
                 barValue={kpis.oee}
                 barColor={kpis.oee !== null
-                  ? (kpis.oee >= OEE_GOOD ? 'bg-emerald-500' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-sky-500' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.oee >= OEE_GOOD ? 'bg-emerald-500' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-blue-500' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-amber-500' : 'bg-red-500')
                   : 'bg-muted'}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
               />
@@ -329,7 +329,7 @@ export function PlantKPIBoard({
                 valueColor={availColor(kpis.availability)}
                 barValue={kpis.availability}
                 barColor={kpis.availability !== null
-                  ? (kpis.availability >= KPI_CUTOFFS.availability.warnBelow ? 'bg-emerald-500' : kpis.availability >= KPI_CUTOFFS.availability.critBelow ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.availability >= KPI_CUTOFFS.availability.warnBelow ? 'bg-emerald-500' : kpis.availability >= KPI_CUTOFFS.availability.critBelow ? 'bg-amber-500' : 'bg-red-500')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -340,7 +340,7 @@ export function PlantKPIBoard({
                 valueColor={perfColor(kpis.performance)}
                 barValue={kpis.performance}
                 barColor={kpis.performance !== null
-                  ? (kpis.performance >= KPI_CUTOFFS.performance.warnBelow ? 'bg-emerald-500' : kpis.performance >= KPI_CUTOFFS.performance.critBelow ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.performance >= KPI_CUTOFFS.performance.warnBelow ? 'bg-emerald-500' : kpis.performance >= KPI_CUTOFFS.performance.critBelow ? 'bg-amber-500' : 'bg-red-500')
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
@@ -353,7 +353,7 @@ export function PlantKPIBoard({
                   : 'text-muted-foreground'}
                 barValue={kpis.quality}
                 barColor={kpis.quality !== null
-                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-emerald-500' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-amber-500' : 'bg-rose-500')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'bg-emerald-500' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'bg-amber-500' : 'bg-red-500')
                   : undefined}
                 note={kpis.quality === null ? (classifies ? 'Sin Grader' : 'No clasifica') : undefined}
               />
@@ -369,7 +369,7 @@ export function PlantKPIBoard({
                 value={fmtMin(kpis.mttrMin)}
                 valueColor={mttrColor(kpis.mttrMin)}
                 barValue={kpis.mttrMin > 0 ? Math.min(1, kpis.mttrMin / 30) : null}
-                barColor={kpis.mttrMin <= KPI_CUTOFFS.mttrMin.warnAbove ? 'bg-emerald-500' : kpis.mttrMin <= KPI_CUTOFFS.mttrMin.critAbove ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.mttrMin <= KPI_CUTOFFS.mttrMin.warnAbove ? 'bg-emerald-500' : kpis.mttrMin <= KPI_CUTOFFS.mttrMin.critAbove ? 'bg-amber-500' : 'bg-red-500'}
               />
               <KPICard
                 label="MTBF ↑"
@@ -377,7 +377,7 @@ export function PlantKPIBoard({
                 value={fmtHours(kpis.mtbfHours)}
                 valueColor={mtbfColor(kpis.mtbfHours)}
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
-                barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-red-500'}
               />
               <div
                 className="px-1 py-1.5"

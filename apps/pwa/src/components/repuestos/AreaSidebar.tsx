@@ -111,7 +111,7 @@ function EquipmentRow({
           </button>
         ) : (
           <span className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center">
-            <Cog className={['h-3.5 w-3.5', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
+            <Cog className={['h-3.5 w-3.5', selected ? 'text-primary' : 'text-cat-7-ink/60'].join(' ')} />
           </span>
         )}
         <div className="min-w-0 flex-1">
@@ -215,7 +215,7 @@ function AreaRow({
               <span className="tabular-nums text-emerald-500"> · {repCount} rep</span>
             )}
             {assetCount > 0 && (
-              <span className="tabular-nums text-cyan-500"> · {assetCount} M/B</span>
+              <span className="tabular-nums text-cat-7-ink"> · {assetCount} M/B</span>
             )}
           </div>
         </div>
@@ -462,7 +462,7 @@ export function AreaSidebar({
                     ].join(' ')}
                     title={eq.nombre}
                   >
-                    <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-cyan-500/70'].join(' ')} />
+                    <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-cat-7-ink/70'].join(' ')} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-caption leading-tight">{eq.alias || eq.nombre}</span>
                       {eq.codigo && (

@@ -1026,7 +1026,7 @@ export function GraderPeriodView({ data }: Props) {
                         className={cn(
                           'text-caption',
                           s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-ink-warn',
-                          s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-indigo-600',
+                          s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-cat-3-ink',
                         )}
                       >
                         {shiftShortName(s.shiftId)}

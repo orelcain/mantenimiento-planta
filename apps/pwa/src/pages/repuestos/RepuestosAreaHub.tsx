@@ -1663,7 +1663,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 </div>
               )}
               <div className="flex items-center gap-2">
-                {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cyan-500" />}
+                {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cat-7-ink" />}
                 <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
                 {selectedNode && !repQuery.trim() && !selectedEquipKey && (
                   <Badge variant="secondary" className="tabular-nums">{eqCount} equipos</Badge>
@@ -2162,7 +2162,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 onClick={() => { setActionTarget({ kind: equipoPicker.kind, source: s }); setEquipoPicker(null) }}
                 className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
               >
-                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                <Cog className="h-4 w-4 shrink-0 text-cat-7-ink" />
                 <span className="truncate">{s.machineName}</span>
               </button>
             ))}
@@ -2230,7 +2230,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     <span className={['flex h-4 w-4 shrink-0 items-center justify-center rounded-ctl border', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'].join(' ')}>
                       {checked && <Check className="h-3 w-3" />}
                     </span>
-                    <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                    <Cog className="h-4 w-4 shrink-0 text-cat-7-ink" />
                     <span className="min-w-0 flex-1 truncate font-medium text-foreground">{g.label}</span>
                     {g.nodeIds.length > 1
                       ? <span className="shrink-0 text-caption text-muted-foreground">· {g.nodeIds.length} equipos</span>
@@ -2313,7 +2313,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   onClick={() => handleAsignarEquipo(e)}
                   className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40 disabled:opacity-50"
                 >
-                  <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                  <Cog className="h-4 w-4 shrink-0 text-cat-7-ink" />
                   <span className="min-w-0 flex-1 truncate">{e.alias || e.nombre}</span>
                   {e.codigo && <span className="shrink-0 font-mono text-caption text-muted-foreground">{e.codigo}</span>}
                 </button>

@@ -1834,7 +1834,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-primary/[0.25] text-ink-info hover:bg-sky-950 shrink-0 mt-0.5"
+                  className="h-7 text-xs border-primary/[0.25] text-ink-info hover:bg-blue-500/[0.15] shrink-0 mt-0.5"
                   onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
@@ -2184,7 +2184,7 @@ export function AnalisisGraderTurnoPage() {
               <CardContent className="py-3 px-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    <Sparkles className="h-4 w-4 text-cat-6-ink" />
                     <span className="text-sm font-medium">Análisis IA</span>
                   </div>
                   <Button

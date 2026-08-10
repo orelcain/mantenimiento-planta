@@ -35,7 +35,7 @@ interface IncidentFormProps {
 
 const PRIORITY_OPTIONS = [
   { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-red-500', border: 'border-red-500' },
-  { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-orange-500', border: 'border-orange-500' },
+  { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-cat-4-tint', border: 'border-cat-4-tint/[0.25]' },
   { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-blue-500', border: 'border-blue-500' },
   { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-muted-foreground', border: 'border-border' },
 ]
@@ -890,7 +890,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     {/* Metadatos (overlay en hover o siempre visible pequeño) */}
                     {photoMeta[index] && (
                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-caption text-white p-1 text-center truncate rounded-b-lg backdrop-blur-[2px] leading-tight">
-                         <div className="font-semibold text-yellow-300">{photoMeta[index].compressed} ({photoMeta[index].format})</div>
+                         <div className="font-semibold text-ink-warn">{photoMeta[index].compressed} ({photoMeta[index].format})</div>
                          <div className="opacity-75">{photoMeta[index].dim}</div>
                          <div className="scale-[0.8] opacity-50 line-through">{photoMeta[index].original}</div>
                        </div>

@@ -99,9 +99,9 @@ export function PreventivePage() {
   // Colores asignados a técnicos (consistente entre renderizados)
   const technicianColors: Record<string, string> = useMemo(() => {
     const colors = [
-      'bg-blue-500', 'bg-cat-6-tint', 'bg-pink-500', 'bg-green-500',
-      'bg-cyan-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500',
-      'bg-teal-500', 'bg-orange-500'
+      'bg-blue-500', 'bg-cat-6-tint', 'bg-cat-5-tint', 'bg-green-500',
+      'bg-cat-7-tint', 'bg-amber-500', 'bg-red-500', 'bg-cat-3-tint',
+      'bg-cat-8-tint', 'bg-cat-4-tint'
     ]
     const result: Record<string, string> = {}
     technicians.forEach((tech, index) => {

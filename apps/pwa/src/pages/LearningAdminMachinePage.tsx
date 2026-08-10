@@ -1530,7 +1530,7 @@ function DiagnosisForm({
         <div className="space-y-2">
           {entry.possibleCauses.map((cause, index) => (
             <div key={index} className="flex items-start gap-2">
-              <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-cat-4-tint/[0.15] text-orange-500 font-bold text-caption">
+              <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-cat-4-tint/[0.15] text-cat-4-ink font-bold text-caption">
                 {index + 1}
               </span>
               <input

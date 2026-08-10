@@ -252,7 +252,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                             usadas.has(h.label) ? 'text-foreground/85' : 'text-muted-foreground/50',
                           )}
                         >
-                          <span className={cn('w-1 h-1 rounded-full shrink-0', usadas.has(h.label) ? 'bg-sky-400' : 'bg-muted-foreground/40')} />
+                          <span className={cn('w-1 h-1 rounded-full shrink-0', usadas.has(h.label) ? 'bg-ink-info' : 'bg-muted-foreground/40')} />
                           <span className="truncate">{h.label}</span>
                         </div>
                       ))}

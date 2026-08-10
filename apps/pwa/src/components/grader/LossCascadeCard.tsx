@@ -257,7 +257,7 @@ export function LossCascadeCard({
       pct: `${pctOfTurno(totals.planificadoSec).toFixed(1)}% del turno`,
       pct2: null,
       bg: 'bg-muted-foreground/[0.10]', text: 'text-muted-foreground',
-      ringHover: 'hover:ring-slate-400/40', ringActive: 'ring-1 ring-slate-400/70',
+      ringHover: 'hover:ring-border/40', ringActive: 'ring-1 ring-border/70',
       tip: 'Colación, ejercicio compensatorio, cambio de turno — pausas de personas acordadas. Se descuentan ANTES de medir a la máquina (fuera del techo). Click para ver sus eventos.',
     },
     {
@@ -532,8 +532,8 @@ export function LossCascadeCard({
                   title={`${MANUAL_LINE_LABEL}: la planta procesó ${manual!.manualPieces.toLocaleString('es-CL')} piezas por fuera de las Baader. ${MANUAL_LINE_TOOLTIP}`}
                 >
                   <span className="w-2 h-2 rounded-ctl shrink-0 bg-cat-6-tint/[0.15]" />
-                  <span className="truncate text-violet-300">Recuperadas por la línea manual</span>
-                  <span className="ml-auto shrink-0 tabular-nums text-violet-300">
+                  <span className="truncate text-cat-6-ink">Recuperadas por la línea manual</span>
+                  <span className="ml-auto shrink-0 tabular-nums text-cat-6-ink">
                     −{recuperadas.toLocaleString('es-CL')} pz
                   </span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">

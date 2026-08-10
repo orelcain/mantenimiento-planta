@@ -170,7 +170,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                         <span className="tabular-nums text-muted-foreground">{fmtDur(p.min)}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-rose-500' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${w}%` }} />
+                        <div className={cn('h-full rounded-full', i === 0 ? 'bg-red-500' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${w}%` }} />
                       </div>
                     </div>
                   )

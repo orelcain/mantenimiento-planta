@@ -220,7 +220,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         {/* Barra visual proporcional al share */}
                         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden ml-1 max-w-[120px]">
                           <div
-                            className={`h-full rounded-full ${isTop ? 'bg-rose-400' : 'bg-muted-foreground'}`}
+                            className={`h-full rounded-full ${isTop ? 'bg-cat-5-tint' : 'bg-muted-foreground'}`}
                             style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
                           />
                         </div>
