@@ -19,7 +19,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, PauseCircle, Radio, Repeat, RefreshCw, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, PauseCircle, Radio, RefreshCw, Timer } from 'lucide-react'
 import {
   subscribePublicShiftMonitor,
   trackMonitorUsage,
@@ -334,14 +334,6 @@ export function PublicShiftMonitorPage() {
                 Turno cerrado
               </span>
             )}
-            {/* Sin esto, ver que cambió el turno del encabezado se lee como que
-                el link se rompió. Con el chip, se entiende que sigue la línea. */}
-            {data.mode === 'line' && esActual && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300/90">
-                <Repeat className="h-3 w-3" />
-                Sigue el turno vigente
-              </span>
-            )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-white/55">
             {areaTitle && <span>{areaTitle}</span>}
@@ -369,24 +361,33 @@ export function PublicShiftMonitorPage() {
             className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/70 transition-colors enabled:hover:bg-white/10 disabled:opacity-30"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
-            Turno anterior
+            Anterior
           </button>
 
-          <span className="text-[11px] text-white/40">
-            {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/40">
+              {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
+            </span>
+            {/* Atajo al presente: con seis turnos de historial, volver de a uno
+                es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
+            {idx > 1 && (
+              <button
+                onClick={() => verIndice(0)}
+                className="rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-200 transition-colors hover:bg-sky-400/20"
+              >
+                Ir al actual
+              </button>
+            )}
+          </div>
 
-          {esActual ? (
-            <span className="px-3 py-1.5 text-[12px] text-white/20">Siguiente</span>
-          ) : (
-            <button
-              onClick={() => verIndice(0)}
-              className="flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-400/10 px-3 py-1.5 text-[12px] text-sky-200 transition-colors hover:bg-sky-400/20"
-            >
-              Volver al actual
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <button
+            onClick={() => irA(-1)}
+            disabled={esActual}
+            className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/70 transition-colors enabled:hover:bg-white/10 disabled:opacity-30"
+          >
+            Siguiente
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
