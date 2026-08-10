@@ -208,7 +208,7 @@ export function ShoplogixCredentialsPage() {
                     : '—'}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground/80">
+              <p className="text-xs text-muted-foreground">
                 Las Cloud Functions usan estas credenciales para hacer auto-login ROPC cada vez que el token
                 Bearer expira (cada ~1 hora). Si la pass de Javier rota en AquaChile, actualízala aquí y
                 no es necesario tocar el script.
@@ -220,7 +220,7 @@ export function ShoplogixCredentialsPage() {
                 <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div>
                   <div className="font-medium text-ink-warn">Sin credenciales configuradas</div>
-                  <div className="text-muted-foreground/80 text-xs mt-1">
+                  <div className="text-muted-foreground text-xs mt-1">
                     El sync está en modo <em>cookie legado</em> — solo funciona mientras el token Bearer
                     siga vigente. Configura credenciales para auto-login automático.
                   </div>
@@ -315,7 +315,7 @@ export function ShoplogixCredentialsPage() {
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar credenciales (volver al modo cookie)
             </Button>
-            <p className="text-xs text-muted-foreground/80 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Borra el doc de Firestore. El sync usará el token Bearer almacenado mientras siga vigente.
               Cuando expire, el sync va a fallar con AUTH_EXPIRED hasta que se vuelvan a configurar credenciales.
             </p>

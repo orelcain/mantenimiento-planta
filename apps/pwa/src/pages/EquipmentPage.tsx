@@ -1045,8 +1045,8 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <div className="flex flex-col gap-3">
             {/* Badge filtro activo desde jerarquía */}
             {filterSelectedIds.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-ctl">
-                <div className="flex-1 text-sm text-blue-700">
+              <div className="flex items-center gap-2 p-3 bg-blue-500/[0.15] border border-blue-500/[0.25] rounded-ctl">
+                <div className="flex-1 text-sm text-ink-info">
                   Mostrando {filterSelectedIds.size} {filterSelectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'} desde jerarquía
                 </div>
                 <Button
@@ -1056,7 +1056,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                     setFilterSelectedIds(new Set())
                     navigate('/equipment', { replace: true })
                   }}
-                  className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                  className="text-ink-info hover:text-ink-info hover:bg-blue-500/[0.15]"
                 >
                   Ver todos
                 </Button>
@@ -1510,8 +1510,8 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
 
                 {/* Selector individual de notas cuando está habilitado */}
                 {shareIncludeNotes && (
-                  <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
-                    <p className="text-xs text-gray-600 mb-2">Selecciona las notas a incluir:</p>
+                  <div className="ml-6 mt-2 space-y-2 border-l-2 border-border pl-4">
+                    <p className="text-xs text-muted-foreground mb-2">Selecciona las notas a incluir:</p>
                     {equipment.filter((e) => selectedIds.has(e.id)).map((eq) => {
                       const eqNotes = notesById[eq.id] || []
                       if (eqNotes.length === 0) return null
@@ -1519,8 +1519,8 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                       const selectedNotesSet = selectedNotesByEquipment.get(eq.id) || new Set()
                       
                       return (
-                        <div key={eq.id} className="bg-gray-50 p-2 rounded-ctl">
-                          <p className="text-xs font-semibold text-gray-700 mb-1">{eq.nombre}</p>
+                        <div key={eq.id} className="bg-muted p-2 rounded-ctl">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">{eq.nombre}</p>
                           <div className="space-y-1">
                             {eqNotes.map((note, idx) => {
                               const noteId = `${eq.id}-${idx}`
@@ -1545,7 +1545,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                                   />
                                   <Label htmlFor={noteId} className="text-xs font-normal cursor-pointer">
                                     {note.text.substring(0, 50)}{note.text.length > 50 ? '...' : ''} 
-                                    <span className="text-gray-400 ml-1">({note.createdAt})</span>
+                                    <span className="text-muted-foreground ml-1">({note.createdAt})</span>
                                   </Label>
                                 </div>
                               )
@@ -2311,7 +2311,7 @@ function EquipmentDetailDialog({
                                   onDeleteNote(n.id)
                                 }
                               }}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-ink-crit hover:bg-red-500/[0.15]"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

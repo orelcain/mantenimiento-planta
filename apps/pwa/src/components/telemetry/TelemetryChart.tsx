@@ -705,10 +705,10 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   // Mostrar skeleton mientras carga
   if (isLoading) {
     return (
-      <div style={{ height: `${height}px` }} className="relative bg-muted-foreground/[0.10] rounded-card dark:border-gray-700 overflow-hidden">
+      <div style={{ height: `${height}px` }} className="relative bg-muted-foreground/[0.10] rounded-card dark:border-border overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            <div className="w-12 h-12 border-4 border-blue-500/[0.25] border-t-blue-600 rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground animate-pulse">
               Generando historial...
             </p>
@@ -810,7 +810,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={zoomToNow}
-              className="px-2 py-1 text-xs rounded-ctl border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
               title="Zoom al tiempo actual"
             >
               Ahora
@@ -818,7 +818,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={resetZoom}
-              className="px-2 py-1 text-xs rounded-ctl border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
               title="Restablecer zoom"
             >
               Reset

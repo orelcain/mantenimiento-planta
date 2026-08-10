@@ -59,15 +59,15 @@ const CAUSE_HEX_BORDERS: Record<MatrixP0Cause, string> = {
   otro:                 '#71717a',
 }
 
-const FALLBACK_COLOR = { badge: 'bg-muted-foreground/[0.10] text-zinc-400', bar: 'bg-zinc-500' }
+const FALLBACK_COLOR = { badge: 'bg-muted-foreground/[0.10] text-muted-foreground', bar: 'bg-muted-foreground' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
   red:     { badge: 'bg-red-500/[0.15] text-red-400',       bar: 'bg-red-500'   },
   orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink', bar: 'bg-orange-500'},
-  purple:  { badge: 'bg-cat-6-tint/[0.15] text-purple-400', bar: 'bg-purple-500'},
+  purple:  { badge: 'bg-cat-6-tint/[0.15] text-cat-6-ink', bar: 'bg-cat-6-tint'},
   cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink',     bar: 'bg-cyan-500'  },
   emerald: { badge: 'bg-emerald-500/[0.15] text-emerald-400', bar: 'bg-emerald-500' },
   amber:   { badge: 'bg-amber-500/[0.15] text-amber-400',   bar: 'bg-amber-500' },
-  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-amber-800' },
+  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-amber-600' },
   blue:    { badge: 'bg-primary/[0.15] text-blue-400',     bar: 'bg-blue-500'  },
   zinc:    FALLBACK_COLOR,
 }
@@ -159,7 +159,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
           <div className="text-right shrink-0 min-w-[60px] sm:min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
-              <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
+              <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
             </div>
             <div className="text-caption text-muted-foreground font-mono">
               {stats.pct.toFixed(1)}% del P0
@@ -267,7 +267,7 @@ function UmbrellaCauseRow({
           <div className="text-right shrink-0 min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
-              <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
+              <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
             </div>
             <div className="text-caption text-muted-foreground font-mono">
               {umbrellaStats.pct.toFixed(1)}% del P0
@@ -360,7 +360,7 @@ function SubCauseRow({
       </span>
       <div className="text-right shrink-0 font-mono tabular-nums">
         <span className="font-semibold">{pctOfTotal.toFixed(2)}%</span>
-        <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
+        <span className="text-caption font-normal text-muted-foreground ml-0.5">total</span>
         <span className="text-muted-foreground ml-2">({stats.pct.toFixed(1)}% del P0)</span>
         <span className="text-muted-foreground ml-2">{stats.pieces.toLocaleString('es-CL')} pzas</span>
       </div>
@@ -475,7 +475,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
               <div className="text-caption text-muted-foreground pt-1 border-t border-border/40">
                 {isClassificationPlant ? (
                   <>
-                    Total <span className="font-mono text-muted-foreground/80">unsorted pcs</span> (Matrix):{' '}
+                    Total <span className="font-mono text-muted-foreground">unsorted pcs</span> (Matrix):{' '}
                     <span className="font-mono font-medium text-foreground/80">{unsortedPcs.toLocaleString('es-CL')}</span>
                   </>
                 ) : (

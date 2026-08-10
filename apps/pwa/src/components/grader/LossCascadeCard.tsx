@@ -567,7 +567,7 @@ export function LossCascadeCard({
                               )}
                               className={cn(
                                 'text-caption px-1 rounded-ctl bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
-                                active ? 'border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground/80',
+                                active ? 'border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
                               )}
                               title={`Ver solo los eventos de "${c.label}" en ${mn}`}
                             >
@@ -592,7 +592,7 @@ export function LossCascadeCard({
           )}
           {plannedCauses.length > 0 && (
             <div>
-              <p className="text-caption text-muted-foreground/70 tracking-wider mb-1">
+              <p className="text-caption text-muted-foreground tracking-wider mb-1">
                 Pausas planificadas · fuera del techo (no cuentan como pérdida)
               </p>
               <div className="space-y-0.5 opacity-70">

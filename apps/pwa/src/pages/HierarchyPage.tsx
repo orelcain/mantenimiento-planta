@@ -760,7 +760,7 @@ export function HierarchyPage() {
             ) : hasChildren ? (
               <FolderOpen className="h-4 w-4 text-amber-500" />
             ) : (
-              <Folder className="h-4 w-4 text-gray-400" />
+              <Folder className="h-4 w-4 text-muted-foreground" />
             )}
 
             {/* Info */}
@@ -793,7 +793,7 @@ export function HierarchyPage() {
                 {node.isBaseStructure ? (
                   <Badge 
                     variant="outline" 
-                    className="text-xs flex items-center gap-1 border-blue-300 text-blue-700 bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs flex items-center gap-1 border-blue-500/[0.25] text-ink-info bg-blue-500/[0.15] opacity-0 group-hover:opacity-100 transition-opacity"
                     title={`Estructura base - ${node.baseStructureDate ? new Date(node.baseStructureDate.toDate()).toLocaleDateString() : 'Fecha no disponible'}`}
                   >
                     <Clock className="h-2.5 w-2.5" />

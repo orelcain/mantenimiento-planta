@@ -1212,7 +1212,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
       {/* Data notes */}
       {analytics.notes.length > 0 && (
-        <Card className="border-amber-300 bg-amber-500/[0.15]">
+        <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-ink-warn mt-0.5 shrink-0" />
@@ -1492,8 +1492,8 @@ function KPICard({
   return (
     <Card
       className={cn(
-        severity === 'critical' && 'border-red-300',
-        severity === 'warn' && 'border-amber-300',
+        severity === 'critical' && 'border-red-500/[0.25]',
+        severity === 'warn' && 'border-amber-500/[0.25]',
       )}
     >
       <CardContent className="pt-4">
@@ -1506,9 +1506,9 @@ function KPICard({
               variant="outline"
               className={cn(
                 'text-caption px-1.5 py-0 h-4 ml-auto',
-                statusBadge.severity === 'critical' && 'text-ink-crit border-red-300',
-                statusBadge.severity === 'warn' && 'text-ink-warn border-amber-300',
-                statusBadge.severity === 'ok' && 'text-ink-ok border-emerald-300',
+                statusBadge.severity === 'critical' && 'text-ink-crit border-red-500/[0.25]',
+                statusBadge.severity === 'warn' && 'text-ink-warn border-amber-500/[0.25]',
+                statusBadge.severity === 'ok' && 'text-ink-ok border-emerald-500/[0.25]',
               )}
             >
               {statusBadge.label}

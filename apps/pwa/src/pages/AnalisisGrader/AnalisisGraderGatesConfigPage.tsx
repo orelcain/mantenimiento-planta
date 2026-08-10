@@ -724,7 +724,7 @@ export function AnalisisGraderGatesConfigPage({
             </div>
           )}
 
-          <div className="border-t border-zinc-800 my-5" />
+          <div className="border-t border-border my-5" />
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-xs font-semibold tracking-wider text-muted-foreground">Horarios de turnos</h3>

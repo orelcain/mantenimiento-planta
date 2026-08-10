@@ -41,7 +41,7 @@ export function DevModulesPage() {
           <div className="text-sm font-medium flex items-center gap-1.5">
             {item.name}
             {item.locked && (
-              <span className="inline-flex items-center gap-1 text-caption text-muted-foreground/70 font-normal">
+              <span className="inline-flex items-center gap-1 text-caption text-muted-foreground font-normal">
                 <Lock className="w-3 h-3" />
                 fijo
               </span>
@@ -74,7 +74,7 @@ export function DevModulesPage() {
 
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Wrench className="w-6 h-6 text-purple-400" />
+          <Wrench className="w-6 h-6 text-cat-6-ink" />
           Módulos del sidebar
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -127,7 +127,7 @@ export function DevModulesPage() {
         </CardContent>
       </Card>
 
-      <p className="text-caption text-muted-foreground/70 px-1">
+      <p className="text-caption text-muted-foreground px-1">
         Los cambios se aplican al instante. Si no ves un item después de
         activarlo, refrescá la página.
       </p>

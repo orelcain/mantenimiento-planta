@@ -92,7 +92,7 @@ function KpiCard({ value, label, hint, icon: Icon, tone }: {
           <Icon className={['h-[18px] w-[18px]', t.text].join(' ')} strokeWidth={2.25} />
         </div>
       </div>
-      {hint && <div className="relative mt-2.5 text-caption font-medium text-muted-foreground/70">{hint}</div>}
+      {hint && <div className="relative mt-2.5 text-caption font-medium text-muted-foreground">{hint}</div>}
     </div>
   )
 }
@@ -1578,7 +1578,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
               </button>
               {favBarOpen && (equipFavLists.length === 0 ? (
-                <p className="mt-2 pl-5 text-caption text-muted-foreground/70">Marca equipos con la estrella en «Estructura de equipos del área (admin)» para crear listas.</p>
+                <p className="mt-2 pl-5 text-caption text-muted-foreground">Marca equipos con la estrella en «Estructura de equipos del área (admin)» para crear listas.</p>
               ) : (
                 <div className="mt-2 space-y-2">
                   {equipFavLists.map((list) => {
@@ -1983,7 +1983,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 {r.codigoSAP && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); copySapFromRow(r.rowKey, r.codigoSAP) }}
-                                    className="inline-flex items-center gap-0.5 font-mono text-muted-foreground/80 active:text-primary"
+                                    className="inline-flex items-center gap-0.5 font-mono text-muted-foreground active:text-primary"
                                     aria-label="Copiar código SAP"
                                   >
                                     {r.codigoSAP}
@@ -1992,7 +1992,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </button>
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
-                                {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground/80">Fab {r.codigoFabricante}</span></span>}
+                                {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground">Fab {r.codigoFabricante}</span></span>}
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>

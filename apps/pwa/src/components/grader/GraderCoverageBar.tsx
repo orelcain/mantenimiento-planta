@@ -201,7 +201,7 @@ export function GraderCoverageBar({
           {marcas.map((m) => (
             <span
               key={m.ms}
-              className="absolute top-0 -translate-x-1/2 text-caption text-muted-foreground/70 tabular-nums"
+              className="absolute top-0 -translate-x-1/2 text-caption text-muted-foreground tabular-nums"
               style={{ left: `${m.pct}%` }}
             >
               {fmtTime(new Date(m.ms))}

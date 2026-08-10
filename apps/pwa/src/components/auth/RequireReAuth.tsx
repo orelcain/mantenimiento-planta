@@ -119,7 +119,7 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
               ? `Re-introduce tus credenciales ${reason}.`
               : 'Esta es un área sensible. Re-introduce tus credenciales para continuar.'}
           </p>
-          <p className="text-xs text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground">
             Aunque tu sesión esté activa, pedimos confirmación cada vez que entras al panel admin
             para evitar cambios accidentales si alguien más usa el dispositivo.
           </p>

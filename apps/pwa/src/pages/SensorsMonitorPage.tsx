@@ -1170,7 +1170,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         )}
 
         {alert !== 'normal' && (
-          <div className="rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] p-2 text-amber-700 flex items-center gap-2">
+          <div className="rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] p-2 text-ink-warn flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Revisar condición anómala y evaluar creación de incidencia.
           </div>
@@ -1495,9 +1495,9 @@ export function SensorsMonitorPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Sin asignar</p>
-                <p className="text-2xl font-bold text-slate-500">{metrics.unassigned}</p>
+                <p className="text-2xl font-bold text-muted-foreground">{metrics.unassigned}</p>
               </div>
-              <Link2 className="h-8 w-8 text-slate-500/20" />
+              <Link2 className="h-8 w-8 text-muted-foreground/20" />
             </div>
           </CardContent>
         </Card>

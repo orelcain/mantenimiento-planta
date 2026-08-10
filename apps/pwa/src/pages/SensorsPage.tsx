@@ -1391,8 +1391,8 @@ export function SensorsPage() {
                   {/* WiFi Principal (Station Mode) */}
                   {selectedDevice.wifiSsid && (
                     <div className={`rounded-ctl border p-3 ${selectedDeviceIsFresh
-                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800'
-                      : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800'
+                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-emerald-500/[0.25]'
+                      : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-500/[0.25]'
                       }`}>
                       <div className={`text-xs font-semibold mb-2 flex items-center gap-1 ${selectedDeviceIsFresh
                         ? 'text-ink-ok'
@@ -1486,7 +1486,7 @@ export function SensorsPage() {
                   )}
 
                   {/* Configurar nueva WiFi principal */}
-                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-500/[0.25]">
                     <div className="text-xs font-semibold text-ink-warn mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Cambiar WiFi Principal
@@ -1581,7 +1581,7 @@ export function SensorsPage() {
 
                   {/* WiFi AP Local */}
                   {selectedDevice.apSsid && (
-                    <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                    <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25]">
                       <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                         <Wifi className="h-3 w-3" />
                         WiFi Local (Access Point)
@@ -1654,7 +1654,7 @@ export function SensorsPage() {
                   )}
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
-                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded-ctl border border-amber-200 dark:border-amber-800">
+                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded-ctl border border-amber-500/[0.25]">
                       <AlertTriangle className="inline size-3.5" /> Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
@@ -1747,7 +1747,7 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-primary/[0.15] border border-blue-200 dark:border-blue-800 rounded-ctl">
+                    <div className="p-4 text-sm bg-primary/[0.15] border border-blue-500/[0.25] rounded-ctl">
                       <div className="font-medium text-primary mb-1">
                         <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
                       </div>
@@ -1756,7 +1756,7 @@ export function SensorsPage() {
                       </div>
                     </div>
                   ) : equipment.length === 0 ? (
-                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-amber-200 dark:border-amber-800 rounded-ctl">
+                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-ctl">
                       <div className="font-medium text-ink-warn mb-1">
                         <AlertTriangle className="inline size-3.5" /> No hay equipos disponibles
                       </div>
@@ -2027,7 +2027,7 @@ export function SensorsPage() {
                       {equipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
                           <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><Loader2 className="size-3.5 animate-spin" />Cargando equipos…</div>
-                          <div className="text-xs text-muted-foreground/70">
+                          <div className="text-xs text-muted-foreground">
                             Si esto tarda mucho, recarga la página
                           </div>
                         </div>
@@ -2148,7 +2148,7 @@ export function SensorsPage() {
                     </div>
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
-                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded-ctl border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded-ctl border border-blue-500/[0.25]">
                         <Lightbulb className="inline size-3.5" /> Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
@@ -2162,7 +2162,7 @@ export function SensorsPage() {
                   )}
 
                   {saveOk && (
-                    <div className="text-sm text-ink-ok bg-green-500/[0.15] p-2 rounded-ctl border border-green-200 dark:border-green-800">
+                    <div className="text-sm text-ink-ok bg-green-500/[0.15] p-2 rounded-ctl border border-emerald-500/[0.25]">
                       ✓ {saveOk}
                     </div>
                   )}
@@ -2199,7 +2199,7 @@ export function SensorsPage() {
                 </div>
 
                 {selectedDevice.apSsid && (
-                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25]">
                     <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Configuración Actual del AP
@@ -2262,7 +2262,7 @@ export function SensorsPage() {
                 )}
 
                 {selectedDevice && (
-                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-500/[0.25]">
                     <div className="text-xs font-semibold text-ink-ok mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Información OTA (WiFi)
@@ -2290,7 +2290,7 @@ export function SensorsPage() {
                         {otaPasswordState === 'idle' && (
                           <button
                             onClick={fetchOtaPassword}
-                            className="text-xs px-2 py-0.5 rounded-ctl border border-emerald-300 dark:border-emerald-700 hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
+                            className="text-xs px-2 py-0.5 rounded-ctl border border-emerald-500/[0.25] hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                           >
                             Mostrar (solo admin)
                           </button>
@@ -2332,7 +2332,7 @@ export function SensorsPage() {
                       id="ap-enabled"
                       checked={apEnabled}
                       onChange={(e) => setApEnabled(e.target.checked)}
-                      className="rounded-ctl border-gray-300"
+                      className="rounded-ctl border-border"
                     />
                     <Label htmlFor="ap-enabled" className="text-sm cursor-pointer">
                       AP siempre activo (AP+STA)
@@ -2453,7 +2453,7 @@ export function SensorsPage() {
               </Card>
 
               {/* Configuración Intervalo de Lectura */}
-              <Card className="border-slate-200 dark:border-slate-700">
+              <Card className="border-border dark:border-border">
                 <CardHeader 
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => setIsIntervalExpanded(!isIntervalExpanded)}

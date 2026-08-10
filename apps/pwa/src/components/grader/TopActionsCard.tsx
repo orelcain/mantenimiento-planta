@@ -44,7 +44,7 @@ export function TopActionsCard({ attribution }: Props) {
                 ? 'text-emerald-500'
                 : worsened
                   ? 'text-red-500'
-                  : 'text-zinc-400'
+                  : 'text-muted-foreground'
               const valueColor = improved
                 ? 'text-ink-ok'
                 : worsened

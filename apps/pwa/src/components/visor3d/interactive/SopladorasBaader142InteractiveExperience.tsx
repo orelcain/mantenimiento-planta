@@ -113,8 +113,8 @@ interface FlowSegment {
 const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
 const PRIMARY_LINE_IDS: PrimaryLineId[] = ['L1', 'L2', 'L3']
 const STATUS_STYLES: Record<BlowerStatus, string> = {
-  operativa: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  revision: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  operativa: 'bg-emerald-500/15 text-ink-ok border-emerald-500/30',
+  revision: 'bg-amber-500/15 text-ink-warn border-amber-500/30',
   detenida: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 }
 
@@ -1371,7 +1371,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sopladoras</p>
-                  <span className="text-[10px] text-muted-foreground/80">{editMappingsMode ? 'Selecciona para enlazar' : 'ON, REV u OFF'}</span>
+                  <span className="text-[10px] text-muted-foreground">{editMappingsMode ? 'Selecciona para enlazar' : 'ON, REV u OFF'}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {blowers.map((blower) => {
@@ -1396,7 +1396,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas por linea</p>
-                  <span className="text-[10px] text-muted-foreground/80">{editMappingsMode ? 'Selecciona para enlazar' : 'Manilla real a 90 grados'}</span>
+                  <span className="text-[10px] text-muted-foreground">{editMappingsMode ? 'Selecciona para enlazar' : 'Manilla real a 90 grados'}</span>
                 </div>
                 <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
                   {(Object.keys(LINE_VISUALS) as LineId[]).map((lineId) => (
@@ -1431,7 +1431,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
-                  <span className="text-[10px] text-muted-foreground/80">Reparte caudal</span>
+                  <span className="text-[10px] text-muted-foreground">Reparte caudal</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {([

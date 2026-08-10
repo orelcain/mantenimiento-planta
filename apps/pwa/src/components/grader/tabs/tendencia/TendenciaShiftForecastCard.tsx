@@ -57,7 +57,7 @@ export function TendenciaShiftForecastCard({
     <Card className={cn('border-2', severityBorder)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Target className="h-4 w-4 text-purple-500" />
+          <Target className="h-4 w-4 text-cat-6-ink" />
           Proyección de Turno en Curso
         </CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -72,7 +72,7 @@ export function TendenciaShiftForecastCard({
             <p className="text-2xl font-bold tabular-nums">{shiftProgressView.remainingLabel}</p>
             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
               <div
-                className="h-full bg-purple-500 transition-all"
+                className="h-full bg-cat-6-tint transition-all"
                 style={{ width: `${Math.min(100, shiftProgressView.elapsedPct)}%` }}
               />
             </div>

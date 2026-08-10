@@ -13,7 +13,7 @@ const CATEGORY_META: Record<RunbookCategory, { label: string; icon: typeof Wrenc
   calibracion:   { label: 'Calibración',   icon: Zap,      color: 'text-amber-400' },
   mantencion:    { label: 'Mantención',    icon: Wrench,   color: 'text-cat-4-ink' },
   limpieza:      { label: 'Limpieza',      icon: Droplets, color: 'text-cat-7-ink' },
-  troubleshooting: { label: 'Troubleshooting', icon: BookOpen, color: 'text-purple-400' },
+  troubleshooting: { label: 'Troubleshooting', icon: BookOpen, color: 'text-cat-6-ink' },
 }
 
 interface RunbookCardProps {

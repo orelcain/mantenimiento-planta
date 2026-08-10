@@ -276,12 +276,12 @@ export function SensorStopsCausePanel({
                   {stop.durationMin >= 10 ? Math.round(stop.durationMin) : stop.durationMin.toFixed(1)} min
                 </span>
                 {stop.lostPieces != null && stop.lostPieces > 0 && (
-                  <span className="font-mono tabular-nums text-muted-foreground/80" title={`Al objetivo de la máquina: ${Math.round(stop.durationMin)} min sin producir`}>
+                  <span className="font-mono tabular-nums text-muted-foreground" title={`Al objetivo de la máquina: ${Math.round(stop.durationMin)} min sin producir`}>
                     ≈{stop.lostPieces.toLocaleString('es-CL')} pz
                   </span>
                 )}
                 {snapshot.machines.length > 1 && (
-                  <span className="text-muted-foreground/70 truncate max-w-[8rem]">{shortMachineName(stop.machineName)}</span>
+                  <span className="text-muted-foreground truncate max-w-[8rem]">{shortMachineName(stop.machineName)}</span>
                 )}
 
                 <div className="flex-1" />

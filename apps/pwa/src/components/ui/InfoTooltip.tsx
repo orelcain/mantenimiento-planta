@@ -186,7 +186,7 @@ export function InfoTooltip({
         }}
       >
         <Icon
-          className="text-blue-600/80 dark:text-blue-400/80 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-150"
+          className="text-blue-600/80 dark:text-blue-400/80 hover:text-ink-info dark:hover:text-ink-info transition-colors duration-150"
           style={{ width: iconSize, height: iconSize }}
         />
       </span>
@@ -228,17 +228,17 @@ export function InfoTooltip({
                 </span>
               )}
               {text && (
-                <span className="block text-slate-300 leading-snug">
+                <span className="block text-muted-foreground leading-snug">
                   {text}
                 </span>
               )}
               {formula && (
-                <span className="block font-mono text-caption bg-muted-foreground/[0.10] text-emerald-300 px-2 py-1.5 rounded-ctl border border-muted-foreground/[0.10]">
+                <span className="block font-mono text-caption bg-muted-foreground/[0.10] text-ink-ok px-2 py-1.5 rounded-ctl border border-muted-foreground/[0.10]">
                   {formula}
                 </span>
               )}
               {example && (
-                <span className="block text-slate-400 italic text-caption">
+                <span className="block text-muted-foreground italic text-caption">
                   Ej: {example}
                 </span>
               )}

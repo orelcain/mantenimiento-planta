@@ -196,7 +196,7 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
           </div>
 
           {/* Fotos ANTES */}
-          <div className="p-3 bg-red-500/[0.15] rounded-card dark:border-red-800">
+          <div className="p-3 bg-red-500/[0.15] rounded-card dark:border-red-500/[0.25]">
             <PhotoUploader
               photos={photos}
               onPhotosChange={setPhotos}

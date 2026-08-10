@@ -288,7 +288,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
   }
 
   return (
-    <div className="h-16 rounded-ctl bg-card border border-border dark:bg-muted-foreground/[0.10] dark:border-slate-800">
+    <div className="h-16 rounded-ctl bg-card border border-border dark:bg-muted-foreground/[0.10] dark:border-border">
       <ReactECharts
         ref={echartsRef}
         option={option}

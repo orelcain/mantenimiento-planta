@@ -234,7 +234,7 @@ export function RepuestoGalleryModal({
                           </Button>
                         )}
                       </div>
-                      <div className="flex flex-col text-caption text-gray-300 font-mono leading-tight">
+                      <div className="flex flex-col text-caption text-muted-foreground font-mono leading-tight">
                         {img.dimensions && (
                           <span>
                             {img.dimensions.width}x{img.dimensions.height}

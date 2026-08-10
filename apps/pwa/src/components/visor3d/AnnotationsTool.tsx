@@ -191,7 +191,7 @@ function AnnotationPin({
       {/* Resolved check icon */}
       {isResolved && (
         <Html position={[0.14, 0.62, 0]} center distanceFactor={8} zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
-          <div className="bg-emerald-500 text-white p-0.5 rounded-full shadow-md ring-2 ring-emerald-300/50">
+          <div className="bg-emerald-500 text-white p-0.5 rounded-full shadow-md ring-2 ring-emerald-500/[0.25]/50">
             <CheckCircle size={11} strokeWidth={3} />
           </div>
         </Html>
@@ -239,17 +239,17 @@ function AnnotationPin({
               {annotation.description && (
                 <div className="mt-1 max-w-[220px]">
                   {descExpanded || !needsTruncation(annotation.description) ? (
-                    <p className="text-xs text-gray-400 leading-snug whitespace-pre-wrap">
+                    <p className="text-xs text-muted-foreground leading-snug whitespace-pre-wrap">
                       {annotation.description}
                     </p>
                   ) : (
-                    <p className="text-xs text-gray-400 leading-snug whitespace-pre-wrap line-clamp-2">
+                    <p className="text-xs text-muted-foreground leading-snug whitespace-pre-wrap line-clamp-2">
                       {annotation.description}
                     </p>
                   )}
                   {needsTruncation(annotation.description) && (
                     <button
-                      className="text-[10px] text-blue-400 hover:text-blue-300 mt-0.5 font-medium"
+                      className="text-[10px] text-blue-400 hover:text-ink-info mt-0.5 font-medium"
                       onClick={(e) => { e.stopPropagation(); setDescExpanded(!descExpanded) }}
                     >
                       {descExpanded ? 'Ver menos' : 'Ver más'}
@@ -274,7 +274,7 @@ function AnnotationPin({
                   ))}
                   {annotation.photos!.length > 3 && (
                     <div 
-                      className="w-10 h-10 rounded border border-white/20 bg-white/10 flex items-center justify-center text-xs text-gray-300 cursor-pointer hover:bg-white/20 transition-colors"
+                      className="w-10 h-10 rounded border border-white/20 bg-white/10 flex items-center justify-center text-xs text-muted-foreground cursor-pointer hover:bg-white/20 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation()
                         onPhotoClick?.(annotation.photos!, 3)
@@ -301,7 +301,7 @@ function AnnotationPin({
                   Editar anotación
                 </button>
               ) : (
-                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                   <MapPin size={9} /> Clic para fijar y ver opciones
                 </p>
               )}

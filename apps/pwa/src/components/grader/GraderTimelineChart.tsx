@@ -850,7 +850,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="h-4 w-4 text-purple-500" />
+            <Activity className="h-4 w-4 text-cat-6-ink" />
             Timeline segundo a segundo
           </CardTitle>
           <div className="flex items-center gap-1.5 flex-wrap">

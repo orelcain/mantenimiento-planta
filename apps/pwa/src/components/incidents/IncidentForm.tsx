@@ -37,7 +37,7 @@ const PRIORITY_OPTIONS = [
   { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-red-500', border: 'border-red-500' },
   { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-orange-500', border: 'border-orange-500' },
   { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-blue-500', border: 'border-blue-500' },
-  { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-zinc-500', border: 'border-zinc-500' },
+  { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-muted-foreground', border: 'border-border' },
 ]
 
 const COMMON_SYMPTOMS = [

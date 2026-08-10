@@ -553,7 +553,7 @@ export function GateBreakdownCard({
                                 {severityLabel(s.severity)}
                               </span>
                             </div>
-                            <div className="text-muted-foreground/70 mt-0.5">
+                            <div className="text-muted-foreground mt-0.5">
                               G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%)
                               {' · '}destino saturado a {s.satRatio.toFixed(1)}×
                             </div>

@@ -95,9 +95,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   className={cn(
                     'p-3 rounded-card border flex items-start gap-3',
                     gb.severity === 'critical'
-                      ? 'border-red-300 bg-red-500/[0.15]'
+                      ? 'border-red-500/[0.25] bg-red-500/[0.15]'
                       : gb.severity === 'warn'
-                      ? 'border-amber-300 bg-amber-500/[0.15]'
+                      ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
                       : 'border-muted bg-muted',
                   )}
                 >
@@ -118,7 +118,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         <Badge variant="destructive" className="text-caption">-{gb.gap} gate(s)</Badge>
                       )}
                       {gb.gap < 0 && (
-                        <Badge variant="outline" className="text-caption text-ink-ok border-emerald-300">
+                        <Badge variant="outline" className="text-caption text-ink-ok border-emerald-500/[0.25]">
                           +{-gb.gap} extra
                         </Badge>
                       )}
@@ -289,10 +289,10 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
 
       {/* Gate Swap Suggestions */}
       {analytics.gateSwapSuggestions.length > 0 && (
-        <Card className="border-purple-200">
+        <Card className="border-cat-6-tint">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <ArrowRightLeft className="h-4 w-4 text-purple-500" />
+              <ArrowRightLeft className="h-4 w-4 text-cat-6-ink" />
               Sugerencias de Reasignación
               <InfoTooltip {...getTooltipProps('gate.swap')} />
             </CardTitle>
@@ -494,7 +494,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
         <Card className="border-cat-6-tint/[0.25]">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <Target className="h-4 w-4 text-purple-500" />
+              <Target className="h-4 w-4 text-cat-6-ink" />
               Asignación Óptima Sugerida
             </CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -558,7 +558,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         {o.isMatch ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 inline" />
                         ) : o.suggestedCalibre != null ? (
-                          <XCircle className="h-3.5 w-3.5 text-purple-500 inline" />
+                          <XCircle className="h-3.5 w-3.5 text-cat-6-ink inline" />
                         ) : (
                           <span className="text-caption text-muted-foreground">—</span>
                         )}

@@ -139,7 +139,7 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
               busy
                 ? "text-ink-info"
                 : active
-                ? "bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 animate-pulse"
+                ? "bg-red-500/[0.15] text-red-600 hover:bg-red-500/[0.15] hover:text-ink-crit animate-pulse"
                 : "text-muted-foreground hover:text-foreground",
             )}
             onClick={handleMicClick}

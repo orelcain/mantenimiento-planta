@@ -80,7 +80,7 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
         <Hourglass className="w-3 h-3" />
         Esperando más datos
         {v.afterPieces > 0 && (
-          <span className="text-muted-foreground/70">
+          <span className="text-muted-foreground">
             ({v.afterPieces} pzas hasta ahora — esperá ≥30)
           </span>
         )}
@@ -110,7 +110,7 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
       <span className={color}>
         {sign}{v.delta.toFixed(2)}pts
       </span>
-      <span className="text-muted-foreground/80">
+      <span className="text-muted-foreground">
         en {v.afterMinutes} min · {v.afterPieces.toLocaleString('es-CL')} pzas
       </span>
     </div>
@@ -199,7 +199,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
                   <span key={i}>
                     {i > 0 && <span className="text-muted-foreground/60"> · </span>}
                     {FIELD_LABELS[c.field]}{' '}
-                    <span className="text-muted-foreground/80 font-mono">{fmtValue(c.field, c.before)}</span>
+                    <span className="text-muted-foreground font-mono">{fmtValue(c.field, c.before)}</span>
                     <span className="mx-0.5 text-muted-foreground/60">→</span>
                     <span className="text-foreground font-mono">{fmtValue(c.field, c.after)}</span>
                   </span>
@@ -210,7 +210,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
         )}
 
         {snap.reason && (
-          <div className="text-caption italic text-muted-foreground/80">
+          <div className="text-caption italic text-muted-foreground">
             "{snap.reason}"
           </div>
         )}
@@ -269,7 +269,7 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
           <div className="text-xs text-muted-foreground text-center flex flex-col items-center gap-2 py-4">
             <Clock className="w-5 h-5 text-muted-foreground/50" />
             <p>Sin cambios registrados todavía.</p>
-            <p className="text-caption text-muted-foreground/70 max-w-sm">
+            <p className="text-caption text-muted-foreground max-w-sm">
               Cuando control de producción cambie un gate, registralo con el botón de arriba —
               quedará en el timeline y se usará para clasificar las piezas posteriores.
             </p>

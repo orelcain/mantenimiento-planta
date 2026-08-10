@@ -81,7 +81,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   reductor: {
     label: 'Reductor / Motorreductor',
     icon: Cog,
-    color: 'text-zinc-400',
+    color: 'text-muted-foreground',
     fields: {
       relacion: 'Relación (Ratio)',
       torqueSalida: 'Torque Salida (Nm)',
@@ -120,7 +120,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   sensor: {
     label: 'Sensor / Instrumento',
     icon: Gauge,
-    color: 'text-purple-400',
+    color: 'text-cat-6-ink',
     fields: {
       tipoSensor: 'Tipo (Temp/Presión/Flujo/Nivel/pH)',
       rangoMedicion: 'Rango de Medición',

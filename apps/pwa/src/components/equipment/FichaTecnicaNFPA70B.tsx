@@ -161,7 +161,7 @@ function Field({ label, value, pending }: { label: string; value?: ReactNode; pe
   return (
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-sm font-medium ${empty ? 'italic text-muted-foreground/70' : ''}`}>
+      <div className={`text-sm font-medium ${empty ? 'italic text-muted-foreground' : ''}`}>
         {empty ? 'Por capturar' : value}
       </div>
     </div>

@@ -205,7 +205,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
 
           {vacias.length > 0 && (
             <div className="space-y-0.5">
-              <p className="text-caption text-muted-foreground/70 tracking-wider">
+              <p className="text-caption text-muted-foreground tracking-wider">
                 Sin registros en este turno
               </p>
               {vacias.map((c) => renderCategoria(c, true))}
@@ -259,7 +259,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                     </div>
                   )
                 })}
-                <p className="col-span-full text-caption text-muted-foreground/70">
+                <p className="col-span-full text-caption text-muted-foreground">
                   En claro, las causales que se usaron en este turno. Las seis que aparecen en
                   Eléctrica y en Mecánica a la vez son las mismas: Shoplogix manda la causal sin su
                   categoría.

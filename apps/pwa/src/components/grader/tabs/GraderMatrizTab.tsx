@@ -28,9 +28,9 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
           <div className="flex flex-wrap gap-2 mt-1">
             <Badge variant="outline" className={cn(
               'text-caption',
-              analytics.matrixEnhanced.globalHHI > 0.5 && 'text-ink-crit border-red-300',
-              analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-ink-warn border-amber-300',
-              analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-ink-ok border-emerald-300',
+              analytics.matrixEnhanced.globalHHI > 0.5 && 'text-ink-crit border-red-500/[0.25]',
+              analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-ink-warn border-amber-500/[0.25]',
+              analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-ink-ok border-emerald-500/[0.25]',
             )}>
               Concentración: {
                 analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta' :
@@ -40,8 +40,8 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
             </Badge>
             <Badge variant="outline" className={cn(
               'text-caption',
-              analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-ink-crit border-red-300',
-              analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-ink-warn border-amber-300',
+              analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-ink-crit border-red-500/[0.25]',
+              analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-ink-warn border-amber-500/[0.25]',
             )}>
               Desbalance: {(analytics.matrixEnhanced.imbalanceScore * 100).toFixed(1)}%
               <InfoTooltip {...getTooltipProps('matrix.imbalance')} iconSize={11} className="ml-1" />
@@ -85,7 +85,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                         return (
                           <td key={c} className={cn(
                             'py-2 px-2 text-center',
-                            isMax && 'bg-primary/[0.15] ring-1 ring-blue-300',
+                            isMax && 'bg-primary/[0.15] ring-1 ring-blue-500/[0.25]',
                             cell && cell.pct >= 20 && !isMax && 'bg-primary/[0.15]',
                           )}>
                             {cell ? (

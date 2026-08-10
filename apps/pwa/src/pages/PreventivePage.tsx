@@ -99,7 +99,7 @@ export function PreventivePage() {
   // Colores asignados a técnicos (consistente entre renderizados)
   const technicianColors: Record<string, string> = useMemo(() => {
     const colors = [
-      'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-green-500',
+      'bg-blue-500', 'bg-cat-6-tint', 'bg-pink-500', 'bg-green-500',
       'bg-cyan-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500',
       'bg-teal-500', 'bg-orange-500'
     ]
@@ -111,8 +111,8 @@ export function PreventivePage() {
   }, [technicians])
 
   const getColorForTechnician = (userId: string | undefined) => {
-    if (!userId) return 'bg-gray-500'
-    return technicianColors[userId] || 'bg-gray-500'
+    if (!userId) return 'bg-muted-foreground'
+    return technicianColors[userId] || 'bg-muted-foreground'
   }
 
   const getTechnicianName = (userId: string | undefined) => {

@@ -237,7 +237,7 @@ export function PhotoEvidencePage() {
               <p className="text-xs text-muted-foreground">Corregidas</p>
             </div>
             <div className="p-2 bg-cat-6-tint/[0.15] rounded-card text-center">
-              <p className="text-2xl font-bold text-purple-600">{stats.verificadas}</p>
+              <p className="text-2xl font-bold text-cat-6-ink">{stats.verificadas}</p>
               <p className="text-xs text-muted-foreground">Verificadas</p>
             </div>
           </div>
@@ -337,7 +337,7 @@ export function PhotoEvidencePage() {
                     'absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors',
                     selectedForExport.has(evidence.id)
                       ? 'bg-primary border-primary text-primary-foreground'
-                      : 'bg-white/80 border-gray-300 hover:border-primary'
+                      : 'bg-white/80 border-border hover:border-primary'
                   )}
                   onClick={(e) => {
                     e.stopPropagation()

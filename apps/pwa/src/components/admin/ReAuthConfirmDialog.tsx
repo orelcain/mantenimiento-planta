@@ -113,7 +113,7 @@ export function ReAuthConfirmDialog({
           </DialogTitle>
           <DialogDescription className="text-xs">
             {`Introduce tu contraseña ${reason}.`}
-            <span className="block mt-1 text-muted-foreground/70">
+            <span className="block mt-1 text-muted-foreground">
               Sesión activa: <span className="font-mono">{userEmail}</span>
             </span>
           </DialogDescription>

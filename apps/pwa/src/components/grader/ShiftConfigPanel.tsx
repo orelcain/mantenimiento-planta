@@ -143,7 +143,7 @@ export function ShiftConfigPanel({
 
           {/* Distribución calidades */}
           {Object.keys(qualityCount).length > 0 && (
-            <span className="flex items-center gap-0.5 text-caption font-normal text-muted-foreground/70">
+            <span className="flex items-center gap-0.5 text-caption font-normal text-muted-foreground">
               {Object.entries(qualityCount).sort().flatMap(([q, n], i) => [
                 ...(i > 0 ? [<span key={`sep-${i}`} className="text-muted-foreground/30 mx-0.5">·</span>] : []),
                 <span key={q} className={qualityColorTextClass(q)}>{n}×{q}</span>,

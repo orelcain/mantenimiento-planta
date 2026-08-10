@@ -253,7 +253,7 @@ export function AnalisisGraderPeriodoPage() {
               size="sm"
               onClick={handleMigrate}
               disabled={migrating}
-              className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+              className="bg-amber-600 hover:bg-amber-600 text-white shrink-0"
             >
               {migrating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Migrando…</>
@@ -394,7 +394,7 @@ export function AnalisisGraderPeriodoPage() {
       )}
 
       {!loading && error && (
-        <Card className="border-red-300">
+        <Card className="border-red-500/[0.25]">
           <CardContent className="pt-6 pb-6 text-center">
             <p className="text-sm text-destructive">{error}</p>
           </CardContent>

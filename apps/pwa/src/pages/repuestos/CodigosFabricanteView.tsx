@@ -252,7 +252,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         <p className="text-sm text-muted-foreground">Sin resultados en los catálogos ({piezas.length.toLocaleString('es-CL')} filas indexadas).</p>
       )}
       {piezas && query.trim().length < 3 && (
-        <p className="text-footnote text-muted-foreground/70">
+        <p className="text-footnote text-muted-foreground">
           {piezas.length.toLocaleString('es-CL')} filas de despiece indexadas · catálogos: {CATALOGOS.map((c) => c.maquina).join(', ')}.
         </p>
       )}

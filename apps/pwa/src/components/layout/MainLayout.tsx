@@ -1027,7 +1027,7 @@ export function MainLayout() {
                       <div className="text-destructive mt-1">{entry.error}</div>
                     )}
                     {entry.status === 'conflict' && (
-                      <div className="text-amber-700 mt-1">Conflicto detectado</div>
+                      <div className="text-ink-warn mt-1">Conflicto detectado</div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -1046,7 +1046,7 @@ export function MainLayout() {
                           : entry.status === 'error'
                             ? 'text-destructive'
                             : entry.status === 'conflict'
-                              ? 'text-amber-700'
+                              ? 'text-ink-warn'
                               : 'text-amber-600'
                       }
                     >
@@ -1175,7 +1175,7 @@ export function MainLayout() {
 
         {isReadOnly && (
           <div className="fixed inset-0 z-40 flex items-start justify-center pt-24 pointer-events-none">
-            <div className="pointer-events-auto bg-amber-500/[0.15] text-amber-950 px-4 py-3 rounded-card shadow-lg border border-amber-500/[0.25] max-w-md">
+            <div className="pointer-events-auto bg-amber-500/[0.15] text-ink-warn px-4 py-3 rounded-card shadow-lg border border-amber-500/[0.25] max-w-md">
               <div className="font-medium">Modo solo lectura</div>
               <div className="text-sm opacity-90">
                 Estas en una seccion critica sin conexion. Conectate para editar o vuelve al inicio.

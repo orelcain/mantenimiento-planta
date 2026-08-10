@@ -108,7 +108,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
         {busy && <div className="flex items-center gap-2 text-xs text-muted-foreground py-1"><Spinner /> Cargando…</div>}
 
         {!busy && !calc && (
-          <p className="text-xs text-muted-foreground/70 py-1">Sin datos del mes para estimar el OEE del área.</p>
+          <p className="text-xs text-muted-foreground py-1">Sin datos del mes para estimar el OEE del área.</p>
         )}
 
         {!busy && calc && (
@@ -178,7 +178,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
               </div>
             )}
 
-            <div className="flex items-start gap-1.5 text-caption text-muted-foreground/70">
+            <div className="flex items-start gap-1.5 text-caption text-muted-foreground">
               <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
               <span>
                 Estimado. El rendimiento es el de la máquina instrumentada{calc.sinCalidad ? ' y el área no tiene medición de calidad' : ' y la calidad viene del Grader'}; las demás etapas entran a la disponibilidad vía sus paros registrados. Mejora al instrumentar o registrar más.

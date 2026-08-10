@@ -124,7 +124,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
               <span className="text-emerald-400 font-semibold">Shoplogix</span>
               <span className="text-muted-foreground">· en vivo</span>
-              <span className="ml-auto text-muted-foreground/70 normal-case tracking-normal">
+              <span className="ml-auto text-muted-foreground normal-case tracking-normal">
                 {fmtSyncRelative(upstreamSyncedAt)}
               </span>
             </div>
@@ -152,7 +152,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
                       {/* Mismo nombre que el gráfico y la cascada: "Baader N". */}
                       {shortMachineName(m.machineName)}
                     </div>
-                    <div className="text-caption text-muted-foreground/70 tabular-nums">
+                    <div className="text-caption text-muted-foreground tabular-nums">
                       {uptimePct}% uptime
                     </div>
                   </div>
@@ -161,7 +161,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             </div>
           </div>
         ) : (
-          <div className="md:border-r md:pr-4 flex flex-col gap-2 text-xs text-muted-foreground/70">
+          <div className="md:border-r md:pr-4 flex flex-col gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5 text-caption tracking-wider">
               <Radio className="w-3 h-3" />
               <span>Shoplogix</span>
@@ -177,7 +177,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             <FileSpreadsheet className="w-3 h-3 text-ink-info" />
             <span className="text-ink-info font-semibold">Grader</span>
             <span className="text-muted-foreground">· subido</span>
-            <span className="ml-auto text-muted-foreground/70 normal-case tracking-normal">
+            <span className="ml-auto text-muted-foreground normal-case tracking-normal">
               {fmtSyncRelative(summary.updatedAt ? new Date(summary.updatedAt) : null)}
             </span>
           </div>
@@ -268,7 +268,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               </span>
             </span>
             <span
-              className="ml-auto text-muted-foreground/70 cursor-help"
+              className="ml-auto text-muted-foreground cursor-help"
               title="La línea manual no está instrumentada en Shoplogix: sus piezas solo aparecen en el Grader. Si el Excel del turno está incompleto, este reparto todavía puede cambiar."
             >
               ⓘ estimado desde Grader − Baader

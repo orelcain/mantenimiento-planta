@@ -56,7 +56,7 @@ const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> =
 const SEVERITY_COLOR: Record<SuggestedAction['severity'], string> = {
   critical: 'text-red-400',
   warning: 'text-amber-400',
-  recommended: 'text-zinc-400',
+  recommended: 'text-muted-foreground',
 }
 
 const TRIGGER_LABELS: Record<ActionTrigger, string> = {
@@ -240,7 +240,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
             ? 'Acciones sugeridas para el turno en curso — marcá las que ya realizaste'
             : 'Resumen de acciones para este turno'}
           {rulesDescriptor && (
-            <span className="block mt-1 text-caption text-muted-foreground/70 italic">
+            <span className="block mt-1 text-caption text-muted-foreground italic">
               {rulesDescriptor}
             </span>
           )}

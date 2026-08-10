@@ -52,7 +52,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
-          <Table2 className="h-4 w-4 text-purple-500" />
+          <Table2 className="h-4 w-4 text-cat-6-ink" />
           Pivote Error × Calidad × Calibre
           <InfoTooltip {...getTooltipProps('pz.pivote')} />
         </CardTitle>

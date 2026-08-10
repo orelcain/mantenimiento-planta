@@ -227,7 +227,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                   <span className="text-xs text-ink-ok font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>
-                  <Button size="sm" variant="outline" className="ml-2 h-6 text-caption px-2 text-green-700 border-green-400"
+                  <Button size="sm" variant="outline" className="ml-2 h-6 text-caption px-2 text-ink-ok border-green-400"
                     onClick={() => setPhysicalConfig((p) => ({
                       ...p,
                       belts: p.belts.map((b) => b.beltId === belt.beltId

@@ -155,7 +155,7 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
   const CATEGORY_LABEL = {
     operacional:    { label: 'Atacables (operacionales)',     color: 'text-cat-5-ink'   },
     organizacional: { label: 'Ineludibles (organizacionales)', color: 'text-cat-7-ink'  },
-    sin_clasificar: { label: 'Sin clasificar',                color: 'text-slate-500'    },
+    sin_clasificar: { label: 'Sin clasificar',                color: 'text-muted-foreground'    },
   } as const
   for (const e of entries) {
     if (e.category !== lastCategory) {
@@ -552,7 +552,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                   value={fmtSec(cat.unclassifiedSec)}
                   sub={`${((cat.unclassifiedSec / cat.totalSec) * 100).toFixed(0)}% — clasificar para análisis preciso`}
                   icon={<Tag className="w-3.5 h-3.5" />}
-                  valueColor="text-slate-400"
+                  valueColor="text-muted-foreground"
                 />
               )}
             </div>

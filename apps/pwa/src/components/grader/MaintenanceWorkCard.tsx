@@ -127,7 +127,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
               />
             </div>
 
-            <p className="text-caption text-muted-foreground/70 leading-snug">
+            <p className="text-caption text-muted-foreground leading-snug">
               TPM: el valor no está en apagar incendios sino en convertir cada falla en prevención
               (causa raíz → preventiva/predicción) para que el equipo no vuelva a fallar y la producción se afine.
             </p>

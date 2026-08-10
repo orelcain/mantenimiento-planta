@@ -362,7 +362,7 @@ export function MinuteDetailDialog({
                     {bucket?.dominantCalibre && (
                       <>
                         <span className="text-muted-foreground"> · </span>
-                        <span className="text-muted-foreground/80">Calibre: {bucket.dominantCalibre}</span>
+                        <span className="text-muted-foreground">Calibre: {bucket.dominantCalibre}</span>
                       </>
                     )}
                   </>
@@ -412,7 +412,7 @@ export function MinuteDetailDialog({
                       <span className="text-muted-foreground"> ({breakdown.topP0Cause.pieces} {breakdown.topP0Cause.pieces === 1 ? 'pza' : 'pzas'}, {breakdown.topP0Cause.pctOfP0.toFixed(0)}% de las P0)</span>
                     </span>
                   </div>
-                  <div className="text-muted-foreground/90 mt-0.5">
+                  <div className="text-muted-foreground mt-0.5">
                     {SUGGESTION_BY_CAUSE[breakdown.topP0Cause.id]}
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export function MinuteDetailDialog({
                 <Info className="h-4 w-4 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium">Detalle individual parcial</div>
-                  <div className="text-amber-800/90 dark:text-amber-200/80 mt-0.5">
+                  <div className="text-ink-warn/90 dark:text-ink-warn/80 mt-0.5">
                     Las piezas productivas (gates 1-12) se muestran agregadas por gate.
                     El detalle pieza-por-pieza solo está disponible para las P0 en turnos
                     históricos (bulk upload antiguo no subió las productivas).

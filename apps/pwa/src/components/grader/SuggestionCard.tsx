@@ -124,7 +124,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.ignoreFn}
-                className="px-3 py-1.5 rounded-ctl border border-slate-600 hover:bg-slate-700 text-muted-foreground text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl border border-border hover:bg-slate-700 text-muted-foreground text-xs transition-colors"
               >
                 Ignorar
               </button>

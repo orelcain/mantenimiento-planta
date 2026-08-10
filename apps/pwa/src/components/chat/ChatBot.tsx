@@ -341,7 +341,7 @@ function MessageBubble({
         {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
         {/* #7 — Indicador fuente de datos */}
         {dataSource.length > 0 && (
-          <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground/70">
+          <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground">
             <Database className="w-2.5 h-2.5" />
             <span>{dataSource.join(' · ')}</span>
           </div>
@@ -478,7 +478,7 @@ import type { AgentStatusEvent } from '@/services/ariaOrchestrator'
 function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
   const phaseStyles: Record<string, { color: string; animate: boolean }> = {
     analyzing: { color: 'text-blue-400', animate: true },
-    selecting: { color: 'text-purple-400', animate: true },
+    selecting: { color: 'text-cat-6-ink', animate: true },
     calling: { color: 'text-amber-400', animate: true },
     streaming: { color: 'text-green-400', animate: true },
     fallback: { color: 'text-cat-4-ink', animate: true },
@@ -737,7 +737,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
     : technicians
 
   return (
-    <div className="px-3 py-2 border-t border-amber-300 bg-amber-500/[0.15] dark:border-amber-700">
+    <div className="px-3 py-2 border-t border-amber-500/[0.25] bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
       <div className="flex items-center gap-2 mb-1.5">
         <AlertTriangle className="w-4 h-4 text-ink-warn flex-shrink-0" />
         <span className="text-xs text-ink-warn flex-1 font-medium">
@@ -758,7 +758,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="mb-2">
           <button
             onClick={() => { setShowEquipmentPicker(p => !p); setShowTechPicker(false) }}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-amber-300 dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-100 dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
+            className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-amber-500/[0.25] dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-500/[0.15] dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
           >
             <span className="truncate">
               <Factory className="inline size-3.5" /> {pendingData?.equipmentName
@@ -803,7 +803,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        c.score >= 0.7 ? 'bg-green-500' : c.score >= 0.4 ? 'bg-amber-500' : 'bg-gray-400'
+                        c.score >= 0.7 ? 'bg-green-500' : c.score >= 0.4 ? 'bg-amber-500' : 'bg-muted-foreground'
                       }`} />
                       <span className="truncate flex-1" title={c.nombre}>{c.nombre}</span>
                       <span className="text-caption text-muted-foreground flex-shrink-0">{c.codigo}</span>
@@ -823,7 +823,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             currentTechId === userId ? (
               <button
                 onClick={() => { onAssignTechnician('', '') }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-green-300 dark:border-green-600 bg-green-500/[0.15] hover:bg-green-100 dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-emerald-500/[0.25] dark:border-green-600 bg-green-500/[0.15] hover:bg-emerald-500/[0.15] dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
               >
                 <CheckCircle className="w-3.5 h-3.5 text-ink-ok flex-shrink-0" />
                 <span className="truncate"><HardHat className="inline size-3" /> Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
@@ -831,7 +831,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             ) : (
               <button
                 onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-500/[0.25] dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
               >
                 <span className="inline-flex items-center gap-1"><HardHat className="size-3" /> Autoasignarme esta incidencia</span>
               </button>
@@ -841,7 +841,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             <>
               <button
                 onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-500/[0.25] dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-500/[0.15] dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
               >
                 <span className="truncate">
                   <HardHat className="inline size-3" /> {currentTechName
@@ -910,14 +910,14 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-600 text-white hover:bg-emerald-600 transition-colors font-medium"
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar
         </button>
         <button
           onClick={onModify}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-600 transition-colors font-medium"
         >
           <Pencil className="size-3" />
           Modificar
@@ -1449,7 +1449,7 @@ export function ChatBot() {
                               <span className={`inline-block w-1.5 h-1.5 rounded-full ${
                                 agent.status === 'online' ? 'bg-green-500'
                                 : agent.status === 'rate-limited' ? 'bg-amber-500'
-                                : agent.status === 'disabled' ? 'bg-gray-400'
+                                : agent.status === 'disabled' ? 'bg-muted-foreground'
                                 : 'bg-red-500'
                               }`} />
                             </div>
@@ -1471,7 +1471,7 @@ export function ChatBot() {
                   onClick={toggleThinking}
                   className={`p-1.5 rounded-ctl transition-colors ${
                     thinkingEnabled
-                      ? 'bg-cat-6-tint/[0.15] text-purple-400 hover:bg-cat-6-tint/[0.15]'
+                      ? 'bg-cat-6-tint/[0.15] text-cat-6-ink hover:bg-cat-6-tint/[0.15]'
                       : 'hover:bg-background text-muted-foreground hover:text-foreground'
                   }`}
                   title={thinkingEnabled ? 'Pensamiento profundo: ACTIVO — click para desactivar' : 'Activar pensamiento profundo'}

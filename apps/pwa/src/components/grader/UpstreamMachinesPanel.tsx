@@ -683,7 +683,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
     <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-emerald-900 text-emerald-300 tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-emerald-500/[0.25] text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Tiempo total procesando (suma de las 3 Baaders)"
       >
         ▲ {fmtDurationSec(totals.uptimeSec)}
@@ -701,7 +701,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-amber-500/[0.15] border-amber-500/[0.25] text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
           <Coffee className="h-3 w-3" />
@@ -725,7 +725,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       <Badge
         variant="outline"
-        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] dark:border-slate-700 dark:text-slate-300 tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] dark:border-border dark:text-muted-foreground tabular-nums text-caption px-2 py-0.5 h-5"
         title={
           `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
           `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`
@@ -738,14 +738,14 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-emerald-900 text-emerald-300 tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-emerald-500/[0.25] text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-amber-500/[0.15] border-amber-500/[0.25] text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5"
         title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
@@ -886,7 +886,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             </Badge>
           )}
           {microAlert && (
-            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
+            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
               <AlertTriangle className="w-3 h-3" /> Atención
             </Badge>
           )}
@@ -1076,7 +1076,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
                                 <span>{comentario}</span>
                               </span>
                             ) : (
-                              <span className="text-muted-foreground dark:text-slate-700">—</span>
+                              <span className="text-muted-foreground dark:text-muted-foreground">—</span>
                             )}
                           </td>
                         </tr>
@@ -1350,7 +1350,7 @@ export function UpstreamMachinesPanel({
                   "operación real" no se entendía sin abrir el tooltip. */}
               eje: {framedOnProduction ? 'solo con proceso' : 'turno completo'}
               {axisRangeLabel && (
-                <span className="hidden md:inline text-muted-foreground/80"> · {axisRangeLabel}</span>
+                <span className="hidden md:inline text-muted-foreground"> · {axisRangeLabel}</span>
               )}
             </button>
           )}

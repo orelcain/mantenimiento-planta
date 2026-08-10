@@ -93,7 +93,7 @@ export function CauseTooltip({ meta }: Props) {
                 {LEVEL_LABELS[meta.level]}
               </span>
             </div>
-            <p className="text-muted-foreground/80 italic text-caption">
+            <p className="text-muted-foreground italic text-caption">
               Marelec HMI: &ldquo;{meta.translation}&rdquo;
             </p>
           </div>

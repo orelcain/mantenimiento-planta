@@ -1504,7 +1504,7 @@ export function AnalisisGraderTurnoPage() {
                 </span>
                 {shiftScheduleInfo && (
                   <span
-                    className="text-caption tabular-nums text-muted-foreground/80 shrink-0"
+                    className="text-caption tabular-nums text-muted-foreground shrink-0"
                     title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftMeta.period})`}
                   >
                     {shiftScheduleInfo.startTime}–{shiftScheduleInfo.endTime}
@@ -1811,7 +1811,7 @@ export function AnalisisGraderTurnoPage() {
               <Zap className="w-4 h-4 text-cat-6-ink mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cat-6-ink">Shoplogix — Evisceradoras Baader 142</p>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Se sincroniza automáticamente cada 5 min cuando las máquinas están en operación.
                   No requiere acción manual.
                 </p>
@@ -1826,7 +1826,7 @@ export function AnalisisGraderTurnoPage() {
               <Upload className="w-4 h-4 text-ink-info mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Grader Matrix — Informe de turno</p>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Exportar Excel de Matrix al cierre del turno y cargarlo para ver P0%, causas y timeline.
                 </p>
               </div>
@@ -1850,7 +1850,7 @@ export function AnalisisGraderTurnoPage() {
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>
                 </div>
