@@ -68,8 +68,16 @@ export interface PublicMonitorLive {
   topStops: Array<{ reason: string; sec: number; count: number }>
 }
 
+/**
+ * `shift` sigue un turno fijo; `line` sigue el turno VIGENTE de la línea y el
+ * backend le cambia solo el turno al que apunta (link que no se regenera).
+ * Ausente en los docs creados antes del modo línea → se tratan como `shift`.
+ */
+export type MonitorMode = 'shift' | 'line'
+
 export interface PublicShiftMonitorDoc {
   token: string
+  mode?: MonitorMode
   plantSlug: string
   dateKey: string
   shiftId: string
@@ -86,14 +94,16 @@ export interface PublicShiftMonitorDoc {
   live: PublicMonitorLive | null
 }
 
-/** Duraciones que acepta el backend (horas). */
-export const MONITOR_TTL_CHOICES = [12, 24, 72, 168] as const
+/** Duraciones que acepta el backend (horas). 720 = 30 días. */
+export const MONITOR_TTL_CHOICES = [12, 24, 72, 168, 720] as const
 export type MonitorTtlHours = (typeof MONITOR_TTL_CHOICES)[number]
 
 export interface CreateMonitorParams {
+  mode?: MonitorMode
   plantSlug: string
-  dateKey: string
-  shiftId: string
+  /** Obligatorios en modo `shift`; ignorados en modo `line`. */
+  dateKey?: string
+  shiftId?: string
   plantLineId?: string
   areaLabel?: string
   lineLabel?: string
@@ -113,9 +123,12 @@ async function callable<TReq extends object, TRes>(name: string, data: TReq): Pr
 }
 
 /**
- * Genera el link público del turno. Requiere rol supervisor/admin (lo valida
- * el backend). Falla si el turno todavía no tiene datos sincronizados — así el
- * link no nace apuntando a una pantalla vacía.
+ * Genera el link público. Requiere rol supervisor/admin (lo valida el backend).
+ *
+ * En modo `shift` falla si el turno todavía no tiene datos sincronizados — así
+ * el link no nace apuntando a una pantalla vacía. En modo `line` se permite
+ * crearlo fuera de turno (justamente sirve para el próximo), pero no sobre una
+ * línea que nunca sincronizó.
  */
 export function createPublicShiftMonitor(
   params: CreateMonitorParams,

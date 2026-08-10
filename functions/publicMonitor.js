@@ -15,6 +15,14 @@
  * Frescura: lo refresca el trigger del doc padre del turno, que el sync
  * reescribe cada ~5 min mientras el turno corre.
  *
+ * Dos modos de link:
+ *   - `shift` — sigue UN turno concreto. Sirve para compartir "el turno de
+ *     ayer" y deja de moverse cuando ese turno termina.
+ *   - `line`  — sigue el turno VIGENTE de la línea. Es el que se le deja fijo a
+ *     Control de Producción: el mismo QR pegado en la pared vale mañana, porque
+ *     en cada refresco el backend vuelve a resolver qué turno está corriendo
+ *     (ver `resolveCurrentShiftDocId`).
+ *
  * ⚠ Convención de tiempos (la misma del resto del módulo): los timestamps de
  * TURNO (`scheduledStart/End`, `effectiveStart/End`, intervals, states) son
  * wall-clock de planta guardado como UTC → se formatean con getUTC*. En
@@ -78,6 +86,72 @@ function currentStateOf(states) {
 function statusOf(state) {
   if (!state) return 'sin-datos'
   return state.type === 'uptime' ? 'produciendo' : 'detenida'
+}
+
+/** dateKey (wall-clock de planta) desplazado `n` días. */
+function shiftDateKey(nowWall, n) {
+  const d = new Date(nowWall.getTime() + n * 86_400_000)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Resuelve qué turno está vigente en una línea AHORA. Es el corazón del modo
+ * `line`: gracias a esto el mismo link sirve mañana sin regenerarlo.
+ *
+ * Cómo elige, en orden:
+ *   1. El turno cuya ventana contiene el reloj de planta (con 30 min de gracia
+ *      al final, porque `scheduledEnd` se deriva del último intervalo
+ *      sincronizado y siempre va unos minutos atrasado).
+ *   2. Si ninguno lo contiene (estamos entre turnos), el último que YA empezó.
+ *      Preferible a no mostrar nada: quien abre el QL a las 20:00 quiere ver
+ *      cómo terminó el turno, no una pantalla vacía.
+ *
+ * Solo mira los dateKey de hoy y ayer: un turno noche que arranca 21:30 queda
+ * archivado bajo el día en que arrancó, así que a las 02:00 el vigente es de
+ * "ayer". Se leen 2-6 docs padre; nada de subcolecciones.
+ *
+ * ⚠ Se resuelve SIEMPRE de nuevo, nunca se adopta el turno que disparó el
+ * trigger: el re-sync móvil reescribe padres de ayer y de hace 2-3 días, y
+ * adoptarlos haría saltar el monitor a un turno viejo.
+ *
+ * @returns {Promise<string|null>} shiftDocId, o null si la línea no tiene turnos recientes.
+ */
+async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPolling.toChileWall(new Date())) {
+  const wanted = new Set([shiftDateKey(nowWall, 0), shiftDateKey(nowWall, -1)])
+
+  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+  const candidates = refs.filter(r => wanted.has(r.id.slice(0, 10)))
+  if (candidates.length === 0) return null
+
+  const docs = await db.getAll(...candidates)
+  const parsed = []
+  for (const snap of docs) {
+    if (!snap.exists) continue
+    const d = snap.data() || {}
+    const start = toDate(d.scheduledStart)
+    const end = toDate(d.scheduledEnd)
+    if (!start) continue
+    const pieces = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+    // `Unscheduled` son las horas ENTRE turnos (limpieza, calibración). Solo
+    // vale como turno si acumuló producción de verdad — mismo umbral que usa
+    // la PWA para no disfrazar 20 ciclos sueltos de turno real.
+    if (/unscheduled/i.test(d.shiftId || snap.id) && pieces < 50) continue
+    parsed.push({ id: snap.id, start, end, pieces })
+  }
+  if (parsed.length === 0) return null
+
+  const nowMs = nowWall.getTime()
+  const GRACE_MS = 30 * 60 * 1000
+
+  const vigente = parsed
+    .filter(p => p.start.getTime() <= nowMs && (!p.end || nowMs <= p.end.getTime() + GRACE_MS))
+    .sort((a, b) => b.start.getTime() - a.start.getTime())[0]
+  if (vigente) return vigente.id
+
+  const yaEmpezados = parsed
+    .filter(p => p.start.getTime() <= nowMs)
+    .sort((a, b) => b.start.getTime() - a.start.getTime())
+  return yaEmpezados[0]?.id ?? null
 }
 
 /**
@@ -256,9 +330,47 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   }
 }
 
+/**
+ * Refresca un monitor. En modo `line` además re-resuelve qué turno está
+ * vigente, así que devuelve también los campos de identidad del turno para que
+ * la cabecera del link cambie sola al cambiar de turno.
+ *
+ * @returns {Promise<object|null>} patch a mergear en el doc, o null si no hay nada que publicar.
+ */
+async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map()) {
+  const plantSlug = monitor.plantSlug
+  if (!plantSlug) return null
+
+  if (monitor.mode !== 'line') {
+    const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId)
+    return live ? { live } : null
+  }
+
+  // Modo línea: el turno vigente se resuelve una vez por planta y se reusa
+  // entre los monitores de esa misma línea.
+  let shiftDocId = currentShiftDocIdByPlant.get(plantSlug)
+  if (shiftDocId === undefined) {
+    shiftDocId = await resolveCurrentShiftDocId(db, plantSlug)
+    currentShiftDocIdByPlant.set(plantSlug, shiftDocId)
+  }
+  if (!shiftDocId) return null
+
+  const live = await buildMonitorLive(db, plantSlug, shiftDocId)
+  if (!live) return null
+
+  return {
+    live,
+    shiftDocId,
+    dateKey: shiftDocId.slice(0, 10),
+    shiftId: shiftDocId.slice(11),
+  }
+}
+
 module.exports = {
   COLLECTION,
   buildMonitorLive,
+  buildMonitorPatch,
+  resolveCurrentShiftDocId,
   // exportados para tests
   currentStateOf,
   statusOf,

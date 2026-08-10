@@ -16,7 +16,7 @@ import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
-import { createPublicShiftMonitor, revokePublicShiftMonitor, MONITOR_TTL_CHOICES, type MonitorTtlHours } from '@/services/shoplogix/publicShiftMonitor.service'
+import { createPublicShiftMonitor, revokePublicShiftMonitor, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -620,7 +620,8 @@ export function AnalisisGraderTurnoPage() {
   // Grader; este publica el avance del turno y se refresca solo con cada sync.
   const [monitorUrl, setMonitorUrl] = useState<string | null>(null)
   const [monitorToken, setMonitorToken] = useState<string | null>(null)
-  const [monitorTtl, setMonitorTtl] = useState<MonitorTtlHours>(24)
+  const [monitorMode, setMonitorMode] = useState<MonitorMode>('line')
+  const [monitorTtl, setMonitorTtl] = useState<MonitorTtlHours>(720)
   const [monitorBusy, setMonitorBusy] = useState(false)
   const [monitorCopied, setMonitorCopied] = useState(false)
   const [monitorError, setMonitorError] = useState<string | null>(null)
@@ -1470,7 +1471,9 @@ export function AnalisisGraderTurnoPage() {
     setMonitorError(null)
     try {
       const { token } = await createPublicShiftMonitor({
+        mode:            monitorMode,
         plantSlug:       plantLineCfg.plantSlug,
+        // En modo línea el backend ignora estos dos y resuelve el turno vigente.
         dateKey:         slx.dateKey,
         shiftId:         slx.shiftId,
         plantLineId:     plantLineCfg.id,
@@ -1488,7 +1491,7 @@ export function AnalisisGraderTurnoPage() {
     } finally {
       setMonitorBusy(false)
     }
-  }, [upstreamLine.snapshot, upstreamLine.source, plantLineCfg, monitorTtl])
+  }, [upstreamLine.snapshot, upstreamLine.source, plantLineCfg, monitorTtl, monitorMode])
 
   const handleRevokeMonitor = useCallback(async () => {
     if (!monitorToken) return
@@ -2279,10 +2282,31 @@ export function AnalisisGraderTurnoPage() {
                 Comparte el avance de piezas de {plantLineCfg.machineKind?.long ?? 'la línea'} con
                 Control de Producción: piezas del turno, pz/min, pz/hora, horario y detenciones.
                 Sin login y solo lectura — se actualiza solo con cada sync.
+                {monitorMode === 'line'
+                  ? ' El link sigue el turno que esté corriendo: el mismo QR sirve mañana.'
+                  : ' El link queda fijo en este turno.'}
               </p>
 
               {!monitorUrl && (
                 <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-[11px] text-muted-foreground" htmlFor="monitor-mode">
+                    Qué sigue
+                  </label>
+                  <select
+                    id="monitor-mode"
+                    value={monitorMode}
+                    onChange={(e) => {
+                      const m = e.target.value as MonitorMode
+                      setMonitorMode(m)
+                      // El sentido del link de línea es no regenerarlo: nace con
+                      // la vigencia larga. El de un turno puntual, con 1 día.
+                      setMonitorTtl(m === 'line' ? 720 : 24)
+                    }}
+                    className="h-7 rounded border border-border bg-background px-2 text-xs"
+                  >
+                    <option value="line">El turno vigente (no hay que regenerarlo)</option>
+                    <option value="shift">Solo este turno</option>
+                  </select>
                   <label className="text-[11px] text-muted-foreground" htmlFor="monitor-ttl">
                     Vigencia
                   </label>
@@ -2350,7 +2374,8 @@ export function AnalisisGraderTurnoPage() {
                         Escanear con el celular
                       </div>
                       <p className="text-[10px] text-muted-foreground/60">
-                        Vence en {monitorTtl < 24 ? `${monitorTtl} horas` : monitorTtl === 24 ? '1 día' : `${monitorTtl / 24} días`}
+                        {monitorMode === 'line' ? 'Sigue el turno vigente · vence en ' : 'Este turno · vence en '}
+                        {monitorTtl < 24 ? `${monitorTtl} horas` : monitorTtl === 24 ? '1 día' : `${monitorTtl / 24} días`}
                       </p>
                     </div>
                   </div>

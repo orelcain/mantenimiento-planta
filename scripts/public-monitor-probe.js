@@ -21,6 +21,24 @@ const { buildMonitorLive, COLLECTION } = require('../functions/publicMonitor')
 async function main() {
   const args = process.argv.slice(2)
 
+  // `--current` resuelve qué turno considera vigente el modo línea, para cada
+  // planta. Contrastarlo con la realidad ANTES de dejar un link fijo colgado.
+  if (args[0] === '--current') {
+    const { resolveCurrentShiftDocId } = require('../functions/publicMonitor')
+    for (const p of ['chonchi', 'yal', 'filete']) {
+      const id = await resolveCurrentShiftDocId(db, p)
+      let detalle = ''
+      if (id) {
+        const d = (await db.doc(`shoplogix/${p}/shifts/${id}`).get()).data() || {}
+        const pz = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+        const hh = (t) => t?.toDate?.().toISOString().slice(11, 16) ?? '—'
+        detalle = `  ${hh(d.scheduledStart)}→${hh(d.scheduledEnd)}  ${pz} pz`
+      }
+      console.log(`${p.padEnd(8)} → ${id ?? 'SIN TURNO VIGENTE'}${detalle}`)
+    }
+    return
+  }
+
   if (args[0] === '--revoke') {
     await db.collection(COLLECTION).doc(args[1]).delete()
     console.log('Monitor borrado:', args[1])
@@ -59,12 +77,15 @@ async function main() {
   if (write) {
     const token = randomUUID()
     const now = new Date()
+    // `--line` crea el monitor en modo línea (sigue el turno vigente); si no,
+    // queda fijo en el turno indicado.
+    const mode = args.includes('--line') ? 'line' : 'shift'
     await db.collection(COLLECTION).doc(token).set({
-      token, plantSlug,
+      token, mode, plantSlug,
       dateKey: shiftDocId.slice(0, 10),
       shiftId: shiftDocId.slice(11),
       shiftDocId,
-      scope: `${plantSlug}|${shiftDocId}`,
+      scope: mode === 'line' ? `line|${plantSlug}` : `${plantSlug}|${shiftDocId}`,
       plantLineId: 'chonchi-filete',
       areaLabel: 'Filete',
       lineLabel: 'P. Principal',

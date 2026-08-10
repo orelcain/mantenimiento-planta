@@ -8160,8 +8160,9 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
 
 const publicMonitorMod = require('./publicMonitor')
 
-/** Duraciones ofrecidas al generar el link (horas). */
-const MONITOR_TTL_CHOICES = [12, 24, 72, 168]
+/** Duraciones ofrecidas al generar el link (horas). 720 = 30 dias, para el
+ *  link de linea que se pega en la pared y no se regenera. */
+const MONITOR_TTL_CHOICES = [12, 24, 72, 168, 720]
 const MONITOR_TTL_DEFAULT = 24
 
 async function _assertSupervisorCaller(request) {
@@ -8176,36 +8177,67 @@ async function _assertSupervisorCaller(request) {
 }
 
 /**
- * Crea el link público de monitoreo de un turno y devuelve su token.
+ * Crea el link público de monitoreo y devuelve su token.
  *
- * data: { plantSlug, dateKey, shiftId, plantLineId?, areaLabel?, lineLabel?,
- *         machineKindLong?, targetPieces?, ttlHours? }
+ * Dos modos:
+ *   - `shift` (default) — sigue UN turno; exige que ese turno exista.
+ *   - `line`            — sigue el turno VIGENTE de la línea, resuelto de nuevo
+ *                         en cada refresco. Es el link que no hay que regenerar
+ *                         cada día. Se permite crearlo aunque ahora mismo no
+ *                         haya turno corriendo (justamente sirve para mañana),
+ *                         pero sí se exige que la línea tenga turnos alguna vez.
+ *
+ * data: { mode?, plantSlug, dateKey?, shiftId?, plantLineId?, areaLabel?,
+ *         lineLabel?, machineKindLong?, targetPieces?, ttlHours? }
  */
 exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (request) => {
   const { uid, user } = await _assertSupervisorCaller(request)
 
+  const mode = request.data?.mode === 'line' ? 'line' : 'shift'
   const plantSlug = String(request.data?.plantSlug ?? '').trim()
-  const dateKey   = String(request.data?.dateKey ?? '').trim()
-  const shiftId   = String(request.data?.shiftId ?? '').trim()
-  if (!plantSlug || !dateKey || !shiftId) {
-    throw new HttpsError('invalid-argument', 'plantSlug, dateKey y shiftId son obligatorios')
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-    throw new HttpsError('invalid-argument', 'dateKey debe ser YYYY-MM-DD')
+  if (!plantSlug) throw new HttpsError('invalid-argument', 'plantSlug es obligatorio')
+
+  let dateKey = String(request.data?.dateKey ?? '').trim()
+  let shiftId = String(request.data?.shiftId ?? '').trim()
+  let live = null
+  let shiftDocId = null
+
+  if (mode === 'line') {
+    shiftDocId = await publicMonitorMod.resolveCurrentShiftDocId(db, plantSlug)
+    if (shiftDocId) {
+      live = await publicMonitorMod.buildMonitorLive(db, plantSlug, shiftDocId)
+      dateKey = shiftDocId.slice(0, 10)
+      shiftId = shiftDocId.slice(11)
+    } else {
+      // Sin turnos recientes: puede ser fin de semana o parada de planta. Se
+      // deja nacer el link (mostrará "esperando el próximo turno"), pero no si
+      // la línea NUNCA tuvo turnos — eso es un plantSlug mal escrito.
+      const any = await db.collection(`shoplogix/${plantSlug}/shifts`).limit(1).get()
+      if (any.empty) {
+        throw new HttpsError('not-found', `La línea ${plantSlug} no tiene turnos sincronizados`)
+      }
+      dateKey = ''
+      shiftId = ''
+    }
+  } else {
+    if (!dateKey || !shiftId) {
+      throw new HttpsError('invalid-argument', 'dateKey y shiftId son obligatorios en modo turno')
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      throw new HttpsError('invalid-argument', 'dateKey debe ser YYYY-MM-DD')
+    }
+    shiftDocId = `${dateKey}_${shiftId}`
+    // El turno tiene que existir: un link que nace apuntando a la nada solo se
+    // descubre cuando el destinatario lo abre y ve "sin datos".
+    live = await publicMonitorMod.buildMonitorLive(db, plantSlug, shiftDocId)
+    if (!live) {
+      throw new HttpsError('not-found', `El turno ${shiftDocId} de ${plantSlug} no tiene datos sincronizados`)
+    }
   }
 
   const ttlHours = MONITOR_TTL_CHOICES.includes(Number(request.data?.ttlHours))
     ? Number(request.data.ttlHours)
     : MONITOR_TTL_DEFAULT
-
-  const shiftDocId = `${dateKey}_${shiftId}`
-
-  // El turno tiene que existir: un link que nace apuntando a la nada solo se
-  // descubre cuando el destinatario lo abre y ve "sin datos".
-  const live = await publicMonitorMod.buildMonitorLive(db, plantSlug, shiftDocId)
-  if (!live) {
-    throw new HttpsError('not-found', `El turno ${shiftDocId} de ${plantSlug} no tiene datos sincronizados`)
-  }
 
   const token = randomUUID()
   const now = new Date()
@@ -8214,12 +8246,15 @@ exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (requ
 
   await db.collection(publicMonitorMod.COLLECTION).doc(token).set({
     token,
+    mode,
     plantSlug,
     dateKey,
     shiftId,
     shiftDocId,
     // Clave de búsqueda del trigger: una sola igualdad, sin índice compuesto.
-    scope: `${plantSlug}|${shiftDocId}`,
+    // Los de línea se enganchan a CUALQUIER escritura de turno de su planta,
+    // porque el turno al que apuntan cambia solo.
+    scope: mode === 'line' ? `line|${plantSlug}` : `${plantSlug}|${shiftDocId}`,
     plantLineId:     request.data?.plantLineId ? String(request.data.plantLineId) : null,
     areaLabel:       request.data?.areaLabel ? String(request.data.areaLabel) : null,
     lineLabel:       request.data?.lineLabel ? String(request.data.lineLabel) : null,
@@ -8235,7 +8270,7 @@ exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (requ
     live,
   })
 
-  logger.info('[publicShiftMonitor] creado', { token, plantSlug, shiftDocId, ttlHours, uid })
+  logger.info('[publicShiftMonitor] creado', { token, mode, plantSlug, shiftDocId, ttlHours, uid })
   return { token, expiresAt: new Date(now.getTime() + ttlHours * 3600 * 1000).toISOString(), ttlHours }
 })
 
@@ -8259,21 +8294,27 @@ exports.revokePublicShiftMonitor = onCall({ region: 'us-central1' }, async (requ
 })
 
 /**
- * Refresca los monitores públicos de un turno cada vez que el sync reescribe
- * su doc padre (~cada 5 min mientras el turno corre).
+ * Refresca los monitores públicos cada vez que el sync reescribe el doc padre
+ * de un turno (~cada 5 min mientras el turno corre).
  *
  * Se engancha al PADRE y no a `machines/{id}`: el padre se escribe una sola vez
  * por ciclo de sync, mientras que la subcolección dispara un evento por máquina
  * (3 en Eviscerado) y los tres compondrían el mismo payload.
+ *
+ * Atiende dos audiencias con una sola query (`in` de dos igualdades, sin índice
+ * compuesto): los monitores de ESE turno y los de la LÍNEA completa. Estos
+ * últimos no adoptan el turno del evento — vuelven a resolver cuál está
+ * vigente, porque el re-sync móvil reescribe padres de días anteriores y
+ * adoptarlos haría saltar el monitor a un turno viejo.
  */
 exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
   { document: 'shoplogix/{plant}/shifts/{shiftDoc}', region: 'us-central1' },
   async (event) => {
     const { plant, shiftDoc } = event.params
-    const scope = `${plant}|${shiftDoc}`
+    const scopes = [`${plant}|${shiftDoc}`, `line|${plant}`]
 
     const monitors = await db.collection(publicMonitorMod.COLLECTION)
-      .where('scope', '==', scope)
+      .where('scope', 'in', scopes)
       .get()
     if (monitors.empty) return
 
@@ -8281,16 +8322,27 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     const activos = monitors.docs.filter(d => String(d.data()?.expiresAt || '') > nowIso)
     if (activos.length === 0) return
 
-    let live
-    try {
-      live = await publicMonitorMod.buildMonitorLive(db, plant, shiftDoc)
-    } catch (err) {
-      logger.error('[publicShiftMonitor] no se pudo componer el live', { scope, error: err.message })
-      return
-    }
-    if (!live) return
+    // El turno vigente se resuelve UNA vez por planta y se comparte entre todos
+    // los monitores de línea de este evento.
+    const currentByPlant = new Map()
+    let refrescados = 0
 
-    await Promise.all(activos.map(d => d.ref.set({ live }, { merge: true })))
-    logger.info('[publicShiftMonitor] refrescados', { scope, monitores: activos.length, piezas: live.totalPieces })
+    for (const d of activos) {
+      try {
+        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant)
+        if (!patch) continue
+        await d.ref.set(patch, { merge: true })
+        refrescados++
+      } catch (err) {
+        // Un monitor roto no puede tumbar el refresco de los demás.
+        logger.error('[publicShiftMonitor] no se pudo refrescar', { token: d.id, error: err.message })
+      }
+    }
+
+    if (refrescados > 0) {
+      logger.info('[publicShiftMonitor] refrescados', {
+        plant, shiftDoc, monitores: refrescados, turnoVigente: currentByPlant.get(plant) ?? null,
+      })
+    }
   },
 )

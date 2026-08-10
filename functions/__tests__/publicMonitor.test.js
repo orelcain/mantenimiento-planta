@@ -189,3 +189,155 @@ test('currentStateOf prefiere isCurrent y cae al último por tiempo', () => {
   assert.equal(statusOf(a), 'produciendo')
   assert.equal(statusOf(c), 'detenida')
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Modo `line`: el link que NO hay que regenerar cada día.
+//
+// Lo que se juega acá es que el QR pegado en la pared apunte siempre al turno
+// correcto. Los dos modos de equivocarse son simétricos y ambos rompen la
+// confianza en la pantalla: quedarse pegado en el turno de ayer, o saltar a un
+// turno viejo porque el re-sync móvil reescribió su doc padre.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { resolveCurrentShiftDocId, buildMonitorPatch } = require('../publicMonitor')
+
+/** db falso con varios docs padre de turno, direccionables por id. */
+function fakeShiftsDb(parents, machinesByShift = {}) {
+  const ids = Object.keys(parents)
+  return {
+    collection: (path) => ({
+      listDocuments: async () => ids.map(id => ({ id, path: `${path}/${id}` })),
+      limit: () => ({ get: async () => ({ empty: ids.length === 0 }) }),
+    }),
+    getAll: async (...refs) => refs.map(r => ({
+      id: r.id,
+      exists: true,
+      data: () => parents[r.id],
+    })),
+    doc: (path) => {
+      const id = path.split('/shifts/')[1]
+      return {
+        get: async () => ({ exists: !!parents[id], data: () => parents[id] }),
+        collection: () => ({
+          get: async () => {
+            const ms = machinesByShift[id] || []
+            return { empty: ms.length === 0, docs: ms.map((m, i) => ({ id: m.machineid || `m${i}`, data: () => m })) }
+          },
+        }),
+      }
+    },
+  }
+}
+
+const hoy = (h, m = 0) => {
+  const w = nowWall()
+  return new Date(Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), h, m))
+}
+const dk = (d) => d.toISOString().slice(0, 10)
+
+test('modo línea: elige el turno cuya ventana contiene el reloj de planta', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  // Turno "vigente" = una ventana de 2 h centrada en el ahora; el otro terminó
+  // varias horas antes.
+  const vigenteId = `${dk(w)}_Turno Dia`
+  const viejoId = `${dk(w)}_Turno Madrugada`
+
+  const db = fakeShiftsDb({
+    [viejoId]:   { shiftId: 'Turno Madrugada', scheduledStart: hoy(Math.max(0, hora - 8)), scheduledEnd: hoy(Math.max(1, hora - 6)), machines: [{ totalCycles: 900 }] },
+    [vigenteId]: { shiftId: 'Turno Dia',       scheduledStart: hoy(hora, 0),               scheduledEnd: new Date(w.getTime() + 60 * 60_000), machines: [{ totalCycles: 500 }] },
+  })
+
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), vigenteId)
+})
+
+test('modo línea: entre turnos cae al último que ya empezó, no a una pantalla vacía', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  if (hora < 3) return   // a esta hora no se puede construir el escenario "más temprano hoy"
+
+  const tempranoId = `${dk(w)}_Turno A`
+  const anteriorId = `${dk(w)}_Turno B`
+
+  const db = fakeShiftsDb({
+    [tempranoId]: { shiftId: 'Turno A', scheduledStart: hoy(0), scheduledEnd: hoy(1), machines: [{ totalCycles: 100 }] },
+    [anteriorId]: { shiftId: 'Turno B', scheduledStart: hoy(hora - 3), scheduledEnd: hoy(hora - 2), machines: [{ totalCycles: 800 }] },
+  })
+
+  // Ninguno contiene el ahora (el más reciente terminó hace ~2 h, fuera de la
+  // gracia de 30 min) → gana el que arrancó más tarde.
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), anteriorId)
+})
+
+test('modo línea: un turno FUTURO todavía no es el vigente', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  if (hora > 20) return
+
+  const actualId = `${dk(w)}_Turno Dia`
+  const futuroId = `${dk(w)}_Turno Noche`
+
+  const db = fakeShiftsDb({
+    [actualId]: { shiftId: 'Turno Dia',   scheduledStart: hoy(Math.max(0, hora - 1)), scheduledEnd: new Date(w.getTime() + 30 * 60_000), machines: [{ totalCycles: 400 }] },
+    [futuroId]: { shiftId: 'Turno Noche', scheduledStart: new Date(w.getTime() + 3 * 3600_000), scheduledEnd: new Date(w.getTime() + 11 * 3600_000), machines: [] },
+  })
+
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), actualId)
+})
+
+test('modo línea: Unscheduled con ruido no se disfraza de turno', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  const realId = `${dk(w)}_Turno Dia`
+  const ruidoId = `${dk(w)}_Unscheduled`
+
+  const db = fakeShiftsDb({
+    [realId]:  { shiftId: 'Turno Dia',   scheduledStart: hoy(Math.max(0, hora - 2)), scheduledEnd: new Date(w.getTime() + 60 * 60_000), machines: [{ totalCycles: 3000 }] },
+    // Arranca DESPUÉS que el real: sin el filtro de ruido ganaría por ser el más reciente.
+    [ruidoId]: { shiftId: 'Unscheduled', scheduledStart: hoy(Math.max(0, hora - 1)), scheduledEnd: new Date(w.getTime() + 60 * 60_000), machines: [{ totalCycles: 12 }] },
+  })
+
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), realId)
+})
+
+test('modo línea: sin turnos de hoy ni de ayer devuelve null (no inventa uno viejo)', async () => {
+  const db = fakeShiftsDb({
+    '2026-01-05_Turno Dia': { shiftId: 'Turno Dia', scheduledStart: iso(Date.UTC(2026, 0, 5, 9)), scheduledEnd: iso(Date.UTC(2026, 0, 5, 17)), machines: [{ totalCycles: 3000 }] },
+  })
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', nowWall()), null)
+})
+
+test('el patch de un monitor de línea reapunta el turno; el de un turno fijo no se mueve', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  const vigenteId = `${dk(w)}_Turno Dia`
+  const viejoId = '2026-01-05_Turno Dia'
+
+  const maquina = (cycles) => ({
+    machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+    totalCycles: cycles, shiftRuntime: 0.8,
+    shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+    intervals: intervals(hoy(Math.max(0, hora - 1)).getTime(), 6, 50),
+    states: [],
+  })
+
+  const db = fakeShiftsDb(
+    {
+      [vigenteId]: { shiftId: 'Turno Dia', scheduledStart: hoy(Math.max(0, hora - 1)), scheduledEnd: new Date(w.getTime() + 3600_000), machines: [{ totalCycles: 300 }] },
+      [viejoId]:   { shiftId: 'Turno Dia', scheduledStart: iso(Date.UTC(2026, 0, 5, 9)), scheduledEnd: iso(Date.UTC(2026, 0, 5, 17)), machines: [{ totalCycles: 3000 }] },
+    },
+    { [vigenteId]: [maquina(300)], [viejoId]: [maquina(3000)] },
+  )
+
+  // El monitor de línea guardaba el turno de enero: debe saltar al vigente.
+  const linea = await buildMonitorPatch(db, { mode: 'line', plantSlug: 'filete', shiftDocId: viejoId })
+  assert.equal(linea.shiftDocId, vigenteId)
+  assert.equal(linea.dateKey, dk(w))
+  assert.equal(linea.shiftId, 'Turno Dia')
+  assert.equal(linea.live.totalPieces, 300)
+
+  // El de turno fijo se queda donde está, aunque haya uno vigente.
+  const fijo = await buildMonitorPatch(db, { mode: 'shift', plantSlug: 'filete', shiftDocId: viejoId })
+  assert.equal(fijo.shiftDocId, undefined, 'un link de turno fijo no debe reapuntar')
+  assert.equal(fijo.live.totalPieces, 3000)
+})
