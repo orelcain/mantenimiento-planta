@@ -30,7 +30,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
 
   if (!before && !after) {
     return (
-      <div className="rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
+      <div className="rounded-card border border-dashed border-muted-foreground/30 p-8 text-center">
         <p className="text-muted-foreground">No hay fotos disponibles</p>
       </div>
     )
@@ -75,7 +75,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
               </span>
               {before ? (
                 <div
-                  className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted cursor-pointer group"
+                  className="relative aspect-[4/3] rounded-card overflow-hidden bg-muted cursor-pointer group"
                   onClick={() => handleImageClick('before')}
                 >
                   <img
@@ -93,7 +93,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
                   )}
                 </div>
               ) : (
-                <div className="aspect-[4/3] rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                <div className="aspect-[4/3] rounded-card border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
                   <span className="text-xs text-muted-foreground">Sin foto</span>
                 </div>
               )}
@@ -107,7 +107,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
               </span>
               {after ? (
                 <div
-                  className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted cursor-pointer group"
+                  className="relative aspect-[4/3] rounded-card overflow-hidden bg-muted cursor-pointer group"
                   onClick={() => handleImageClick('after')}
                 >
                   <img
@@ -125,7 +125,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
                   )}
                 </div>
               ) : (
-                <div className="aspect-[4/3] rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                <div className="aspect-[4/3] rounded-card border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
                   <span className="text-xs text-muted-foreground">Pendiente</span>
                 </div>
               )}
@@ -136,7 +136,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
         {/* Vista con slider */}
         {viewMode === 'slider' && before && after && (
           <div
-            className="relative aspect-[4/3] rounded-lg overflow-hidden cursor-ew-resize select-none"
+            className="relative aspect-[4/3] rounded-card overflow-hidden cursor-ew-resize select-none"
             onMouseMove={handleSliderChange}
             onTouchMove={(e) => {
               const rect = e.currentTarget.getBoundingClientRect()
@@ -178,10 +178,10 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             </div>
 
             {/* Labels */}
-            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded">
+            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-ctl">
               ANTES
             </div>
-            <div className="absolute top-2 right-2 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded">
+            <div className="absolute top-2 right-2 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-ctl">
               DESPUÉS
             </div>
           </div>
@@ -203,7 +203,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
               className="w-full h-full object-contain"
             />
             <div className={cn(
-              "absolute top-4 left-4 px-3 py-1.5 text-white text-sm font-medium rounded",
+              "absolute top-4 left-4 px-3 py-1.5 text-white text-sm font-medium rounded-ctl",
               fullscreenImage === 'before' ? 'bg-red-500' : 'bg-green-500'
             )}>
               {fullscreenImage === 'before' ? 'ANTES' : 'DESPUÉS'}

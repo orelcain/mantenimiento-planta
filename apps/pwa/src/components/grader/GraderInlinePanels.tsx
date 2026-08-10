@@ -62,7 +62,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
       <div className="rounded-card border border-blue-200 dark:border-blue-800 bg-primary/[0.15] p-3">
-        <p className="text-caption font-semibold uppercase tracking-wider text-primary mb-1.5">
+        <p className="text-caption font-semibold tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
         <ul className="space-y-1">
@@ -78,7 +78,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Causas probables en grid 2 cols */}
       {output.likelyCauses.length > 0 && (
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-caption font-semibold tracking-wider text-muted-foreground mb-2">
             Causas probables
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -125,7 +125,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Acciones recomendadas como checklist visual con prioridad */}
       {output.recommendedActions.length > 0 && (
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-caption font-semibold tracking-wider text-muted-foreground mb-2">
             Acciones recomendadas
           </p>
           <div className="space-y-1.5">
@@ -171,7 +171,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
         <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.15] p-3">
-          <p className="text-caption font-semibold uppercase tracking-wider text-ink-ok mb-2">
+          <p className="text-caption font-semibold tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
           <div className="space-y-1.5">
@@ -191,7 +191,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
         <div className="p-2.5 bg-amber-500/[0.15] rounded-card border border-amber-200 dark:border-amber-800">
-          <p className="text-caption font-semibold uppercase tracking-wider text-ink-warn mb-1">Advertencias</p>
+          <p className="text-caption font-semibold tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-caption text-ink-warn">{d}</p>
           ))}

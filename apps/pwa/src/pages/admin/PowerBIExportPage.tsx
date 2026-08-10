@@ -61,7 +61,7 @@ function CorridaRow({ corrida }: { corrida: PowerBIExportCorrida }) {
         )}
       </span>
       {corrida.solicitadaPor && (
-        <span className="text-[11px] text-muted-foreground hidden sm:inline truncate max-w-[10rem]">
+        <span className="text-caption text-muted-foreground hidden sm:inline truncate max-w-[10rem]">
           {corrida.solicitadaPor}
         </span>
       )}

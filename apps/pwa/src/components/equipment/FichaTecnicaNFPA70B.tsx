@@ -151,7 +151,7 @@ function SectionTitle({
     <div className="flex items-center gap-2">
       <Icon className="h-4 w-4 text-muted-foreground" />
       <h3 className="text-sm font-semibold">{children}</h3>
-      {hint && <span className="text-[11px] text-muted-foreground">· {hint}</span>}
+      {hint && <span className="text-caption text-muted-foreground">· {hint}</span>}
     </div>
   )
 }
@@ -547,7 +547,7 @@ export function FichaTecnicaNFPA70B({
           )}
 
           {!editing && (
-            <div className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-dashed p-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap rounded-ctl border border-dashed p-2.5">
               <span className="text-xs text-muted-foreground">
                 Próxima inspección sugerida:{' '}
                 <span className="font-medium text-foreground">{sugeridaFecha.toLocaleDateString()}</span> — criticidad{' '}
@@ -601,12 +601,12 @@ export function FichaTecnicaNFPA70B({
           </div>
 
           {addingEntry && (
-            <div className="rounded-lg border p-3 space-y-3">
+            <div className="rounded-card border p-3 space-y-3">
               <div className="grid md:grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs">Tipo</Label>
                   <select
-                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    className="w-full h-9 rounded-ctl border border-input bg-background px-2 text-sm"
                     value={draft.tipo}
                     onChange={(e) => setDraft((d) => ({ ...d, tipo: e.target.value as MaintenanceLogEntry['tipo'] }))}
                   >
@@ -641,7 +641,7 @@ export function FichaTecnicaNFPA70B({
                     </Button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-caption text-muted-foreground">
                   Condición 1 · como nuevo, sin alertas — Condición 2 · con desvíos, requiere atención — Condición 3 ·
                   acción correctiva requerida.
                 </p>
@@ -654,19 +654,19 @@ export function FichaTecnicaNFPA70B({
                     const medicion = m?.tipo === 'medicion'
                     const fuera = medicion && fueraDeRango(t.valor, m?.rango)
                     return (
-                      <div key={t.id} className="rounded-md border p-2 space-y-1">
+                      <div key={t.id} className="rounded-ctl border p-2 space-y-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="text-xs font-medium">{t.tarea}</div>
-                            {m?.nota && <div className="text-[10px] text-muted-foreground">{m.nota}</div>}
+                            {m?.nota && <div className="text-caption text-muted-foreground">{m.nota}</div>}
                           </div>
-                          <div className="inline-flex shrink-0 overflow-hidden rounded-md border">
+                          <div className="inline-flex shrink-0 overflow-hidden rounded-ctl border">
                             {CHK_ESTADO.map((st) => (
                               <button
                                 key={st.value}
                                 type="button"
                                 onClick={() => setChkItem(i, { estado: st.value })}
-                                className={`px-2 py-1 text-[11px] ${t.estado === st.value ? st.on : 'bg-background text-muted-foreground'}`}
+                                className={`px-2 py-1 text-caption ${t.estado === st.value ? st.on : 'bg-background text-muted-foreground'}`}
                                 title={st.value === 'ok' ? 'Conforme' : st.value === 'obs' ? 'Observación' : 'No evaluado / N/A'}
                               >
                                 {st.label}
@@ -685,9 +685,9 @@ export function FichaTecnicaNFPA70B({
                                 value={t.valor ?? ''}
                                 onChange={(e) => setChkItem(i, { valor: e.target.value })}
                               />
-                              {m?.unidad && <span className="text-[10px] text-muted-foreground">{m.unidad}</span>}
+                              {m?.unidad && <span className="text-caption text-muted-foreground">{m.unidad}</span>}
                               {m?.rango && (
-                                <span className={`text-[10px] ${fuera ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                <span className={`text-caption ${fuera ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                   ok: {rangoText(m.rango)}
                                   {fuera ? ' · fuera' : ''}
                                 </span>
@@ -703,7 +703,7 @@ export function FichaTecnicaNFPA70B({
                           {m?.instrumento && (
                             <button
                               type="button"
-                              className="text-[10px] text-muted-foreground underline decoration-dotted"
+                              className="text-caption text-muted-foreground underline decoration-dotted"
                               onClick={() => setChkItem(i, { estado: 'na', detalle: 'falta de instrumento' })}
                               title={`Marcar N/A por falta de ${m.instrumento}`}
                             >
@@ -715,7 +715,7 @@ export function FichaTecnicaNFPA70B({
                     )
                   })}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1">
+                <p className="text-caption text-muted-foreground mt-1">
                   Conforme · Observación · No evaluado (N/A). En medición anota el valor (se resalta si sale del rango
                   sugerido). Solo se guardan las tareas evaluadas o con valor. Rangos = sugeridos (afinar con el fabricante).
                 </p>
@@ -729,7 +729,7 @@ export function FichaTecnicaNFPA70B({
                   onChange={(e) => setDraft((d) => ({ ...d, hallazgo: e.target.value }))}
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Si el tipo es una inspección (inspección/termografía/medición/preventivo/predictivo), al guardar se
                 actualiza la condición del equipo según la severidad y se reprograma la próxima inspección
                 (criticidad × condición).
@@ -765,7 +765,7 @@ export function FichaTecnicaNFPA70B({
                 const lid = e.source === 'log' ? e.logId : undefined
                 if (lid && editLogId === lid) {
                   return (
-                    <div key={e.key} className="space-y-2 rounded-md border bg-muted p-2">
+                    <div key={e.key} className="space-y-2 rounded-ctl border bg-muted p-2">
                       <div className="grid grid-cols-2 gap-2">
                         <Input
                           type="date"
@@ -814,12 +814,12 @@ export function FichaTecnicaNFPA70B({
                     <span className="text-sm flex-1 min-w-0">
                       <span className="font-semibold">{e.tipoLabel}</span>
                       {e.source === 'incidencia' && (
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground"> · incidencia</span>
+                        <span className="text-caption tracking-wide text-muted-foreground"> · incidencia</span>
                       )}
                       {' — '}
                       {e.texto}
                       {e.checklist && e.checklist.length > 0 && (
-                        <span className="ml-1 text-[10px] text-muted-foreground">
+                        <span className="ml-1 text-caption text-muted-foreground">
                           · {e.checklist.filter((t) => t.estado === 'ok').length}✓ {e.checklist.filter((t) => t.estado === 'obs').length}⚠
                         </span>
                       )}
@@ -852,7 +852,7 @@ export function FichaTecnicaNFPA70B({
         </CardContent>
       </Card>
 
-      <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+      <div className="flex items-start gap-2 text-caption text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           Estructura basada en NFPA 70B (placa · criticidad/condición · historial), según el material del

@@ -84,7 +84,7 @@ function formatLine(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs">$1</code>')
+    .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded-ctl text-xs">$1</code>')
     // #7 — Links internos clickeables
     .replace(/\[\[equipo:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="equipment" data-name="$1">🔧 $1</a>')
     .replace(/\[\[incidencia:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="incident" data-name="$1">🎫 $1</a>')
@@ -98,7 +98,7 @@ function PhotoPreview({ src, onRemove }: { src: string; onRemove: () => void }) 
       <img 
         src={src} 
         alt="Preview" 
-        className="w-20 h-20 object-cover rounded-lg border border-border"
+        className="w-20 h-20 object-cover rounded-card border border-border"
       />
       <button
         onClick={onRemove}
@@ -201,10 +201,10 @@ function MiniChart({ data }: { data: MiniChartData }) {
 
   return (
     <div className="mt-2 mb-1">
-      {data.title && <p className="text-[10px] text-muted-foreground font-medium mb-1">{data.title}</p>}
+      {data.title && <p className="text-caption text-muted-foreground font-medium mb-1">{data.title}</p>}
       <canvas
         ref={canvasRef}
-        className="w-full rounded-md border border-border/50 bg-background"
+        className="w-full rounded-ctl border border-border/50 bg-background"
         style={{ height: data.type === 'donut' ? 120 : 100 }}
       />
     </div>
@@ -221,7 +221,7 @@ function MessagePhotos({ urls }: { urls: string[] }) {
           <img 
             src={url} 
             alt={`Foto ${i + 1}`}
-            className="w-24 h-24 object-cover rounded-md border border-border hover:opacity-80 transition-opacity cursor-pointer" 
+            className="w-24 h-24 object-cover rounded-ctl border border-border hover:opacity-80 transition-opacity cursor-pointer" 
           />
         </a>
       ))}
@@ -238,7 +238,7 @@ function ActionButtons({ actions, onNavigate }: { actions: ChatAction[]; onNavig
         <button
           key={action.route}
           onClick={() => onNavigate(action.route)}
-          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
         >
           <ExternalLink className="w-3 h-3" />
           {action.label}
@@ -341,7 +341,7 @@ function MessageBubble({
         {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
         {/* #7 — Indicador fuente de datos */}
         {dataSource.length > 0 && (
-          <div className="flex items-center gap-1 mt-1 text-[9px] text-muted-foreground/70">
+          <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground/70">
             <Database className="w-2.5 h-2.5" />
             <span>{dataSource.join(' · ')}</span>
           </div>
@@ -351,7 +351,7 @@ function MessageBubble({
         <div className={`flex items-center justify-between mt-1 ${
           isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
         }`}>
-          <span className="text-[10px]">
+          <span className="text-caption">
             {msg.timestamp.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
           </span>
           <div className="flex items-center gap-0.5 ml-2">
@@ -359,7 +359,7 @@ function MessageBubble({
             {!isUser && msg.content.length > 20 && (
               <button
                 onClick={handleCopy}
-                className="p-0.5 rounded hover:bg-background/50 transition-colors"
+                className="p-0.5 rounded-ctl hover:bg-background/50 transition-colors"
                 title={copied ? 'Copiado' : 'Copiar respuesta'}
               >
                 {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
@@ -378,14 +378,14 @@ function MessageBubble({
             {/* Feedback thumbs */}
             {!isUser && msg.id !== 'welcome' && msg.content.length > 30 && (
               feedbackGiven ? (
-                <span className="text-[10px] ml-1">
+                <span className="text-caption ml-1">
                   {feedbackGiven === 'positive' ? '✓ Útil' : '✓ Registrado'}
                 </span>
               ) : (
                 <>
                   <button
                     onClick={() => handleFeedback('positive')}
-                    className="p-0.5 rounded hover:bg-background/50 transition-colors"
+                    className="p-0.5 rounded-ctl hover:bg-background/50 transition-colors"
                     title="Respuesta útil"
                   >
                     <ThumbsUp className="w-3 h-3" />
@@ -404,33 +404,33 @@ function MessageBubble({
 
           {/* Formulario de corrección (se expande tras thumbs down) */}
           {showCorrection && !feedbackGiven && (
-            <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-lg space-y-1.5">
-              <div className="text-[11px] font-medium text-ink-warn">
+            <div className="mt-2 p-2 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card space-y-1.5">
+              <div className="text-caption font-medium text-ink-warn">
                 ✏️ ¿Cuál era la respuesta correcta?
               </div>
               <textarea
                 value={correctionText}
                 onChange={e => setCorrectionText(e.target.value)}
                 placeholder="Ej: Solo hay 4 motores para la Baader 142, el AMPLIFICADOR ELECTRONICO no es un motor..."
-                className="w-full text-xs px-2 py-1.5 rounded-md border border-amber-500/[0.25] bg-background resize-none focus:ring-1 focus:ring-amber-500/50 focus:outline-none"
+                className="w-full text-xs px-2 py-1.5 rounded-ctl border border-amber-500/[0.25] bg-background resize-none focus:ring-1 focus:ring-amber-500/50 focus:outline-none"
                 rows={3}
                 autoFocus
               />
               <div className="flex gap-1.5">
                 <button
                   onClick={handleSubmitCorrection}
-                  className="flex-1 text-[10px] py-1 px-2 rounded bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
+                  className="flex-1 text-caption py-1 px-2 rounded-ctl bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
                 >
                   {correctionText.trim() ? 'Enviar corrección' : 'Marcar como incorrecto'}
                 </button>
                 <button
                   onClick={handleSkipCorrection}
-                  className="text-[10px] py-1 px-2 rounded border border-border hover:bg-muted transition-colors text-muted-foreground"
+                  className="text-caption py-1 px-2 rounded-ctl border border-border hover:bg-muted transition-colors text-muted-foreground"
                 >
                   Omitir
                 </button>
               </div>
-              <div className="text-[9px] text-muted-foreground">
+              <div className="text-caption text-muted-foreground">
                 Tu corrección ayuda a ARIA a mejorar. Se usa como contexto en futuras consultas similares.
               </div>
             </div>
@@ -448,7 +448,7 @@ function StreamingBubble({ content }: { content: string }) {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-card border border-border text-foreground">
+      <div className="max-w-[85%] rounded-card px-3 py-2 text-sm leading-relaxed bg-card border border-border text-foreground">
         <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(content)) }} />
         <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
       </div>
@@ -463,7 +463,7 @@ function LoadingIndicator() {
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="bg-card border border-border rounded-lg px-3 py-2 flex gap-1.5 items-center">
+      <div className="bg-card border border-border rounded-card px-3 py-2 flex gap-1.5 items-center">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Consultando datos de la planta...</span>
       </div>
@@ -488,7 +488,7 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
 
   return (
     <div className="flex gap-2 items-center mb-1">
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/80 border border-border/50 text-[11px] max-w-[85%] overflow-hidden">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/80 border border-border/50 text-caption max-w-[85%] overflow-hidden">
         {style.animate && (
           <Loader2 className={`w-3 h-3 animate-spin ${style.color} shrink-0`} />
         )}
@@ -515,7 +515,7 @@ function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/c
     vision: '👁️ visión',
   }
   return (
-    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground opacity-70 flex-wrap">
+    <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground opacity-70 flex-wrap">
       <span>{agentInfo.agentEmoji}</span>
       <span>{agentInfo.agentName}</span>
       <span>·</span>
@@ -555,7 +555,7 @@ const QUICK_SUGGESTIONS = [
 function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5 px-3 py-2 border-t border-border bg-muted">
-      <span className="w-full text-[10px] text-muted-foreground mb-0.5">Sugerencias rápidas:</span>
+      <span className="w-full text-caption text-muted-foreground mb-0.5">Sugerencias rápidas:</span>
       {QUICK_SUGGESTIONS.map(suggestion => (
         <button
           key={suggestion}
@@ -757,7 +757,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="mb-2">
           <button
             onClick={() => { setShowEquipmentPicker(p => !p); setShowTechPicker(false) }}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-amber-300 dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-100 dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
+            className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-amber-300 dark:border-amber-600 bg-amber-500/[0.15] hover:bg-amber-100 dark:hover:bg-amber-500/[0.15] transition-colors flex items-center justify-between"
           >
             <span className="truncate">
               <Factory className="inline size-3.5" /> {pendingData?.equipmentName
@@ -767,7 +767,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             <ChevronUp className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${showEquipmentPicker ? '' : 'rotate-180'}`} />
           </button>
           {showEquipmentPicker && (
-            <div className="mt-1 rounded-md border border-border bg-background shadow-lg">
+            <div className="mt-1 rounded-ctl border border-border bg-background shadow-lg">
               {/* Buscador de equipos */}
               <div className="px-2 py-1.5 border-b border-border">
                 <input
@@ -775,7 +775,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                   value={equipmentSearch}
                   onChange={e => setEquipmentSearch(e.target.value)}
                   placeholder="Buscar equipo…"
-                  className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  className="w-full text-xs px-2 py-1 rounded-ctl border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                   autoFocus
                 />
               </div>
@@ -805,7 +805,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                         c.score >= 0.7 ? 'bg-green-500' : c.score >= 0.4 ? 'bg-amber-500' : 'bg-gray-400'
                       }`} />
                       <span className="truncate flex-1" title={c.nombre}>{c.nombre}</span>
-                      <span className="text-[9px] text-muted-foreground flex-shrink-0">{c.codigo}</span>
+                      <span className="text-caption text-muted-foreground flex-shrink-0">{c.codigo}</span>
                     </button>
                   ))
                 )}
@@ -822,7 +822,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             currentTechId === userId ? (
               <button
                 onClick={() => { onAssignTechnician('', '') }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-green-300 dark:border-green-600 bg-green-500/[0.15] hover:bg-green-100 dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-green-300 dark:border-green-600 bg-green-500/[0.15] hover:bg-green-100 dark:hover:bg-green-500/[0.15] transition-colors flex items-center gap-2"
               >
                 <CheckCircle className="w-3.5 h-3.5 text-ink-ok flex-shrink-0" />
                 <span className="truncate"><HardHat className="inline size-3" /> Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
@@ -830,7 +830,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             ) : (
               <button
                 onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center gap-2"
               >
                 <span className="inline-flex items-center gap-1"><HardHat className="size-3" /> Autoasignarme esta incidencia</span>
               </button>
@@ -840,7 +840,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
             <>
               <button
                 onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
-                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
+                className="w-full text-left text-xs px-2 py-1.5 rounded-ctl border border-blue-300 dark:border-blue-600 bg-primary/[0.15] hover:bg-blue-100 dark:hover:bg-primary/[0.15] transition-colors flex items-center justify-between"
               >
                 <span className="truncate">
                   <HardHat className="inline size-3" /> {currentTechName
@@ -850,14 +850,14 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                 <ChevronUp className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${showTechPicker ? '' : 'rotate-180'}`} />
               </button>
               {showTechPicker && (
-                <div className="mt-1 rounded-md border border-border bg-background shadow-lg">
+                <div className="mt-1 rounded-ctl border border-border bg-background shadow-lg">
                   <div className="px-2 py-1.5 border-b border-border">
                     <input
                       type="text"
                       value={techSearch}
                       onChange={e => setTechSearch(e.target.value)}
                       placeholder="Buscar técnico…"
-                      className="w-full text-xs px-2 py-1 rounded border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      className="w-full text-xs px-2 py-1 rounded-ctl border border-border bg-muted focus:outline-none focus:ring-1 focus:ring-primary/50"
                       autoFocus
                     />
                   </div>
@@ -891,7 +891,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                             >
                               <RolIcon className="size-3 shrink-0 text-muted-foreground" />
                               <span className="truncate flex-1" title={fullName}>{fullName}</span>
-                              <span className="text-[9px] text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
+                              <span className="text-caption text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
                             </button>
                           )
                         })}
@@ -909,20 +909,20 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar
         </button>
         <button
           onClick={onModify}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
         >
           ✏️ Modificar
         </button>
         <button
           onClick={onCancel}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-muted text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-ctl bg-muted text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
         >
           <XCircle className="w-3 h-3" />
           Cancelar
@@ -1365,7 +1365,7 @@ export function ChatBot() {
       {isOpen && (
         <div
           style={{ width: chatWidth }}
-          className="fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden"
+          className="fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-card shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden"
         >
           {/* Resize handle (left edge) */}
           <div
@@ -1385,7 +1385,7 @@ export function ChatBot() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold">ARIA — Asistente de Planta</h3>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   {pendingAction?.status === 'confirming'
                     ? 'Acción pendiente de confirmación'
                     : thinkingEnabled
@@ -1400,7 +1400,7 @@ export function ChatBot() {
                 <div className="relative" ref={agentSelectorRef}>
                   <button
                     onClick={() => setShowAgentSelector(p => !p)}
-                    className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] transition-colors ${
+                    className={`flex items-center gap-1 px-1.5 py-1 rounded-ctl text-caption transition-colors ${
                       selectedAgent
                         ? 'bg-primary/[0.15] text-blue-400 hover:bg-primary/[0.15]'
                         : 'hover:bg-background text-muted-foreground hover:text-foreground'
@@ -1416,8 +1416,8 @@ export function ChatBot() {
                     <ChevronDown className={`w-3 h-3 transition-transform ${showAgentSelector ? 'rotate-180' : ''}`} />
                   </button>
                   {showAgentSelector && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modelo IA</div>
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-card shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="px-3 py-1.5 text-caption font-medium text-muted-foreground tracking-wider">Modelo IA</div>
                       {/* Auto option */}
                       <button
                         onClick={() => { changeAgent(null); setShowAgentSelector(false) }}
@@ -1451,7 +1451,7 @@ export function ChatBot() {
                                 : 'bg-red-500'
                               }`} />
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
+                            <div className="text-caption text-muted-foreground">
                               {agent.costTier === 'free' ? 'Gratis' : agent.costTier === 'cheap' ? 'Económico' : 'Moderado'}
                               {' · '}
                               {agent.status === 'online' ? 'Disponible' : agent.status === 'disabled' ? 'Sin API key' : agent.status}
@@ -1467,7 +1467,7 @@ export function ChatBot() {
               {canThink && (
                 <button
                   onClick={toggleThinking}
-                  className={`p-1.5 rounded-md transition-colors ${
+                  className={`p-1.5 rounded-ctl transition-colors ${
                     thinkingEnabled
                       ? 'bg-cat-6-tint/[0.15] text-purple-400 hover:bg-cat-6-tint/[0.15]'
                       : 'hover:bg-background text-muted-foreground hover:text-foreground'
@@ -1480,7 +1480,7 @@ export function ChatBot() {
               {/* Ver — mostrar/ocultar el avatar de video de ARIA */}
               <button
                 onClick={() => setAvatarShow(v => !v)}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-1.5 rounded-ctl transition-colors ${
                   avatarShow
                     ? 'bg-primary/20 text-primary hover:bg-primary/30'
                     : 'hover:bg-background text-muted-foreground hover:text-foreground'
@@ -1492,7 +1492,7 @@ export function ChatBot() {
               {/* Escuchar — auto-leer las respuestas de ARIA en voz alta */}
               <button
                 onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-1.5 rounded-ctl transition-colors ${
                   autoSpeak
                     ? 'bg-primary/20 text-primary hover:bg-primary/30'
                     : 'hover:bg-background text-muted-foreground hover:text-foreground'
@@ -1503,14 +1503,14 @@ export function ChatBot() {
               </button>
               <button
                 onClick={clearHistory}
-                className="p-1.5 rounded-md hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 rounded-ctl hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
                 title="Limpiar historial"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
               <button
                 onClick={toggle}
-                className="p-1.5 rounded-md hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 rounded-ctl hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
                 title="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -1546,7 +1546,7 @@ export function ChatBot() {
                     <div className="flex items-center gap-2 ml-9 mt-1">
                       <button
                         onClick={retryLastMessage}
-                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded-md hover:bg-muted"
+                        className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded-ctl hover:bg-muted"
                         title="Reintentar respuesta"
                       >
                         <RotateCcw className="w-3 h-3" />
@@ -1566,7 +1566,7 @@ export function ChatBot() {
               <div>
                 {agentStatus && (
                   <div className="mb-1 ml-9">
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-caption text-muted-foreground">
                       {agentStatus.agentEmoji} {agentStatus.agentName}
                     </span>
                   </div>
@@ -1607,15 +1607,15 @@ export function ChatBot() {
           <div className="border-t border-border px-3 py-2 bg-background relative">
             {/* #8 + #10 — Dropdown: búsquedas recientes (colapsable) o slash commands */}
             {showDropdown && dropdownItems.length > 0 && (
-              <div className="absolute bottom-full left-0 right-0 mx-3 mb-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="absolute bottom-full left-0 right-0 mx-3 mb-1 bg-background border border-border rounded-card shadow-lg max-h-48 overflow-y-auto z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
                 {input.trim().toLowerCase().startsWith('/mis') && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Star className="inline size-3" /> Mis plantillas guardadas</div>
+                  <div className="px-3 py-1 text-caption text-muted-foreground border-b border-border"><Star className="inline size-3" /> Mis plantillas guardadas</div>
                 )}
                 {input.trim().startsWith('/') && !input.trim().toLowerCase().startsWith('/mis') && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Zap className="inline size-3" /> Comandos rápidos</div>
+                  <div className="px-3 py-1 text-caption text-muted-foreground border-b border-border"><Zap className="inline size-3" /> Comandos rápidos</div>
                 )}
                 {!input.trim().startsWith('/') && showRecents && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border"><Clock className="inline size-3" /> Búsquedas recientes</div>
+                  <div className="px-3 py-1 text-caption text-muted-foreground border-b border-border"><Clock className="inline size-3" /> Búsquedas recientes</div>
                 )}
                 {dropdownItems.map((item, i) => (
                   <div key={i} className="flex items-center hover:bg-muted transition-colors">
@@ -1673,7 +1673,7 @@ export function ChatBot() {
                     setShowRecents(prev => !prev)
                     setShowDropdown(prev => !prev)
                   }}
-                  className={`p-2 rounded-lg transition-colors ${showRecents ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
+                  className={`p-2 rounded-card transition-colors ${showRecents ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
                   title={showRecents ? 'Ocultar recientes' : 'Búsquedas recientes'}
                 >
                   <ChevronUp className={`w-4 h-4 transition-transform ${showRecents ? '' : 'rotate-180'}`} />
@@ -1683,7 +1683,7 @@ export function ChatBot() {
               <button
                 onClick={() => photoInputRef.current?.click()}
                 disabled={isLoading || photoFiles.length >= 3}
-                className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors"
+                className="p-2 rounded-card bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors"
                 title={photoFiles.length >= 3 ? 'Máximo 3 fotos' : 'Adjuntar foto'}
               >
                 <Camera className="w-4 h-4" />
@@ -1702,7 +1702,7 @@ export function ChatBot() {
               {voiceSupported && (
                 <button
                   onClick={toggleConvo}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-card transition-colors ${
                     convoMode
                       ? 'bg-primary text-primary-foreground animate-pulse'
                       : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
@@ -1718,7 +1718,7 @@ export function ChatBot() {
                 <button
                   onClick={isListening ? stopListening : startListening}
                   disabled={isLoading}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-card transition-colors ${
                     isListening
                       ? 'bg-destructive text-destructive-foreground animate-pulse'
                       : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
@@ -1739,7 +1739,7 @@ export function ChatBot() {
                 onKeyDown={handleKeyDown}
                 placeholder={isListening ? 'Escuchando...' : pendingAction?.status === 'confirming' ? 'Sí / No / Modificar...' : 'Pregunta, /comando o describe una falla...'}
                 disabled={isLoading}
-                className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
+                className="flex-1 text-sm px-3 py-2 rounded-card border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
               />
 
               {/* #5 v2.60 — Save template button */}
@@ -1752,7 +1752,7 @@ export function ChatBot() {
                   }
                 }}
                 disabled={!input.trim() || input.trim().startsWith('/') || isLoading}
-                className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-amber-500 hover:bg-muted/80 disabled:opacity-30 transition-colors"
+                className="p-2 rounded-card bg-muted text-muted-foreground hover:text-amber-500 hover:bg-muted/80 disabled:opacity-30 transition-colors"
                 title="Guardar como plantilla"
               >
                 <Star className="w-4 h-4" />
@@ -1761,13 +1761,13 @@ export function ChatBot() {
               <button
                 onClick={handleSend}
                 disabled={(!input.trim() && photoFiles.length === 0) || isLoading}
-                className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-card bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Enviar"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 text-center">
+            <p className="text-caption text-muted-foreground mt-1 text-center">
               ARIA v6 · Powered by Gemini AI · /ayuda · /mis para plantillas
             </p>
           </div>

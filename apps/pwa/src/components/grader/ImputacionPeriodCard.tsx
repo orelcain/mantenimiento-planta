@@ -61,7 +61,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
           <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />
-          <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
+          <p className="text-caption font-semibold text-muted-foreground tracking-wide">
             Imputación del período
           </p>
           <span

@@ -391,7 +391,7 @@ export function MobileHomeGrid() {
 
         return (
           <div key={group.label} className="space-y-1.5">
-            <p className="text-caption font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
+            <p className="text-caption font-semibold tracking-widest text-muted-foreground px-0.5">
               {group.label}
             </p>
 

@@ -84,7 +84,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
           {/* Fórmula */}
           {runbook.formula && (
             <div className="mt-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Fórmula</p>
+              <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-1">Fórmula</p>
               <div className="bg-black/30 rounded-ctl p-2.5 font-mono text-sm text-ink-warn">
                 {runbook.formula.expression}
               </div>
@@ -100,7 +100,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
 
           {/* Pasos */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-2">
               Pasos ({runbook.steps.length})
             </p>
             <ol className="space-y-2">
@@ -151,7 +151,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
 
           {/* Criterios de éxito */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-1.5">
               Criterios de éxito
             </p>
             <ul className="space-y-1">

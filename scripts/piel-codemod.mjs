@@ -208,6 +208,23 @@ for (const file of files) {
   }
   if (nTipo) applied.push(`${nTipo} tamaños bajo el piso → text-caption (11px)`)
 
+  // 7) MAYÚSCULAS (Constitución §10). Prohibidas en la interfaz salvo códigos
+  //    técnicos, identificadores, labels industriales cortos y tags.
+  //    Se quita la clase `uppercase` de los ENCABEZADOS DE SECCIÓN, que es donde
+  //    está el grueso (327 usos en 96 archivos). El texto vuelve a su
+  //    capitalización de origen, que casi siempre ya es sentence case.
+  //    Y no es solo la norma de Orel: iOS moderno (13+) pasó los encabezados de
+  //    lista agrupada a sentence case — "Notificaciones", no "NOTIFICACIONES".
+  //    Se conserva donde acompaña a `font-mono` o `tabular-nums`: ahí es un
+  //    código o un identificador, que la §10 sí permite.
+  const upperRe = /\buppercase (?=[^"'`]*tracking)/g
+  // El replacer recibe (match, offset, cadenaCompleta): con la cadena entera se
+  // puede respetar la excepción de la §10 sin inventar otra regex.
+  const esCodigo = (full) => /font-mono|tabular-nums/.test(full)
+  const nUpper = replaceInStrings(s, upperRe, (m, _o, full) => (esCodigo(full) ? m : '')).hits
+  s = replaceInStrings(s, upperRe, (m, _o, full) => (esCodigo(full) ? m : '')).out
+  if (nUpper) applied.push(`${nUpper} encabezados en MAYÚSCULAS → sentence case`)
+
   // Lo que queda sin mapear: SE REPORTA, no se toca. Suele ser color en datos,
   // gradientes o casos que piden criterio (y por eso no van en un codemod).
   const leftoverRe = new RegExp(`\\b(?:text|bg|border|ring|fill|stroke)-(?:${FAMS})-\\d{2,3}`, 'g')

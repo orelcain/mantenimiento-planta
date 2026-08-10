@@ -404,7 +404,7 @@ export function MinuteDetailDialog({
                 <div className="flex-1 min-w-0">
                   <div className={cn('font-medium flex items-center gap-1.5 flex-wrap', p0StatusColor(breakdown.p0Status))}>
                     <span>P0% {breakdown.p0Pct.toFixed(1)}%</span>
-                    <span className="text-caption uppercase tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
+                    <span className="text-caption tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
                     <span className="text-muted-foreground/60 font-normal">·</span>
                     <span className="font-normal text-foreground">
                       Causa dominante: <span className="font-medium">{breakdown.topP0Cause.label}</span>
@@ -433,7 +433,7 @@ export function MinuteDetailDialog({
             )}
             {/* Breakdown por gate */}
             <section>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              <h3 className="text-xs font-medium text-muted-foreground tracking-wider mb-2">
                 Desglose por gate
               </h3>
               <div className="space-y-1">
@@ -520,7 +520,7 @@ export function MinuteDetailDialog({
 
             {/* Tabla detalle */}
             <section>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              <h3 className="text-xs font-medium text-muted-foreground tracking-wider mb-2">
                 Piezas ({records.length})
               </h3>
               <div className="border border-border rounded-ctl overflow-hidden">

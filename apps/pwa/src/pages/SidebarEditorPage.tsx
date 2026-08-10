@@ -109,7 +109,7 @@ function SortableItem({ item, isDragging }: { item: Item; isDragging?: boolean }
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card text-sm text-foreground select-none"
+      className="flex items-center gap-2 px-3 py-2 rounded-card border border-border bg-card text-sm text-foreground select-none"
     >
       <button
         {...attributes}
@@ -120,7 +120,7 @@ function SortableItem({ item, isDragging }: { item: Item; isDragging?: boolean }
         <GripVertical className="h-5 w-5" />
       </button>
       <span className="flex-1 truncate">{item.name}</span>
-      <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{item.href}</span>
+      <span className="text-caption text-muted-foreground truncate max-w-[120px]">{item.href}</span>
     </div>
   )
 }
@@ -137,7 +137,7 @@ function SortableGroup({
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   return (
-    <div ref={setNodeRef} style={style} className="rounded-xl border border-border bg-card/50">
+    <div ref={setNodeRef} style={style} className="rounded-card border border-border bg-card/50">
       {/* Group header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
         <button
@@ -149,7 +149,7 @@ function SortableGroup({
           <GripVertical className="h-5 w-5" />
         </button>
         <span className="font-semibold text-sm text-foreground flex-1">{group.label}</span>
-        <span className="text-[10px] text-muted-foreground">{group.items.length} módulos</span>
+        <span className="text-caption text-muted-foreground">{group.items.length} módulos</span>
       </div>
 
       {/* Items */}
@@ -340,7 +340,7 @@ export function SidebarEditorPage() {
         </div>
         <button
           onClick={handleReset}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-card border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Resetear
@@ -348,7 +348,7 @@ export function SidebarEditorPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-card bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
           {saved ? '¡Guardado!' : 'Guardar'}
@@ -356,7 +356,7 @@ export function SidebarEditorPage() {
       </div>
 
       {/* Info */}
-      <div className="flex items-start gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 mb-5 text-xs text-muted-foreground">
+      <div className="flex items-start gap-2 rounded-card border border-border bg-muted px-3 py-2.5 mb-5 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
           Los cambios se aplican al <strong>recargar la app</strong>. El grupo "Administración" siempre es solo visible para admins.
@@ -389,7 +389,7 @@ export function SidebarEditorPage() {
         {/* Drag overlay */}
         <DragOverlay>
           {activeItem && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-primary bg-card shadow-lg text-sm text-foreground opacity-95">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-card border border-primary bg-card shadow-lg text-sm text-foreground opacity-95">
               <GripVertical className="h-4 w-4 text-primary" />
               <span>{activeItem.name}</span>
             </div>

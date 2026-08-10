@@ -112,7 +112,7 @@ export function PuntoCeroClasificacionCard({
           <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-muted/40 text-left text-caption uppercase tracking-wide text-muted-foreground/90">
+                <tr className="border-b border-muted/40 text-left text-caption tracking-wide text-muted-foreground/90">
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2">Causa</th>
                   <th className="py-2 px-2 text-right">Piezas</th>

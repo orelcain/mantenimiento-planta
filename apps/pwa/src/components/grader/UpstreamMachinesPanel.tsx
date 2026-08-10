@@ -1473,7 +1473,7 @@ export function UpstreamMachinesPanel({
             {snapshot && snapshot.machines.length > 0 && (
               <div className="mb-3 pb-3 border-b border-border/60">
                 <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                  <p className="text-caption text-muted-foreground uppercase tracking-wider">
+                  <p className="text-caption text-muted-foreground tracking-wider">
                     Tasa de producción por máquina · pz/min
                   </p>
                   {/* Solo con UNA máquina: la brecha se apila sobre la barra, y

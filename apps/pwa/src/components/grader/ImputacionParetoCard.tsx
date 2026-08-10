@@ -205,7 +205,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
 
           {vacias.length > 0 && (
             <div className="space-y-0.5">
-              <p className="text-caption text-muted-foreground/70 uppercase tracking-wider">
+              <p className="text-caption text-muted-foreground/70 tracking-wider">
                 Sin registros en este turno
               </p>
               {vacias.map((c) => renderCategoria(c, true))}

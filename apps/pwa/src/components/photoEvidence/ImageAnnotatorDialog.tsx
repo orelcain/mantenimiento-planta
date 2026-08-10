@@ -1163,7 +1163,7 @@ export function ImageAnnotatorDialog({
             {isLoading && <div className="text-sm text-muted-foreground">Cargando imagen…</div>}
             {loadError && <div className="text-sm text-red-600">{loadError}</div>}
 
-            <div className={cn('w-full rounded-md border border-border bg-muted overflow-auto', isLoading && 'opacity-60')}>
+            <div className={cn('w-full rounded-ctl border border-border bg-muted overflow-auto', isLoading && 'opacity-60')}>
               <canvas
                 ref={canvasRef}
                 onPointerDown={handleCanvasPointerDown}
@@ -1179,7 +1179,7 @@ export function ImageAnnotatorDialog({
 
             {mode === 'shape' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-md border border-border p-3">
+                <div className="rounded-ctl border border-border p-3">
                   <div className="text-sm font-medium">Formas</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Click agrega puntos 1..N. Para cerrar, vuelve al punto 1.
@@ -1234,7 +1234,7 @@ export function ImageAnnotatorDialog({
                   )}
                 </div>
 
-                <div className="rounded-md border border-border p-3">
+                <div className="rounded-ctl border border-border p-3">
                   <div className="text-sm font-medium">Texto</div>
                   <div className="text-xs text-muted-foreground mt-1">Usa “Texto” para agregar y editar.</div>
                 </div>
@@ -1242,7 +1242,7 @@ export function ImageAnnotatorDialog({
             )}
 
             {mode === 'text' && (
-              <div className="rounded-md border border-border p-3">
+              <div className="rounded-ctl border border-border p-3">
                 <div className="text-sm font-medium">Textos</div>
                 <div className="text-xs text-muted-foreground mt-1">Selecciona un texto para editar contenido/color/tamaño.</div>
                 <div className="mt-2 space-y-1">

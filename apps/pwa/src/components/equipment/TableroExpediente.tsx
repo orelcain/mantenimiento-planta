@@ -208,7 +208,7 @@ export function TableroExpediente({ equipment }: { equipment: Equipment }) {
   return (
     <div className="space-y-3">
       {error && (
-        <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2">{error}</div>
+        <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-ctl p-2">{error}</div>
       )}
 
       {/* Vista lectura */}
@@ -219,7 +219,7 @@ export function TableroExpediente({ equipment }: { equipment: Equipment }) {
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold">Tablero / Unifilar</h3>
-                <span className="text-[11px] text-muted-foreground">· levantamiento NFPA 70B</span>
+                <span className="text-caption text-muted-foreground">· levantamiento NFPA 70B</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={downloadPlantillaTableros}>
@@ -356,20 +356,20 @@ export function TableroExpediente({ equipment }: { equipment: Equipment }) {
                 <p className="text-sm text-muted-foreground italic">Sin circuitos. Agrega el primero.</p>
               ) : (
                 draft.circuitos.map((c, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-md p-2">
-                    <div className="col-span-2"><Label className="text-[11px]">N°</Label><Input value={c.numero} onChange={(e) => setCircuito(i, { numero: e.target.value })} /></div>
-                    <div className="col-span-5"><Label className="text-[11px]">Carga (equipo)</Label><Input value={c.cargaNombre ?? ''} onChange={(e) => setCircuito(i, { cargaNombre: e.target.value || undefined })} placeholder="Motor 720004608" /></div>
-                    <div className="col-span-2"><Label className="text-[11px]">Int. (A)</Label><Input type="number" value={c.ratingA ?? ''} onChange={(e) => setCircuito(i, { ratingA: numOrUndef(e.target.value) })} /></div>
-                    <div className="col-span-2"><Label className="text-[11px]">Cond.</Label>
+                  <div key={i} className="grid grid-cols-12 gap-2 items-end border rounded-ctl p-2">
+                    <div className="col-span-2"><Label className="text-caption">N°</Label><Input value={c.numero} onChange={(e) => setCircuito(i, { numero: e.target.value })} /></div>
+                    <div className="col-span-5"><Label className="text-caption">Carga (equipo)</Label><Input value={c.cargaNombre ?? ''} onChange={(e) => setCircuito(i, { cargaNombre: e.target.value || undefined })} placeholder="Motor 720004608" /></div>
+                    <div className="col-span-2"><Label className="text-caption">Int. (A)</Label><Input type="number" value={c.ratingA ?? ''} onChange={(e) => setCircuito(i, { ratingA: numOrUndef(e.target.value) })} /></div>
+                    <div className="col-span-2"><Label className="text-caption">Cond.</Label>
                       <Select value={String(c.condicion)} onValueChange={(v) => setCircuito(i, { condicion: Number(v) as CondicionNFPA })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>{([1, 2, 3] as CondicionNFPA[]).map((cc) => (<SelectItem key={cc} value={String(cc)}>{cc}</SelectItem>))}</SelectContent>
                       </Select>
                     </div>
                     <div className="col-span-1 flex justify-end"><Button variant="ghost" size="sm" className="text-destructive" onClick={() => removeCircuito(i)}><Trash2 className="h-4 w-4" /></Button></div>
-                    <div className="col-span-7"><Label className="text-[11px]">Descripción</Label><Input value={c.descripcion} onChange={(e) => setCircuito(i, { descripcion: e.target.value })} /></div>
-                    <div className="col-span-3"><Label className="text-[11px]">Calibre</Label><Input value={c.conductorCalibre ?? ''} onChange={(e) => setCircuito(i, { conductorCalibre: e.target.value || undefined })} placeholder="8 AWG" /></div>
-                    <div className="col-span-2"><Label className="text-[11px]">Estado</Label>
+                    <div className="col-span-7"><Label className="text-caption">Descripción</Label><Input value={c.descripcion} onChange={(e) => setCircuito(i, { descripcion: e.target.value })} /></div>
+                    <div className="col-span-3"><Label className="text-caption">Calibre</Label><Input value={c.conductorCalibre ?? ''} onChange={(e) => setCircuito(i, { conductorCalibre: e.target.value || undefined })} placeholder="8 AWG" /></div>
+                    <div className="col-span-2"><Label className="text-caption">Estado</Label>
                       <Select value={c.estado} onValueChange={(v) => setCircuito(i, { estado: v as EstadoCircuito })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>{(Object.keys(ESTADO_CIRCUITO_LABEL) as EstadoCircuito[]).map((es) => (<SelectItem key={es} value={es}>{ESTADO_CIRCUITO_LABEL[es]}</SelectItem>))}</SelectContent>
@@ -391,7 +391,7 @@ export function TableroExpediente({ equipment }: { equipment: Equipment }) {
                 <Input value={revisionNota} onChange={(e) => setRevisionNota(e.target.value)} placeholder="Qué cambió…" />
               </div>
             ) : (
-              <p className="text-[11px] text-muted-foreground">Se guardará como Revisión 0 (as-found) con la fecha de hoy.</p>
+              <p className="text-caption text-muted-foreground">Se guardará como Revisión 0 (as-found) con la fecha de hoy.</p>
             )}
 
             <div className="flex items-center gap-2 pt-1">

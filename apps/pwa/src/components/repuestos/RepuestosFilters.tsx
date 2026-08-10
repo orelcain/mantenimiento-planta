@@ -58,7 +58,7 @@ export function RepuestosFilters({
           {/* Chip "Todos" */}
           <button
             onClick={() => onFilterTipoChange(null)}
-            className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
+            className={`shrink-0 text-caption px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
               filterTipo === null
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
@@ -70,7 +70,7 @@ export function RepuestosFilters({
             <button
               key={tipo}
               onClick={() => onFilterTipoChange(filterTipo === tipo ? null : tipo)}
-              className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
+              className={`shrink-0 text-caption px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
                 filterTipo === tipo
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'

@@ -350,7 +350,7 @@ export function TelemetryExportDialog(props: {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded border p-3">
+          <div className="rounded-ctl border p-3">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-medium">Sensores a exportar</div>
               <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export function TelemetryExportDialog(props: {
                     : null
 
                   return (
-                    <label key={d.deviceId} className="flex items-start gap-2 rounded border p-2 cursor-pointer">
+                    <label key={d.deviceId} className="flex items-start gap-2 rounded-ctl border p-2 cursor-pointer">
                       <Checkbox checked={selectedDeviceIds.includes(d.deviceId)} onCheckedChange={() => toggleDevice(d.deviceId)} />
                       <div className="min-w-0">
                         <div className="text-sm font-medium break-all">{d.deviceId}</div>
@@ -436,7 +436,7 @@ export function TelemetryExportDialog(props: {
             ) : (
               <div className="space-y-2">
                 <Label>Ventana</Label>
-                <div className="rounded border p-3 text-xs text-muted-foreground">
+                <div className="rounded-ctl border p-3 text-xs text-muted-foreground">
                   Se calcula contra "ahora" al exportar. Para un peritaje con tramo exacto, usa "Personalizado".
                 </div>
               </div>
@@ -444,13 +444,13 @@ export function TelemetryExportDialog(props: {
           </div>
 
           {error && (
-            <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="rounded-ctl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
           )}
 
           {lastInfo && (
-            <div className="rounded border bg-muted p-3 text-sm">
+            <div className="rounded-ctl border bg-muted p-3 text-sm">
               {lastInfo}
             </div>
           )}

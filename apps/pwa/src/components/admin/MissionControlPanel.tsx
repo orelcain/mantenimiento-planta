@@ -84,25 +84,25 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   onToggle: (id: string, active: boolean) => void
 }) {
   return (
-    <div className={`flex items-start gap-2 p-2 rounded border text-xs ${c.active ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
+    <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
       <div className="flex-1 min-w-0">
         <div className="text-muted-foreground truncate" title={c.userQuery}>❓ "{c.userQuery}"</div>
-        <div className="text-red-400 truncate text-[10px]" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
-        <div className="text-green-400 text-[10px]">✅ {c.correctResponse.slice(0, 120)}</div>
-        {c.equipmentName && <div className="flex items-center gap-1 text-[9px] text-muted-foreground"><Wrench className="size-2.5" /> {c.equipmentName}</div>}
-        <div className="text-[9px] text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
+        <div className="text-red-400 truncate text-caption" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
+        <div className="text-green-400 text-caption">✅ {c.correctResponse.slice(0, 120)}</div>
+        {c.equipmentName && <div className="flex items-center gap-1 text-caption text-muted-foreground"><Wrench className="size-2.5" /> {c.equipmentName}</div>}
+        <div className="text-caption text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
         <button
           onClick={() => onToggle(c.id!, !c.active)}
-          className="text-[9px] px-1.5 py-0.5 rounded border border-border hover:bg-muted"
+          className="text-caption px-1.5 py-0.5 rounded-ctl border border-border hover:bg-muted"
           title={c.active ? 'Desactivar' : 'Activar'}
         >
           {c.active ? 'Off' : 'On'}
         </button>
         <button
           onClick={() => onDelete(c.id!)}
-          className="p-0.5 rounded hover:bg-red-500/[0.15] dark:bg-red-500/[0.15] text-ink-crit"
+          className="p-0.5 rounded-ctl hover:bg-red-500/[0.15] dark:bg-red-500/[0.15] text-ink-crit"
           title="Eliminar corrección"
         >
           <Trash2 className="h-3 w-3" />
@@ -251,7 +251,7 @@ export function MissionControlPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="p-2.5 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl">
+            <div className="p-2.5 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-card">
               <Satellite className="h-6 w-6 text-purple-500" />
             </div>
             {/* Pulse indicador */}
@@ -282,27 +282,27 @@ export function MissionControlPanel() {
 
       {/* ─── KPIs ─── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="p-3 bg-muted/50 rounded-lg text-center">
+        <div className="p-3 bg-muted/50 rounded-card text-center">
           <div className="text-2xl font-bold text-green-500">{onlineCount}</div>
           <div className="text-xs text-muted-foreground">Agentes Online</div>
         </div>
-        <div className="p-3 bg-muted/50 rounded-lg text-center">
+        <div className="p-3 bg-muted/50 rounded-card text-center">
           <div className="text-2xl font-bold">{totalRequests}</div>
           <div className="text-xs text-muted-foreground">Requests Hoy</div>
         </div>
-        <div className="p-3 bg-muted/50 rounded-lg text-center">
+        <div className="p-3 bg-muted/50 rounded-card text-center">
           <div className="text-2xl font-bold">
             {totalTokens > 1000 ? `${Math.round(totalTokens / 1000)}K` : totalTokens}
           </div>
           <div className="text-xs text-muted-foreground">Tokens Hoy</div>
         </div>
-        <div className="p-3 bg-muted/50 rounded-lg text-center">
+        <div className="p-3 bg-muted/50 rounded-card text-center">
           <div className={`text-2xl font-bold ${successRate >= 90 ? 'text-green-500' : successRate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>
             {successRate}%
           </div>
           <div className="text-xs text-muted-foreground">Tasa Éxito</div>
         </div>
-        <div className="p-3 bg-muted/50 rounded-lg text-center col-span-2 md:col-span-1">
+        <div className="p-3 bg-muted/50 rounded-card text-center col-span-2 md:col-span-1">
           <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-orange-500' : 'text-green-500'}`}>
             ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : totalCostUsd.toFixed(2)}
           </div>
@@ -325,7 +325,7 @@ export function MissionControlPanel() {
             return (
               <div
                 key={agent.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                className={`flex items-center gap-3 p-3 rounded-card border transition-all ${
                   agent.status === 'online'
                     ? 'border-green-500/[0.25] bg-green-500/[0.15]'
                     : agent.status === 'rate-limited'
@@ -341,17 +341,17 @@ export function MissionControlPanel() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{agent.emoji}</span>
                     <span className="font-semibold text-sm">{agent.name}</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    <Badge variant="outline" className="text-caption px-1.5 py-0">
                       {agent.provider}
                     </Badge>
                     {agent.thinking && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-cat-6-tint/[0.25] text-purple-500">
+                      <Badge variant="outline" className="text-caption px-1.5 py-0 border-cat-6-tint/[0.25] text-purple-500">
                         Thinking
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-caption text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         {agent.capabilities.map(c => {
                           const Icon = capabilityIcon(c)
@@ -359,10 +359,10 @@ export function MissionControlPanel() {
                         })}
                       </span>
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-caption text-muted-foreground">
                       · P{agent.priority} · {agent.costTier}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-caption text-muted-foreground">
                       · {statusLabel(agent.status)}
                     </span>
                   </div>
@@ -377,7 +377,7 @@ export function MissionControlPanel() {
                   {(() => {
                     const cost = costSummary.find(c => c.agentId === agent.id)?.estimatedCostUsd || 0
                     return cost > 0 ? (
-                      <div className="text-orange-500 font-mono text-[10px]">
+                      <div className="text-orange-500 font-mono text-caption">
                         ${cost < 0.01 ? '<0.01' : cost.toFixed(3)}
                       </div>
                     ) : null
@@ -427,7 +427,7 @@ export function MissionControlPanel() {
                   </span>
 
                   {/* Task type */}
-                  <Badge variant={statusBadgeVariant(log.status)} className="text-[10px] px-1 py-0 shrink-0">
+                  <Badge variant={statusBadgeVariant(log.status)} className="text-caption px-1 py-0 shrink-0">
                     {log.taskType}
                   </Badge>
 
@@ -452,7 +452,7 @@ export function MissionControlPanel() {
                       </span>
                     )}
                     {(log.estimatedCostUsd ?? 0) > 0 && (
-                      <span className="text-orange-500 text-[10px] font-mono">
+                      <span className="text-orange-500 text-caption font-mono">
                         ${(log.estimatedCostUsd ?? 0).toFixed(4)}
                       </span>
                     )}
@@ -496,23 +496,23 @@ export function MissionControlPanel() {
             <>
               {/* KPIs de aprendizaje */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                <div className="p-2 bg-muted/50 rounded-card text-center">
                   <div className="text-lg font-bold text-blue-500">{learningStats.totalFeedback}</div>
-                  <div className="text-[10px] text-muted-foreground">Feedback Total</div>
+                  <div className="text-caption text-muted-foreground">Feedback Total</div>
                 </div>
-                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                <div className="p-2 bg-muted/50 rounded-card text-center">
                   <div className={`text-lg font-bold ${learningStats.satisfactionRate >= 70 ? 'text-green-500' : learningStats.satisfactionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
                     {learningStats.satisfactionRate}%
                   </div>
-                  <div className="text-[10px] text-muted-foreground">Satisfacción</div>
+                  <div className="text-caption text-muted-foreground">Satisfacción</div>
                 </div>
-                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                <div className="p-2 bg-muted/50 rounded-card text-center">
                   <div className="text-lg font-bold text-purple-500">{learningStats.totalKnowledge}</div>
-                  <div className="text-[10px] text-muted-foreground">Conocimientos</div>
+                  <div className="text-caption text-muted-foreground">Conocimientos</div>
                 </div>
-                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                <div className="p-2 bg-muted/50 rounded-card text-center">
                   <div className="text-lg font-bold text-amber-500">{learningStats.activeCorrections}</div>
-                  <div className="text-[10px] text-muted-foreground">Correcciones</div>
+                  <div className="text-caption text-muted-foreground">Correcciones</div>
                 </div>
               </div>
 
@@ -534,39 +534,39 @@ export function MissionControlPanel() {
                             className={`w-full rounded-t ${rate >= 70 ? 'bg-green-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500'} transition-all`}
                             style={{ height: `${height}%`, minHeight: 2 }}
                           />
-                          <div className="absolute -top-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-popover text-popover-foreground text-[9px] px-1 py-0.5 rounded shadow whitespace-nowrap z-10">
+                          <div className="absolute -top-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-popover text-popover-foreground text-caption px-1 py-0.5 rounded-ctl shadow whitespace-nowrap z-10">
                             {day.date.slice(5)}: {day.positive}<ThumbsUp className="inline size-3" /> {day.negative}<ThumbsDown className="inline size-3" />
                           </div>
                         </div>
                       )
                     })}
                   </div>
-                  <div className="flex justify-between text-[8px] text-muted-foreground mt-0.5">
+                  <div className="flex justify-between text-caption text-muted-foreground mt-0.5">
                     <span>{learningStats.feedbackByDay.slice(-14)[0]?.date.slice(5) || ''}</span>
                     <span>Hoy</span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-[9px] text-muted-foreground">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500" /> &ge;70%</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-500" /> 40-69%</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500" /> &lt;40%</span>
+                  <div className="flex items-center gap-3 mt-1 text-caption text-muted-foreground">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-green-500" /> &ge;70%</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-amber-500" /> 40-69%</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-ctl bg-red-500" /> &lt;40%</span>
                   </div>
                 </div>
               )}
 
               {/* Desglose de métricas */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded border border-green-500/[0.25]">
+                <div className="flex items-center gap-2 p-2 bg-green-500/[0.15] rounded-ctl border border-green-500/[0.25]">
                   <MessageSquare className="h-3.5 w-3.5 text-green-500" />
                   <div>
                     <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
-                    <div className="text-[10px] text-muted-foreground">Respuestas marcadas útiles</div>
+                    <div className="text-caption text-muted-foreground">Respuestas marcadas útiles</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded border border-red-500/[0.25]">
+                <div className="flex items-center gap-2 p-2 bg-red-500/[0.15] rounded-ctl border border-red-500/[0.25]">
                   <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                   <div>
                     <div className="font-medium">{learningStats.negativeFeedback} negativos</div>
-                    <div className="text-[10px] text-muted-foreground">Respuestas marcadas incorrectas</div>
+                    <div className="text-caption text-muted-foreground">Respuestas marcadas incorrectas</div>
                   </div>
                 </div>
               </div>
@@ -613,7 +613,7 @@ export function MissionControlPanel() {
                 <div className="text-center py-4 text-xs text-muted-foreground">
                   <Brain className="h-6 w-6 mx-auto mb-1.5 opacity-30" />
                   Sin datos de aprendizaje aún.<br />
-                  <span className="text-[10px]">Los usuarios pueden puntuar las respuestas del chat para que ARIA aprenda.</span>
+                  <span className="text-caption">Los usuarios pueden puntuar las respuestas del chat para que ARIA aprenda.</span>
                 </div>
               )}
             </>
@@ -657,7 +657,7 @@ export function MissionControlPanel() {
                 </div>
               ))}
           </div>
-          <p className="text-[10px] text-muted-foreground text-center mt-2">
+          <p className="text-caption text-muted-foreground text-center mt-2">
             Si el primer agente falla o está rate-limited, ARIA pasa automáticamente al siguiente
           </p>
         </CardContent>

@@ -29,7 +29,7 @@ export function TopActionsCard({ attribution }: Props) {
         ) : (
           <div className="space-y-3">
             {/* Cabecera tabla */}
-            <div className="grid grid-cols-[1fr_6rem_4rem_5rem] text-caption text-muted-foreground uppercase tracking-wide font-medium gap-2 pb-1 border-b">
+            <div className="grid grid-cols-[1fr_6rem_4rem_5rem] text-caption text-muted-foreground tracking-wide font-medium gap-2 pb-1 border-b">
               <span>Campo ajustado</span>
               <span className="text-right">Impacto total</span>
               <span className="text-right">Veces</span>

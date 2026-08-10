@@ -136,13 +136,13 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                     <tr key={s.id} className="align-top">
                       <td className="px-3 py-2">
                         <div className="font-medium text-foreground">{s.textoBreve || '(sin nombre)'}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">SAP {s.codigoSAP} · {fmtDate(s.createdAt)}</div>
-                        {s.observaciones && <div className="mt-0.5 text-[11px] italic text-muted-foreground">{s.observaciones}</div>}
+                        <div className="font-mono text-caption text-muted-foreground">SAP {s.codigoSAP} · {fmtDate(s.createdAt)}</div>
+                        {s.observaciones && <div className="mt-0.5 text-caption italic text-muted-foreground">{s.observaciones}</div>}
                       </td>
                       <td className="px-3 py-2 tabular-nums">{s.cantidad}</td>
                       <td className="px-3 py-2 text-muted-foreground">{s.solicitadoPorNombre || '—'}</td>
                       <td className="px-3 py-2">
-                        <span className={['inline-block rounded-ctl px-1.5 py-0.5 text-[11px] font-medium', meta.cls].join(' ')}>{meta.label}</span>
+                        <span className={['inline-block rounded-ctl px-1.5 py-0.5 text-caption font-medium', meta.cls].join(' ')}>{meta.label}</span>
                       </td>
                       <td className="px-3 py-2 text-right">
                         {next ? (
@@ -157,7 +157,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                             {ACCION_LABEL[s.estado as Exclude<SolicitudEstado, 'entregada'>]}
                           </Button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-ok">
+                          <span className="inline-flex items-center gap-1 text-caption text-ink-ok">
                             <Check className="h-3.5 w-3.5" /> Lista
                           </span>
                         )}

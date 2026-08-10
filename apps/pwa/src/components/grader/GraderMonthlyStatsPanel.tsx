@@ -159,7 +159,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Header ── */}
       <div>
-        <p className="text-caption text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
+        <p className="text-caption text-muted-foreground font-semibold tracking-wide">Resumen del mes</p>
         <p className="text-sm font-bold leading-tight">{monthLabel}</p>
         <p className="text-caption text-muted-foreground/60 mt-0">
           {daysCount} días · {turnosCount} turnos
@@ -248,7 +248,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           de Shoplogix, sin inventar Día/Noche). */}
       <Card>
         <CardContent className="py-1.5 px-4">
-          <p className="text-caption text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
+          <p className="text-caption text-muted-foreground tracking-wide text-center mb-1">Turnos</p>
           {isClassificationPlant || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
@@ -305,7 +305,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-              <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
+              <p className="text-caption font-semibold text-muted-foreground tracking-wide">
                 Fuera de turno configurado
               </p>
             </div>
@@ -354,7 +354,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="py-2 px-3 space-y-1.5">
             <div className="flex items-center gap-1.5 mb-1">
               <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-              <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
+              <p className="text-caption font-semibold text-muted-foreground tracking-wide">
                 Causas P0 del mes
               </p>
               <p className="text-caption text-muted-foreground/60 ml-auto tabular-nums">

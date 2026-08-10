@@ -29,8 +29,11 @@ export function ListGroup({ title, action, footer, className, children, ...props
     <section className={cn('flex flex-col', className)} {...props}>
       {(title || action) && (
         <header className="flex items-baseline gap-2 px-4 pb-2">
+          {/* Sentence case, no MAYÚSCULAS (Constitución §10). iOS moderno hizo el
+              mismo cambio en los encabezados de lista agrupada: "Notificaciones",
+              no "NOTIFICACIONES". */}
           {title && (
-            <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+            <h3 className="text-caption font-semibold text-muted-foreground">
               {title}
             </h3>
           )}

@@ -168,7 +168,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
             <div className={cn('text-4xl sm:text-5xl font-bold tabular-nums leading-none', style.numColor)}>
               {totalCycles.toLocaleString('es-CL')}
             </div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+            <div className="text-xs tracking-wider text-muted-foreground mt-1">
               ciclos · línea total
             </div>
             {/* Cumplimiento vs lo PLANIFICADO por producción. Se rotula como
@@ -277,7 +277,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
         {snapshot.machines.length > 0 && (
           <div className="border-t border-border/40 pt-3 space-y-2">
             <div className="flex items-baseline gap-2 text-xs">
-              <span className="font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="font-semibold text-muted-foreground tracking-wider">
                 {lineMachinesLabel(snapshot.machines) || 'Máquinas de la línea'}
               </span>
               <span className="tabular-nums font-semibold">{totalCycles.toLocaleString('es-CL')}</span>
@@ -307,7 +307,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                           (no solo si estuvo prendida — también si rindió al ritmo
                           esperado). Pedido Orel 2026-07-23. */}
                       <span
-                        className={cn('flex items-center gap-1 text-caption font-semibold uppercase tracking-wide shrink-0', vStyle.text)}
+                        className={cn('flex items-center gap-1 text-caption font-semibold tracking-wide shrink-0', vStyle.text)}
                         title="Combina disponibilidad (uptime) y ritmo vs objetivo — manda el peor de los dos."
                       >
                         <span className={cn('w-1.5 h-1.5 rounded-full', vStyle.dot)} />

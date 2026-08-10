@@ -248,7 +248,7 @@ export function ETTTemplatePicker({
                 <button
                   key={ett.id}
                   onClick={() => handleDuplicar(ett)}
-                  className="w-full text-left px-3 py-2 rounded hover:bg-blue-50 flex items-center justify-between text-sm"
+                  className="w-full text-left px-3 py-2 rounded-ctl hover:bg-blue-50 flex items-center justify-between text-sm"
                 >
                   <span className="font-medium truncate flex-1">
                     {ett.cabecera.proyecto || '(sin título)'}
@@ -276,7 +276,7 @@ export function ETTTemplatePicker({
                 key={p.id}
                 onClick={() => handlePlantilla(p.id)}
                 className={cn(
-                  'p-4 border-2 rounded-lg text-left transition-all',
+                  'p-4 border-2 rounded-card text-left transition-all',
                   'hover:border-green-500 hover:bg-green-50',
                   'border-gray-200',
                 )}

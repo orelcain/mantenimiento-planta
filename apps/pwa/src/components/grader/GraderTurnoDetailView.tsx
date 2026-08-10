@@ -346,7 +346,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide flex items-center gap-1.5">
                 <span className="text-base">{summary.shiftId.includes('día') ? '☀️' : '🌙'}</span>
                 {summary.shiftId} · {summary.totalPieces.toLocaleString('es-CL')} piezas
               </p>
@@ -382,7 +382,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               )}
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">P0%</p>
+              <p className="text-xs text-muted-foreground tracking-wide">P0%</p>
               <p className={cn('text-5xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(summary.pointZeroPct)))}>
                 {summary.pointZeroPct}%
               </p>
@@ -395,7 +395,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Piezas totales</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Piezas totales</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {summary.totalPieces.toLocaleString('es-CL')}
             </p>
@@ -406,7 +406,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Peso clasificado</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Peso clasificado</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatWeight(summary.totalWeightKg)}
             </p>
@@ -419,7 +419,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Tasa producción</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Tasa producción</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {displayRate != null ? displayRate.toLocaleString('es-CL') : '—'}
             </p>
@@ -428,7 +428,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Duración turno</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Duración turno</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatDuration(displayMinutes)}
             </p>

@@ -503,7 +503,7 @@ export function QuickInterventionCapture({
                     )}
                     <p className="text-xs text-foreground break-words">{e.hallazgo}</p>
                     <p className="text-caption text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5">
-                      <span className="uppercase tracking-wide">{TIPO_LABEL[e.tipo] ?? e.tipo}</span>
+                      <span className="tracking-wide">{TIPO_LABEL[e.tipo] ?? e.tipo}</span>
                       <span>·</span>
                       <span>{fmtFecha(e.fecha)}</span>
                       {e.tecnico && (<><span>·</span><span>{e.tecnico}</span></>)}

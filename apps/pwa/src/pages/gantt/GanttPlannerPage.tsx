@@ -21,10 +21,10 @@ const ZOOM_COL: Record<ZoomLevel, number> = { day: 40, week: 100, month: 200 }
 const MS_DAY = 86_400_000
 
 const STATUS_COLORS: Record<GanttTaskStatus, string> = {
-  planificada: 'bg-blue-500/80',
-  en_progreso: 'bg-amber-500/80',
-  bloqueada: 'bg-red-500/80',
-  completada: 'bg-emerald-500/80',
+  planificada: 'bg-primary/[0.15]',
+  en_progreso: 'bg-amber-500/[0.15]',
+  bloqueada: 'bg-red-500/[0.15]',
+  completada: 'bg-emerald-500/[0.15]',
 }
 const STATUS_LABELS: Record<GanttTaskStatus, string> = {
   planificada: 'Planificada',
@@ -224,7 +224,7 @@ export function GanttPlannerPage() {
               }}
           />
         </div>
-        <div className="flex items-center gap-1 border rounded-md px-1">
+        <div className="flex items-center gap-1 border rounded-ctl px-1">
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setZoom('day')} title="Día">
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -268,13 +268,13 @@ export function GanttPlannerPage() {
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge variant="outline">{filtered.length} tareas</Badge>
-        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+        <Badge variant="outline" className="bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]">
           {filtered.filter((t) => t.status === 'completada').length} completadas
         </Badge>
-        <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+        <Badge variant="outline" className="bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]">
           {filtered.filter((t) => t.status === 'en_progreso').length} en progreso
         </Badge>
-        <Badge variant="outline" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
+        <Badge variant="outline" className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
           {cpm.criticalPath.length} ruta crítica
         </Badge>
       </div>
@@ -291,7 +291,7 @@ export function GanttPlannerPage() {
         </Card>
       ) : (
         /* Main split view */
-        <div className="border rounded-lg overflow-hidden bg-card" style={{ height: Math.min(700, HEADER_H + filtered.length * ROW_H + 2) }}>
+        <div className="border rounded-card overflow-hidden bg-card" style={{ height: Math.min(700, HEADER_H + filtered.length * ROW_H + 2) }}>
           <div className="flex h-full">
             {/* ─── LEFT TABLE ─────────────────────────────────── */}
             <div style={{ width: splitterX, minWidth: 200 }} className="flex flex-col border-r bg-[var(--panel-surface)] dark:bg-transparent">
@@ -312,7 +312,7 @@ export function GanttPlannerPage() {
                   <div
                     key={task.id}
                     className={`flex items-center border-b text-xs hover:bg-muted/30 cursor-pointer transition-colors ${
-                      criticalSet.has(task.id) ? 'bg-red-500/10' : ''
+                      criticalSet.has(task.id) ? 'bg-red-500/[0.15]' : ''
                     }`}
                     style={{ height: ROW_H }}
                     onClick={() => setEditTask(task)}
@@ -324,7 +324,7 @@ export function GanttPlannerPage() {
                     <div className="w-24 text-center">
                       <Badge
                         variant={task.status === 'completada' ? 'success' : task.status === 'bloqueada' ? 'destructive' : 'outline'}
-                        className="text-[10px] px-1.5 py-0"
+                        className="text-caption px-1.5 py-0"
                       >
                         {STATUS_LABELS[task.status]}
                       </Badge>
@@ -356,7 +356,7 @@ export function GanttPlannerPage() {
                     {columns.map((col, i) => (
                       <div
                         key={i}
-                        className="text-[10px] text-muted-foreground border-r flex items-center justify-center select-none shrink-0"
+                        className="text-caption text-muted-foreground border-r flex items-center justify-center select-none shrink-0"
                         style={{ width: colWidth }}
                       >
                         {col.label}
@@ -387,7 +387,7 @@ export function GanttPlannerPage() {
                         style={{ left: todayX, top: 0, width: 2, height: HEADER_H + filtered.length * ROW_H }}
                       >
                         <div className="w-0.5 h-full bg-primary" />
-                        <div className="absolute -top-0 -left-2 bg-primary text-primary-foreground text-[9px] px-1 rounded-b font-semibold">
+                        <div className="absolute -top-0 -left-2 bg-primary text-primary-foreground text-caption px-1 rounded-b font-semibold">
                           Hoy
                         </div>
                       </div>
@@ -413,7 +413,7 @@ export function GanttPlannerPage() {
                           {/* Baseline bar */}
                           {task.baselineStartDate && task.baselineEndDate && (
                             <div
-                              className="absolute rounded-sm bg-muted-foreground/20"
+                              className="absolute rounded-ctl bg-muted-foreground/20"
                               style={{
                                 left: dateToX(task.baselineStartDate),
                                 width: Math.max(dateToX(task.baselineEndDate) - dateToX(task.baselineStartDate), 4),
@@ -425,7 +425,7 @@ export function GanttPlannerPage() {
 
                           {/* Main bar */}
                           <div
-                            className={`absolute rounded cursor-pointer transition-all hover:brightness-110 ${
+                            className={`absolute rounded-ctl cursor-pointer transition-all hover:brightness-110 ${
                               isCritical ? 'ring-1 ring-red-400' : ''
                             } ${STATUS_COLORS[task.status]}`}
                             style={{ left, width: barW, top, height: barH }}
@@ -434,12 +434,12 @@ export function GanttPlannerPage() {
                           >
                             {/* Progress fill */}
                             <div
-                              className="absolute inset-0 rounded bg-white/20"
+                              className="absolute inset-0 rounded-ctl bg-white/20"
                               style={{ width: `${task.progress}%` }}
                             />
                             {/* Label */}
                             {barW > 60 && (
-                              <span className="absolute inset-0 flex items-center px-2 text-[10px] font-medium text-white truncate">
+                              <span className="absolute inset-0 flex items-center px-2 text-caption font-medium text-white truncate">
                                 {task.titulo}
                               </span>
                             )}

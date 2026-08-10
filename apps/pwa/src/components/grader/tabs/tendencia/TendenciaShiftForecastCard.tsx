@@ -68,7 +68,7 @@ export function TendenciaShiftForecastCard({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Tiempo restante */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Tiempo restante</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Tiempo restante</p>
             <p className="text-2xl font-bold tabular-nums">{shiftProgressView.remainingLabel}</p>
             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
               <div
@@ -82,7 +82,7 @@ export function TendenciaShiftForecastCard({
           {/* P0 proyectado al cierre */}
           <div className={cn('flex flex-col gap-1 p-3 rounded-card bg-background border-2', severityBorder)}>
             <div className="flex items-center justify-between">
-              <p className="text-caption text-muted-foreground uppercase tracking-wide">P0 al cierre</p>
+              <p className="text-caption text-muted-foreground tracking-wide">P0 al cierre</p>
               <Badge variant="outline" className={cn('text-caption px-1.5 py-0', severityText, 'border-current')}>
                 {severityLabel}
               </Badge>
@@ -100,7 +100,7 @@ export function TendenciaShiftForecastCard({
 
           {/* Piezas proyectadas al cierre */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Piezas al cierre</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Piezas al cierre</p>
             <p className="text-2xl font-bold tabular-nums">
               {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
             </p>
@@ -114,7 +114,7 @@ export function TendenciaShiftForecastCard({
 
           {/* Tendencia del peso */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Tendencia peso</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Tendencia peso</p>
             <div className="flex items-center gap-2">
               <TrendIcon className={cn('h-6 w-6', trendColor)} />
               <p className={cn('text-2xl font-bold', trendColor)}>{trendLabel}</p>

@@ -39,7 +39,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
         {/* Resumen vs promedio histórico */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div className={cn('p-2.5 rounded-ctl border', p0BgClass)}>
-            <p className="text-caption uppercase tracking-wide text-muted-foreground">P0 vs promedio</p>
+            <p className="text-caption tracking-wide text-muted-foreground">P0 vs promedio</p>
             <p className={cn('text-lg font-bold tabular-nums', p0Color)}>
               {m.deltaP0 >= 0 ? '+' : ''}{m.deltaP0.toFixed(2)} pp
             </p>
@@ -48,14 +48,14 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
             </p>
           </div>
           <div className="p-2.5 rounded-ctl border bg-muted/20">
-            <p className="text-caption uppercase tracking-wide text-muted-foreground">Piezas vs promedio</p>
+            <p className="text-caption tracking-wide text-muted-foreground">Piezas vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaPieces >= 0 ? '+' : ''}{m.deltaPieces.toLocaleString('es-CL')}
             </p>
             <p className="text-caption text-muted-foreground">hist. {m.avgPieces.toLocaleString('es-CL')}</p>
           </div>
           <div className="p-2.5 rounded-ctl border bg-muted/20">
-            <p className="text-caption uppercase tracking-wide text-muted-foreground">Peso vs promedio</p>
+            <p className="text-caption tracking-wide text-muted-foreground">Peso vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaWeight >= 0 ? '+' : ''}{m.deltaWeight.toFixed(0)} g
             </p>

@@ -26,22 +26,22 @@ interface PhotoEvidenceCardProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-500 border-yellow-500/20',
+    color: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]',
     icon: Clock,
   },
   en_proceso: {
     label: 'En Proceso',
-    color: 'bg-blue-500/15 text-blue-700 dark:text-blue-500 border-blue-500/20',
+    color: 'bg-primary/[0.15] text-ink-info border-primary/[0.25]',
     icon: AlertCircle,
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/15 text-green-700 dark:text-green-500 border-green-500/20',
+    color: 'bg-green-500/[0.15] text-ink-ok border-green-500/[0.25]',
     icon: CheckCircle,
   },
   verificada: {
     label: 'Verificada',
-    color: 'bg-purple-500/15 text-purple-700 dark:text-purple-500 border-purple-500/20',
+    color: 'bg-cat-6-tint/[0.15] text-cat-6-ink border-cat-6-tint/[0.25]',
     icon: CheckCircle,
   },
 }
@@ -100,11 +100,11 @@ export function PhotoEvidenceCard({
   if (compact) {
     return (
       <div
-        className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+        className="flex items-center gap-3 p-3 rounded-card border border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
         onClick={onClick}
       >
         {/* Thumbnail */}
-        <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+        <div className="relative w-16 h-16 rounded-card overflow-hidden bg-muted flex-shrink-0">
           {hasBeforePhotos && thumbBefore ? (
             <img
               src={thumbBefore.url}
@@ -117,7 +117,7 @@ export function PhotoEvidenceCard({
             </div>
           )}
           {/* Badge de cantidad de fotos */}
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5">
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-caption text-center py-0.5">
             {totalBefore} / {totalAfter}
           </div>
         </div>
@@ -132,7 +132,7 @@ export function PhotoEvidenceCard({
             </p>
           )}
           <div className="flex items-center gap-2 mt-1">
-            <Badge className={cn('text-[10px] px-1.5 py-0', statusConfig.color)}>
+            <Badge className={cn('text-caption px-1.5 py-0', statusConfig.color)}>
               {statusConfig.label}
             </Badge>
           </div>
@@ -162,7 +162,7 @@ export function PhotoEvidenceCard({
                 <Camera className="w-8 h-8 text-muted-foreground" />
               </div>
             )}
-            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-medium rounded">
+            <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-caption font-medium rounded-ctl">
               ANTES ({totalBefore})
             </div>
           </div>
@@ -193,7 +193,7 @@ export function PhotoEvidenceCard({
                 )}
               </div>
             )}
-            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white text-[10px] font-medium rounded">
+            <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white text-caption font-medium rounded-ctl">
               DESPUÉS ({totalAfter})
             </div>
           </div>
@@ -242,12 +242,12 @@ export function PhotoEvidenceCard({
         {evidence.tags && evidence.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {evidence.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+              <Badge key={tag} variant="secondary" className="text-caption px-1.5 py-0">
                 {tag}
               </Badge>
             ))}
             {evidence.tags.length > 3 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              <Badge variant="secondary" className="text-caption px-1.5 py-0">
                 +{evidence.tags.length - 3}
               </Badge>
             )}

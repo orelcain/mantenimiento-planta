@@ -435,7 +435,7 @@ export function LossCascadeCard({
             const groupLabel = activeBucket == null ? 'Uso real por máquina' : `${LOSS_BUCKET_META[activeBucket as keyof typeof LOSS_BUCKET_META]?.label ?? activeBucket} por máquina`
             return (
               <div className="space-y-1">
-                <p className="text-caption text-muted-foreground uppercase tracking-wider">{groupLabel}</p>
+                <p className="text-caption text-muted-foreground tracking-wider">{groupLabel}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                   {perMachine.map((m) => {
                     const sec = bucketSecOf(m.cascade)
@@ -517,7 +517,7 @@ export function LossCascadeCard({
               pérdida total. Se listan aparte, sin ≈pz. */}
           {techoCauses.length > 0 && (
             <div>
-              <p className="text-caption text-muted-foreground uppercase tracking-wider mb-1">
+              <p className="text-caption text-muted-foreground tracking-wider mb-1">
                 {filter === 'all'
                   ? `Piezas perdidas por causal · ${piezasPerdidas.toLocaleString('es-CL')} pz bajo el máximo teórico`
                   : 'Eventos del grupo · con su costo en piezas'}
@@ -592,7 +592,7 @@ export function LossCascadeCard({
           )}
           {plannedCauses.length > 0 && (
             <div>
-              <p className="text-caption text-muted-foreground/70 uppercase tracking-wider mb-1">
+              <p className="text-caption text-muted-foreground/70 tracking-wider mb-1">
                 Pausas planificadas · fuera del techo (no cuentan como pérdida)
               </p>
               <div className="space-y-0.5 opacity-70">

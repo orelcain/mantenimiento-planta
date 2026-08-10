@@ -269,7 +269,7 @@ export function Perilla5Page() {
               role="tab"
               aria-selected={vista === 'herramienta'}
               onClick={() => setVista('herramienta')}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+              className="inline-flex items-center gap-1.5 rounded-ctl border px-3 py-1.5 text-sm font-medium"
               style={
                 vista === 'herramienta'
                   ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
@@ -283,7 +283,7 @@ export function Perilla5Page() {
               role="tab"
               aria-selected={vista === 'protocolo'}
               onClick={() => setVista('protocolo')}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+              className="inline-flex items-center gap-1.5 rounded-ctl border px-3 py-1.5 text-sm font-medium"
               style={
                 vista === 'protocolo'
                   ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
@@ -297,7 +297,7 @@ export function Perilla5Page() {
 
         {vista === 'herramienta' ? (
           <div
-            className="mt-4 overflow-hidden rounded-lg border"
+            className="mt-4 overflow-hidden rounded-card border"
             style={{ borderColor: LC.border }}
           >
             {/* El visor de figuras de la herramienta es position:fixed DENTRO del
@@ -488,7 +488,7 @@ function VistaProtocolo() {
     <div className="mt-4 space-y-4">
       {/* Qué es y por qué se registra */}
       <div
-        className="rounded-lg border p-4 text-sm leading-relaxed"
+        className="rounded-card border p-4 text-sm leading-relaxed"
         style={{ background: LC.surface, borderColor: LC.border, color: LC.inkMid }}
       >
         <p>
@@ -506,7 +506,7 @@ function VistaProtocolo() {
 
       {/* Selector de máquina */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wide" style={{ color: LC.inkLo }}>
+        <span className="text-xs tracking-wide" style={{ color: LC.inkLo }}>
           Máquina
         </span>
         {MAQUINAS.map((m) => (
@@ -529,14 +529,14 @@ function VistaProtocolo() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Formulario */}
-        <div className="rounded-lg border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+        <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Nueva lectura</h2>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={precargarBase}
-                className="rounded border px-2 py-1 text-xs"
+                className="rounded-ctl border px-2 py-1 text-xs"
                 style={{ borderColor: LC.border, color: LC.inkMid }}
                 title="Rellena el formulario con la lectura de terreno del 08-08-2026 (Baader antigua)"
               >
@@ -545,7 +545,7 @@ function VistaProtocolo() {
               <button
                 type="button"
                 onClick={limpiar}
-                className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+                className="inline-flex items-center gap-1 rounded-ctl border px-2 py-1 text-xs"
                 style={{ borderColor: LC.border, color: LC.inkMid }}
               >
                 <RotateCcw className="h-3 w-3" /> Limpiar
@@ -559,15 +559,15 @@ function VistaProtocolo() {
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
-              className="mt-1 block w-full rounded border px-2 py-1.5 font-mono text-sm"
+              className="mt-1 block w-full rounded-ctl border px-2 py-1.5 font-mono text-sm"
               style={{ background: LC.surfaceHi, borderColor: LC.border, color: LC.ink }}
             />
           </label>
 
           <div className="mt-3 grid grid-cols-[1fr_92px_56px] items-center gap-x-2 gap-y-1.5">
-            <span className="text-[10px] uppercase tracking-wide" style={{ color: LC.inkGhost }}>Contador</span>
-            <span className="text-right text-[10px] uppercase tracking-wide" style={{ color: LC.inkGhost }}>Valor</span>
-            <span className="text-right text-[10px] uppercase tracking-wide" style={{ color: LC.inkGhost }}>/1000</span>
+            <span className="text-caption tracking-wide" style={{ color: LC.inkGhost }}>Contador</span>
+            <span className="text-right text-caption tracking-wide" style={{ color: LC.inkGhost }}>Valor</span>
+            <span className="text-right text-caption tracking-wide" style={{ color: LC.inkGhost }}>/1000</span>
             {CAMPOS.map((c) => {
               const r = c.conTasa && fish > 0 ? tasa1000(num(c.k), fish) : null
               const nivel = r !== null && r > 0 ? nivelTasa(r) : null
@@ -593,7 +593,7 @@ function VistaProtocolo() {
               onChange={(e) => setNotas(e.target.value)}
               rows={2}
               maxLength={500}
-              className="mt-1 block w-full rounded border px-2 py-1.5 text-sm"
+              className="mt-1 block w-full rounded-ctl border px-2 py-1.5 text-sm"
               style={{ background: LC.surfaceHi, borderColor: LC.border, color: LC.ink }}
             />
           </label>
@@ -611,7 +611,7 @@ function VistaProtocolo() {
             type="button"
             onClick={() => void guardar()}
             disabled={guardando || !isAuthenticated}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-ctl px-4 py-2 text-sm font-semibold disabled:opacity-50"
             style={{ background: LC.aqua, color: '#fff' }}
           >
             {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -625,7 +625,7 @@ function VistaProtocolo() {
         </div>
 
         {/* Tendencia */}
-        <div className="rounded-lg border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+        <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
           <h2 className="text-base font-semibold">Tendencia de correcciones -C</h2>
           <p className="mt-1 text-xs" style={{ color: LC.inkMid }}>
             Tasa /1000 pescados por herramienta. La serie que sube semana a semana marca el
@@ -651,7 +651,7 @@ function VistaProtocolo() {
       </div>
 
       {/* Historial */}
-      <div className="rounded-lg border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
+      <div className="rounded-card border p-4" style={{ background: LC.surface, borderColor: LC.border }}>
         <h2 className="text-base font-semibold">Lecturas registradas</h2>
         {cargando ? null : lecturas.length === 0 ? (
           <p className="mt-2 text-sm" style={{ color: LC.inkLo }}>Ninguna todavía.</p>
@@ -731,7 +731,7 @@ function FilaContador({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="0"
-        className="w-full rounded border px-2 py-1 text-right font-mono text-sm"
+        className="w-full rounded-ctl border px-2 py-1 text-right font-mono text-sm"
         style={{ background: LC.surfaceHi, borderColor: LC.border, color: LC.ink }}
       />
       <span className="text-right font-mono text-xs" style={{ color: tasaColor }}>

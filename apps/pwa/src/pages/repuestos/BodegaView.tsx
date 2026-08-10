@@ -178,7 +178,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
               <Icon className="hidden sm:block h-3.5 w-3.5" />
               {t.label}
               {t.id === 'stock' && bodega.stats.bajoStock + bodega.stats.sinStock > 0 && (
-                <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/[0.15] text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/[0.15] text-white text-caption font-bold flex items-center justify-center">
                   {bodega.stats.bajoStock + bodega.stats.sinStock}
                 </span>
               )}
@@ -328,14 +328,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
 
       {/* Sort bar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Ordenar:</span>
+        <span className="text-caption text-muted-foreground font-medium tracking-wider">Ordenar:</span>
         {([['nombre', 'Nombre'], ['stock', 'Stock'], ['valor', 'Valor'], ['equipos', 'Equipos']] as [SortField, string][]).map(([field, label]) => (
           <button key={field} onClick={() => toggleSort(field)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-ctl text-[10px] font-medium transition-colors ${sortField === field ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+            className={`flex items-center gap-1 px-2 py-1 rounded-ctl text-caption font-medium transition-colors ${sortField === field ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
             {label} <SortIcon field={field} />
           </button>
         ))}
-        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{filtered.length} de {items.length}</span>
+        <span className="ml-auto text-caption text-muted-foreground tabular-nums">{filtered.length} de {items.length}</span>
       </div>
 
       {/* Cards grid */}
@@ -445,19 +445,19 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
         <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
           <div className="bg-card border border-border rounded-card p-4 text-center">
             <p className="text-2xl font-bold text-foreground">{resumenFinal.contados}</p>
-            <p className="text-[10px] text-muted-foreground">Ítems contados</p>
+            <p className="text-caption text-muted-foreground">Ítems contados</p>
           </div>
           <div className="bg-card border border-border rounded-card p-4 text-center">
             <p className="text-2xl font-bold text-ink-warn">{resumenFinal.ajustados}</p>
-            <p className="text-[10px] text-muted-foreground">Con diferencia</p>
+            <p className="text-caption text-muted-foreground">Con diferencia</p>
           </div>
           <div className="bg-card border border-border rounded-card p-4 text-center">
             <p className="text-2xl font-bold text-cat-6-ink">${resumenFinal.valorDif.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
-            <p className="text-[10px] text-muted-foreground">Valor diferencias</p>
+            <p className="text-caption text-muted-foreground">Valor diferencias</p>
           </div>
           <div className="bg-card border border-border rounded-card p-4 text-center">
             <p className={`text-2xl font-bold ${resumenFinal.precision >= 95 ? 'text-ink-ok' : resumenFinal.precision >= 80 ? 'text-ink-warn' : 'text-ink-crit'}`}>{resumenFinal.precision}%</p>
-            <p className="text-[10px] text-muted-foreground">Precisión</p>
+            <p className="text-caption text-muted-foreground">Precisión</p>
           </div>
         </div>
         <button onClick={() => setResumenFinal(null)} className="mt-4 px-6 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90">
@@ -527,9 +527,9 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
           </button>
         </div>
         {soloConStock && items.filter(i => i.bodegaId).length === 0 ? (
-          <p className="text-[10px] text-ink-warn mt-2 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" />No hay ítems con stock configurado.</p>
+          <p className="text-caption text-ink-warn mt-2 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" />No hay ítems con stock configurado.</p>
         ) : (
-          <p className="text-[10px] text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
+          <p className="text-caption text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
         )}
       </div>
 
@@ -547,15 +547,15 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{s.nombre}</p>
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-3 text-caption text-muted-foreground mt-0.5">
                   <span>{s.contados}/{s.totalItems} contados</span>
                   {s.conDiferencia > 0 && <span className="text-ink-warn">{s.conDiferencia} con diferencia</span>}
                   <span>{s.creadoPorNombre}</span>
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold uppercase shrink-0">En curso</span>}
-              {s.estado === 'finalizado' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold uppercase shrink-0">Finalizado</span>}
+              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold uppercase shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold uppercase shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -621,7 +621,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
         ))}
         <div className="flex-1" />
         {!isFinalizado && tab === 'pendientes' && (
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+          <label className="flex items-center gap-1.5 text-caption text-muted-foreground cursor-pointer">
             <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded-ctl h-3 w-3" />
             <Zap className="h-3 w-3" /> Escaneo rápido
           </label>
@@ -646,20 +646,20 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{c.textoBreve}</p>
-                  <span className="text-[10px] font-mono text-primary">{c.codigoSAP}</span>
+                  <span className="text-caption font-mono text-primary">{c.codigoSAP}</span>
                 </div>
                 <div className="text-center shrink-0 w-16">
-                  <p className="text-[9px] text-muted-foreground uppercase">Sistema</p>
+                  <p className="text-caption text-muted-foreground uppercase">Sistema</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{c.stockSistema}</p>
                 </div>
                 {c.stockFisico !== null ? (
                   <>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-[9px] text-muted-foreground uppercase">Físico</p>
+                      <p className="text-caption text-muted-foreground uppercase">Físico</p>
                       <p className="text-sm font-bold text-foreground tabular-nums">{c.stockFisico}</p>
                     </div>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-[9px] text-muted-foreground uppercase">Dif.</p>
+                      <p className="text-caption text-muted-foreground uppercase">Dif.</p>
                       <p className={`text-sm font-bold tabular-nums ${c.diferencia > 0 ? 'text-ink-ok' : c.diferencia < 0 ? 'text-ink-crit' : 'text-muted-foreground'}`}>
                         {c.diferencia > 0 ? '+' : ''}{c.diferencia}
                       </p>
@@ -687,7 +687,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                   )
                 )}
               </div>
-              {c.observaciones && c.stockFisico !== null && <p className="text-[10px] text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
+              {c.observaciones && c.stockFisico !== null && <p className="text-caption text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
             </div>
           ))}
         </div>
@@ -764,7 +764,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             <button key={o.f} onClick={() => setFiltroTipo(o.f)}
               className={`flex items-center gap-2 p-3 rounded-card border transition-all text-left ${filtroTipo === o.f ? o.border : 'border-border bg-card hover:bg-muted'}`}>
               <I className={`h-4 w-4 ${o.color}`} />
-              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-[10px] text-muted-foreground">{o.label}</p></div>
+              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-caption text-muted-foreground">{o.label}</p></div>
             </button>
           )
         })}
@@ -786,7 +786,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <EmptyState message={movimientos.length === 0 ? 'Sin movimientos registrados' : 'Sin resultados'} />
       ) : (
         <div className="border border-border rounded-card overflow-hidden bg-card">
-          <div className="hidden sm:grid grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2 bg-muted border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+          <div className="hidden sm:grid grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2 bg-muted border-b border-border text-caption tracking-wider font-semibold text-muted-foreground">
             <span>Fecha</span><span>Tipo</span><span>Motivo</span><span className="text-center">Cantidad</span><span className="text-center">Stock</span><span>Realizado por</span>
           </div>
           <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
@@ -801,15 +801,15 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                 <div key={m.id} className="sm:grid sm:grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2.5 hover:bg-muted transition-colors">
                   <div className="text-xs text-muted-foreground tabular-nums">
                     <p>{m.createdAt.toLocaleDateString('es-CL')}</p>
-                    <p className="text-[10px] text-muted-foreground/60">{m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-caption text-muted-foreground/60">{m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className={`h-6 w-6 rounded-ctl flex items-center justify-center shrink-0 ${tipoConfig.bg}`}><TIcon className={`h-3.5 w-3.5 ${tipoConfig.color}`} /></div>
-                    <span className={`text-[10px] font-semibold ${tipoConfig.color}`}>{tipoConfig.label}</span>
+                    <span className={`text-caption font-semibold ${tipoConfig.color}`}>{tipoConfig.label}</span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-foreground truncate">{m.motivo || '—'}</p>
-                    <span className="text-[10px] font-mono text-primary">{m.bodegaItemId}</span>
+                    <span className="text-caption font-mono text-primary">{m.bodegaItemId}</span>
                   </div>
                   <div className="flex items-center justify-center">
                     <span className={`text-sm font-bold tabular-nums ${tipoConfig.color}`}>
@@ -932,7 +932,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {/* Salud + Cobertura */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-card p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Salud del inventario</p>
+          <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Salud del inventario</p>
           <div className="flex items-center gap-3 mb-3">
             {[
               { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]' },
@@ -940,7 +940,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]' },
             ].map(s => (
               <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-card border border-border bg-muted">
-                <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-[9px] text-muted-foreground">{s.label}</span>
+                <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-caption text-muted-foreground">{s.label}</span>
               </div>
             ))}
           </div>
@@ -953,7 +953,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           )}
         </div>
         <div className="bg-card border border-border rounded-card p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Cobertura de bodega</p>
+          <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Cobertura de bodega</p>
           <div className="flex items-center justify-center">
             <div className="relative h-28 w-28">
               <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
@@ -964,11 +964,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-2xl font-bold text-foreground tabular-nums">{coberturaPct}%</span>
-                <span className="text-[9px] text-muted-foreground">configurados</span>
+                <span className="text-caption text-muted-foreground">configurados</span>
               </div>
             </div>
           </div>
-          <div className="flex justify-center gap-4 mt-3 text-[10px] text-muted-foreground">
+          <div className="flex justify-center gap-4 mt-3 text-caption text-muted-foreground">
             <span><strong className="text-foreground">{stats.conStock}</strong> configurados</span>
             <span><strong className="text-foreground">{stats.sinConfig}</strong> sin configurar</span>
           </div>
@@ -978,7 +978,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {/* Clasificación ABC automática */}
       <div className="bg-card border border-border rounded-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-cat-6-tint/[0.15]">
-          <p className="text-xs font-semibold text-cat-6-ink uppercase tracking-wide flex items-center gap-1.5">
+          <p className="text-xs font-semibold text-cat-6-ink tracking-wide flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5" /> Clasificación ABC (por valor inventario)
           </p>
         </div>
@@ -992,8 +992,8 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               <div key={cat.label} className={`rounded-card border border-border p-3 ${cat.bg}`}>
                 <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
                 <p className="text-xl font-bold text-foreground tabular-nums mt-1">{cat.data.length}</p>
-                <p className="text-[9px] text-muted-foreground">{cat.desc}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-caption text-muted-foreground">{cat.desc}</p>
+                <p className="text-caption text-muted-foreground mt-1">
                   ${cat.data.reduce((s, r) => s + r.valorTotal, 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}
                 </p>
               </div>
@@ -1015,7 +1015,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         {/* Stock sin movimiento */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted-foreground/[0.10]">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5">
               <Archive className="h-3.5 w-3.5" /> Stock sin movimiento
             </p>
           </div>
@@ -1026,11 +1026,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               <div className="flex gap-3">
                 <div className="flex-1 rounded-card border border-border bg-amber-500/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-warn tabular-nums">{deadStock.noMov90.length}</p>
-                  <p className="text-[9px] text-muted-foreground">+90 días</p>
+                  <p className="text-caption text-muted-foreground">+90 días</p>
                 </div>
                 <div className="flex-1 rounded-card border border-border bg-red-500/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-crit tabular-nums">{deadStock.noMov180.length}</p>
-                  <p className="text-[9px] text-muted-foreground">+180 días</p>
+                  <p className="text-caption text-muted-foreground">+180 días</p>
                 </div>
               </div>
               {deadStock.noMov180.length > 0 && (
@@ -1038,11 +1038,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                   {deadStock.noMov180.slice(0, 8).map(item => (
                     <div key={item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
                       <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                      <span className="text-[10px] font-mono text-primary shrink-0">{item.codigoSAP}</span>
+                      <span className="text-caption font-mono text-primary shrink-0">{item.codigoSAP}</span>
                       <span className="text-xs font-bold text-muted-foreground tabular-nums shrink-0">{item.stockActual}</span>
                     </div>
                   ))}
-                  {deadStock.noMov180.length > 8 && <p className="px-3 py-1.5 text-[10px] text-muted-foreground text-center">+{deadStock.noMov180.length - 8} más</p>}
+                  {deadStock.noMov180.length > 8 && <p className="px-3 py-1.5 text-caption text-muted-foreground text-center">+{deadStock.noMov180.length - 8} más</p>}
                 </div>
               )}
             </div>
@@ -1052,7 +1052,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         {/* Rotación */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-primary/[0.15]">
-            <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-primary tracking-wide flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5" /> Rotación de inventario
             </p>
           </div>
@@ -1062,11 +1062,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             <div className="p-4 space-y-3">
               <div className="rounded-card border border-border bg-primary/[0.15] p-3 text-center">
                 <p className="text-xl font-bold text-primary tabular-nums">{rotacionData.avgRotacion.toFixed(2)}</p>
-                <p className="text-[9px] text-muted-foreground">Rotación promedio</p>
+                <p className="text-caption text-muted-foreground">Rotación promedio</p>
               </div>
               {rotacionData.itemRotacion.filter(r => r.salidas > 0).length > 0 && (
                 <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border rounded-card">
-                  <div className="px-3 py-1 bg-muted text-[9px] text-muted-foreground font-semibold flex items-center">
+                  <div className="px-3 py-1 bg-muted text-caption text-muted-foreground font-semibold flex items-center">
                     <span className="flex-1">Ítem</span><span className="w-14 text-center">Salidas</span><span className="w-14 text-right">Rotación</span>
                   </div>
                   {rotacionData.itemRotacion.filter(r => r.salidas > 0).slice(0, 8).map(r => (
@@ -1087,7 +1087,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         {/* Alertas */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-red-500/[0.15]">
-            <p className="text-xs font-semibold text-ink-crit uppercase tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
+            <p className="text-xs font-semibold text-ink-crit tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.alertas.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas</p>
@@ -1096,8 +1096,8 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                 <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
                   {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit" /> : <TrendingDown className="h-4 w-4 text-ink-warn" />}
                 </div>
-                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] font-mono text-primary">{item.codigoSAP}</p></div>
-                <div className="text-right shrink-0"><p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</p><p className="text-[9px] text-muted-foreground">mín: {item.stockMinimo}</p></div>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption font-mono text-primary">{item.codigoSAP}</p></div>
+                <div className="text-right shrink-0"><p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</p><p className="text-caption text-muted-foreground">mín: {item.stockMinimo}</p></div>
               </div>
             ))}
           </div>
@@ -1105,7 +1105,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
         {/* Distribución por tipo */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-muted"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Distribución por tipo</p></div>
+          <div className="px-4 py-3 border-b border-border bg-muted"><p className="text-xs font-semibold text-muted-foreground tracking-wide">Distribución por tipo</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.tipoDistribution.map(([tipo, count]) => (
               <div key={tipo} className="px-4 py-2 flex items-center justify-between">
@@ -1118,13 +1118,13 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
         {/* Top por valor */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-cat-6-tint/[0.15]"><p className="text-xs font-semibold text-cat-6-ink uppercase tracking-wide">Top 10 por valor</p></div>
+          <div className="px-4 py-3 border-b border-border bg-cat-6-tint/[0.15]"><p className="text-xs font-semibold text-cat-6-ink tracking-wide">Top 10 por valor</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.topByValue.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin datos</p>
             : stats.topByValue.map((item, i) => (
               <div key={item.codigoSAP} className="px-4 py-2 flex items-center gap-3">
-                <span className="text-[10px] text-muted-foreground/50 w-4 text-right shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p></div>
+                <span className="text-caption text-muted-foreground/50 w-4 text-right shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p></div>
                 <span className="text-xs font-bold text-cat-6-ink tabular-nums shrink-0">${item.valorInventario.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
               </div>
             ))}
@@ -1134,7 +1134,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         {/* Movimientos recientes */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> Movimientos recientes {!movLoading && <span className="text-muted-foreground/50">({movEntradas}↓ {movSalidas}↑ {movAjustes}⟳)</span>}
             </p>
           </div>
@@ -1143,12 +1143,12 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             : movimientos.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin movimientos</p>
             : movimientos.slice(0, 15).map(m => (
               <div key={m.id} className="px-4 py-2 flex items-center gap-2">
-                <span className={`text-[10px] font-bold w-12 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
+                <span className={`text-caption font-bold w-12 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
                   {m.tipo === 'entrada' ? '↓ Entr.' : m.tipo === 'salida' ? '↑ Sal.' : '⟳ Ajuste'}
                 </span>
                 <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">{m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}</span>
                 <span className="text-xs text-muted-foreground truncate flex-1">{m.motivo || m.bodegaItemId}</span>
-                <span className="text-[10px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
+                <span className="text-caption text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
               </div>
             ))}
           </div>
@@ -1181,14 +1181,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         return equipoRows.length > 0 ? (
           <div className="bg-card border border-border rounded-card overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-cat-7-tint/[0.15]">
-              <p className="text-xs font-semibold text-cat-7-ink uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-cat-7-ink tracking-wide flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5" /> Cobertura por equipo
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-muted text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                  <tr className="bg-muted text-caption tracking-wider text-muted-foreground/60">
                     <th className="px-4 py-2 text-left font-semibold">Equipo</th>
                     <th className="px-2 py-2 text-center font-semibold">Repuestos</th>
                     <th className="px-2 py-2 text-center font-semibold">Con stock</th>
@@ -1213,7 +1213,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>
-                          <span className={`text-[10px] font-bold tabular-nums w-8 text-right ${row.pct >= 50 ? 'text-ink-ok' : row.pct >= 20 ? 'text-ink-warn' : 'text-ink-crit'}`}>
+                          <span className={`text-caption font-bold tabular-nums w-8 text-right ${row.pct >= 50 ? 'text-ink-ok' : row.pct >= 20 ? 'text-ink-warn' : 'text-ink-crit'}`}>
                             {row.pct}%
                           </span>
                         </div>
@@ -1233,7 +1233,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                         <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${coberturaPct}%` }} />
                         </div>
-                        <span className="text-[10px] font-bold tabular-nums w-8 text-right text-primary">{coberturaPct}%</span>
+                        <span className="text-caption font-bold tabular-nums w-8 text-right text-primary">{coberturaPct}%</span>
                       </div>
                     </td>
                   </tr>
@@ -1265,14 +1265,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         return tipoRows.length > 0 ? (
           <div className="bg-card border border-border rounded-card overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-cat-3-tint/[0.15]">
-              <p className="text-xs font-semibold text-cat-3-ink uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-cat-3-ink tracking-wide flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5" /> Resumen por tipo de repuesto
               </p>
             </div>
             <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-card z-10">
-                  <tr className="bg-muted text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                  <tr className="bg-muted text-caption tracking-wider text-muted-foreground/60">
                     <th className="px-4 py-2 text-left font-semibold">Tipo</th>
                     <th className="px-2 py-2 text-center font-semibold">Total</th>
                     <th className="px-2 py-2 text-center font-semibold">Con stock</th>
@@ -1303,7 +1303,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>
-                          <span className="text-[10px] font-bold tabular-nums w-8 text-right text-muted-foreground">{row.pct}%</span>
+                          <span className="text-caption font-bold tabular-nums w-8 text-right text-muted-foreground">{row.pct}%</span>
                         </div>
                       </td>
                     </tr>
@@ -1319,7 +1319,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {proveedores.length > 0 && (
         <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})</p>
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})</p>
           </div>
           <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
             {proveedores.map(([prov, count]) => (
@@ -1348,7 +1348,7 @@ function StatCard({ icon: Icon, label, value, color, bg, onClick, active, sublab
       <div className={`h-9 w-9 rounded-card flex items-center justify-center shrink-0 ${bg}`}><Icon className={`h-4 w-4 ${color}`} /></div>
       <div className="min-w-0">
         <p className="text-lg font-bold text-foreground leading-tight truncate">{value}</p>
-        <p className="text-[10px] text-muted-foreground leading-tight">{active && sublabel ? sublabel : label}</p>
+        <p className="text-caption text-muted-foreground leading-tight">{active && sublabel ? sublabel : label}</p>
       </div>
     </button>
   )
@@ -1360,7 +1360,7 @@ function KpiCard({ label, value, icon: Icon, color, sub }: {
   return (
     <div className="bg-card border border-border rounded-card p-4 flex items-center gap-3">
       <div className="h-10 w-10 rounded-card flex items-center justify-center shrink-0 bg-muted"><Icon className={`h-5 w-5 ${color}`} /></div>
-      <div><p className="text-xl font-bold text-foreground tabular-nums">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p>{sub && <p className="text-[9px] text-muted-foreground/60 mt-0.5">{sub}</p>}</div>
+      <div><p className="text-xl font-bold text-foreground tabular-nums">{value}</p><p className="text-caption text-muted-foreground">{label}</p>{sub && <p className="text-caption text-muted-foreground/60 mt-0.5">{sub}</p>}</div>
     </div>
   )
 }
@@ -1370,7 +1370,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data: number[]; width?: number; height?: number; color?: string }) {
-  if (data.length < 2) return <span className="text-[9px] text-muted-foreground">—</span>
+  if (data.length < 2) return <span className="text-caption text-muted-foreground">—</span>
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -1470,15 +1470,15 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
           {has ? (
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className={`text-2xl font-bold leading-none tabular-nums ${stockColor}`}>{item.stockActual}</span>
-              <span className="text-[11px] text-muted-foreground">{item.unidad}</span>
-              {isSin && <span className="text-[10px] font-semibold uppercase text-ink-crit">sin stock</span>}
-              {isBajo && <span className="text-[10px] font-semibold uppercase text-ink-warn">bajo mín</span>}
+              <span className="text-caption text-muted-foreground">{item.unidad}</span>
+              {isSin && <span className="text-caption font-semibold uppercase text-ink-crit">sin stock</span>}
+              {isBajo && <span className="text-caption font-semibold uppercase text-ink-warn">bajo mín</span>}
               {!isSin && !isBajo && item.stockMinimo > 0 && (
-                <span className="text-[10px] text-muted-foreground">mín {item.stockMinimo}</span>
+                <span className="text-caption text-muted-foreground">mín {item.stockMinimo}</span>
               )}
             </div>
           ) : (
-            <span className="rounded-ctl bg-muted px-2 py-1 text-[11px] text-muted-foreground">Sin configurar</span>
+            <span className="rounded-ctl bg-muted px-2 py-1 text-caption text-muted-foreground">Sin configurar</span>
           )}
           {item.ubicacionBodega && (
             <span className="inline-flex max-w-[55%] items-center gap-1 rounded-ctl bg-muted px-2 py-1 text-xs font-medium text-foreground" title={item.ubicacionBodega}>
@@ -1496,15 +1496,15 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
 
         {/* Meta secundaria */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-[10px] text-primary">{item.codigoSAP}</span>
+          <span className="rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-caption text-primary">{item.codigoSAP}</span>
           {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
           {item.equipos.length > 0 && (
-            <span className="flex items-center gap-0.5 rounded-ctl bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" title={item.equipos.map(e => e.machineName).join(', ')}>
+            <span className="flex items-center gap-0.5 rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground" title={item.equipos.map(e => e.machineName).join(', ')}>
               <Layers className="h-2.5 w-2.5" />{item.equipos.length}
             </span>
           )}
           {valorTotal > 0 && (
-            <span className="ml-auto text-[10px] font-medium tabular-nums text-cat-6-ink">
+            <span className="ml-auto text-caption font-medium tabular-nums text-cat-6-ink">
               ${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
             </span>
           )}
@@ -1606,10 +1606,10 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className="min-w-0 flex-1">
               <p className={item.textoBreve ? 'text-base font-bold text-foreground' : 'text-base font-bold italic text-muted-foreground'}>{item.textoBreve || `(sin nombre — SAP ${item.codigoSAP})`}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
-                {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
+                <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
+                {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
                 {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
-                {item.categoria && <span className={`text-[10px] px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
+                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
@@ -1641,15 +1641,15 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-card border border-border p-3 text-center">
               <p className={`text-2xl font-bold tabular-nums ${isSin ? 'text-ink-crit' : isBajo ? 'text-ink-warn' : 'text-foreground'}`}>{item.stockActual}</p>
-              <p className="text-[9px] text-muted-foreground">Stock actual</p>
+              <p className="text-caption text-muted-foreground">Stock actual</p>
             </div>
             <div className="rounded-card border border-border p-3 text-center">
               <p className="text-2xl font-bold text-muted-foreground tabular-nums">{item.stockMinimo}</p>
-              <p className="text-[9px] text-muted-foreground">Mínimo</p>
+              <p className="text-caption text-muted-foreground">Mínimo</p>
             </div>
             <div className="rounded-card border border-border p-3 text-center">
               <p className="text-2xl font-bold text-cat-6-ink tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
-              <p className="text-[9px] text-muted-foreground">Valor</p>
+              <p className="text-caption text-muted-foreground">Valor</p>
             </div>
           </div>
 
@@ -1657,7 +1657,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {has && item.stockMinimo > 0 && (
             <div className="space-y-1">
               <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
-              <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+              <div className="flex items-center justify-between text-caption text-muted-foreground">
                 <span>0</span>
                 <span>Mín: {item.stockMinimo}</span>
                 <span>{item.stockMaximo || item.stockMinimo * 2}</span>
@@ -1668,7 +1668,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {/* Sparkline */}
           {sparkData.length >= 2 && (
             <div className="rounded-card border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
+              <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
               <div className="flex items-center justify-center">
                 <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} />
               </div>
@@ -1678,38 +1678,38 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {/* Punto de reorden */}
           {reorder && (
             <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border'}`}>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
-                {reorder.necesitaPedir && <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold uppercase">Pedir ahora</span>}
+                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold uppercase">Pedir ahora</span>}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-lg font-bold text-foreground tabular-nums">{reorder.puntoReorden}</p>
-                  <p className="text-[8px] text-muted-foreground">Pto. reorden</p>
+                  <p className="text-caption text-muted-foreground">Pto. reorden</p>
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-bold text-primary tabular-nums">{reorder.consumoDiario.toFixed(1)}</p>
-                  <p className="text-[8px] text-muted-foreground">Consumo/día</p>
+                  <p className="text-caption text-muted-foreground">Consumo/día</p>
                 </div>
                 <div className="text-center">
                   <p className={`text-lg font-bold tabular-nums ${reorder.diasRestantes < 14 ? 'text-ink-crit' : reorder.diasRestantes < 30 ? 'text-ink-warn' : 'text-ink-ok'}`}>
                     {reorder.diasRestantes === Infinity ? '∞' : reorder.diasRestantes}
                   </p>
-                  <p className="text-[8px] text-muted-foreground">Días restantes</p>
+                  <p className="text-caption text-muted-foreground">Días restantes</p>
                 </div>
               </div>
-              {item.leadTime && <p className="text-[9px] text-muted-foreground text-center mt-2">Lead time proveedor: {item.leadTime} días</p>}
+              {item.leadTime && <p className="text-caption text-muted-foreground text-center mt-2">Lead time proveedor: {item.leadTime} días</p>}
             </div>
           )}
 
           {/* Fotos */}
           <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border flex items-center justify-between">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <Image className="h-3 w-3" /> Fotos ({item.fotos?.length || 0})
               </p>
               {addPhoto && (
-                <label className="flex items-center gap-1 text-[10px] text-primary cursor-pointer hover:underline">
+                <label className="flex items-center gap-1 text-caption text-primary cursor-pointer hover:underline">
                   <Camera className="h-3 w-3" /> Agregar
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                 </label>
@@ -1718,7 +1718,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             {uploading && (
               <div className="px-3 py-2 flex items-center gap-2">
                 <Loader2 className="h-3 w-3 text-primary animate-spin" />
-                <span className="text-[10px] text-muted-foreground">Subiendo foto...</span>
+                <span className="text-caption text-muted-foreground">Subiendo foto...</span>
               </div>
             )}
             {item.fotos && item.fotos.length > 0 ? (
@@ -1736,14 +1736,14 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 ))}
               </div>
             ) : (
-              <p className="px-3 py-3 text-[10px] text-muted-foreground text-center">Sin fotos. Agrega una para identificación visual.</p>
+              <p className="px-3 py-3 text-caption text-muted-foreground text-center">Sin fotos. Agrega una para identificación visual.</p>
             )}
           </div>
 
           {/* Código QR */}
           <div className="rounded-card border border-border overflow-hidden">
             <button onClick={() => setShowQR(q => !q)} className="w-full px-3 py-2 bg-muted flex items-center justify-between hover:bg-muted transition-colors">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <QrCode className="h-3 w-3" /> Código QR
               </p>
               <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showQR ? 'rotate-180' : ''}`} />
@@ -1751,12 +1751,12 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             {showQR && (
               <div className="p-4 flex flex-col items-center gap-3">
                 <QRCodeSVG id="bodega-qr-svg" value={qrValue} size={180} level="H" includeMargin />
-                <p className="text-[9px] text-muted-foreground text-center break-all max-w-[200px]">{item.codigoSAP}</p>
+                <p className="text-caption text-muted-foreground text-center break-all max-w-[200px]">{item.codigoSAP}</p>
                 <div className="flex gap-2">
-                  <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
+                  <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
                     <Download className="h-3 w-3" /> Descargar PNG
                   </button>
-                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-primary">
+                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-primary">
                     <QrCode className="h-3 w-3" /> Imprimir
                   </button>
                 </div>
@@ -1775,7 +1775,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               { label: 'Lead time', value: item.leadTime ? `${item.leadTime} días` : '—' },
             ].map(d => (
               <div key={d.label} className="flex items-center justify-between px-3 py-2">
-                <span className="text-[10px] text-muted-foreground">{d.label}</span>
+                <span className="text-caption text-muted-foreground">{d.label}</span>
                 <span className="text-xs text-foreground font-medium">{d.value}</span>
               </div>
             ))}
@@ -1784,7 +1784,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {/* Equipos vinculados */}
           <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <Layers className="h-3 w-3" /> Equipos ({item.equipos.length})
               </p>
             </div>
@@ -1795,7 +1795,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   {onViewInEquipo && (
                     <button
                       onClick={() => { onViewInEquipo(e.machineId); onClose() }}
-                      className="shrink-0 text-[9px] text-primary hover:text-primary/80 hover:underline transition-colors"
+                      className="shrink-0 text-caption text-primary hover:text-primary/80 hover:underline transition-colors"
                     >
                       Ver en Áreas
                     </button>
@@ -1808,24 +1808,24 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {/* Historial de movimientos */}
           <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <History className="h-3 w-3" /> Movimientos recientes
               </p>
             </div>
             {loading ? <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
-            : movs.length === 0 ? <p className="p-3 text-[10px] text-muted-foreground text-center">Sin movimientos</p>
+            : movs.length === 0 ? <p className="p-3 text-caption text-muted-foreground text-center">Sin movimientos</p>
             : (
               <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
                 {movs.map(m => (
                   <div key={m.id} className="px-3 py-2 flex items-center gap-2">
-                    <span className={`text-[10px] font-bold w-10 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
+                    <span className={`text-caption font-bold w-10 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
                       {m.tipo === 'entrada' ? '↓ Ent' : m.tipo === 'salida' ? '↑ Sal' : '⟳ Aj'}
                     </span>
                     <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">
                       {m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground truncate flex-1">{m.motivo || '—'}</span>
-                    <span className="text-[9px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
+                    <span className="text-caption text-muted-foreground truncate flex-1">{m.motivo || '—'}</span>
+                    <span className="text-caption text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
                   </div>
                 ))}
               </div>
@@ -1834,7 +1834,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 
           {item.observaciones && (
             <div className="rounded-card border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Observaciones</p>
+              <p className="text-caption text-muted-foreground tracking-wide mb-1">Observaciones</p>
               <p className="text-xs text-foreground">{item.observaciones}</p>
             </div>
           )}
@@ -1868,8 +1868,8 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-ink-crit" />
           <span className="text-xs font-semibold text-ink-crit">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock</span>
-          {sinStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">{sinStock.length} sin stock</span>}
-          {bajoStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-bold">{bajoStock.length} bajo mínimo</span>}
+          {sinStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">{sinStock.length} sin stock</span>}
+          {bajoStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-bold">{bajoStock.length} bajo mínimo</span>}
         </div>
         <ChevronDown className={`h-4 w-4 text-ink-crit/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
@@ -1878,11 +1878,11 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
           {alertas.slice(0, 10).map(item => (
             <div key={item.codigoSAP} className="flex items-center gap-3 px-4 py-2">
               {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit shrink-0" /> : <TrendingDown className="h-4 w-4 text-ink-warn shrink-0" />}
-              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><span className="text-[10px] font-mono text-primary">{item.codigoSAP}</span></div>
-              <div className="text-right shrink-0"><span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</span><span className="text-[9px] text-muted-foreground ml-1">/ {item.stockMinimo}</span></div>
+              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><span className="text-caption font-mono text-primary">{item.codigoSAP}</span></div>
+              <div className="text-right shrink-0"><span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</span><span className="text-caption text-muted-foreground ml-1">/ {item.stockMinimo}</span></div>
             </div>
           ))}
-          {alertas.length > 10 && <div className="px-4 py-2 text-center"><button onClick={() => onFilter('bajo')} className="text-[10px] text-primary hover:underline">Ver todas →</button></div>}
+          {alertas.length > 10 && <div className="px-4 py-2 text-center"><button onClick={() => onFilter('bajo')} className="text-caption text-primary hover:underline">Ver todas →</button></div>}
         </div>
       )}
     </div>
@@ -1917,7 +1917,7 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-base font-bold">{item.bodegaId ? 'Editar stock' : 'Configurar stock'}</h3>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve}</p>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
+          <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-4 gap-3">
@@ -2072,7 +2072,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
                     <span className="text-xs text-muted-foreground">(stock: {m.stockResultante})</span>
                   </div>
                   {m.motivo && <p className="text-xs text-muted-foreground mt-0.5">{m.motivo}</p>}
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground/70">
+                  <div className="flex items-center gap-2 mt-1 text-caption text-muted-foreground/70">
                     <span>{m.realizadoPorNombre || 'Usuario'}</span><span>•</span>
                     <span>{m.createdAt.toLocaleDateString('es-CL')} {m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -2181,7 +2181,7 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
               <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
                 <span className="text-xs text-muted-foreground font-semibold">{selected.size} seleccionados</span>
                 <div className="flex-1" />
-                <input type="text" value={searchBatch} onChange={e => setSearchBatch(e.target.value)} placeholder="Filtrar…" className="w-40 px-2 py-1 text-[10px] bg-muted border border-border rounded-ctl text-foreground" />
+                <input type="text" value={searchBatch} onChange={e => setSearchBatch(e.target.value)} placeholder="Filtrar…" className="w-40 px-2 py-1 text-caption bg-muted border border-border rounded-ctl text-foreground" />
               </div>
               <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
                 {visible.slice(0, 100).map(item => {
@@ -2190,8 +2190,8 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
                     <div key={item.codigoSAP} className={`flex items-center gap-2 px-3 py-2 ${isSelected ? 'bg-primary/5' : 'hover:bg-muted'}`}>
                       <input type="checkbox" checked={isSelected} onChange={() => toggleItem(item.codigoSAP)} className="rounded-ctl" />
                       <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                      <span className="text-[10px] font-mono text-primary shrink-0 w-20">{item.codigoSAP}</span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 w-12 text-right">stk: {item.stockActual}</span>
+                      <span className="text-caption font-mono text-primary shrink-0 w-20">{item.codigoSAP}</span>
+                      <span className="text-caption text-muted-foreground shrink-0 w-12 text-right">stk: {item.stockActual}</span>
                       {isSelected && (
                         <input type="number" min={0} value={selected.get(item.codigoSAP) || 1}
                           onChange={e => setCant(item.codigoSAP, Number(e.target.value))}
@@ -2296,7 +2296,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
                 <input type="checkbox" checked={selected.size === visible.length && visible.length > 0} onChange={toggleAll} className="rounded-ctl" />
                 <span className="text-xs text-muted-foreground">{selected.size} seleccionados</span>
                 <div className="flex-1" />
-                <input type="text" value={searchBulk} onChange={e => setSearchBulk(e.target.value)} placeholder="Filtrar…" className="w-32 px-2 py-1 text-[10px] bg-muted border border-border rounded-ctl text-foreground" />
+                <input type="text" value={searchBulk} onChange={e => setSearchBulk(e.target.value)} placeholder="Filtrar…" className="w-32 px-2 py-1 text-caption bg-muted border border-border rounded-ctl text-foreground" />
               </div>
               <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
                 {visible.slice(0, 100).map(item => (
@@ -2307,7 +2307,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
                       setSelected(next)
                     }} className="rounded-ctl" />
                     <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                    <span className="text-[10px] font-mono text-primary shrink-0">{item.codigoSAP}</span>
+                    <span className="text-caption font-mono text-primary shrink-0">{item.codigoSAP}</span>
                   </label>
                 ))}
               </div>

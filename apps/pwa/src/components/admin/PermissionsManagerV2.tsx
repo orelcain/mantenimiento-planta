@@ -271,7 +271,7 @@ function RolePermissionsTab() {
             <button
               key={role}
               onClick={() => setSelectedRole(role)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-card font-medium transition-colors ${
                 selectedRole === role
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted hover:bg-muted/80'
@@ -284,7 +284,7 @@ function RolePermissionsTab() {
       </div>
 
       {hasChanges && (
-        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning rounded-card">
           <AlertCircle className="h-4 w-4 text-warning" />
           <span className="text-sm flex-1">Hay cambios sin guardar</span>
           <Button size="sm" variant="outline" onClick={handleReset}>
@@ -345,7 +345,7 @@ function RolePermissionsTab() {
                         <button
                           key={action}
                           onClick={() => handleToggleAction(module.id, action)}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          className={`flex items-center gap-2 px-3 py-2 rounded-card text-sm transition-colors ${
                             isActive
                               ? 'bg-primary/20 text-primary border border-primary'
                               : 'bg-muted hover:bg-muted/80 border border-transparent'
@@ -551,7 +551,7 @@ function UserPermissionsTab() {
               <button
                 key={user.id}
                 onClick={() => setSelectedUser(user)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
+                className={`w-full text-left p-3 rounded-card transition-colors ${
                   selectedUser?.id === user.id
                     ? 'bg-primary/10 border border-primary'
                     : 'bg-muted/50 hover:bg-muted border border-transparent'
@@ -600,7 +600,7 @@ function UserPermissionsTab() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Toggle de override */}
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-card">
                 <div>
                   <Label className="font-medium">Permisos Personalizados</Label>
                   <p className="text-sm text-muted-foreground">
@@ -652,7 +652,7 @@ function UserPermissionsTab() {
                                   <button
                                     key={action}
                                     onClick={() => handleToggleAction(module.id, action)}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                    className={`flex items-center gap-1 px-2 py-1 rounded-ctl text-xs transition-colors ${
                                       isActive
                                         ? 'bg-primary/20 text-primary border border-primary'
                                         : 'bg-muted hover:bg-muted/80 border border-transparent'

@@ -95,7 +95,7 @@ export function ETTInlineText({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={cn(
-          'w-full bg-yellow-50 border border-yellow-300 rounded px-2 py-1',
+          'w-full bg-yellow-50 border border-yellow-300 rounded-ctl px-2 py-1',
           'focus:outline-none focus:ring-2 focus:ring-yellow-400',
           'text-gray-900 font-sans text-sm',
           multiline && 'min-h-[60px] resize-y',
@@ -111,7 +111,7 @@ export function ETTInlineText({
       onClick={() => setEditing(true)}
       className={cn(
         'inline-block bg-yellow-50 hover:bg-yellow-100 border border-yellow-200',
-        'rounded px-1.5 py-0.5 cursor-text transition-colors',
+        'rounded-ctl px-1.5 py-0.5 cursor-text transition-colors',
         'text-gray-900',
         bold && 'font-semibold',
         !value && 'text-gray-400 italic',

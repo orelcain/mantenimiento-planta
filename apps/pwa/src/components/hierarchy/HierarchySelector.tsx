@@ -119,7 +119,7 @@ export function HierarchySelector({
     <div className="space-y-3">
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
-        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-200">
           <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {breadcrumbLoading ? (
@@ -178,7 +178,7 @@ export function HierarchySelector({
 
       {/* Mensaje de validación */}
       {showValidation && !isMinLevelReached && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-card">
           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-amber-800">
             Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo para crear la incidencia.
@@ -247,7 +247,7 @@ function LevelSelector({
         <label className="block text-sm font-medium text-gray-500 mb-1">
           {HIERARCHY_LEVEL_NAMES[nivel]}
         </label>
-        <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 font-medium">
+        <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-card text-blue-900 font-medium">
           ✓ {options[0].label}
         </div>
       </div>
@@ -266,7 +266,7 @@ function LevelSelector({
           onChange(e.target.value || null)
         }}
         disabled={disabled || loading}
-        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
+        className="w-full px-4 py-2.5 border border-gray-300 rounded-card focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
       >
         <option value="">
           {loading ? 'Cargando...' : `Seleccionar ${HIERARCHY_LEVEL_NAMES[nivel].toLowerCase()}`}

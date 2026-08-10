@@ -141,19 +141,19 @@ function ThresholdEditor({ deviceId, current, onClose }: {
 
   const field = (label: string, key: keyof typeof form, color: string) => (
     <div className="flex items-center gap-2">
-      <label className={`text-[11px] w-20 text-right ${color}`}>{label}</label>
+      <label className={`text-caption w-20 text-right ${color}`}>{label}</label>
       <input
         type="number"
         step="0.5"
         value={form[key]}
         onChange={e => set(key, e.target.value)}
-        className="h-7 w-16 rounded border border-border bg-background px-1.5 text-xs text-center tabular-nums"
+        className="h-7 w-16 rounded-ctl border border-border bg-background px-1.5 text-xs text-center tabular-nums"
       />
     </div>
   )
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card p-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="rounded-card border border-border/40 bg-card p-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold flex items-center gap-1.5">
           <Settings2 className="h-3.5 w-3.5" /> Umbrales de alerta
@@ -164,14 +164,14 @@ function ThresholdEditor({ deviceId, current, onClose }: {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-orange-400 flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
+          <p className="text-caption font-medium text-orange-400 flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
           {field('Crít. bajo', 'tempCritLow', 'text-red-400')}
           {field('Adv. bajo', 'tempWarnLow', 'text-amber-400')}
           {field('Adv. alto', 'tempWarnHigh', 'text-amber-400')}
           {field('Crít. alto', 'tempCritHigh', 'text-red-400')}
         </div>
         <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-cyan-400 flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
+          <p className="text-caption font-medium text-cyan-400 flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
           {field('Crít. bajo', 'humCritLow', 'text-blue-400')}
           {field('Adv. bajo', 'humWarnLow', 'text-cyan-400')}
           {field('Adv. alto', 'humWarnHigh', 'text-cyan-400')}
@@ -348,7 +348,7 @@ function TrendSparkline({
 
   if (timeFilteredReadings.length < 2) {
     return (
-      <div className="rounded-md border p-2 text-xs text-muted-foreground">
+      <div className="rounded-ctl border p-2 text-xs text-muted-foreground">
         Sin histórico suficiente para graficar cambios.
       </div>
     )
@@ -633,12 +633,12 @@ function TrendSparkline({
   const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - countdownMs) / 1000)) : undefined
 
   return (
-    <div className="rounded-xl border border-border/40 bg-muted p-3 space-y-2.5">
+    <div className="rounded-card border border-border/40 bg-muted p-3 space-y-2.5">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2.5">
           <h4 className="text-xs font-semibold text-foreground tracking-wide">Tendencia</h4>
           {alertLevel !== 'normal' && (
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium animate-pulse ${
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-caption font-medium animate-pulse ${
               alertLevel === 'critical'
                 ? 'bg-red-500/[0.15] text-red-400 ring-1 ring-red-500/30'
                 : 'bg-amber-500/[0.15] text-amber-400 ring-1 ring-amber-500/30'
@@ -650,25 +650,25 @@ function TrendSparkline({
           <select
             value={chartMode}
             onChange={(e) => setChartMode(e.target.value as ChartMode)}
-            className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
+            className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground"
           >
             <option value="dual">Temp + Humedad</option>
             <option value="temperature">Solo Temperatura</option>
             <option value="humidity">Solo Humedad</option>
           </select>
-          <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none">
+          <label className="flex items-center gap-1 text-caption text-muted-foreground cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showThresholds}
               onChange={() => setShowThresholds(!showThresholds)}
-              className="h-3 w-3 accent-primary rounded"
+              className="h-3 w-3 accent-primary rounded-ctl"
             />
             Umbrales
           </label>
           <select
             value={timeFilterPreset}
             onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
-            className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
+            className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground"
             title="Filtrar por rango de tiempo"
           >
             <option value="all">Todo tiempo</option>
@@ -684,14 +684,14 @@ function TrendSparkline({
                 type="datetime-local"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
+                className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground"
                 title="Desde"
               />
               <input
                 type="datetime-local"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-6 rounded-md border border-border bg-background px-1.5 text-[11px] text-muted-foreground"
+                className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground"
                 title="Hasta"
               />
             </>
@@ -705,7 +705,7 @@ function TrendSparkline({
                   setChartH(next)
                   persistHeight(next)
                 }}
-                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground hover:text-foreground"
               >
                 Alto -
               </button>
@@ -716,7 +716,7 @@ function TrendSparkline({
                   setChartH(next)
                   persistHeight(next)
                 }}
-                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground hover:text-foreground"
               >
                 Alto +
               </button>
@@ -726,7 +726,7 @@ function TrendSparkline({
                   setChartH(CHART_DEFAULT_H)
                   persistHeight(CHART_DEFAULT_H)
                 }}
-                className="h-6 rounded border border-border bg-background px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                className="h-6 rounded-ctl border border-border bg-background px-1.5 text-caption text-muted-foreground hover:text-foreground"
               >
                 Reset
               </button>
@@ -736,11 +736,11 @@ function TrendSparkline({
         <div className="flex items-center gap-2 flex-wrap">
           {showTemp && (
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-orange-400/80">°C</span>
+              <span className="text-caption text-orange-400/80">°C</span>
               <select
                 value={tempInterval ?? 'auto'}
                 onChange={(e) => setTempInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
-                className="h-5 rounded border border-border bg-background px-1 text-[10px] text-muted-foreground"
+                className="h-5 rounded-ctl border border-border bg-background px-1 text-caption text-muted-foreground"
                 title="Intervalo eje Temperatura"
               >
                 <option value="auto">Auto</option>
@@ -755,11 +755,11 @@ function TrendSparkline({
           )}
           {showHum && (
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-cyan-400/80">%</span>
+              <span className="text-caption text-cyan-400/80">%</span>
               <select
                 value={humInterval ?? 'auto'}
                 onChange={(e) => setHumInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
-                className="h-5 rounded border border-border bg-background px-1 text-[10px] text-muted-foreground"
+                className="h-5 rounded-ctl border border-border bg-background px-1 text-caption text-muted-foreground"
                 title="Intervalo eje Humedad"
               >
                 <option value="auto">Auto</option>
@@ -772,7 +772,7 @@ function TrendSparkline({
             </div>
           )}
         </div>
-        <span className="text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-caption text-muted-foreground tabular-nums">
           {timeFilteredReadings.length} muestras
           {timeFilteredReadings.length < normalizedReadings.length && (
             <span className="text-primary/70"> · filtradas de {normalizedReadings.length}</span>
@@ -784,13 +784,13 @@ function TrendSparkline({
       {/* ── Botones rápidos de zoom ── */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <ZoomIn className="h-3 w-3 text-muted-foreground/60" />
-        <span className="text-[10px] text-muted-foreground/60 mr-0.5">Zoom:</span>
+        <span className="text-caption text-muted-foreground/60 mr-0.5">Zoom:</span>
         {([['15', '15 min'], ['30', '30 min'], ['60', '1 hora'], ['240', '4 horas'], ['all', 'Todo']] as const).map(([val, label]) => (
           <button
             key={val}
             type="button"
             onClick={() => zoomToLast(val === 'all' ? 'all' : Number(val))}
-            className={`h-6 rounded-md px-2 text-[10px] font-medium transition-colors ${
+            className={`h-6 rounded-ctl px-2 text-caption font-medium transition-colors ${
               activeZoom === val
                 ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
                 : 'border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -803,7 +803,7 @@ function TrendSparkline({
 
       <div
         ref={containerRef}
-        className={`w-full rounded-lg overflow-hidden relative select-none transition-colors duration-700 ${
+        className={`w-full rounded-card overflow-hidden relative select-none transition-colors duration-700 ${
           alertLevel === 'critical'
             ? 'border-2 border-red-500/[0.25] bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)]'
             : alertLevel === 'warning'
@@ -838,7 +838,7 @@ function TrendSparkline({
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
+      <div className="flex items-center gap-4 text-caption text-muted-foreground flex-wrap">
         {showTemp && (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-orange-500" /> Temperatura
@@ -852,10 +852,10 @@ function TrendSparkline({
         {showThresholds && (
           <>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-amber-500/[0.15]" /> Advertencia
+              <span className="h-2 w-2 rounded-ctl bg-amber-500/[0.15]" /> Advertencia
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-sm bg-red-500/[0.15]" /> Peligro
+              <span className="h-2 w-2 rounded-ctl bg-red-500/[0.15]" /> Peligro
             </span>
           </>
         )}
@@ -916,7 +916,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
           <div>
             <h2 className="text-base font-bold flex items-center gap-2">
               {device.deviceId}
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium ${
                 isFresh
                   ? 'bg-emerald-500/[0.15] text-emerald-500 ring-1 ring-emerald-500/30'
                   : 'bg-muted text-muted-foreground ring-1 ring-border'
@@ -925,17 +925,17 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
                 {isFresh ? 'Online' : 'Offline'}
               </span>
               {alert === 'critical' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2 py-0.5 text-[10px] font-medium text-red-500 ring-1 ring-red-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2 py-0.5 text-caption font-medium text-red-500 ring-1 ring-red-500/30">
                   <AlertTriangle className="h-3 w-3" /> Crítico
                 </span>
               )}
               {alert === 'warning' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 text-[10px] font-medium text-amber-500 ring-1 ring-amber-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 text-caption font-medium text-amber-500 ring-1 ring-amber-500/30">
                   <AlertTriangle className="h-3 w-3" /> Warning
                 </span>
               )}
               {backfillStatus?.active && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-[10px] font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                   <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
@@ -949,7 +949,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
         <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
           <X className="h-4 w-4" />
           Salir enfoque
-          <kbd className="ml-1 text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground border">Esc</kbd>
+          <kbd className="ml-1 text-caption px-1 py-0.5 rounded-ctl bg-muted text-muted-foreground border">Esc</kbd>
         </Button>
       </div>
 
@@ -957,7 +957,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* KPIs row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-4">
+          <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-4">
             <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -965,9 +965,9 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">°C</span>
             </div>
-            <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
+            <div className="mt-1 text-caption text-orange-400/80">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-xl border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-4">
+          <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-4">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -975,13 +975,13 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">%</span>
             </div>
-            <div className="mt-1 text-[11px] text-cyan-400/80">{humThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cyan-400/80">{humThresholdInfo}</div>
           </div>
-          <div className="rounded-xl border border-border/40 bg-muted p-4">
+          <div className="rounded-card border border-border/40 bg-muted p-4">
             <div className="text-xs text-muted-foreground mb-1">Última actualización</div>
             <div className="text-sm font-medium">{formatDateTime(lastUpdateTs || undefined)}</div>
           </div>
-          <div className="rounded-xl border border-border/40 bg-muted p-4">
+          <div className="rounded-card border border-border/40 bg-muted p-4">
             <div className="text-xs text-muted-foreground mb-1">Muestras disponibles</div>
             <div className="text-sm font-medium">{trendReadings?.length ?? 0}</div>
           </div>
@@ -989,7 +989,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
 
         {/* Chart – takes remaining space */}
         {backfillStatus?.active && (
-          <div className="rounded-lg border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-primary flex items-center gap-2 text-sm">
+          <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15] px-3 py-2 text-primary flex items-center gap-2 text-sm">
             <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1104,7 +1104,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-3">
+          <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-3">
             <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
@@ -1112,9 +1112,9 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">°C</span>
             </div>
-            <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
+            <div className="mt-1 text-caption text-orange-400/80">{tempThresholdInfo}</div>
           </div>
-          <div className="rounded-lg border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-3">
+          <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-3">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
@@ -1122,7 +1122,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">%</span>
             </div>
-            <div className="mt-1 text-[11px] text-cyan-400/80">{humThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cyan-400/80">{humThresholdInfo}</div>
           </div>
         </div>
 
@@ -1145,7 +1145,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
           ) : (
             <button
               onClick={() => setShowThresholdEditor(true)}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-caption text-muted-foreground hover:text-foreground transition-colors"
             >
               <Settings2 className="h-3.5 w-3.5" />
               Configurar umbrales
@@ -1159,7 +1159,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         </div>
 
         {backfillStatus?.active && (
-          <div className="rounded-md border border-primary/[0.25] bg-primary/[0.15] p-2 text-primary flex items-center gap-2 text-xs">
+          <div className="rounded-ctl border border-primary/[0.25] bg-primary/[0.15] p-2 text-primary flex items-center gap-2 text-xs">
             <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
             <span>
               Reenviando datos offline almacenados
@@ -1170,7 +1170,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         )}
 
         {alert !== 'normal' && (
-          <div className="rounded-md border border-amber-500/[0.25] bg-amber-500/[0.15] p-2 text-amber-700 flex items-center gap-2">
+          <div className="rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] p-2 text-amber-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Revisar condición anómala y evaluar creación de incidencia.
           </div>
@@ -1513,7 +1513,7 @@ export function SensorsMonitorPage() {
           <select
             value={areaFilter}
             onChange={(e) => setAreaFilter(e.target.value)}
-            className="h-10 rounded-md border bg-background px-3 text-sm"
+            className="h-10 rounded-ctl border bg-background px-3 text-sm"
           >
             <option value="all">Todas las áreas</option>
             {areaOptions.map((area) => (

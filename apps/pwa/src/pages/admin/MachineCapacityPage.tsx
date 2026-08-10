@@ -201,7 +201,7 @@ export function MachineCapacityPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <span className="text-foreground">{line.label}</span>
-                <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                <Badge variant="outline" className="text-caption font-normal text-muted-foreground">
                   {line.description}
                 </Badge>
               </CardTitle>
@@ -218,7 +218,7 @@ export function MachineCapacityPage() {
                     <div className="flex-1 space-y-1">
                       <Label className="text-xs text-muted-foreground">
                         {cfg.machineName}
-                        <span className="ml-1.5 text-[10px] text-muted-foreground/60">
+                        <span className="ml-1.5 text-caption text-muted-foreground/60">
                           {idx === 0 ? '(modelo antiguo)' : '(modelo nuevo)'}
                         </span>
                       </Label>
@@ -234,20 +234,20 @@ export function MachineCapacityPage() {
                         />
                         <span className="text-xs text-muted-foreground whitespace-nowrap">piezas / min</span>
                         {!isDirty && cfg.updatedAt && (
-                          <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                          <span className="text-caption text-emerald-400 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" />
                             guardado
                           </span>
                         )}
                       </div>
                       {cfg.updatedAt && (
-                        <p className="text-[10px] text-muted-foreground/60">
+                        <p className="text-caption text-muted-foreground/60">
                           Actualizado por {cfg.updatedByEmail || 'admin'} el{' '}
                           {cfg.updatedAt.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                       )}
                       {!cfg.updatedAt && (
-                        <p className="text-[10px] text-muted-foreground/50">Valor por defecto (no guardado en Firestore)</p>
+                        <p className="text-caption text-muted-foreground/50">Valor por defecto (no guardado en Firestore)</p>
                       )}
                     </div>
 

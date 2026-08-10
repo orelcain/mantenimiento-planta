@@ -96,7 +96,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             {summary.pointZeroPct.toFixed(1)}%
           </div>
           <div>
-            <div className="text-caption uppercase tracking-wider text-muted-foreground">
+            <div className="text-caption tracking-wider text-muted-foreground">
               P0 · Punto Cero
             </div>
             <div className="text-xs font-medium">{style.label}</div>
@@ -120,7 +120,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
         {/* Columna 2 — Shoplogix EN VIVO (auto) */}
         {upstreamSnapshot && baaderTotal > 0 ? (
           <div className="md:border-r md:pr-4 flex flex-col gap-2 min-w-0">
-            <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-caption tracking-wider">
               <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
               <span className="text-emerald-400 font-semibold">Shoplogix</span>
               <span className="text-muted-foreground">· en vivo</span>
@@ -162,7 +162,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
           </div>
         ) : (
           <div className="md:border-r md:pr-4 flex flex-col gap-2 text-xs text-muted-foreground/70">
-            <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-caption tracking-wider">
               <Radio className="w-3 h-3" />
               <span>Shoplogix</span>
               <span>· sin datos</span>
@@ -173,7 +173,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
 
         {/* Columna 3 — Grader subido (manual) */}
         <div className="flex flex-col gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 text-caption tracking-wider">
             <FileSpreadsheet className="w-3 h-3 text-sky-400" />
             <span className="text-sky-400 font-semibold">Grader</span>
             <span className="text-muted-foreground">· subido</span>
@@ -230,7 +230,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
       {baaderTotal > 0 && upstreamSnapshot && manualLine != null && (
         <div className="px-4 py-2 border-t bg-muted space-y-1">
           <div className="flex items-baseline gap-2 text-caption">
-            <span className="text-muted-foreground uppercase tracking-wider text-caption">
+            <span className="text-muted-foreground tracking-wider text-caption">
               Composición
             </span>
             <span className="ml-auto tabular-nums text-muted-foreground">

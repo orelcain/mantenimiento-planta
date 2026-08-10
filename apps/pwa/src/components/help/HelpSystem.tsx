@@ -245,7 +245,7 @@ export function HelpModal() {
                   >
                     <CardContent className="p-4 flex items-start gap-4">
                       <div className={cn(
-                        'p-2 rounded-lg',
+                        'p-2 rounded-card',
                         currentStep === index ? 'bg-primary text-primary-foreground' : 'bg-muted'
                       )}>
                         <step.icon className="h-5 w-5" />
@@ -398,7 +398,7 @@ export function ContextualTip({
   return (
     <div className="relative group">
       {children}
-      <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border rounded-lg shadow-lg text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+      <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border rounded-card shadow-lg text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         {tip}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-popover" />
       </div>

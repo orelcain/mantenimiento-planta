@@ -37,7 +37,7 @@ function StatCard({ label, value, icon: Icon, color }: {
   color: string
 }) {
   return (
-    <div className="bg-background border border-border rounded-lg p-4 flex items-center gap-3">
+    <div className="bg-background border border-border rounded-card p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
         <Icon className="w-5 h-5" />
       </div>
@@ -64,11 +64,11 @@ function ActionRow({ action, onViewIncident }: {
   }
 
   const typeColors: Record<string, string> = {
-    create_incident: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/30',
-    update_incident_status: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/30',
-    search_equipment: 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30',
-    search_repuestos: 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-950/30',
-    navigate: 'text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-950/30',
+    create_incident: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-primary/[0.15]',
+    update_incident_status: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/[0.15]',
+    search_equipment: 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-500/[0.15]',
+    search_repuestos: 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-cat-6-tint/[0.15]',
+    navigate: 'text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-muted-foreground/[0.10]',
   }
 
   const ts = action.timestamp instanceof Date
@@ -176,7 +176,7 @@ export function AriaActionsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/')}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            className="p-2 rounded-card hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -195,7 +195,7 @@ export function AriaActionsPage() {
         <button
           onClick={loadActions}
           disabled={loading}
-          className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          className="p-2 rounded-card hover:bg-muted transition-colors text-muted-foreground"
           title="Refrescar"
         >
           <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -208,25 +208,25 @@ export function AriaActionsPage() {
           label="Total acciones"
           value={totalActions}
           icon={TrendingUp}
-          color="bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
+          color="bg-primary/[0.15] text-ink-info"
         />
         <StatCard
           label="Exitosas"
           value={successCount}
           icon={CheckCircle}
-          color="bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
+          color="bg-green-500/[0.15] text-ink-ok"
         />
         <StatCard
           label="Incidencias creadas"
           value={incidentsCreated}
           icon={AlertTriangle}
-          color="bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400"
+          color="bg-amber-500/[0.15] text-ink-warn"
         />
         <StatCard
           label="Hoy"
           value={todayCount}
           icon={Clock}
-          color="bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400"
+          color="bg-cat-6-tint/[0.15] text-cat-6-ink"
         />
       </div>
 
@@ -236,7 +236,7 @@ export function AriaActionsPage() {
         <select
           value={filterType}
           onChange={e => setFilterType(e.target.value)}
-          className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background"
+          className="text-sm border border-border rounded-card px-3 py-1.5 bg-background"
         >
           <option value="all">Todos los tipos</option>
           <option value="create_incident">Incidencias creadas</option>
@@ -247,7 +247,7 @@ export function AriaActionsPage() {
         <select
           value={filterSuccess}
           onChange={e => setFilterSuccess(e.target.value as any)}
-          className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background"
+          className="text-sm border border-border rounded-card px-3 py-1.5 bg-background"
         >
           <option value="all">Todos</option>
           <option value="success">Exitosas</option>
@@ -259,7 +259,7 @@ export function AriaActionsPage() {
       </div>
 
       {/* Actions Table */}
-      <div className="bg-background border border-border rounded-lg overflow-hidden">
+      <div className="bg-background border border-border rounded-card overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />

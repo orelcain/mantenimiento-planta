@@ -115,9 +115,9 @@ function EquipmentRow({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
+          <div className="truncate text-caption leading-tight">{leaf.alias || leaf.nombre}</div>
           {leaf.codigo && (
-            <div className="truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
+            <div className="truncate font-mono text-caption leading-tight text-muted-foreground/60">{leaf.codigo}</div>
           )}
         </div>
         {onToggleEquipFav && (
@@ -206,10 +206,10 @@ function AreaRow({
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] font-medium leading-tight">{node.nombre}</div>
+          <div className="truncate text-footnote font-medium leading-tight">{node.nombre}</div>
           {/* Meta en una sola línea (trunca si no entra). Orden por relevancia en Repuestos:
               equipos · rep · M/B → al truncar se corta primero el M/B (menos crítico). */}
-          <div className="truncate text-[10px] leading-tight text-muted-foreground">
+          <div className="truncate text-caption leading-tight text-muted-foreground">
             <span className="tabular-nums">{eqCount} equipos</span>
             {repCount > 0 && (
               <span className="tabular-nums text-emerald-500"> · {repCount} rep</span>
@@ -386,7 +386,7 @@ export function AreaSidebar({
           />
         )}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Áreas</span>
+        <span className="text-caption font-bold tracking-wider text-muted-foreground">Áreas</span>
         <div className="flex items-center gap-1">
           {onToggleFavoritesOnly && (
             <button
@@ -447,7 +447,7 @@ export function AreaSidebar({
             <div className="px-3 py-4 text-xs text-muted-foreground">Sin equipos para «{equipSearch.trim()}».</div>
           ) : (
             <div className="space-y-0.5 px-1">
-              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="px-2 py-1 text-caption font-semibold tracking-wider text-muted-foreground">
                 {equipResults.length} equipo{equipResults.length === 1 ? '' : 's'}
               </div>
               {equipResults.map((eq) => {
@@ -464,9 +464,9 @@ export function AreaSidebar({
                   >
                     <Cog className={['h-3.5 w-3.5 shrink-0', isSel ? 'text-primary' : 'text-cyan-500/70'].join(' ')} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11px] leading-tight">{eq.alias || eq.nombre}</span>
+                      <span className="block truncate text-caption leading-tight">{eq.alias || eq.nombre}</span>
                       {eq.codigo && (
-                        <span className="block truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{eq.codigo}</span>
+                        <span className="block truncate font-mono text-caption leading-tight text-muted-foreground/60">{eq.codigo}</span>
                       )}
                     </span>
                   </button>

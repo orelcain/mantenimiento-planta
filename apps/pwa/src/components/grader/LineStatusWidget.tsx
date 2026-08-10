@@ -75,7 +75,7 @@ export function LineStatusWidget({
 
         {/* Grader P0% */}
         <div className="flex flex-col gap-0.5 pr-2">
-          <span className="text-caption text-muted-foreground/60 uppercase tracking-wide">Grader</span>
+          <span className="text-caption text-muted-foreground/60 tracking-wide">Grader</span>
           {p0Pct !== null ? (
             <>
               <span className={cn('text-lg font-bold tabular-nums leading-tight', P0_COLOR[verdict])}>
@@ -96,7 +96,7 @@ export function LineStatusWidget({
         <div className="flex flex-col gap-0.5 pl-2">
           <div className="flex items-center gap-1">
             <Zap className="w-2.5 h-2.5 text-muted-foreground/50" />
-            <span className="text-caption text-muted-foreground/60 uppercase tracking-wide">Producción</span>
+            <span className="text-caption text-muted-foreground/60 tracking-wide">Producción</span>
           </div>
           {todaySummary?.totalPieces != null && todaySummary.totalPieces > 0 ? (
             <>

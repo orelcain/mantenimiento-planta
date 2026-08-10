@@ -1475,7 +1475,7 @@ export function ShiftTimelineView({
         {checkpoints.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-medium text-muted-foreground tracking-wider">
                 Eventos del turno
               </p>
               {checkpoints.length > CHECKPOINT_PREVIEW && (

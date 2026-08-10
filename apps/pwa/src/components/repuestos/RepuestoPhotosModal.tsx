@@ -182,7 +182,7 @@ export function RepuestoPhotosModal({
                 <h3 className="text-sm font-semibold">
                   Fotos reales
                   {fotosReales.length > 0 && (
-                    <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                    <span className="ml-1.5 text-caption font-normal text-muted-foreground">
                       ({fotosReales.length})
                     </span>
                   )}
@@ -268,7 +268,7 @@ export function RepuestoPhotosModal({
                       </div>
                       {/* Badge principal */}
                       {foto.esPrincipal && (
-                        <span className="absolute bottom-1 left-1 rounded-ctl bg-primary/80 px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
+                        <span className="absolute bottom-1 left-1 rounded-ctl bg-primary/80 px-1 py-0.5 text-caption font-bold text-primary-foreground">
                           Principal
                         </span>
                       )}
@@ -297,7 +297,7 @@ export function RepuestoPhotosModal({
               <div>
                 <h3 className="mb-2 text-sm font-semibold">
                   Imágenes del manual
-                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                  <span className="ml-1.5 text-caption font-normal text-muted-foreground">
                     ({imagenesManual.length}) — solo lectura
                   </span>
                 </h3>
@@ -335,7 +335,7 @@ export function RepuestoPhotosModal({
               <div>
                 <h3 className="mb-2 text-sm font-semibold">
                   Galería (fotos anteriores)
-                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                  <span className="ml-1.5 text-caption font-normal text-muted-foreground">
                     ({gallery.length}) — solo lectura
                   </span>
                 </h3>

@@ -298,7 +298,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/[0.15] rounded-lg">
+              <div className="p-2 bg-primary/[0.15] rounded-card">
                 <ClipboardCheck className="h-5 w-5 text-blue-500" />
               </div>
               <div>
@@ -311,7 +311,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/[0.15] rounded-lg">
+              <div className="p-2 bg-red-500/[0.15] rounded-card">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <div>
@@ -324,7 +324,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/[0.15] rounded-lg">
+              <div className="p-2 bg-amber-500/[0.15] rounded-card">
                 <Clock className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
@@ -337,7 +337,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/[0.15] rounded-lg">
+              <div className="p-2 bg-green-500/[0.15] rounded-card">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
               </div>
               <div>
@@ -444,7 +444,7 @@ export function PreventivePage() {
                     <div
                       key={day.toISOString()}
                       className={cn(
-                        'h-24 p-1 border rounded-lg overflow-hidden cursor-pointer transition-colors',
+                        'h-24 p-1 border rounded-card overflow-hidden cursor-pointer transition-colors',
                         isToday(day) && 'bg-primary/5 border-primary',
                         selectedDate?.toDateString() === day.toDateString() && 'ring-2 ring-primary'
                       )}
@@ -468,7 +468,7 @@ export function PreventivePage() {
                           <div
                             key={task.id}
                             className={cn(
-                              'text-xs px-1 py-0.5 rounded truncate cursor-pointer transition-all hover:scale-105',
+                              'text-xs px-1 py-0.5 rounded-ctl truncate cursor-pointer transition-all hover:scale-105',
                               task.proximaEjecucion < new Date()
                                 ? 'bg-red-500/[0.15] text-red-500'
                                 : `${getColorForTechnician(task.asignadoA)}/20 text-white`
@@ -652,10 +652,10 @@ export function PreventivePage() {
                     return (
                       <div
                         key={exec.id}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-muted/50 rounded-card"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-500/[0.15] rounded-lg">
+                          <div className="p-2 bg-green-500/[0.15] rounded-card">
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                           </div>
                           <div>
@@ -828,14 +828,14 @@ function TaskCard({
   return (
     <div
       className={cn(
-        'flex items-center justify-between p-3 rounded-lg border',
+        'flex items-center justify-between p-3 rounded-card border',
         isOverdue ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'bg-muted'
       )}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
-            'p-2 rounded-lg',
+            'p-2 rounded-card',
             isOverdue ? 'bg-red-500/[0.15]' : 'bg-primary/[0.15]'
           )}
         >
@@ -1021,7 +1021,7 @@ function TaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-md">
+          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1322,7 +1322,7 @@ function ExecuteTaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-md">
+          <div className="bg-red-500/[0.15] border border-red-500/[0.25] text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1334,7 +1334,7 @@ function ExecuteTaskDialog({
 
         <div className="space-y-2">
           <Label>Checklist</Label>
-          <div className="space-y-2 border rounded-lg p-3">
+          <div className="space-y-2 border rounded-card p-3">
             {checklist.map((item, index) => (
               <div key={item.id} className="space-y-1">
                 <div className="flex items-center gap-2">

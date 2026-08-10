@@ -120,7 +120,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
         {/* Lista */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {/* Cabecera de columnas (desktop) */}
-          <div className="sticky top-0 z-10 mb-1 hidden grid-cols-[1fr_70px_88px_88px_72px_28px] gap-2 bg-card px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+          <div className="sticky top-0 z-10 mb-1 hidden grid-cols-[1fr_70px_88px_88px_72px_28px] gap-2 bg-card px-3 py-1 text-caption font-semibold tracking-wide text-muted-foreground sm:grid">
             <span>Material</span><span>Stock</span><span>Pasillo</span><span>Estante</span><span>Nivel</span><span />
           </div>
           {visible.length === 0 ? (
@@ -136,7 +136,7 @@ export function CargaRapidaModal({ items, saveStock, onClose }: Props) {
                 <div key={item.codigoSAP} className="grid grid-cols-2 items-center gap-2 rounded-ctl px-3 py-1.5 hover:bg-muted/40 sm:grid-cols-[1fr_70px_88px_88px_72px_28px]">
                   <div className="col-span-2 min-w-0 sm:col-span-1">
                     <div className="truncate text-sm font-medium text-foreground" title={item.textoBreve}>{item.textoBreve || '(sin nombre)'}</div>
-                    <div className="font-mono text-[10px] text-muted-foreground">SAP {item.codigoSAP}{item.tipo ? ` · ${item.tipo}` : ''}</div>
+                    <div className="font-mono text-caption text-muted-foreground">SAP {item.codigoSAP}{item.tipo ? ` · ${item.tipo}` : ''}</div>
                   </div>
                   <input
                     ref={(el) => { stockRefs.current[idx] = el }}

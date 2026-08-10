@@ -21,8 +21,8 @@ function fmtSec(sec: number): string {
 
 function KpiChip({ label, value, icon }: { label: string; value: React.ReactNode; icon: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-white/10 bg-white/5 px-4 py-3 min-w-[110px]">
-      <div className="flex items-center gap-1 text-[11px] text-white/50 mb-1">{icon}{label}</div>
+    <div className="flex flex-col items-center rounded-card border border-white/10 bg-white/5 px-4 py-3 min-w-[110px]">
+      <div className="flex items-center gap-1 text-caption text-white/50 mb-1">{icon}{label}</div>
       <div className="text-xl font-bold tabular-nums text-white">{value}</div>
     </div>
   )
@@ -68,7 +68,7 @@ export function GraderPublicTokenPage() {
         </p>
         <button
           onClick={() => navigate('/login')}
-          className="mt-4 flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-black hover:bg-amber-400 transition-colors"
+          className="mt-4 flex items-center gap-2 rounded-card bg-amber-500 px-4 py-2 text-sm font-medium text-black hover:bg-amber-400 transition-colors"
         >
           <ExternalLink className="w-4 h-4" />
           Ir al sistema
@@ -98,7 +98,7 @@ export function GraderPublicTokenPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <header className="border-b border-white/10 bg-gray-900/80 backdrop-blur sticky top-0 z-10">
+      <header className="border-b border-white/10 bg-muted-foreground/[0.10] backdrop-blur sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
@@ -111,7 +111,7 @@ export function GraderPublicTokenPage() {
           <div className="ml-auto">
             <button
               onClick={() => navigate('/login')}
-              className="flex items-center gap-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 text-xs text-white/70"
+              className="flex items-center gap-1.5 rounded-ctl bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 text-xs text-white/70"
             >
               <ExternalLink className="w-3 h-3" />
               Ver en sistema
@@ -159,7 +159,7 @@ export function GraderPublicTokenPage() {
         />
 
         {/* Footer de trazabilidad */}
-        <div className="text-center text-[11px] text-white/30 pb-4">
+        <div className="text-center text-caption text-white/30 pb-4">
           Compartido por <span className="text-white/50">{createdBy}</span> el {createdLabel}
           {' · '}válido hasta <span className="text-white/50">{expiresLabel}</span>
           {' · '}

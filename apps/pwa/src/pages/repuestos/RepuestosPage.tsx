@@ -126,7 +126,7 @@ export function RepuestosPage() {
                 <span className="hidden sm:inline">{label}</span>
                 <span className="sm:hidden">{mobileLabel}</span>
                 {badge && (
-                  <span className="hidden sm:inline text-[8px] font-bold uppercase tracking-wide text-amber-400 bg-amber-500/[0.15] px-1 py-0.5 rounded-ctl">
+                  <span className="hidden sm:inline text-caption font-bold tracking-wide text-amber-400 bg-amber-500/[0.15] px-1 py-0.5 rounded-ctl">
                     {badge}
                   </span>
                 )}

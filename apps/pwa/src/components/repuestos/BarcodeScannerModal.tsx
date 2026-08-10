@@ -277,7 +277,7 @@ export function BarcodeScannerModal({
               {scanning && !detected && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="h-40 w-40 rounded-card border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" />
-                  <div className="absolute bottom-2 w-full text-center text-[10px] text-white/70">
+                  <div className="absolute bottom-2 w-full text-center text-caption text-white/70">
                     Alineá el código dentro del recuadro
                   </div>
                 </div>

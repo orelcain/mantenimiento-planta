@@ -376,7 +376,7 @@ export function RepuestoFormModal({
                             if (checked) next.delete(s.id); else next.add(s.id)
                             return next
                           })}
-                          className={`px-2 py-1 rounded-ctl text-[11px] font-medium border transition-all ${checked ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                          className={`px-2 py-1 rounded-ctl text-caption font-medium border transition-all ${checked ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                           {s.nombre}
                         </button>
                       )

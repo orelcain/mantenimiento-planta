@@ -60,12 +60,12 @@ export function OtherLearningModulesStrip({
       className="mt-10 pt-6 border-t border-border"
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">
+        <h3 className="text-xs tracking-widest font-semibold text-muted-foreground">
           Otros módulos
         </h3>
         <button
           onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-card transition-colors"
           style={{
             color: accent,
             background: `${accent}12`,
@@ -84,7 +84,7 @@ export function OtherLearningModulesStrip({
             <button
               key={item.key}
               onClick={() => navigate(item.href)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-2 px-3 py-2 rounded-card text-xs font-medium text-foreground transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{
                 background: `${item.color}10`,
                 border: `1px solid ${item.color}35`,

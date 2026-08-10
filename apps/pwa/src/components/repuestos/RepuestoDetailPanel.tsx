@@ -75,7 +75,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger }: { icon: typeof FileTe
     <button
       onClick={onClick}
       className={[
-        'flex flex-col items-center gap-1 rounded-card border border-border bg-card px-2 py-2 text-[10px] font-medium transition',
+        'flex flex-col items-center gap-1 rounded-card border border-border bg-card px-2 py-2 text-caption font-medium transition',
         danger ? 'text-red-500 hover:bg-red-500/[0.15] hover:border-red-500/[0.25]' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       ].join(' ')}
     >
@@ -123,8 +123,8 @@ function agruparEquiposPorFamilia(equipos: { machineId: string; machineName: str
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="text-right text-[13px] font-medium text-foreground">{value || '-'}</span>
+      <span className="text-caption tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-right text-footnote font-medium text-foreground">{value || '-'}</span>
     </div>
   )
 }
@@ -283,7 +283,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
       />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del repuesto</span>
+        <span className="text-caption font-bold tracking-wider text-muted-foreground">Detalle del repuesto</span>
         <div className="flex items-center gap-1">
           {onToggleFavorite && (
             <button
@@ -331,18 +331,18 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         )}
         <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
           {item.clase && (
-            <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CLASE_LABEL[item.clase]}</span>
+            <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{CLASE_LABEL[item.clase]}</span>
           )}
           {sap ? (
             <span className="inline-flex items-center gap-1">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">SAP</span>
+              <span className="text-caption tracking-wide text-muted-foreground">SAP</span>
               <span className="font-mono text-sm text-foreground">{sap}</span>
               <button onClick={copySap} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Copiar SAP">
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
             </span>
           ) : (
-            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-[10px] font-medium text-ink-warn">sin SAP · pieza de despiece</span>
+            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">sin SAP · pieza de despiece</span>
           )}
         </div>
 
@@ -357,8 +357,8 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
               <span className={item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'}>
                 {item.stockActual} {item.unidad || 'pzas'}
               </span>
-              {item.stockStatus === 'out' && <span className="text-[11px] font-normal text-muted-foreground">sin stock</span>}
-              {item.stockStatus === 'low' && <span className="text-[11px] font-normal text-muted-foreground">bajo mínimo</span>}
+              {item.stockStatus === 'out' && <span className="text-caption font-normal text-muted-foreground">sin stock</span>}
+              {item.stockStatus === 'low' && <span className="text-caption font-normal text-muted-foreground">bajo mínimo</span>}
             </span>
             <span className="inline-flex min-w-0 items-center gap-1 text-sm text-foreground">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -376,7 +376,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           )
         ) : (
           <div className="mb-3 rounded-card border border-dashed border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
+            <p className="text-caption text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
                 <Plus className="h-4 w-4" /> Asignar código SAP
@@ -411,34 +411,34 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
 
         {/* Dónde se usa — N:M (todos los equipos donde sirve el material) */}
         <div className="border-y border-border/60 py-2">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" />
             {equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
           </div>
           {equiposReales.length > 0 ? (
             <div className="space-y-1">
               {familiasEquipos.slice(0, 6).map((f) => (
-                <div key={f.familia} className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-[12.5px] text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
+                <div key={f.familia} className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-footnote text-foreground" title={f.unidades.length ? `${f.familia} ${f.unidades.join(', ')}` : f.familia}>
                   <span className="min-w-0 truncate">{f.familia}</span>
                   {f.unidades.length > 0 && (
-                    <span className="ml-auto shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    <span className="ml-auto shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 font-mono text-caption text-muted-foreground">
                       {f.unidades.join(' · ')}
                     </span>
                   )}
                 </div>
               ))}
               {familiasEquipos.length > 6 && (
-                <div className="px-2 text-[11px] text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
+                <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
               )}
               {onAssignEquipo && (
-                <button onClick={onAssignEquipo} className="mt-0.5 inline-flex items-center gap-1 px-1 text-[11px] text-primary hover:underline">
+                <button onClick={onAssignEquipo} className="mt-0.5 inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline">
                   <Plus className="h-3 w-3" /> Agregar equipo
                 </button>
               )}
             </div>
           ) : (
             <div>
-              <p className="text-[12.5px] text-muted-foreground">Insumo/herramienta sin equipo fijo — disponible para toda la planta.</p>
+              <p className="text-footnote text-muted-foreground">Insumo/herramienta sin equipo fijo — disponible para toda la planta.</p>
               {onAssignEquipo && (
                 <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignEquipo}>
                   <Plus className="h-4 w-4" /> Asignar a un equipo
@@ -461,7 +461,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           if (allSlugs.length === 0 && !onMarkComun) return null
           return (
             <div className="border-b border-border/60 py-2">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
                 <Wrench className="h-3.5 w-3.5 text-emerald-500" />
                 Repuesto común de
               </div>
@@ -473,11 +473,11 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     return (
                       <span
                         key={slug}
-                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-[12px] font-medium text-ink-ok"
+                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-footnote font-medium text-ink-ok"
                         title={seededOnly ? 'De la lista base (planilla de planta) — se edita en el código' : undefined}
                       >
                         {findMachineBySlug(slug)?.name ?? slug}
-                        {seededOnly && <span className="text-[9px] uppercase tracking-wide opacity-60">base</span>}
+                        {seededOnly && <span className="text-caption tracking-wide opacity-60">base</span>}
                         {removable && (
                           <button onClick={() => onRemoveComun!(slug)} className="ml-0.5 opacity-60 hover:opacity-100" aria-label="Quitar">
                             <X className="h-3 w-3" />
@@ -487,14 +487,14 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     )
                   })}
                   {onMarkComun && (
-                    <button onClick={onMarkComun} className="inline-flex items-center gap-1 px-1 text-[11px] text-primary hover:underline">
+                    <button onClick={onMarkComun} className="inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline">
                       <Plus className="h-3 w-3" /> Otra máquina
                     </button>
                   )}
                 </div>
               ) : (
                 <div>
-                  <p className="text-[12.5px] text-muted-foreground">Marcalo como repuesto común de una máquina para que aparezca en su lista de aprendizaje.</p>
+                  <p className="text-footnote text-muted-foreground">Marcalo como repuesto común de una máquina para que aparezca en su lista de aprendizaje.</p>
                   {onMarkComun && (
                     <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onMarkComun}>
                       <Wrench className="h-4 w-4" /> Marcar como común
@@ -509,13 +509,13 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         {/* Manuales del equipo (heredados de los equipos donde se usa) */}
         {(manualesHeredados.length > 0 || manualesLoading) && (
           <div className="border-b border-border/60 py-2">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
               <BookOpen className="h-3.5 w-3.5" />
               Manuales del equipo
               {manualesHeredados.length > 0 && <span className="font-normal">({manualesHeredados.length})</span>}
             </div>
             {manualesLoading ? (
-              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
+              <div className="flex items-center gap-1.5 text-footnote text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
             ) : (
               <div className="space-y-1">
                 {manualesHeredados.map((m) => (
@@ -524,7 +524,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                     href={m.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-ctl border border-border/60 px-2 py-1.5 text-[12.5px] text-foreground transition hover:bg-muted/50 hover:text-primary"
+                    className="flex items-center gap-2 rounded-ctl border border-border/60 px-2 py-1.5 text-footnote text-foreground transition hover:bg-muted/50 hover:text-primary"
                   >
                     <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate" title={m.titulo}>{m.titulo}</span>
@@ -541,14 +541,14 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           <div className="border-b border-border/60 py-2">
             {item.descripcion && (
               <div className="mb-1.5">
-                <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">Descripción</div>
-                <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-foreground">{item.descripcion}</p>
+                <div className="mb-0.5 text-caption tracking-wide text-muted-foreground">Descripción</div>
+                <p className="whitespace-pre-wrap text-footnote leading-snug text-foreground">{item.descripcion}</p>
               </div>
             )}
             {item.observacionesRepuesto && (
               <div>
-                <div className="mb-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">Observaciones</div>
-                <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-muted-foreground">{item.observacionesRepuesto}</p>
+                <div className="mb-0.5 text-caption tracking-wide text-muted-foreground">Observaciones</div>
+                <p className="whitespace-pre-wrap text-footnote leading-snug text-muted-foreground">{item.observacionesRepuesto}</p>
               </div>
             )}
           </div>
@@ -563,9 +563,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           {/* Nombres comunes (apodos) — editable acá porque la columna de la tabla solo existe en lg+ */}
           <div className="py-1.5">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Nombres comunes</span>
+              <span className="text-caption tracking-wide text-muted-foreground">Nombres comunes</span>
               {!editApodos && (
-                <span className="flex min-w-0 items-center gap-1.5 text-right text-[13px] font-medium text-foreground">
+                <span className="flex min-w-0 items-center gap-1.5 text-right text-footnote font-medium text-foreground">
                   <span className="min-w-0 truncate" title={(item.nombresComunes ?? []).join(', ')}>
                     {(item.nombresComunes && item.nombresComunes.length) ? item.nombresComunes.join(', ') : '—'}
                   </span>
@@ -605,17 +605,17 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         {/* Tarjeta de stock */}
         <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
           <div className="bg-card px-2 py-3">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Disponible</div>
+            <div className="text-caption tracking-wide text-muted-foreground">Disponible</div>
             <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'].join(' ')}>
               {item.bodegaId ? item.stockActual : '—'}
             </div>
           </div>
           <div className="bg-card px-2 py-3">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Mínimo</div>
+            <div className="text-caption tracking-wide text-muted-foreground">Mínimo</div>
             <div className="text-2xl font-bold tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
           </div>
           <div className="bg-card px-2 py-3">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Máximo</div>
+            <div className="text-caption tracking-wide text-muted-foreground">Máximo</div>
             <div className="text-2xl font-bold tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
           </div>
         </div>
@@ -626,7 +626,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           <div className="mt-2">
             {!contando ? (
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 text-[11px] text-muted-foreground">
+                <div className="min-w-0 text-caption text-muted-foreground">
                   {item.ultimoConteoAt ? (
                     <>Contado el {fmtDate(item.ultimoConteoAt)}{item.ultimoConteoPor ? ` · por ${item.ultimoConteoPor}` : ''}</>
                   ) : (
@@ -639,7 +639,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
               </div>
             ) : (
               <div className="rounded-card border border-primary/40 bg-primary/5 p-2">
-                <div className="mb-1.5 text-[11px] text-muted-foreground">
+                <div className="mb-1.5 text-caption text-muted-foreground">
                   Antes había <span className="font-bold text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
                 </div>
                 <div className="flex gap-2">
@@ -673,9 +673,9 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           {/* Ubicación estructurada (editable) */}
           <div className="py-1.5">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Ubicación</span>
+              <span className="text-caption tracking-wide text-muted-foreground">Ubicación</span>
               {!editLoc && (
-                <span className="flex items-center gap-1.5 text-right text-[13px] font-medium text-foreground">
+                <span className="flex items-center gap-1.5 text-right text-footnote font-medium text-foreground">
                   {formatUbicacion(item)}
                   {item.bodegaId && (
                     <button onClick={startEditLoc} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Editar ubicación">
@@ -704,8 +704,8 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         </div>
 
         {/* Última actualización */}
-        <div className="mt-3 text-[11px] text-muted-foreground">
-          <div className="uppercase tracking-wide">Última actualización</div>
+        <div className="mt-3 text-caption text-muted-foreground">
+          <div className="tracking-wide">Última actualización</div>
           {movsLoading ? (
             <div className="mt-1 flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
           ) : ultimo ? (
@@ -732,7 +732,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
                   <Icon className={['h-3.5 w-3.5 shrink-0', meta.cls].join(' ')} />
                   <span className="font-medium">{meta.label}</span>
                   <span className="tabular-nums">{m.cantidad}</span>
-                  <span className="ml-auto text-[10px] text-muted-foreground">{fmtDate(m.createdAt)}</span>
+                  <span className="ml-auto text-caption text-muted-foreground">{fmtDate(m.createdAt)}</span>
                 </div>
               )
             })}

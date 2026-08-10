@@ -378,7 +378,7 @@ export function MapsAdminPage() {
                         {locationVersions.map((version) => (
                           <div
                             key={version.id}
-                            className="border rounded-lg overflow-hidden group"
+                            className="border rounded-card overflow-hidden group"
                           >
                             <button
                               onClick={() => setPreviewVersion(version)}
@@ -520,13 +520,13 @@ export function MapsAdminPage() {
             <div
               onClick={() => fileInputRef.current?.click()}
               className={cn(
-                'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+                'border-2 border-dashed rounded-card p-6 text-center cursor-pointer transition-colors',
                 'hover:border-primary hover:bg-primary/5',
                 filePreview && 'border-primary bg-primary/5'
               )}
             >
               {filePreview ? (
-                <img src={filePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                <img src={filePreview} alt="Preview" className="max-h-48 mx-auto rounded-ctl" />
               ) : (
                 <>
                   <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />

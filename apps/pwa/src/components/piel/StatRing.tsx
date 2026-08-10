@@ -68,7 +68,7 @@ export function StatRing({ value, label, size = 132, className, children }: Stat
         )}
         {label && (
           <span
-            className="mt-1 font-semibold uppercase tracking-[0.06em] text-muted-foreground"
+            className="mt-1 font-semibold text-muted-foreground"
             style={{ fontSize: Math.max(9, Math.round(size * 0.075)) }}
           >
             {label}

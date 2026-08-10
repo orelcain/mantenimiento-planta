@@ -284,7 +284,7 @@ export function Baader200LearningPage() {
         const title = sections.find(s => s.id === qrSection)?.title ?? qrSection
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setQrSection(null)}>
-            <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-card border border-border rounded-card p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-1.5">
                   <QrCode className="h-4 w-4 text-primary" />
@@ -295,18 +295,18 @@ export function Baader200LearningPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground text-center">{title}</p>
-              <div className="bg-white p-3 rounded-lg">
+              <div className="bg-white p-3 rounded-card">
                 <QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} />
               </div>
               <div className="flex items-center gap-2 w-full">
-                <input readOnly value={learnUrl} className="flex-1 text-[10px] bg-muted border border-border rounded px-2 py-1.5 text-foreground outline-none min-w-0" />
+                <input readOnly value={learnUrl} className="flex-1 text-caption bg-muted border border-border rounded-ctl px-2 py-1.5 text-foreground outline-none min-w-0" />
                 <Button size="sm" className="h-7 gap-1 text-xs flex-shrink-0"
                   onClick={() => { navigator.clipboard.writeText(learnUrl).then(() => { setQrCopied(true); setTimeout(() => setQrCopied(false), 2000) }) }}>
                   {qrCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   {qrCopied ? 'Copiado' : 'Copiar'}
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+              <p className="text-caption text-muted-foreground text-center leading-relaxed">
                 Abre la sección en modo lectura.<br />No requiere login.
               </p>
             </div>
@@ -335,12 +335,12 @@ export function Baader200LearningPage() {
             {loadingHistory && <div className="text-xs text-muted-foreground text-center py-8">Cargando historial…</div>}
             {!loadingHistory && history.length === 0 && <div className="text-xs text-muted-foreground text-center py-8">Sin cambios registrados</div>}
             {history.map((entry, i) => (
-              <div key={entry.id ?? i} className="text-xs rounded-lg border border-border p-2 space-y-0.5 hover:bg-muted/40 transition-colors">
+              <div key={entry.id ?? i} className="text-xs rounded-card border border-border p-2 space-y-0.5 hover:bg-muted/40 transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <span className={cn('font-semibold truncate', entry.action === 'delete' ? 'text-red-400' : entry.action === 'create' ? 'text-blue-400' : 'text-emerald-400')}>
                     {entry.action === 'delete' ? '🗑' : entry.action === 'create' ? '✨' : '💾'} {entry.sectionTitle}
                   </span>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                  <span className="text-caption text-muted-foreground flex-shrink-0">
                     {entry.timestamp.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
                 </div>

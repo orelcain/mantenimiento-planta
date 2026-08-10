@@ -277,7 +277,7 @@ export function PlanoLienzo({
         </svg>
       </div>
 
-      <div data-controles className="absolute bottom-24 right-3 flex flex-col overflow-hidden rounded-lg border shadow-lg md:bottom-3"
+      <div data-controles className="absolute bottom-24 right-3 flex flex-col overflow-hidden rounded-card border shadow-lg md:bottom-3"
            style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         {[
           ['+', 'Acercar', () => { const r = stageRef.current!.getBoundingClientRect(); zoom(1.4, r.width / 2, r.height / 2) }],

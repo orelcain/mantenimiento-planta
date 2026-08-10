@@ -43,7 +43,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* P0 */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Punto Cero</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Punto Cero</p>
             <div className="flex items-baseline gap-1.5">
               <p className="text-xl font-bold tabular-nums">{cmp.current.p0.toFixed(2)}%</p>
               <P0Icon className={cn('h-4 w-4', p0Color)} />
@@ -57,7 +57,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
           </div>
           {/* Piezas */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Piezas</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Piezas</p>
             <p className="text-xl font-bold tabular-nums">{cmp.current.pieces.toLocaleString('es-CL')}</p>
             <p className="text-caption text-muted-foreground">
               {cmp.siblingLabel}: {cmp.sibling.pieces.toLocaleString('es-CL')}
@@ -68,7 +68,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
           </div>
           {/* Peso promedio */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Peso promedio</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Peso promedio</p>
             <div className="flex items-baseline gap-1.5">
               <p className="text-xl font-bold tabular-nums">{cmp.current.avgWeight.toFixed(0)} g</p>
               <WeightIcon className={cn('h-4 w-4', weightColor)} />
@@ -82,7 +82,7 @@ export function TendenciaShiftComparisonCard({ shiftComparisonView, siblingSessi
           </div>
           {/* Calibre dominante */}
           <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
-            <p className="text-caption text-muted-foreground uppercase tracking-wide">Calibre dominante</p>
+            <p className="text-caption text-muted-foreground tracking-wide">Calibre dominante</p>
             <p className="text-xl font-bold tabular-nums">{cmp.current.calibre}</p>
             <p className="text-caption text-muted-foreground">
               {cmp.siblingLabel}: {cmp.sibling.calibre}

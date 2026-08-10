@@ -200,13 +200,13 @@ export function AdminPanelPage() {
         if (items.length === 0) return null
         return (
           <section key={section} className="space-y-2">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80 px-1">
+            <h2 className="text-xs font-medium tracking-wider text-muted-foreground/80 px-1">
               {SECTION_LABELS[section]}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {items.map((item) => (
                 <Link key={item.to} to={item.to} className="group">
-                  <Card className="h-full hover:border-amber-500/40 transition-colors">
+                  <Card className="h-full hover:border-amber-500/[0.25] transition-colors">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
                         <span className={item.iconColor}>{item.icon}</span>

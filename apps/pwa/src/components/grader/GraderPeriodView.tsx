@@ -555,7 +555,7 @@ export function GraderPeriodView({ data }: Props) {
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Período analizado
               </p>
               <h2 className="text-lg font-bold mt-0.5">{range.label}</h2>
@@ -581,7 +581,7 @@ export function GraderPeriodView({ data }: Props) {
               )}
             </div>
             <div className="text-right shrink-0">
-              <p className="text-caption text-muted-foreground uppercase tracking-wide">P0% ponderado</p>
+              <p className="text-caption text-muted-foreground tracking-wide">P0% ponderado</p>
               <p className={cn('text-4xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
                 {visibleStats.p0PctWeighted}%
               </p>
@@ -594,7 +594,7 @@ export function GraderPeriodView({ data }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Piezas</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Piezas</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {visibleStats.totalPieces >= 1e6
                 ? `${(visibleStats.totalPieces / 1e6).toFixed(1)}M`
@@ -605,7 +605,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">P0 piezas</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">P0 piezas</p>
             <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
               {(visibleStats.totalP0Pieces / 1e3).toFixed(1)}k
             </p>
@@ -614,7 +614,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Peso total</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Peso total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatWeight(visibleStats.totalWeightKg)}
             </p>
@@ -622,7 +622,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Tasa promedio</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Tasa promedio</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatNumber(visibleStats.avgProductionRatePerHour)}
             </p>
@@ -631,7 +631,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Duración total</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Duración total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatDurationH(visibleStats.totalDurationMinutes)}
             </p>
@@ -639,7 +639,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Días · Turnos</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Días · Turnos</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {visibleStats.daysCount} · {visibleStats.shiftsCount}
             </p>
@@ -659,7 +659,7 @@ export function GraderPeriodView({ data }: Props) {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   <div>
-                    <p className="text-caption uppercase tracking-wide text-muted-foreground">Mejor día</p>
+                    <p className="text-caption tracking-wide text-muted-foreground">Mejor día</p>
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
@@ -678,7 +678,7 @@ export function GraderPeriodView({ data }: Props) {
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
                   <div>
-                    <p className="text-caption uppercase tracking-wide text-muted-foreground">Peor día</p>
+                    <p className="text-caption tracking-wide text-muted-foreground">Peor día</p>
                     <p className="text-sm font-semibold">{visibleStats.maxP0Day.dateKey}</p>
                   </div>
                 </div>
@@ -704,7 +704,7 @@ export function GraderPeriodView({ data }: Props) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               {/* Tendencia */}
               <div className="rounded-card border border-border bg-background px-3 py-2">
-                <p className="text-caption text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
+                <p className="text-caption text-muted-foreground tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
                   insights.trendDir === 'better' && 'text-ink-ok',
@@ -720,7 +720,7 @@ export function GraderPeriodView({ data }: Props) {
               </div>
               {/* Días críticos */}
               <div className="rounded-card border border-border bg-background px-3 py-2">
-                <p className="text-caption text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
+                <p className="text-caption text-muted-foreground tracking-wider mb-1">Días críticos ≥3.5%</p>
                 <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-ink-ok')}>
                   {insights.criticalCount} / {insights.totalDays}
                 </p>
@@ -732,7 +732,7 @@ export function GraderPeriodView({ data }: Props) {
               {/* Día vs Noche */}
               {insights.diaAvg !== null && insights.nocheAvg !== null && (
                 <div className="rounded-card border border-border bg-background px-3 py-2">
-                  <p className="text-caption text-muted-foreground uppercase tracking-wider mb-1">Día vs Noche (prom.)</p>
+                  <p className="text-caption text-muted-foreground tracking-wider mb-1">Día vs Noche (prom.)</p>
                   <p className="font-semibold text-sm">
                     <span className="text-amber-500">{insights.diaAvg}%</span>
                     <span className="text-muted-foreground mx-1">/</span>
@@ -750,7 +750,7 @@ export function GraderPeriodView({ data }: Props) {
               {/* Mejor semana */}
               {insights.bestWeekStart && (
                 <div className="rounded-card border border-border bg-background px-3 py-2">
-                  <p className="text-caption text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
+                  <p className="text-caption text-muted-foreground tracking-wider mb-1">Mejor semana</p>
                   <p className="font-semibold text-sm text-ink-ok">{insights.bestWeekAvg}% P0 prom.</p>
                   <p className="text-caption text-muted-foreground mt-0.5">
                     semana del {formatShortDate(insights.bestWeekStart)}

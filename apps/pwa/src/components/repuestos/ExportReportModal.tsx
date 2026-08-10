@@ -260,7 +260,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         <div className="flex flex-1 overflow-hidden">
             {/* Sidebar: Tree Selection */}
             <div className="w-[45%] border-r flex flex-col bg-background">
-                <div className="p-3 border-b bg-muted font-medium text-xs uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                <div className="p-3 border-b bg-muted font-medium text-xs tracking-wider text-muted-foreground flex justify-between items-center">
                     <span>Árbol de Navegación</span>
                     <div className="space-x-1">
                         <Button variant="ghost" className="h-6 text-xs" onClick={() => setSelectedIds(new Set())}>Ninguno</Button>
@@ -289,7 +289,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
             {/* Right Panel: Options */}
             <div className="w-[55%] flex flex-col p-6 space-y-8 bg-muted overflow-y-auto">
                 <div className="space-y-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground flex items-center gap-2">
+                    <h3 className="font-semibold text-sm tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
                         Formato de Reporte
                     </h3>
@@ -348,7 +348,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 </div>
 
                 <div className="space-y-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground flex items-center gap-2">
+                    <h3 className="font-semibold text-sm tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
                         Configuración
                     </h3>

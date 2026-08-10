@@ -253,7 +253,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
           const Icon = meta.icon
           return (
             <div key={cat}>
-              <div className={cn('flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-ctl border', meta.bg, meta.color)}>
+              <div className={cn('flex items-center gap-1.5 text-xs font-semibold tracking-wider mb-2 px-2 py-1 rounded-ctl border', meta.bg, meta.color)}>
                 <Icon className="w-3.5 h-3.5" />
                 {meta.label}
               </div>
@@ -274,7 +274,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
 
         {relatedRunbooks.length > 0 && (
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-ctl border bg-muted-foreground/[0.10] border-muted-foreground/[0.10] text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider mb-2 px-2 py-1 rounded-ctl border bg-muted-foreground/[0.10] border-muted-foreground/[0.10] text-muted-foreground">
               <Eye className="w-3.5 h-3.5" />
               Runbooks relacionados
             </div>

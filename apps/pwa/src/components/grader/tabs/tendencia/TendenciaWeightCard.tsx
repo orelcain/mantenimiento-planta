@@ -215,7 +215,7 @@ export function TendenciaWeightCard({
                   'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-card border-2 shrink-0',
                   projBadgeClass,
                 )}>
-                  <p className="text-caption uppercase tracking-wide opacity-80">P0 al cierre</p>
+                  <p className="text-caption tracking-wide opacity-80">P0 al cierre</p>
                   <p className="text-lg font-bold tabular-nums leading-none">
                     {trendForecastView.projectedPointZeroPct.toFixed(2)}%
                   </p>

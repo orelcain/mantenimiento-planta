@@ -545,7 +545,7 @@ export function GateBreakdownCard({
                               {/* Badge severidad — visible primero, comunica complejidad del cambio */}
                               <span
                                 className={cn(
-                                  'inline-flex items-center px-1.5 py-0 rounded-full border text-caption font-medium uppercase tracking-wide',
+                                  'inline-flex items-center px-1.5 py-0 rounded-full border text-caption font-medium tracking-wide',
                                   severityBadgeClass(s.severity),
                                 )}
                                 title={s.cautela}

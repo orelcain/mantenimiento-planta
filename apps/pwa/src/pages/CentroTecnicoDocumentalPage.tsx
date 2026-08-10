@@ -372,9 +372,9 @@ export function CentroTecnicoDocumentalPage() {
           {datosMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setDatosMenu(false)} />
-              <div className="absolute right-0 mt-1 z-20 w-56 rounded-md border bg-background shadow-md p-1 text-sm">
+              <div className="absolute right-0 mt-1 z-20 w-56 rounded-ctl border bg-background shadow-md p-1 text-sm">
                 <button
-                  className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60 disabled:opacity-50"
+                  className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60 disabled:opacity-50"
                   onClick={() => {
                     setDatosMenu(false)
                     exportarExcel()
@@ -386,7 +386,7 @@ export function CentroTecnicoDocumentalPage() {
                 {canEditEquipment && (
                   <>
                     <button
-                      className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60"
+                      className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60"
                       onClick={() => {
                         setDatosMenu(false)
                         descargarPlantillaPlaca(equipos)
@@ -395,7 +395,7 @@ export function CentroTecnicoDocumentalPage() {
                       Descargar plantilla de placa
                     </button>
                     <button
-                      className="w-full text-left px-3 py-1.5 rounded hover:bg-muted/60 disabled:opacity-50"
+                      className="w-full text-left px-3 py-1.5 rounded-ctl hover:bg-muted/60 disabled:opacity-50"
                       onClick={() => {
                         setDatosMenu(false)
                         placaInputRef.current?.click()
@@ -421,12 +421,12 @@ export function CentroTecnicoDocumentalPage() {
               key={k.key}
               onClick={() => setFiltro(k.key)}
               title={`Filtrar: ${k.label}`}
-              className={`rounded-lg border p-3 text-center transition-colors ${
+              className={`rounded-card border p-3 text-center transition-colors ${
                 active ? 'border-primary ring-1 ring-primary bg-primary/20' : 'border-border bg-card hover:bg-muted'
               }`}
             >
               <div className={`text-2xl font-extrabold leading-none ${k.cls ?? ''}`}>{k.n}</div>
-              <div className="text-[11px] text-muted-foreground mt-1 truncate">{k.label}</div>
+              <div className="text-caption text-muted-foreground mt-1 truncate">{k.label}</div>
             </button>
           )
         })}
@@ -442,7 +442,7 @@ export function CentroTecnicoDocumentalPage() {
 
       {/* Vista · Estado · Sección · Línea · Tipo · Orden · Densidad */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-md border overflow-hidden mr-1">
+        <div className="inline-flex rounded-ctl border overflow-hidden mr-1">
           <button
             onClick={() => setVista('lista')}
             className={`text-xs px-3 py-1.5 ${vista === 'lista' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
@@ -456,11 +456,11 @@ export function CentroTecnicoDocumentalPage() {
             Tarjetas
           </button>
         </div>
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado</label>
+        <label className="text-caption tracking-wide text-muted-foreground">Estado</label>
         <select
           value={estadoFiltro}
           onChange={(e) => setEstadoFiltro(e.target.value as EstadoFiltro)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background"
           aria-label="Filtrar por estado"
         >
           {estadoChips.map((c) => (
@@ -469,11 +469,11 @@ export function CentroTecnicoDocumentalPage() {
             </option>
           ))}
         </select>
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Sección</label>
+        <label className="text-caption tracking-wide text-muted-foreground">Sección</label>
         <select
           value={seccionFiltro}
           onChange={(e) => setSeccionFiltro(e.target.value)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px]"
           aria-label="Filtrar por sección"
         >
           <option value="all">Todas ({secciones.length})</option>
@@ -484,11 +484,11 @@ export function CentroTecnicoDocumentalPage() {
           ))}
         </select>
 
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Línea</label>
+        <label className="text-caption tracking-wide text-muted-foreground">Línea</label>
         <select
           value={lineaFiltro}
           onChange={(e) => setLineaFiltro(e.target.value)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px] disabled:opacity-50"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px] disabled:opacity-50"
           aria-label="Filtrar por línea"
           disabled={lineas.length === 0}
         >
@@ -500,11 +500,11 @@ export function CentroTecnicoDocumentalPage() {
           ))}
         </select>
 
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</label>
+        <label className="text-caption tracking-wide text-muted-foreground">Tipo</label>
         <select
           value={tipoFiltro}
           onChange={(e) => setTipoFiltro(e.target.value)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[180px] disabled:opacity-50"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[180px] disabled:opacity-50"
           aria-label="Filtrar por tipo"
           disabled={tipos.length === 0}
         >
@@ -516,11 +516,11 @@ export function CentroTecnicoDocumentalPage() {
           ))}
         </select>
 
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Familia</label>
+        <label className="text-caption tracking-wide text-muted-foreground">Familia</label>
         <select
           value={familiaFiltro}
           onChange={(e) => setFamiliaFiltro(e.target.value as typeof familiaFiltro)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background max-w-[200px]"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background max-w-[200px]"
           aria-label="Filtrar por familia eléctrica (NFPA 70B)"
           title="Familia eléctrica NFPA 70B (máquina rotativa incluye motores, motorreductores, mototambores y bombas)"
         >
@@ -532,11 +532,11 @@ export function CentroTecnicoDocumentalPage() {
           ))}
         </select>
 
-        <label className="ml-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ordenar</label>
+        <label className="ml-2 text-caption tracking-wide text-muted-foreground">Ordenar</label>
         <select
           value={orden}
           onChange={(e) => setOrden(e.target.value as OrdenCampo)}
-          className="text-xs border rounded-md px-2 py-1.5 bg-background"
+          className="text-xs border rounded-ctl px-2 py-1.5 bg-background"
           aria-label="Ordenar por"
         >
           <option value="criticidad">Criticidad</option>
@@ -653,7 +653,7 @@ export function CentroTecnicoDocumentalPage() {
         </div>
       )}
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-caption text-muted-foreground">
         El expediente (Información, Ficha NFPA 70B, Tablero, Fotos, Notas, QR) se abre a la derecha, sin salir del CTD. “Ficha
         %” = completitud de la placa. Favoritos y notas se comparten con la página de Equipos.
       </p>
@@ -705,7 +705,7 @@ export function CentroTecnicoDocumentalPage() {
           role="dialog"
           aria-modal="true"
         >
-          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded" />
+          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-ctl" />
         </div>
       )}
 
@@ -811,7 +811,7 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">
             Tendencia de condición{' '}
-            <span className="text-[11px] font-normal text-muted-foreground">(historial NFPA 70B)</span>
+            <span className="text-caption font-normal text-muted-foreground">(historial NFPA 70B)</span>
           </div>
           <div className="text-xs text-muted-foreground">
             Actual: {condActual ? `${COND_EMOJI[condActual]} Cond. ${condActual}` : '—'}
@@ -827,7 +827,7 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
             <div className="mt-3">
               <ReactECharts option={condOption} style={{ height: 150, width: '100%' }} notMerge opts={{ renderer: 'canvas' }} />
             </div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between text-caption text-muted-foreground">
               <span>🟢 Cond 1 (mejor) · 🟡 2 · 🔴 3 (peor)</span>
               <span>{serie.length} registro(s)</span>
             </div>
@@ -837,18 +837,18 @@ function TendenciaCondicion({ log, equipment }: { log: MaintenanceLogEntry[]; eq
         <div className="mt-3 border-t pt-2">
           <div className="text-xs font-medium mb-1">Trazabilidad de cambios</div>
           {cambios.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">Sin cambios de condición registrados.</p>
+            <p className="text-caption text-muted-foreground">Sin cambios de condición registrados.</p>
           ) : (
             <ul className="space-y-0.5">
               {cambios.slice(0, 6).map((c, i) => (
-                <li key={`${c.fecha.getTime()}-${i}`} className="text-[11px] text-muted-foreground">
+                <li key={`${c.fecha.getTime()}-${i}`} className="text-caption text-muted-foreground">
                   {c.fecha.toLocaleDateString()} · {SEV_LABEL[c.from]} →{' '}
                   <span className="font-medium text-foreground">{SEV_LABEL[c.to]}</span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 text-caption text-muted-foreground">
             Última actualización de la ficha: {equipment.updatedAt ? new Date(equipment.updatedAt).toLocaleString() : '—'}
           </p>
         </div>
@@ -1092,8 +1092,8 @@ function MetricChart({
       {eventos.length > 0 && (
         <ul className="mt-1 space-y-0.5">
           {eventos.map((e, i) => (
-            <li key={`${e.fecha.getTime()}-${i}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: MC_EVENT }} />
+            <li key={`${e.fecha.getTime()}-${i}`} className="flex items-center gap-1.5 text-caption text-muted-foreground">
+              <span className="inline-block h-2 w-2 shrink-0 rounded-ctl" style={{ background: MC_EVENT }} />
               <span className="tabular-nums">{e.fecha.toLocaleDateString()}</span>
               <span className="text-foreground">· {e.label}</span>
               <span className="capitalize">({e.tipo})</span>
@@ -1254,7 +1254,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">
             Tendencias de comportamiento{' '}
-            <span className="text-[11px] font-normal text-muted-foreground">· {FAMILIA_LABEL[familiaDe(equipment)]}</span>
+            <span className="text-caption font-normal text-muted-foreground">· {FAMILIA_LABEL[familiaDe(equipment)]}</span>
           </div>
           {canEdit && !adding && (
             <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
@@ -1264,7 +1264,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
         </div>
 
         {adding && (
-          <div className="rounded-lg border bg-muted p-3 space-y-3">
+          <div className="rounded-card border bg-muted p-3 space-y-3">
             <div className="grid md:grid-cols-3 gap-2">
               <div>
                 <label className="text-xs text-muted-foreground">Fecha</label>
@@ -1272,7 +1272,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Contexto</label>
-                <div className="inline-flex rounded-md border overflow-hidden mt-1">
+                <div className="inline-flex rounded-ctl border overflow-hidden mt-1">
                   {(['proceso', 'reposo'] as const).map((c) => (
                     <button
                       key={c}
@@ -1339,7 +1339,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
         ) : (
           <>
             {metricSel && (
-              <div className="rounded-lg border bg-muted p-2">
+              <div className="rounded-card border bg-muted p-2">
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <div className="text-xs font-medium">
                     {metricSel.label} <span className="text-muted-foreground">({metricSel.unidad})</span>
@@ -1347,7 +1347,7 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
                   <select
                     value={metricSel.id}
                     onChange={(e) => setMetricId(e.target.value)}
-                    className="rounded-md border bg-background px-2 py-1 text-xs"
+                    className="rounded-ctl border bg-background px-2 py-1 text-xs"
                     aria-label="Métrica a graficar"
                   >
                     {camposConDatos.map((c) => (
@@ -1360,13 +1360,13 @@ function MedicionesTab({ equipment, canEdit }: { equipment: Equipment; canEdit: 
                 <MetricChart rows={rows} campo={metricSel} eventos={eventos} umbral={umbral} />
               </div>
             )}
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Todas las series</div>
+            <div className="text-caption font-medium tracking-wide text-muted-foreground">Todas las series</div>
             <div className="divide-y">
               {campos.map((c) => (
                 <SerieCampo key={c.id} rows={rows} campo={c} />
               ))}
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-3 text-caption text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-2 rounded-full" style={{ background: CTX_COLOR.proceso }} /> proceso
               </span>
@@ -1389,7 +1389,7 @@ function OtBadge({ ot }: { ot?: OtCount }) {
   return (
     <span
       title={`${ot.abiertas} OT abierta(s)${ot.vencidas > 0 ? ` · ${ot.vencidas} vencida(s)` : ''}`}
-      className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
+      className={`inline-flex items-center gap-0.5 text-caption font-medium ${danger ? 'text-red-600' : 'text-blue-600'}`}
     >
       <Wrench className="h-3 w-3" />
       {ot.abiertas}
@@ -1475,7 +1475,7 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
         </div>
 
         {adding && (
-          <div className="space-y-2 rounded-lg border bg-muted p-2">
+          <div className="space-y-2 rounded-card border bg-muted p-2">
             <Input placeholder="Buscar repuesto por nombre o SAP…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
             {loadingMaestro ? (
               <p className="text-xs italic text-muted-foreground">Cargando maestro…</p>
@@ -1527,7 +1527,7 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
                 <span className="w-28 shrink-0 font-mono text-xs text-muted-foreground">{r.codigoSAP || '—'}</span>
                 <span className="min-w-0 flex-1 truncate">
                   {r.nombre}
-                  {r.tipo ? <span className="text-[11px] text-muted-foreground"> · {r.tipo}</span> : null}
+                  {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
                 </span>
                 {typeof r.stockFisico === 'number' && (
                   <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
@@ -1547,7 +1547,7 @@ function RecursosRepuestos({ equipment, canEdit }: { equipment: Equipment; canEd
             ))}
           </div>
         )}
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Los repuestos se comparten N:M con el maestro; “Vincular” agrega este equipo al repuesto.
         </p>
       </CardContent>
@@ -1603,13 +1603,13 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
   }
 
   return (
-    <div className="rounded-lg border bg-card/95 p-3 shadow-sm">
+    <div className="rounded-card border bg-card/95 p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" /> Ubicación en la planta
         </span>
         {isAdmin && nodeId && !moving && (
-          <button className="text-[11px] text-primary hover:underline" onClick={openMove}>
+          <button className="text-caption text-primary hover:underline" onClick={openMove}>
             Cambiar
           </button>
         )}
@@ -1633,15 +1633,15 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
       )}
 
       {moving && (
-        <div className="mt-3 space-y-2 rounded-md border bg-muted p-2">
-          <div className="text-[11px] font-medium">Mover bajo… (nuevo padre)</div>
+        <div className="mt-3 space-y-2 rounded-ctl border bg-muted p-2">
+          <div className="text-caption font-medium">Mover bajo… (nuevo padre)</div>
           <Input placeholder="Buscar área/equipo destino…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           {loadingCands ? (
-            <p className="text-[11px] italic text-muted-foreground">Cargando jerarquía…</p>
+            <p className="text-caption italic text-muted-foreground">Cargando jerarquía…</p>
           ) : term.length < 2 ? (
-            <p className="text-[11px] italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
+            <p className="text-caption italic text-muted-foreground">Escribe al menos 2 caracteres.</p>
           ) : resultados.length === 0 ? (
-            <p className="text-[11px] italic text-muted-foreground">Sin coincidencias.</p>
+            <p className="text-caption italic text-muted-foreground">Sin coincidencias.</p>
           ) : (
             <div className="max-h-60 divide-y overflow-y-auto">
               {resultados.map((c) => (
@@ -1649,7 +1649,7 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
                   key={c.id}
                   disabled={busy}
                   onClick={() => mover(c)}
-                  className="block w-full py-1.5 text-left text-[11px] hover:bg-muted/40 disabled:opacity-50"
+                  className="block w-full py-1.5 text-left text-caption hover:bg-muted/40 disabled:opacity-50"
                   title={c.rutaNombre}
                 >
                   {c.rutaNombre}
@@ -1672,7 +1672,7 @@ function UbicacionRail({ equipment, onMoved }: { equipment: Equipment; onMoved?:
         </div>
       )}
 
-      <p className="mt-3 text-[10px] text-muted-foreground">
+      <p className="mt-3 text-caption text-muted-foreground">
         Origen: jerarquía SAP. {isAdmin ? 'Cambiar reubica el nodo y excluye del sync (conserva repuestos/manuales).' : ''}
       </p>
     </div>
@@ -1978,7 +1978,7 @@ function ExpedienteDialog({
                       </div>
                     )}
                     {edad == null || vidaUtil == null ? (
-                      <p className="mt-2 text-[11px] text-muted-foreground">
+                      <p className="mt-2 text-caption text-muted-foreground">
                         Requiere fecha de instalación y vida útil (en la Ficha) para el cálculo.
                       </p>
                     ) : null}
@@ -1993,7 +1993,7 @@ function ExpedienteDialog({
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">
                       Confiabilidad{' '}
-                      <span className="text-[11px] font-normal text-muted-foreground">(según historial cargado)</span>
+                      <span className="text-caption font-normal text-muted-foreground">(según historial cargado)</span>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -2024,7 +2024,7 @@ function ExpedienteDialog({
                   <CardContent className="p-4">
                     <div className="text-sm font-semibold mb-2">
                       Costo de mantenimiento (TCO){' '}
-                      <span className="text-[11px] font-normal text-muted-foreground">(según OT con costo)</span>
+                      <span className="text-caption font-normal text-muted-foreground">(según OT con costo)</span>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                       <div>
@@ -2042,7 +2042,7 @@ function ExpedienteDialog({
                         <div className="font-medium">{otConCosto > 0 ? formatCosto(tco / otConCosto) : '—'}</div>
                       </div>
                     </div>
-                    <p className="mt-2 text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-caption text-muted-foreground">
                       El costo se captura al crear o cerrar una orden de trabajo (pestaña Trabajos).
                     </p>
                   </CardContent>
@@ -2063,7 +2063,7 @@ function ExpedienteDialog({
                 <CardContent className="p-4">
                   <div className="text-sm font-semibold mb-1">
                     Protocolo de inspección NFPA 70B{' '}
-                    <span className="text-[11px] font-normal text-muted-foreground">
+                    <span className="text-caption font-normal text-muted-foreground">
                       · familia {FAMILIA_LABEL[familiaDe(equipment)]}
                     </span>
                   </div>
@@ -2073,9 +2073,9 @@ function ExpedienteDialog({
                         <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
                           <div>{t.tarea}</div>
-                          {t.nota && <div className="text-[11px] text-muted-foreground">{t.nota}</div>}
+                          {t.nota && <div className="text-caption text-muted-foreground">{t.nota}</div>}
                         </div>
-                        <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap">
+                        <span className="text-caption text-muted-foreground shrink-0 whitespace-nowrap">
                           {t.tipo === 'medicion'
                             ? `medición${t.unidad ? ` · ${t.unidad}` : ''}${t.rango ? ` (${t.rango.min ?? ''}${t.rango.min != null && t.rango.max != null ? '–' : ''}${t.rango.max ?? ''})` : ''}`
                             : 'cualitativo'}
@@ -2083,7 +2083,7 @@ function ExpedienteDialog({
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
+                  <p className="mt-2 text-caption text-muted-foreground">
                     Tareas recomendadas por familia (NFPA 70B). Al registrar una inspección en la Ficha se captura el
                     protocolo con valores y rangos. Plantilla de arranque — se afina con el estándar completo / RPTD N°15.
                   </p>
@@ -2126,7 +2126,7 @@ function ExpedienteDialog({
                     )}
                   </CardContent>
                 </Card>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Repuestos y documentos se heredan del nodo de jerarquía del equipo (maestro N:M).
                 </p>
               </div>
@@ -2152,7 +2152,7 @@ function ExpedienteDialog({
                   </div>
 
                   {woForm && (
-                    <div className="rounded-lg border bg-muted p-3 space-y-3">
+                    <div className="rounded-card border bg-muted p-3 space-y-3">
                       <Input
                         placeholder="Título de la OT…"
                         value={woDraft.titulo}
@@ -2160,7 +2160,7 @@ function ExpedienteDialog({
                       />
                       <div className="grid md:grid-cols-3 gap-2">
                         <select
-                          className="text-sm border rounded-md px-2 py-1.5 bg-background"
+                          className="text-sm border rounded-ctl px-2 py-1.5 bg-background"
                           value={woDraft.tipo}
                           onChange={(e) => setWoDraft((d) => ({ ...d, tipo: e.target.value as WorkOrder['tipo'] }))}
                         >
@@ -2171,7 +2171,7 @@ function ExpedienteDialog({
                           ))}
                         </select>
                         <select
-                          className="text-sm border rounded-md px-2 py-1.5 bg-background"
+                          className="text-sm border rounded-ctl px-2 py-1.5 bg-background"
                           value={woDraft.prioridad}
                           onChange={(e) => setWoDraft((d) => ({ ...d, prioridad: e.target.value as WorkOrder['prioridad'] }))}
                         >
@@ -2240,7 +2240,7 @@ function ExpedienteDialog({
                                 {we.label}
                               </Badge>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
                               <span>{WO_TIPOS.find((t) => t.value === wo.tipo)?.label ?? wo.tipo}</span>
                               <span className={wp.cls}>● {wp.label}</span>
                               {wo.asignadoA && <span>👤 {wo.asignadoA}</span>}
@@ -2315,7 +2315,7 @@ function ExpedienteDialog({
                   {equipment.photos && equipment.photos.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {equipment.photos.map((url, idx) => (
-                        <div key={url} className="relative group aspect-square rounded-lg overflow-hidden border">
+                        <div key={url} className="relative group aspect-square rounded-card overflow-hidden border">
                           <img
                             src={url}
                             alt={`Foto ${idx + 1}`}
@@ -2325,7 +2325,7 @@ function ExpedienteDialog({
                           />
                           {canEdit && (
                             <button
-                              className="absolute top-1 left-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="absolute top-1 left-1 p-1 rounded-ctl bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                               title="Anotar foto (marcar hallazgos)"
                               aria-label="Anotar foto"
                               onClick={(ev) => {
@@ -2338,7 +2338,7 @@ function ExpedienteDialog({
                           )}
                           {canEdit && (
                             <button
-                              className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="absolute top-1 right-1 p-1 rounded-ctl bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                               title="Eliminar foto"
                               aria-label="Eliminar foto"
                               onClick={(ev) => {
@@ -2391,7 +2391,7 @@ function ExpedienteDialog({
                   ) : (
                     <div className="space-y-2">
                       {notes.map((n) => (
-                        <div key={n.id} className="rounded-lg border p-3">
+                        <div key={n.id} className="rounded-card border p-3">
                           {editingNoteId === n.id ? (
                             <div className="space-y-2">
                               <Textarea
@@ -2419,7 +2419,7 @@ function ExpedienteDialog({
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-sm whitespace-pre-wrap break-words">{n.text}</div>
-                                <div className="text-[11px] text-muted-foreground mt-1">
+                                <div className="text-caption text-muted-foreground mt-1">
                                   {new Date(n.createdAt).toLocaleString()}
                                 </div>
                               </div>
@@ -2450,7 +2450,7 @@ function ExpedienteDialog({
                       ))}
                     </div>
                   )}
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     Las notas se guardan en este dispositivo (por usuario) y se comparten con la página de Equipos.
                   </p>
                 </CardContent>
@@ -2522,14 +2522,14 @@ function AgendaInspecciones({
                       <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
                       <span className="w-6 text-center">{cond ? COND_EMOJI[cond] : '—'}</span>
                       <span className="flex-1 min-w-0 truncate">
-                        {e.nombre} <span className="text-[11px] text-muted-foreground font-mono">· {e.codigo}</span>
+                        {e.nombre} <span className="text-caption text-muted-foreground font-mono">· {e.codigo}</span>
                       </span>
                       <OtBadge ot={otByEquipo.get(e.id)} />
                       <span className={`text-xs shrink-0 ${dias !== null ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                         {dias !== null ? `vencida ${dias} d` : prox ? new Date(prox).toLocaleDateString() : 'sin fecha'}
                       </span>
                       {danger && (
-                        <span className="text-[11px] font-medium text-primary shrink-0 inline-flex items-center">
+                        <span className="text-caption font-medium text-primary shrink-0 inline-flex items-center">
                           Registrar <ChevronRight className="h-3 w-3" />
                         </span>
                       )}
@@ -2583,22 +2583,22 @@ function CtdEquipoCard({
           }}
           title={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
           aria-label={isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
-          className="absolute top-1 right-1 p-1 rounded bg-black/40"
+          className="absolute top-1 right-1 p-1 rounded-ctl bg-black/40"
         >
           <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-white'}`} />
         </button>
       </div>
       <CardContent className="p-3 space-y-1.5">
         <div className="font-medium text-sm truncate">{e.nombre}</div>
-        <div className="text-[11px] text-muted-foreground font-mono truncate">{e.codigo}</div>
-        {e.nombreComun && <div className="text-[11px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
+        <div className="text-caption text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" className={`${crit.cls} text-xs`}>{crit.nivel}</Badge>
           {cond ? <span className="text-xs">{COND_EMOJI[cond]}</span> : null}
           <Badge variant="outline" className={`${est.cls} text-xs`}>{est.label}</Badge>
           <OtBadge ot={ot} />
         </div>
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between text-caption">
           <span className="text-muted-foreground">Ficha</span>
           <span className={pct < 100 ? 'text-amber-600' : 'text-emerald-600'}>{pct > 0 ? `${pct}%` : '—'}</span>
         </div>
@@ -2646,7 +2646,7 @@ function CtdEquipoRow({
         <Star className={`h-4 w-4 ${isFavorite ? 'fill-current text-yellow-500' : 'text-muted-foreground'}`} />
       </button>
 
-      <div className={`shrink-0 overflow-hidden rounded bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
+      <div className={`shrink-0 overflow-hidden rounded-ctl bg-muted flex items-center justify-center ${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
         {foto ? (
           <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
         ) : (
@@ -2656,8 +2656,8 @@ function CtdEquipoRow({
 
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{e.nombre}</div>
-        <div className="text-[10px] text-muted-foreground font-mono truncate">{e.codigo}</div>
-        {e.nombreComun && <div className="text-[10px] text-muted-foreground truncate">“{e.nombreComun}”</div>}
+        <div className="text-caption text-muted-foreground font-mono truncate">{e.codigo}</div>
+        {e.nombreComun && <div className="text-caption text-muted-foreground truncate">“{e.nombreComun}”</div>}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs md:hidden">
           <Badge variant="outline" className={`${crit.cls}`}>{crit.nivel}</Badge>
           {cond ? <span>{COND_EMOJI[cond]}</span> : null}

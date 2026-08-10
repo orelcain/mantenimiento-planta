@@ -90,7 +90,7 @@ export function NotificationsSettings() {
         {/* Información del estado */}
         <div className="space-y-2">
           {isEnabled && (
-            <div className="flex items-start gap-2 p-3 bg-success/10 rounded-lg border border-success/20">
+            <div className="flex items-start gap-2 p-3 bg-success/10 rounded-card border border-success/20">
               <CheckCircle className="h-4 w-4 text-success mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-success">Notificaciones activadas</p>
@@ -108,7 +108,7 @@ export function NotificationsSettings() {
           )}
 
           {isDenied && (
-            <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-card border border-destructive/20">
               <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-destructive">Notificaciones bloqueadas</p>
@@ -126,7 +126,7 @@ export function NotificationsSettings() {
           )}
 
           {canRequest && (
-            <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+            <div className="flex items-start gap-2 p-3 bg-muted rounded-card">
               <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
               <p className="text-sm text-muted-foreground">
                 Las notificaciones te ayudan a estar al tanto de cambios importantes en tiempo real.

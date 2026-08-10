@@ -367,7 +367,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* ── Top causas P0 ── */}
         {allCauses.size > 0 && (
           <div className="pt-2">
-            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <p className="text-caption font-medium text-muted-foreground tracking-wide mb-2">
               Top causas P0
             </p>
             <div className="space-y-1.5">

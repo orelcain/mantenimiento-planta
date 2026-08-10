@@ -72,7 +72,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 {p.label}
               </span>
               {soon && (
-                <span className="inline-flex items-center text-caption leading-none mt-0.5 px-1 py-0.5 rounded-ctl bg-muted-foreground/10 text-muted-foreground/70 font-medium uppercase tracking-wide">
+                <span className="inline-flex items-center text-caption leading-none mt-0.5 px-1 py-0.5 rounded-ctl bg-muted-foreground/10 text-muted-foreground/70 font-medium tracking-wide">
                   próx.
                 </span>
               )}
@@ -106,7 +106,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
               >
                 {area.areaLabel}
                 {area.comingSoon && (
-                  <span className="text-caption leading-none px-1 py-0.5 rounded-ctl bg-muted-foreground/10 uppercase tracking-wide">
+                  <span className="text-caption leading-none px-1 py-0.5 rounded-ctl bg-muted-foreground/10 tracking-wide">
                     próx.
                   </span>
                 )}

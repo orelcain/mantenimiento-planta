@@ -173,7 +173,7 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
               disabled={isLoading}
             />
             {hierarchyPath && (
-              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
                 📍 {hierarchyPath}
               </p>
             )}
@@ -195,7 +195,7 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
           </div>
 
           {/* Fotos ANTES */}
-          <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+          <div className="p-3 bg-red-500/[0.15] rounded-card border border-red-200 dark:border-red-800">
             <PhotoUploader
               photos={photos}
               onPhotosChange={setPhotos}
@@ -207,7 +207,7 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
           </div>
 
           {/* Info */}
-          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-card">
             <p>
               <strong>💡 Consejo:</strong> Las fotos "DESPUÉS" se pueden agregar posteriormente
               cuando se corrija el problema. Esto te permite comparar el antes y después.

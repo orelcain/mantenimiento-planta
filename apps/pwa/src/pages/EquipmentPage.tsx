@@ -950,7 +950,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
+          <div className="p-2 bg-primary/10 rounded-card">
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
@@ -1040,7 +1040,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <div className="flex flex-col gap-3">
             {/* Badge filtro activo desde jerarquía */}
             {filterSelectedIds.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-ctl">
                 <div className="flex-1 text-sm text-blue-700">
                   Mostrando {filterSelectedIds.size} {filterSelectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'} desde jerarquía
                 </div>
@@ -1498,7 +1498,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                       const selectedNotesSet = selectedNotesByEquipment.get(eq.id) || new Set()
                       
                       return (
-                        <div key={eq.id} className="bg-gray-50 p-2 rounded">
+                        <div key={eq.id} className="bg-gray-50 p-2 rounded-ctl">
                           <p className="text-xs font-semibold text-gray-700 mb-1">{eq.nombre}</p>
                           <div className="space-y-1">
                             {eqNotes.map((note, idx) => {
@@ -1685,15 +1685,15 @@ function EquipmentCard({
     ? 'text-xs leading-snug line-clamp-3 group-hover:text-primary transition-colors'
     : 'text-sm leading-snug line-clamp-3 group-hover:text-primary transition-colors'
 
-  const codeBadgeClassName = compact ? 'font-mono text-[10px]' : 'font-mono text-[11px]'
-  const metaBadgeTextClassName = compact ? 'text-[10px]' : 'text-[11px]'
+  const codeBadgeClassName = compact ? 'font-mono text-caption' : 'font-mono text-caption'
+  const metaBadgeTextClassName = compact ? 'text-caption' : 'text-caption'
   const headerClassName = compact ? 'p-3 pb-2' : 'p-3.5 pb-2.5'
   const contentClassName = compact ? 'p-3 pt-0 space-y-2' : 'p-3.5 pt-0 space-y-2.5'
   const statusIconSizeClassName = compact ? 'h-4 w-4' : 'h-5 w-5'
   const favButtonClassName = compact ? 'h-7 w-7' : 'h-8 w-8'
   const favIconSizeClassName = compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-  const smallTextClassName = compact ? 'text-[11px]' : 'text-xs'
-  const actionButtonClassName = compact ? 'h-6 text-[11px]' : 'h-7 text-xs'
+  const smallTextClassName = compact ? 'text-caption' : 'text-xs'
+  const actionButtonClassName = compact ? 'h-6 text-caption' : 'h-7 text-xs'
 
   if (viewMode === 'list') {
     return (
@@ -1709,7 +1709,7 @@ function EquipmentCard({
                   <div
                     className={
                       compact
-                        ? 'text-[11px] text-muted-foreground font-mono truncate'
+                        ? 'text-caption text-muted-foreground font-mono truncate'
                         : 'text-sm text-muted-foreground font-mono truncate'
                     }
                   >
@@ -2060,7 +2060,7 @@ function EquipmentDetailDialog({
                 {equipment.photos && equipment.photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {equipment.photos.map((photoUrl, idx) => (
-                      <div key={photoUrl} className="relative group aspect-square rounded-lg overflow-hidden border">
+                      <div key={photoUrl} className="relative group aspect-square rounded-card overflow-hidden border">
                         <img
                           src={photoUrl}
                           alt={`Foto ${idx + 1}`}
@@ -2253,7 +2253,7 @@ function EquipmentDetailDialog({
                 {/* QR Code Visual */}
                 <div className="flex flex-col items-center gap-4">
                   <div className="text-sm font-medium text-center">Código QR del Equipo</div>
-                  <div className="p-4 bg-white rounded-lg border-2 border-border">
+                  <div className="p-4 bg-white rounded-card border-2 border-border">
                     <QRCodeSVG
                       value={`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                       size={200}
@@ -2270,7 +2270,7 @@ function EquipmentDetailDialog({
                 {/* Texto del QR */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">URL del equipo</div>
-                  <div className="font-mono text-xs p-3 rounded-md bg-muted break-all">
+                  <div className="font-mono text-xs p-3 rounded-ctl bg-muted break-all">
                     {`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                   </div>
                 </div>
@@ -2278,7 +2278,7 @@ function EquipmentDetailDialog({
                 {/* Código del equipo */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Código del equipo</div>
-                  <div className="font-mono text-sm p-3 rounded-md bg-muted break-all">
+                  <div className="font-mono text-sm p-3 rounded-ctl bg-muted break-all">
                     {equipment.qrCode || equipment.codigo}
                   </div>
                 </div>

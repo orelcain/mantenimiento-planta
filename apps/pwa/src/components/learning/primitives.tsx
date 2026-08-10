@@ -17,7 +17,7 @@ export function SectionTitle({ children, icon, className = '' }: {
   className?: string
 }) {
   return (
-    <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${className}`} style={{ color: LC.inkMid }}>
+    <div className={`flex items-center gap-1.5 text-footnote font-semibold ${className}`} style={{ color: LC.inkMid }}>
       {icon}
       {children}
     </div>
@@ -54,7 +54,7 @@ export function FilterChip({ active = false, onClick, children, accent = LC.aqua
       type="button"
       onClick={onClick}
       title={title}
-      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+      className="inline-flex items-center gap-1.5 rounded-ctl px-2.5 py-1 text-xs font-medium transition-colors"
       style={{
         color: active ? LC.ink : LC.inkMid,
         background: active ? tint(accent, 0.16) : 'transparent',
@@ -76,7 +76,7 @@ export function StatusTag({ children, tone = LC.inkMid, subtle = false, icon }: 
 }) {
   if (subtle) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: tone }}>
+      <span className="inline-flex items-center gap-1.5 text-caption" style={{ color: tone }}>
         {icon}
         {children}
       </span>
@@ -84,7 +84,7 @@ export function StatusTag({ children, tone = LC.inkMid, subtle = false, icon }: 
   }
   return (
     <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+      className="inline-flex items-center gap-1 rounded-ctl px-1.5 py-0.5 text-caption font-medium"
       style={{ color: tone, background: tint(tone, 0.12) }}
     >
       {icon}
@@ -107,7 +107,7 @@ export function PanelSection({ title, children, className = '', first = false }:
       style={first ? undefined : { borderTop: `1px solid ${LC.border}` }}
     >
       {title && (
-        <div className="mb-2 text-[13px] font-semibold" style={{ color: LC.inkMid }}>
+        <div className="mb-2 text-footnote font-semibold" style={{ color: LC.inkMid }}>
           {title}
         </div>
       )}

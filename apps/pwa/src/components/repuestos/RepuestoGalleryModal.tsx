@@ -156,7 +156,7 @@ export function RepuestoGalleryModal({
           </DialogTitle>
           <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
             <span>SAP: {repuesto.codigoSAP || 'N/A'}</span>
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+            <Badge variant="outline" className="text-caption px-1.5 py-0">
               {gallery.length} {gallery.length === 1 ? 'imagen' : 'imágenes'}
             </Badge>
           </div>
@@ -217,7 +217,7 @@ export function RepuestoGalleryModal({
                     {/* Overlay */}
                     <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-white truncate max-w-[70%]">
+                        <span className="text-caption text-white truncate max-w-[70%]">
                           {new Date(img.timestamp).toLocaleDateString()}
                         </span>
                         {!readOnly && (
@@ -234,7 +234,7 @@ export function RepuestoGalleryModal({
                           </Button>
                         )}
                       </div>
-                      <div className="flex flex-col text-[9px] text-gray-300 font-mono leading-tight">
+                      <div className="flex flex-col text-caption text-gray-300 font-mono leading-tight">
                         {img.dimensions && (
                           <span>
                             {img.dimensions.width}x{img.dimensions.height}
@@ -250,7 +250,7 @@ export function RepuestoGalleryModal({
                     </div>
 
                     {/* Type badge */}
-                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded-ctl text-[10px] text-white font-medium uppercase">
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded-ctl text-caption text-white font-medium uppercase">
                       {TYPE_LABELS[img.type] || img.type}
                     </div>
                   </div>

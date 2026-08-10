@@ -253,7 +253,7 @@ export function GraderResumenRapido({
       {/* ─── Top problemas + acciones ─── */}
       {topInsights.length > 0 ? (
         <div className="space-y-2 border-t border-border/30 pt-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-medium text-muted-foreground tracking-wide">
             Problemas detectados
           </p>
           {topInsights.map((insight) => (
@@ -291,7 +291,7 @@ export function GraderResumenRapido({
           {/* Acciones numeradas */}
           {topActions.length > 0 && (
             <div className="mt-3 space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Acciones prioritarias
               </p>
               {topActions.map((a, i) => (

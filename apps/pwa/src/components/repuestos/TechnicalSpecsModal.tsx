@@ -335,7 +335,7 @@ export function TechnicalSpecsModal({
           {/* Tipo de Componente */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground tracking-wider">
                 Tipo de Componente
               </span>
               <div className="flex items-center gap-1.5">
@@ -374,14 +374,14 @@ export function TechnicalSpecsModal({
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Datos Generales</h3>
               </div>
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+              <Badge variant="outline" className="text-caption px-1.5 py-0">
                 {filledCommon}/{Object.keys(COMMON_FIELDS).length}
               </Badge>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(COMMON_FIELDS).map(([key, label]) => (
                 <div key={key} className="space-y-1">
-                  <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                  <label className="text-caption font-medium text-muted-foreground uppercase">{label}</label>
                   <Input
                     disabled={readOnly}
                     value={specs.standardValues[key]?.toString() || ''}
@@ -404,14 +404,14 @@ export function TechnicalSpecsModal({
                     Datos {currentTemplate.label}
                   </h3>
                 </div>
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                <Badge variant="outline" className="text-caption px-1.5 py-0">
                   {filledSpecific}/{Object.keys(currentTemplate.fields).length}
                 </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(currentTemplate.fields).map(([key, label]) => (
                   <div key={key} className="space-y-1">
-                    <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                    <label className="text-caption font-medium text-muted-foreground uppercase">{label}</label>
                     <Input
                       disabled={readOnly}
                       value={specs.standardValues[key]?.toString() || ''}
@@ -432,7 +432,7 @@ export function TechnicalSpecsModal({
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
                 {filledCustom > 0 && (
-                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">{filledCustom}</Badge>
+                  <Badge variant="outline" className="text-caption px-1.5 py-0">{filledCustom}</Badge>
                 )}
               </div>
               {!readOnly && (

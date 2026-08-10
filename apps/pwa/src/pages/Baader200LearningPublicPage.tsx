@@ -169,16 +169,16 @@ export function Baader200LearningPublicPage() {
         style={{ height: visualFs ? '0' : '44px', overflow: 'hidden', background: 'linear-gradient(180deg, #0d1f3c 0%, #0a1628 100%)', transition: 'height .2s' }}>
         <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-blue-300 text-[11px] font-bold tracking-wide uppercase truncate">BAADER 200</span>
-          <span className="text-[#3a6a9a] text-[9px] truncate hidden xs:block">{selectedTitle || 'Manual de Ajustes'}</span>
+          <span className="text-blue-300 text-caption font-bold tracking-wide uppercase truncate">BAADER 200</span>
+          <span className="text-[#3a6a9a] text-caption truncate hidden xs:block">{selectedTitle || 'Manual de Ajustes'}</span>
         </div>
         <button onClick={toggleFullscreen}
-          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-lg border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0"
           title={(isFullscreen || visualFs) ? 'Salir' : 'Pantalla completa'}>
           {(isFullscreen || visualFs) ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
         </button>
         <button onClick={() => setQrOpen(true)}
-          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-lg border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0">
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0">
           <QrCode className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -189,7 +189,7 @@ export function Baader200LearningPublicPage() {
         <div className="flex items-center gap-1.5 px-2 h-full" style={{ minWidth: 'max-content' }}>
           {Object.entries(groups).map(([, secs]) => secs.length > 0 && secs.map(s => (
             <button key={s.id} onClick={() => switchSection(s.id)}
-              className="flex-shrink-0 rounded-lg text-[11px] transition-all whitespace-nowrap"
+              className="flex-shrink-0 rounded-card text-caption transition-all whitespace-nowrap"
               style={s.id === selected
                 ? { background: '#1a4a8a', color: '#7ec8ff', border: '1px solid #2a6abf', fontWeight: 700, padding: '6px 12px' }
                 : { background: 'transparent', color: '#4a7aaa', border: '1px solid #1e3a5f', padding: '6px 12px' }}>
@@ -208,13 +208,13 @@ export function Baader200LearningPublicPage() {
 
       {!visualFs && (
         <div className="flex-shrink-0 text-center flex-shrink-0" style={{ padding: '4px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}>
-          <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Solo lectura — No requiere login</p>
+          <p className="text-caption text-[#2a4a6a] tracking-wider">Solo lectura — No requiere login</p>
         </div>
       )}
 
       {visualFs && (
         <button onClick={() => setVisualFs(false)}
-          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-200"
+          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-card text-caption text-blue-200"
           style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}>
           <Minimize className="h-3 w-3" />
         </button>
@@ -222,16 +222,16 @@ export function Baader200LearningPublicPage() {
 
       {qrOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setQrOpen(false)}>
-          <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-card p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between w-full">
               <span className="text-blue-300 text-sm font-semibold">Compartir sección</span>
               <button onClick={() => setQrOpen(false)} className="text-[#3a5a7a] hover:text-blue-300"><X className="h-4 w-4" /></button>
             </div>
-            {selected && <p className="text-[11px] text-blue-400 text-center">{sections.find(s => s.id === selected)?.title}</p>}
-            <div className="bg-white p-3 rounded-lg"><QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} /></div>
+            {selected && <p className="text-caption text-blue-400 text-center">{sections.find(s => s.id === selected)?.title}</p>}
+            <div className="bg-white p-3 rounded-card"><QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} /></div>
             <div className="flex items-center gap-2 w-full">
-              <input readOnly value={learnUrl} className="flex-1 text-[10px] bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 text-blue-300 outline-none min-w-0" />
-              <button onClick={copyLink} className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#1a4a8a] text-blue-200 text-[10px] hover:bg-[#2a5a9a] transition-colors flex-shrink-0">
+              <input readOnly value={learnUrl} className="flex-1 text-caption bg-[#0a1628] border border-[#1e3a5f] rounded-ctl px-2 py-1.5 text-blue-300 outline-none min-w-0" />
+              <button onClick={copyLink} className="flex items-center gap-1 px-2.5 py-1.5 rounded-ctl bg-[#1a4a8a] text-blue-200 text-caption hover:bg-[#2a5a9a] transition-colors flex-shrink-0">
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copiado' : 'Copiar'}
               </button>

@@ -162,7 +162,7 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
       renderItems.push(
         <div
           key={`hdr-${e.category}`}
-          className={`text-caption uppercase tracking-wider mt-2 first:mt-0 ${CATEGORY_LABEL[e.category].color}`}
+          className={`text-caption tracking-wider mt-2 first:mt-0 ${CATEGORY_LABEL[e.category].color}`}
         >
           {CATEGORY_LABEL[e.category].label}
         </div>,

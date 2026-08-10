@@ -269,7 +269,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
               </div>
 
               {filteredUsers.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted">
+                <div className="text-center py-12 text-muted-foreground border rounded-card bg-muted">
                   No se encontraron usuarios
                 </div>
               ) : (
@@ -277,7 +277,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                   {filteredUsers.map((user) => (
                     <div 
                       key={user.id} 
-                      className="flex flex-col md:flex-row items-start md:items-center p-3 border rounded-lg hover:bg-muted/50 transition-colors gap-3"
+                      className="flex flex-col md:flex-row items-start md:items-center p-3 border rounded-card hover:bg-muted/50 transition-colors gap-3"
                     >
                       <div className="flex-1 font-medium min-w-[200px]">
                         {user.nombre} {user.apellido}

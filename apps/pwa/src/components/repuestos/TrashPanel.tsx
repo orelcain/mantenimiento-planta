@@ -184,14 +184,14 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.documentLabel}</p>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-ctl bg-muted text-[10px] font-medium">
+                    <div className="flex items-center gap-2 text-caption text-muted-foreground mt-0.5">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-ctl bg-muted text-caption font-medium">
                         {collectionLabel(item.originalCollection)}
                       </span>
                       <span>{item.deletedByName}</span>
                       <span>{formatRelativeDate(item.deletedAt)}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] mt-1">
+                    <div className="flex items-center gap-1 text-caption mt-1">
                       <Clock className="h-3 w-3" />
                       <span className={days <= 5 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                         {days === 0 ? 'Expira hoy' : `${days} días restantes`}

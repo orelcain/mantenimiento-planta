@@ -460,7 +460,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
+        <DialogContent className="max-w-4xl w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-card">
           <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
@@ -505,7 +505,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Datos IoT del equipo */}
             {incident.equipmentId && (
-              <div className="p-4 border rounded-lg bg-muted space-y-3">
+              <div className="p-4 border rounded-card bg-muted space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-primary" />
@@ -538,8 +538,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
                 {!iotLoading && !iotError && iotData && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div className="p-3 rounded border bg-background space-y-1">
-                      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground tracking-wide">
+                    <div className="p-3 rounded-ctl border bg-background space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground tracking-wide">
                         <Thermometer className="h-4 w-4" />
                         <span>Temperatura</span>
                       </div>
@@ -557,8 +557,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       )}
                     </div>
 
-                    <div className="p-3 rounded border bg-background space-y-1">
-                      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground tracking-wide">
+                    <div className="p-3 rounded-ctl border bg-background space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground tracking-wide">
                         <Droplets className="h-4 w-4" />
                         <span>Humedad</span>
                       </div>
@@ -593,7 +593,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       key={index}
                       src={foto}
                       alt={`Foto ${index + 1}`}
-                      className="aspect-square object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                      className="aspect-square object-cover rounded-ctl cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => setSelectedPhoto(foto)}
                     />
                   ))}
@@ -614,11 +614,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                   )}
                 </h4>
                 {mapLoading ? (
-                  <div className="h-40 flex items-center justify-center bg-muted rounded-lg">
+                  <div className="h-40 flex items-center justify-center bg-muted rounded-card">
                     <Spinner className="h-6 w-6" />
                   </div>
                 ) : (
-                  <div className="w-full aspect-square md:aspect-[4/3] max-h-[50vh] min-h-[300px] md:min-h-[400px] rounded-lg overflow-hidden border">
+                  <div className="w-full aspect-square md:aspect-[4/3] max-h-[50vh] min-h-[300px] md:min-h-[400px] rounded-card overflow-hidden border">
                   <MapViewer
                     imageUrl={mapVersion.imageUrl}
                     markers={[{
@@ -655,7 +655,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
                 {/* Usuario asignado */}
                 {assignedUser ? (
-                  <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="p-3 bg-primary/10 rounded-card border border-primary/20">
                     <div className="flex items-center gap-2 mb-1">
                       <User className="h-4 w-4 text-primary" />
                       <span className="font-medium text-primary">Asignado a:</span>
@@ -673,7 +673,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </div>
                   </div>
                 ) : incident.status === 'confirmada' && permissions.canAssignIncident && (
-                  <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
+                  <div className="p-3 bg-warning/10 rounded-card border border-warning/20">
                     <div className="flex items-center gap-2 text-warning">
                       <AlertTriangle className="h-4 w-4" />
                       <span className="text-sm font-medium">Sin asignar</span>
@@ -685,7 +685,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Motivo de rechazo */}
             {incident.status === 'rechazada' && incident.rejectionReason && (
-              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <div className="p-4 bg-destructive/10 rounded-card border border-destructive/20">
                 <h4 className="font-medium text-destructive mb-2">
                   Motivo de rechazo
                 </h4>
@@ -695,7 +695,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Resolución */}
             {(incident.status === 'resuelta' || incident.status === 'cerrada') && incident.resolucion && (
-              <div className="p-4 bg-success/10 rounded-lg border border-success/20">
+              <div className="p-4 bg-success/10 rounded-card border border-success/20">
                 <h4 className="font-medium text-success mb-2">
                   {incident.status === 'resuelta' ? 'Resolución (Por Validar)' : 'Resolución'}
                 </h4>
@@ -723,7 +723,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Formulario de rechazo */}
             {showRejectForm && (
-              <div className="p-4 bg-muted rounded-lg space-y-4">
+              <div className="p-4 bg-muted rounded-card space-y-4">
                 <h4 className="font-medium">Rechazar incidencia</h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -777,7 +777,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Formulario de resolución (Técnico) */}
             {showResolveForm && (
-              <div className="p-4 bg-muted rounded-lg space-y-4">
+              <div className="p-4 bg-muted rounded-card space-y-4">
                 <h4 className="font-medium">Resolver incidencia</h4>
                 <div className="space-y-2">
                    <div className="flex items-center justify-between">
@@ -831,7 +831,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Formulario de cierre (Admin/Supervisor) */}
             {showCloseForm && (
-              <div className="p-4 bg-muted rounded-lg space-y-4">
+              <div className="p-4 bg-muted rounded-card space-y-4">
                 <h4 className="font-medium">Cerrar incidencia (Validación Final)</h4>
                 <div className="space-y-2">
                    <div className="flex items-center justify-between">
@@ -885,7 +885,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
             {/* Formulario de asignación */}
             {showAssignForm && (
-              <div className="p-4 bg-muted rounded-lg space-y-4">
+              <div className="p-4 bg-muted rounded-card space-y-4">
                 <h4 className="font-medium">Asignar técnico</h4>
                 <div className="space-y-2">
                   <Label htmlFor="technician">Técnico responsable *</Label>

@@ -282,7 +282,7 @@ function UmbrellaCauseRow({
       </div>
       {expanded && hasPieces && (
         <div className="px-3 pb-3 pt-1 bg-muted/20 border-t space-y-2">
-          <p className="text-caption uppercase tracking-wider text-muted-foreground font-semibold">
+          <p className="text-caption tracking-wider text-muted-foreground font-semibold">
             Desglose — análisis nuestro con config gates
           </p>
           <div className="space-y-1">
@@ -409,7 +409,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
           <>
             {/* ─── Vista Matrix oficial — 4 filas, paraguas expandible ─ */}
             <section>
-              <h3 className="text-caption font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+              <h3 className="text-caption font-semibold text-muted-foreground tracking-wider mb-2 flex items-center gap-2">
                 <span>{sectionTitle}</span>
                 <span className="h-px flex-1 bg-border" />
                 <span className="text-caption font-normal normal-case tracking-normal">{sectionSubtitle}</span>

@@ -82,7 +82,7 @@ function ChangeSummary({ before, after }: { before?: Record<string, unknown>; af
   return (
     <div className="mt-1 space-y-0.5">
       {changedKeys.slice(0, 3).map(key => (
-        <div key={key} className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <div key={key} className="text-caption text-muted-foreground flex items-center gap-1">
           <span className="font-medium text-foreground/70">{key}:</span>
           <span className="line-through text-red-400 truncate max-w-[80px]" title={String(before[key] ?? '')}>
             {String(before[key] ?? '').slice(0, 30)}
@@ -94,7 +94,7 @@ function ChangeSummary({ before, after }: { before?: Record<string, unknown>; af
         </div>
       ))}
       {changedKeys.length > 3 && (
-        <span className="text-[10px] text-muted-foreground">+{changedKeys.length - 3} más</span>
+        <span className="text-caption text-muted-foreground">+{changedKeys.length - 3} más</span>
       )}
     </div>
   )
@@ -169,7 +169,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
           {filterAction && (
             <button
               onClick={() => setFilterAction('')}
-              className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-muted text-muted-foreground hover:bg-muted/80"
+              className="text-caption px-1.5 py-0.5 rounded-ctl bg-muted text-muted-foreground hover:bg-muted/80"
             >
               {ACTION_CONFIG[filterAction].label} &times;
             </button>
@@ -186,7 +186,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                   key={action}
                   onClick={() => setFilterAction(isActive ? '' : action)}
                   className={[
-                    'flex items-center gap-1 px-2 py-1 rounded-ctl text-[11px] font-medium transition-colors border',
+                    'flex items-center gap-1 px-2 py-1 rounded-ctl text-caption font-medium transition-colors border',
                     isActive
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-transparent bg-muted text-muted-foreground hover:bg-muted',
@@ -225,11 +225,11 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-xs font-medium truncate" title={entry.documentLabel}>{entry.documentLabel}</span>
-                      <span className="text-[10px] px-1 py-0.5 rounded-ctl bg-muted text-muted-foreground shrink-0">
+                      <span className="text-caption px-1 py-0.5 rounded-ctl bg-muted text-muted-foreground shrink-0">
                         {collectionLabel(entry.collection)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
+                    <div className="flex items-center gap-1.5 text-caption text-muted-foreground mt-0.5">
                       <span className={`font-medium ${cfg.color}`}>{cfg.label}</span>
                       <span>por {entry.userName || 'Sistema'}</span>
                       <span>&middot;</span>
@@ -239,7 +239,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                       <ChangeSummary before={entry.before} after={entry.after} />
                     )}
                     {entry.action === 'relocate' && entry.metadata && (
-                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                      <div className="text-caption text-muted-foreground mt-0.5">
                         De <span className="font-medium">{entry.metadata.sourceMachineId}</span>
                         {' '}&rarr;{' '}
                         <span className="font-medium">{entry.metadata.targetMachineId}</span>

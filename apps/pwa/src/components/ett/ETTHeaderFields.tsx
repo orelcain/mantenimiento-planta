@@ -77,7 +77,7 @@ function DateField({
         type="date"
         value={formatDateForInput(value)}
         onChange={(e) => onChange(parseDateFromInput(e.target.value))}
-        className="w-full bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-yellow-400"
+        className="w-full bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-ctl px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-yellow-400"
         title={formatDateDisplay(value) || 'Click para seleccionar fecha'}
       />
     </div>
@@ -93,7 +93,7 @@ export function ETTHeaderFields({ cabecera, onChange }: ETTHeaderFieldsProps) {
   }
 
   return (
-    <div className="border border-blue-300 rounded overflow-hidden bg-white">
+    <div className="border border-blue-300 rounded-ctl overflow-hidden bg-white">
       <Row label="FECHA REQUERIMIENTO">
         <DateField
           value={cabecera.fecha_requerimiento}

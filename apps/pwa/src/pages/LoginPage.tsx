@@ -242,7 +242,7 @@ export function LoginPage() {
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     required
                     disabled={isLoading}
-                    className="uppercase tracking-widest"
+                    className="tracking-widest"
                   />
                   {validationErrors.inviteCode && (
                     <p className="text-sm text-destructive">{validationErrors.inviteCode}</p>
@@ -300,7 +300,7 @@ export function LoginPage() {
             )}
 
             {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">
+              <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-ctl">
                 {error}
               </div>
             )}

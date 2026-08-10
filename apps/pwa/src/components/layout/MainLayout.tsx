@@ -558,7 +558,7 @@ export function MainLayout() {
                 <div key={group.id}>
                   <button
                     onClick={() => toggleGroup(group.id)}
-                    className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
+                    className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                   >
                     <span>{group.label}</span>
                     <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
@@ -717,7 +717,7 @@ export function MainLayout() {
                     <div key={group.id}>
                       <button
                         onClick={() => toggleGroup(group.id)}
-                        className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
+                        className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                       >
                         <span>{group.label}</span>
                         <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />

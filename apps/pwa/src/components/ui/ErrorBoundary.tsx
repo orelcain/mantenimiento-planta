@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
             La aplicación ha encontrado un error inesperado al renderizar.
           </p>
 
-          <div className="bg-muted p-4 rounded text-xs font-mono text-left w-full max-w-lg overflow-auto max-h-48 border border-border">
+          <div className="bg-muted p-4 rounded-ctl text-xs font-mono text-left w-full max-w-lg overflow-auto max-h-48 border border-border">
             {this.state.error?.message || this.state.error?.toString()}
           </div>
 

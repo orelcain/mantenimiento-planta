@@ -54,7 +54,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
         >
           <img src={mainPhoto} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-110" loading="lazy" />
           {photos.length > 1 && (
-            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8px] font-bold text-white">+{photos.length - 1}</span>
+            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-caption font-bold text-white">+{photos.length - 1}</span>
           )}
         </button>
       ) : (
@@ -124,7 +124,7 @@ export function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
               )}
               {isAdmin && (
                 <button onClick={() => handleDelete(photos[lightbox.idx]!)}
-                  className="ml-2 h-8 rounded-card bg-red-500/[0.15] px-3 text-[10px] font-medium text-ink-crit transition-colors hover:bg-red-500/[0.15]">
+                  className="ml-2 h-8 rounded-card bg-red-500/[0.15] px-3 text-caption font-medium text-ink-crit transition-colors hover:bg-red-500/[0.15]">
                   Eliminar
                 </button>
               )}

@@ -214,29 +214,29 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
       <CardContent className="flex-1 min-h-[300px] relative">
         {visibleStats && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-            <div className="rounded-md border p-2 bg-muted">
-              <div className="text-[10px] text-muted-foreground">Temperatura actual</div>
+            <div className="rounded-ctl border p-2 bg-muted">
+              <div className="text-caption text-muted-foreground">Temperatura actual</div>
               <div className="text-sm font-semibold">{visibleStats.temp.latest.toFixed(1)} °C</div>
             </div>
-            <div className="rounded-md border p-2 bg-muted">
-              <div className="text-[10px] text-muted-foreground">Humedad actual</div>
+            <div className="rounded-ctl border p-2 bg-muted">
+              <div className="text-caption text-muted-foreground">Humedad actual</div>
               <div className="text-sm font-semibold">{visibleStats.hum.latest.toFixed(1)} %</div>
             </div>
-            <div className="rounded-md border p-2 bg-muted">
-              <div className="text-[10px] text-muted-foreground">Temp promedio / min-max</div>
+            <div className="rounded-ctl border p-2 bg-muted">
+              <div className="text-caption text-muted-foreground">Temp promedio / min-max</div>
               <div className="text-sm font-semibold">
                 {visibleStats.temp.avg.toFixed(1)} °C
                 <span className="text-xs text-muted-foreground"> · {visibleStats.temp.min.toFixed(1)}-{visibleStats.temp.max.toFixed(1)}</span>
               </div>
             </div>
-            <div className="rounded-md border p-2 bg-muted">
-              <div className="text-[10px] text-muted-foreground">Hum promedio / min-max</div>
+            <div className="rounded-ctl border p-2 bg-muted">
+              <div className="text-caption text-muted-foreground">Hum promedio / min-max</div>
               <div className="text-sm font-semibold">
                 {visibleStats.hum.avg.toFixed(1)} %
                 <span className="text-xs text-muted-foreground"> · {visibleStats.hum.min.toFixed(1)}-{visibleStats.hum.max.toFixed(1)}</span>
               </div>
             </div>
-            <div className="col-span-2 lg:col-span-4 text-[10px] text-muted-foreground">
+            <div className="col-span-2 lg:col-span-4 text-caption text-muted-foreground">
               Última lectura: {new Date(visibleStats.latestAt).toLocaleString('es-CL')}
             </div>
           </div>

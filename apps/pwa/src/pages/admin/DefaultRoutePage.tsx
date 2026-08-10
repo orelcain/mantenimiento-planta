@@ -99,14 +99,14 @@ export function DefaultRoutePage() {
           Página de inicio por defecto
         </h1>
         <p className="text-sm text-muted-foreground">
-          Cuando un usuario navega a <code className="text-xs px-1 py-0.5 rounded bg-muted">/</code>,
+          Cuando un usuario navega a <code className="text-xs px-1 py-0.5 rounded-ctl bg-muted">/</code>,
           la app redirige automáticamente al módulo elegido acá. Aplica a TODOS
           los usuarios (no por dispositivo).
         </p>
       </div>
 
-      <Card className="border-emerald-500/20 bg-emerald-500/15">
-        <CardContent className="p-3 flex items-start gap-2 text-xs text-emerald-800 dark:text-emerald-300">
+      <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
+        <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-ok">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             Actualmente: <b>{savedOption?.label ?? savedPath}</b>
@@ -127,7 +127,7 @@ export function DefaultRoutePage() {
             return (
               <label
                 key={opt.path}
-                className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-muted/30 rounded -mx-2 px-2 transition-colors"
+                className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-muted/30 rounded-ctl -mx-2 px-2 transition-colors"
               >
                 <input
                   type="radio"
@@ -141,7 +141,7 @@ export function DefaultRoutePage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{opt.label}</div>
                   <div className="text-xs text-muted-foreground">{opt.description}</div>
-                  <div className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">{opt.path}</div>
+                  <div className="text-caption text-muted-foreground/60 mt-0.5 font-mono">{opt.path}</div>
                 </div>
               </label>
             )

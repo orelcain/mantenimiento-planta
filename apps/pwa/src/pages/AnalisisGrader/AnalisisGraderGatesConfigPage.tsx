@@ -582,7 +582,7 @@ export function AnalisisGraderGatesConfigPage({
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Umbrales de alerta</h3>
+            <h3 className="text-xs font-semibold tracking-wider text-muted-foreground">Umbrales de alerta</h3>
             {shiftDocId && (
               <div className="flex items-center gap-2">
                 {hasShiftThresholdsOverride ? (
@@ -727,7 +727,7 @@ export function AnalisisGraderGatesConfigPage({
           <div className="border-t border-zinc-800 my-5" />
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Horarios de turnos</h3>
+              <h3 className="text-xs font-semibold tracking-wider text-muted-foreground">Horarios de turnos</h3>
               {isScheduleDirty && (
                 <span className="text-caption text-amber-400 font-medium">● sin guardar</span>
               )}
@@ -878,7 +878,7 @@ export function AnalisisGraderGatesConfigPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border/60 text-left text-xs tracking-wider text-muted-foreground">
                   <th className="py-2.5 px-2 w-16">Gate</th>
                   <th className="py-2.5 px-2">Calibre</th>
                   <th className="py-2.5 px-2 text-center">Rango (g)</th>
