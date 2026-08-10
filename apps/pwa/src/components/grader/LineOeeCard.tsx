@@ -101,7 +101,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             iconSize={11}
             position="top"
           />
-          {areaLabel && <span className="text-[10px] font-normal text-muted-foreground">· {areaLabel} · este mes</span>}
+          {areaLabel && <span className="text-caption font-normal text-muted-foreground">· {areaLabel} · este mes</span>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -116,17 +116,17 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             {/* OEE Baader → línea */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-muted rounded-card px-3 py-2 border border-border">
-                <div className="text-[10px] text-muted-foreground mb-0.5">
+                <div className="text-caption text-muted-foreground mb-0.5">
                   OEE de la máquina{machineLabel ? ` · ${machineLabel}` : ''}
                 </div>
                 <div className={cn('text-xl font-bold tabular-nums', oeeColor(calc.oeeMachine))}>{pct(calc.oeeMachine)}</div>
               </div>
               <div className="bg-primary/[0.15] rounded-card px-3 py-2 border border-primary/[0.25]">
-                <div className="text-[10px] text-sky-800/90 dark:text-sky-300/80 mb-0.5 flex items-center gap-1 flex-wrap">
+                <div className="text-caption text-sky-800/90 dark:text-sky-300/80 mb-0.5 flex items-center gap-1 flex-wrap">
                   OEE del área (estimado)
                   {calc.sinCalidad && (
                     <span
-                      className="text-[9px] px-1 rounded-ctl bg-muted-foreground/15 text-muted-foreground"
+                      className="text-caption px-1 rounded-ctl bg-muted-foreground/15 text-muted-foreground"
                       title="El área no tiene medición de calidad (no pasa por Grader): el OEE mostrado es Disponibilidad × Rendimiento. No se asume calidad 100%."
                     >
                       A×R
@@ -138,7 +138,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             </div>
 
             {/* Explicación del ajuste */}
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
+            <p className="text-caption text-muted-foreground leading-relaxed">
               {calc.etapaMin > 0
                 ? <>Área = la máquina penalizada por <b className="text-cat-5-ink">{fmtDur(calc.etapaMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
                 : <>Todavía no registraste paros de etapa → el OEE del área es el de la máquina. Registrá abajo los paros de las etapas sin sensor (la GEA, cintas) y este número se separa.</>}
@@ -147,7 +147,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             {/* Pareto unificado de pérdidas de la línea */}
             {calc.perdidas.length > 0 && (
               <div className="space-y-1.5 pt-1 border-t border-border/40">
-                <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+                <p className="text-caption font-medium text-muted-foreground flex items-center gap-1.5">
                   <BarChart3 className="h-3.5 w-3.5" /> Dónde pierde tiempo el área · este mes
                   <span className="text-muted-foreground/60">({fmtDur(calc.perdidasTotal)} total)</span>
                 </p>
@@ -155,11 +155,11 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                   const w = calc.perdidas[0]!.min > 0 ? (p.min / calc.perdidas[0]!.min) * 100 : 0
                   return (
                     <div key={p.label} className="space-y-0.5">
-                      <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center justify-between text-caption">
                         <span className={cn('font-medium flex items-center gap-1.5 min-w-0', i === 0 ? 'text-cat-5-ink' : 'text-foreground')}>
                           <span className="truncate">{i + 1}. {p.label}</span>
                           <span
-                            className="text-[9px] px-1 rounded-ctl bg-muted-foreground/12 text-muted-foreground shrink-0"
+                            className="text-caption px-1 rounded-ctl bg-muted-foreground/12 text-muted-foreground shrink-0"
                             title={p.fuente === 'maquina'
                               ? 'Paro de la máquina instrumentada (lo midió el sensor)'
                               : 'Paro de una etapa sin sensor (registrado a mano)'}
@@ -178,7 +178,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
               </div>
             )}
 
-            <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground/70">
+            <div className="flex items-start gap-1.5 text-caption text-muted-foreground/70">
               <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
               <span>
                 Estimado. El rendimiento es el de la máquina instrumentada{calc.sinCalidad ? ' y el área no tiene medición de calidad' : ' y la calidad viene del Grader'}; las demás etapas entran a la disponibilidad vía sus paros registrados. Mejora al instrumentar o registrar más.

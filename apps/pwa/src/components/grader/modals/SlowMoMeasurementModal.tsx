@@ -109,7 +109,7 @@ export function SlowMoMeasurementModal({
         </DialogHeader>
 
         {/* Guía breve del procedimiento */}
-        <div className="bg-muted rounded-ctl p-2 text-[11px] text-muted-foreground space-y-0.5">
+        <div className="bg-muted rounded-ctl p-2 text-caption text-muted-foreground space-y-0.5">
           <div className="font-medium text-foreground">Procedimiento:</div>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Z2 → Servicio → Probar salidas → gate {gateNumber} [<span className="font-mono">8620</span>]</li>
@@ -134,7 +134,7 @@ export function SlowMoMeasurementModal({
                   type="button"
                   onClick={() => setPhase(opt.v)}
                   className={cn(
-                    'rounded-ctl border text-[10px] px-1.5 py-1 text-left',
+                    'rounded-ctl border text-caption px-1.5 py-1 text-left',
                     phase === opt.v ? 'border-primary bg-primary/5 text-primary' : 'border-muted hover:bg-muted/30',
                   )}
                 >
@@ -180,12 +180,12 @@ export function SlowMoMeasurementModal({
                 <span className="font-mono font-semibold text-primary">{seconds.toFixed(3)} s</span>
               </div>
               {deltaMs !== null && (
-                <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center justify-between text-caption">
                   <span className="text-muted-foreground">Δ vs actual:</span>
                   <Badge
                     variant="outline"
                     className={cn(
-                      'text-[10px] font-mono',
+                      'text-caption font-mono',
                       Math.abs(deltaMs) < 50 ? 'border-green-500/[0.25] text-ink-ok' :
                       Math.abs(deltaMs) < 150 ? 'border-amber-500/[0.25] text-ink-warn' :
                       'border-red-500/[0.25] text-ink-crit',
@@ -217,11 +217,11 @@ export function SlowMoMeasurementModal({
                 onChange={(e) => setApplyToConfig(e.target.checked)}
                 className="rounded-ctl"
               />
-              Aplicar como <code className="font-mono text-[10px]">flipperMechanicalResetS</code>
+              Aplicar como <code className="font-mono text-caption">flipperMechanicalResetS</code>
             </label>
           )}
           {phase !== 'fullCycle' && (
-            <p className="text-[10px] text-muted-foreground italic">
+            <p className="text-caption text-muted-foreground italic">
               Sólo el ciclo completo se puede aplicar como reset mecánico. Fases parciales quedan guardadas como referencia histórica.
             </p>
           )}

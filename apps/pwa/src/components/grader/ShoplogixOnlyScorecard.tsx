@@ -180,7 +180,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 : pct >= 75 ? 'text-ink-warn'
                 : 'text-cat-5-ink'
               return (
-                <div className="text-[11px] mt-1 flex items-center gap-1 flex-wrap">
+                <div className="text-caption mt-1 flex items-center gap-1 flex-wrap">
                   <span className={cn('font-semibold tabular-nums', cls)}>{pct.toFixed(0)}%</span>
                   <span className="text-muted-foreground">
                     de {plannedTargetPieces.toLocaleString('es-CL')} planificadas
@@ -299,7 +299,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                 return (
                   <div key={m.machineid} className={cn('rounded-ctl border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
                     <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="text-[11px] text-muted-foreground truncate" title={shortMachineName(m.machineName)}>
+                      <div className="text-caption text-muted-foreground truncate" title={shortMachineName(m.machineName)}>
                         <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>
                         <span className="sm:hidden">{shortLabel}</span>
                       </div>
@@ -307,7 +307,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                           (no solo si estuvo prendida — también si rindió al ritmo
                           esperado). Pedido Orel 2026-07-23. */}
                       <span
-                        className={cn('flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide shrink-0', vStyle.text)}
+                        className={cn('flex items-center gap-1 text-caption font-semibold uppercase tracking-wide shrink-0', vStyle.text)}
                         title="Combina disponibilidad (uptime) y ritmo vs objetivo — manda el peor de los dos."
                       >
                         <span className={cn('w-1.5 h-1.5 rounded-full', vStyle.dot)} />
@@ -316,13 +316,13 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                     </div>
                     <div className="text-base font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}
-                      <span className="text-[10px] text-muted-foreground font-normal ml-1">
+                      <span className="text-caption text-muted-foreground font-normal ml-1">
                         ({sharePct.toFixed(0)}%)
                       </span>
                     </div>
                     <div className="mt-1.5 space-y-1">
                       <div>
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex items-center justify-between text-caption">
                           <span className="text-muted-foreground">uptime</span>
                           <span className={cn('font-semibold tabular-nums', uptimeTextColor(uptimePct))}>
                             {uptimePct.toFixed(0)}%
@@ -334,7 +334,7 @@ No es el target de cadencia del sensor: ese mide velocidad instantánea, este mi
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex items-center justify-between text-caption">
                           <span className="text-muted-foreground" title="Ciclos reales vs objetivo Shoplogix para este turno">ritmo vs objetivo</span>
                           <span className={cn('font-semibold tabular-nums', ratioPct >= 85 ? 'text-emerald-400' : ratioPct >= 50 ? 'text-amber-400' : 'text-red-400')}>
                             {ratioPct.toFixed(0)}%

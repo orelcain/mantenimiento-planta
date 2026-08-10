@@ -99,11 +99,11 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-sm text-foreground">{state.name}</span>
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
+              <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-border text-muted-foreground">
                 {TYPE_LABEL[state.type] ?? state.type}
               </Badge>
               {state.isCurrent && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-800 dark:border-emerald-900 dark:bg-emerald-500/[0.15] dark:text-emerald-300">
+                <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-800 dark:border-emerald-900 dark:bg-emerald-500/[0.15] dark:text-emerald-300">
                   En curso
                 </Badge>
               )}

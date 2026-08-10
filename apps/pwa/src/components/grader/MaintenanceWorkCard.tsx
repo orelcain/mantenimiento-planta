@@ -28,9 +28,9 @@ function Kpi({ label, value, sub, icon, valueColor }: {
 }) {
   return (
     <div className="rounded-card border border-border bg-muted px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">{icon}{label}</div>
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-1">{icon}{label}</div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
-      <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
+      <div className="text-caption text-muted-foreground/60 mt-1">{sub}</div>
     </div>
   )
 }
@@ -67,7 +67,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
         <CardTitle className="text-sm flex items-center gap-2 min-w-0">
           <Wrench className="w-4 h-4 shrink-0 text-sky-500" />
           <span className="truncate">Trabajo de Mantención (TPM)</span>
-          <span className="text-[11px] font-normal text-muted-foreground ml-1 hidden sm:inline">
+          <span className="text-caption font-normal text-muted-foreground ml-1 hidden sm:inline">
             del correctivo a la prevención
           </span>
         </CardTitle>
@@ -127,7 +127,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
               />
             </div>
 
-            <p className="text-[11px] text-muted-foreground/70 leading-snug">
+            <p className="text-caption text-muted-foreground/70 leading-snug">
               TPM: el valor no está en apagar incendios sino en convertir cada falla en prevención
               (causa raíz → preventiva/predicción) para que el equipo no vuelva a fallar y la producción se afine.
             </p>

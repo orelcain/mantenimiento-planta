@@ -742,7 +742,7 @@ export function AnalisisGraderWizardPage() {
                     {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                   </span>
                 </p>
-                <p className="text-[11px] text-sky-800/90 dark:text-sky-300/70 mt-0.5">
+                <p className="text-caption text-sky-800/90 dark:text-sky-300/70 mt-0.5">
                   Se guardará en <b>{lineConfig.label}</b>
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>
@@ -786,7 +786,7 @@ export function AnalisisGraderWizardPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm text-ink-crit font-medium">No se pudo guardar el turno</p>
               <p className="text-xs text-red-700/90 dark:text-red-200/80 mt-0.5 break-words">{saveError}</p>
-              <p className="text-[11px] text-red-700/70 dark:text-red-200/60 mt-1">
+              <p className="text-caption text-red-700/70 dark:text-red-200/60 mt-1">
                 El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
               </p>
             </div>
@@ -836,7 +836,7 @@ export function AnalisisGraderWizardPage() {
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-primary/[0.15] transition-colors rounded-card"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-caption text-blue-700/90 dark:text-blue-300/80 hover:bg-primary/[0.15] transition-colors rounded-card"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />
@@ -844,7 +844,7 @@ export function AnalisisGraderWizardPage() {
                   Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
                 </span>
                 {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-medium">
+                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-medium">
                     {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
                   </span>
                 )}

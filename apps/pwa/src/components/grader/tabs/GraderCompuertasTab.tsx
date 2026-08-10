@@ -115,10 +115,10 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         Demanda {gb.demandPct}% — {gb.gatesAssigned}/{gb.idealGates} gate(s)
                       </span>
                       {gb.gap > 0 && (
-                        <Badge variant="destructive" className="text-[10px]">-{gb.gap} gate(s)</Badge>
+                        <Badge variant="destructive" className="text-caption">-{gb.gap} gate(s)</Badge>
                       )}
                       {gb.gap < 0 && (
-                        <Badge variant="outline" className="text-[10px] text-ink-ok border-emerald-300">
+                        <Badge variant="outline" className="text-caption text-ink-ok border-emerald-300">
                           +{-gb.gap} extra
                         </Badge>
                       )}
@@ -241,7 +241,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       </td>
                       <td className="py-2 px-2 text-right">{gs.utilizationPct.toFixed(1)}%</td>
                       <td className="py-2 px-2">
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-caption">
                           {gs.assignedCalibre}
                         </Badge>
                       </td>
@@ -321,7 +321,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <label className="text-caption text-muted-foreground flex items-center gap-1">
                   Margen OK (s) <InfoTooltip {...getTooltipProps('threshold.timingOk')} iconSize={10} />
                 </label>
                 <input type="number" step="0.05" min="0.1" max="2"
@@ -331,7 +331,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 />
               </div>
               <div>
-                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <label className="text-caption text-muted-foreground flex items-center gap-1">
                   Margen Warn (s) <InfoTooltip {...getTooltipProps('threshold.timingWarn')} iconSize={10} />
                 </label>
                 <input type="number" step="0.05" min="0" max="1"
@@ -341,7 +341,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 />
               </div>
               <div>
-                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <label className="text-caption text-muted-foreground flex items-center gap-1">
                   Sobrecarga Warn (%) <InfoTooltip {...getTooltipProps('threshold.overloadWarn')} iconSize={10} />
                 </label>
                 <input type="number" step="5" min="10" max="80"
@@ -351,7 +351,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 />
               </div>
               <div>
-                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <label className="text-caption text-muted-foreground flex items-center gap-1">
                   Sobrecarga Critical (%) <InfoTooltip {...getTooltipProps('threshold.overloadCritical')} iconSize={10} />
                 </label>
                 <input type="number" step="5" min="20" max="100"
@@ -455,7 +455,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                           {t.marginSec >= 0 ? '+' : ''}{(t.marginSec * 1000).toFixed(0)}ms
                         </td>
                         <td className="py-2 px-2 text-center">
-                          <Badge variant="outline" className={cn('text-[10px]', color, 'border-current')}>
+                          <Badge variant="outline" className={cn('text-caption', color, 'border-current')}>
                             {label}
                           </Badge>
                         </td>
@@ -465,7 +465,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-4 mt-3 text-caption text-muted-foreground flex-wrap">
               <span>Sorting Belt: {timingSignals[0]?.beltSpeedMps.toFixed(2)} m/s</span>
               {timingSignals[0]?.pneumaticBreakdown ? (
                 <>
@@ -530,11 +530,11 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       </td>
                       <td className="py-2 px-2">
                         {o.currentCalibre ? (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-caption">
                             {o.currentCalibre}
                           </Badge>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">—</span>
+                          <span className="text-caption text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -542,7 +542,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                           <Badge
                             variant="outline"
                             className={cn(
-                              'text-[10px]',
+                              'text-caption',
                               o.isMatch
                                 ? 'border-emerald-500/[0.25] text-ink-ok'
                                 : 'border-cat-6-tint/[0.25] text-cat-6-ink',
@@ -551,7 +551,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                             {o.suggestedCalibre}
                           </Badge>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground italic">desactivar</span>
+                          <span className="text-caption text-muted-foreground italic">desactivar</span>
                         )}
                       </td>
                       <td className="py-2 px-2 text-center">
@@ -560,10 +560,10 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         ) : o.suggestedCalibre != null ? (
                           <XCircle className="h-3.5 w-3.5 text-purple-500 inline" />
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">—</span>
+                          <span className="text-caption text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="py-2 px-2 text-[11px] text-muted-foreground">{o.reason}</td>
+                      <td className="py-2 px-2 text-caption text-muted-foreground">{o.reason}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -574,7 +574,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                 (o) => !o.isMatch && o.suggestedCalibre != null,
               ).length
               return (
-                <p className="text-[10px] text-muted-foreground mt-3">
+                <p className="text-caption text-muted-foreground mt-3">
                   {mismatchCount === 0
                     ? '✓ Todas las gates coinciden con la asignación óptima sugerida.'
                     : `${mismatchCount} gate${mismatchCount !== 1 ? 's' : ''} con asignación sub-óptima — revisar razón y validar con el operador antes de aplicar.`}

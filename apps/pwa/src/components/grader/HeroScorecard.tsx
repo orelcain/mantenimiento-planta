@@ -96,13 +96,13 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             {summary.pointZeroPct.toFixed(1)}%
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="text-caption uppercase tracking-wider text-muted-foreground">
               P0 · Punto Cero
             </div>
             <div className="text-xs font-medium">{style.label}</div>
             {shiftWindow.status === 'live' && shiftWindow.progressPct != null && (
               <div className="mt-2 w-24">
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                <div className="flex items-center justify-between text-caption text-muted-foreground mb-0.5">
                   <span>Progreso</span>
                   <span className="tabular-nums">{shiftWindow.progressPct.toFixed(0)}%</span>
                 </div>
@@ -120,7 +120,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
         {/* Columna 2 — Shoplogix EN VIVO (auto) */}
         {upstreamSnapshot && baaderTotal > 0 ? (
           <div className="md:border-r md:pr-4 flex flex-col gap-2 min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
               <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
               <span className="text-emerald-400 font-semibold">Shoplogix</span>
               <span className="text-muted-foreground">· en vivo</span>
@@ -148,11 +148,11 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
                     <div className="text-sm font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}
                     </div>
-                    <div className="text-[10px] text-muted-foreground truncate">
+                    <div className="text-caption text-muted-foreground truncate">
                       {/* Mismo nombre que el gráfico y la cascada: "Baader N". */}
                       {shortMachineName(m.machineName)}
                     </div>
-                    <div className="text-[10px] text-muted-foreground/70 tabular-nums">
+                    <div className="text-caption text-muted-foreground/70 tabular-nums">
                       {uptimePct}% uptime
                     </div>
                   </div>
@@ -162,7 +162,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
           </div>
         ) : (
           <div className="md:border-r md:pr-4 flex flex-col gap-2 text-xs text-muted-foreground/70">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
               <Radio className="w-3 h-3" />
               <span>Shoplogix</span>
               <span>· sin datos</span>
@@ -173,7 +173,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
 
         {/* Columna 3 — Grader subido (manual) */}
         <div className="flex flex-col gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider">
             <FileSpreadsheet className="w-3 h-3 text-sky-400" />
             <span className="text-sky-400 font-semibold">Grader</span>
             <span className="text-muted-foreground">· subido</span>
@@ -194,7 +194,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               title="Throughput promedio: piezas ÷ minutos productivos (excluye colación y paros)."
             >
               <div className="text-sm font-semibold tabular-nums">{throughputPerMin}</div>
-              <div className="text-[10px] text-muted-foreground">pz/min</div>
+              <div className="text-caption text-muted-foreground">pz/min</div>
             </div>
             <div
               className="text-center cursor-help"
@@ -203,7 +203,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               <div className="text-sm font-semibold tabular-nums">
                 {summary.totalWeightKg != null ? Math.round(summary.totalWeightKg).toLocaleString('es-CL') : '—'}
               </div>
-              <div className="text-[10px] text-muted-foreground">kg</div>
+              <div className="text-caption text-muted-foreground">kg</div>
             </div>
             <div
               className="text-center cursor-help"
@@ -212,7 +212,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               <div className="text-sm font-semibold tabular-nums text-amber-400">
                 {summary.pointZeroPieces.toLocaleString('es-CL')}
               </div>
-              <div className="text-[10px] text-muted-foreground">P0 piezas</div>
+              <div className="text-caption text-muted-foreground">P0 piezas</div>
             </div>
           </div>
         </div>
@@ -229,8 +229,8 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
           deja de parecer un descuadre entre fuentes. */}
       {baaderTotal > 0 && upstreamSnapshot && manualLine != null && (
         <div className="px-4 py-2 border-t bg-muted space-y-1">
-          <div className="flex items-baseline gap-2 text-[11px]">
-            <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
+          <div className="flex items-baseline gap-2 text-caption">
+            <span className="text-muted-foreground uppercase tracking-wider text-caption">
               Composición
             </span>
             <span className="ml-auto tabular-nums text-muted-foreground">
@@ -251,7 +251,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             />
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+          <div className="flex items-center gap-3 flex-wrap text-caption">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-[2px] bg-primary/[0.15]" />
               <span className="text-muted-foreground">Baader</span>

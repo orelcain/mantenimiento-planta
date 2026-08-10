@@ -75,12 +75,12 @@ function KpiCard({
 }) {
   return (
     <div className="rounded-card border border-border bg-muted px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-1">
         {icon}
         {label}
       </div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
-      <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
+      <div className="text-caption text-muted-foreground/60 mt-1">{sub}</div>
     </div>
   )
 }
@@ -142,7 +142,7 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
 
   if (entries.length === 0) {
     return (
-      <p className="mt-2 text-[11px] text-muted-foreground/60">
+      <p className="mt-2 text-caption text-muted-foreground/60">
         Todas las pausas están sin clasificar o los datos aún no se han cargado.
       </p>
     )
@@ -162,7 +162,7 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
       renderItems.push(
         <div
           key={`hdr-${e.category}`}
-          className={`text-[10px] uppercase tracking-wider mt-2 first:mt-0 ${CATEGORY_LABEL[e.category].color}`}
+          className={`text-caption uppercase tracking-wider mt-2 first:mt-0 ${CATEGORY_LABEL[e.category].color}`}
         >
           {CATEGORY_LABEL[e.category].label}
         </div>,
@@ -172,17 +172,17 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
     renderItems.push(
       <div key={e.id} className="flex items-center gap-2">
         <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
-        <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
+        <span className="w-24 shrink-0 text-caption text-muted-foreground truncate">{e.label}</span>
         <div className="flex-1 h-2.5 bg-muted rounded-ctl overflow-hidden">
           <div
             className="h-full rounded-ctl transition-all duration-300"
             style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
           />
         </div>
-        <span className="w-10 shrink-0 text-[11px] text-muted-foreground tabular-nums">
+        <span className="w-10 shrink-0 text-caption text-muted-foreground tabular-nums">
           {fmtSec(e.sec)}
         </span>
-        <span className="w-7 shrink-0 text-[11px] text-muted-foreground/60 tabular-nums text-right">
+        <span className="w-7 shrink-0 text-caption text-muted-foreground/60 tabular-nums text-right">
           {totalSec > 0 ? `${((e.sec / totalSec) * 100).toFixed(0)}%` : '—'}
         </span>
       </div>,
@@ -211,7 +211,7 @@ function PauseAnnotationPanel({
 
   if (pending.length === 0) {
     return (
-      <p className="mt-2 text-[11px] text-ink-ok">
+      <p className="mt-2 text-caption text-ink-ok">
         ✓ Todas las pausas del período están clasificadas.
       </p>
     )
@@ -242,12 +242,12 @@ function PauseAnnotationPanel({
         const durLabel = fmtSec(item.pause.durationSec)
 
         return (
-          <div key={key} className="flex items-center gap-2 text-[11px]">
+          <div key={key} className="flex items-center gap-2 text-caption">
             <span className="w-14 shrink-0 text-muted-foreground tabular-nums">{dateLabel}</span>
             <span className="w-10 shrink-0 text-muted-foreground/60 truncate">{item.shiftId.replace('Turno ', '')}</span>
             <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{durLabel}</span>
             <select
-              className="flex-1 h-6 rounded-ctl border border-border bg-background text-[11px] px-1"
+              className="flex-1 h-6 rounded-ctl border border-border bg-background text-caption px-1"
               value={selections[key] ?? ''}
               onChange={e => setSelections(s => ({ ...s, [key]: e.target.value }))}
               disabled={isSaving}
@@ -260,7 +260,7 @@ function PauseAnnotationPanel({
             <button
               onClick={() => void handleSave(item)}
               disabled={!selections[key] || isSaving}
-              className="shrink-0 px-2 h-6 rounded-ctl text-[11px] bg-amber-500/[0.15] text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
+              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
             >
               {isSaving ? '…' : 'OK'}
             </button>
@@ -479,7 +479,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
         <CardTitle className="text-sm flex items-center gap-2">
           <PauseCircle className="w-4 h-4 text-muted-foreground" />
           Tiempo muerto del período
-          <span className="text-[11px] font-normal text-muted-foreground ml-1">
+          <span className="text-caption font-normal text-muted-foreground ml-1">
             {withData.length}/{summaries.length} turnos con datos
           </span>
         </CardTitle>
@@ -563,14 +563,14 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
         {chart.entries.length > 0 && (
           <div className="pt-1">
             {chart.grouped && (
-              <p className="text-[11px] text-muted-foreground mb-2">
+              <p className="text-caption text-muted-foreground mb-2">
                 Agrupado por semana · período largo
               </p>
             )}
             <div className="space-y-0.5 max-h-56 overflow-y-auto pr-1">
               {chart.entries.map(d => (
                 <div key={d.key} className="flex items-center gap-2 text-xs">
-                  <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+                  <span className="w-12 shrink-0 text-right text-caption text-muted-foreground tabular-nums">
                     {d.label}
                   </span>
                   <div className="flex-1 h-3 bg-muted rounded-ctl overflow-hidden">
@@ -580,7 +580,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                       title={fmtSec(d.sec)}
                     />
                   </div>
-                  <span className="w-12 shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  <span className="w-12 shrink-0 text-caption text-muted-foreground tabular-nums">
                     {fmtSec(d.sec)}
                   </span>
                 </div>
@@ -594,7 +594,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
           <div className="pt-2 border-t border-border/20">
             <button
               onClick={handleToggleTags}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-caption text-muted-foreground hover:text-foreground transition-colors"
             >
               {tagOpen
                 ? <ChevronUp className="w-3 h-3" />
@@ -615,7 +615,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
             {/* Progreso de carga */}
             {tagOpen && loadingTags && loadProgress && (
               <div className="mt-2 space-y-1">
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Cargando pausas — {loadProgress.current}/{loadProgress.total} turnos…
                 </p>
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -637,7 +637,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
               <div className="mt-3 pt-2 border-t border-border/20">
                 <button
                   onClick={() => setAnnotationOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-[11px] text-ink-warn hover:text-amber-500 transition-colors"
+                  className="flex items-center gap-1.5 text-caption text-ink-warn hover:text-amber-500 transition-colors"
                 >
                   {annotationOpen
                     ? <ChevronUp className="w-3 h-3" />

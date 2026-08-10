@@ -57,7 +57,7 @@ export function ConfigDriftBanner({
         )}
       >
         <Loader2 className="w-[18px] h-[18px] text-ink-warn animate-spin" aria-hidden />
-        <span className="text-[13px] text-ink-warn">
+        <span className="text-footnote text-ink-warn">
           Actualizando el desglose con la configuración de gates nueva…
         </span>
       </div>
@@ -85,7 +85,7 @@ export function ConfigDriftBanner({
         className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left"
       >
         <AlertTriangle className="w-[18px] h-[18px] text-ink-warn flex-shrink-0" aria-hidden />
-        <span className="flex-1 text-[13px] leading-snug text-ink-warn">
+        <span className="flex-1 text-footnote leading-snug text-ink-warn">
           {changedAfterAnalysis
             ? 'Las gates cambiaron después de este análisis — el desglose de abajo no se recalculó.'
             : 'El desglose de abajo no corresponde a la configuración de gates actual.'}
@@ -100,9 +100,9 @@ export function ConfigDriftBanner({
 
       {open && (
         <div className="px-3.5 pb-3.5 pt-3 border-t border-amber-500/[0.25] dark:border-amber-500/[0.25]">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-footnote">
             <thead>
-              <tr className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
+              <tr className="text-caption text-amber-700/80 dark:text-amber-300/80">
                 <th className="text-left font-normal pb-1.5">Causa que depende de las gates</th>
                 <th className="text-right font-normal pb-1.5">guardado</th>
                 <th className="text-right font-normal pb-1.5 pl-3">config actual</th>
@@ -126,7 +126,7 @@ export function ConfigDriftBanner({
             </tbody>
           </table>
 
-          <p className="mt-2.5 text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-300/70">
+          <p className="mt-2.5 text-caption leading-relaxed text-amber-800/80 dark:text-amber-300/70">
             {analyzed && <>Análisis: {analyzed} · </>}
             {changed && <>última edición de gates: {changed}{lastConfigChangeBy ? `, ${lastConfigChangeBy}` : ''} · </>}
             {drift.changedGateNumbers.length > 0 && (

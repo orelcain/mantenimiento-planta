@@ -131,7 +131,7 @@ function ActionItem({
           {action.actionTrigger && (
             <button
               onClick={handleTrigger}
-              className="mt-2 flex items-center gap-1 text-[11px] px-2 py-1 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-medium"
+              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-medium"
             >
               {action.actionLabel ?? TRIGGER_LABELS[action.actionTrigger]}
               <ArrowRight className="w-3 h-3" />
@@ -240,7 +240,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
             ? 'Acciones sugeridas para el turno en curso — marcá las que ya realizaste'
             : 'Resumen de acciones para este turno'}
           {rulesDescriptor && (
-            <span className="block mt-1 text-[10px] text-muted-foreground/70 italic">
+            <span className="block mt-1 text-caption text-muted-foreground/70 italic">
               {rulesDescriptor}
             </span>
           )}

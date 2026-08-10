@@ -328,7 +328,7 @@ export function UpstreamScatterCard({
 
         {/* Sub-header: tendencia con magnitud operacional + tono narrativo */}
         {trendNarrative && (
-          <div className={`flex items-center gap-1.5 text-[11px] mb-1 ${trendNarrative.color}`}>
+          <div className={`flex items-center gap-1.5 text-caption mb-1 ${trendNarrative.color}`}>
             {trendNarrative.icon}
             <span className="font-medium tabular-nums">{trendNarrative.text}</span>
             <span className="text-slate-500">— {trendNarrative.tone}</span>
@@ -336,7 +336,7 @@ export function UpstreamScatterCard({
         )}
 
         {/* Nota explicativa pequeña */}
-        <div className="text-[10px] text-slate-500 mb-2">
+        <div className="text-caption text-slate-500 mb-2">
           Punto = 5 min · X = ciclos Baader · Y = P0% Grader · tamaño = piezas Grader (confianza).
           {' '}Líneas: <span className="text-rose-400/80">P0% crítico {criticalThreshold}%</span>
           {' · '}<span className="text-slate-400">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
@@ -350,7 +350,7 @@ export function UpstreamScatterCard({
               return (
                 <span
                   key={s.name}
-                  className="text-[10px] tabular-nums opacity-70"
+                  className="text-caption tabular-nums opacity-70"
                   style={{ color: trendColor }}
                   title={`${s.name}: ${s.pts} puntos, R²=${s.r2?.toFixed(2) ?? '—'}, slope=${s.slope?.toFixed(4) ?? '—'}`}
                 >

@@ -159,9 +159,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Header ── */}
       <div>
-        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
+        <p className="text-caption text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
         <p className="text-sm font-bold leading-tight">{monthLabel}</p>
-        <p className="text-[10px] text-muted-foreground/60 mt-0">
+        <p className="text-caption text-muted-foreground/60 mt-0">
           {daysCount} días · {turnosCount} turnos
         </p>
       </div>
@@ -171,12 +171,12 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         {/* Grader */}
         <Card className={stats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">P0% promedio</p>
+            <p className="text-caption text-muted-foreground mb-0.5">P0% promedio</p>
             <p className={`text-xl font-bold leading-none tabular-nums ${p0Color}`}>
               {stats ? `${fmtDec(stats.p0Avg, 2)}%` : '—'}
             </p>
             {stats && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+              <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                 {fmt(stats.totalPieces)} pz
                 {stats.totalWeightKg > 0 && <> · {fmtDec(stats.totalWeightKg / 1000, 1)} t</>}
               </p>
@@ -187,7 +187,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         {/* Shoplogix */}
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
+            <p className="text-caption text-muted-foreground mb-0.5">Ciclos Baader</p>
             <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-primary' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
@@ -196,7 +196,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 : '—'}
             </p>
             {slxStats && (
-              <p className={`text-[10px] mt-0.5 ${
+              <p className={`text-caption mt-0.5 ${
                 slxStats.avgUptimePct >= 70 ? 'text-ink-ok'
                 : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-cat-5-ink'
               }`}>
@@ -215,14 +215,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
-              <p className="text-[11px] text-ink-ok font-medium">
+              <p className="text-caption text-ink-ok font-medium">
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
             <p className="text-lg font-bold text-ink-ok leading-none tabular-nums">
               {best?.value ?? '—'}
             </p>
-            {best && <p className="text-[10px] text-muted-foreground mt-0.5">{best.date}</p>}
+            {best && <p className="text-caption text-muted-foreground mt-0.5">{best.date}</p>}
           </CardContent>
         </Card>
 
@@ -230,14 +230,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
-              <p className="text-[11px] text-cat-5-ink font-medium">
+              <p className="text-caption text-cat-5-ink font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
             <p className="text-lg font-bold text-cat-5-ink leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
-            {worst && <p className="text-[10px] text-muted-foreground mt-0.5">{worst.date}</p>}
+            {worst && <p className="text-caption text-muted-foreground mt-0.5">{worst.date}</p>}
           </CardContent>
         </Card>
       </div>
@@ -248,19 +248,19 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           de Shoplogix, sin inventar Día/Noche). */}
       <Card>
         <CardContent className="py-1.5 px-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
+          <p className="text-caption text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
           {isClassificationPlant || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sun className="w-3 h-3 text-amber-500" /> Día
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{nightShifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> Noche
                 </p>
               </div>
@@ -269,21 +269,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t1Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunrise className="w-3 h-3 text-amber-400" /> T1
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t2Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunset className="w-3 h-3 text-orange-400" /> T2
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t3Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> T3
                 </p>
               </div>
@@ -305,7 +305,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+              <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
                 Fuera de turno configurado
               </p>
             </div>
@@ -316,21 +316,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                     ? `${(slxStats.unscheduled.cycles / 1000).toFixed(1)}k`
                     : slxStats.unscheduled.cycles.toLocaleString('es-CL')}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">ciclos</p>
+                <p className="text-caption text-muted-foreground mt-0.5">ciclos</p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {fmtSecPanoramic(slxStats.unscheduled.uptimeSec)}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">horas-máquina</p>
+                <p className="text-caption text-muted-foreground mt-0.5">horas-máquina</p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {slxStats.unscheduled.daysWithData}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-caption text-muted-foreground mt-0.5">
                   día{slxStats.unscheduled.daysWithData === 1 ? '' : 's'}
                 </p>
               </div>
@@ -354,20 +354,20 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           <CardContent className="py-2 px-3 space-y-1.5">
             <div className="flex items-center gap-1.5 mb-1">
               <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+              <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
                 Causas P0 del mes
               </p>
-              <p className="text-[10px] text-muted-foreground/60 ml-auto tabular-nums">
+              <p className="text-caption text-muted-foreground/60 ml-auto tabular-nums">
                 {stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz P0
               </p>
             </div>
             {stats.causas.map(({ error, pieces, pct, barPct }) => (
               <div key={error} className="space-y-0.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-medium leading-tight truncate min-w-0">
+                  <span className="text-caption font-medium leading-tight truncate min-w-0">
                     {getCauseLabel(error)}
                   </span>
-                  <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                  <span className="text-caption tabular-nums text-muted-foreground shrink-0">
                     {pieces.toLocaleString('es-CL')} pz · <span className="font-semibold text-foreground">{pct.toFixed(2)}%</span>
                   </span>
                 </div>

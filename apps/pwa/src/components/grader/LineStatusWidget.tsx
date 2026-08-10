@@ -31,7 +31,7 @@ interface LineStatusWidgetProps {
 function ShiftStartLabel({ iso }: { iso: string | null }) {
   if (!iso) return null
   return (
-    <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
+    <span className="flex items-center gap-1 text-caption text-muted-foreground/60">
       <Clock className="w-2.5 h-2.5" />
       desde {fmtTime(iso)}
     </span>
@@ -65,7 +65,7 @@ export function LineStatusWidget({
         <Activity className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
         <span className="text-xs font-semibold text-red-400">{shortShift} en curso</span>
         <ShiftStartLabel iso={shiftStart} />
-        <span className="ml-auto text-[10px] text-muted-foreground/50 flex items-center gap-1">
+        <span className="ml-auto text-caption text-muted-foreground/50 flex items-center gap-1">
           Ver turno <ArrowRight className="w-3 h-3" />
         </span>
       </div>
@@ -75,18 +75,18 @@ export function LineStatusWidget({
 
         {/* Grader P0% */}
         <div className="flex flex-col gap-0.5 pr-2">
-          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Grader</span>
+          <span className="text-caption text-muted-foreground/60 uppercase tracking-wide">Grader</span>
           {p0Pct !== null ? (
             <>
               <span className={cn('text-lg font-bold tabular-nums leading-tight', P0_COLOR[verdict])}>
                 {p0Pct.toFixed(1)}%
               </span>
-              <span className="text-[10px] text-muted-foreground/50">P0 del turno</span>
+              <span className="text-caption text-muted-foreground/50">P0 del turno</span>
             </>
           ) : (
             <>
               <span className="text-sm font-medium text-muted-foreground/40">—</span>
-              <span className="text-[10px] text-muted-foreground/40">Sin Excel cargado</span>
+              <span className="text-caption text-muted-foreground/40">Sin Excel cargado</span>
             </>
           )}
         </div>
@@ -96,14 +96,14 @@ export function LineStatusWidget({
         <div className="flex flex-col gap-0.5 pl-2">
           <div className="flex items-center gap-1">
             <Zap className="w-2.5 h-2.5 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">Producción</span>
+            <span className="text-caption text-muted-foreground/60 uppercase tracking-wide">Producción</span>
           </div>
           {todaySummary?.totalPieces != null && todaySummary.totalPieces > 0 ? (
             <>
               <span className="text-lg font-bold tabular-nums leading-tight text-foreground/80">
                 {todaySummary.totalPieces.toLocaleString('es-CL')}
               </span>
-              <span className="text-[10px] text-muted-foreground/50">
+              <span className="text-caption text-muted-foreground/50">
                 piezas
                 {todaySummary.productionRatePerHour
                   ? ` · ${Math.round(todaySummary.productionRatePerHour)}/h`
@@ -113,7 +113,7 @@ export function LineStatusWidget({
           ) : (
             <>
               <span className="text-sm font-medium text-muted-foreground/40">—</span>
-              <span className="text-[10px] text-muted-foreground/40">Sin datos aún</span>
+              <span className="text-caption text-muted-foreground/40">Sin datos aún</span>
             </>
           )}
         </div>

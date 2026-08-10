@@ -369,12 +369,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-[10px] bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-[10px] bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -395,23 +395,23 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Piezas totales</p>
+            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Piezas totales</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {summary.totalPieces.toLocaleString('es-CL')}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-caption text-muted-foreground mt-0.5">
               {summary.pointZeroPieces.toLocaleString('es-CL')} en P0
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Peso clasificado</p>
+            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Peso clasificado</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatWeight(summary.totalWeightKg)}
             </p>
             {summary.avgWeightGrams != null && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-caption text-muted-foreground mt-0.5">
                 ~{summary.avgWeightGrams} g/pza
               </p>
             )}
@@ -419,21 +419,21 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tasa producción</p>
+            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Tasa producción</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {displayRate != null ? displayRate.toLocaleString('es-CL') : '—'}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">pz/hora</p>
+            <p className="text-caption text-muted-foreground mt-0.5">pz/hora</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Duración turno</p>
+            <p className="text-caption font-medium text-muted-foreground uppercase tracking-wider">Duración turno</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatDuration(displayMinutes)}
             </p>
             {displayMinutes != null && displayMinutes > 0 && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-caption text-muted-foreground mt-0.5">
                 {displayMinutes} min
               </p>
             )}
@@ -512,7 +512,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {/* Causas P0 como badges informativos */}
               {topCauses.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                  <span className="text-[10px] text-muted-foreground">Causas P0:</span>
+                  <span className="text-caption text-muted-foreground">Causas P0:</span>
                   {topCauses.slice(0, 4).map((c, i) => {
                     const pctTotal = summary.totalPieces > 0 ? +((c.pieces / summary.totalPieces) * 100).toFixed(2) : 0
                     return (
@@ -520,7 +520,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         key={i}
                         variant="outline"
                         className={cn(
-                          'text-[9px] py-0',
+                          'text-caption py-0',
                           c.pct >= 50 ? 'border-red-500/[0.25] text-red-500' :
                           c.pct >= 25 ? 'border-amber-500/[0.25] text-amber-500' :
                           'border-muted-foreground/30 text-muted-foreground'
@@ -633,7 +633,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                 />
               </div>
               {/* Leyenda de colores P0 */}
-              <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-4 mt-2 text-caption text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
                   P0% {'<'} 2% (OK)
@@ -660,7 +660,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <CardTitle className="text-base flex items-center gap-2">
               <Zap className="h-4 w-4 text-muted-foreground" />
               Alertas automáticas
-              <Badge variant="outline" className="text-[10px] ml-auto">
+              <Badge variant="outline" className="text-caption ml-auto">
                 {insights.length} alerta{insights.length !== 1 ? 's' : ''}
               </Badge>
             </CardTitle>
@@ -683,13 +683,13 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                   </div>
                   <ul className="pl-5 space-y-0.5">
                     {ins.evidence.map((e, i) => (
-                      <li key={i} className="text-[11px] text-muted-foreground list-disc">{e}</li>
+                      <li key={i} className="text-caption text-muted-foreground list-disc">{e}</li>
                     ))}
                   </ul>
                   {ins.recommendations.length > 0 && (
                     <ul className="pl-5 space-y-0.5 pt-1 border-t border-dashed border-muted">
                       {ins.recommendations.map((r, i) => (
-                        <li key={i} className="text-[11px] list-disc">{r}</li>
+                        <li key={i} className="text-caption list-disc">{r}</li>
                       ))}
                     </ul>
                   )}
@@ -707,7 +707,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <Card className="lg:col-span-2">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-2">Distribución por Calibre
-              <Badge variant="outline" className="text-[10px] font-normal">{summary.totalPieces.toLocaleString('es-CL')} pz</Badge>
+              <Badge variant="outline" className="text-caption font-normal">{summary.totalPieces.toLocaleString('es-CL')} pz</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -797,7 +797,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <Card className="lg:col-span-3">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-2">Distribución por Compuerta (G1–G12)
-              <Badge variant="outline" className="text-[10px] font-normal">12 gates</Badge>
+              <Badge variant="outline" className="text-caption font-normal">12 gates</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -848,7 +848,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               Desglose Punto Cero
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 P0: {summary.pointZeroPct}% ({summary.pointZeroPieces.toLocaleString('es-CL')} de {summary.totalPieces.toLocaleString('es-CL')})
               </Badge>
             </CardTitle>

@@ -397,7 +397,7 @@ export function PauseAnnotationDialog({
           <div className="space-y-2">
             <Label>
               Motivo{' '}
-              <span className="text-[10px] font-normal text-muted-foreground/60">(tecla 1–9 para seleccionar)</span>
+              <span className="text-caption font-normal text-muted-foreground/60">(tecla 1–9 para seleccionar)</span>
             </Label>
             <div className="grid grid-cols-1 gap-1.5">
               {tags.map((tag) => {

@@ -129,18 +129,18 @@ export function ProductoTab({
                 className={cn('h-8 text-xs w-28 font-mono', medianWeightG != null && 'opacity-70')}
               />
               {medianSource === 'excel' && (
-                <Badge className="text-[10px] bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0">
+                <Badge className="text-caption bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0">
                   Excel · {(medianWeightG! / 1000).toFixed(2)} kg
                 </Badge>
               )}
               {medianSource === 'manual' && (
-                <Badge className="text-[10px] bg-primary/[0.15] text-primary px-1.5 py-0">
+                <Badge className="text-caption bg-primary/[0.15] text-primary px-1.5 py-0">
                   Manual
                 </Badge>
               )}
               {medianSource === 'historical' && historicalMedianG && (
                 <Badge className={cn(
-                  'text-[10px] px-1.5 py-0',
+                  'text-caption px-1.5 py-0',
                   historicalMedianG.fromCalendar
                     ? 'bg-emerald-500/[0.15] text-ink-ok'
                     : 'bg-amber-500/[0.15] text-ink-warn',
@@ -149,14 +149,14 @@ export function ProductoTab({
                 </Badge>
               )}
               {medianSource === null && (
-                <span className="text-[10px] text-muted-foreground">Ingresa peso o carga Excel</span>
+                <span className="text-caption text-muted-foreground">Ingresa peso o carga Excel</span>
               )}
             </>
           )}
         </div>
 
         {physicalConfig.species && !medianWeightG && historicalMedianG && !historicalMedianG.fromCalendar && (
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             💡 Haz click en una tarjeta de turno del calendario para usar datos específicos.
           </p>
         )}
@@ -221,7 +221,7 @@ export function ProductoTab({
           )}>
             {verdictEmoji} {verdictText}
           </span>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-caption text-muted-foreground">
             ratio pez/paso: <span className="font-mono">{lengthToSpacingRatio.toFixed(2)}</span>
             {cadenceSource === 'excel' && <span className="text-emerald-500 ml-1">· cadencia Excel</span>}
             {cadenceSource === 'historical' && <span className="text-amber-500 ml-1">· cadencia histórica</span>}
@@ -254,7 +254,7 @@ export function ProductoTab({
                     <button
                       type="button"
                       onClick={onOpenZ2Capture}
-                      className="inline-flex items-center gap-1 text-[10px] border border-primary/[0.25] text-primary rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
+                      className="inline-flex items-center gap-1 text-caption border border-primary/[0.25] text-primary rounded-ctl px-1.5 py-0.5 hover:bg-primary/[0.15] transition-colors"
                     >
                       📟 Leer Z2
                     </button>
@@ -278,7 +278,7 @@ export function ProductoTab({
                           onChange={(e) => setPhysicalConfig((p) => ({ ...p, [field]: Number(e.target.value) }))}
                           className="h-6 w-16 text-xs font-mono px-1.5 py-0"
                         />
-                        <span className="text-muted-foreground text-[10px]">ms</span>
+                        <span className="text-muted-foreground text-caption">ms</span>
                       </div>
                     </div>
                   ))}
@@ -287,7 +287,7 @@ export function ProductoTab({
                     <span className="font-mono font-bold text-sky-400 text-xs">{cycleTotal} ms</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground/60">
+                <p className="text-caption text-muted-foreground/60">
                   Z2: delayFlipperOpen / minFlipperOpenTime / delayFlipperClose
                 </p>
               </div>
@@ -298,7 +298,7 @@ export function ProductoTab({
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-[10px] bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</span>
+              <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>
@@ -312,9 +312,9 @@ export function ProductoTab({
                 className="mt-1 font-mono h-8"
               />
             </div>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Cronometrar con cámara slow-mo en{' '}
-              <span className="font-mono text-foreground text-[10px]">Servicio → Probar salidas [8620]</span>
+              <span className="font-mono text-foreground text-caption">Servicio → Probar salidas [8620]</span>
             </p>
           </div>
 
@@ -333,10 +333,10 @@ export function ProductoTab({
                 placeholder="Medir en terreno"
                 className="mt-1 font-mono h-8"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Medido: 475 mm. Desde eje hasta extremo.</p>
+              <p className="text-caption text-muted-foreground mt-1">Medido: 475 mm. Desde eje hasta extremo.</p>
             </div>
             {minOpenTimeSec != null && (
-              <div className="text-[10px] text-muted-foreground pt-1 border-t border-muted-foreground/[0.10]">
+              <div className="text-caption text-muted-foreground pt-1 border-t border-muted-foreground/[0.10]">
                 Apertura mínima calculada:{' '}
                 <span className="font-mono text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
               </div>
@@ -384,19 +384,19 @@ export function ProductoTab({
                 example="Turno saludable: 40–55 pz/min promedio · picos 65–70"
                 position="top"
               />
-              {cadenceSource === 'excel' && <span className="text-[10px] text-emerald-500">· cadencia real del Excel</span>}
+              {cadenceSource === 'excel' && <span className="text-caption text-emerald-500">· cadencia real del Excel</span>}
               {cadenceSource === 'historical' && (
-                <span className="text-[10px] text-amber-500">
+                <span className="text-caption text-amber-500">
                   · histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}
                 </span>
               )}
-              {cadenceSource === 'theoretical' && <span className="text-[10px] text-muted-foreground">· cadencia teórica</span>}
+              {cadenceSource === 'theoretical' && <span className="text-caption text-muted-foreground">· cadencia teórica</span>}
             </div>
             <p className="text-muted-foreground">
               Cadencia promedio:{' '}
               <span className="font-mono font-medium text-foreground">{cadencePiecesPerMin.toFixed(0)} pz/min</span>
               {batchStats?.peakPzPerMin != null && (
-                <span className="text-[10px]">
+                <span className="text-caption">
                   {' '}· pico: <span className="font-mono font-medium text-foreground">{batchStats.peakPzPerMin} pz/min</span>
                 </span>
               )}
@@ -409,7 +409,7 @@ export function ProductoTab({
               )}>
                 {(gapM * 100).toFixed(0)} cm
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-caption text-muted-foreground">
                 {' '}· Pez {physicalConfig.avgSalmonLengthCm} cm + aire = paso {(spacingM * 100).toFixed(0)} cm
               </span>
               <InfoTooltip
@@ -420,17 +420,17 @@ export function ProductoTab({
               />
             </p>
             {overlapping && (
-              <p className="text-[10px] text-red-500">
+              <p className="text-caption text-red-500">
                 ⚠ El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
                 Con {pocketCountAlt} pockets el gap sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>
             )}
             {!overlapping && lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn && (
-              <p className="text-[10px] text-amber-500">
+              <p className="text-caption text-amber-500">
                 ⚠ Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Alternativa {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
             </p>
           </div>
@@ -441,7 +441,7 @@ export function ProductoTab({
             const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
             const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
             return (
-              <div className="p-2 rounded-ctl bg-muted border border-border dark:bg-muted-foreground/[0.10] dark:border-muted-foreground/[0.10] text-[10px] space-y-1">
+              <div className="p-2 rounded-ctl bg-muted border border-border dark:bg-muted-foreground/[0.10] dark:border-muted-foreground/[0.10] text-caption space-y-1">
                 <p className="font-medium text-muted-foreground">
                   {s.label} · {scientific} · FishBase ID {fishBaseId}
                 </p>
@@ -493,18 +493,18 @@ export function ProductoTab({
             return JSON.stringify(v).slice(0, 40)
           }
           return (
-            <div key={entry.id} className="flex items-center gap-2 text-[11px] py-1 border-b border-muted/50 last:border-0">
-              <span className="text-[10px] text-muted-foreground font-mono tabular-nums min-w-[80px]">
+            <div key={entry.id} className="flex items-center gap-2 text-caption py-1 border-b border-muted/50 last:border-0">
+              <span className="text-caption text-muted-foreground font-mono tabular-nums min-w-[80px]">
                 {timeStr}
               </span>
               <span className="font-medium text-xs flex-1 truncate" title={entry.field}>
                 {labelForField(entry.field)}
               </span>
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span className="text-caption font-mono text-muted-foreground">
                 {fmt(pv)} → <span className="text-foreground">{fmt(nv)}</span>
               </span>
               {entry.reason && (
-                <Badge variant="outline" className="text-[9px]">{entry.reason}</Badge>
+                <Badge variant="outline" className="text-caption">{entry.reason}</Badge>
               )}
             </div>
           )

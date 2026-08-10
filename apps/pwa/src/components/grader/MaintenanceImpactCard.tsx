@@ -43,9 +43,9 @@ function KpiCard({
 }) {
   return (
     <div className="rounded-card border border-border bg-muted px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">{icon}{label}</div>
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-1">{icon}{label}</div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
-      <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
+      <div className="text-caption text-muted-foreground/60 mt-1">{sub}</div>
     </div>
   )
 }
@@ -131,7 +131,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <Wrench className="w-4 h-4 shrink-0 text-orange-500" />
             <span className="truncate">Impacto de Mantención</span>
             {rel && (
-              <span className="text-[11px] font-normal text-muted-foreground ml-1 hidden sm:inline">
+              <span className="text-caption font-normal text-muted-foreground ml-1 hidden sm:inline">
                 confiabilidad del período · {rel.shiftsWithData} turnos
               </span>
             )}
@@ -140,7 +140,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-2.5 py-1 text-[11px] font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.15] disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-2.5 py-1 text-caption font-medium text-cat-4-ink transition hover:bg-cat-4-tint/[0.15] disabled:opacity-50"
               title="Descargar reporte PDF de impacto de mantención"
             >
               {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
@@ -211,7 +211,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
 
             {/* Micro-detenciones — aparte, poco accionables */}
             {rel!.microCount > 0 && (
-              <div className="flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-ctl bg-muted px-3 py-2 text-caption text-muted-foreground">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400/70" />
                 <span>
                   Aparte: <span className="tabular-nums font-medium text-foreground">{rel!.microCount.toLocaleString('es-CL')}</span> micro-detenciones
@@ -223,14 +223,14 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             {/* Tendencia del paro de mantención */}
             {rel!.trend.length > 0 && (
               <div className="pt-1">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-2">
+                <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-2">
                   {dir?.down ? <TrendingDown className="w-3.5 h-3.5 text-emerald-400" /> : <TrendingUp className="w-3.5 h-3.5 text-rose-400" />}
                   Tendencia del paro de mantención {rel!.trend[0]?.grouped ? '· por semana' : '· por día'}
                 </div>
                 <div className="space-y-0.5 max-h-44 overflow-y-auto pr-1">
                   {rel!.trend.map((t) => (
                     <div key={t.key} className="flex items-center gap-2 text-xs">
-                      <span className="w-12 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">{t.label}</span>
+                      <span className="w-12 shrink-0 text-right text-caption text-muted-foreground tabular-nums">{t.label}</span>
                       <div className="flex-1 h-3 bg-muted rounded-ctl overflow-hidden">
                         <div
                           className="h-full rounded-ctl bg-cat-4-tint/[0.15] transition-all duration-300"
@@ -238,7 +238,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                           title={`${fmt(t.downtimeSec)} · ${t.events} eventos`}
                         />
                       </div>
-                      <span className="w-12 shrink-0 text-[11px] text-muted-foreground tabular-nums">{fmt(t.downtimeSec)}</span>
+                      <span className="w-12 shrink-0 text-caption text-muted-foreground tabular-nums">{fmt(t.downtimeSec)}</span>
                     </div>
                   ))}
                 </div>

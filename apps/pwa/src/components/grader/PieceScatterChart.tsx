@@ -212,7 +212,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
             return (
               <span
                 key={cause}
-                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-ctl border tabular-nums"
+                className="inline-flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl border tabular-nums"
                 style={{
                   borderColor: color.replace('0.85)', '0.35)'),
                   color: color.replace('0.85)', '1)'),
@@ -229,7 +229,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
         {/* Chart (colapsado por defecto) */}
         {expanded && (
           <>
-            <p className="text-[10px] text-slate-500 mt-2 mb-1">
+            <p className="text-caption text-slate-500 mt-2 mb-1">
               Cada punto = 1 pieza rechazada · X = hora exacta (segundos)
               {hasWeight ? ' · Y = peso por pieza (g)' : ' · Y = posición visual — sin peso disponible'}
               {' · '}Zoom con scroll o el slider inferior

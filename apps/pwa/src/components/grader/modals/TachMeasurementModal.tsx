@@ -135,7 +135,7 @@ export function TachMeasurementModal({
                 )}
               >
                 <div className="font-medium">Rueda sobre cinta</div>
-                <div className="text-muted-foreground text-[10px]">Lectura directa m/s</div>
+                <div className="text-muted-foreground text-caption">Lectura directa m/s</div>
               </button>
               <button
                 type="button"
@@ -148,7 +148,7 @@ export function TachMeasurementModal({
                 )}
               >
                 <div className="font-medium">Óptico en eje</div>
-                <div className="text-muted-foreground text-[10px]">
+                <div className="text-muted-foreground text-caption">
                   {effectiveMpsPerRpm ? 'RPM → m/s con factor' : 'Falta effectiveMpsPerRpm'}
                 </div>
               </button>
@@ -170,7 +170,7 @@ export function TachMeasurementModal({
               className="font-mono"
             />
             {method === 'shaft' && effectiveMpsPerRpm && validNum && (
-              <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+              <p className="text-caption text-muted-foreground mt-1 font-mono">
                 {numValue} RPM × {effectiveMpsPerRpm.toFixed(6)} m/s/RPM = {beltMps.toFixed(3)} m/s
               </p>
             )}
@@ -212,7 +212,7 @@ export function TachMeasurementModal({
                 <Badge
                   variant="outline"
                   className={cn(
-                    'text-[10px] font-mono',
+                    'text-caption font-mono',
                     Math.abs(deltaPct) < 3 ? 'border-green-500/[0.25] text-ink-ok' :
                     Math.abs(deltaPct) < 10 ? 'border-amber-500/[0.25] text-ink-warn' :
                     'border-red-500/[0.25] text-ink-crit',

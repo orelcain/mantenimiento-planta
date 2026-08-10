@@ -1312,7 +1312,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                 </span>
               )}
               {trend.anomalyBuckets.length > 0 && (
-                <Badge variant="destructive" className="ml-2 text-[10px]">
+                <Badge variant="destructive" className="ml-2 text-caption">
                   {trend.anomalyBuckets.length} anomalía(s)
                 </Badge>
               )}
@@ -1499,7 +1499,7 @@ function KPICard({
             <Badge
               variant="outline"
               className={cn(
-                'text-[9px] px-1.5 py-0 h-4 ml-auto',
+                'text-caption px-1.5 py-0 h-4 ml-auto',
                 statusBadge.severity === 'critical' && 'text-ink-crit border-red-300',
                 statusBadge.severity === 'warn' && 'text-ink-warn border-amber-300',
                 statusBadge.severity === 'ok' && 'text-ink-ok border-emerald-300',
@@ -1519,7 +1519,7 @@ function KPICard({
           {value}
         </p>
         {secondaryText && (
-          <p className="text-[11px] text-muted-foreground mt-1">{secondaryText}</p>
+          <p className="text-caption text-muted-foreground mt-1">{secondaryText}</p>
         )}
       </CardContent>
     </Card>

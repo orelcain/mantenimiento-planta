@@ -179,7 +179,7 @@ export function PuntoCeroPatronesCard({
         </p>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-2">
           <div className="md:col-span-2">
-            <label className="text-[11px] text-muted-foreground block mb-1">Causa</label>
+            <label className="text-caption text-muted-foreground block mb-1">Causa</label>
             <select
               className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs"
               value={selectedCauseLabel ?? ''}
@@ -194,24 +194,24 @@ export function PuntoCeroPatronesCard({
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-1">Desde</label>
+            <label className="text-caption text-muted-foreground block mb-1">Desde</label>
             <input type="time" className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs" value={timeFilterFrom} onChange={(e) => onTimeFilterFromChange(e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-1">Hasta</label>
+            <label className="text-caption text-muted-foreground block mb-1">Hasta</label>
             <input type="time" className="w-full bg-background border rounded-ctl px-2 py-1.5 text-xs" value={timeFilterTo} onChange={(e) => onTimeFilterToChange(e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-1">Intervalo (min)</label>
+            <label className="text-caption text-muted-foreground block mb-1">Intervalo (min)</label>
             <input type="range" min={1} max={60} step={1} className="w-full" value={patternIntervalMinutes} onChange={(e) => onPatternIntervalMinutesChange(Math.min(60, Math.max(1, Number(e.target.value) || 60)))} />
-            <div className="text-[10px] text-muted-foreground mt-1">{patternIntervalMinutes} min</div>
+            <div className="text-caption text-muted-foreground mt-1">{patternIntervalMinutes} min</div>
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString('es-CL')}</Badge>
-          {topPatternCalibre && <Badge variant="secondary" className="text-[11px]">Top calibre: {topPatternCalibre.key} ({topPatternCalibre.pct}%)</Badge>}
-          {topPatternQuality && <Badge variant="secondary" className="text-[11px]">Top calidad: {topPatternQuality.key} ({topPatternQuality.pct}%)</Badge>}
-          {peakPatternHour && <Badge variant="secondary" className="text-[11px]">Ventana pico: {peakPatternHour.rangeLabel} ({peakPatternHour.pct}%)</Badge>}
+          <Badge variant="outline" className="text-caption">Piezas filtradas: {patternTotalPieces.toLocaleString('es-CL')}</Badge>
+          {topPatternCalibre && <Badge variant="secondary" className="text-caption">Top calibre: {topPatternCalibre.key} ({topPatternCalibre.pct}%)</Badge>}
+          {topPatternQuality && <Badge variant="secondary" className="text-caption">Top calidad: {topPatternQuality.key} ({topPatternQuality.pct}%)</Badge>}
+          {peakPatternHour && <Badge variant="secondary" className="text-caption">Ventana pico: {peakPatternHour.rangeLabel} ({peakPatternHour.pct}%)</Badge>}
           <Button
             type="button"
             variant="ghost"
@@ -277,9 +277,9 @@ export function PuntoCeroPatronesCard({
             <div className="border rounded-ctl p-3">
               <div className="flex items-center justify-between mb-2 gap-2">
                 <p className="text-xs font-medium">Patrón por intervalo ({patternIntervalMinutes} min)</p>
-                <p className="text-[10px] text-muted-foreground">Click fija · arrastra compara · X quita</p>
+                <p className="text-caption text-muted-foreground">Click fija · arrastra compara · X quita</p>
               </div>
-              <p className="text-[10px] text-muted-foreground mb-2">
+              <p className="text-caption text-muted-foreground mb-2">
                 Cada punto resume un rango de {patternIntervalMinutes} min (ejemplo: 22:00 = 21:00 - 22:00).
               </p>
               <div ref={patternChartContainerRef} className="w-full relative" style={{ height: 220 }}>
@@ -333,7 +333,7 @@ export function PuntoCeroPatronesCard({
                 </svg>
 
                 {pinnedPatternPoints.map((pin) => (
-                  <div key={pin.id} className="absolute z-20 w-56 rounded-ctl border bg-card/95 shadow-sm p-2 text-[11px] select-none" style={{ left: pin.x, top: pin.y }}>
+                  <div key={pin.id} className="absolute z-20 w-56 rounded-ctl border bg-card/95 shadow-sm p-2 text-caption select-none" style={{ left: pin.x, top: pin.y }}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-semibold">{pin.label}</p>
@@ -359,7 +359,7 @@ export function PuntoCeroPatronesCard({
 
             <div className="border rounded-ctl p-3">
               <p className="text-xs font-medium mb-1">Evolución % acumulado por causa (sobre total del turno)</p>
-              <p className="text-[10px] text-muted-foreground mb-2">
+              <p className="text-caption text-muted-foreground mb-2">
                 Inicia en 0% y muestra cómo evoluciona cada causa en el turno. El último punto debe cuadrar con el % total final.
               </p>
               <div className="w-full" style={{ height: 240 }}>

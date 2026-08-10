@@ -161,7 +161,7 @@ function TurnoViewTabs({
           >
             {TURNO_VIEW_LABEL[view]}
             {view === 'gates' && !!gatesBadge && (
-              <span className={`text-[10px] tabular-nums px-1.5 rounded-full ${
+              <span className={`text-caption tabular-nums px-1.5 rounded-full ${
                 isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/15'
               }`}>
                 {gatesBadge}
@@ -1504,7 +1504,7 @@ export function AnalisisGraderTurnoPage() {
                 </span>
                 {shiftScheduleInfo && (
                   <span
-                    className="text-[11px] tabular-nums text-muted-foreground/80 shrink-0"
+                    className="text-caption tabular-nums text-muted-foreground/80 shrink-0"
                     title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftMeta.period})`}
                   >
                     {shiftScheduleInfo.startTime}–{shiftScheduleInfo.endTime}
@@ -1515,7 +1515,7 @@ export function AnalisisGraderTurnoPage() {
                 {summary?.turnoLabel && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] px-1.5 py-0 shrink-0 border-cat-6-tint/[0.25] text-violet-400"
+                    className="text-caption px-1.5 py-0 shrink-0 border-cat-6-tint/[0.25] text-violet-400"
                     title="Turno de producción (columna Turno del Excel)"
                   >
                     Turno {summary.turnoLabel}
@@ -1524,7 +1524,7 @@ export function AnalisisGraderTurnoPage() {
                 {shiftWindow && (
                   <Badge
                     variant="outline"
-                    className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                    className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
                         ? 'border-red-500/[0.25] text-red-400'
                         : 'border-muted-foreground/30 text-muted-foreground'
@@ -1711,7 +1711,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* Contador de tiempo desde último sync */}
             {slxBestSyncedAt && (
-              <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+              <span className={`flex items-center gap-1 text-caption font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
                 {slxSyncing ? 'sincronizando…' : syncAge.label}
               </span>
@@ -1816,7 +1816,7 @@ export function AnalisisGraderTurnoPage() {
                   No requiere acción manual.
                 </p>
               </div>
-              <Badge variant="outline" className="text-[10px] border-cat-6-tint/[0.25] text-violet-400 shrink-0 mt-0.5">
+              <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-violet-400 shrink-0 mt-0.5">
                 automático
               </Badge>
             </div>
@@ -1854,7 +1854,7 @@ export function AnalisisGraderTurnoPage() {
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>
                 </div>
-                <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-amber-400 shrink-0 mt-0.5">
+                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-amber-400 shrink-0 mt-0.5">
                   requiere Grader
                 </Badge>
               </div>
@@ -2049,14 +2049,14 @@ export function AnalisisGraderTurnoPage() {
           {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
               <span
-                className="text-[11px] text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
+                className="text-caption text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
                 title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / paros afectan directamente al throughput del Grader."
               >
                 Línea upstream · Baader 142
               </span>
               <div className="flex items-center gap-2">
                 {slxBestSyncedAt && (
-                  <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+                  <span className={`flex items-center gap-1 text-caption font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
                     {slxSyncing ? 'sincronizando…' : syncAge.label}
                   </span>
@@ -2064,7 +2064,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-[11px] text-muted-foreground hover:text-sky-400 px-2"
+                  className="h-6 text-caption text-muted-foreground hover:text-sky-400 px-2"
                   onClick={handleSlxRefresh}
                   disabled={slxSyncing}
                   title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -2232,12 +2232,12 @@ export function AnalisisGraderTurnoPage() {
               {shareUrl && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 truncate rounded-ctl bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                    <code className="flex-1 truncate rounded-ctl bg-muted px-2 py-1 text-caption text-muted-foreground">
                       {shareUrl}
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:bg-amber-500 text-white text-caption px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -2254,7 +2254,7 @@ export function AnalisisGraderTurnoPage() {
                         setRevoking(false)
                       }}
                       disabled={revoking}
-                      className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
+                      className="shrink-0 text-caption text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
                       title="Revocar link (lo invalida para quien lo tenga)"
                     >
                       {revoking ? '…' : 'Revocar'}
@@ -2266,18 +2266,18 @@ export function AnalisisGraderTurnoPage() {
                       <QRCodeSVG value={shareUrl} size={100} level="M" includeMargin={false} />
                     </div>
                     <div className="flex flex-col justify-center gap-1 pt-1">
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1 text-caption text-muted-foreground">
                         <QrCode className="w-3 h-3" />
                         Escanear con el celular
                       </div>
-                      <p className="text-[10px] text-muted-foreground/50">
+                      <p className="text-caption text-muted-foreground/50">
                         Abre la vista de turno sin necesidad de login
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground/40">
+              <p className="text-caption text-muted-foreground/40">
                 Link válido 24 horas · sin login · solo lectura
               </p>
             </div>

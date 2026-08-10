@@ -37,14 +37,14 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
           }}
           className="w-28 h-7 rounded-ctl border border-input bg-background px-2 text-xs font-mono text-right"
         />
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-caption text-muted-foreground">
           Default: 0.000786 · Ajustar hasta que Z2 coincida con tachómetro
         </span>
         {(physicalConfig.kFactor ?? 0.000786) !== 0.000786 && (
           <button
             type="button"
             onClick={() => setPhysicalConfig((p) => { const { kFactor: _, ...rest } = p; return rest as typeof p })}
-            className="ml-auto text-[10px] text-muted-foreground hover:text-foreground underline"
+            className="ml-auto text-caption text-muted-foreground hover:text-foreground underline"
           >
             Restaurar default
           </button>
@@ -86,7 +86,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                 <span className="font-medium text-sm">{belt.label}</span>
                 {belt.vfd?.label && (
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-[10px]">VFD: {belt.vfd.label}</Badge>
+                    <Badge variant="outline" className="text-caption">VFD: {belt.vfd.label}</Badge>
                     <Select
                       value={belt.vfd.assignedBeltId ?? belt.beltId}
                       onValueChange={(v) => setPhysicalConfig((p) => ({
@@ -95,7 +95,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                           ? { ...b, vfd: b.vfd ? { ...b.vfd, assignedBeltId: v as 'zeta' | 'accel1' | 'accel2' | 'main' } : b.vfd }
                           : b),
                       }))}>
-                      <SelectTrigger className="h-5 text-[10px] w-36 px-1">
+                      <SelectTrigger className="h-5 text-caption w-36 px-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -107,7 +107,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     </Select>
                   </div>
                 )}
-                {hasDiscrepancy && <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
+                {hasDiscrepancy && <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
                 <span className="ml-auto font-mono font-semibold">{belt.speedMps.toFixed(3)} m/s actual</span>
               </div>
               <table className="w-full">
@@ -128,7 +128,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                     <td className="py-1 px-2 text-right font-mono">{speedFromZ2?.toFixed(3) ?? '—'}</td>
                     <td className="py-1 px-2 text-right"><CalibBadge status="estimated" /></td>
                     <td className="py-1 px-2 text-right">
-                      <Button size="sm" variant={truthSource === 'z2' ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
+                      <Button size="sm" variant={truthSource === 'z2' ? 'default' : 'outline'} className="h-6 text-caption px-2"
                         onClick={() => applyTruth('z2', speedFromZ2)}>
                         {truthSource === 'z2' ? '✓ Activo' : 'Usar'}
                       </Button>
@@ -148,14 +148,14 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                               ? { ...b, vfd: b.vfd ? { ...b.vfd, vfdCurrentRpm: e.target.value ? Number(e.target.value) : undefined } : b.vfd }
                               : b),
                           }))}
-                          className="h-6 text-[10px] w-20 font-mono" />
+                          className="h-6 text-caption w-20 font-mono" />
                         <span className="text-muted-foreground">RPM</span>
                       </div>
                     </td>
                     <td className="py-1 px-2 text-right font-mono">{speedFromVfd?.toFixed(3) ?? '—'}</td>
                     <td className="py-1 px-2 text-right"><CalibBadge status={belt.vfd?.effectiveStatus} /></td>
                     <td className="py-1 px-2 text-right">
-                      <Button size="sm" variant={truthSource === 'vfd' ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
+                      <Button size="sm" variant={truthSource === 'vfd' ? 'default' : 'outline'} className="h-6 text-caption px-2"
                         disabled={speedFromVfd === null}
                         onClick={() => applyTruth('vfd', speedFromVfd)}>
                         {truthSource === 'vfd' ? '✓ Activo' : 'Usar'}
@@ -176,14 +176,14 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                               ? { ...b, vfd: b.vfd ? { ...b.vfd, measuredShaftRpm: e.target.value ? Number(e.target.value) : undefined } : b.vfd }
                               : b),
                           }))}
-                          className="h-6 text-[10px] w-20 font-mono" />
+                          className="h-6 text-caption w-20 font-mono" />
                         <span className="text-muted-foreground">RPM</span>
                       </div>
                     </td>
                     <td className="py-1 px-2 text-right font-mono">{speedFromTachShaft?.toFixed(3) ?? '—'}</td>
                     <td className="py-1 px-2 text-right"><CalibBadge status={belt.vfd?.measuredShaftRpm ? 'verified' : 'unknown'} /></td>
                     <td className="py-1 px-2 text-right">
-                      <Button size="sm" variant={truthSource === 'tachShaft' ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
+                      <Button size="sm" variant={truthSource === 'tachShaft' ? 'default' : 'outline'} className="h-6 text-caption px-2"
                         disabled={speedFromTachShaft === null}
                         onClick={() => applyTruth('tachShaft', speedFromTachShaft)}>
                         {truthSource === 'tachShaft' ? '✓ Activo' : 'Usar'}
@@ -204,14 +204,14 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                               ? { ...b, vfd: b.vfd ? { ...b.vfd, measuredBeltMps: e.target.value ? Number(e.target.value) : undefined } : b.vfd }
                               : b),
                           }))}
-                          className="h-6 text-[10px] w-20 font-mono" />
+                          className="h-6 text-caption w-20 font-mono" />
                         <span className="text-muted-foreground">m/s</span>
                       </div>
                     </td>
                     <td className="py-1 px-2 text-right font-mono">{speedFromTachLinear?.toFixed(3) ?? '—'}</td>
                     <td className="py-1 px-2 text-right"><CalibBadge status={belt.vfd?.measuredBeltMps ? 'verified' : 'unknown'} /></td>
                     <td className="py-1 px-2 text-right">
-                      <Button size="sm" variant={truthSource === 'tachLinear' ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
+                      <Button size="sm" variant={truthSource === 'tachLinear' ? 'default' : 'outline'} className="h-6 text-caption px-2"
                         disabled={speedFromTachLinear === null}
                         onClick={() => applyTruth('tachLinear', speedFromTachLinear)}>
                         {truthSource === 'tachLinear' ? '✓ Activo' : 'Usar'}
@@ -226,7 +226,7 @@ export function VerificacionTab({ physicalConfig, setPhysicalConfig }: Verificac
                   <span className="text-xs text-ink-ok font-medium">
                     Factor calibrado: {(belt.vfd.measuredBeltMps / belt.vfd.vfdCurrentRpm).toFixed(6)} m/(s·RPM)
                   </span>
-                  <Button size="sm" variant="outline" className="ml-2 h-6 text-[10px] px-2 text-green-700 border-green-400"
+                  <Button size="sm" variant="outline" className="ml-2 h-6 text-caption px-2 text-green-700 border-green-400"
                     onClick={() => setPhysicalConfig((p) => ({
                       ...p,
                       belts: p.belts.map((b) => b.beltId === belt.beltId

@@ -192,6 +192,22 @@ for (const file of files) {
   }
   if (nRad) applied.push(`${nRad} radios → escala única (ctl/card/panel)`)
 
+  // 6) TIPOGRAFÍA por debajo del piso legal (Constitución §9 y §64).
+  //    La app usaba 8/9/10px como tamaños de trabajo: 1.125 usos. Eso es
+  //    "texto diminuto", explícitamente prohibido, y es la causa real de que la
+  //    pantalla se sienta densa y no Apple. Todo lo que esté bajo el piso sube
+  //    a `caption` (11px). Los tamaños ya legales NO se tocan.
+  const TIPO = [
+    [/\btext-\[(?:8|9|10|10\.5|11)px\]/g, 'text-caption'],
+    [/\btext-\[(?:11\.5|12|12\.5|13)px\]/g, 'text-footnote'],
+  ]
+  let nTipo = 0
+  for (const [re, to] of TIPO) {
+    nTipo += count(re)
+    s = replaceInStrings(s, re, () => to).out
+  }
+  if (nTipo) applied.push(`${nTipo} tamaños bajo el piso → text-caption (11px)`)
+
   // Lo que queda sin mapear: SE REPORTA, no se toca. Suele ser color en datos,
   // gradientes o casos que piden criterio (y por eso no van en un codemod).
   const leftoverRe = new RegExp(`\\b(?:text|bg|border|ring|fill|stroke)-(?:${FAMS})-\\d{2,3}`, 'g')

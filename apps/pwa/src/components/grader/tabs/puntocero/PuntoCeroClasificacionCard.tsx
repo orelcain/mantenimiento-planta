@@ -100,7 +100,7 @@ export function PuntoCeroClasificacionCard({
                     </div>
                     <span className="text-muted-foreground">{c.pctOfPointZero}%</span>
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                  <div className="text-caption text-muted-foreground mt-0.5">
                     {c.pieces.toLocaleString('es-CL')} pz · {c.pctOfTotal}% total
                   </div>
                 </div>
@@ -112,7 +112,7 @@ export function PuntoCeroClasificacionCard({
           <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground/90">
+                <tr className="border-b border-muted/40 text-left text-caption uppercase tracking-wide text-muted-foreground/90">
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2">Causa</th>
                   <th className="py-2 px-2 text-right">Piezas</th>
@@ -151,7 +151,7 @@ export function PuntoCeroClasificacionCard({
                               <span className="inline-block h-2.5 w-2.5 rounded-ctl" style={{ backgroundColor: getCauseColor(c.cause) }} />
                               <span className="font-semibold text-sm leading-tight">{c.label}</span>
                             </div>
-                            <p className="text-[11px] text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
+                            <p className="text-caption text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
                           </div>
                         </td>
                         <td className="py-2 px-2 text-right font-medium tabular-nums">{c.pieces.toLocaleString('es-CL')}</td>

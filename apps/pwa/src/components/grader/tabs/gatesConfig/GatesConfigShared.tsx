@@ -28,10 +28,10 @@ export const SPECIES_ALLOMETRY = {
 /** Badge de estado de calibración para parámetros físicos */
 export function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
-    return <Badge className="text-[10px] bg-green-500/[0.15] text-ink-ok whitespace-nowrap">✓ Verificado</Badge>
+    return <Badge className="text-caption bg-green-500/[0.15] text-ink-ok whitespace-nowrap">✓ Verificado</Badge>
   if (status === 'estimated')
-    return <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</Badge>
-  return <Badge className="text-[10px] bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap">? Falta</Badge>
+    return <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</Badge>
+  return <Badge className="text-caption bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap">? Falta</Badge>
 }
 
 /**
@@ -86,7 +86,7 @@ export function BeltVisualizer({
 
   return (
     <div className="mt-3 p-3 rounded-card bg-muted-foreground/[0.10] border border-muted-foreground/[0.10]">
-      <div className="flex items-center justify-between mb-2 text-[10px] text-muted-foreground">
+      <div className="flex items-center justify-between mb-2 text-caption text-muted-foreground">
         <span className="font-medium text-sky-300">Diagrama de distancias (escala real)</span>
         <span>cinta <span className="font-mono text-foreground">{speedMps.toFixed(2)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{secondsBetweenFish.toFixed(2)} s</span></span>
       </div>
@@ -306,7 +306,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
             disabled={!hasData}
             className="scale-75 origin-right"
           />
-          <span className="text-[10px] text-muted-foreground">Auto</span>
+          <span className="text-caption text-muted-foreground">Auto</span>
         </div>
       </div>
       <div className="relative">
@@ -322,13 +322,13 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
           className={cn('mt-1 font-mono', auto && hasData && 'opacity-60 pr-14')}
         />
         {auto && hasData && (
-          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0 pointer-events-none">
+          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-caption bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0 pointer-events-none">
             Auto
           </Badge>
         )}
       </div>
       {!auto && suggested !== null && (
-        <p className="text-[10px] mt-1 flex items-center gap-1">
+        <p className="text-caption mt-1 flex items-center gap-1">
           <span className="text-sky-500">Sugerido: ~{suggested}{unit ? ` ${unit}` : ''}</span>
           {Number(value) !== suggested && (
             <button
@@ -342,7 +342,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
         </p>
       )}
       {hint && !auto && suggested === null && (
-        <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
+        <p className="text-caption text-muted-foreground mt-1">{hint}</p>
       )}
     </div>
   )

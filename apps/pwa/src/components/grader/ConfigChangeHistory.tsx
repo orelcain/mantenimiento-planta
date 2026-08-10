@@ -76,7 +76,7 @@ interface RowProps {
 function VerdictBadge({ v }: { v: SegmentVerdict }) {
   if (v.status === 'insufficient-data') {
     return (
-      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted rounded-ctl px-2 py-1 mt-1">
+      <div className="inline-flex items-center gap-1.5 text-caption text-muted-foreground bg-muted rounded-ctl px-2 py-1 mt-1">
         <Hourglass className="w-3 h-3" />
         Esperando más datos
         {v.afterPieces > 0 && (
@@ -102,7 +102,7 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
   const sign = v.delta > 0 ? '+' : ''
   return (
     <div
-      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded-ctl px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
+      className={cn('inline-flex items-center gap-1.5 text-caption rounded-ctl px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
       title={`Antes ${v.beforePct.toFixed(2)}% → Después ${v.afterPct.toFixed(2)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
     >
       <visualByStatus.Icon className={cn('w-3 h-3', color)} />
@@ -173,14 +173,14 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
             {titleLabel}
           </span>
           {snap.changedBy?.name && !isSynthetic && (
-            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+            <span className="text-caption text-muted-foreground inline-flex items-center gap-1">
               <User className="w-2.5 h-2.5" />
               {snap.changedBy.name}
             </span>
           )}
           {undetectedChanges > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/[0.15] text-amber-400 border border-amber-500/[0.25] font-medium"
+              className="inline-flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-full bg-amber-500/[0.15] text-amber-400 border border-amber-500/[0.25] font-medium"
               title={`El sistema detectó ~${undetectedChanges} transiciones de configuración durante el turno que no fueron registradas en tiempo real. Si recordás los cambios reales (qué gate, qué hora), registralos manualmente con el botón "Cambiar gate" para que el análisis segmentado los reconozca.`}
             >
               <AlertTriangle className="w-2.5 h-2.5" />
@@ -210,7 +210,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
         )}
 
         {snap.reason && (
-          <div className="text-[11px] italic text-muted-foreground/80">
+          <div className="text-caption italic text-muted-foreground/80">
             "{snap.reason}"
           </div>
         )}
@@ -250,7 +250,7 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
           <Wrench className="w-4 h-4 text-amber-500" />
           Historial de configuración
           {sorted.length > 0 && (
-            <Badge variant="outline" className="text-[10px] font-normal">
+            <Badge variant="outline" className="text-caption font-normal">
               {sorted.length} {sorted.length === 1 ? 'snapshot' : 'snapshots'}
             </Badge>
           )}
@@ -269,7 +269,7 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
           <div className="text-xs text-muted-foreground text-center flex flex-col items-center gap-2 py-4">
             <Clock className="w-5 h-5 text-muted-foreground/50" />
             <p>Sin cambios registrados todavía.</p>
-            <p className="text-[11px] text-muted-foreground/70 max-w-sm">
+            <p className="text-caption text-muted-foreground/70 max-w-sm">
               Cuando control de producción cambie un gate, registralo con el botón de arriba —
               quedará en el timeline y se usará para clasificar las piezas posteriores.
             </p>

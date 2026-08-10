@@ -177,7 +177,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-muted-foreground mt-2 italic">
+      <p className="text-caption text-muted-foreground mt-2 italic">
         Medir largo de tubo real desde manifold (bloque de electroválvulas) siguiendo el recorrido del tubo hasta cada flipper.
         Default: estimación lineal (1.5m base + 1.5m × gate).
       </p>

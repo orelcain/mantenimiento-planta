@@ -39,13 +39,13 @@ interface TileGroup {
 // ─── Paleta de colores ────────────────────────────────────────────────────────
 
 const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label: string }> = {
-  red:     { bg: 'bg-red-500/15',     border: 'border-red-500/30',     icon: 'text-red-500',     label: 'text-red-700 dark:text-red-400' },
-  blue:    { bg: 'bg-blue-500/15',    border: 'border-blue-500/30',    icon: 'text-blue-500',    label: 'text-blue-700 dark:text-blue-400' },
-  amber:   { bg: 'bg-amber-500/15',   border: 'border-amber-500/30',   icon: 'text-amber-500',   label: 'text-amber-700 dark:text-amber-400' },
-  green:   { bg: 'bg-green-500/15',   border: 'border-green-500/30',   icon: 'text-green-500',   label: 'text-green-700 dark:text-green-400' },
-  purple:  { bg: 'bg-purple-500/15',  border: 'border-purple-500/30',  icon: 'text-purple-500',  label: 'text-purple-700 dark:text-purple-400' },
-  emerald: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', icon: 'text-emerald-500', label: 'text-emerald-700 dark:text-emerald-400' },
-  orange:  { bg: 'bg-orange-500/15',  border: 'border-orange-500/30',  icon: 'text-orange-500',  label: 'text-orange-700 dark:text-orange-400' },
+  red:     { bg: 'bg-red-500/[0.15]',     border: 'border-red-500/[0.25]',     icon: 'text-red-500',     label: 'text-ink-crit' },
+  blue:    { bg: 'bg-primary/[0.15]',    border: 'border-primary/[0.25]',    icon: 'text-blue-500',    label: 'text-ink-info' },
+  amber:   { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25]',   icon: 'text-amber-500',   label: 'text-ink-warn' },
+  green:   { bg: 'bg-green-500/[0.15]',   border: 'border-green-500/[0.25]',   icon: 'text-green-500',   label: 'text-ink-ok' },
+  purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-purple-500',  label: 'text-cat-6-ink' },
+  emerald: { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]', icon: 'text-emerald-500', label: 'text-ink-ok' },
+  orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-orange-500',  label: 'text-cat-4-ink' },
   slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
 }
 
@@ -223,7 +223,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
       <button
         onClick={onTap}
         className={cn(
-          'shrink-0 text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
+          'shrink-0 text-caption font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
           onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
         )}
       >
@@ -236,7 +236,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
     <div
       onClick={onTap}
       className={cn(
-        'absolute inset-0 overflow-hidden rounded-xl z-10',
+        'absolute inset-0 overflow-hidden rounded-card z-10',
         onTap ? 'cursor-pointer' : 'pointer-events-none',
       )}
     >
@@ -261,12 +261,12 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
     <Link
       to={tile.href}
       className={cn(
-        'flex items-center gap-3 px-4 py-3.5 rounded-xl border mb-2 overflow-hidden relative',
+        'flex items-center gap-3 px-4 py-3.5 rounded-card border mb-2 overflow-hidden relative',
         'transition-all active:scale-[0.98] touch-manipulation select-none',
         c.bg, c.border,
       )}
     >
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', c.bg)}>
+      <div className={cn('w-9 h-9 rounded-card flex items-center justify-center shrink-0', c.bg)}>
         <Icon className={cn('h-5 w-5', c.icon)} />
       </div>
       <div className="flex-1 min-w-0">
@@ -283,11 +283,11 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
         <div className="flex gap-1.5 shrink-0">
           <button
             onClick={(e) => { e.preventDefault(); onRelease?.(); setConfirming(false) }}
-            className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+            className="text-caption bg-emerald-500 text-white rounded-card w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
           >✓</button>
           <button
             onClick={(e) => { e.preventDefault(); setConfirming(false) }}
-            className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
+            className="text-caption bg-muted text-muted-foreground rounded-card w-7 h-7 flex items-center justify-center active:scale-90"
           >✗</button>
         </div>
       )}
@@ -311,14 +311,14 @@ function AppShareCard() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-muted overflow-hidden">
+    <div className="rounded-card border border-border bg-muted overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2.5 px-4 py-3 active:bg-muted/80 transition-colors touch-manipulation"
       >
         <QrCode className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="flex-1 text-sm font-medium text-left">Compartir app</span>
-        <span className="text-[10px] text-muted-foreground mr-1">Invitar usuarios</span>
+        <span className="text-caption text-muted-foreground mr-1">Invitar usuarios</span>
         {open
           ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -326,17 +326,17 @@ function AppShareCard() {
       </button>
       {open && (
         <div className="px-4 pb-4 flex flex-col items-center gap-3 border-t border-border/60 pt-3">
-          <div className="p-2 bg-white rounded-xl shadow-sm">
+          <div className="p-2 bg-white rounded-card shadow-sm">
             <QRCodeSVG value={appUrl} size={148} level="M" />
           </div>
           <p className="text-xs text-center text-muted-foreground leading-snug max-w-[200px]">
             Escanea para abrir la app.<br />
             Inicia sesión con <strong>Google</strong> o con tu cuenta si ya estás registrado.
           </p>
-          <p className="text-[10px] text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
+          <p className="text-caption text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
+            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-card bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
           >
             <Share2 className="h-3.5 w-3.5" />
             Compartir enlace
@@ -366,7 +366,7 @@ export function MobileHomeGrid() {
         {/* Botón Menú — a la izquierda del nombre */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
+          className="w-9 h-9 rounded-card bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
           aria-label="Menú"
         >
           <Menu className="h-4 w-4 text-foreground" />
@@ -391,7 +391,7 @@ export function MobileHomeGrid() {
 
         return (
           <div key={group.label} className="space-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
+            <p className="text-caption font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
               {group.label}
             </p>
 

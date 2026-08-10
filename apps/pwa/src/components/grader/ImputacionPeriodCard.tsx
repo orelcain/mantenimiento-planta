@@ -61,11 +61,11 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
           <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          <p className="text-caption font-semibold text-muted-foreground uppercase tracking-wide">
             Imputación del período
           </p>
           <span
-            className={cn('text-[9px] px-1.5 rounded-ctl border border-current/30 ml-auto', th.text)}
+            className={cn('text-caption px-1.5 rounded-ctl border border-current/30 ml-auto', th.text)}
             title="Del tiempo detenido del período, cuánto llegó con una causal anotada en Shoplogix. No mide a Mantención: mide si los turnos quedaron documentados."
           >
             {th.label}
@@ -77,7 +77,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
             <p className={cn('text-lg font-bold leading-none tabular-nums', th.text)}>
               {pct.toFixed(0)}%
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">con causal</p>
+            <p className="text-caption text-muted-foreground mt-0.5">con causal</p>
           </div>
 
           {/* La serie es el punto de la card: un 60% que viene de 20% es una
@@ -97,7 +97,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                   )
                 })}
               </div>
-              <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+              <div className="flex justify-between text-caption text-muted-foreground mt-0.5">
                 <span className="tabular-nums">{serie[0]!.dateKey.slice(5)}</span>
                 {tend && (
                   <span className={cn(
@@ -117,7 +117,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
           <span className="tabular-nums">
             <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
           </span>
@@ -136,7 +136,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
             {imputacion.topCategorias.slice(0, 5).map((c) => (
               <span
                 key={c.label}
-                className="text-[9px] px-1.5 py-px rounded-ctl bg-muted border border-border text-muted-foreground tabular-nums"
+                className="text-caption px-1.5 py-px rounded-ctl bg-muted border border-border text-muted-foreground tabular-nums"
               >
                 {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
               </span>

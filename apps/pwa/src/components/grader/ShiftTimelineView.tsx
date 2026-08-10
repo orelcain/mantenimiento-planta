@@ -1262,7 +1262,7 @@ export function ShiftTimelineView({
           {coverage && (
             <span
               className={cn(
-                'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium',
+                'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium',
                 coverage.pct >= 95 && 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok',
                 coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn',
                 coverage.pct < 85 && 'border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] text-cat-4-ink',
@@ -1287,7 +1287,7 @@ export function ShiftTimelineView({
           )}
           {productionWindow && productionWindow.excludedPieces > 0 && (
             <span
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground text-caption font-medium"
               title={`Calibración/aseo detectado por lotes no-correlativos${productionWindow.dummyLots.size > 0 ? ` (${[...productionWindow.dummyLots].join(', ')})` : ' (ej. 1111)'}. ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
@@ -1301,7 +1301,7 @@ export function ShiftTimelineView({
             <button
               type="button"
               onClick={onUploadClick}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-primary hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-[11px] font-medium"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-ctl border border-primary/[0.25] bg-primary/[0.15] text-primary hover:bg-primary/[0.15] active:bg-primary/[0.15] transition-colors text-caption font-medium"
               title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
             >
               <Upload className="w-3 h-3" />
@@ -1312,7 +1312,7 @@ export function ShiftTimelineView({
       {hasData && (
         <div className="flex items-center gap-2 px-6 pb-2 flex-wrap">
           {/* Zoom horario dinámico — scroll horizontal en mobile, wrap en desktop */}
-          <div className="flex flex-nowrap sm:flex-wrap border border-border rounded-ctl overflow-x-auto sm:overflow-hidden text-[11px] max-w-full scrollbar-thin">
+          <div className="flex flex-nowrap sm:flex-wrap border border-border rounded-ctl overflow-x-auto sm:overflow-hidden text-caption max-w-full scrollbar-thin">
             <button
               onClick={() => {
                 setActiveZoom('turno')
@@ -1379,7 +1379,7 @@ export function ShiftTimelineView({
               return (
                 <span
                   key={cause}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium"
                   style={{ borderColor: color + '60', backgroundColor: color + '15', color }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
@@ -1481,7 +1481,7 @@ export function ShiftTimelineView({
               {checkpoints.length > CHECKPOINT_PREVIEW && (
                 <button
                   onClick={() => setCheckpointsExpanded((v) => !v)}
-                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-caption text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {checkpointsExpanded ? 'Ocultar' : `Ver todos (${checkpoints.length})`}
                 </button>
@@ -1508,7 +1508,7 @@ export function ShiftTimelineView({
                   {cp.p0Delta != null && (
                     <span
                       className={cn(
-                        'ml-2 tabular-nums text-[11px] font-medium',
+                        'ml-2 tabular-nums text-caption font-medium',
                         cp.p0Delta > 0 ? 'text-rose-400' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-slate-400',
                       )}
                       title="Δ P0% respecto a la carga anterior"
@@ -1529,7 +1529,7 @@ export function ShiftTimelineView({
               </div>
             ))}
             {!checkpointsExpanded && checkpoints.length > CHECKPOINT_PREVIEW && (
-              <p className="text-[11px] text-muted-foreground pl-1">
+              <p className="text-caption text-muted-foreground pl-1">
                 +{checkpoints.length - CHECKPOINT_PREVIEW} eventos más
               </p>
             )}

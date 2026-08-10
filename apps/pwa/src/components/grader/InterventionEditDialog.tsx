@@ -122,19 +122,19 @@ export function InterventionEditDialog({
         <div className="space-y-3">
           {/* Fecha y hora */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Fecha y hora</label>
+            <label className="text-caption font-medium text-muted-foreground">Fecha y hora</label>
             <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background" />
           </div>
 
           {/* Equipo */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Equipo</label>
+            <label className="text-caption font-medium text-muted-foreground">Equipo</label>
             <EquipoCombobox options={equipoOptions} value={equipoId} onChange={setEquipoId} placeholder="Área general / buscar equipo…" />
           </div>
 
           {/* Tipo */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Tipo de mantención</label>
+            <label className="text-caption font-medium text-muted-foreground">Tipo de mantención</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {TIPOS.map((t) => (
                 <button key={t.id} type="button" onClick={() => setTipo(t.id)}
@@ -149,7 +149,7 @@ export function InterventionEditDialog({
 
           {/* Condición */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Condición</label>
+            <label className="text-caption font-medium text-muted-foreground">Condición</label>
             <div className="grid grid-cols-3 gap-1.5">
               {SEVS.map((s) => (
                 <button key={s.id} type="button" onClick={() => setSeveridad(s.id)}
@@ -159,7 +159,7 @@ export function InterventionEditDialog({
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
+            <p className="text-caption text-muted-foreground leading-relaxed">
               Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}🟢 <b>1</b> como nuevo ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
             </p>
@@ -167,23 +167,23 @@ export function InterventionEditDialog({
 
           {/* Detalle */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Detalle</label>
+            <label className="text-caption font-medium text-muted-foreground">Detalle</label>
             <Textarea value={hallazgo} onChange={(e) => setHallazgo(e.target.value)} rows={3} className="text-sm bg-background resize-none" />
           </div>
 
           {/* SAP */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">N° Aviso SAP</label>
+              <label className="text-caption font-medium text-muted-foreground">N° Aviso SAP</label>
               <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="ej. 10012345" className="text-sm bg-background" inputMode="numeric" />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">N° Orden (OT) SAP</label>
+              <label className="text-caption font-medium text-muted-foreground">N° Orden (OT) SAP</label>
               <Input value={sapOrden} onChange={(e) => setSapOrden(e.target.value)} placeholder="ej. 40098765" className="text-sm bg-background" inputMode="numeric" />
             </div>
           </div>
           {!sapOrden.trim() && (
-            <Badge variant="outline" className="text-[10px] text-ink-warn border-amber-500/[0.25]">
+            <Badge variant="outline" className="text-caption text-ink-warn border-amber-500/[0.25]">
               SAP pendiente · falta crear la OT
             </Badge>
           )}

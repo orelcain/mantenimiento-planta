@@ -25,7 +25,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
             <span className="text-primary font-medium"> [fotocélula]</span> → <span className="font-mono font-semibold">Grading ❹</span>
           </p>
         </div>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-caption">
           Medir con tach SKF para calibrar
         </Badge>
       </div>
@@ -58,19 +58,19 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                     <span className="text-xs opacity-70">{resp.icon}</span>
                     {getBeltLabel(beltId)}
                     {beltId === 'main' && (
-                      <Badge className="text-[10px] bg-primary/10 text-primary border-primary/30">Principal</Badge>
+                      <Badge className="text-caption bg-primary/10 text-primary border-primary/30">Principal</Badge>
                     )}
                   </CardTitle>
                   <CalibBadge status={belt.calibrationStatus} />
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{resp.role}</p>
+                <p className="text-caption text-muted-foreground mt-0.5">{resp.role}</p>
               </CardHeader>
               <CardContent className="pt-0 space-y-2">
                 {/* Largo + velocidad en grid 2-col */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="flex items-center gap-1 mb-1">
-                      <Label className="text-[10px] text-muted-foreground">Largo (m)</Label>
+                      <Label className="text-caption text-muted-foreground">Largo (m)</Label>
                       <InfoTooltip
                         title="Largo útil de la cinta"
                         text="Distancia lineal de la superficie superior, de polea a polea. NO el perímetro completo del lazo."
@@ -91,7 +91,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                   </div>
                   <div>
                     <div className="flex items-center gap-1 mb-1">
-                      <Label className="text-[10px] text-muted-foreground">Velocidad (m/s)</Label>
+                      <Label className="text-caption text-muted-foreground">Velocidad (m/s)</Label>
                       <InfoTooltip
                         title="Velocidad base calibrada"
                         text="Velocidad de la superficie medida con tachómetro SKF. Es el parámetro de planta — no el setpoint operacional del turno."
@@ -112,7 +112,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                 </div>
 
                 {/* Métricas derivadas */}
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
+                <div className="flex items-center gap-3 text-caption text-muted-foreground flex-wrap">
                   <span className="font-mono">Tránsito {transitSec.toFixed(1)}s</span>
                   {belt.widthMeters && (
                     <span className="font-mono">Ancho {(belt.widthMeters * 1000).toFixed(0)}mm</span>
@@ -124,7 +124,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                     <Badge
                       variant="outline"
                       className={cn(
-                        'text-[10px]',
+                        'text-caption',
                         ratio >= 2 ? 'border-green-500/[0.25] text-ink-ok' :
                         ratio >= 1.2 ? 'border-amber-500/[0.25] text-ink-warn' :
                         'border-red-500/[0.25] text-ink-crit',
@@ -138,7 +138,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                 {/* Medición tach SKF */}
                 <div className="flex items-center justify-between gap-2 border-t pt-1.5">
                   {belt.vfd?.measuredAt ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-caption text-muted-foreground">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                       Medido {new Date(belt.vfd.measuredAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })}
                       {belt.vfd.measuredBeltMps && (
@@ -146,12 +146,12 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                       )}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground italic">Sin medición tach</span>
+                    <span className="text-caption text-muted-foreground italic">Sin medición tach</span>
                   )}
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-6 text-[10px] px-2"
+                    className="h-6 text-caption px-2"
                     onClick={() => setTachModalBelt(beltId)}
                   >
                     <Gauge className="w-3 h-3 mr-1" /> SKF

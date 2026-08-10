@@ -68,13 +68,13 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <span className="text-xs text-slate-400 tabular-nums flex-shrink-0">
           {fmtTime(corr.pauseStart)}
         </span>
-        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
+        <Badge variant="outline" className={`text-caption px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
           {fmtDurationSec(corr.pauseDurSec)}
         </Badge>
         <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
           variant="outline"
-          className={`ml-auto text-[10px] px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
+          className={`ml-auto text-caption px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
           title={`Confianza ${Math.round(corr.confidence * 100)}% (alta ≥70%, media 40-70%, baja <40%)`}
         >
           confianza {conf.text}
@@ -82,7 +82,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
       </button>
 
       {expanded && corr.contributors.length > 0 && (
-        <div className="mt-2 ml-6 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border/60 pl-3">
+        <div className="mt-2 ml-6 space-y-1 text-caption text-muted-foreground border-l-2 border-border/60 pl-3">
           {corr.contributors.map(c => (
             <div key={c.machineid} className="flex items-center gap-2">
               <span className="text-foreground min-w-[9rem]">{shortMachineName(c.machineName)}</span>
@@ -177,7 +177,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         {/* Sub-info: cuántos paros fueron coincidentales (colación, etc.) — claridad
             sobre por qué el conteo upstream excluye esas filas cyan abajo */}
         {coincidentalCount > 0 && (
-          <div className="text-[11px] text-cyan-400/80 mb-2 flex items-center gap-1.5">
+          <div className="text-caption text-cyan-400/80 mb-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
             {coincidentalCount} paro{coincidentalCount !== 1 ? 's' : ''} coincide{coincidentalCount === 1 ? '' : 'n'} con paros programados de Baader (colación, reunión) — excluido{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
           </div>
@@ -193,7 +193,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
             {/* Breakdown por máquina — qué Baader atender primero */}
             {summary.byMachine.length > 0 && (
               <div className="mb-3 p-2 rounded-ctl border border-border/80 bg-muted/40">
-                <div className="text-[10px] text-muted-foreground mb-1.5 flex items-center gap-1">
+                <div className="text-caption text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Factory className="w-3 h-3" />
                   Impacto por máquina (paros del Grader donde la máquina contribuyó)
                 </div>
@@ -211,7 +211,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     return (
                       <div
                         key={m.machineid}
-                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
+                        className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
                       >
                         <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
@@ -229,7 +229,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     )
                   })}
                 </div>
-                <div className="text-[9px] text-muted-foreground mt-1.5">
+                <div className="text-caption text-muted-foreground mt-1.5">
                   Recomendación: priorizar mantención en la máquina con mayor overlap.
                 </div>
               </div>
@@ -245,7 +245,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                 />
               ))}
               {sorted.length > 10 && (
-                <div className="text-[11px] text-muted-foreground py-2 text-center">
+                <div className="text-caption text-muted-foreground py-2 text-center">
                   … y {sorted.length - 10} paros más
                 </div>
               )}

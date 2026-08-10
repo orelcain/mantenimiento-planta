@@ -284,7 +284,7 @@ export function QuickInterventionCapture({
             <Mic className="h-4 w-4 text-primary" />
             Captura Rápida de Intervención
             {areaLabel && (
-              <Badge variant="outline" className="ml-1 text-[10px] font-normal text-muted-foreground border-border/50">
+              <Badge variant="outline" className="ml-1 text-caption font-normal text-muted-foreground border-border/50">
                 {areaLabel}
               </Badge>
             )}
@@ -329,7 +329,7 @@ export function QuickInterventionCapture({
           {/* Título (sugerido / editable) */}
           {(titulo || suggesting) && (
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">Título</label>
+              <label className="text-caption font-medium text-muted-foreground">Título</label>
               <Input
                 value={titulo}
                 onChange={(e) => setTitulo(e.target.value)}
@@ -342,7 +342,7 @@ export function QuickInterventionCapture({
           {/* Equipo del área (opcional, con buscador) — solo si la línea tiene areaNodeId */}
           {areaNodeId && (
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">
+              <label className="text-caption font-medium text-muted-foreground">
                 Equipo <span className="text-muted-foreground/60">(opcional)</span>
               </label>
               <EquipoCombobox
@@ -352,7 +352,7 @@ export function QuickInterventionCapture({
                 placeholder="Área general · escribí para buscar equipo…"
               />
               {loadingEquip && (
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <p className="text-caption text-muted-foreground flex items-center gap-1">
                   <Loader2 className="h-3 w-3 animate-spin" /> Cargando equipos del área…
                 </p>
               )}
@@ -361,7 +361,7 @@ export function QuickInterventionCapture({
 
           {/* Tipo de mantención */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Tipo de mantención</label>
+            <label className="text-caption font-medium text-muted-foreground">Tipo de mantención</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {TIPOS.map((t) => {
                 const Icon = t.icon
@@ -388,7 +388,7 @@ export function QuickInterventionCapture({
 
           {/* Condición / severidad */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Condición resultante</label>
+            <label className="text-caption font-medium text-muted-foreground">Condición resultante</label>
             <div className="grid grid-cols-3 gap-1.5">
               {SEVERIDADES.map((s) => {
                 const active = severidad === s.id
@@ -408,7 +408,7 @@ export function QuickInterventionCapture({
                 )
               })}
             </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
+            <p className="text-caption text-muted-foreground leading-relaxed">
               Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}🟢 <b>1</b> como nuevo, sin alertas ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
             </p>
@@ -416,7 +416,7 @@ export function QuickInterventionCapture({
 
           {/* Trazabilidad SAP (opcional) */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+            <label className="text-caption font-medium text-muted-foreground flex items-center gap-1">
               <FileText className="h-3 w-3" /> SAP <span className="text-muted-foreground/60">(opcional — si lo dejás vacío queda "SAP pendiente")</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -465,15 +465,15 @@ export function QuickInterventionCapture({
           <div className="flex flex-wrap items-center gap-2">
             <div className="rounded-ctl border border-primary/30 bg-primary/10 px-3 py-1.5">
               <span className="text-lg font-bold text-primary tabular-nums">{kpi.totalMes}</span>
-              <span className="text-[11px] text-muted-foreground ml-1.5">este mes</span>
+              <span className="text-caption text-muted-foreground ml-1.5">este mes</span>
             </div>
             {TIPOS.map((t) => kpi.porTipo[t.id] ? (
-              <Badge key={t.id} variant="outline" className="text-[10px] font-normal text-muted-foreground border-border/50">
+              <Badge key={t.id} variant="outline" className="text-caption font-normal text-muted-foreground border-border/50">
                 {t.label}: <b className="text-foreground ml-1">{kpi.porTipo[t.id]}</b>
               </Badge>
             ) : null)}
             {kpi.totalAll > kpi.totalMes && (
-              <span className="text-[11px] text-muted-foreground">· {kpi.totalAll} histórico</span>
+              <span className="text-caption text-muted-foreground">· {kpi.totalAll} histórico</span>
             )}
           </div>
 
@@ -497,12 +497,12 @@ export function QuickInterventionCapture({
                   <span className={cn('h-2 w-2 rounded-full shrink-0 mt-1.5', SEV_DOT[e.severidad] ?? 'bg-muted')} />
                   <div className="min-w-0 flex-1">
                     {equipoLabel && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-primary/90 mb-0.5">
+                      <span className="inline-flex items-center gap-1 text-caption text-primary/90 mb-0.5">
                         <Wrench className="h-2.5 w-2.5" /> {equipoLabel}
                       </span>
                     )}
                     <p className="text-xs text-foreground break-words">{e.hallazgo}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                    <p className="text-caption text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5">
                       <span className="uppercase tracking-wide">{TIPO_LABEL[e.tipo] ?? e.tipo}</span>
                       <span>·</span>
                       <span>{fmtFecha(e.fecha)}</span>
@@ -512,9 +512,9 @@ export function QuickInterventionCapture({
                     {/* SAP */}
                     <div className="flex flex-wrap items-center gap-1 mt-1">
                       {e.sapOrden
-                        ? <Badge variant="outline" className="text-[9px] text-primary border-primary/[0.25]">OT {e.sapOrden}</Badge>
-                        : <Badge variant="outline" className="text-[9px] text-ink-warn border-amber-500/[0.25]">SAP pendiente</Badge>}
-                      {e.sapAviso && <Badge variant="outline" className="text-[9px] text-muted-foreground border-border/50">Aviso {e.sapAviso}</Badge>}
+                        ? <Badge variant="outline" className="text-caption text-primary border-primary/[0.25]">OT {e.sapOrden}</Badge>
+                        : <Badge variant="outline" className="text-caption text-ink-warn border-amber-500/[0.25]">SAP pendiente</Badge>}
+                      {e.sapAviso && <Badge variant="outline" className="text-caption text-muted-foreground border-border/50">Aviso {e.sapAviso}</Badge>}
                     </div>
                   </div>
                   <button
@@ -579,7 +579,7 @@ export function QuickInterventionCapture({
                       {RIESGO_STYLE[insights.riesgo].label}
                     </span>
                     {insights.confianza != null && (
-                      <span className="text-[10px] text-muted-foreground self-center">
+                      <span className="text-caption text-muted-foreground self-center">
                         confianza {Math.round(insights.confianza * 100)}%
                       </span>
                     )}
@@ -591,7 +591,7 @@ export function QuickInterventionCapture({
                   {/* Patrones recurrentes */}
                   {insights.patrones.length > 0 && (
                     <div className="space-y-1.5">
-                      <p className="text-[11px] font-medium text-muted-foreground">Patrones recurrentes</p>
+                      <p className="text-caption font-medium text-muted-foreground">Patrones recurrentes</p>
                       {insights.patrones.map((p, i) => (
                         <div key={i} className="rounded-ctl border border-border bg-background px-2.5 py-2">
                           <p className="text-xs text-foreground flex items-start gap-1.5">
@@ -599,7 +599,7 @@ export function QuickInterventionCapture({
                             <span className="break-words">{p.descripcion}</span>
                           </p>
                           {p.recomendacion && (
-                            <p className="text-[11px] text-ink-ok/80 mt-1 flex items-start gap-1">
+                            <p className="text-caption text-ink-ok/80 mt-1 flex items-start gap-1">
                               <Lightbulb className="h-3 w-3 shrink-0 mt-0.5" />
                               <span className="break-words">{p.recomendacion}</span>
                             </p>
@@ -612,10 +612,10 @@ export function QuickInterventionCapture({
                   {/* Equipos a vigilar */}
                   {insights.equiposAVigilar.length > 0 && (
                     <div className="space-y-1">
-                      <p className="text-[11px] font-medium text-muted-foreground">Equipos / componentes a vigilar</p>
+                      <p className="text-caption font-medium text-muted-foreground">Equipos / componentes a vigilar</p>
                       <div className="flex flex-wrap gap-1.5">
                         {insights.equiposAVigilar.map((eq, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] font-normal text-ink-warn border-amber-500/[0.25]">
+                          <Badge key={i} variant="outline" className="text-caption font-normal text-ink-warn border-amber-500/[0.25]">
                             {eq}
                           </Badge>
                         ))}
@@ -626,7 +626,7 @@ export function QuickInterventionCapture({
                   {/* Próxima acción preventiva */}
                   {insights.proximaAccion && (
                     <div className="rounded-ctl border border-primary/30 bg-primary/10 px-2.5 py-2">
-                      <p className="text-[11px] font-medium text-primary flex items-center gap-1.5">
+                      <p className="text-caption font-medium text-primary flex items-center gap-1.5">
                         <Lightbulb className="h-3.5 w-3.5" /> Próxima acción preventiva (RCM)
                       </p>
                       <p className="text-xs text-foreground/90 mt-1 break-words">{insights.proximaAccion}</p>

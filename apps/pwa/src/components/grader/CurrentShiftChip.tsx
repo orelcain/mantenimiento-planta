@@ -251,7 +251,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
           <span className="text-xs font-medium text-ink-warn/90">
             Programado · {meta.label}
           </span>
-          <span className="text-[10px] text-amber-700/80 dark:text-amber-300/70">
+          <span className="text-caption text-amber-700/80 dark:text-amber-300/70">
             {upstream.loading ? 'Verificando producción…' : 'Sin actividad detectada'}
           </span>
         </span>
@@ -279,7 +279,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         <span className="text-xs font-medium text-ink-ok">
           En curso · {meta.label}
         </span>
-        <span className="text-[10px] text-emerald-700/90 dark:text-emerald-300/80 tabular-nums">
+        <span className="text-caption text-emerald-700/90 dark:text-emerald-300/80 tabular-nums">
           {elapsedLabel} transcurridos{progressPct != null ? ` · ${progressPct}%` : ''}
         </span>
       </span>

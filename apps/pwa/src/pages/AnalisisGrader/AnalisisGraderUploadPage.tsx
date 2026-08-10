@@ -400,7 +400,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           }
           Cargar Excel
           {files.length > 0 && (
-            <Badge className={cn('text-[10px] h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-primary' : '')}>
+            <Badge className={cn('text-caption h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-primary' : '')}>
               {files.length}
             </Badge>
           )}
@@ -476,9 +476,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             <p className="text-sm font-semibold">
               {parsing ? 'Procesando...' : 'Arrastra los Excel de Matrix aquí'}
             </p>
-            <p className="text-[11px] lg:text-xs text-muted-foreground mt-1">.xlsx o .xls (grader Pieza-Pieza / Punto Cero)</p>
+            <p className="text-caption lg:text-xs text-muted-foreground mt-1">.xlsx o .xls (grader Pieza-Pieza / Punto Cero)</p>
             {!parsing && (
-              <p className="text-[10px] text-primary/60 mt-2 hidden lg:block">o haz clic para seleccionar archivos</p>
+              <p className="text-caption text-primary/60 mt-2 hidden lg:block">o haz clic para seleccionar archivos</p>
             )}
             {parsing && <Loader2 className="h-4 w-4 animate-spin mx-auto mt-2 text-muted-foreground" />}
           </div>
@@ -497,7 +497,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               {files.map((f) => (
                 <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded-ctl px-2 py-1.5 text-xs">
                   <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                  <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
+                  <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
                     {KIND_LABELS[f.fileMeta.kind]}
                   </Badge>
                   <span className="truncate flex-1">{f.fileMeta.name}</span>
@@ -532,7 +532,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Aviso Puerta 0 faltante */}
           {hasPiezaPieza && files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && (
-            <p className="text-[11px] text-ink-warn flex items-center gap-1">
+            <p className="text-caption text-ink-warn flex items-center gap-1">
               <Info className="h-3 w-3" />
               Sin Puerta 0: el desglose de errores será inferido desde los pesos
             </p>

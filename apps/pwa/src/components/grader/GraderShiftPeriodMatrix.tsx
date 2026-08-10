@@ -151,7 +151,7 @@ export function GraderShiftPeriodMatrix({
                   <div
                     key={dk}
                     className={cn(
-                      'text-center text-[10px] font-mono leading-tight pb-1',
+                      'text-center text-caption font-mono leading-tight pb-1',
                       isWeekend(dk) ? 'text-primary font-semibold' : 'text-muted-foreground',
                     )}
                   >
@@ -188,14 +188,14 @@ export function GraderShiftPeriodMatrix({
                       meta.borderColorClass)}>
                       <Icon className={cn('h-3.5 w-3.5 shrink-0', meta.textColorClass)} aria-hidden />
                       <span className="min-w-0">
-                        <span className="block text-[11.5px] font-semibold leading-tight truncate">
+                        <span className="block text-footnote font-semibold leading-tight truncate">
                           {/* Los turnos llevan el nombre FIEL de Shoplogix. El
                               residuo sin turno no ES un turno — mostrar el
                               string interno "Unscheduled" se leía como bug; se
                               nombra por lo que significa y lo que hay que hacer. */}
                           {isOutOfShift ? 'Sin turno' : displayShiftName(shiftId)}
                         </span>
-                        <span className="block text-[9px] text-muted-foreground font-mono leading-tight">
+                        <span className="block text-caption text-muted-foreground font-mono leading-tight">
                           {isOutOfShift ? 'configurar en Shoplogix' : meta.scheduleHint}
                         </span>
                       </span>
@@ -265,7 +265,7 @@ export function GraderShiftPeriodMatrix({
                             />
                           )}
                           {(s.crossesMidnight || s.startDayOffset > 0) && (
-                            <span aria-hidden className="absolute top-0 right-[2px] text-[8px] font-bold opacity-90">
+                            <span aria-hidden className="absolute top-0 right-[2px] text-caption font-bold opacity-90">
                               {s.startDayOffset > 0 ? '⁺¹' : '→'}
                             </span>
                           )}
@@ -275,7 +275,7 @@ export function GraderShiftPeriodMatrix({
                           {s.mergedFrom && (
                             <span
                               aria-hidden
-                              className="absolute bottom-0 left-[2px] text-[8px] font-bold opacity-90 leading-none"
+                              className="absolute bottom-0 left-[2px] text-caption font-bold opacity-90 leading-none"
                             >
                               ×{s.mergedFrom.length}
                             </span>
@@ -294,9 +294,9 @@ export function GraderShiftPeriodMatrix({
                   className="grid gap-[2px] mt-2 pt-2 border-t border-border"
                   style={{ gridTemplateColumns: gridCols }}
                 >
-                  <div className="pl-2 text-[11px] text-muted-foreground">Σ 24 h</div>
+                  <div className="pl-2 text-caption text-muted-foreground">Σ 24 h</div>
                   {days.map(dk => (
-                    <div key={dk} className="text-center text-[9px] font-mono tabular-nums text-muted-foreground">
+                    <div key={dk} className="text-center text-caption font-mono tabular-nums text-muted-foreground">
                       {totals.get(dk) ? Math.round(totals.get(dk)!).toLocaleString('es-CL') : ''}
                     </div>
                   ))}
@@ -366,7 +366,7 @@ export function GraderShiftPeriodMatrix({
             {hovered.mergedFrom && (
               <div className="mt-0.5 pl-1.5 border-l border-border/60 space-y-0.5">
                 {hovered.mergedFrom.map(inst => (
-                  <div key={inst.key} className="font-mono text-[10px] text-muted-foreground">
+                  <div key={inst.key} className="font-mono text-caption text-muted-foreground">
                     {formatShiftWindow(inst)} · {inst.cycles.toLocaleString('es-CL')} cic
                   </div>
                 ))}

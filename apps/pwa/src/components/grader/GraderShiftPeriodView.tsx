@@ -174,7 +174,7 @@ export function GraderShiftPeriodView({
             los filtros, porque no cambia lo que se ve sino que se lo lleva. */}
         {onExport && (
           <div className="inline-flex items-center gap-1 ml-auto">
-            <span className="text-[11px] text-muted-foreground mr-0.5 hidden sm:inline">
+            <span className="text-caption text-muted-foreground mr-0.5 hidden sm:inline">
               Resumen del mes
             </span>
             <button

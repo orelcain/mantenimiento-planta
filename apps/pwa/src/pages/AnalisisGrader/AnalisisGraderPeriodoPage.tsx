@@ -352,7 +352,7 @@ export function AnalisisGraderPeriodoPage() {
                 Siguiente
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[11px] text-muted-foreground ml-1">
+              <span className="text-caption text-muted-foreground ml-1">
                 {activePreset === 'week'
                   ? (weekOffset === 0 ? 'semana actual' : `${weekOffset < 0 ? 'hace' : 'en'} ${Math.abs(weekOffset)} semana${Math.abs(weekOffset) !== 1 ? 's' : ''}`)
                   : (monthOffset === 0 ? 'mes actual' : `${monthOffset < 0 ? 'hace' : 'en'} ${Math.abs(monthOffset)} mes${Math.abs(monthOffset) !== 1 ? 'es' : ''}`)

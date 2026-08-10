@@ -85,7 +85,7 @@ export function AnalisisGraderConfigPage() {
         <div className="flex items-center gap-2 min-w-0">
           <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium truncate">Configuración del Grader</span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+          <Badge variant="outline" className="text-caption px-1.5 py-0 shrink-0">
             {plantLineCfg.label}
           </Badge>
         </div>

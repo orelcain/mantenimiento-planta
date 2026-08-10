@@ -514,7 +514,7 @@ export function MainLayout() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Skip to content - accesibilidad */}
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-ctl">
         Ir al contenido principal
       </a>
 
@@ -535,14 +535,14 @@ export function MainLayout() {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
+              <div className="p-2 bg-primary/10 rounded-card">
                 <Wrench className="h-5 w-5 text-primary" />
               </div>
               <span className="font-semibold">Mantenimiento</span>
             </div>
             <button
               onClick={toggleSidebarCollapse}
-              className="p-1.5 hover:bg-muted rounded-md transition-colors"
+              className="p-1.5 hover:bg-muted rounded-ctl transition-colors"
               aria-label="Contraer menú"
               title="Contraer menú"
             >
@@ -558,7 +558,7 @@ export function MainLayout() {
                 <div key={group.id}>
                   <button
                     onClick={() => toggleGroup(group.id)}
-                    className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                    className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                   >
                     <span>{group.label}</span>
                     <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
@@ -598,7 +598,7 @@ export function MainLayout() {
               tooltip, para soporte. */}
           <div className="px-4 pb-2">
             <div
-              className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+              className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-ctl"
               title={versionTooltip}
             >
               <span className="tabular-nums">{formatUpdatedLabel()}</span>
@@ -621,7 +621,7 @@ export function MainLayout() {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors"
+                className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10 text-primary text-xs">
@@ -654,7 +654,7 @@ export function MainLayout() {
 
               {/* User dropdown */}
               {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -686,7 +686,7 @@ export function MainLayout() {
               {/* Logo */}
               <div className="flex items-center justify-between h-16 px-4 border-b">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-lg">
+                  <div className="p-2 bg-primary/10 rounded-card">
                     <Wrench className="h-5 w-5 text-primary" />
                   </div>
                   <span className="font-semibold">Mantenimiento</span>
@@ -695,13 +695,13 @@ export function MainLayout() {
                   <button
                     onClick={toggleTheme}
                     title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                    className="p-1.5 rounded-card text-muted-foreground hover:text-foreground hover:bg-muted"
                   >
                     {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </button>
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="p-1 hover:bg-muted rounded"
+                    className="p-1 hover:bg-muted rounded-ctl"
                     aria-label="Cerrar menú"
                   >
                     <X className="h-5 w-5" />
@@ -717,7 +717,7 @@ export function MainLayout() {
                     <div key={group.id}>
                       <button
                         onClick={() => toggleGroup(group.id)}
-                        className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                        className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                       >
                         <span>{group.label}</span>
                         <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
@@ -752,7 +752,7 @@ export function MainLayout() {
               {/* Version label (mobile) — el toggle de tema vive en la cabecera del drawer */}
               <div className="px-4 pb-2 flex items-center gap-2">
                 <div
-                  className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+                  className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-ctl"
                   title={versionTooltip}
                 >
                   <span className="tabular-nums">{formatUpdatedLabel()}</span>
@@ -764,7 +764,7 @@ export function MainLayout() {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors"
+                    className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-primary/10 text-primary text-xs">
@@ -785,7 +785,7 @@ export function MainLayout() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-lg shadow-lg overflow-hidden">
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -838,7 +838,7 @@ export function MainLayout() {
           </div>
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-lg text-muted-foreground"
+            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-card text-muted-foreground"
             aria-label="Abrir menú completo"
             aria-expanded={sidebarOpen}
           >
@@ -868,7 +868,7 @@ export function MainLayout() {
           <div className="hidden lg:flex items-center gap-3">
             {(pendingWrites > 0 || lastSyncLabel) && (
               <button
-                className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl border border-amber-500/[0.25] hover:bg-amber-500/[0.15] transition-colors"
                 title={pendingSummary || lastSyncLabel || undefined}
                 onClick={() => setShowSyncPanel((prev) => !prev)}
               >
@@ -877,7 +877,7 @@ export function MainLayout() {
               </button>
             )}
             {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded-ctl">
               <span className="tabular-nums" title={versionTooltip}>{formatBuildDateShort()}</span>
               {isAdmin && (
                 <Button
@@ -894,7 +894,7 @@ export function MainLayout() {
             <button
               onClick={toggleTheme}
               title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-              className="p-1.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="p-1.5 rounded-card transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -912,7 +912,7 @@ export function MainLayout() {
 
         {/* Syncing banner (mobile) */}
         {isOnline && pendingWrites > 0 && (
-          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-2 rounded-card flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Sincronizando...</span>
@@ -928,7 +928,7 @@ export function MainLayout() {
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-3 rounded-card flex items-center justify-between gap-3">
             <AlertTriangle className="h-5 w-5" />
             <div>
               <span className="font-medium block">Sin conexion a internet</span>
@@ -942,7 +942,7 @@ export function MainLayout() {
               )}
             </div>
             {pendingWrites > 0 && (
-              <div className="ml-auto text-xs font-medium bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-1 rounded">
+              <div className="ml-auto text-xs font-medium bg-amber-500/[0.15] text-ink-warn px-2 py-1 rounded-ctl">
                 {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
               </div>
             )}
@@ -950,7 +950,7 @@ export function MainLayout() {
         )}
 
         {showSyncPanel && (pendingEntries.length > 0 || uploadItems.length > 0 || lastSyncLabel) && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-lg shadow-sm p-4">
+          <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-card shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium">Sincronizacion</h3>
@@ -962,7 +962,7 @@ export function MainLayout() {
                 <label className="text-xs text-muted-foreground">
                   <span className="sr-only">Filtro</span>
                   <select
-                    className="text-xs bg-transparent border rounded px-2 py-1"
+                    className="text-xs bg-transparent border rounded-ctl px-2 py-1"
                     value={syncFilter}
                     onChange={(e) => setSyncFilter(e.target.value)}
                   >
@@ -994,7 +994,7 @@ export function MainLayout() {
             </div>
 
             {syncTotalCount > 0 && (
-              <div className="mt-3 rounded-md border p-2">
+              <div className="mt-3 rounded-ctl border p-2">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">
                     Progreso: {syncProcessedCount}/{syncTotalCount} ({syncProgress}%)
@@ -1003,7 +1003,7 @@ export function MainLayout() {
                     Pendientes: {syncPendingCount} · Errores: {syncErrorCount}
                   </span>
                 </div>
-                <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                <div className="h-2 w-full rounded-ctl bg-muted overflow-hidden">
                   <div
                     className="h-2 bg-primary transition-all"
                     style={{ width: `${syncProgress}%` }}
@@ -1110,7 +1110,7 @@ export function MainLayout() {
 
         {/* Banner de actualización disponible */}
         {hasUpdate && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="mx-4 mt-4 lg:mx-6 bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-5 w-5" />
               <div>
@@ -1178,14 +1178,14 @@ export function MainLayout() {
 
         {isReadOnly && (
           <div className="fixed inset-0 z-40 flex items-start justify-center pt-24 pointer-events-none">
-            <div className="pointer-events-auto bg-amber-500/95 text-amber-950 px-4 py-3 rounded-lg shadow-lg border border-amber-600/30 max-w-md">
+            <div className="pointer-events-auto bg-amber-500/[0.15] text-amber-950 px-4 py-3 rounded-card shadow-lg border border-amber-500/[0.25] max-w-md">
               <div className="font-medium">Modo solo lectura</div>
               <div className="text-sm opacity-90">
                 Estas en una seccion critica sin conexion. Conectate para editar o vuelve al inicio.
               </div>
               <div className="mt-2 flex gap-2">
                 <button
-                  className="text-xs px-2 py-1 rounded bg-white/70 hover:bg-white"
+                  className="text-xs px-2 py-1 rounded-ctl bg-white/70 hover:bg-white"
                   onClick={() => navigate('/')}
                 >
                   Ir al inicio

@@ -101,7 +101,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
 
         {/* Divergencia por causa */}
         <div className="space-y-2">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-caption font-medium text-muted-foreground uppercase tracking-wide">
             Participación por causa en el P0
           </p>
           {CAUSE_KEYS.map((cause) => {
@@ -137,7 +137,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
               </div>
             )
           })}
-          <p className="text-[10px] text-muted-foreground pt-1">
+          <p className="text-caption text-muted-foreground pt-1">
             Base temporada: {benchmark.totalPieces.toLocaleString('es-CL')} pp ·{' '}
             {benchmark.totalP0.toLocaleString('es-CL')} P0
           </p>

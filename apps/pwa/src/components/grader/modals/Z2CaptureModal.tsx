@@ -114,7 +114,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
         </DialogHeader>
 
         {/* Guía de navegación Z2 */}
-        <div className="bg-muted rounded-ctl p-2.5 text-[11px] text-muted-foreground space-y-1">
+        <div className="bg-muted rounded-ctl p-2.5 text-caption text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground text-xs">Procedimiento en Z2:</p>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Pantalla principal → <span className="font-mono text-foreground">Cambiar Parámetros</span></li>
@@ -133,9 +133,9 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
             return (
               <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
                 <div>
-                  <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                  <Label className="text-caption text-muted-foreground block mb-0.5">
                     {label}
-                    <span className="ml-1 font-mono text-[9px] text-sky-400/70">Z2: {z2Param}</span>
+                    <span className="ml-1 font-mono text-caption text-sky-400/70">Z2: {z2Param}</span>
                   </Label>
                   <div className="flex items-center gap-1">
                     <Input
@@ -147,10 +147,10 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                       onChange={(e) => setField(key, e.target.value)}
                       className="h-7 w-24 text-xs font-mono px-1.5"
                     />
-                    <span className="text-[10px] text-muted-foreground">ms</span>
+                    <span className="text-caption text-muted-foreground">ms</span>
                   </div>
                 </div>
-                <div className="text-[10px] text-muted-foreground text-right">
+                <div className="text-caption text-muted-foreground text-right">
                   <div>actual</div>
                   <div className="font-mono">{currentVal} ms</div>
                 </div>
@@ -158,7 +158,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                   <Badge
                     variant="outline"
                     className={cn(
-                      'text-[10px] font-mono shrink-0',
+                      'text-caption font-mono shrink-0',
                       Math.abs(delta) === 0 ? 'border-muted text-muted-foreground' :
                       Math.abs(delta) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' :
                       'border-red-500/[0.25] text-ink-crit',
@@ -183,7 +183,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
               <Badge
                 variant="outline"
                 className={cn(
-                  'text-[10px] font-mono',
+                  'text-caption font-mono',
                   Math.abs(deltaCycleMs) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' : 'border-red-500/[0.25] text-ink-crit',
                 )}
               >

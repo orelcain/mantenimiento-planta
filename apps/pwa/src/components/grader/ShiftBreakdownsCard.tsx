@@ -82,13 +82,13 @@ export function ShiftBreakdownsCard({
                     <span className="font-mono text-muted-foreground truncate" title={l.lot}>
                       {l.lot}
                     </span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge variant="outline" className="text-caption shrink-0">
                       {l.pct.toFixed(1)}%
                     </Badge>
                   </div>
                 ))}
                 {lots.length > 5 && (
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-caption text-muted-foreground">
                     +{lots.length - 5} más
                   </div>
                 )}
@@ -107,7 +107,7 @@ export function ShiftBreakdownsCard({
                 {calidadEntries.map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-muted-foreground truncate" title={k}>{k}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge variant="outline" className="text-caption shrink-0">
                       {formatPct(v, calidadTotal)}
                     </Badge>
                   </div>
@@ -127,7 +127,7 @@ export function ShiftBreakdownsCard({
                 {productoEntries.map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-muted-foreground truncate" title={k}>{k}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge variant="outline" className="text-caption shrink-0">
                       {formatPct(v, productoTotal)}
                     </Badge>
                   </div>
@@ -147,7 +147,7 @@ export function ShiftBreakdownsCard({
                 {conservacionEntries.map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-muted-foreground truncate" title={k}>{k}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
+                    <Badge variant="outline" className="text-caption shrink-0">
                       {formatPct(v, conservacionTotal)}
                     </Badge>
                   </div>

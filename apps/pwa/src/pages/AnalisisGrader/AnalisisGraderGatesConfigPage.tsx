@@ -86,14 +86,14 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   if (status === 'idle') return null
   if (status === 'saving') {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-ink-warn font-medium">
+      <span className="inline-flex items-center gap-1 text-caption text-ink-warn font-medium">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
         Guardando…
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-ink-ok font-medium">
+    <span className="inline-flex items-center gap-1 text-caption text-ink-ok font-medium">
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
       Guardado
     </span>
@@ -586,9 +586,9 @@ export function AnalisisGraderGatesConfigPage({
             {shiftDocId && (
               <div className="flex items-center gap-2">
                 {hasShiftThresholdsOverride ? (
-                  <Badge className="text-[10px] bg-primary/[0.15] text-blue-400 border-primary/[0.25]">Override de este turno</Badge>
+                  <Badge className="text-caption bg-primary/[0.15] text-blue-400 border-primary/[0.25]">Override de este turno</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[10px] text-muted-foreground">Global de planta</Badge>
+                  <Badge variant="outline" className="text-caption text-muted-foreground">Global de planta</Badge>
                 )}
               </div>
             )}
@@ -611,7 +611,7 @@ export function AnalisisGraderGatesConfigPage({
                 }
                 className="mt-1"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Típico: 1–3%</p>
+              <p className="text-caption text-muted-foreground mt-1">Típico: 1–3%</p>
             </div>
             <div>
               <div className="flex items-center gap-1">
@@ -630,7 +630,7 @@ export function AnalisisGraderGatesConfigPage({
                 }
                 className="mt-1"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Típico: 3–5%</p>
+              <p className="text-caption text-muted-foreground mt-1">Típico: 3–5%</p>
             </div>
             <div>
               <div className="flex items-center gap-1">
@@ -649,7 +649,7 @@ export function AnalisisGraderGatesConfigPage({
                 }
                 className="mt-1"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Meta: &lt;2%</p>
+              <p className="text-caption text-muted-foreground mt-1">Meta: &lt;2%</p>
             </div>
             <div>
               <div className="flex items-center gap-1">
@@ -668,7 +668,7 @@ export function AnalisisGraderGatesConfigPage({
                 }
                 className="mt-1"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Debe ser &gt; alerta</p>
+              <p className="text-caption text-muted-foreground mt-1">Debe ser &gt; alerta</p>
             </div>
           </div>
 
@@ -729,7 +729,7 @@ export function AnalisisGraderGatesConfigPage({
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Horarios de turnos</h3>
               {isScheduleDirty && (
-                <span className="text-[10px] text-amber-400 font-medium">● sin guardar</span>
+                <span className="text-caption text-amber-400 font-medium">● sin guardar</span>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -765,7 +765,7 @@ export function AnalisisGraderGatesConfigPage({
                     />
                   </div>
                   {shift.quota && shift.quota.value > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-ctl bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
+                    <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
                       Cuota: {shift.quota.value.toLocaleString('es-CL')} {shift.quota.unit === 'kg' ? 'kg' : 'pz'}
                     </span>
                   )}
@@ -804,7 +804,7 @@ export function AnalisisGraderGatesConfigPage({
               Configuración de 12 Gates
             </CardTitle>
             {activeTemplateName && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 {activeTemplateName}
               </Badge>
             )}
@@ -835,12 +835,12 @@ export function AnalisisGraderGatesConfigPage({
                   <div>
                     <span className="text-sm font-medium">{t.name}</span>
                     {activeTemplateName === t.name && (
-                      <Badge className="ml-2 text-[10px] bg-green-500/[0.15] text-ink-ok">
+                      <Badge className="ml-2 text-caption bg-green-500/[0.15] text-ink-ok">
                         Activa
                       </Badge>
                     )}
                     {t.deviceId && (
-                      <Badge variant="outline" className="ml-2 text-[10px]">
+                      <Badge variant="outline" className="ml-2 text-caption">
                         {t.deviceId}
                       </Badge>
                     )}
@@ -985,17 +985,17 @@ export function AnalisisGraderGatesConfigPage({
             {!tabbed && <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />}
             Rangos de Peso por Calibre
             {hasShiftOverride && (
-              <Badge className="text-[10px] bg-primary/[0.15] text-primary">
+              <Badge className="text-caption bg-primary/[0.15] text-primary">
                 Override de este turno
               </Badge>
             )}
             {!hasShiftOverride && isCustomRanges && (
-              <Badge className="text-[10px] bg-amber-500/[0.15] text-ink-warn">
+              <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn">
                 Global personalizado
               </Badge>
             )}
             {!hasShiftOverride && !isCustomRanges && (
-              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              <Badge variant="outline" className="text-caption text-muted-foreground">
                 Global planta
               </Badge>
             )}
@@ -1041,7 +1041,7 @@ export function AnalisisGraderGatesConfigPage({
             {/* Editor inline del override por turno */}
             {editingShiftRanges && (
               <div className="space-y-2">
-                <p className="text-[11px] text-blue-400 font-medium">Editando override de este turno — los cambios NO afectan otros turnos</p>
+                <p className="text-caption text-blue-400 font-medium">Editando override de este turno — los cambios NO afectan otros turnos</p>
                 <div className="space-y-1.5">
                   {shiftRangesDraft.map((r, idx) => (
                     <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">
@@ -1062,7 +1062,7 @@ export function AnalisisGraderGatesConfigPage({
                         className="h-7 text-xs tabular-nums"
                         onChange={e => setShiftRangesDraft(prev => prev.map((x, i) => i === idx ? { ...x, maxGrams: Number(e.target.value) } : x))}
                       />
-                      <span className="text-[10px] text-muted-foreground/50 tabular-nums whitespace-nowrap">
+                      <span className="text-caption text-muted-foreground/50 tabular-nums whitespace-nowrap">
                         {buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
                       </span>
                     </div>

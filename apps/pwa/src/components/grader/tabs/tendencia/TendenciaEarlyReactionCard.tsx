@@ -95,16 +95,16 @@ export function TendenciaEarlyReactionCard({
           >
             <div className="flex items-center gap-2">
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showThresholds && 'rotate-180')} />
-              <span className="text-[11px] font-medium">Ajustar umbrales P0</span>
+              <span className="text-caption font-medium">Ajustar umbrales P0</span>
             </div>
-            <span className="text-[10px] text-muted-foreground tabular-nums">
+            <span className="text-caption text-muted-foreground tabular-nums">
               warn {pointZeroWarnThreshold}% · crítico {pointZeroCriticalThreshold}%
             </span>
           </button>
           {showThresholds && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border-t">
               <div>
-                <label className="text-[11px] text-muted-foreground">Umbral P0 Warn (%)</label>
+                <label className="text-caption text-muted-foreground">Umbral P0 Warn (%)</label>
                 <Input
                   type="number"
                   min={0}
@@ -122,7 +122,7 @@ export function TendenciaEarlyReactionCard({
                 />
               </div>
               <div>
-                <label className="text-[11px] text-muted-foreground">Umbral P0 Crítico (%)</label>
+                <label className="text-caption text-muted-foreground">Umbral P0 Crítico (%)</label>
                 <Input
                   type="number"
                   min={0}
@@ -149,7 +149,7 @@ export function TendenciaEarlyReactionCard({
             <div key={`trend-auto-${action.gateNumber}`} className="flex items-start justify-between gap-2 text-xs">
               <p>• {action.text}</p>
               {action.isApplied ? (
-                <Badge variant="outline" className="text-[11px] border-emerald-500/[0.25] text-ink-ok">
+                <Badge variant="outline" className="text-caption border-emerald-500/[0.25] text-ink-ok">
                   Aplicada
                 </Badge>
               ) : (
@@ -158,7 +158,7 @@ export function TendenciaEarlyReactionCard({
                     size="sm"
                     variant="outline"
                     onClick={() => onApplyGateAction(action)}
-                    className="h-7 px-2 text-[11px]"
+                    className="h-7 px-2 text-caption"
                   >
                     Aplicar
                   </Button>
@@ -173,7 +173,7 @@ export function TendenciaEarlyReactionCard({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium">IA (Grok)</p>
-            <Button size="sm" variant="outline" onClick={onAnalyzeAI} disabled={aiLoading} className="h-7 px-2 text-[11px]">
+            <Button size="sm" variant="outline" onClick={onAnalyzeAI} disabled={aiLoading} className="h-7 px-2 text-caption">
               {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Brain className="h-3.5 w-3.5 mr-1" />}
               {trendAIRuns.length > 0 ? 'Analizar otra vez' : 'Analizar ahora'}
             </Button>
@@ -189,7 +189,7 @@ export function TendenciaEarlyReactionCard({
                 if (!run) return null
                 return (
                   <div className="rounded-ctl border bg-muted/20 p-2 space-y-1.5">
-                    <p className="text-[11px] text-muted-foreground font-medium">
+                    <p className="text-caption text-muted-foreground font-medium">
                       Última corrida · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                     {run.recommendations.length > 0 ? (
@@ -214,7 +214,7 @@ export function TendenciaEarlyReactionCard({
                 <div>
                   <button
                     type="button"
-                    className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors mt-1"
+                    className="text-caption text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors mt-1"
                     onClick={() => onToggleAIHistory()}
                   >
                     <ChevronDown className={cn('h-3 w-3 transition-transform', showAIHistory && 'rotate-180')} />
@@ -225,21 +225,21 @@ export function TendenciaEarlyReactionCard({
                       {trendAIConsistency && (
                         <div className="flex flex-wrap items-center gap-2 rounded-ctl border bg-muted/20 px-2 py-1.5">
                           <Badge variant="outline" className={cn(
-                            'text-[10px]',
+                            'text-caption',
                             trendAIConsistency.level === 'alta' && 'border-emerald-500/[0.25] text-ink-ok',
                             trendAIConsistency.level === 'media' && 'border-amber-500/[0.25] text-ink-warn',
                             trendAIConsistency.level === 'baja' && 'border-red-500/[0.25] text-ink-crit',
                           )}>
                             Consistencia: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
                           </Badge>
-                          <p className="text-[11px] text-muted-foreground">{trendAIConsistency.note}</p>
+                          <p className="text-caption text-muted-foreground">{trendAIConsistency.note}</p>
                         </div>
                       )}
                       {trendAIDiffRows.length > 0 && (
                         <div className="rounded-ctl border bg-muted/20 p-2">
-                          <p className="text-[11px] font-medium mb-1">Comparación corrida anterior vs actual</p>
+                          <p className="text-caption font-medium mb-1">Comparación corrida anterior vs actual</p>
                           <div className="overflow-x-auto">
-                            <table className="w-full text-[11px]">
+                            <table className="w-full text-caption">
                               <thead>
                                 <tr className="border-b text-left text-muted-foreground">
                                   <th className="py-1 px-1.5">Ítem</th>
@@ -262,7 +262,7 @@ export function TendenciaEarlyReactionCard({
                                     </td>
                                     <td className="py-1 px-1.5">
                                       <Badge variant="outline" className={cn(
-                                        'text-[10px]',
+                                        'text-caption',
                                         row.changeType === 'igual' && 'border-emerald-500/[0.25] text-ink-ok',
                                         row.changeType === 'ajustada' && 'border-amber-500/[0.25] text-ink-warn',
                                         row.changeType === 'nueva' && 'border-primary/[0.25] text-sky-600',
@@ -280,7 +280,7 @@ export function TendenciaEarlyReactionCard({
                       )}
                       {trendAIRuns.slice(1).map((run) => (
                         <div key={run.id} className="rounded-ctl border bg-muted/20 p-2 space-y-1.5">
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="text-caption text-muted-foreground">
                             {run.runLabel} · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                           {run.recommendations.map((action, idx) => {

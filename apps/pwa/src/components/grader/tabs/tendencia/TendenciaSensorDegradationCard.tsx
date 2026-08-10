@@ -45,7 +45,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                     <Badge
                       variant="outline"
                       className={cn(
-                        'text-[10px] shrink-0',
+                        'text-caption shrink-0',
                         isCritical
                           ? 'border-red-500/[0.25] text-ink-crit'
                           : 'border-amber-500/[0.25] text-ink-warn',
@@ -55,7 +55,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                     </Badge>
                     <p className="text-xs font-medium truncate">{deg.error}</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
+                  <p className="text-caption text-muted-foreground mt-1">
                     Crecimiento {deg.growthRatio.toFixed(1)}× entre inicio y fin del turno
                     · {deg.total.toLocaleString('es-CL')} piezas P0 acumuladas
                   </p>
@@ -74,7 +74,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                           )}
                           style={{ height: `${Math.max(heightPct, 4)}%` }}
                         />
-                        <span className="text-[8px] text-muted-foreground tabular-nums">Q{idx + 1}</span>
+                        <span className="text-caption text-muted-foreground tabular-nums">Q{idx + 1}</span>
                       </div>
                     )
                   })}
@@ -83,7 +83,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
             )
           })}
         </div>
-        <p className="text-[10px] text-muted-foreground mt-3">
+        <p className="text-caption text-muted-foreground mt-3">
           Análisis: turno dividido en 4 cuartos; se flagea cuando Q4 ≥ 1.5× Q1 (alerta) o ≥ 3× Q1 (crítico).
         </p>
       </CardContent>

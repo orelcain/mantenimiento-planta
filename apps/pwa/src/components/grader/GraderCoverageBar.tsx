@@ -159,7 +159,7 @@ export function GraderCoverageBar({
 
   return (
     <div className="rounded-card border border-border bg-card px-3 py-2 space-y-1.5">
-      <div className="flex items-center gap-2 flex-wrap text-[11px]">
+      <div className="flex items-center gap-2 flex-wrap text-caption">
         <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
         <span className="font-medium">Cobertura del Excel</span>
         <span className="text-muted-foreground tabular-nums">
@@ -201,7 +201,7 @@ export function GraderCoverageBar({
           {marcas.map((m) => (
             <span
               key={m.ms}
-              className="absolute top-0 -translate-x-1/2 text-[9px] text-muted-foreground/70 tabular-nums"
+              className="absolute top-0 -translate-x-1/2 text-caption text-muted-foreground/70 tabular-nums"
               style={{ left: `${m.pct}%` }}
             >
               {fmtTime(new Date(m.ms))}
@@ -210,7 +210,7 @@ export function GraderCoverageBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-3 flex-wrap text-caption text-muted-foreground">
         {(['produccion', 'sin-produccion', 'sin-datos'] as Tramo[]).map((k) => (
           <span key={k} className="flex items-center gap-1">
             <span className={cn('w-2 h-2 rounded-[2px]', ESTILO[k].clase)} />
@@ -221,13 +221,13 @@ export function GraderCoverageBar({
       </div>
 
       {faltaExcel ? (
-        <p className="text-[10px] text-ink-warn/90">
+        <p className="text-caption text-ink-warn/90">
           Las Baader produjeron <b>{fmtDurationMin(faltaExcelMin ?? sinDatosMin)}</b> que el Excel no cubre.
           Esas piezas todavía no están contadas.
         </p>
       ) : (
         <p
-          className="text-[10px] text-ink-ok/90 cursor-help"
+          className="text-caption text-ink-ok/90 cursor-help"
           title={`El pescado va Baader → Grader, así que entre ambas fuentes solo hay minutos de tránsito (se toleran ${TRANSITO_MIN}). Que el Excel arranque después no es dato faltante: es cuando llegó la primera pieza.`}
         >
           El Excel cubre toda la producción del turno.

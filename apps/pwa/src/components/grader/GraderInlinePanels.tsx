@@ -30,7 +30,7 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       <div className="flex items-center gap-2">
         <Badge
           variant={insight.severity === 'critical' ? 'destructive' : 'outline'}
-          className="text-[10px]"
+          className="text-caption"
         >
           {insight.severity.toUpperCase()}
         </Badge>
@@ -62,7 +62,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
     <div className="space-y-4">
       {/* Resumen compacto en card destacada */}
       <div className="rounded-card border border-blue-200 dark:border-blue-800 bg-primary/[0.15] p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-1.5">
+        <p className="text-caption font-semibold uppercase tracking-wider text-primary mb-1.5">
           Resumen del an&aacute;lisis
         </p>
         <ul className="space-y-1">
@@ -78,7 +78,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Causas probables en grid 2 cols */}
       {output.likelyCauses.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-caption font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             Causas probables
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -99,7 +99,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                   <Badge
                     variant="outline"
                     className={cn(
-                      'text-[9px] shrink-0',
+                      'text-caption shrink-0',
                       c.confidence === 'high' && 'text-ink-crit border-red-300',
                       c.confidence === 'medium' && 'text-ink-warn border-amber-300',
                     )}
@@ -110,11 +110,11 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 {c.evidence.length > 0 ? (
                   <div className="space-y-0.5">
                     {c.evidence.map((e, j) => (
-                      <p key={j} className="text-[11px] text-muted-foreground">{e}</p>
+                      <p key={j} className="text-caption text-muted-foreground">{e}</p>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[11px] text-amber-500">Sin evidencia num&eacute;rica</p>
+                  <p className="text-caption text-amber-500">Sin evidencia num&eacute;rica</p>
                 )}
               </div>
             ))}
@@ -125,7 +125,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Acciones recomendadas como checklist visual con prioridad */}
       {output.recommendedActions.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <p className="text-caption font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             Acciones recomendadas
           </p>
           <div className="space-y-1.5">
@@ -143,7 +143,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               >
                 <div
                   className={cn(
-                    'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-[10px] font-bold',
+                    'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-caption font-bold',
                     a.priority === 'high'
                       ? 'bg-red-500/[0.15] text-ink-crit'
                       : a.priority === 'medium'
@@ -156,11 +156,11 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{a.action}</span>
-                    <Badge variant="outline" className="text-[9px] shrink-0">
+                    <Badge variant="outline" className="text-caption shrink-0">
                       {priorityLabel[a.priority] || a.priority}
                     </Badge>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{a.why}</p>
+                  <p className="text-caption text-muted-foreground mt-0.5">{a.why}</p>
                 </div>
               </div>
             ))}
@@ -171,7 +171,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
         <div className="rounded-card border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-500/[0.15] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-ok mb-2">
+          <p className="text-caption font-semibold uppercase tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
           <div className="space-y-1.5">
@@ -191,9 +191,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
         <div className="p-2.5 bg-amber-500/[0.15] rounded-card border border-amber-200 dark:border-amber-800">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-warn mb-1">Advertencias</p>
+          <p className="text-caption font-semibold uppercase tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
-            <p key={i} className="text-[11px] text-ink-warn">{d}</p>
+            <p key={i} className="text-caption text-ink-warn">{d}</p>
           ))}
         </div>
       )}
@@ -237,14 +237,14 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
       'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="outline" className={cn('text-[10px]', typeColors[suggestion.type])}>
+        <Badge variant="outline" className={cn('text-caption', typeColors[suggestion.type])}>
           {typeIcons[suggestion.type] || ''} {typeLabels[suggestion.type] || suggestion.type}
         </Badge>
         <span className="text-sm font-medium">
           Gate {suggestion.gateNumber}: {suggestion.currentCalibre}
           {showArrow && <> → {suggestion.suggestedCalibre}</>}
         </span>
-        <Badge variant={suggestion.impactScore >= 70 ? 'destructive' : 'outline'} className="text-[10px] ml-auto">
+        <Badge variant={suggestion.impactScore >= 70 ? 'destructive' : 'outline'} className="text-caption ml-auto">
           Impacto: {suggestion.impactScore}
         </Badge>
       </div>
@@ -252,7 +252,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
       {suggestion.evidence.length > 0 && (
         <div className="mt-1.5 space-y-0.5">
           {suggestion.evidence.map((e, i) => (
-            <p key={i} className="text-[11px] text-muted-foreground">
+            <p key={i} className="text-caption text-muted-foreground">
               {e.startsWith('⚠') ? e : `📊 ${e}`}
             </p>
           ))}

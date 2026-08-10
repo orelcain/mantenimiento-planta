@@ -162,9 +162,27 @@ export default {
         card: 'var(--r-card)',    // tarjeta / grupo de lista
         panel: 'var(--r-panel)',  // contenedor grande, sheet, modal
       },
+      fontSize: {
+        // ── ESCALA TIPOGRÁFICA de la Constitución (§9) ────────────────────────
+        // En PX a propósito: el `html` de esta app está al 87.5%, así que los
+        // `rem` no dan los tamaños que la norma pide.
+        // El piso de la escala es 11px: por debajo es "texto diminuto", que la
+        // §64 prohíbe explícitamente. La app tenía 1.125 usos por debajo (8, 9
+        // y 10px) — esa era la causa real de que se viera densa y no Apple.
+        caption:   ['11px', { lineHeight: '1.35' }],
+        footnote:  ['13px', { lineHeight: '1.4' }],
+        body:      ['15px', { lineHeight: '1.45' }],
+        headline:  ['17px', { lineHeight: '1.35', fontWeight: '600' }],
+        title3:    ['20px', { lineHeight: '1.25', fontWeight: '600' }],
+        title2:    ['23px', { lineHeight: '1.2',  fontWeight: '600' }],
+        title1:    ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
+        display:   ['33px', { lineHeight: '1.1',  letterSpacing: '-0.028em', fontWeight: '700' }],
+      },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)
-        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        // §8: familia del sistema primero — en Apple resuelve a SF Pro, que es
+        // lo que le da el aire correcto; IBM Plex queda de respaldo con carácter.
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Segoe UI Variable Text"', '"IBM Plex Sans"', 'system-ui', 'sans-serif'],
         // Mono técnico para datos/lecturas (KPIs, códigos, timestamps, IDs)
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },

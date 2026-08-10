@@ -52,7 +52,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
             <span className="text-muted-foreground">{s.currentValue} {s.unit}</span>
             <span className="text-muted-foreground">→</span>
             <span className="font-semibold text-foreground">{s.suggestedValue} {typeof s.suggestedValue === 'number' ? s.unit : ''}</span>
-            <span className={cn('ml-auto text-[10px] px-1.5 py-0.5 rounded-ctl font-medium', style.badge)}>
+            <span className={cn('ml-auto text-caption px-1.5 py-0.5 rounded-ctl font-medium', style.badge)}>
               {(() => { const Icon = SOURCE_ICONS[s.source]; return Icon ? <Icon className="inline size-3" /> : null })()} {s.sourceLabel}
             </span>
           </div>
@@ -79,7 +79,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
                   <div key={i} className="flex justify-between gap-2">
                     <span className="text-muted-foreground">{dp.label}</span>
                     <span className="font-mono text-foreground">{dp.value}
-                      {dp.detail && <span className="text-muted-foreground/60 ml-1 text-[10px]">({dp.detail})</span>}
+                      {dp.detail && <span className="text-muted-foreground/60 ml-1 text-caption">({dp.detail})</span>}
                     </span>
                   </div>
                 ))}
@@ -91,7 +91,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
           {s.formula && (
             <div>
               <p className="font-semibold text-muted-foreground mb-1"><FlaskConical className="inline size-3" /> Fórmula</p>
-              <pre className="font-mono text-[10px] text-foreground/80 whitespace-pre-wrap bg-black/20 rounded-ctl p-2">{s.formula}</pre>
+              <pre className="font-mono text-caption text-foreground/80 whitespace-pre-wrap bg-black/20 rounded-ctl p-2">{s.formula}</pre>
             </div>
           )}
 

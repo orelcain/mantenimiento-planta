@@ -39,27 +39,27 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
         {/* Resumen vs promedio histórico */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div className={cn('p-2.5 rounded-ctl border', p0BgClass)}>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">P0 vs promedio</p>
+            <p className="text-caption uppercase tracking-wide text-muted-foreground">P0 vs promedio</p>
             <p className={cn('text-lg font-bold tabular-nums', p0Color)}>
               {m.deltaP0 >= 0 ? '+' : ''}{m.deltaP0.toFixed(2)} pp
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               hist. {m.avgP0.toFixed(2)}% · posición {percentileLabel}
             </p>
           </div>
           <div className="p-2.5 rounded-ctl border bg-muted/20">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Piezas vs promedio</p>
+            <p className="text-caption uppercase tracking-wide text-muted-foreground">Piezas vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaPieces >= 0 ? '+' : ''}{m.deltaPieces.toLocaleString('es-CL')}
             </p>
-            <p className="text-[10px] text-muted-foreground">hist. {m.avgPieces.toLocaleString('es-CL')}</p>
+            <p className="text-caption text-muted-foreground">hist. {m.avgPieces.toLocaleString('es-CL')}</p>
           </div>
           <div className="p-2.5 rounded-ctl border bg-muted/20">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Peso vs promedio</p>
+            <p className="text-caption uppercase tracking-wide text-muted-foreground">Peso vs promedio</p>
             <p className="text-lg font-bold tabular-nums">
               {m.deltaWeight >= 0 ? '+' : ''}{m.deltaWeight.toFixed(0)} g
             </p>
-            <p className="text-[10px] text-muted-foreground">hist. {m.avgWeight.toFixed(0)} g</p>
+            <p className="text-caption text-muted-foreground">hist. {m.avgWeight.toFixed(0)} g</p>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
                       {isInCurrent && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
                       <span className="truncate">{re.error}</span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                    <span className="text-caption text-muted-foreground tabular-nums shrink-0">
                       {re.frequency.toFixed(0)}% sesiones · {re.totalPieces.toLocaleString('es-CL')} pz
                     </span>
                   </div>
@@ -92,7 +92,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
               })}
             </div>
             {m.recurrentInCurrent.length > 0 && (
-              <p className="text-[10px] text-ink-warn mt-1.5">
+              <p className="text-caption text-ink-warn mt-1.5">
                 ⚠ {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
               </p>
             )}

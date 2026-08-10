@@ -47,7 +47,7 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
       {currentJob?.name && (
         <Badge
           variant="outline"
-          className="text-[10px] px-1.5 py-0 gap-1 border-cat-7-tint/[0.25] text-cyan-400"
+          className="text-caption px-1.5 py-0 gap-1 border-cat-7-tint/[0.25] text-cyan-400"
           title={currentJob.jobMaxRunRate ? `Máx ${currentJob.jobMaxRunRate} pph` : 'Especie en curso'}
         >
           <Fish className="w-3 h-3" />
@@ -57,7 +57,7 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
       {compliance && (
         <Badge
           variant="outline"
-          className={`text-[10px] px-1.5 py-0 gap-1 tabular-nums ${LEVEL_STYLES[compliance.level]}`}
+          className={`text-caption px-1.5 py-0 gap-1 tabular-nums ${LEVEL_STYLES[compliance.level]}`}
           title={`Target oficial: ${Math.round(compliance.targetTotal).toLocaleString('es-CL')} piezas · ${Math.round(compliance.totalCycles).toLocaleString('es-CL')} producidas`}
         >
           <Target className="w-3 h-3" />

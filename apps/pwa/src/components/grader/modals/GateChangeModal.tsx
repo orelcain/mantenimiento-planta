@@ -230,7 +230,7 @@ export function GateChangeModal({
                   >
                     {n}
                     {!isActive && (
-                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] leading-none text-muted-foreground/30">
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-caption leading-none text-muted-foreground/30">
                         off
                       </span>
                     )}
@@ -316,7 +316,7 @@ export function GateChangeModal({
                         key={c}
                         onClick={() => setNewConservation(newConservation === c ? '' : c)}
                         className={cn(
-                          'text-[11px] px-2 py-0.5 rounded-ctl border transition-colors',
+                          'text-caption px-2 py-0.5 rounded-ctl border transition-colors',
                           newConservation === c
                             ? 'bg-primary text-primary-foreground border-primary'
                             : 'border-border bg-muted hover:bg-accent text-muted-foreground',
@@ -335,7 +335,7 @@ export function GateChangeModal({
                         key={p}
                         onClick={() => setNewProduct(newProduct === p ? '' : p)}
                         className={cn(
-                          'text-[11px] px-2 py-0.5 rounded-ctl border transition-colors',
+                          'text-caption px-2 py-0.5 rounded-ctl border transition-colors',
                           newProduct === p
                             ? 'bg-primary text-primary-foreground border-primary'
                             : 'border-border bg-muted hover:bg-accent text-muted-foreground',

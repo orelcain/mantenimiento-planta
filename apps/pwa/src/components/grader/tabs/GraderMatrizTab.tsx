@@ -27,7 +27,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
         {analytics.matrixEnhanced.globalHHI > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
             <Badge variant="outline" className={cn(
-              'text-[10px]',
+              'text-caption',
               analytics.matrixEnhanced.globalHHI > 0.5 && 'text-ink-crit border-red-300',
               analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-ink-warn border-amber-300',
               analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-ink-ok border-emerald-300',
@@ -39,7 +39,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
               <InfoTooltip {...getTooltipProps('matrix.hhi')} iconSize={11} className="ml-1" />
             </Badge>
             <Badge variant="outline" className={cn(
-              'text-[10px]',
+              'text-caption',
               analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-ink-crit border-red-300',
               analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-ink-warn border-amber-300',
             )}>
@@ -47,7 +47,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
               <InfoTooltip {...getTooltipProps('matrix.imbalance')} iconSize={11} className="ml-1" />
             </Badge>
             {analytics.matrixEnhanced.maxCell && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 Celda Max: {analytics.matrixEnhanced.maxCell.quality}×{analytics.matrixEnhanced.maxCell.calibre} ({analytics.matrixEnhanced.maxCell.pct}%)
               </Badge>
             )}
@@ -93,7 +93,7 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                                 <span className="font-medium">{cell.pieces.toLocaleString('es-CL')}</span>
                                 <span className="text-muted-foreground text-xs ml-1">({cell.pct}%)</span>
                                 {avgW != null && (
-                                  <p className="text-[10px] text-muted-foreground">{avgW.toLocaleString('es-CL')}g</p>
+                                  <p className="text-caption text-muted-foreground">{avgW.toLocaleString('es-CL')}g</p>
                                 )}
                               </div>
                             ) : (

@@ -272,7 +272,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                     onChange={e => setAlertThreshold(Number(e.target.value))}
                     className="mt-1"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Línea amarilla en el timeline. Típico: 2%</p>
+                  <p className="text-caption text-muted-foreground mt-1">Línea amarilla en el timeline. Típico: 2%</p>
                 </div>
 
                 <div>
@@ -284,13 +284,13 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                     onChange={e => setCriticalThreshold(Number(e.target.value))}
                     className="mt-1"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Línea roja en el timeline. Típico: 3.5%</p>
+                  <p className="text-caption text-muted-foreground mt-1">Línea roja en el timeline. Típico: 3.5%</p>
                 </div>
               </div>
 
               {/* Preview visual de los umbrales */}
               <div className="rounded-ctl border border-border bg-muted p-3">
-                <p className="text-[11px] text-muted-foreground mb-2 font-medium">Vista previa de colores</p>
+                <p className="text-caption text-muted-foreground mb-2 font-medium">Vista previa de colores</p>
                 <div className="flex items-center gap-3 text-xs flex-wrap">
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-ctl bg-emerald-500/[0.15] text-ink-ok font-medium">
                     ✓ OK — bajo {alertThreshold}%
@@ -320,7 +320,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                        ['largaMaxSec', 'Máx. "Pausa larga" (s)', 'ej: 3600'],
                   ] as const).map(([key, label, placeholder]) => (
                     <div key={key}>
-                      <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                      <Label className="text-caption text-muted-foreground">{label}</Label>
                       <Input
                         type="number"
                         min={0}
@@ -340,13 +340,13 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                 <p className="text-xs font-semibold text-foreground">Auto-tag Colación</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Duración mín. (min)</Label>
+                    <Label className="text-caption text-muted-foreground">Duración mín. (min)</Label>
                     <Input type="number" min={0} value={detector.colacionMinMin}
                       onChange={e => setDetector(p => ({ ...p, colacionMinMin: Number(e.target.value) }))}
                       className="h-7 text-xs mt-0.5 font-mono" disabled={!isAdmin} />
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Duración máx. (min)</Label>
+                    <Label className="text-caption text-muted-foreground">Duración máx. (min)</Label>
                     <Input type="number" min={0} value={detector.colacionMaxMin}
                       onChange={e => setDetector(p => ({ ...p, colacionMaxMin: Number(e.target.value) }))}
                       className="h-7 text-xs mt-0.5 font-mono" disabled={!isAdmin} />
@@ -354,7 +354,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Ventana Turno día (min del día)</Label>
+                    <Label className="text-caption text-muted-foreground">Ventana Turno día (min del día)</Label>
                     <div className="flex gap-1 mt-0.5">
                       <Input type="number" min={0} max={1440} value={detector.colacionWindowDia.start}
                         onChange={e => setDetector(p => ({ ...p, colacionWindowDia: { ...p.colacionWindowDia, start: Number(e.target.value) } }))}
@@ -363,13 +363,13 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                         onChange={e => setDetector(p => ({ ...p, colacionWindowDia: { ...p.colacionWindowDia, end: Number(e.target.value) } }))}
                         className="h-7 text-xs font-mono" placeholder="fin" disabled={!isAdmin} />
                     </div>
-                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                    <p className="text-caption text-muted-foreground/60 mt-0.5">
                       {Math.floor(detector.colacionWindowDia.start/60).toString().padStart(2,'0')}:{((detector.colacionWindowDia.start%60)).toString().padStart(2,'0')} –{' '}
                       {Math.floor(detector.colacionWindowDia.end/60).toString().padStart(2,'0')}:{((detector.colacionWindowDia.end%60)).toString().padStart(2,'0')}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Ventana Turno noche (min del día)</Label>
+                    <Label className="text-caption text-muted-foreground">Ventana Turno noche (min del día)</Label>
                     <div className="flex gap-1 mt-0.5">
                       <Input type="number" min={0} max={1440} value={detector.colacionWindowNoche.start}
                         onChange={e => setDetector(p => ({ ...p, colacionWindowNoche: { ...p.colacionWindowNoche, start: Number(e.target.value) } }))}
@@ -378,7 +378,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                         onChange={e => setDetector(p => ({ ...p, colacionWindowNoche: { ...p.colacionWindowNoche, end: Number(e.target.value) } }))}
                         className="h-7 text-xs font-mono" placeholder="fin" disabled={!isAdmin} />
                     </div>
-                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                    <p className="text-caption text-muted-foreground/60 mt-0.5">
                       {Math.floor(detector.colacionWindowNoche.start/60).toString().padStart(2,'0')}:{((detector.colacionWindowNoche.start%60)).toString().padStart(2,'0')} –{' '}
                       {Math.floor(detector.colacionWindowNoche.end/60).toString().padStart(2,'0')}:{((detector.colacionWindowNoche.end%60)).toString().padStart(2,'0')}
                     </p>
@@ -419,7 +419,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
                         className="w-3 h-3 rounded-full shrink-0"
                         style={{ backgroundColor: tag.color }}
                       />
-                      <span className="text-[10px] font-mono text-muted-foreground/60">{tag.id}</span>
+                      <span className="text-caption font-mono text-muted-foreground/60">{tag.id}</span>
                       {isAdmin && (
                         <button
                           onClick={() => handleArchiveTag(tag.id)}
@@ -524,7 +524,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
               </div>
 
               {isCustomRanges && (
-                <Badge variant="outline" className="text-[10px] border-amber-500/[0.25] text-ink-warn">
+                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-ink-warn">
                   Personalizado
                 </Badge>
               )}

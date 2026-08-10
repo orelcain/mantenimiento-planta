@@ -144,7 +144,7 @@ export function GraderQuickChangePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25] text-[10px]">RETROACTIVO</Badge>
+                    <Badge className="bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25] text-caption">RETROACTIVO</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {overrideDisplay.dateKey}
@@ -167,7 +167,7 @@ export function GraderQuickChangePage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-[10px]">EN VIVO</Badge>
+                    <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-caption">EN VIVO</Badge>
                   </div>
                   {shiftStart && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
@@ -243,7 +243,7 @@ export function GraderQuickChangePage() {
                     ))}
                 </div>
                 {latest?.changedBy?.name && (
-                  <p className="text-[10px] text-muted-foreground/50 pt-1">
+                  <p className="text-caption text-muted-foreground/50 pt-1">
                     Última config por {latest.changedBy.name}
                   </p>
                 )}

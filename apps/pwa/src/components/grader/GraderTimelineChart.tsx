@@ -855,20 +855,20 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           </CardTitle>
           <div className="flex items-center gap-1.5 flex-wrap">
             {stats.withWeight > 0 && (
-              <Badge variant="outline" className="text-[10px] gap-1">
+              <Badge variant="outline" className="text-caption gap-1">
                 ⚖ {stats.avgWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
             {stats.withWeight > 0 && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 {stats.minWeight.toLocaleString('es-CL')}–{stats.maxWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
-            <Badge variant="outline" className={cn('text-[10px]', stats.p0Count > 0 ? 'text-red-400' : '')}>
+            <Badge variant="outline" className={cn('text-caption', stats.p0Count > 0 ? 'text-red-400' : '')}>
               {stats.p0Count.toLocaleString('es-CL')} P0
             </Badge>
             {gaps.length > 0 && (
-              <Badge variant="outline" className="text-[10px] text-amber-400 gap-0.5">
+              <Badge variant="outline" className="text-caption text-amber-400 gap-0.5">
                 <Coffee className="h-2.5 w-2.5" />{gaps.length} pausa{gaps.length > 1 ? 's' : ''}
               </Badge>
             )}
@@ -881,7 +881,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             {stats.totalPieces.toLocaleString('es-CL')} pzs · {shiftId} · {dateKey}
           </p>
           {visibleStats && (zoomRange.start > 0 || zoomRange.end < 100) && (
-            <p className="text-[10px] text-sky-400">
+            <p className="text-caption text-sky-400">
               Zoom: {visibleStats.count.toLocaleString('es-CL')} pts · {visibleStats.avg.toLocaleString('es-CL')}g prom · {visibleStats.spanHours}h
             </p>
           )}
@@ -895,7 +895,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
               type="button"
               onClick={() => toggleLayer(key)}
               className={cn(
-                'px-2.5 py-1 rounded-ctl text-[11px] font-medium border transition-colors',
+                'px-2.5 py-1 rounded-ctl text-caption font-medium border transition-colors',
                 layers[key]
                   ? 'border-transparent text-white'
                   : 'bg-background border-border text-muted-foreground hover:bg-muted/50',
@@ -908,14 +908,14 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           <button
             type="button"
             onClick={() => setShowLegend((v) => !v)}
-            className="px-2 py-1 rounded-ctl text-[10px] font-medium border border-border text-muted-foreground hover:bg-muted/50 ml-auto"
+            className="px-2 py-1 rounded-ctl text-caption font-medium border border-border text-muted-foreground hover:bg-muted/50 ml-auto"
           >
             {showLegend ? 'Ocultar leyenda' : 'Leyenda'}
           </button>
         </div>
 
         {showLegend && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 pt-2 border-t border-border/30 text-[10px]">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 pt-2 border-t border-border/30 text-caption">
             {layers.weights && stats.uniqueCalibres.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                 <span className="text-muted-foreground font-semibold">Calibres:</span>

@@ -404,7 +404,7 @@ export function MinuteDetailDialog({
                 <div className="flex-1 min-w-0">
                   <div className={cn('font-medium flex items-center gap-1.5 flex-wrap', p0StatusColor(breakdown.p0Status))}>
                     <span>P0% {breakdown.p0Pct.toFixed(1)}%</span>
-                    <span className="text-[10px] uppercase tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
+                    <span className="text-caption uppercase tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
                     <span className="text-muted-foreground/60 font-normal">·</span>
                     <span className="font-normal text-foreground">
                       Causa dominante: <span className="font-medium">{breakdown.topP0Cause.label}</span>
@@ -586,7 +586,7 @@ export function MinuteDetailDialog({
                             {calibreDiffers ? (
                               <span title={`Marelec reportó "${r.calibre}" (default de rechazo)`}>
                                 <span className="text-foreground">{inferredCalibre}</span>
-                                <span className="text-muted-foreground/60 text-[10px] ml-1">real</span>
+                                <span className="text-muted-foreground/60 text-caption ml-1">real</span>
                               </span>
                             ) : (
                               r.calibre ?? inferredCalibre ?? '—'

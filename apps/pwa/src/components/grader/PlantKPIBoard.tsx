@@ -133,7 +133,7 @@ function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barC
   return (
     <div className="px-1 py-1.5">
       <div className="flex items-center justify-between gap-1 mb-1">
-        <div className="text-[10px] font-medium text-muted-foreground leading-tight truncate">{label}</div>
+        <div className="text-caption font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
       <div className={cn('text-xl font-bold tabular-nums leading-none', valueColor)}>{value}</div>
@@ -143,7 +143,7 @@ function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barC
                style={{ width: barWidth(barValue, barMax) }} />
         </div>
       )}
-      {note && <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight truncate">{note}</p>}
+      {note && <p className="text-caption text-muted-foreground/60 mt-1 leading-tight truncate">{note}</p>}
     </div>
   )
 }
@@ -228,7 +228,7 @@ export function PlantKPIBoard({
             <TrendingUp className="w-4 h-4 text-sky-400" />
             Indicadores de Rendimiento
             {kpis && (
-              <span className="text-[10px] font-normal text-muted-foreground">
+              <span className="text-caption font-normal text-muted-foreground">
                 · {kpis.periodLabel}
                 {kpis.shiftsCount > 1 && (
                   <span className="text-muted-foreground/60"> ({kpis.shiftsCount} turnos)</span>
@@ -244,7 +244,7 @@ export function PlantKPIBoard({
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
                 className={cn(
-                  'px-2 py-0.5 text-[11px] font-medium rounded-ctl transition-colors',
+                  'px-2 py-0.5 text-caption font-medium rounded-ctl transition-colors',
                   period === p.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -256,7 +256,7 @@ export function PlantKPIBoard({
           </div>
         </div>
         {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
-        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
+        <p className="text-caption text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
@@ -282,7 +282,7 @@ export function PlantKPIBoard({
           <>
             {/* Banner informativo cuando solo hay calidad Grader */}
             {kpis.graderOnly && (
-              <p className="text-[10px] text-sky-400/80 flex items-center gap-1 pb-0.5">
+              <p className="text-caption text-sky-400/80 flex items-center gap-1 pb-0.5">
                 <AlertTriangle className="w-3 h-3 shrink-0" />
                 Sin datos Shoplogix para este período — solo calidad Grader
               </p>
@@ -298,7 +298,7 @@ export function PlantKPIBoard({
               const SIGNIFICANT_CYCLES_THRESHOLD = 100
               if (totalCycles >= SIGNIFICANT_CYCLES_THRESHOLD) return null
               return (
-                <p className="text-[10px] text-amber-400/90 flex items-start gap-1 pb-0.5">
+                <p className="text-caption text-amber-400/90 flex items-start gap-1 pb-0.5">
                   <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                   <span>
                     Período sin producción significativa ({totalCycles.toLocaleString('es-CL')} ciclos totales).
@@ -382,16 +382,16 @@ export function PlantKPIBoard({
                 className="px-1 py-1.5"
                 title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
-                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
+                <div className="text-caption font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
-                <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight">
+                <p className="text-caption text-muted-foreground/60 mt-1 leading-tight">
                   paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
             {/* Micro-detenciones: se reportan aparte para no inflar el MTTR */}
             {kpis.microCount > 0 && (
-              <p className="text-[10px] text-muted-foreground/70 leading-tight px-0.5">
+              <p className="text-caption text-muted-foreground/70 leading-tight px-0.5">
                 + {kpis.microCount.toLocaleString('es-CL')} micro-detenciones (&lt;5min, {fmtMin(kpis.microMin)} total) — aparte, no inflan el MTTR.
               </p>
             )}
@@ -400,7 +400,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-[10px] text-ink-warn">
+              <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
@@ -428,7 +428,7 @@ export function PlantKPIBoard({
                 <div
                   key={m.machineid}
                   className={cn(
-                    'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-[11px]',
+                    'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
