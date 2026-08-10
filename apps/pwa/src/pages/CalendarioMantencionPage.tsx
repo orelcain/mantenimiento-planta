@@ -1,5 +1,16 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import {
+  AlertTriangle,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  CornerUpLeft,
+  Pencil,
+  Settings,
+  X as XIcon,
+  Zap,
+} from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../services/firebase'
@@ -7,6 +18,18 @@ import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
 import { getHmiTooltipPwd } from '../services/hmiKnuro'
 import { logger } from '@/lib/logger'
+
+/**
+ * Semáforo de 4 niveles para el delta de horas (sobre-asignado → muy bajo).
+ * El color ya lo pone la clase del contenedor; el ícono es el segundo canal (§13).
+ */
+const deltaIcon = (delta: number, alto: number, ok: number, aviso: number) => {
+  const cls = 'h-3 w-3 shrink-0'
+  if (delta > alto) return <Zap className={cls} aria-label="Por sobre lo asignado" />
+  if (delta >= ok) return <Check className={cls} aria-label="En rango" />
+  if (delta >= aviso) return <AlertTriangle className={cls} aria-label="Bajo lo asignado" />
+  return <XIcon className={cls} aria-label="Muy por debajo" />
+}
 
 type DayCol = {
   c: number
@@ -1857,7 +1880,7 @@ export function CalendarioMantencionPage() {
                   ? <span className="ml-1 text-caption text-yellow-400">● hoy</span>
                   : weekKeys.includes(todayWeekKey) && (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
-                      className="ml-1.5 h-5 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none">↩ Ir a hoy</button>
+                      className="ml-1.5 inline-flex h-5 items-center gap-1 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Ir a hoy</button>
                   )
                 }
               </div>
@@ -1875,7 +1898,8 @@ export function CalendarioMantencionPage() {
               ))}
               <button
                 onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                className={`h-6 px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}>✏</button>
+                aria-label={mobileEditMode ? 'Salir del modo edición' : 'Editar calendario'}
+                className={`inline-flex h-6 items-center justify-center px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}><Pencil className="h-3 w-3" /></button>
               <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
             </div>
           ) : (
@@ -1895,7 +1919,7 @@ export function CalendarioMantencionPage() {
                 </div>
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
-                    className="shrink-0 h-6 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none">↩ Hoy</button>
+                    className="shrink-0 inline-flex h-6 items-center gap-1 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Hoy</button>
                 )}
                 <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
@@ -1913,7 +1937,8 @@ export function CalendarioMantencionPage() {
                 ))}
                 <button
                   onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                  className={`h-6 px-2.5 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>✏</button>
+                  aria-label={mobileEditMode ? 'Salir del modo edición' : 'Editar calendario'}
+                  className={`inline-flex h-6 items-center justify-center px-2.5 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}><Pencil className="h-3 w-3" /></button>
               </div>
             </>
           )}
@@ -1930,7 +1955,7 @@ export function CalendarioMantencionPage() {
           >
             {weekDays.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground p-6 text-center">
-                <span className="text-2xl">📅</span>
+                <CalendarDays className="h-8 w-8 text-muted-foreground/50" />
                 <span>No hay datos cargados.<br/>Usa <strong>"Editar"</strong> para cargar el calendario.</span>
               </div>
             ) : (
@@ -1939,7 +1964,7 @@ export function CalendarioMantencionPage() {
                   <tr className="bg-muted text-foreground border-b border-border">
                     <th className="sticky left-0 z-[25] bg-muted px-1.5 py-1.5 text-left font-semibold"
                       style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
-                      {mobileEditMode ? <span className="text-ink-ok text-caption">✏ Toca un día</span> : <span className="text-muted-foreground text-caption tracking-wide">Técnico</span>}
+                      {mobileEditMode ? <span className="inline-flex items-center gap-1 text-ink-ok text-caption"><Pencil className="h-3 w-3" />Toca un día</span> : <span className="text-muted-foreground text-caption tracking-wide">Técnico</span>}
                     </th>
                     {weekDays.map((d) => {
                       const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
@@ -2115,12 +2140,12 @@ export function CalendarioMantencionPage() {
                               /* Portrait: icono + número compacto */
                               <div className="flex flex-col items-end pr-0.5 leading-none gap-0.5">
                                 <div className="flex items-center gap-0.5">
-                                  <span className={`text-caption ${wCls}`}>{wDelta > tol * 4 ? '⚡' : wDelta >= -tol ? '✓' : wDelta >= -tol * 6 ? '⚠' : '✗'}</span>
+                                  <span className={`inline-flex items-center text-caption ${wCls}`}>{deltaIcon(wDelta, tol * 4, -tol, -tol * 6)}</span>
                                   <span className={`text-caption font-bold ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
                                   <span className="text-caption text-muted-foreground/50">h·s</span>
                                 </div>
                                 <div className="flex items-center gap-0.5">
-                                  <span className={`text-caption ${mCls}`}>{mDelta > tol * 16 ? '⚡' : mDelta >= -tol * 4 ? '✓' : mDelta >= -tol * 24 ? '⚠' : '✗'}</span>
+                                  <span className={`inline-flex items-center text-caption ${mCls}`}>{deltaIcon(mDelta, tol * 16, -tol * 4, -tol * 24)}</span>
                                   <span className={`text-caption font-bold ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
                                   <span className="text-caption text-muted-foreground/50">h·m</span>
                                 </div>
@@ -2187,14 +2212,14 @@ export function CalendarioMantencionPage() {
             )}
             {mobileEditMode && (
               <div className="flex items-center gap-2 px-1">
-                <span className="text-caption text-emerald-400">✏ Modo edición activo — toca cualquier día para ajustar su horario</span>
+                <span className="inline-flex items-center gap-1 text-caption text-ink-ok"><Pencil className="h-3 w-3 shrink-0" />Modo edición activo — toca cualquier día para ajustar su horario</span>
               </div>
             )}
 
             <details className="rounded-card border bg-card group">
               <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground select-none">
-                <span>⚙ Editar calendario</span>
-                <span className="text-sm leading-none transition-transform group-open:rotate-180">⌄</span>
+                <span className="inline-flex items-center gap-1.5"><Settings className="h-3.5 w-3.5" />Editar calendario</span>
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
               </summary>
               <div className="border-t border-border p-2 space-y-2">
                 <div className="text-caption text-muted-foreground">Para configurar horarios base, técnicos o exportar Excel, accede desde escritorio o tablet.</div>

@@ -19,7 +19,7 @@ import ReactECharts from 'echarts-for-react'
 import type ReactEChartsCore from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
-import { Activity, Coffee } from 'lucide-react'
+import { Activity, Coffee, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { TimelineBucket } from '@/services/grader/types'
@@ -672,7 +672,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
               const ts = params.data.xAxis
               const match = errorSeries.find(([t]) => t === ts)
               const time = new Date(ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-              return `<b style="color:${params.data.lineStyle.color}">⚠ Error P0</b><br/>⏱ ${time}<br/>${match ? match[2] : '?'} (${match ? match[1] : '?'} pz)`
+              return `<b style="color:${params.data.lineStyle.color}">Error P0</b><br/>${time}<br/>${match ? match[2] : '?'} (${match ? match[1] : '?'} pz)`
             },
           },
         }
@@ -692,7 +692,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             label: {
               show: true,
               position: 'insideTop',
-              formatter: `☕ ${label}`,
+              formatter: `${label}`,
               fontSize: 9,
               color: 'rgba(148,163,184,0.6)',
               padding: [4, 0],
@@ -788,22 +788,22 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           if (sn.includes('Peso pieza')) {
             const w = params.value[1]
             const cal = weightSeries.find(([ts]) => ts === params.value[0])?.[2] ?? '?'
-            return `<b style="color:${params.color}">● ${cal}</b><br/>⏱ ${time}<br/>⚖ <b>${w.toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
+            return `<b style="color:${params.color}">● ${cal}</b><br/>${time}<br/>Peso <b>${w.toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
           }
           if (sn.includes('promedio')) {
-            return `<b style="color:#fbbf24">━ Promedio móvil</b><br/>⏱ ${time}<br/>⚖ <b>${params.value[1].toLocaleString('es-CL')}g</b>`
+            return `<b style="color:#fbbf24">━ Promedio móvil</b><br/>${time}<br/>Peso <b>${params.value[1].toLocaleString('es-CL')}g</b>`
           }
           if (sn.includes('acum')) {
-            return `<b style="color:#fb923c">┅ P0% acumulado</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> del turno`
+            return `<b style="color:#fb923c">┅ P0% acumulado</b><br/>${time}<br/><b>${params.value[1]}%</b> del turno`
           }
           if (sn.includes('P0%')) {
-            return `<b style="color:#ef4444">● P0% instantáneo</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> (ventana 5 min)`
+            return `<b style="color:#ef4444">● P0% instantáneo</b><br/>${time}<br/><b>${params.value[1]}%</b> (ventana 5 min)`
           }
           if (sn.includes('Producción')) {
-            return `<b style="color:#10b981">▊ Producción</b><br/>⏱ ${time}<br/>🏭 <b>${params.value[1]}</b> pz/min`
+            return `<b style="color:#10b981">▊ Producción</b><br/>${time}<br/><b>${params.value[1]}</b> pz/min`
           }
           if (sn.startsWith('G')) {
-            return `<b style="color:${params.color}">■ Gate ${sn.slice(1)}</b><br/>⏱ ${time}<br/>📦 <b>${params.value[1]}</b> pz (5 min)`
+            return `<b style="color:${params.color}">■ Gate ${sn.slice(1)}</b><br/>${time}<br/><b>${params.value[1]}</b> pz (5 min)`
           }
           if (sn.startsWith('_')) return ''
           return `${sn}: ${params.value[1]}`
@@ -856,7 +856,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           <div className="flex items-center gap-1.5 flex-wrap">
             {stats.withWeight > 0 && (
               <Badge variant="outline" className="text-caption gap-1">
-                ⚖ {stats.avgWeight.toLocaleString('es-CL')}g
+                <Scale className="h-3 w-3" />
+                {stats.avgWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
             {stats.withWeight > 0 && (
