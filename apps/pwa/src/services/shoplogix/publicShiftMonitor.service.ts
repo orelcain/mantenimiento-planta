@@ -45,7 +45,13 @@ export interface PublicMonitorLive {
   effectiveStart: string | null
   effectiveEnd: string | null
   shiftClosed: boolean
+  /** Jornada completa = `shiftPieces` + `outsidePieces`. */
   totalPieces: number
+  /** Lo que Shoplogix metió DENTRO de la ventana del turno. */
+  shiftPieces?: number
+  /** Lo que la línea hizo fuera de esa ventana (arranque anticipado o cola). */
+  outsidePieces?: number
+  outsideRanges?: Array<{ from: string; to: string; pieces: number; kind: 'antes' | 'despues' }>
   expectedPieces: number
   piecesPerHour: number
   piecesPerMinute: number
