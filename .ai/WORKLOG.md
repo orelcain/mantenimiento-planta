@@ -13,6 +13,43 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - La vista de turno tambien cuenta la cola + umbral unificado + UX
+
+Orel revisando la app en el celular. Cinco cosas:
+
+1. **El scorecard seguia mostrando 4.410.** El monitor y la matriz ya contaban la produccion de
+   fuera del horario, pero la vista de turno no: era la tercera superficie con el mismo dato y un
+   numero distinto. Nuevo hook `useShiftOutsidePieces` con el MISMO umbral y el MISMO dedupe →
+   ahora **4.915** con el desglose "4.410 en el turno + 505 fuera del horario (15:40–16:30)".
+   Cuesta 1 lectura: los intervals del turno ya estan en el snapshot cargado.
+2. **El horario decia 15:30** cuando la linea siguio hasta las 16:30. Sin Grader el "Produjo" iba
+   vacio y solo quedaba el programado; ahora cae a la ventana REAL del sensor (cola incluida):
+   *Programado 07:45–15:30 · Produjo 07:55–16:30*.
+3. **Umbral unificado en la matriz.** ⚠ Al aplicarlo tal cual, dos tests reales fallaron: castigaba
+   ciclos sueltos DENTRO del horario del turno, que son del turno sin discusion. El umbral solo
+   aplica FUERA de las ventanas. Y hubo que **actualizar un test que fijaba la decision anterior**
+   ("ningun ciclo sin turno", 03-ago): el caso Yal pasa de 1.836 a 1.835 cic porque 1 ciclo suelto
+   a las 09:30 es ruido. Queda escrito en el test por que cambio.
+4. **Boton "Abrir"** junto a Copiar/Revocar: se podia compartir el monitor pero no entrar a mirarlo.
+5. **Detalle por aparato en la telemetria**: "5 aperturas · 5 aparatos" no distinguia *una persona
+   que abrio 5 veces* de *5 personas que abrieron una vez*, que es justo lo que hay que saber. Ahora
+   lista los 5 aparatos mas recientes con sus aperturas, su tiempo y cuando fue la ultima.
+
+- Archivos: `apps/pwa/src/hooks/useShiftOutsidePieces.ts` (nuevo),
+  `apps/pwa/src/components/grader/ShoplogixOnlyScorecard.tsx`,
+  `apps/pwa/src/components/grader/MonitorUsagePanel.tsx`,
+  `apps/pwa/src/components/grader/LossCascadeCard.tsx`,
+  `apps/pwa/src/services/grader/graderUnscheduledAttribution.ts`,
+  `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx` y su test.
+- Verificacion: 1.107 tests del PWA y 202 de functions en verde; tsc y eslint limpios. En el
+  navegador con sesion real: hero 4.915, desglose correcto, "Produjo 07:55–16:30", boton Abrir.
+- Estado: HECHO (mergeado)
+- ⚠ **SIN VERIFICAR**: el arreglo de los textos que se salian por el borde en el celular (filas de
+  "Piezas perdidas por causal", que llevaban 6 elementos `shrink-0` sin poder envolver). El fix es
+  `flex-wrap` + anchos fijos solo en desktop, pero **no se pudo mirar en un viewport movil real**:
+  `resize_window` no cambia el viewport de la pestaña del Chrome del usuario, y el navegador de la
+  herramienta —que si emula movil— no tiene su sesion. Pedido spot-check a Orel.
+
 ## 2026-08-10 - claude - El monitor publico pasa a ser theme-aware (claro/oscuro)
 
 Pedido de Orel. La pantalla nacio dark-only por decision explicita ("un tablero de planta se mira

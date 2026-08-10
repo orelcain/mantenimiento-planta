@@ -107,9 +107,16 @@ describe('no inventa atribuciones', () => {
     expect(attributeUnscheduledCycles([iv('05:00', 10)], [t]).unattributed).toBe(0)
   })
 
-  it('caso real Yal 2026-08-03: 1.836 cic de media mañana van al Turno 3', () => {
+  it('caso real Yal 2026-08-03: los 1.835 cic de media mañana van al Turno 3', () => {
     // El Turno 3 corrió 00:06–07:18 y la producción fue 09–11 h. Con la regla
     // sin límite, esos ciclos se suman al turno y quedan marcados.
+    //
+    // ⚠ El total bajó de 1.836 a 1.835 el 2026-08-10, cuando Orel pidió unificar
+    // el umbral de ruido con el del monitor: ese 1 ciclo suelto de las 09:30 es
+    // un tramo por debajo de OUTSIDE_MIN_PIECES y ya no se atribuye. Convive con
+    // la decisión de "ningún ciclo sin turno" del 03-ago: esa sigue valiendo para
+    // la producción REAL; lo que se descarta ahora es el ruido de 1-19 piezas
+    // (higiene, giro en vacío) que antes inflaba el turno de al lado.
     const t3 = shift({ dateKey: '2026-08-03', shiftId: 'Turno 3', cycles: 12000,
                        start: wall('2026-08-03T00:06:00'), end: wall('2026-08-03T07:18:00') })
     const uns = shift({ dateKey: '2026-08-03', shiftId: 'Unscheduled', cycles: 1836, unscheduled: true })
@@ -119,8 +126,8 @@ describe('no inventa atribuciones', () => {
     ]))
     expect(out.find(s => s.unscheduled)).toBeUndefined()
     const t = out.find(s => s.shiftId === 'Turno 3')!
-    expect(t.cycles).toBe(12000 + 1836)
-    expect(t.attributedCycles).toBe(1836)
+    expect(t.cycles).toBe(12000 + 1835)
+    expect(t.attributedCycles).toBe(1835)
   })
 
   it('si el día tiene turnos, no queda resto: el bloque desaparece', () => {
