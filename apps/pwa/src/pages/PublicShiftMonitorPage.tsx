@@ -19,7 +19,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Activity, AlertCircle, Clock, Gauge, PauseCircle, Radio, RefreshCw, Timer } from 'lucide-react'
+import { Activity, AlertCircle, Clock, Gauge, Hourglass, PauseCircle, Radio, Repeat, RefreshCw, Timer } from 'lucide-react'
 import {
   subscribePublicShiftMonitor,
   type PublicShiftMonitorDoc,
@@ -219,7 +219,7 @@ export function PublicShiftMonitorPage() {
     )
   }
 
-  if (status === 'gone' || !data || !live) {
+  if (status === 'gone' || !data) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gray-950 px-6 text-center">
         <AlertCircle className="h-11 w-11 text-red-400" />
@@ -227,6 +227,22 @@ export function PublicShiftMonitorPage() {
         <p className="max-w-xs text-sm text-white/50">
           Los links de monitoreo tienen vencimiento y se pueden revocar. Pide uno nuevo a
           Mantención para seguir viendo el turno.
+        </p>
+      </div>
+    )
+  }
+
+  // Un link de línea puede nacer fuera de turno (fin de semana, parada). No
+  // está roto: está esperando. Decirle "no disponible" mandaría a pedir otro
+  // link que tampoco mostraría nada.
+  if (!live) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gray-950 px-6 text-center">
+        <Hourglass className="h-11 w-11 text-sky-400/70" />
+        <p className="text-lg font-semibold text-white">Esperando el próximo turno</p>
+        <p className="max-w-xs text-sm text-white/50">
+          {data.machineKindLong || data.lineLabel || 'La línea'} no tiene un turno en curso. Esta
+          pantalla se llena sola cuando arranque — deja el link guardado.
         </p>
       </div>
     )
@@ -250,6 +266,14 @@ export function PublicShiftMonitorPage() {
             {live.shiftClosed && (
               <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/50">
                 Turno cerrado
+              </span>
+            )}
+            {/* Sin esto, ver que cambió el turno del encabezado se lee como que
+                el link se rompió. Con el chip, se entiende que sigue la línea. */}
+            {data.mode === 'line' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300/90">
+                <Repeat className="h-3 w-3" />
+                Sigue el turno vigente
               </span>
             )}
           </div>
@@ -418,6 +442,11 @@ export function PublicShiftMonitorPage() {
           <p>
             Se actualiza solo · solo lectura · compartido por {data.createdBy}
           </p>
+          {data.mode === 'line' && (
+            <p className="text-white/40">
+              Este link no caduca con el turno: al arrancar el siguiente, cambia solo.
+            </p>
+          )}
           <p>
             Link válido hasta {new Date(data.expiresAt).toLocaleString('es-CL', {
               day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',

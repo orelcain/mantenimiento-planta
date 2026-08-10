@@ -13,6 +13,54 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - El link del monitor sigue el turno vigente (no se regenera)
+
+Continuacion de la entrada de abajo. El link nacia atado a UN turno, asi que al dia siguiente
+habia que generar otro: inservible para un QR pegado en la pared. Ahora el modo por defecto es
+**`line`**: el mismo link sigue el turno que este corriendo.
+
+**Como se resuelve el turno vigente** (`resolveCurrentShiftDocId`): entre los padres de HOY y AYER
+en wall-clock (un turno noche que arranca 21:30 queda archivado bajo el dia en que arranco), gana
+el que contiene el reloj de planta con 30 min de gracia; si no hay ninguno —estamos entre turnos—
+gana el ultimo que YA empezo, porque quien abre el QR a las 20:00 quiere ver como termino el
+turno, no una pantalla vacia. `Unscheduled` con <50 ciclos se descarta (mismo umbral que la PWA).
+Se leen 2-6 docs padre, ningun `machines/`, y sin indices nuevos (`listDocuments` + filtro por
+prefijo de fecha).
+
+⚠ **Lo que NO se hace, y es el punto entero:** el monitor de linea **nunca adopta el turno que
+disparo el trigger**. El re-sync movil reescribe padres de ayer y de hace 2-3 dias; adoptarlos
+haria saltar el link a un turno viejo justo cuando alguien lo esta mirando. Siempre se re-resuelve.
+
+El trigger atiende las dos audiencias con **una sola query** (`where scope in [plant|shiftDoc,
+line|plant]`, dos igualdades, sin indice compuesto) y resuelve el turno vigente **una vez por
+planta** aunque haya varios links de esa linea.
+
+Tres estados en la pantalla publica, los tres verificados: turno corriendo (chip "Sigue el turno
+vigente"), link vencido/revocado, y **"Esperando el proximo turno"** — un link de linea puede
+nacer un domingo y no esta roto, esta esperando; decirle "no disponible" mandaria a pedir otro
+link que tampoco mostraria nada.
+
+- Hecho: modo `line` en el callable (permite crear fuera de turno, pero no sobre una linea que
+  nunca sincronizo), `buildMonitorPatch` que ademas reapunta dateKey/shiftId, trigger que cubre
+  ambos scopes, vigencia nueva de **30 dias** (default del modo linea), selector "Que sigue" en la
+  tarjeta de generacion, chip + nota al pie en la vista publica, y `--current` en el probe para
+  contrastar que turno se considera vigente en cada planta.
+- Archivos: `functions/publicMonitor.js`, `functions/index.js`,
+  `functions/__tests__/publicMonitor.test.js`, `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`,
+  `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`,
+  `scripts/public-monitor-probe.js`.
+- Verificacion: `tsc` limpio, eslint sin errores nuevos, **176 tests functions** (6 nuevos del modo
+  linea) y **1.104 del PWA** en verde, build OK. **Contrastado contra las 3 lineas reales a las
+  15:11**: chonchi → `Turno 2` 09:15→15:05 (6.751 pz), yal → `Turno 2` recien arrancado 15:00,
+  filete → `Turno Dia` 07:45→15:05 (4.010 pz). Los tres estados de la pantalla vistos en el
+  navegador con docs reales de Firestore.
+- Estado: HECHO (mergeado)
+- Sigue: sigue faltando ejercitar el boton "Generar link" con sesion de supervisor (el callable
+  necesita usuario). Los links de linea se refrescan solo cuando el sync escribe algun padre de esa
+  planta — si una planta deja de sincronizar, el link conserva el ultimo turno y lo dice con la
+  frescura, que es lo correcto.
+
 ## 2026-08-10 - claude - Monitor publico de turno en vivo (link/QR sin sesion)
 
 Control de Produccion necesitaba seguir el avance de piezas de la Baader 200 de Filete sin entrar
