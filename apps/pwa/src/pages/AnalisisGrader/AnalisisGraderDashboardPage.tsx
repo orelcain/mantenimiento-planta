@@ -918,11 +918,17 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     }))
   }, [analytics.lotAnalysis])
 
+  /**
+   * Señal de dispersión del lote. El campo `emoji` que traía cada nivel era
+   * CÓDIGO MUERTO — no se renderizaba en ninguna parte —, así que se elimina en
+   * vez de traducirlo a ícono: la §63 pide quitar antes que sustituir.
+   * El nivel ya se comunica con `label` (texto) y `cls`/`bar` (color).
+   */
   const getCvSignal = useCallback((cv: number) => {
-    if (cv >= 20) return { emoji: '🔴', label: 'alta', cls: 'text-ink-crit', bar: 'rgba(239,68,68,0.75)' }
-    if (cv >= 12) return { emoji: '🟠', label: 'media-alta', cls: 'text-ink-warn', bar: 'rgba(245,158,11,0.75)' }
-    if (cv >= 8) return { emoji: '🟡', label: 'media', cls: 'text-yellow-500', bar: 'rgba(234,179,8,0.75)' }
-    return { emoji: '🟢', label: 'baja', cls: 'text-ink-ok', bar: 'rgba(16,185,129,0.75)' }
+    if (cv >= 20) return { label: 'alta', cls: 'text-ink-crit', bar: 'rgba(239,68,68,0.75)' }
+    if (cv >= 12) return { label: 'media-alta', cls: 'text-ink-warn', bar: 'rgba(245,158,11,0.75)' }
+    if (cv >= 8) return { label: 'media', cls: 'text-yellow-500', bar: 'rgba(234,179,8,0.75)' }
+    return { label: 'baja', cls: 'text-ink-ok', bar: 'rgba(16,185,129,0.75)' }
   }, [])
 
   const lotDispersionView = useMemo(() => {

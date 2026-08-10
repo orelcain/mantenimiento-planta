@@ -44,7 +44,7 @@ type GateAction = {
   isApplied: boolean
 }
 
-type CvSignal = { cls: string; emoji: string; label: string; bar: string }
+type CvSignal = { cls: string; label: string; bar: string }
 
 interface Props {
   analytics: GraderAnalyticsResult
