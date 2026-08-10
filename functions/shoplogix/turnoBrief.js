@@ -69,9 +69,13 @@ function fmtHora(d) {
  * @param {{start: Date, end: Date}|null} p.officialSchedule
  * @param {{name: string, jobMaxRunRate: number|null}|null} p.currentJob
  * @param {Record<string, number>|null} p.officialTargets — machineid → ciclos
+ * @param {string|null} [p.monitorUrl] — link público del monitor en vivo, para
+ *   reenviar a Control de Producción. Va al final y con su propia explicación:
+ *   quien recibe el brief tiene que saber que ESE link se puede compartir con
+ *   gente sin cuenta, cosa que ningún otro link de la app permite.
  * @returns {string} HTML para Telegram
  */
-function componerBriefInicioTurno({ plantLabel, shiftId, officialSchedule, currentJob, officialTargets }) {
+function componerBriefInicioTurno({ plantLabel, shiftId, officialSchedule, currentJob, officialTargets, monitorUrl }) {
   const lineas = [`🟢 <b>Inicio de turno · ${plantLabel}</b>`, `${shiftId} ha arrancado`]
   if (officialSchedule?.start && officialSchedule?.end) {
     lineas.push(`🕐 Horario oficial: ${fmtHora(officialSchedule.start)} → ${fmtHora(officialSchedule.end)}`)
@@ -85,7 +89,32 @@ function componerBriefInicioTurno({ plantLabel, shiftId, officialSchedule, curre
     const total = targets.reduce((a, b) => a + (b || 0), 0)
     if (total > 0) lineas.push(`🎯 Target del turno: <b>${fmtNum(total)}</b> ciclos (${targets.length} máquinas)`)
   }
+  if (monitorUrl) lineas.push('', lineaMonitor(monitorUrl))
   return lineas.join('\n')
+}
+
+/**
+ * Línea con el link del monitor público. Una sola definición para el brief y
+ * para el aviso suelto: el texto que explica QUÉ es ese link (compartible, sin
+ * login, solo lectura) es lo que evita que se reenvíe creyendo otra cosa.
+ */
+function lineaMonitor(url) {
+  return `📡 <a href="${url}">Monitor en vivo del turno</a> — para Control de Producción: sin login, solo mirar.`
+}
+
+/**
+ * Aviso suelto con el link del monitor, para las líneas que NO tienen abierto
+ * el canal Telegram de alertas (hoy, Filete). El link es lo que se pidió, así
+ * que se manda igual; el resto de las alertas de esa línea siguen apagadas.
+ * @returns {string} HTML para Telegram
+ */
+function componerAvisoMonitor({ plantLabel, shiftId, monitorUrl }) {
+  return [
+    `🟢 <b>Inicio de turno · ${plantLabel}</b>`,
+    `${shiftId} ha arrancado`,
+    '',
+    lineaMonitor(monitorUrl),
+  ].join('\n')
 }
 
 /**
@@ -252,6 +281,7 @@ function componerMensajeRecuperacion({ plantLabel, shiftId, delayMinutes }) {
 
 module.exports = {
   componerBriefInicioTurno,
+  componerAvisoMonitor,
   componerBriefFinTurno,
   resumenParos,
   evaluarDelayCheck,

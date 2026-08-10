@@ -249,7 +249,9 @@ export function PublicShiftMonitorPage() {
   }
 
   const lineTitle = data.machineKindLong || data.lineLabel || data.areaLabel || 'Línea de producción'
-  const areaTitle = [data.lineLabel, data.areaLabel].filter(Boolean).join(' · ')
+  // Dedupe: en las líneas donde el área y la planta se llaman igual (Filete)
+  // el subtítulo quedaba "Filete · Filete".
+  const areaTitle = [...new Set([data.lineLabel, data.areaLabel].filter(Boolean))].join(' · ')
 
   const stale = live.lastSyncAt
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60

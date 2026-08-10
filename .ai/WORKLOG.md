@@ -13,6 +13,50 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - El link del monitor llega por Telegram al arrancar el turno
+
+Tercera parte. El link ya seguia el turno vigente, pero habia que ir a buscarlo a la app. Ahora
+llega solo: al crearse el doc de un turno (`onShoplogixShiftStarted`), el aviso de arranque incluye
+el link del monitor listo para reenviar a Control de Produccion.
+
+**La invariante que manda: el TOKEN NO CAMBIA.** `ensureLineMonitor` reusa siempre el link de linea
+vigente y solo le extiende la vigencia cuando le quedan <7 dias (a 30). Crear uno nuevo en cada
+arranque habria pasado cualquier test de contenido y aun asi habria roto lo unico que hace util al
+link: que el QR impreso y el mensaje de Telegram de ayer sigan abriendo la misma pantalla. Hay 4
+tests sobre eso, y se comprobo que fallan mutando el codigo.
+
+⚠ **Hallazgo que cambio el diseno: Filete NO tenia el canal Telegram abierto** (`notificationConfig`
+solo existe para chonchi y yal; filete heredaba `telegram:false`). O sea, la linea donde mas se pide
+el monitor era justo la que no iba a recibir nada. Se resolvio con un flag propio,
+`monitorLink.enabled` (default true, `ttlDays` 30), independiente de `channels.telegram`:
+  - Chonchi/Yal (canal abierto): el link va DENTRO del brief de inicio de siempre, sin mensajes nuevos.
+  - Filete (canal cerrado): un aviso corto y aparte, solo con el link. **No se le abrio el canal de
+    alertas**: activar `telegram:true` habria traido tambien detenciones y fin de turno de Filete,
+    que nadie pidio.
+
+El envio por Telegram salio ademas de dentro del gate `eligibleIds.length > 0`: ese gate son las
+preferencias de push de los usuarios de la app, y el mensaje va al chat del admin o al grupo. Que
+alguien apague su push no puede dejar sin link a Control de Produccion.
+
+- Hecho: `monitorLink` en la config de notificaciones (3 capas, ajustable por planta desde
+  Firestore), `ensureLineMonitor` (reusa/renueva/crea), `resolveMonitorUrlForPlant` (nunca tumba el
+  aviso: ante error devuelve null y el mensaje sale sin la linea), linea del link en
+  `componerBriefInicioTurno` + `componerAvisoMonitor` para el caso sin canal. De paso, dedupe de
+  `lineLabel`/`areaLabel` en la cabecera publica ("Filete · Filete").
+- Archivos: `functions/index.js`, `functions/publicMonitor.js`, `functions/shoplogix/notifConfig.js`,
+  `functions/shoplogix/turnoBrief.js`, `functions/__tests__/publicMonitor.test.js`,
+  `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`.
+- Verificacion: **181 tests functions** (5 nuevos) y 1.104 del PWA en verde; `tsc` limpio; el modulo
+  `index.js` carga sin TDZ. Contra PRODUCCION: dos corridas seguidas de `ensureLineMonitor` sobre
+  filete devolvieron **el mismo token** (`created:true` y luego `false`), el monitor quedo con datos
+  reales (4.408 pz) y vigencia al 9-sep, y la pagina se abrio sin sesion. Los dos mensajes se
+  renderizaron con el composer real antes de tocar nada.
+- Estado: HECHO (mergeado)
+- Sigue: **el envio real solo se puede confirmar en el proximo arranque de turno** — no se disparo
+  ningun Telegram de prueba a proposito (mandar mensajes es del usuario, no mio). Si el primer aviso
+  no llega, mirar `monitorLink.enabled` en `notificationConfig/{planta}` y los logs
+  `[publicShiftMonitor] link de linea ...`.
+
 ## 2026-08-10 - claude - El link del monitor sigue el turno vigente (no se regenera)
 
 Continuacion de la entrada de abajo. El link nacia atado a UN turno, asi que al dia siguiente

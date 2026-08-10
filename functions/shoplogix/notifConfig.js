@@ -31,6 +31,14 @@ const DEFAULTS = Object.freeze({
   // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es
   // ruido operacional (y las "Micro Detencion" tienen su propio toggle aparte).
   events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false },
+  /**
+   * Link del monitor público al arrancar el turno (el que se le reenvía a
+   * Control de Producción). Va por su PROPIO flag y no por `channels.telegram`:
+   * así una línea puede recibir el link sin que se le abra todo el canal de
+   * alertas. `ttlDays` es la vigencia del link de línea, que se renueva sola en
+   * cada arranque — el token NO cambia, para que el QR impreso siga sirviendo.
+   */
+  monitorLink:   { enabled: true, ttlDays: 30 },
 })
 
 /**
@@ -48,7 +56,7 @@ const PLANT_DEFAULTS = Object.freeze({
 })
 
 /** Secciones que se mergean campo por campo. */
-const SECTIONS = ['channels', 'shiftStart', 'shiftEnd', 'firstPiece', 'pieceInterval', 'events']
+const SECTIONS = ['channels', 'shiftStart', 'shiftEnd', 'firstPiece', 'pieceInterval', 'events', 'monitorLink']
 
 /**
  * Resuelve la config efectiva de una planta.

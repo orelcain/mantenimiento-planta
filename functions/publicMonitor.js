@@ -366,11 +366,73 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   }
 }
 
+/**
+ * Devuelve el link de línea de una planta, creándolo si no existe.
+ *
+ * Lo llama el aviso de arranque de turno, así que la regla de oro es que el
+ * **token no cambie**: un QR impreso o un mensaje viejo de Telegram tienen que
+ * seguir funcionando. Por eso reusa el monitor vigente y solo le extiende la
+ * vigencia; nunca crea uno nuevo si ya hay.
+ *
+ * Si hay más de uno vigente (alguien generó uno a mano desde la app), se queda
+ * con el que vence más tarde y renueva ese: repartir avisos entre dos links de
+ * la misma línea sería peor que elegir cualquiera de forma estable.
+ *
+ * @param {object} p.meta — etiquetas de la línea para la cabecera del monitor.
+ * @returns {Promise<{token: string, created: boolean}|null>} null si la línea aún no tiene turnos.
+ */
+async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}) {
+  const nowMs = Date.now()
+  const nuevoVencimiento = new Date(nowMs + ttlDays * 86_400_000).toISOString()
+
+  const snap = await db.collection(COLLECTION).where('scope', '==', `line|${plantSlug}`).get()
+  const vigentes = snap.docs
+    .filter(d => String(d.data()?.expiresAt || '') > new Date(nowMs).toISOString())
+    .sort((a, b) => String(b.data().expiresAt).localeCompare(String(a.data().expiresAt)))
+
+  if (vigentes.length > 0) {
+    const doc = vigentes[0]
+    // Renovar solo si de verdad hace falta: una escritura por arranque de turno
+    // no cuesta nada, pero tampoco aporta si al link le quedan semanas.
+    if (String(doc.data().expiresAt) < new Date(nowMs + 7 * 86_400_000).toISOString()) {
+      await doc.ref.set({ expiresAt: nuevoVencimiento, ttlHours: ttlDays * 24 }, { merge: true })
+    }
+    return { token: doc.id, created: false }
+  }
+
+  const shiftDocId = await resolveCurrentShiftDocId(db, plantSlug)
+  const live = shiftDocId ? await buildMonitorLive(db, plantSlug, shiftDocId) : null
+
+  const token = require('crypto').randomUUID()
+  await db.collection(COLLECTION).doc(token).set({
+    token,
+    mode: 'line',
+    plantSlug,
+    dateKey: shiftDocId ? shiftDocId.slice(0, 10) : '',
+    shiftId: shiftDocId ? shiftDocId.slice(11) : '',
+    shiftDocId: shiftDocId ?? null,
+    scope: `line|${plantSlug}`,
+    plantLineId:     meta.plantLineId ?? null,
+    areaLabel:       meta.areaLabel ?? null,
+    lineLabel:       meta.lineLabel ?? null,
+    machineKindLong: meta.machineKindLong ?? null,
+    targetPieces:    meta.targetPieces ?? null,
+    createdBy: 'Mantención (automático)',
+    createdByUid: 'system',
+    createdAt: new Date(nowMs).toISOString(),
+    expiresAt: nuevoVencimiento,
+    ttlHours: ttlDays * 24,
+    live,
+  })
+  return { token, created: true }
+}
+
 module.exports = {
   COLLECTION,
   buildMonitorLive,
   buildMonitorPatch,
   resolveCurrentShiftDocId,
+  ensureLineMonitor,
   // exportados para tests
   currentStateOf,
   statusOf,
