@@ -256,7 +256,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
         <div className="mt-1.5 space-y-0.5">
           {suggestion.evidence.map((e, i) => (
             <p key={i} className="text-caption text-muted-foreground">
-              {e.replace(/^[⚠📊]\s*/, '')}
+              {e}
             </p>
           ))}
         </div>
