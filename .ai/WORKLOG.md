@@ -13,6 +13,38 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - La tarjeta del monitor NO aparecia en Filete (el caso de uso principal)
+
+Orel: *"no lo veo"*. Tenia razon. La tarjeta "Monitor en vivo (link / QR)" estaba anidada dentro de
+`{summary && shiftWindow && (...)}` — y ese `summary` es **el del Excel del Grader**. Filete no
+tiene Grader, asi que en Filete el bloque entero no se renderizaba: la tarjeta no existia justo en
+la linea para la que se construyo la feature. Movida fuera de ese gate.
+
+**Por que no se detecto antes**: tsc, eslint, 1.104 tests, el build y la vista publica estaban todos
+en verde, y la vista publica se verifico a fondo. Lo que nunca se hizo fue **abrir la pagina de la
+app y mirar la tarjeta**, porque requiere sesion y el navegador de la herramienta no la tiene. Se
+declaro como "pendiente: falta apretar Generar link" cuando la conclusion honesta era "no se sabe si
+la tarjeta aparece". *Un pendiente de verificacion no es un detalle: es exactamente donde estaba el
+bug.*
+
+**Como se verifico ahora**: con `claude-in-chrome` sobre el Chrome REAL de Orel, que ya tiene la
+sesion iniciada, contra un `vite` en el puerto 5173 (el autorizado por Firebase). Recorrido
+completo: Analisis de Turno → Filete → matriz de turnos → Ver turno → la tarjeta aparece al final →
+**Generar link** crea el link y el QR → **Revocar** lo borra (verificado en Firestore: vuelve a
+quedar un solo monitor de linea). Con eso queda cerrado el ultimo pendiente del circuito.
+
+De paso, el callable en modo linea pasa a ser **idempotente**: si la linea ya tiene un link vigente
+devuelve ESE (y solo refresca sus etiquetas), en vez de crear un segundo link. Sin esto, el QR
+pegado en la pared y el que acaba de copiar el supervisor serian distintos.
+
+- Archivos: `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`, `functions/index.js`,
+  `functions/publicMonitor.js`, `functions/__tests__/publicMonitor.test.js`.
+- Verificacion: 193 tests functions (1 nuevo) y 1.104 del PWA en verde; tsc limpio; build OK; y el
+  recorrido completo hecho a mano en el navegador con sesion real.
+- Estado: HECHO (mergeado)
+- Sigue: Orel pregunta si se puede saber quien usa el QR — sin sesion no hay identidad; lo que si se
+  puede medir es cuantas aperturas y desde cuantos dispositivos, de forma anonima.
+
 ## 2026-08-10 - claude - `Unscheduled` ganaba como turno vigente del monitor
 
 Encontrado **verificando en produccion** justo despues del deploy anterior: el monitor de linea de

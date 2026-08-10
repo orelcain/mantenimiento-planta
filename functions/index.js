@@ -8266,6 +8266,30 @@ exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (requ
   let shiftDocId = null
 
   if (mode === 'line') {
+    // Si la línea YA tiene un link vigente, se devuelve ESE. Generar uno nuevo
+    // desde la app dejaría dos links de la misma línea y el que llega por
+    // Telegram sería otro: el QR pegado en la pared y el que acaba de copiar el
+    // supervisor tienen que ser el mismo.
+    const ttlDays = MONITOR_TTL_CHOICES.includes(Number(request.data?.ttlHours))
+      ? Number(request.data.ttlHours) / 24
+      : 30
+    const existente = await publicMonitorMod.ensureLineMonitor(db, plantSlug, {
+      ttlDays: Math.max(1, Math.round(ttlDays)),
+      meta: {
+        plantLineId:     request.data?.plantLineId ?? null,
+        areaLabel:       request.data?.areaLabel ?? null,
+        lineLabel:       request.data?.lineLabel ?? null,
+        machineKindLong: request.data?.machineKindLong ?? null,
+        targetPieces:    Number.isFinite(Number(request.data?.targetPieces)) && Number(request.data.targetPieces) > 0
+          ? Number(request.data.targetPieces) : null,
+      },
+    })
+    if (existente) {
+      const doc = await db.collection(publicMonitorMod.COLLECTION).doc(existente.token).get()
+      logger.info('[publicShiftMonitor] link de línea entregado', { token: existente.token, plantSlug, creado: existente.created, uid })
+      return { token: existente.token, expiresAt: doc.data()?.expiresAt ?? null, ttlHours: doc.data()?.ttlHours ?? null, reused: !existente.created }
+    }
+
     shiftDocId = await publicMonitorMod.resolveCurrentShiftDocId(db, plantSlug)
     if (shiftDocId) {
       live = await publicMonitorMod.buildMonitorLive(db, plantSlug, shiftDocId)

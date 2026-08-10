@@ -717,11 +717,20 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
 
   if (vigentes.length > 0) {
     const doc = vigentes[0]
+    const patch = {}
     // Renovar solo si de verdad hace falta: una escritura por arranque de turno
     // no cuesta nada, pero tampoco aporta si al link le quedan semanas.
     if (String(doc.data().expiresAt) < new Date(nowMs + 7 * 86_400_000).toISOString()) {
-      await doc.ref.set({ expiresAt: nuevoVencimiento, ttlHours: ttlDays * 24 }, { merge: true })
+      patch.expiresAt = nuevoVencimiento
+      patch.ttlHours = ttlDays * 24
     }
+    // Las etiquetas SÍ se refrescan: quien genera desde la app manda las de
+    // `plantLines.ts`, que son más descriptivas que las que arma el backend.
+    // Cambiar el rótulo no cambia el token, que es lo que hay que preservar.
+    for (const k of ['plantLineId', 'areaLabel', 'lineLabel', 'machineKindLong', 'targetPieces']) {
+      if (meta[k] != null && meta[k] !== doc.data()[k]) patch[k] = meta[k]
+    }
+    if (Object.keys(patch).length > 0) await doc.ref.set(patch, { merge: true })
     return { token: doc.id, created: false }
   }
 

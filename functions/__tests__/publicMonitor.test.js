@@ -780,3 +780,22 @@ test('…salvo que la línea no tenga ningún turno con nombre (mejor eso que na
   })
   assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), unschId)
 })
+
+test('ensureLineMonitor refresca las etiquetas sin cambiar el token', async () => {
+  const vence = enDias(20)
+  const db = fakeMonitorsDb({
+    'tok': { scope: 'line|filete', expiresAt: vence, areaLabel: 'Filete', machineKindLong: 'Baader 200 · Línea 1' },
+  })
+
+  // Quien genera desde la app manda las etiquetas de plantLines.ts, más
+  // descriptivas que las que arma el backend.
+  const res = await ensureLineMonitor(db, 'filete', {
+    ttlDays: 30,
+    meta: { machineKindLong: 'Baader 200 · Línea 1 de Filete', targetPieces: 5000 },
+  })
+
+  assert.equal(res.token, 'tok', 'el token no puede cambiar por un cambio de rótulo')
+  assert.equal(db._store['tok'].machineKindLong, 'Baader 200 · Línea 1 de Filete')
+  assert.equal(db._store['tok'].targetPieces, 5000)
+  assert.equal(db._store['tok'].expiresAt, vence, 'con vigencia de sobra no se toca')
+})
