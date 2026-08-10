@@ -273,7 +273,7 @@ export function UpstreamScatterCard({
 
   // Color del KPI zona crítica según severidad
   const criticalColor =
-    criticalKpi.pct >= 20 ? 'text-rose-400'
+    criticalKpi.pct >= 20 ? 'text-cat-5-ink'
     : criticalKpi.pct >= 10 ? 'text-amber-400'
     : 'text-emerald-400'
 
@@ -284,7 +284,7 @@ export function UpstreamScatterCard({
       ? {
           icon: <TrendingDown className="w-3 h-3" />,
           text: `Cada -10 ciclos/5min Baader → +${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
-          color: 'text-rose-400',
+          color: 'text-cat-5-ink',
           tone: 'Más Baader → menos P0%. Confirma que ritmo upstream impacta calidad.',
         }
       : slopeMagnitude.direction === 'pos'
@@ -307,7 +307,7 @@ export function UpstreamScatterCard({
         {/* Header: ícono + título + KPI accionable de zona crítica */}
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <ScatterChart className="w-4 h-4 text-violet-400" />
+            <ScatterChart className="w-4 h-4 text-cat-6-ink" />
             <span className="font-medium text-sm">Correlación Baader → P0%</span>
           </div>
 
@@ -338,7 +338,7 @@ export function UpstreamScatterCard({
         {/* Nota explicativa pequeña */}
         <div className="text-caption text-slate-500 mb-2">
           Punto = 5 min · X = ciclos Baader · Y = P0% Grader · tamaño = piezas Grader (confianza).
-          {' '}Líneas: <span className="text-rose-400/80">P0% crítico {criticalThreshold}%</span>
+          {' '}Líneas: <span className="text-cat-5-ink">P0% crítico {criticalThreshold}%</span>
           {' · '}<span className="text-slate-400">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
         </div>
 

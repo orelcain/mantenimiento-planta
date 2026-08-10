@@ -89,7 +89,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
 
               {/* Z2 */}
               <div className="space-y-0.5 border-t border-muted-foreground/[0.10] pt-1.5">
-                <p className="text-caption text-violet-400 font-medium">Z2 programado</p>
+                <p className="text-caption text-cat-6-ink font-medium">Z2 programado</p>
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number"

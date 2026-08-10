@@ -151,7 +151,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
       {/* Indicador timeline lateral */}
       <div className="flex flex-col items-center pt-1" title={isSynthetic ? 'Inferido' : 'Registrado manualmente'}>
         {isSynthetic
-          ? <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+          ? <Sparkles className="w-3.5 h-3.5 text-cat-7-ink" />
           : <Wrench className="w-3.5 h-3.5 text-amber-500" />}
       </div>
 

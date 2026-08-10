@@ -1509,7 +1509,7 @@ export function ShiftTimelineView({
                     <span
                       className={cn(
                         'ml-2 tabular-nums text-caption font-medium',
-                        cp.p0Delta > 0 ? 'text-rose-400' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-slate-400',
+                        cp.p0Delta > 0 ? 'text-cat-5-ink' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-slate-400',
                       )}
                       title="Δ P0% respecto a la carga anterior"
                     >

@@ -357,7 +357,7 @@ export function ShoplogixNotificationsConfigPage() {
     <div className="container mx-auto p-4 sm:p-6 max-w-2xl space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Bell className="w-6 h-6 text-orange-400" />
+          <Bell className="w-6 h-6 text-cat-4-ink" />
           Notificaciones Shoplogix
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -374,7 +374,7 @@ export function ShoplogixNotificationsConfigPage() {
             className={[
               'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
               activeTab === pl.plantSlug
-                ? 'border-orange-400 text-foreground'
+                ? 'border-cat-4-ink text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >

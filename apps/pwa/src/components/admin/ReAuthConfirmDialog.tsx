@@ -136,7 +136,7 @@ export function ReAuthConfirmDialog({
               placeholder="••••••••"
             />
           </div>
-          {error && <p className="text-xs text-rose-400">{error}</p>}
+          {error && <p className="text-xs text-cat-5-ink">{error}</p>}
 
           <DialogFooter className="gap-2 pt-1">
             <Button

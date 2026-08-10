@@ -167,7 +167,7 @@ export function MachineCapacityPage() {
     <div className="container mx-auto p-4 sm:p-6 max-w-2xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Gauge className="w-5 h-5 text-cyan-400" />
+          <Gauge className="w-5 h-5 text-cat-7-ink" />
           Velocidad Nameplate — Baader 142
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -186,7 +186,7 @@ export function MachineCapacityPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-rose-400 flex items-center gap-1">
+        <p className="text-sm text-cat-5-ink flex items-center gap-1">
           <AlertTriangle className="w-4 h-4" /> {error}
           <Button variant="ghost" size="sm" onClick={loadAll} className="ml-2">
             <RotateCcw className="w-3 h-3 mr-1" /> Reintentar

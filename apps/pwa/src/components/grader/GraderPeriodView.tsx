@@ -736,7 +736,7 @@ export function GraderPeriodView({ data }: Props) {
                   <p className="font-semibold text-sm">
                     <span className="text-amber-500">{insights.diaAvg}%</span>
                     <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-indigo-400">{insights.nocheAvg}%</span>
+                    <span className="text-cat-3-ink">{insights.nocheAvg}%</span>
                   </p>
                   <p className="text-caption text-muted-foreground mt-0.5">
                     {Math.abs(insights.diaAvg - insights.nocheAvg) < 0.2

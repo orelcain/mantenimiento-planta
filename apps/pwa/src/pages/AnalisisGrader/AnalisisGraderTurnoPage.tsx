@@ -1515,7 +1515,7 @@ export function AnalisisGraderTurnoPage() {
                 {summary?.turnoLabel && (
                   <Badge
                     variant="outline"
-                    className="text-caption px-1.5 py-0 shrink-0 border-cat-6-tint/[0.25] text-violet-400"
+                    className="text-caption px-1.5 py-0 shrink-0 border-cat-6-tint/[0.25] text-cat-6-ink"
                     title="Turno de producción (columna Turno del Excel)"
                   >
                     Turno {summary.turnoLabel}
@@ -1808,7 +1808,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* Shoplogix — automático */}
             <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.15] dark:border-cat-6-tint/[0.25]">
-              <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+              <Zap className="w-4 h-4 text-cat-6-ink mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cat-6-ink">Shoplogix — Evisceradoras Baader 142</p>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -1816,7 +1816,7 @@ export function AnalisisGraderTurnoPage() {
                   No requiere acción manual.
                 </p>
               </div>
-              <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-violet-400 shrink-0 mt-0.5">
+              <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-cat-6-ink shrink-0 mt-0.5">
                 automático
               </Badge>
             </div>

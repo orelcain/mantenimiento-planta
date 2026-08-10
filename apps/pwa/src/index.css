@@ -125,12 +125,17 @@
   --ink-ok: 4 120 87;         /* emerald-700 */
   --ink-info: 29 78 216;      /* blue-700  */
 
-  /* Categóricos en la piel ACTUAL (claro): los -700 de Tailwind, para que el
-     barrido no cambie el aspecto de producción. Los valores Apple viven en el
-     bloque [data-skin="apple"]. */
-  --cat-1-ink: 29 78 216;    --cat-2-ink: 21 128 61;    --cat-3-ink: 67 56 202;
-  --cat-4-ink: 194 65 12;    --cat-5-ink: 190 18 60;    --cat-6-ink: 109 40 217;
-  --cat-7-ink: 15 118 110;   --cat-8-ink: 180 83 9;
+  /* Categóricos en claro. Partieron de los -700 de Tailwind, pero se derivaron
+     de nuevo: se usan SOBRE SU PROPIO TINTE al 15%, no sobre la tarjeta lisa, y
+     ese fondo baja el contraste. Medido contra la tarjeta más oscura de las dos
+     pieles, 5 de las 8 reprobaban AA (cat-8 3,79 · cat-2 3,93 · cat-4 4,05 ·
+     cat-7 4,23 · cat-5 4,47). Ahora las 8 pasan ≥4,5 con el matiz intacto.
+     Mismo método que las tintas semánticas: el tinte se fija y la tinta se
+     DERIVA de él. Recalcular con scripts/check-contrast.mjs si se tocan.
+     El bloque [data-skin="apple"] NO las redefine: hereda de acá. */
+  --cat-1-ink: 29 78 216;    --cat-2-ink: 19 116 56;    --cat-3-ink: 67 56 202;
+  --cat-4-ink: 180 60 11;    --cat-5-ink: 188 18 59;    --cat-6-ink: 109 40 217;
+  --cat-7-ink: 14 113 106;   --cat-8-ink: 160 74 8;
 
   /* ── ESCALA ÚNICA DE RADIOS (docs §3) ────────────────────────────────────
      La app mezclaba 6 variantes (650 `rounded`, 565 `-lg`, 304 `-md`, 90 `-xl`,
@@ -237,10 +242,11 @@
   --ink-ok: 108 154 138;
   --ink-info: 109 163 216;
 
-  /* Categóricos en la piel ACTUAL (oscuro): los -400 que ya usaba la app. */
-  --cat-1-ink: 109 163 216;  --cat-2-ink: 119 159 133;  --cat-3-ink: 137 146 209;
-  --cat-4-ink: 251 146 60;   --cat-5-ink: 224 125 140;  --cat-6-ink: 161 144 214;
-  --cat-7-ink: 86 184 204;   --cat-8-ink: 172 150 110;
+  /* OJO: acá vivía un bloque `--cat-N-ink` con los -400 de julio, rotulado
+     "categóricos en la piel ACTUAL". Era CÓDIGO MUERTO: lo pisaban, dentro de
+     este mismo `.dark`, las declaraciones de más abajo. O sea que la piel actual
+     lleva usando los categóricos de sistema desde que existen. Se eliminó para
+     que nadie vuelva a leer de ahí un valor que nunca se aplicó. */
 
   /* Paleta categórica en oscuro: NO es el claro invertido. La tinta usa los
      tonos vivos (que sobre superficie oscura son los legibles) y el tinte el

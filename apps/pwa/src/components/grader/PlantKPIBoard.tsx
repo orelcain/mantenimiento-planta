@@ -64,35 +64,35 @@ function oeeColor(v: number | null): string {
   if (v >= OEE_GOOD) return 'text-emerald-400'
   if (v >= KPI_CUTOFFS.oee.warnBelow) return 'text-sky-400'
   if (v >= KPI_CUTOFFS.oee.critBelow) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 function availColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
   if (v >= KPI_CUTOFFS.availability.warnBelow) return 'text-emerald-400'
   if (v >= KPI_CUTOFFS.availability.critBelow) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 function perfColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
   if (v >= KPI_CUTOFFS.performance.warnBelow) return 'text-emerald-400'
   if (v >= KPI_CUTOFFS.performance.critBelow) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 function mttrColor(min: number): string {
   if (min === 0) return 'text-muted-foreground'
   if (min <= KPI_CUTOFFS.mttrMin.warnAbove) return 'text-emerald-400'
   if (min <= KPI_CUTOFFS.mttrMin.critAbove) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 function mtbfColor(h: number): string {
   if (h === 0)  return 'text-muted-foreground'
   if (h >= KPI_CUTOFFS.mtbfHours.warnBelow) return 'text-emerald-400'
   if (h >= KPI_CUTOFFS.mtbfHours.critBelow) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 function barWidth(v: number | null, max = 1): string {
@@ -268,7 +268,7 @@ export function PlantKPIBoard({
         )}
 
         {error && (
-          <p className="text-xs text-rose-400 flex items-center gap-1">
+          <p className="text-xs text-cat-5-ink flex items-center gap-1">
             <AlertTriangle className="w-3.5 h-3.5" /> {error}
           </p>
         )}
@@ -349,7 +349,7 @@ export function PlantKPIBoard({
                 tooltip={DEFS.quality.desc}
                 value={kpis.quality !== null ? pct(kpis.quality) : 'N/A'}
                 valueColor={kpis.quality !== null
-                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'text-emerald-400' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'text-amber-400' : 'text-rose-400')
+                  ? (kpis.quality >= KPI_CUTOFFS.quality.warnBelow ? 'text-emerald-400' : kpis.quality >= KPI_CUTOFFS.quality.critBelow ? 'text-amber-400' : 'text-cat-5-ink')
                   : 'text-muted-foreground'}
                 barValue={kpis.quality}
                 barColor={kpis.quality !== null

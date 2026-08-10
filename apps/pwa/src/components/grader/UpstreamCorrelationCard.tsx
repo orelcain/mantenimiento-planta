@@ -154,7 +154,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         {/* Header — KPI accionable: tiempo muerto causado por upstream */}
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <Link2 className="w-4 h-4 text-violet-400" />
+            <Link2 className="w-4 h-4 text-cat-6-ink" />
             <span className="font-medium text-sm">Correlación con upstream</span>
           </div>
 
@@ -177,7 +177,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         {/* Sub-info: cuántos paros fueron coincidentales (colación, etc.) — claridad
             sobre por qué el conteo upstream excluye esas filas cyan abajo */}
         {coincidentalCount > 0 && (
-          <div className="text-caption text-cyan-400/80 mb-2 flex items-center gap-1.5">
+          <div className="text-caption text-cat-7-ink mb-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
             {coincidentalCount} paro{coincidentalCount !== 1 ? 's' : ''} coincide{coincidentalCount === 1 ? '' : 'n'} con paros programados de Baader (colación, reunión) — excluido{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
           </div>

@@ -2091,7 +2091,7 @@ export function CalendarioMantencionPage() {
                           cellContent = isReduced && times ? (
                             <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl bg-cat-4-tint/[0.15] border border-cat-4-tint/[0.25]`}>
                               <span className="text-caption font-semibold text-cat-4-ink leading-tight">{times.start}</span>
-                              <span className="text-caption text-orange-400/70 leading-tight">{times.end}</span>
+                              <span className="text-caption text-cat-4-ink leading-tight">{times.end}</span>
                             </span>
                           ) : (
                             <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>{badge.letter}</span>
@@ -2112,11 +2112,11 @@ export function CalendarioMantencionPage() {
                         const wDelta = hr.deltaWeek
                         const mDelta = hr.deltaMonth
                         // 4 zonas: sobretiempo | en rango | bajo | muy bajo
-                        const wCls = wDelta > tol * 4 ? 'text-orange-400'
+                        const wCls = wDelta > tol * 4 ? 'text-cat-4-ink'
                                    : wDelta >= -tol ? 'text-emerald-400'
                                    : wDelta >= -tol * 6 ? 'text-amber-400'
                                    : 'text-red-400'
-                        const mCls = mDelta > tol * 16 ? 'text-orange-400'
+                        const mCls = mDelta > tol * 16 ? 'text-cat-4-ink'
                                    : mDelta >= -tol * 4 ? 'text-emerald-400'
                                    : mDelta >= -tol * 24 ? 'text-amber-400'
                                    : 'text-red-400'
@@ -2668,18 +2668,18 @@ export function CalendarioMantencionPage() {
                     </th>
                     <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
                     <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
-                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-caption font-semibold text-cat-3-ink/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
+                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-caption font-semibold text-cat-3-ink" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
                       <div>Horas</div><div className="font-normal text-caption text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días efectivamente trabajados en el mes">
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días efectivamente trabajados en el mes">
                       <div>Días</div><div className="font-normal text-caption text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
                       <div>Días</div><div className="font-normal text-caption text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días de vacaciones del mes">Vac.</th>
-                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días feriados del mes">Fer.</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días de vacaciones del mes">Vac.</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink" title="Días feriados del mes">Fer.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2719,7 +2719,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${wOver ? 'bg-orange-500' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.15] text-orange-400' : riskW ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskW ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2748,7 +2748,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${mOver ? 'bg-orange-500' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.15] text-orange-400' : riskM ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskM ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaMonth)}
                             </span>
                           </div>
@@ -2848,7 +2848,7 @@ export function CalendarioMantencionPage() {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-foreground">{d.dayLabel}</span>
-                      {isWeekStart(idx) ? <span className="rounded-ctl bg-cat-7-tint/[0.15] px-1 text-caption text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
+                      {isWeekStart(idx) ? <span className="rounded-ctl bg-cat-7-tint/[0.15] px-1 text-caption text-cat-7-ink">{weekNumberLabel(d.dateObj)}</span> : null}
                     </div>
                   </th>
                 ))}

@@ -133,7 +133,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   cilindro: {
     label: 'Cilindro Neumático/Hidráulico',
     icon: CircleDot,
-    color: 'text-orange-400',
+    color: 'text-cat-4-ink',
     fields: {
       tipoCilindro: 'Tipo (Neumático/Hidráulico)',
       diametroPiston: 'Diámetro Pistón (mm)',
@@ -146,7 +146,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   compresor: {
     label: 'Compresor',
     icon: Wind,
-    color: 'text-cyan-400',
+    color: 'text-cat-7-ink',
     fields: {
       tipoCompresor: 'Tipo (Pistón/Tornillo/Centrífugo)',
       caudalAire: 'Caudal (CFM / m³/min)',
@@ -159,7 +159,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   intercambiador: {
     label: 'Intercambiador de Calor',
     icon: Thermometer,
-    color: 'text-rose-400',
+    color: 'text-cat-5-ink',
     fields: {
       tipoIntercambiador: 'Tipo (Placas/Tubular/Carcasa)',
       capacidadTermica: 'Capacidad Térmica (kW)',

@@ -58,7 +58,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
   const trendIcon = work.proactivoTrend === 'mejor'
     ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
     : work.proactivoTrend === 'peor'
-      ? <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+      ? <TrendingDown className="w-3.5 h-3.5 text-cat-5-ink" />
       : <TrendingUp className="w-3.5 h-3.5" />
 
   return (
@@ -97,7 +97,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 icon={<Search className="w-3.5 h-3.5" />}
                 valueColor={work.causaRaizPct == null ? undefined
                   : work.causaRaizPct >= 70 ? 'text-emerald-400'
-                  : work.causaRaizPct >= 40 ? 'text-amber-400' : 'text-rose-400'}
+                  : work.causaRaizPct >= 40 ? 'text-amber-400' : 'text-cat-5-ink'}
               />
               <Kpi
                 label="Preventivas cumplidas"
@@ -106,7 +106,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 icon={<ShieldCheck className="w-3.5 h-3.5" />}
                 valueColor={work.cumplimientoPct == null ? undefined
                   : work.cumplimientoPct >= 90 ? 'text-emerald-400'
-                  : work.cumplimientoPct >= 70 ? 'text-amber-400' : 'text-rose-400'}
+                  : work.cumplimientoPct >= 70 ? 'text-amber-400' : 'text-cat-5-ink'}
               />
               <Kpi
                 label="Trabajo proactivo"
@@ -115,7 +115,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 icon={trendIcon}
                 valueColor={work.proactivoPct == null ? undefined
                   : work.proactivoPct >= 50 ? 'text-emerald-400'
-                  : work.proactivoPct >= 25 ? 'text-amber-400' : 'text-rose-400'}
+                  : work.proactivoPct >= 25 ? 'text-amber-400' : 'text-cat-5-ink'}
               />
               <Kpi
                 label="Equipos recurrentes"
@@ -123,7 +123,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 sub="≥2 incidencias · objetivo: bajar"
                 icon={<Repeat className="w-3.5 h-3.5" />}
                 valueColor={work.equiposRecurrentes === 0 ? 'text-emerald-400'
-                  : work.equiposRecurrentes <= 3 ? 'text-amber-400' : 'text-rose-400'}
+                  : work.equiposRecurrentes <= 3 ? 'text-amber-400' : 'text-cat-5-ink'}
               />
             </div>
 

@@ -481,7 +481,7 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
     selecting: { color: 'text-purple-400', animate: true },
     calling: { color: 'text-amber-400', animate: true },
     streaming: { color: 'text-green-400', animate: true },
-    fallback: { color: 'text-orange-400', animate: true },
+    fallback: { color: 'text-cat-4-ink', animate: true },
     done: { color: 'text-green-500', animate: false },
     error: { color: 'text-red-400', animate: false },
   }

@@ -413,9 +413,9 @@ export function GateBreakdownCard({
             <div className="border-t border-border/40 my-1" />
             <div className="flex items-center gap-2">
               <div className="w-8 shrink-0 text-right">
-                <span className="text-xs font-semibold text-orange-400 tabular-nums">P0</span>
+                <span className="text-xs font-semibold text-cat-4-ink tabular-nums">P0</span>
               </div>
-              <div className="w-32 shrink-0 text-caption text-orange-400/70">Rechazo</div>
+              <div className="w-32 shrink-0 text-caption text-cat-4-ink">Rechazo</div>
               <div className="flex-1 h-4 rounded-ctl bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-ctl bg-cat-4-tint/[0.15]"
@@ -423,7 +423,7 @@ export function GateBreakdownCard({
                 />
               </div>
               <div className="w-28 shrink-0 text-right text-xs tabular-nums">
-                <span className="text-orange-400 font-medium">{pointZeroPieces.toLocaleString('es-CL')}</span>
+                <span className="text-cat-4-ink font-medium">{pointZeroPieces.toLocaleString('es-CL')}</span>
                 <span className="text-muted-foreground/60 ml-1">{pointZeroPct.toFixed(1)}%</span>
               </div>
             </div>

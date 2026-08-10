@@ -282,7 +282,7 @@ export function ShoplogixCredentialsPage() {
                 </div>
               </div>
               {formError && (
-                <p className="text-xs text-rose-400">{formError}</p>
+                <p className="text-xs text-cat-5-ink">{formError}</p>
               )}
               <div className="flex gap-2 pt-1">
                 <Button onClick={handleSave} disabled={saving}>

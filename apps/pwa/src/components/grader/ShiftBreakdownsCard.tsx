@@ -72,7 +72,7 @@ export function ShiftBreakdownsCard({
           {/* Lotes */}
           {lots.length > 0 && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-violet-400">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-cat-6-ink">
                 <Package className="w-3.5 h-3.5" />
                 Lotes ({lots.length})
               </div>
@@ -139,7 +139,7 @@ export function ShiftBreakdownsCard({
           {/* Conservación */}
           {conservacionVisible && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-400">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-cat-7-ink">
                 <Snowflake className="w-3.5 h-3.5" />
                 Conservación
               </div>
