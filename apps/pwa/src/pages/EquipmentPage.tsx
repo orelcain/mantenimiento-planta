@@ -55,7 +55,7 @@ import { useAppStore, useAuthStore } from '@/store'
 import { getEquipments, updateEquipment, addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
-import { formatRelativeTime, generateId } from '@/lib/utils'
+import { formatRelativeTime, generateId, cn } from '@/lib/utils'
 import { debounce } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
@@ -1982,16 +1982,67 @@ function EquipmentDetailDialog({
           </div>
         )}
 
+        {/*
+          LA MÁQUINA COMO HUB (Constitución §21, §24, §40).
+
+          Siete pestañas es demasiado para un teléfono: se apelotonan, se cortan
+          y obligan a adivinar qué hay detrás de cada una. La §40 dice que en
+          móvil puede cambiar la ARQUITECTURA, no solo el tamaño — así que la
+          misma información se presenta con dos formas distintas:
+
+            · Móvil     → LISTA de secciones (una fila por sección, con su
+                          contador y su chevron). Es el patrón de una ficha en
+                          iOS: la máquina es el eje y sus secciones se abren.
+            · Escritorio → pestañas, que ahí sí funcionan y evitan un clic.
+
+          Son los mismos `TabsTrigger` en ambos casos, así que el estado, el
+          teclado y la accesibilidad de Radix se conservan sin duplicar lógica.
+        */}
         <Tabs defaultValue={initialTab ?? 'info'}>
-          <TabsList>
-            <TabsTrigger value="info">Información</TabsTrigger>
-            <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
-            <TabsTrigger value="tablero">Tablero</TabsTrigger>
-            <TabsTrigger value="photos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
-            <TabsTrigger value="history">Historial ({incidents.length})</TabsTrigger>
-            <TabsTrigger value="notes">Notas ({notes.length})</TabsTrigger>
-            <TabsTrigger value="qr">QR</TabsTrigger>
-          </TabsList>
+          {(() => {
+            const SECCIONES: { value: string; label: string; count?: number }[] = [
+              { value: 'info',    label: 'Información' },
+              { value: 'ficha',   label: 'Ficha NFPA 70B' },
+              { value: 'tablero', label: 'Tablero' },
+              { value: 'photos',  label: 'Fotos',     count: equipment.photos?.length || 0 },
+              { value: 'history', label: 'Historial', count: incidents.length },
+              { value: 'notes',   label: 'Notas',     count: notes.length },
+              { value: 'qr',      label: 'QR' },
+            ]
+            return (
+              <>
+                {/* Escritorio: pestañas */}
+                <TabsList className="hidden md:inline-flex">
+                  {SECCIONES.map((s) => (
+                    <TabsTrigger key={s.value} value={s.value}>
+                      {s.label}{s.count !== undefined ? ` (${s.count})` : ''}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {/* Móvil: la ficha como lista de secciones */}
+                <TabsList className="flex h-auto w-full flex-col items-stretch gap-0 overflow-hidden rounded-card bg-card p-0 md:hidden">
+                  {SECCIONES.map((s, i) => (
+                    <TabsTrigger
+                      key={s.value}
+                      value={s.value}
+                      className={cn(
+                        'flex min-h-11 w-full items-center gap-3 rounded-none px-4 py-2.5 text-left text-body',
+                        'data-[state=active]:bg-accent data-[state=active]:text-primary data-[state=active]:shadow-none',
+                        i > 0 && 'border-t border-border',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium">{s.label}</span>
+                      {s.count !== undefined && (
+                        <span className="shrink-0 text-footnote tabular-nums text-muted-foreground">{s.count}</span>
+                      )}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </>
+            )
+          })()}
 
           <TabsContent value="info">
             <Card>
