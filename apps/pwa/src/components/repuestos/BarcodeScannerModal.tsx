@@ -300,7 +300,7 @@ export function BarcodeScannerModal({
                   className="absolute bottom-2 right-2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
                   title={torchOn ? 'Apagar linterna' : 'Encender linterna'}
                 >
-                  <Zap className={`h-4 w-4 ${torchOn ? 'text-yellow-400' : 'text-white'}`} />
+                  <Zap className={`h-4 w-4 ${torchOn ? 'text-ink-warn' : 'text-white'}`} />
                 </button>
               )}
             </div>

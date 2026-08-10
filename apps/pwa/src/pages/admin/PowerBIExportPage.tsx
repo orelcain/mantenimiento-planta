@@ -121,7 +121,7 @@ export function PowerBIExportPage() {
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <BarChart3 className="w-6 h-6 text-yellow-400" />
+          <BarChart3 className="w-6 h-6 text-ink-warn" />
           Actualizar Power BI
         </h1>
         <p className="text-sm text-muted-foreground">

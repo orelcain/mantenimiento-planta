@@ -148,14 +148,22 @@ export function GraderLotesTab({
             {/* Puntos de color reales en vez de emojis: heredan el tema y son
                 del mismo tamaño. El rango siempre acompaña — el color nunca es
                 el único canal (§13). */}
+            {/* Los puntos salen de getCvSignal con un valor de muestra por tramo:
+                antes la leyenda estaba escrita a mano y YA no calzaba con los
+                puntos de las filas, que sí venían de getCvSignal. */}
             {[
-              { c: 'bg-ink-ok', r: '<8%' },
-              { c: 'bg-yellow-500', r: '8-11.9%' },
-              { c: 'bg-ink-warn', r: '12-19.9%' },
-              { c: 'bg-ink-crit', r: '≥20%' },
-            ].map(({ c, r }) => (
+              { muestra: 5, r: '<8%' },
+              { muestra: 10, r: '8-11.9%' },
+              { muestra: 15, r: '12-19.9%' },
+              { muestra: 25, r: '≥20%' },
+            ].map(({ muestra, r }) => (
               <span key={r} className="inline-flex items-center gap-1">
-                <i className={`inline-block size-2 rounded-full ${c}`} aria-hidden /> {r}
+                <i
+                  className="inline-block size-2 rounded-full"
+                  style={{ background: getCvSignal(muestra).bar }}
+                  aria-hidden
+                />{' '}
+                {r}
               </span>
             ))}
           </p>
@@ -285,14 +293,22 @@ export function GraderLotesTab({
             {/* Puntos de color reales en vez de emojis: heredan el tema y son
                 del mismo tamaño. El rango siempre acompaña — el color nunca es
                 el único canal (§13). */}
+            {/* Los puntos salen de getCvSignal con un valor de muestra por tramo:
+                antes la leyenda estaba escrita a mano y YA no calzaba con los
+                puntos de las filas, que sí venían de getCvSignal. */}
             {[
-              { c: 'bg-ink-ok', r: '<8%' },
-              { c: 'bg-yellow-500', r: '8-11.9%' },
-              { c: 'bg-ink-warn', r: '12-19.9%' },
-              { c: 'bg-ink-crit', r: '≥20%' },
-            ].map(({ c, r }) => (
+              { muestra: 5, r: '<8%' },
+              { muestra: 10, r: '8-11.9%' },
+              { muestra: 15, r: '12-19.9%' },
+              { muestra: 25, r: '≥20%' },
+            ].map(({ muestra, r }) => (
               <span key={r} className="inline-flex items-center gap-1">
-                <i className={`inline-block size-2 rounded-full ${c}`} aria-hidden /> {r}
+                <i
+                  className="inline-block size-2 rounded-full"
+                  style={{ background: getCvSignal(muestra).bar }}
+                  aria-hidden
+                />{' '}
+                {r}
               </span>
             ))}
           </p>

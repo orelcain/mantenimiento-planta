@@ -88,7 +88,7 @@ export function BeltVisualizer({
   return (
     <div className="mt-3 p-3 rounded-card bg-muted-foreground/[0.10] border border-muted-foreground/[0.10]">
       <div className="flex items-center justify-between mb-2 text-caption text-muted-foreground">
-        <span className="font-medium text-sky-300">Diagrama de distancias (escala real)</span>
+        <span className="font-medium text-ink-info">Diagrama de distancias (escala real)</span>
         <span>cinta <span className="font-mono text-foreground">{speedMps.toFixed(2)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{secondsBetweenFish.toFixed(2)} s</span></span>
       </div>
       <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
@@ -330,12 +330,12 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
       </div>
       {!auto && suggested !== null && (
         <p className="text-caption mt-1 flex items-center gap-1">
-          <span className="text-sky-500">Sugerido: ~{suggested}{unit ? ` ${unit}` : ''}</span>
+          <span className="text-ink-info">Sugerido: ~{suggested}{unit ? ` ${unit}` : ''}</span>
           {Number(value) !== suggested && (
             <button
               type="button"
               onClick={() => onChange(suggested)}
-              className="underline text-primary hover:text-sky-800 dark:hover:text-sky-300"
+              className="underline text-primary hover:text-ink-info"
             >
               Aplicar
             </button>

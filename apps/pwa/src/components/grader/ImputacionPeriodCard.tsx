@@ -58,10 +58,10 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
   const serie = imputacion.porTurno
 
   return (
-    <Card className="border-primary/[0.25] bg-primary/[0.15]">
+    <Card className="bg-card">
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />
+          <ListChecks className="w-3 h-3 text-ink-info shrink-0" />
           <p className="text-caption font-semibold text-muted-foreground tracking-wide">
             Imputación del período
           </p>

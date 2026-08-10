@@ -167,9 +167,9 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown className="w-4 h-4 text-sky-400 shrink-0" />
-          : <ChevronRight className="w-4 h-4 text-sky-400 shrink-0" />}
-        <ListTree className="w-4 h-4 text-sky-400 shrink-0" />
+          ? <ChevronDown className="w-4 h-4 text-ink-info shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-ink-info shrink-0" />}
+        <ListTree className="w-4 h-4 text-ink-info shrink-0" />
         <span className="text-footnote font-semibold text-foreground/90">Imputación del turno</span>
         <span className="text-caption text-muted-foreground hidden sm:inline">¿de qué tipo fue el tiempo perdido?</span>
         <span className="ml-auto flex items-center gap-3 text-caption tabular-nums text-foreground/85">
@@ -225,7 +225,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
               onClick={() => setTreeOpen((v) => !v)}
               className={cn(
                 'text-caption px-2 py-0.5 rounded-ctl border transition-colors inline-flex items-center gap-1',
-                treeOpen ? 'bg-primary/[0.15] text-sky-400 border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
+                treeOpen ? 'bg-primary/[0.15] text-ink-info border-primary/[0.25]' : 'bg-muted text-muted-foreground border-border hover:bg-accent',
               )}
             >
               <HelpCircle className="w-3 h-3" />

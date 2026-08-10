@@ -882,7 +882,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             {stats.totalPieces.toLocaleString('es-CL')} pzs · {shiftId} · {dateKey}
           </p>
           {visibleStats && (zoomRange.start > 0 || zoomRange.end < 100) && (
-            <p className="text-caption text-sky-400">
+            <p className="text-caption text-ink-info">
               Zoom: {visibleStats.count.toLocaleString('es-CL')} pts · {visibleStats.avg.toLocaleString('es-CL')}g prom · {visibleStats.spanHours}h
             </p>
           )}

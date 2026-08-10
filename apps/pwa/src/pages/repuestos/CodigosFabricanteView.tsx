@@ -296,7 +296,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 {p.codigoProveedor && (
                   <button
                     onClick={() => copiar(p.codigoProveedor!)}
-                    className="inline-flex items-center gap-1 rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-sky-600 hover:bg-primary/[0.15] dark:text-sky-400"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-ink-info hover:bg-primary/[0.15] dark:text-ink-info"
                     title={`Código ${p.proveedor || 'del distribuidor'} — clic para copiar`}
                   >
                     {p.proveedor || 'Distribuidor'}: {p.codigoProveedor}

@@ -84,7 +84,7 @@ function CorridaRow({ corrida }: { corrida: TelegramSyncCorrida }) {
         <div className="pb-2 pl-6 space-y-0.5">
           {corrida.porTema.map((t, i) => (
             <div key={i} className="text-xs text-muted-foreground flex gap-2">
-              <span className="text-sky-400/80">{t.grupo}</span>
+              <span className="text-ink-info/80">{t.grupo}</span>
               <span>·</span>
               <span className="text-foreground">{t.tema}</span>
               <span className="ml-auto tabular-nums">{t.nuevos}</span>
@@ -170,7 +170,7 @@ export function TelegramSyncPage() {
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Send className="w-6 h-6 text-sky-400" />
+          <Send className="w-6 h-6 text-ink-info" />
           Sincronización Telegram
         </h1>
         <p className="text-sm text-muted-foreground">

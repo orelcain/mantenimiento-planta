@@ -1448,7 +1448,7 @@ export function ChatBot() {
                               {agent.name}
                               <span className={`inline-block w-1.5 h-1.5 rounded-full ${
                                 agent.status === 'online' ? 'bg-green-500'
-                                : agent.status === 'rate-limited' ? 'bg-yellow-500'
+                                : agent.status === 'rate-limited' ? 'bg-amber-500'
                                 : agent.status === 'disabled' ? 'bg-gray-400'
                                 : 'bg-red-500'
                               }`} />

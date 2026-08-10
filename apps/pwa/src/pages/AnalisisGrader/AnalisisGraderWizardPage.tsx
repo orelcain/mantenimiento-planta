@@ -698,7 +698,7 @@ export function AnalisisGraderWizardPage() {
               variant="outline"
               className={
                 autosaveState === 'saved' ? 'text-ink-ok border-emerald-500/[0.25]' :
-                autosaveState === 'saving' ? 'text-sky-600 border-primary/[0.25]' :
+                autosaveState === 'saving' ? 'text-ink-info border-primary/[0.25]' :
                 autosaveState === 'error' ? 'text-ink-warn border-amber-500/[0.25]' :
                 'text-muted-foreground border-muted'
               }
@@ -722,10 +722,10 @@ export function AnalisisGraderWizardPage() {
           vivía al fondo de la página (bajo el calendario) y el usuario no lo
           veía → daba la impresión de que "no pasaba nada". */}
       {multiDayInfo && !savedToCalendar && (
-        <Card className="border-primary/[0.25] bg-primary/[0.15] shadow-md ring-1 ring-sky-500/20">
+        <Card className="bg-card shadow-md">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
-              <Upload className="h-4 w-4 text-sky-400 shrink-0 animate-pulse" />
+              <Upload className="h-4 w-4 text-ink-info shrink-0 animate-pulse" />
               <div className="text-sm min-w-0">
                 <p>
                   <span className="font-semibold text-primary">
@@ -742,7 +742,7 @@ export function AnalisisGraderWizardPage() {
                     {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                   </span>
                 </p>
-                <p className="text-caption text-sky-800/90 dark:text-sky-300/70 mt-0.5">
+                <p className="text-caption text-ink-info mt-0.5">
                   Se guardará en <b>{lineConfig.label}</b>
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>

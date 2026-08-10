@@ -137,7 +137,7 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
             className={cn(
               "absolute right-2 top-2 h-8 w-8 p-0 rounded-full",
               busy
-                ? "text-sky-500"
+                ? "text-ink-info"
                 : active
                 ? "bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 animate-pulse"
                 : "text-muted-foreground hover:text-foreground",

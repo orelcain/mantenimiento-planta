@@ -693,7 +693,7 @@ export function GraderPeriodView({ data }: Props) {
 
       {/* ── Panel de insights automáticos ───────────────────────────────── */}
       {insights && (
-        <Card className="border-primary/[0.25] bg-primary/[0.15]">
+        <Card className="bg-card">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm text-primary flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />

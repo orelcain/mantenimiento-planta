@@ -325,7 +325,7 @@ export function FailureAnalysis() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                       <div className={`h-2 w-2 rounded-full ${inc.status === 'confirmada' ? 'bg-green-500' : inc.status === 'pendiente' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
+                                       <div className={`h-2 w-2 rounded-full ${inc.status === 'confirmada' ? 'bg-green-500' : inc.status === 'pendiente' ? 'bg-amber-500' : 'bg-gray-400'}`} />
                                        {inc.status?.toUpperCase()}
                                     </div>
                                     {inc.equipmentId && (

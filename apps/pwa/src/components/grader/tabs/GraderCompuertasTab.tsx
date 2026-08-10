@@ -370,7 +370,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
         <Card className="border-primary/[0.25]">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <Clock className="h-4 w-4 text-sky-500" />
+              <Clock className="h-4 w-4 text-ink-info" />
               Tiempo de Reacción por Compuerta
               <InfoTooltip {...getTooltipProps('pneum.responseTime')} />
             </CardTitle>

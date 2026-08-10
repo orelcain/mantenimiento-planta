@@ -229,7 +229,7 @@ export function PhotoEvidencePage() {
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
             <div className="p-2 bg-amber-500/[0.15] rounded-card text-center">
-              <p className="text-2xl font-bold text-yellow-600">{stats.pendientes}</p>
+              <p className="text-2xl font-bold text-ink-warn">{stats.pendientes}</p>
               <p className="text-xs text-muted-foreground">Pendientes</p>
             </div>
             <div className="p-2 bg-green-500/[0.15] rounded-card text-center">

@@ -1877,7 +1877,7 @@ export function CalendarioMantencionPage() {
               <div className="text-center min-w-0 flex-1">
                 <span className="text-caption font-semibold text-foreground">{mobileWeekLabel}</span>
                 {isCurrentWeek
-                  ? <span className="ml-1 text-caption text-yellow-400">● hoy</span>
+                  ? <span className="ml-1 text-caption text-ink-warn">● hoy</span>
                   : weekKeys.includes(todayWeekKey) && (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
                       className="ml-1.5 inline-flex h-5 items-center gap-1 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Ir a hoy</button>
@@ -1911,7 +1911,7 @@ export function CalendarioMantencionPage() {
                 <div className="flex-1 text-center min-w-0">
                   <div className="text-caption font-semibold text-foreground truncate leading-tight">
                     {mobileWeekLabel}
-                    {isCurrentWeek && <span className="ml-1 text-caption text-yellow-400 font-normal">● hoy</span>}
+                    {isCurrentWeek && <span className="ml-1 text-caption text-ink-warn font-normal">● hoy</span>}
                   </div>
                   <div className="text-caption text-muted-foreground/70 leading-tight">
                     {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}

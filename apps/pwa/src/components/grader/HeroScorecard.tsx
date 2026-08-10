@@ -174,8 +174,8 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
         {/* Columna 3 — Grader subido (manual) */}
         <div className="flex flex-col gap-2 min-w-0">
           <div className="flex items-center gap-1.5 text-caption tracking-wider">
-            <FileSpreadsheet className="w-3 h-3 text-sky-400" />
-            <span className="text-sky-400 font-semibold">Grader</span>
+            <FileSpreadsheet className="w-3 h-3 text-ink-info" />
+            <span className="text-ink-info font-semibold">Grader</span>
             <span className="text-muted-foreground">· subido</span>
             <span className="ml-auto text-muted-foreground/70 normal-case tracking-normal">
               {fmtSyncRelative(summary.updatedAt ? new Date(summary.updatedAt) : null)}

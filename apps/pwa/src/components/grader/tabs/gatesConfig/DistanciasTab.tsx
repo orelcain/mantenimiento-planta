@@ -70,7 +70,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
 
               {/* Físico */}
               <div className="space-y-0.5">
-                <p className="text-caption text-sky-400 font-medium">Físico</p>
+                <p className="text-caption text-ink-info font-medium">Físico</p>
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number"

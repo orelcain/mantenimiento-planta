@@ -120,10 +120,14 @@
      Aquí los valores reproducen EXACTAMENTE el par original: el -700 de
      Tailwind en claro y el -400 (mate) en oscuro. La piel actual vuelve a
      verse como antes; la nueva usa sus propios valores medidos. */
-  --ink-crit: 185 28 28;      /* red-700   */
-  --ink-warn: 180 83 9;       /* amber-700 */
-  --ink-ok: 4 120 87;         /* emerald-700 */
-  --ink-info: 29 78 216;      /* blue-700  */
+  /* Derivadas contra el PEOR fondo: el tinte al 15% sobre el FONDO de la app, no
+     sobre la tarjeta. Un chip tintado puede apoyarse directamente en el fondo, y
+     ahí el contraste es menor. Partían de los -700 de Tailwind y las 4
+     reprobaban AA así medidas (warn 3,47 · ok 3,74 · crit 4,35 · info 4,40). */
+  --ink-crit: 181 27 27;
+  --ink-warn: 151 70 8;
+  --ink-ok: 4 106 77;
+  --ink-info: 28 76 212;
 
   /* Categóricos en claro. Partieron de los -700 de Tailwind, pero se derivaron
      de nuevo: se usan SOBRE SU PROPIO TINTE al 15%, no sobre la tarjeta lisa, y
@@ -133,9 +137,9 @@
      Mismo método que las tintas semánticas: el tinte se fija y la tinta se
      DERIVA de él. Recalcular con scripts/check-contrast.mjs si se tocan.
      El bloque [data-skin="apple"] NO las redefine: hereda de acá. */
-  --cat-1-ink: 29 78 216;    --cat-2-ink: 19 116 56;    --cat-3-ink: 67 56 202;
-  --cat-4-ink: 180 60 11;    --cat-5-ink: 188 18 59;    --cat-6-ink: 109 40 217;
-  --cat-7-ink: 14 113 106;   --cat-8-ink: 160 74 8;
+  --cat-1-ink: 28 76 212;    --cat-2-ink: 18 110 52;    --cat-3-ink: 67 56 202;
+  --cat-4-ink: 169 57 10;    --cat-5-ink: 175 17 55;    --cat-6-ink: 109 40 217;
+  --cat-7-ink: 13 106 99;    --cat-8-ink: 149 69 7;
 
   /* ── ESCALA ÚNICA DE RADIOS (docs §3) ────────────────────────────────────
      La app mezclaba 6 variantes (650 `rounded`, 565 `-lg`, 304 `-md`, 90 `-xl`,
@@ -336,10 +340,13 @@
   --tw-blue-400: 46 117 182;     --tw-blue-500: 46 117 182;
 
   /* Geometría Apple: más redondeada y con más salto entre niveles. */
-  --ink-crit: 196 45 37;      /* medido sobre tinte 15% */
-  --ink-warn: 158 92 0;
-  --ink-ok: 33 125 56;
-  --ink-info: 42 106 166;
+  /* Medidas sobre el tinte 15% apoyado en el FONDO systemGrouped (#F2F2F7), que
+     es el peor caso — antes se habían medido sobre la tarjeta blanca y las 4
+     quedaban justo por debajo (4,14-4,24). */
+  --ink-crit: 184 42 35;
+  --ink-warn: 152 88 0;
+  --ink-ok: 31 118 53;
+  --ink-info: 40 101 158;
 
   --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
 

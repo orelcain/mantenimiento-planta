@@ -105,7 +105,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MonitorSmartphone className="w-5 h-5 text-sky-400" />
+            <MonitorSmartphone className="w-5 h-5 text-ink-info" />
             Capturar parámetros desde Z2
           </DialogTitle>
           <DialogDescription className="text-xs">
@@ -118,7 +118,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
           <p className="font-semibold text-foreground text-xs">Procedimiento en Z2:</p>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Pantalla principal → <span className="font-mono text-foreground">Cambiar Parámetros</span></li>
-            <li>Ingresar código <span className="font-mono text-sky-400 font-bold">8620</span></li>
+            <li>Ingresar código <span className="font-mono text-ink-info font-bold">8620</span></li>
             <li>Buscar los 3 parámetros de timing del flipper</li>
             <li>Transcribir los valores en ms abajo</li>
           </ol>
@@ -135,7 +135,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                 <div>
                   <Label className="text-caption text-muted-foreground block mb-0.5">
                     {label}
-                    <span className="ml-1 font-mono text-caption text-sky-400/70">Z2: {z2Param}</span>
+                    <span className="ml-1 font-mono text-caption text-ink-info/70">Z2: {z2Param}</span>
                   </Label>
                   <div className="flex items-center gap-1">
                     <Input
@@ -177,7 +177,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
           <div className="bg-primary/[0.15] border border-primary/[0.25] rounded-ctl p-2 text-xs flex items-center justify-between gap-3">
             <div>
               <span className="text-muted-foreground">Ciclo total nuevo: </span>
-              <span className="font-mono font-semibold text-sky-400">{cycleTotalMs} ms</span>
+              <span className="font-mono font-semibold text-ink-info">{cycleTotalMs} ms</span>
             </div>
             {deltaCycleMs !== null && deltaCycleMs !== 0 && (
               <Badge

@@ -62,7 +62,7 @@ function fmtHours(v: number): string {
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
   if (v >= OEE_GOOD) return 'text-emerald-400'
-  if (v >= KPI_CUTOFFS.oee.warnBelow) return 'text-sky-400'
+  if (v >= KPI_CUTOFFS.oee.warnBelow) return 'text-ink-info'
   if (v >= KPI_CUTOFFS.oee.critBelow) return 'text-amber-400'
   return 'text-cat-5-ink'
 }
@@ -226,7 +226,7 @@ export function PlantKPIBoard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-sky-400" />
+            <TrendingUp className="w-4 h-4 text-ink-info" />
             Indicadores de Rendimiento
             {kpis && (
               <span className="text-caption font-normal text-muted-foreground">
@@ -283,7 +283,7 @@ export function PlantKPIBoard({
           <>
             {/* Banner informativo cuando solo hay calidad Grader */}
             {kpis.graderOnly && (
-              <p className="text-caption text-sky-400/80 flex items-center gap-1 pb-0.5">
+              <p className="text-caption text-ink-info/80 flex items-center gap-1 pb-0.5">
                 <AlertTriangle className="w-3 h-3 shrink-0" />
                 Sin datos Shoplogix para este período — solo calidad Grader
               </p>

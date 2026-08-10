@@ -52,7 +52,7 @@ function tipoBadgeClass(tipo: string): string {
   if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-muted-foreground/[0.10] text-muted-foreground'
   if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
   if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 'bg-cat-7-tint/[0.15] text-cat-7-ink'
-  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-amber-500/[0.15] text-yellow-500'
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-amber-500/[0.15] text-ink-warn'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -307,7 +307,7 @@ export function RepuestosTable({
                     <p className="font-medium text-foreground text-footnote leading-tight line-clamp-1 flex-1">{rep.textoBreve || rep.descripcion || 'Sin nombre'}</p>
                     {onToggleFavorite && (
                       <button onClick={e => { e.stopPropagation(); onToggleFavorite(rep.id) }} className="shrink-0 p-0.5">
-                        <Star className={`h-3.5 w-3.5 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/20'}`} />
+                        <Star className={`h-3.5 w-3.5 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-current' : 'text-muted-foreground/20'}`} />
                       </button>
                     )}
                   </div>
@@ -412,7 +412,7 @@ export function RepuestosTable({
                       )}
                       {onToggleFavorite && (
                         <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded-ctl hover:bg-amber-500/[0.15] transition-colors">
-                          <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
+                          <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-current' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
                         </button>
                       )}
                     </div>
@@ -499,7 +499,7 @@ export function RepuestosTable({
                       {isAdmin && onEditAnnotation && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Editar ubicación">
                           <button onClick={() => onEditAnnotation(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-yellow-400 hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-amber-500/[0.15] transition-colors">
                             <Pencil className="h-3 w-3" />
                           </button>
                         </Tip>

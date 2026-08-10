@@ -358,7 +358,7 @@ export function PauseAnnotationDialog({
               )}
               {/* M4: chip trazabilidad rango ajustado */}
               {pause.adjustedBy && (
-                <span className="inline-flex items-center gap-1 text-xs text-sky-400 mt-1">
+                <span className="inline-flex items-center gap-1 text-xs text-ink-info mt-1">
                   <Pencil className="inline h-3 w-3" /> Rango ajustado por <span className="font-medium">{pause.adjustedBy}</span>
                 </span>
               )}

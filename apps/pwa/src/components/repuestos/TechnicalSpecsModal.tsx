@@ -49,7 +49,7 @@ const TEMPLATES: Record<string, TemplateConfig> = {
   motor: {
     label: 'Motor Eléctrico',
     icon: Zap,
-    color: 'text-yellow-400',
+    color: 'text-ink-warn',
     fields: {
       potencia: 'Potencia (HP/kW)',
       rpm: 'RPM',
