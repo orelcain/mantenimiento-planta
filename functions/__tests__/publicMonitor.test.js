@@ -754,3 +754,29 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   assert.equal(hist[0].live.totalPieces, 2000, 'el turno anterior se recompone: el re-sync móvil todavía lo toca')
   assert.equal(hist[1].live.totalPieces, 888888, 'los más viejos se reusan: ya no cambian')
 })
+
+test('Unscheduled NUNCA gana como turno vigente, ni con mucha producción', async () => {
+  const w = nowWall()
+  const hora = w.getUTCHours()
+  const turnoId = `${dk(w)}_Turno Dia`
+  const unschId = `${dk(w)}_Unscheduled`
+
+  // El caso real del 10-ago: el Unscheduled arrancó ANTES y su ventana llega
+  // más lejos, así que por horario ganaba — y mostraba 623 pz como si fueran el
+  // turno, cuando el turno real llevaba 4.915 (y ya incluía esas 623).
+  const db = fakeShiftsDb({
+    [unschId]: { shiftId: 'Unscheduled', scheduledStart: hoy(Math.max(0, hora - 2)), scheduledEnd: new Date(w.getTime() + 3600_000), machines: [{ totalCycles: 623 }] },
+    [turnoId]: { shiftId: 'Turno Dia', scheduledStart: hoy(Math.max(0, hora - 1)), scheduledEnd: hoy(Math.max(1, hora)), machines: [{ totalCycles: 4915 }] },
+  })
+
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), turnoId)
+})
+
+test('…salvo que la línea no tenga ningún turno con nombre (mejor eso que nada)', async () => {
+  const w = nowWall()
+  const unschId = `${dk(w)}_Unscheduled`
+  const db = fakeShiftsDb({
+    [unschId]: { shiftId: 'Unscheduled', scheduledStart: hoy(Math.max(0, w.getUTCHours() - 1)), scheduledEnd: new Date(w.getTime() + 3600_000), machines: [{ totalCycles: 900 }] },
+  })
+  assert.equal(await resolveCurrentShiftDocId(db, 'filete', w), unschId)
+})
