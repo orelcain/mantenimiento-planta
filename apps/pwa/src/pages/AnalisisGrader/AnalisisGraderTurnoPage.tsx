@@ -16,7 +16,7 @@ import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
-import { createPublicShiftMonitor, revokePublicShiftMonitor, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode } from '@/services/shoplogix/publicShiftMonitor.service'
+import { createPublicShiftMonitor, revokePublicShiftMonitor, subscribeMonitorStats, MONITOR_TTL_CHOICES, type MonitorTtlHours, type MonitorMode, type MonitorUsageStats } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -72,6 +72,7 @@ import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
+import { MonitorUsagePanel } from '@/components/grader/MonitorUsagePanel'
 import { SensorStopsCausePanel } from '@/components/grader/SensorStopsCausePanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -625,6 +626,14 @@ export function AnalisisGraderTurnoPage() {
   const [monitorBusy, setMonitorBusy] = useState(false)
   const [monitorCopied, setMonitorCopied] = useState(false)
   const [monitorError, setMonitorError] = useState<string | null>(null)
+  const [monitorStats, setMonitorStats] = useState<MonitorUsageStats | null>(null)
+
+  // Uso del link compartido: cuántas veces se abrió, desde cuántos aparatos y
+  // cuánto lo miraron. Es la evidencia de si la herramienta se usa de verdad.
+  useEffect(() => {
+    if (!monitorToken) { setMonitorStats(null); return }
+    return subscribeMonitorStats(monitorToken, setMonitorStats)
+  }, [monitorToken])
 
   // ── IA (FASE 16) ─────────────────────────────────────────────────────────
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
@@ -2501,6 +2510,8 @@ export function AnalisisGraderTurnoPage() {
                   </p>
                 </div>
               </div>
+
+              <MonitorUsagePanel stats={monitorStats} />
             </div>
           )}
         </div>

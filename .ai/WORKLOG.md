@@ -13,6 +13,55 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Telemetria anonima del monitor publico
+
+Orel: *"¿se puede mostrar quienes usan el QR?"*. Identidad no —quien abre el link no tiene sesion,
+no dio consentimiento y muchas veces ni trabaja en la empresa— pero el USO si se puede medir, y es
+justo lo que permite defender la herramienta con datos: aperturas, aparatos distintos, tiempo
+mirado, ultima vez, celular vs PC, distribucion por hora, aperturas por dia y cuantas vistas fueron
+a turnos anteriores (mide si el deslizamiento sirve).
+
+**Lo que NO se guarda, a proposito**: IP, geolocalizacion, user-agent crudo, nombres, correos. Lo
+unico que distingue a un aparato de otro es un `viewerId` ALEATORIO que genera su propio navegador
+y vive en su localStorage — no se deriva de nada del aparato ni de la persona, y borrar los datos
+del navegador lo reinicia. Del user-agent solo se deriva "movil" u "escritorio". La pantalla
+publica lo dice en el pie: *"Se cuentan las aperturas de forma anonima... No se registra quien la
+abre"*.
+
+**Donde viven los contadores**: coleccion APARTE, `publicShiftMonitorStats/{token}`, con
+`read: if isNotAnonymous()` y `write: if false`. NO en el doc del monitor: ese es de lectura
+publica, asi que ahi la telemetria quedaria expuesta a los propios visitantes y engordaria lo que
+se descarga en cada refresco.
+
+**Endpoint abierto, defensas explicitas** (`publicMonitorPing`): solo acepta tokens de monitores
+VIGENTES, el `viewerId` se valida contra un formato fijo (`danilo@empresa.cl` NO entra), el tiempo
+que suma un latido esta topeado, una apertura del mismo aparato no vuelve a contar antes de 10 min
+(recargar la pestaña no son visitas), y el doc se poda a 60 aparatos y 14 dias. Un abusador con el
+link solo puede inflar sus propios contadores: no lee nada ni toca los datos del turno.
+
+Los latidos van cada 2 min y **solo con la pestaña visible** — el tiempo en segundo plano no es
+tiempo mirado.
+
+⚠ **Un test destapo un bug real**: `applyEvent` mutaba el objeto del dia del estado previo
+(`{...s.byDay}` es copia superficial y el objeto del dia se modificaba in situ) — dentro de una
+transaccion Firestore eso es exactamente la clase de cosa que produce numeros irreproducibles. El
+test "no muta el estado que recibe" lo encontro antes de que llegara a produccion.
+
+- Archivos: `functions/publicMonitorStats.js` (nuevo), `functions/index.js`,
+  `functions/__tests__/publicMonitorStats.test.js` (nuevo), `firestore.rules`,
+  `apps/pwa/src/components/grader/MonitorUsagePanel.tsx` (nuevo),
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`,
+  `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: **202 tests functions** (9 nuevos) y 1.104 del PWA en verde; tsc y eslint limpios;
+  build OK. La agregacion se corrio contra el doc REAL del monitor de Filete con 6 visitas
+  simuladas: 3 aperturas (la recarga se deduplico), 3 aparatos, 7 min mirados, 2 moviles + 1 PC,
+  1 vista a turno anterior. La pantalla publica se abrio en el navegador: genera su `viewerId`,
+  muestra la nota del pie y **sigue funcionando con el endpoint caido** (el fetch falla y se traga
+  en silencio, que es la unica conducta aceptable para telemetria).
+- Estado: HECHO (mergeado)
+- Sigue: el ping real end-to-end solo se puede confirmar con la funcion desplegada.
+
 ## 2026-08-10 - claude - La tarjeta del monitor NO aparecia en Filete (el caso de uso principal)
 
 Orel: *"no lo veo"*. Tenia razon. La tarjeta "Monitor en vivo (link / QR)" estaba anidada dentro de

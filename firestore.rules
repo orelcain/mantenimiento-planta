@@ -1546,6 +1546,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Telemetría de uso del monitor público (anónima: aperturas, dispositivos,
+    // tiempo mirado — nunca identidad). Va en colección APARTE de
+    // `publicShiftMonitors` justamente porque aquella es de lectura pública y
+    // acá la lectura es solo para la gente de la app: quien abre el link mira
+    // el turno, no las estadísticas de quiénes más lo abrieron.
+    // La escribe únicamente la función `publicMonitorPing` (Admin SDK).
+    match /publicShiftMonitorStats/{token} {
+      allow read: if isNotAnonymous();
+      allow write: if false;
+    }
+
     // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
     match /flipperZ2Captures/{captureId} {
       allow read: if isNotAnonymous();

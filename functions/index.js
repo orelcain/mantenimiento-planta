@@ -8435,3 +8435,77 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     }
   },
 )
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEMETRÍA DEL MONITOR PÚBLICO — anónima
+//
+// Mide si Control de Producción realmente usa el link. Ver
+// functions/publicMonitorStats.js para qué se guarda y, sobre todo, qué NO.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const publicMonitorStatsMod = require('./publicMonitorStats')
+
+/**
+ * Registra una apertura o un latido del monitor público.
+ *
+ * Endpoint ABIERTO a propósito: lo llama una pantalla sin sesión. Las defensas
+ * son que solo acepta tokens de monitores VIGENTES, que no escribe nada que
+ * venga del cuerpo salvo contadores acotados, y que el `viewerId` se valida
+ * contra un formato fijo. Un abusador con el link solo puede inflar sus propios
+ * contadores de uso — no puede leer nada ni tocar los datos del turno.
+ */
+exports.publicMonitorPing = onRequest(
+  { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 10, memory: '256MiB', timeoutSeconds: 15 },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'METHOD_NOT_ALLOWED' }); return }
+
+    const body = req.body || {}
+    const token = String(body.token || '').trim()
+    const viewerId = publicMonitorStatsMod.sanitizeViewerId(body.viewerId)
+    const event = body.event === 'ping' ? 'ping' : 'open'
+
+    if (!/^[a-f0-9-]{20,64}$/.test(token) || !viewerId) {
+      res.status(400).json({ error: 'BAD_REQUEST' })
+      return
+    }
+
+    try {
+      const monitorSnap = await db.collection(publicMonitorMod.COLLECTION).doc(token).get()
+      const monitor = monitorSnap.exists ? monitorSnap.data() : null
+      // Un link vencido o revocado no acumula estadísticas: si no se puede
+      // mirar, tampoco hay nada que contar.
+      if (!monitor || String(monitor.expiresAt || '') <= new Date().toISOString()) {
+        res.status(404).json({ error: 'NOT_FOUND' })
+        return
+      }
+
+      const nowMs = Date.now()
+      const nowWall = shoplogixPolling.toChileWall(new Date(nowMs))
+      const ev = {
+        viewerId,
+        event,
+        device: publicMonitorStatsMod.deviceKind(req.get('user-agent')),
+        secs: Number(body.secs) || 0,
+        viewingPast: body.viewingPast === true,
+        nowMs,
+        nowWall,
+      }
+
+      const ref = db.collection(publicMonitorStatsMod.COLLECTION_STATS).doc(token)
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref)
+        const next = publicMonitorStatsMod.applyEvent(snap.exists ? snap.data() : null, ev)
+        next.token = token
+        next.plantSlug = monitor.plantSlug ?? null
+        next.mode = monitor.mode ?? 'shift'
+        tx.set(ref, next)
+      })
+
+      res.status(204).send('')
+    } catch (err) {
+      logger.error('[publicMonitorPing] error', { error: err.message })
+      // Nunca romper la pantalla del visitante por un problema de telemetría.
+      res.status(204).send('')
+    }
+  },
+)
