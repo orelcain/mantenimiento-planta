@@ -132,23 +132,35 @@ async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPollin
     const end = toDate(d.scheduledEnd)
     if (!start) continue
     const pieces = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
-    // `Unscheduled` son las horas ENTRE turnos (limpieza, calibración). Solo
-    // vale como turno si acumuló producción de verdad — mismo umbral que usa
-    // la PWA para no disfrazar 20 ciclos sueltos de turno real.
-    if (/unscheduled/i.test(d.shiftId || snap.id) && pieces < 50) continue
-    parsed.push({ id: snap.id, start, end, pieces })
+    const esUnscheduled = /unscheduled/i.test(d.shiftId || snap.id)
+    parsed.push({ id: snap.id, start, end, pieces, esUnscheduled })
   }
   if (parsed.length === 0) return null
+
+  // `Unscheduled` NO es un turno: es el bucket de las horas entre turnos, y
+  // desde que el monitor rescata las piezas fuera de horario, su producción ya
+  // se suma al turno real. Elegirlo como "vigente" mostraba esas piezas dos
+  // veces y con la etiqueta equivocada — visto en producción el 10-ago: ganó
+  // `Unscheduled` con 623 pz mientras el `Turno Dia` real llevaba 4.915.
+  //
+  // Solo se acepta como último recurso, cuando la línea no tiene NINGÚN turno
+  // con nombre en hoy/ayer y aun así hubo proceso: mejor mostrar producción mal
+  // etiquetada que una pantalla vacía teniendo datos.
+  const conNombre = parsed.filter(p => !p.esUnscheduled)
+  const elegibles = conNombre.length > 0
+    ? conNombre
+    : parsed.filter(p => p.pieces >= 50)
+  if (elegibles.length === 0) return null
 
   const nowMs = nowWall.getTime()
   const GRACE_MS = 30 * 60 * 1000
 
-  const vigente = parsed
+  const vigente = elegibles
     .filter(p => p.start.getTime() <= nowMs && (!p.end || nowMs <= p.end.getTime() + GRACE_MS))
     .sort((a, b) => b.start.getTime() - a.start.getTime())[0]
   if (vigente) return vigente.id
 
-  const yaEmpezados = parsed
+  const yaEmpezados = elegibles
     .filter(p => p.start.getTime() <= nowMs)
     .sort((a, b) => b.start.getTime() - a.start.getTime())
   return yaEmpezados[0]?.id ?? null
