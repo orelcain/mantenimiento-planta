@@ -154,6 +154,167 @@ async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPollin
   return yaEmpezados[0]?.id ?? null
 }
 
+/** ¿`t` cae dentro de alguna de las ventanas [start, end]? */
+function dentroDeAlguna(t, ventanas) {
+  return ventanas.some(v => v.start && v.end && t >= v.start.getTime() && t < v.end.getTime())
+}
+
+/** Corte entre dos tramos de producción fuera de turno. */
+const OUTSIDE_GAP_MS = 15 * 60 * 1000
+
+/**
+ * Piezas mínimas para que un tramo fuera de turno cuente como producción.
+ *
+ * Bajo esto es ruido: higiene, prueba de línea, giro en vacío. Caso real que
+ * fijó el umbral — el 10-ago Filete tenía 6 piezas sueltas a las 06:10, hora y
+ * media antes del turno, mientras el tramo posterior al cierre eran 617 piezas
+ * de producción de verdad.
+ *
+ * Es un umbral y no la regla dura "ignorar todo lo anterior al turno" a
+ * propósito: el arranque anticipado REAL existe y ya costó un fix entero
+ * (turnos que empezaban antes de las 08:00 perdían sus primeros ciclos). Con
+ * umbral, 6 piezas se descartan y 300 se cuentan.
+ */
+const OUTSIDE_MIN_PIECES = 20
+
+/**
+ * Tramos de operación de TODAS las máquinas juntas, cortando cuando pasa más de
+ * `gapMs` sin una sola pieza. Se usa como denominador de la cadencia: mide el
+ * tiempo en que la línea estuvo corriendo, no el reloj entre la primera y la
+ * última pieza del día.
+ */
+function agruparTramosPorGap(machines, gapMs) {
+  const ivs = []
+  for (const m of machines) {
+    for (const iv of m.intervals || []) {
+      if ((iv.cycles || 0) <= 0) continue
+      const s = toDate(iv.startAt)
+      const e = toDate(iv.endAt)
+      if (s && e) ivs.push({ s: s.getTime(), e: e.getTime() })
+    }
+  }
+  ivs.sort((a, b) => a.s - b.s)
+
+  const tramos = []
+  for (const iv of ivs) {
+    const ultimo = tramos[tramos.length - 1]
+    if (ultimo && iv.s - ultimo.end <= gapMs) ultimo.end = Math.max(ultimo.end, iv.e)
+    else tramos.push({ start: iv.s, end: iv.e })
+  }
+  return tramos
+}
+
+/** Agrupa intervals en tramos contiguos (corte cuando hay más de GAP sin piezas). */
+function agruparTramos(intervals) {
+  const orden = intervals
+    .map(iv => ({ iv, s: toDate(iv.startAt)?.getTime(), e: toDate(iv.endAt)?.getTime() }))
+    .filter(x => Number.isFinite(x.s) && Number.isFinite(x.e))
+    .sort((a, b) => a.s - b.s)
+
+  const tramos = []
+  for (const x of orden) {
+    const ultimo = tramos[tramos.length - 1]
+    if (ultimo && x.s - ultimo.end <= OUTSIDE_GAP_MS) {
+      ultimo.end = Math.max(ultimo.end, x.e)
+      ultimo.pieces += x.iv.cycles || 0
+      ultimo.intervals.push(x.iv)
+    } else {
+      tramos.push({ start: x.s, end: x.e, pieces: x.iv.cycles || 0, intervals: [x.iv] })
+    }
+  }
+  return tramos
+}
+
+/**
+ * Recupera la producción que Shoplogix dejó FUERA de la ventana del turno.
+ *
+ * El problema, con datos del 10-ago-2026 en Filete: el turno estaba definido
+ * 07:45→15:30 y así se cerró, pero la línea siguió procesando hasta las 16:27.
+ * Esas 623 piezas (más las del arranque anticipado de las 06:10) fueron a parar
+ * al doc `Unscheduled`, y el monitor mostraba 4.410 cuando la jornada real
+ * habían sido ~5.033. Para Control de Producción eso es plata que no aparece.
+ *
+ * Qué se rescata: los intervals/states de los docs `Unscheduled` del MISMO día
+ * que no caen dentro de la ventana de NINGÚN turno con nombre. El filtro por
+ * ventanas es lo que evita el doble conteo — un interval que ya está dentro del
+ * turno mostrado, o dentro de otro turno del día, se ignora.
+ *
+ * @returns {Promise<Map<string, {intervals: Array, states: Array, pieces: number}>>}
+ */
+async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados = new Map()) {
+  const dateKey = shiftDocId.slice(0, 10)
+  const extras = new Map()
+
+  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+  const delDia = refs.filter(r => r.id.startsWith(dateKey) && r.id !== shiftDocId)
+  if (delDia.length === 0) return extras
+
+  const snaps = await db.getAll(...delDia)
+
+  // Ventanas ocupadas: la del turno mostrado + la de los otros turnos con
+  // nombre. Lo que caiga ahí ya está contado por alguien.
+  const ventanas = [ventanaTurno]
+  const unscheduled = []
+  for (const snap of snaps) {
+    if (!snap.exists) continue
+    const d = snap.data() || {}
+    const esUnscheduled = /unscheduled/i.test(d.shiftId || snap.id)
+    if (esUnscheduled) {
+      unscheduled.push(snap.id)
+    } else {
+      ventanas.push({ start: toDate(d.scheduledStart), end: toDate(d.scheduledEnd) })
+    }
+  }
+  if (unscheduled.length === 0) return extras
+
+  for (const id of unscheduled) {
+    const ms = await db.collection(`shoplogix/${plantSlug}/shifts/${id}/machines`).get()
+    ms.forEach(doc => {
+      const m = doc.data() || {}
+      const yaEnElTurno = yaContados.get(doc.id) || new Set()
+      const candidatos = (m.intervals || []).filter(iv => {
+        if ((iv.cycles || 0) <= 0) return false
+        const s = toDate(iv.startAt)
+        if (!s) return false
+        // Dedupe por timestamp, NO solo por la ventana declarada: el doc del
+        // turno guarda intervals más allá de su propio `scheduledEnd` y
+        // Shoplogix repite esos mismos minutos en `Unscheduled`. Verificado el
+        // 10-ago en Filete: 15:30=47 y 15:35=65 estaban idénticos en los dos
+        // docs, y filtrar solo por ventana los sumaba dos veces (112 piezas
+        // infladas). El doble conteo es el peor error posible en esta pantalla:
+        // nadie que mire el link tiene cómo detectarlo.
+        if (yaEnElTurno.has(s.getTime())) return false
+        return !dentroDeAlguna(s.getTime(), ventanas)
+      })
+
+      // Solo los tramos con producción de verdad (ver OUTSIDE_MIN_PIECES).
+      const tramos = agruparTramos(candidatos).filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+      if (tramos.length === 0) return
+
+      const intervals = tramos.flatMap(t => t.intervals)
+
+      // Los states solo se rescatan si SOLAPAN un tramo con producción real.
+      // Sin esta poda entraban las horas muertas del bucket `Unscheduled` (que
+      // legítimamente dura casi todo el día) y el "% produciendo" se desplomaba
+      // por tiempo en que la planta ni siquiera estaba operando.
+      const states = (m.states || []).filter(st => {
+        const s = toDate(st.startAt)
+        const e = toDate(st.endAt)
+        if (!s || !e || dentroDeAlguna(s.getTime(), ventanas)) return false
+        return tramos.some(t => e.getTime() > t.start && s.getTime() < t.end)
+      })
+
+      const prev = extras.get(doc.id) || { intervals: [], states: [], pieces: 0 }
+      prev.intervals.push(...intervals)
+      prev.states.push(...states)
+      prev.pieces += intervals.reduce((a, iv) => a + (iv.cycles || 0), 0)
+      extras.set(doc.id, prev)
+    })
+  }
+
+  return extras
+}
+
 /**
  * Compone el payload público de un turno.
  *
@@ -173,6 +334,41 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const machines = machinesSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => String(a.machineName || '').localeCompare(String(b.machineName || '')))
+
+  // Piezas que la línea hizo fuera del horario del turno (ver
+  // `loadOutsideShiftProduction`). Se fusionan en los intervals/states de cada
+  // máquina para que TODO —serie, cadencia, estado actual— hable de la jornada
+  // real y no del recorte de Shoplogix; el desglose se publica aparte.
+  const ventanaTurno = {
+    start: toDate(parent.scheduledStart) ?? toDate(machines[0]?.scheduledStart),
+    end:   toDate(parent.scheduledEnd)   ?? toDate(machines[0]?.scheduledEnd),
+  }
+  // Minutos que el turno ya tiene, por máquina — la base del dedupe.
+  const yaContados = new Map(
+    machines.map(m => [
+      m.id,
+      new Set((m.intervals || []).map(iv => toDate(iv.startAt)?.getTime()).filter(Boolean)),
+    ]),
+  )
+
+  let extras = new Map()
+  try {
+    extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados)
+  } catch (err) {
+    // Nunca dejar al monitor sin datos por no poder rescatar la cola.
+    extras = new Map()
+  }
+
+  const shiftPieces = machines.reduce((a, m) => a + (m.totalCycles || 0), 0)
+  let outsidePieces = 0
+  for (const m of machines) {
+    const extra = extras.get(m.id)
+    if (!extra) continue
+    m.intervals = [...(m.intervals || []), ...extra.intervals]
+    m.states = [...(m.states || []), ...extra.states]
+    m.totalCycles = (m.totalCycles || 0) + extra.pieces
+    outsidePieces += extra.pieces
+  }
 
   // ── Ventana de producción ────────────────────────────────────────────────
   // Misma regla que `buildLineSnapshot` de la PWA: la cadencia se divide por la
@@ -198,7 +394,16 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const effectiveStart = hasProduction ? new Date(firstMs) : toDate(parent.effectiveStart)
   const effectiveEnd   = hasProduction ? new Date(lastMs)  : toDate(parent.effectiveEnd)
 
-  const effectiveHours = hasProduction ? (lastMs - firstMs) / 3_600_000 : 0
+  // Horas de OPERACIÓN: de la primera a la última pieza, descontando los huecos
+  // largos en que la línea no estaba corriendo. Sin descontarlos, rescatar la
+  // cola de después del turno abarataba la cadencia — el 10-ago la jornada
+  // pasaba a medir 10,3 h (06:10→16:30) por un hueco de 1,5 h en la mañana, y
+  // los 557 pz/h reales se leían como 487.
+  const IDLE_GAP_MS = 30 * 60 * 1000
+  const tramosOperacion = agruparTramosPorGap(machines, IDLE_GAP_MS)
+  const operatingMs = tramosOperacion.reduce((a, t) => a + (t.end - t.start), 0)
+
+  const effectiveHours = operatingMs > 0 ? operatingMs / 3_600_000 : 0
   const shiftHours = scheduledStart && scheduledEnd
     ? (scheduledEnd.getTime() - scheduledStart.getTime()) / 3_600_000
     : 0
@@ -212,12 +417,40 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const piecesPerHour = windowHours > 0 ? totalPieces / windowHours : 0
   const piecesPerMinute = piecesPerHour / 60
 
-  const uptimeSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.uptimeSec || 0), 0)
-  const downtimeSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.downtimeSec || 0), 0)
-  const breakSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.breakSec || 0), 0)
-  const uptimePct = machines.length > 0
-    ? (machines.reduce((a, m) => a + (m.shiftRuntime || 0), 0) / machines.length) * 100
-    : 0
+  // Tiempos: al agregado del turno se le suma el de la cola fuera de horario,
+  // por categoría. El % se calcula sobre el tiempo RASTREADO (no sobre la
+  // ventana del turno ni sobre el reloj): así no lo distorsionan los huecos en
+  // que la máquina no estuvo bajo seguimiento. Con la cola vacía da exactamente
+  // el mismo número que el `shiftRuntime` de Shoplogix — verificado contra el
+  // turno del 10-ago: 18.105 / (18.105+5.985+615) = 73,3%, igual que su 73,28%.
+  const sumaExtras = (tipo) => {
+    let sec = 0
+    for (const m of machines) {
+      for (const st of extras.get(m.id)?.states || []) {
+        if (st.type === tipo) sec += st.durationSec || 0
+      }
+    }
+    return sec
+  }
+  const uptimeSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.uptimeSec || 0), 0) + sumaExtras('uptime')
+  const downtimeSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.downtimeSec || 0), 0) + sumaExtras('downtime')
+  const breakSec = machines.reduce((a, m) => a + (m.shiftRuntimeBreakdown?.breakSec || 0), 0) + sumaExtras('break')
+  const trackedSec = uptimeSec + downtimeSec + breakSec
+  const uptimePct = trackedSec > 0 ? (uptimeSec / trackedSec) * 100 : 0
+
+  // Tramos de producción fuera del horario del turno, agrupados (un corte cada
+  // vez que hay más de 15 min sin piezas). Es lo que la pantalla nombra como
+  // "antes/después del horario" — sin los rangos, el número suelto no se puede
+  // contrastar con lo que la gente vio en la línea.
+  const outsideRanges = agruparTramos(
+    machines.flatMap(m => extras.get(m.id)?.intervals || []),
+  ).map(t => ({
+    from: new Date(t.start).toISOString(),
+    to: new Date(t.end).toISOString(),
+    pieces: t.pieces,
+    /** `antes` = arrancó antes del turno; `despues` = siguió tras el cierre. */
+    kind: ventanaTurno.start && t.start < ventanaTurno.start.getTime() ? 'antes' : 'despues',
+  }))
 
   // ── Serie temporal (suma de todas las máquinas por bucket de 5 min) ──────
   const byBucket = new Map()
@@ -246,13 +479,23 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     const st = currentStateOf(m.states)
     const pieces = m.totalCycles || 0
     const mHours = windowHours > 0 ? windowHours : 0
+    // Mismo criterio que el % de línea (uptime sobre tiempo rastreado), para que
+    // los dos números se puedan comparar. `shiftRuntime` no sirve acá: es del
+    // turno y no conoce la cola de después del cierre.
+    const b = m.shiftRuntimeBreakdown || {}
+    const extraStates = extras.get(m.id)?.states || []
+    const secDe = (tipo) => (
+      (tipo === 'uptime' ? b.uptimeSec : tipo === 'downtime' ? b.downtimeSec : b.breakSec) || 0
+    ) + extraStates.filter(s => s.type === tipo).reduce((a, s) => a + (s.durationSec || 0), 0)
+    const mUptime = secDe('uptime')
+    const mTracked = mUptime + secDe('downtime') + secDe('break')
     return {
       id: m.id,
       name: m.machineName || m.id,
       model: modelLabel(m.machineType),
       pieces,
       piecesPerHour: mHours > 0 ? pieces / mHours : 0,
-      uptimePct: (m.shiftRuntime || 0) * 100,
+      uptimePct: mTracked > 0 ? (mUptime / mTracked) * 100 : 0,
       status: statusOf(st),
       currentReason: st ? (st.reason || st.name || null) : null,
       currentSinceAt: st ? iso(toDate(st.startAt)) : null,
@@ -307,6 +550,11 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     effectiveEnd: iso(effectiveEnd),
     shiftClosed,
     totalPieces,
+    /** Desglose de `totalPieces`: lo que Shoplogix metió dentro del turno… */
+    shiftPieces,
+    /** …y lo que la línea hizo fuera de esa ventana (ver outsideRanges). */
+    outsidePieces,
+    outsideRanges,
     expectedPieces,
     piecesPerHour,
     piecesPerMinute,

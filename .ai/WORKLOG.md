@@ -13,6 +13,48 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - El monitor cuenta las piezas que Shoplogix deja fuera del turno
+
+Reporte de Orel: "hoy termino filete pero Shoplogix conto hasta las 15:30 y siguieron pasando
+piezas hasta las 17:00". Confirmado en los datos del 10-ago: el turno estaba definido 07:45→15:30
+con 4.410 pz, y el doc `Unscheduled` del mismo dia tenia otras 623 pz — produccion real que el
+monitor no mostraba. **La jornada eran ~4.900 piezas y el link decia 4.410.**
+
+Ahora `buildMonitorLive` rescata los intervals/states de los docs `Unscheduled` del mismo dia que
+no caen dentro de la ventana de NINGUN turno con nombre, los fusiona en la serie/cadencia/estado, y
+publica el desglose: `shiftPieces` + `outsidePieces` + `outsideRanges` (con `kind` antes/despues).
+La pantalla lo muestra como "4.410 dentro del turno + 505 fuera del horario (15:40–16:30)".
+
+⚠⚠ **El bug que casi se cuela: DOBLE CONTEO.** El doc del turno guarda intervals MAS ALLA de su
+propio `scheduledEnd` (15:30 y 15:35) y Shoplogix repite esos mismos minutos en `Unscheduled` —
+**identicos, 112 piezas**. Filtrar por la ventana declarada no los atrapa. Se detecto **mirando la
+pantalla**: el "maximo del tramo" del grafico salto de 83 a 130 pz, que es justo 65+65. Fix: dedupe
+por (maquina, timestamp del interval) contra lo que el turno ya tiene, no por ventana. En esta
+pantalla el doble conteo es el peor error posible — quien mira el link no tiene con que contrastar.
+
+**Dos numeros mas que hubo que arreglar por efecto domino:**
+- La CADENCIA se diluia: al estirar la ventana hasta la ultima pieza del dia, un hueco de 1,5 h en
+  la manana convertia 557 pz/h en 487. Ahora el denominador son las horas de OPERACION (se
+  descuentan los huecos ≥30 min sin una sola pieza).
+- El % PRODUCIENDO pasa a calcularse sobre el tiempo RASTREADO (uptime/(uptime+down+break)) en vez
+  del `shiftRuntime` de Shoplogix, que solo conoce el turno. Con la cola vacia da el mismo numero
+  que antes (18.105/24.705 = 73,3% vs su 73,28%), asi que no rompe lo ya verificado.
+
+**Umbral de ruido**: un tramo fuera de turno cuenta solo si tiene ≥20 piezas. Nace de un dato real
+—6 piezas sueltas a las 06:10, hora y media antes del turno, probablemente higiene— pero se dejo
+como UMBRAL y no como regla "ignorar todo lo anterior al turno", porque el arranque anticipado real
+existe y ya costo un fix entero (ver [[continuity-ventana-turno-inicio-anticipado]]).
+
+- Archivos: `functions/publicMonitor.js`, `functions/__tests__/publicMonitor.test.js`,
+  `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`.
+- Verificacion: **187 tests functions** (6 nuevos, incluido el del doble conteo — comprobado que
+  falla al revertir el dedupe) y 1.104 del PWA en verde; tsc limpio; build OK. Contra los datos
+  REALES del 10-ago: 4.915 pz = 4.410 + 505, tramo 15:40→16:30, 573 pz/h, 72% produciendo, meta al
+  98% (antes marcaba 88% con 4.410). Revisado en el navegador con un monitor real.
+- Estado: HECHO (mergeado)
+- Sigue: pedido de Orel — poder **deslizar a turnos anteriores** desde la misma pantalla.
+
 ## 2026-08-10 - claude - El link del monitor llega por Telegram al arrancar el turno
 
 Tercera parte. El link ya seguia el turno vigente, pero habia que ir a buscarlo a la app. Ahora

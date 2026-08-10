@@ -204,11 +204,20 @@ const { resolveCurrentShiftDocId, buildMonitorPatch } = require('../publicMonito
 /** db falso con varios docs padre de turno, direccionables por id. */
 function fakeShiftsDb(parents, machinesByShift = {}) {
   const ids = Object.keys(parents)
+  const machinesDocs = (id) => {
+    const ms = machinesByShift[id] || []
+    return { empty: ms.length === 0, docs: ms.map((m, i) => ({ id: m.machineid || `m${i}`, data: () => m })), forEach(f) { this.docs.forEach(f) } }
+  }
   return {
-    collection: (path) => ({
-      listDocuments: async () => ids.map(id => ({ id, path: `${path}/${id}` })),
-      limit: () => ({ get: async () => ({ empty: ids.length === 0 }) }),
-    }),
+    collection: (path) => {
+      // `.../shifts/{id}/machines` — lo usa el rescate de piezas fuera de turno.
+      const mm = /\/shifts\/(.+)\/machines$/.exec(path)
+      if (mm) return { get: async () => machinesDocs(mm[1]) }
+      return {
+        listDocuments: async () => ids.map(id => ({ id, path: `${path}/${id}` })),
+        limit: () => ({ get: async () => ({ empty: ids.length === 0 }) }),
+      }
+    },
     getAll: async (...refs) => refs.map(r => ({
       id: r.id,
       exists: true,
@@ -218,12 +227,7 @@ function fakeShiftsDb(parents, machinesByShift = {}) {
       const id = path.split('/shifts/')[1]
       return {
         get: async () => ({ exists: !!parents[id], data: () => parents[id] }),
-        collection: () => ({
-          get: async () => {
-            const ms = machinesByShift[id] || []
-            return { empty: ms.length === 0, docs: ms.map((m, i) => ({ id: m.machineid || `m${i}`, data: () => m })) }
-          },
-        }),
+        collection: () => ({ get: async () => machinesDocs(id) }),
       }
     },
   }
@@ -454,3 +458,192 @@ test('el brief de inicio lleva el link solo cuando hay uno', () => {
   assert.ok(!sin.includes('monitor'), 'sin link no debe quedar una línea colgando')
   assert.ok(!/\n\n$/.test(sin), 'ni una línea en blanco al final')
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Piezas producidas FUERA de la ventana del turno.
+//
+// Caso real que motivó esto (Filete, 10-ago-2026): Shoplogix cerró el turno a
+// las 15:30 y la línea siguió procesando hasta las 16:27. Esas 617 piezas se
+// fueron al bucket `Unscheduled` y el monitor mostraba 4.410 cuando la jornada
+// habían sido 5.027. Para Control de Producción eso es producción que no
+// aparece, y es exactamente lo que se comparte por el link.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Máquina con intervals de 5 min desde `startMs`. */
+const maq = (cycles, startMs, count, over = {}) => ({
+  machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+  totalCycles: cycles,
+  shiftRuntime: 0.8,
+  shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 900, breakSec: 0 },
+  intervals: intervals(startMs, count, cycles / count),
+  states: [],
+  ...over,
+})
+
+test('la producción de después del cierre del turno se suma y se desglosa', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4410 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(Date.UTC(2026, 7, 10, 17, 0)), machines: [{ totalCycles: 617 }] },
+    },
+    {
+      [turnoId]: [maq(4410, inicio, 90)],
+      // Cola: 12 tramos de 5 min desde las 15:30, justo tras el cierre.
+      [unschId]: [maq(600, fin, 12)],
+    },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.shiftPieces, 4410, 'lo que Shoplogix metió en el turno')
+  assert.equal(live.outsidePieces, 600, 'lo que la línea hizo después del cierre')
+  assert.equal(live.totalPieces, 5010, 'el número grande es la jornada completa')
+  assert.equal(live.outsideRanges.length, 1)
+  assert.equal(live.outsideRanges[0].kind, 'despues')
+  assert.equal(live.outsideRanges[0].pieces, 600)
+})
+
+test('un tramo de ruido fuera de turno NO se cuenta (higiene, prueba de línea)', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4410 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(fin), machines: [{ totalCycles: 6 }] },
+    },
+    {
+      [turnoId]: [maq(4410, inicio, 90)],
+      // 6 piezas sueltas a las 06:10, hora y media antes del turno (el caso real).
+      [unschId]: [maq(6, Date.UTC(2026, 7, 10, 6, 10), 3)],
+    },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.outsidePieces, 0, '6 piezas antes del turno son ruido, no producción')
+  assert.equal(live.totalPieces, 4410)
+  assert.deepEqual(live.outsideRanges, [])
+})
+
+test('un arranque anticipado GRANDE sí se cuenta (no es una regla contra lo previo)', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4410 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(fin), machines: [{ totalCycles: 300 }] },
+    },
+    {
+      [turnoId]: [maq(4410, inicio, 90)],
+      [unschId]: [maq(300, Date.UTC(2026, 7, 10, 7, 0), 6)],   // 07:00→07:30
+    },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.outsidePieces, 300)
+  assert.equal(live.outsideRanges[0].kind, 'antes')
+})
+
+test('lo que ya está dentro de la ventana del turno no se cuenta dos veces', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4410 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 500 }] },
+    },
+    {
+      [turnoId]: [maq(4410, inicio, 90)],
+      // Intervals a las 10:00, DENTRO del turno: ya están contados.
+      [unschId]: [maq(500, Date.UTC(2026, 7, 10, 10, 0), 10)],
+    },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.outsidePieces, 0, 'doble conteo: el peor error posible acá')
+  assert.equal(live.totalPieces, 4410)
+})
+
+test('un hueco largo sin producción no diluye la cadencia', async () => {
+  const turnoId = '2026-08-10_Turno Dia'
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 18, 0)
+
+  // 1 h produciendo, 4 h de nada, 1 h produciendo: 1.200 pz en 2 h de operación
+  // = 600 pz/h. Si el denominador fuera de la primera a la última pieza (6 h),
+  // saldrían 200 pz/h y la línea parecería tres veces más lenta de lo que fue.
+  const db = fakeShiftsDb(
+    { [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 1200 }] } },
+    { [turnoId]: [{
+      machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+      totalCycles: 1200, shiftRuntime: 0.5,
+      shiftRuntimeBreakdown: { uptimeSec: 7200, downtimeSec: 0, breakSec: 0 },
+      intervals: [
+        ...intervals(inicio, 12, 50),
+        ...intervals(Date.UTC(2026, 7, 10, 13, 0), 12, 50),
+      ],
+      states: [],
+    }] },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.windowHours, 2, 'solo cuentan los tramos en que la línea corrió')
+  assert.equal(live.piecesPerHour, 600)
+})
+
+test('los minutos que el turno YA tiene no se suman aunque Shoplogix los repita', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const cierre = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+
+  // El caso real: el doc del turno guarda intervals MÁS ALLÁ de su propio
+  // `scheduledEnd` (15:30 y 15:35), y Shoplogix repite esos mismos minutos en
+  // `Unscheduled`. Filtrar solo por la ventana declarada los contaba dos veces.
+  const delTurno = [...intervals(inicio, 88, 50), ...intervals(cierre, 2, 56)]
+  const delUnsch = [...intervals(cierre, 2, 56), ...intervals(Date.UTC(2026, 7, 10, 15, 40), 10, 50)]
+
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(cierre), machines: [{ totalCycles: 4512 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(Date.UTC(2026, 7, 10, 17, 0)), machines: [{ totalCycles: 612 }] },
+    },
+    {
+      [turnoId]: [{ ...maq(4512, inicio, 88), intervals: delTurno }],
+      [unschId]: [{ ...maq(612, cierre, 12), intervals: delUnsch }],
+    },
+  )
+
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+
+  assert.equal(live.outsidePieces, 500, 'solo los 10 tramos que el turno NO tenía')
+  assert.equal(live.totalPieces, 5012, 'sin las 112 piezas repetidas')
+  assert.equal(fmtHHMM(live.outsideRanges[0].from), '15:40', 'el tramo arranca donde termina lo ya contado')
+
+  // Y la serie tampoco puede tener el minuto repetido.
+  const claves = live.series.map(p => p.t)
+  assert.equal(new Set(claves).size, claves.length, 'un mismo minuto no puede aparecer dos veces')
+})
+
+/** HH:MM en wall-clock, igual que la vista pública. */
+function fmtHHMM(isoStr) {
+  const d = new Date(isoStr)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}

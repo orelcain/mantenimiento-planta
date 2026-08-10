@@ -253,6 +253,8 @@ export function PublicShiftMonitorPage() {
   // el subtítulo quedaba "Filete · Filete".
   const areaTitle = [...new Set([data.lineLabel, data.areaLabel].filter(Boolean))].join(' · ')
 
+  const outside = live.outsidePieces ?? 0
+
   const stale = live.lastSyncAt
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
     : true
@@ -300,12 +302,31 @@ export function PublicShiftMonitorPage() {
         <section className="rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-500/10 to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-white/50">
             <Activity className="h-3 w-3" />
-            Piezas procesadas en el turno
+            Piezas procesadas en la jornada
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(live.totalPieces)}</span>
             <span className="text-sm text-white/40">piezas</span>
           </div>
+
+          {/* Desglose cuando la línea produjo fuera del horario del turno.
+              Shoplogix cierra el turno a una hora fija y manda lo que venga
+              después a otro bucket; sin este desglose el total no cuadra con lo
+              que la gente contó en la línea, y ahí se pierde la confianza. */}
+          {outside > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-white/60">
+              <span className="tabular-nums">{fmtInt(live.shiftPieces ?? 0)} dentro del turno</span>
+              <span className="text-white/25">+</span>
+              <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 tabular-nums text-amber-200">
+                {fmtInt(outside)} fuera del horario
+              </span>
+              {(live.outsideRanges ?? []).map(r => (
+                <span key={r.from} className="text-[11px] tabular-nums text-white/35">
+                  ({r.kind === 'antes' ? 'antes: ' : ''}{fmtWallTime(r.from)}–{fmtWallTime(r.to)})
+                </span>
+              ))}
+            </div>
+          )}
 
           {data.targetPieces != null && progressPct != null && (
             <div className="mt-3">
