@@ -9,17 +9,19 @@
  * Se actualiza sola: el doc espejo lo reescribe el backend cada ciclo de sync
  * (~5 min mientras el turno corre) y acá hay un `onSnapshot`.
  *
- * Estilo: paleta oscura fija (no theme-aware), igual que las otras vistas
- * públicas por token. Es un tablero que se mira en el celular en planta o
- * proyectado en una pantalla; el contraste alto y los números grandes mandan,
- * y quien lo abre no tiene sesión ni toggle de tema.
+ * Estilo: theme-aware con los tokens de la app y su propio selector sol/luna.
+ * Nació oscura —un tablero de planta se mira mejor así— pero la pantalla se abre
+ * también de día y en oficina, así que la elección es de quien mira. El tema se
+ * guarda en el mismo `app-theme` que el resto de la app: quien tenga la PWA en
+ * claro abre este link en claro.
  *
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, PauseCircle, Radio, RefreshCw, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Timer } from 'lucide-react'
+import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
   trackMonitorUsage,
@@ -103,17 +105,17 @@ function Kpi({
   tone?: 'default' | 'accent'
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-white/45">
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         {icon}{label}
       </div>
       <div className="mt-1 flex items-baseline gap-1">
-        <span className={`text-2xl font-bold tabular-nums ${tone === 'accent' ? 'text-sky-300' : 'text-white'}`}>
+        <span className={`text-2xl font-bold tabular-nums ${tone === 'accent' ? 'text-sky-700 dark:text-sky-300' : 'text-foreground'}`}>
           {value}
         </span>
-        {unit && <span className="text-[12px] text-white/40">{unit}</span>}
+        {unit && <span className="text-[12px] text-muted-foreground/70">{unit}</span>}
       </div>
-      {hint && <div className="mt-0.5 text-[11px] text-white/35">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[11px] text-muted-foreground/70">{hint}</div>}
     </div>
   )
 }
@@ -128,10 +130,10 @@ function Sparkbars({ series }: { series: PublicMonitorLive['series'] }) {
   const bw = Math.max(0.5, W / series.length - gap)
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-white/45">
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>Piezas por tramo de 5 min</span>
-        <span className="tabular-nums text-white/35">
+        <span className="tabular-nums text-muted-foreground/70">
           {fmtWallTime(series[0]!.t)}–{fmtWallTime(series[series.length - 1]!.t)}
         </span>
       </div>
@@ -147,13 +149,13 @@ function Sparkbars({ series }: { series: PublicMonitorLive['series'] }) {
               width={bw}
               height={h}
               rx={0.4}
-              className={p.pieces > 0 ? 'fill-sky-400/80' : 'fill-white/10'}
+              className={p.pieces > 0 ? 'fill-sky-500 dark:fill-sky-400/80' : 'fill-muted-foreground/20'}
             />
           )
         })}
       </svg>
-      <div className="mt-1 text-[11px] text-white/35">
-        Máximo del tramo: <span className="tabular-nums text-white/60">{fmtInt(max)}</span> pz
+      <div className="mt-1 text-[11px] text-muted-foreground/70">
+        Máximo del tramo: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
       </div>
     </div>
   )
@@ -161,9 +163,9 @@ function Sparkbars({ series }: { series: PublicMonitorLive['series'] }) {
 
 function StatusPill({ live }: { live: PublicMonitorLive }) {
   const map = {
-    produciendo: { label: 'Produciendo', dot: 'bg-emerald-400', text: 'text-emerald-300', ring: 'border-emerald-400/30 bg-emerald-400/10' },
-    detenida:    { label: 'Detenida',    dot: 'bg-red-400',     text: 'text-red-300',     ring: 'border-red-400/30 bg-red-400/10' },
-    'sin-datos': { label: 'Sin datos',   dot: 'bg-white/40',    text: 'text-white/60',    ring: 'border-white/15 bg-white/5' },
+    produciendo: { label: 'Produciendo', dot: 'bg-emerald-400', text: 'text-emerald-800 dark:text-emerald-300', ring: 'border-emerald-400/30 bg-emerald-400/20' },
+    detenida:    { label: 'Detenida',    dot: 'bg-red-400',     text: 'text-red-800 dark:text-red-300',     ring: 'border-red-400/30 bg-red-400/20' },
+    'sin-datos': { label: 'Sin datos',   dot: 'bg-muted-foreground/50',    text: 'text-muted-foreground',    ring: 'border-border bg-muted' },
   } as const
   const s = map[live.status]
   return (
@@ -178,6 +180,7 @@ function StatusPill({ live }: { live: PublicMonitorLive }) {
 
 export function PublicShiftMonitorPage() {
   const { token } = useParams<{ token: string }>()
+  const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'gone'>('loading')
   const [now, setNow] = useState(() => Date.now())
@@ -275,18 +278,18 @@ export function PublicShiftMonitorPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950">
-        <RefreshCw className="h-6 w-6 animate-spin text-sky-400" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <RefreshCw className="h-6 w-6 animate-spin text-sky-600 dark:text-sky-400" />
       </div>
     )
   }
 
   if (status === 'gone' || !data) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gray-950 px-6 text-center">
-        <AlertCircle className="h-11 w-11 text-red-400" />
-        <p className="text-lg font-semibold text-white">Este link ya no está disponible</p>
-        <p className="max-w-xs text-sm text-white/50">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <AlertCircle className="h-11 w-11 text-red-600 dark:text-red-400" />
+        <p className="text-lg font-semibold text-foreground">Este link ya no está disponible</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
           Los links de monitoreo tienen vencimiento y se pueden revocar. Pide uno nuevo a
           Mantención para seguir viendo el turno.
         </p>
@@ -299,10 +302,10 @@ export function PublicShiftMonitorPage() {
   // link que tampoco mostraría nada.
   if (!live) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gray-950 px-6 text-center">
-        <Hourglass className="h-11 w-11 text-sky-400/70" />
-        <p className="text-lg font-semibold text-white">Esperando el próximo turno</p>
-        <p className="max-w-xs text-sm text-white/50">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <Hourglass className="h-11 w-11 text-sky-600 dark:text-sky-400/70" />
+        <p className="text-lg font-semibold text-foreground">Esperando el próximo turno</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
           {data.machineKindLong || data.lineLabel || 'La línea'} no tiene un turno en curso. Esta
           pantalla se llena sola cuando arranque — deja el link guardado.
         </p>
@@ -322,28 +325,37 @@ export function PublicShiftMonitorPage() {
     : true
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-gray-950/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto max-w-3xl px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-base font-semibold leading-tight">{lineTitle}</h1>
             <StatusPill live={live} />
             {live.shiftClosed && (
-              <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-white/50">
+              <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                 Turno cerrado
               </span>
             )}
+          <button
+            onClick={toggleTheme}
+            className="ml-auto shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+            aria-label={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-white/55">
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground">
             {areaTitle && <span>{areaTitle}</span>}
-            {areaTitle && <span className="text-white/20">·</span>}
-            <span className="font-medium text-white/70">{vista?.shiftId || data.shiftId}</span>
-            <span className="text-white/20">·</span>
+            {areaTitle && <span className="text-muted-foreground/50">·</span>}
+            <span className="font-medium text-foreground/80">{vista?.shiftId || data.shiftId}</span>
+            <span className="text-muted-foreground/50">·</span>
             {/* first-letter, no `capitalize`: ese capitaliza CADA palabra y
                 dejaba "Lunes, 10 De Agosto". */}
             <span className="first-letter:uppercase">{fmtDateLong(vista?.dateKey || data.dateKey)}</span>
-            <span className="text-white/20">·</span>
+            <span className="text-muted-foreground/50">·</span>
             <span className="tabular-nums">
               {fmtWallTime(live.scheduledStart)}–{fmtWallTime(live.scheduledEnd)}
             </span>
@@ -358,14 +370,14 @@ export function PublicShiftMonitorPage() {
           <button
             onClick={() => irA(1)}
             disabled={idx >= vistas.length - 1}
-            className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/70 transition-colors enabled:hover:bg-white/10 disabled:opacity-30"
+            className="flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             Anterior
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/40">
+            <span className="text-[11px] text-muted-foreground/70">
               {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
             </span>
             {/* Atajo al presente: con seis turnos de historial, volver de a uno
@@ -373,7 +385,7 @@ export function PublicShiftMonitorPage() {
             {idx > 1 && (
               <button
                 onClick={() => verIndice(0)}
-                className="rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-200 transition-colors hover:bg-sky-400/20"
+                className="rounded-full border border-sky-400/25 bg-sky-400/20 px-2 py-0.5 text-[11px] text-sky-700 dark:text-sky-200 transition-colors hover:bg-sky-400/20"
               >
                 Ir al actual
               </button>
@@ -383,7 +395,7 @@ export function PublicShiftMonitorPage() {
           <button
             onClick={() => irA(-1)}
             disabled={esActual}
-            className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/70 transition-colors enabled:hover:bg-white/10 disabled:opacity-30"
+            className="flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
           >
             Siguiente
             <ChevronRight className="h-3.5 w-3.5" />
@@ -397,14 +409,14 @@ export function PublicShiftMonitorPage() {
         onTouchEnd={onTouchEnd}
       >
         {/* Piezas acumuladas — el número que vienen a ver */}
-        <section className="rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-500/10 to-transparent px-4 py-4">
-          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-white/50">
+        <section className="rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-500/15 to-transparent px-4 py-4">
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
             <Activity className="h-3 w-3" />
             {esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(live.totalPieces)}</span>
-            <span className="text-sm text-white/40">piezas</span>
+            <span className="text-sm text-muted-foreground/70">piezas</span>
           </div>
 
           {/* Desglose cuando la línea produjo fuera del horario del turno.
@@ -412,14 +424,14 @@ export function PublicShiftMonitorPage() {
               después a otro bucket; sin este desglose el total no cuadra con lo
               que la gente contó en la línea, y ahí se pierde la confianza. */}
           {outside > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-white/60">
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
               <span className="tabular-nums">{fmtInt(live.shiftPieces ?? 0)} dentro del turno</span>
-              <span className="text-white/25">+</span>
-              <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 tabular-nums text-amber-200">
+              <span className="text-muted-foreground/60">+</span>
+              <span className="rounded-full border border-amber-400/25 bg-amber-400/20 px-2 py-0.5 tabular-nums text-amber-800 dark:text-amber-200">
                 {fmtInt(outside)} fuera del horario
               </span>
               {(live.outsideRanges ?? []).map(r => (
-                <span key={r.from} className="text-[11px] tabular-nums text-white/35">
+                <span key={r.from} className="text-[11px] tabular-nums text-muted-foreground/70">
                   ({r.kind === 'antes' ? 'antes: ' : ''}{fmtWallTime(r.from)}–{fmtWallTime(r.to)})
                 </span>
               ))}
@@ -428,27 +440,27 @@ export function PublicShiftMonitorPage() {
 
           {data.targetPieces != null && progressPct != null && (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-[11px] text-white/50">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span>Meta del turno: {fmtInt(data.targetPieces)} pz</span>
                 <span className="tabular-nums">{fmtDec(progressPct, 0)}%</span>
               </div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-sky-400 transition-[width] duration-700"
+                  className="h-full rounded-full bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/45">
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
               Producción real desde{' '}
-              <span className="tabular-nums text-white/70">{fmtWallTime(live.effectiveStart)}</span>
+              <span className="tabular-nums text-foreground/80">{fmtWallTime(live.effectiveStart)}</span>
               {' '}hasta{' '}
-              <span className="tabular-nums text-white/70">{fmtWallTime(live.effectiveEnd)}</span>
+              <span className="tabular-nums text-foreground/80">{fmtWallTime(live.effectiveEnd)}</span>
             </span>
-            <span className="text-white/20">·</span>
+            <span className="text-muted-foreground/50">·</span>
             <span className="tabular-nums">{fmtDec(live.windowHours)} h de operación</span>
           </div>
         </section>
@@ -489,15 +501,15 @@ export function PublicShiftMonitorPage() {
 
         {/* Estado actual: por qué NO está corriendo, si es el caso */}
         {live.status === 'detenida' && esActual && (
-          <section className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3">
-            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-300/80">
+          <section className="rounded-2xl border border-red-500/40 bg-red-500/15 px-4 py-3 dark:border-red-400/25">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300/80">
               <PauseCircle className="h-3 w-3" />
               Ahora mismo
             </div>
-            <p className="mt-1 text-sm text-white">
+            <p className="mt-1 text-sm text-foreground">
               Línea detenida{live.currentReason ? ` — ${live.currentReason}` : ''}
               {live.currentSinceAt && (
-                <span className="text-white/50">
+                <span className="text-muted-foreground">
                   {' '}(desde {fmtWallTime(live.currentSinceAt)}, {fmtAgoWall(live.currentSinceAt, now)})
                 </span>
               )}
@@ -509,22 +521,22 @@ export function PublicShiftMonitorPage() {
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
-          <section className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/45">Por máquina</div>
+          <section className="rounded-2xl border border-border bg-card px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Por máquina</div>
             <ul className="mt-2 space-y-2">
               {live.machines.map(m => (
                 <li key={m.id} className="flex items-center gap-3 text-sm">
                   <span
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                      m.status === 'produciendo' ? 'bg-emerald-400' : m.status === 'detenida' ? 'bg-red-400' : 'bg-white/30'
+                      m.status === 'produciendo' ? 'bg-emerald-400' : m.status === 'detenida' ? 'bg-red-400' : 'bg-muted-foreground/40'
                     }`}
                   />
                   <span className="min-w-0 flex-1 truncate">
                     {m.name}
-                    {m.model && <span className="ml-1 text-[11px] text-white/35">{m.model}</span>}
+                    {m.model && <span className="ml-1 text-[11px] text-muted-foreground/70">{m.model}</span>}
                   </span>
-                  <span className="tabular-nums text-white/80">{fmtInt(m.pieces)} pz</span>
-                  <span className="w-20 text-right tabular-nums text-[11px] text-white/40">
+                  <span className="tabular-nums text-foreground/80">{fmtInt(m.pieces)} pz</span>
+                  <span className="w-20 text-right tabular-nums text-[11px] text-muted-foreground/70">
                     {fmtInt(m.piecesPerHour)} pz/h
                   </span>
                 </li>
@@ -535,16 +547,16 @@ export function PublicShiftMonitorPage() {
 
         {/* Paros del turno: lo que explica la diferencia entre lo hecho y lo posible */}
         {live.topStops.length > 0 && (
-          <section className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/45">
+          <section className="rounded-2xl border border-border bg-card px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Detenciones del turno
             </div>
             <ul className="mt-2 space-y-1.5">
               {live.topStops.map(s => (
                 <li key={s.reason} className="flex items-center gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-white/80">{s.reason}</span>
-                  <span className="tabular-nums text-white/60">{fmtDurationSec(s.sec)}</span>
-                  <span className="w-12 text-right tabular-nums text-[11px] text-white/35">
+                  <span className="min-w-0 flex-1 truncate text-foreground/80">{s.reason}</span>
+                  <span className="tabular-nums text-muted-foreground">{fmtDurationSec(s.sec)}</span>
+                  <span className="w-12 text-right tabular-nums text-[11px] text-muted-foreground/70">
                     {s.count}×
                   </span>
                 </li>
@@ -554,8 +566,8 @@ export function PublicShiftMonitorPage() {
         )}
 
         {/* Frescura y procedencia */}
-        <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-white/30">
-          <p className={stale ? 'text-amber-400/80' : 'text-white/40'}>
+        <footer className="space-y-1 pb-6 pt-1 text-center text-[11px] text-muted-foreground/60">
+          <p className={stale ? 'text-amber-700 dark:text-amber-400/80' : 'text-muted-foreground/70'}>
             <RefreshCw className="mr-1 inline h-3 w-3" />
             Datos de planta actualizados {fmtAgo(live.lastSyncAt, now)}
             {stale && ' — la sincronización puede estar detenida'}
@@ -564,7 +576,7 @@ export function PublicShiftMonitorPage() {
             Se actualiza solo · solo lectura · compartido por {data.createdBy}
           </p>
           {data.mode === 'line' && (
-            <p className="text-white/40">
+            <p className="text-muted-foreground/70">
               Este link no caduca con el turno: al arrancar el siguiente, cambia solo.
             </p>
           )}
@@ -574,7 +586,7 @@ export function PublicShiftMonitorPage() {
             })}
           </p>
           {/* Decirlo es parte de hacerlo bien: se cuenta el uso, no a la gente. */}
-          <p className="text-white/25">
+          <p className="text-muted-foreground/60">
             Se cuentan las aperturas de forma anónima, para saber si la pantalla sirve.
             No se registra quién la abre.
           </p>

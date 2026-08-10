@@ -13,6 +13,41 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - El monitor publico pasa a ser theme-aware (claro/oscuro)
+
+Pedido de Orel. La pantalla nacio dark-only por decision explicita ("un tablero de planta se mira
+mejor asi") pero se abre tambien de dia y en oficina. Ahora usa los tokens de la app y tiene su
+propio boton sol/luna; el tema se guarda en el MISMO `app-theme` que el resto, asi que quien tenga
+la PWA en claro abre el link en claro.
+
+57 hardcodes convertidos siguiendo el playbook `/tema-claro-oscuro`: `bg-gray-950`→`bg-background`,
+`bg-white/[0.04]`→`bg-card`, `border-white/10`→`border-border`, la escala de `text-white/NN` a
+`text-foreground` / `text-muted-foreground`, y los acentos con el patron `-700/-800 dark:-300/-400`
+(un -300 sobre fondo claro queda lavado). Los tintes de estado subieron de `/10` a `/20` (patron C:
+en claro un /10 colapsa contra la superficie).
+
+⚠ **Dos cosas que solo aparecieron MIRANDO la pantalla en claro**:
+
+1. **El "% produciendo" se habia hundido de 72% a 58%** — y no era del tema. Al rescatar la cola de
+   despues del cierre entraban tambien los states `Planned Downtime`, que es el relleno de las horas
+   en que la planta NO estaba operando (la memoria del proyecto ya decia que se EXCLUYE del
+   denominador). Ademas encabezaba el ranking de detenciones: el primer lugar era "no estabamos
+   trabajando". Excluido de las dos partes → vuelve a **76,5%**.
+2. **El aviso de linea detenida desaparecia**: `bg-red-500/15` con borde `/25` sobre superficie
+   clara no se ve. Borde a `/40` en claro, oscuro intacto.
+
+**Contraste medido, no mirado** (regla 4d del playbook). Primera medicion dio 2,48:1 y 1,94:1 —
+falsos: el script no componia el alfa de los tintes. Con el alfa compuesto: chip "Detenida" 4,25:1,
+**bajo el 4,5 de AA** → `-700`→`-800` y quedo en **5,46:1**. Resto en claro: numero grande 12,34,
+KPI 5,17, secundario 7,18, chip ambar 4,78. En oscuro: 15,47 / 9,49 / 7,33 / 7,25 y fondo
+`rgb(13,23,34)`, el de siempre.
+
+- Archivos: `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`, `functions/publicMonitor.js`.
+- Verificacion: 202 tests functions y 1.107 del PWA en verde; tsc y eslint limpios; build OK.
+  Screenshot en CLARO y en OSCURO con datos reales, toggle probado en ambos sentidos, y el fondo
+  oscuro verificado byte a byte contra el valor del playbook.
+- Estado: HECHO (mergeado)
+
 ## 2026-08-10 - claude - La MATRIZ contaba dos veces las piezas del borde del turno
 
 Mismo bug que se corrigio en el monitor (#434), ahora en la matriz de turnos, que es donde se mira
