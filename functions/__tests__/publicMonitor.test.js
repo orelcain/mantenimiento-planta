@@ -647,3 +647,110 @@ function fmtHHMM(isoStr) {
   const d = new Date(isoStr)
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Historial de turnos: deslizar hacia atrás desde el mismo link.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { buildMonitorHistory } = require('../publicMonitor')
+
+test('el historial va del turno más reciente al más viejo, por horario real', async () => {
+  const w = nowWall()
+  const d0 = dk(w)
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${d0}_Turno 2`
+
+  const maquina = (c, startMs) => ({
+    machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+    totalCycles: c, shiftRuntime: 0.8,
+    shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+    intervals: intervals(startMs, 6, c / 6), states: [],
+  })
+
+  // Ojo con el orden: en Chonchi "Turno 1" arranca 21:30 y "Turno 2" a las
+  // 09:00, así que ordenar por el id daría el orden cronológico al revés.
+  const t1Ayer = `${d1}_Turno 1`   // 21:30 de ayer → el MÁS reciente de los previos
+  const t2Ayer = `${d1}_Turno 2`   // 09:00 de ayer
+  const hAyer = (h) => new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(5, 7)) - 1, Number(d1.slice(8, 10)), h))
+
+  const db = fakeShiftsDb(
+    {
+      [actual]: { shiftId: 'Turno 2', scheduledStart: hoy(9), scheduledEnd: hoy(17), machines: [{ totalCycles: 3000 }] },
+      [t2Ayer]: { shiftId: 'Turno 2', scheduledStart: hAyer(9), scheduledEnd: hAyer(17), machines: [{ totalCycles: 2000 }] },
+      [t1Ayer]: { shiftId: 'Turno 1', scheduledStart: hAyer(21), scheduledEnd: hAyer(23), machines: [{ totalCycles: 2500 }] },
+    },
+    {
+      [actual]: [maquina(3000, hoy(9).getTime())],
+      [t2Ayer]: [maquina(2000, hAyer(9).getTime())],
+      [t1Ayer]: [maquina(2500, hAyer(21).getTime())],
+    },
+  )
+
+  const hist = await buildMonitorHistory(db, 'chonchi', actual, [])
+
+  assert.equal(hist.length, 2)
+  assert.equal(hist[0].shiftDocId, t1Ayer, 'el Turno 1 de las 21:30 es más reciente que el Turno 2 de las 09:00')
+  assert.equal(hist[1].shiftDocId, t2Ayer)
+  assert.equal(hist[0].live.totalPieces, 2500)
+})
+
+test('el historial descarta turnos sin proceso y el Unscheduled', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const vacio = `${d1}_Turno Dia`
+  const unsch = `${d1}_Unscheduled`
+  const hAyer = (h) => new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(5, 7)) - 1, Number(d1.slice(8, 10)), h))
+
+  const db = fakeShiftsDb(
+    {
+      [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+      [vacio]:  { shiftId: 'Turno Dia', scheduledStart: hAyer(8), scheduledEnd: hAyer(16), machines: [{ totalCycles: 12 }] },
+      [unsch]:  { shiftId: 'Unscheduled', scheduledStart: hAyer(6), scheduledEnd: hAyer(23), machines: [{ totalCycles: 4000 }] },
+    },
+    {},
+  )
+
+  const hist = await buildMonitorHistory(db, 'filete', actual, [])
+  assert.deepEqual(hist, [], '12 piezas no son un turno, y Unscheduled no es un turno')
+})
+
+test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const maquina = (c, startMs) => ({
+    machineid: 'b200', machineName: 'Linea 1', machineType: 'baader_200',
+    totalCycles: c, shiftRuntime: 0.8,
+    shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+    intervals: intervals(startMs, 6, c / 6), states: [],
+  })
+
+  const db = fakeShiftsDb(
+    {
+      [actual]:    { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+      [ayer]:      { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+      [anteayer]:  { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 1000 }] },
+    },
+    {
+      [ayer]:     [maquina(2000, hDe(d1, 8).getTime())],
+      [anteayer]: [maquina(1000, hDe(d2, 8).getTime())],
+    },
+  )
+
+  // El de anteayer viene cacheado con un valor imposible: si se reusa, sale tal
+  // cual; si se recompusiera, saldría 1000.
+  const prev = [
+    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999 } },
+    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888 } },
+  ]
+
+  const hist = await buildMonitorHistory(db, 'filete', actual, prev)
+
+  assert.equal(hist[0].live.totalPieces, 2000, 'el turno anterior se recompone: el re-sync móvil todavía lo toca')
+  assert.equal(hist[1].live.totalPieces, 888888, 'los más viejos se reusan: ya no cambian')
+})

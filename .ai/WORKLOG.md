@@ -13,6 +13,42 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Deslizar a turnos anteriores desde el link publico
+
+Pedido de Orel. El link mostraba solo el turno vigente; ahora publica ademas los **6 turnos
+anteriores** con proceso y se navega con flechas o **swipe** (que es la interaccion natural: el QR
+se abre en el celular).
+
+**Lo que evita que sea caro**: un turno cerrado ya no cambia, asi que el historial se REUSA del doc
+anterior en vez de recomponerse cada 5 min. Solo se recompone el turno inmediatamente anterior,
+que todavia se mueve por el re-sync movil (reescribe ayer cada hora y hace 2-3 dias una vez al
+dia). Sin ese reuso serian ~40 lecturas por refresco por monitor.
+
+⚠ **Ordenar por el id NO sirve**: en Chonchi "Turno 1" arranca 21:30 y "Turno 2" a las 09:00, asi
+que alfabeticamente el historial sale al reves. Se ordena por `scheduledStart` real. Se descartan
+los `Unscheduled` y los turnos con <50 piezas (no hubo proceso).
+
+⚠ **Bug de React que costo una vuelta**: el efecto que reubica la vista cuando arranca un turno
+nuevo dependia tambien de `idx`, asi que se disparaba en la navegacion del propio usuario y lo
+devolvia al turno actual — **el boton parecia no responder**. El efecto debe depender SOLO de
+`vistas`; quien navega actualiza el ref a mano. Detectado clickeando el boton en el navegador, no
+por tsc ni por los tests.
+
+- Archivos: `functions/publicMonitor.js` (`buildMonitorHistory`), `functions/index.js`,
+  `functions/__tests__/publicMonitor.test.js`,
+  `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`, `scripts/public-monitor-probe.js`.
+- Verificacion: **190 tests functions** (3 nuevos, incluido el del orden cronologico y el del
+  reuso) y 1.104 del PWA en verde; tsc y eslint limpios; build OK (chunk publico 15 kB / 4,7 gzip).
+  En el navegador con datos REALES: recorridos los 6 turnos de Filete (3.454 → 4.364 → 3.754 →
+  3.398 → 3.168 → 2.410), el boton se deshabilita en el ultimo, "Volver al actual" funciona, el
+  swipe sintetico navega, y a 375px no hay scroll horizontal ni texto bajo 11px. Al mirar un turno
+  pasado el rotulo cambia a "Piezas de ese turno" y desaparece el bloque "Ahora mismo", que no
+  aplica.
+- Estado: HECHO (mergeado)
+- Sigue: el historial se llena en el primer refresco del trigger (o al crear el link). Un link
+  creado antes de este cambio no tiene `history` hasta que el sync lo toque.
+
 ## 2026-08-10 - claude - El monitor cuenta las piezas que Shoplogix deja fuera del turno
 
 Reporte de Orel: "hoy termino filete pero Shoplogix conto hasta las 15:30 y siguieron pasando

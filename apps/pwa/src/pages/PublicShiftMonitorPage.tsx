@@ -17,9 +17,9 @@
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Activity, AlertCircle, Clock, Gauge, Hourglass, PauseCircle, Radio, Repeat, RefreshCw, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, PauseCircle, Radio, Repeat, RefreshCw, Timer } from 'lucide-react'
 import {
   subscribePublicShiftMonitor,
   type PublicShiftMonitorDoc,
@@ -204,7 +204,58 @@ export function PublicShiftMonitorPage() {
     )
   }, [token])
 
-  const live = data?.live ?? null
+  // Índice del turno que se está mirando: 0 = el vigente, 1..n = anteriores.
+  const [idx, setIdx] = useState(0)
+
+  // Turnos navegables, del actual hacia atrás. El backend publica el historial
+  // ya compuesto; acá solo se elige cuál se pinta.
+  const vistas = useMemo(() => {
+    if (!data?.live) return []
+    return [
+      { shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live },
+      ...(data.history ?? []),
+    ]
+  }, [data])
+
+  // Turno que el usuario eligió mirar. Cuando arranca uno nuevo, el historial se
+  // corre una posición: sin esto la pantalla saltaría sola a otro turno mientras
+  // alguien lo está leyendo.
+  //
+  // ⚠ El efecto depende SOLO de `vistas`, nunca de `idx`: al depender también de
+  // `idx` se disparaba en la propia navegación del usuario y lo devolvía al
+  // turno actual — el botón parecía no responder.
+  const vistaIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (vistas.length === 0) return
+    if (!vistaIdRef.current) { vistaIdRef.current = vistas[0]!.shiftDocId; return }
+    const nuevo = vistas.findIndex(v => v.shiftDocId === vistaIdRef.current)
+    // Si el turno que se miraba se cayó del historial, volver al actual.
+    setIdx(nuevo >= 0 ? nuevo : 0)
+    if (nuevo < 0) vistaIdRef.current = vistas[0]!.shiftDocId
+  }, [vistas])
+
+  const vista = vistas[idx] ?? null
+  const live = vista?.live ?? null
+  const esActual = idx === 0
+
+  const verIndice = (n: number) => {
+    const destino = Math.min(vistas.length - 1, Math.max(0, n))
+    setIdx(destino)
+    vistaIdRef.current = vistas[destino]?.shiftDocId ?? null
+  }
+  const irA = (delta: number) => verIndice(idx + delta)
+
+  // Swipe: es la interacción natural en el celular, que es donde se abre el QR.
+  // Las flechas quedan igual para desktop y accesibilidad.
+  const touchX = useRef<number | null>(null)
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0]?.clientX ?? null }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchX.current == null) return
+    const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current
+    touchX.current = null
+    if (Math.abs(dx) < 60) return       // bajo eso es un scroll, no un swipe
+    irA(dx < 0 ? 1 : -1)                // arrastrar a la izquierda = ir hacia atrás
+  }
 
   const progressPct = useMemo(() => {
     if (!live || !data?.targetPieces) return null
@@ -274,7 +325,7 @@ export function PublicShiftMonitorPage() {
             )}
             {/* Sin esto, ver que cambió el turno del encabezado se lee como que
                 el link se rompió. Con el chip, se entiende que sigue la línea. */}
-            {data.mode === 'line' && (
+            {data.mode === 'line' && esActual && (
               <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-300/90">
                 <Repeat className="h-3 w-3" />
                 Sigue el turno vigente
@@ -284,11 +335,11 @@ export function PublicShiftMonitorPage() {
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-white/55">
             {areaTitle && <span>{areaTitle}</span>}
             {areaTitle && <span className="text-white/20">·</span>}
-            <span className="font-medium text-white/70">{data.shiftId}</span>
+            <span className="font-medium text-white/70">{vista?.shiftId || data.shiftId}</span>
             <span className="text-white/20">·</span>
             {/* first-letter, no `capitalize`: ese capitaliza CADA palabra y
                 dejaba "Lunes, 10 De Agosto". */}
-            <span className="first-letter:uppercase">{fmtDateLong(data.dateKey)}</span>
+            <span className="first-letter:uppercase">{fmtDateLong(vista?.dateKey || data.dateKey)}</span>
             <span className="text-white/20">·</span>
             <span className="tabular-nums">
               {fmtWallTime(live.scheduledStart)}–{fmtWallTime(live.scheduledEnd)}
@@ -297,12 +348,47 @@ export function PublicShiftMonitorPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-3 px-4 py-4">
+      {/* Navegación entre turnos. Solo aparece cuando hay historial: en una
+          línea recién integrada no tiene sentido mostrar flechas muertas. */}
+      {vistas.length > 1 && (
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 pt-3">
+          <button
+            onClick={() => irA(1)}
+            disabled={idx >= vistas.length - 1}
+            className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-white/70 transition-colors enabled:hover:bg-white/10 disabled:opacity-30"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Turno anterior
+          </button>
+
+          <span className="text-[11px] text-white/40">
+            {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
+          </span>
+
+          {esActual ? (
+            <span className="px-3 py-1.5 text-[12px] text-white/20">Siguiente</span>
+          ) : (
+            <button
+              onClick={() => verIndice(0)}
+              className="flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-400/10 px-3 py-1.5 text-[12px] text-sky-200 transition-colors hover:bg-sky-400/20"
+            >
+              Volver al actual
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      <main
+        className="mx-auto max-w-3xl space-y-3 px-4 py-4"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Piezas acumuladas — el número que vienen a ver */}
         <section className="rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-500/10 to-transparent px-4 py-4">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-white/50">
             <Activity className="h-3 w-3" />
-            Piezas procesadas en la jornada
+            {esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(live.totalPieces)}</span>
@@ -390,7 +476,7 @@ export function PublicShiftMonitorPage() {
         </div>
 
         {/* Estado actual: por qué NO está corriendo, si es el caso */}
-        {live.status === 'detenida' && (
+        {live.status === 'detenida' && esActual && (
           <section className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-300/80">
               <PauseCircle className="h-3 w-3" />

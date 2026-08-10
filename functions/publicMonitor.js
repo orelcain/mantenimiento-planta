@@ -578,6 +578,66 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   }
 }
 
+/** Cuántos turnos anteriores se publican para deslizar. */
+const HISTORY_MAX = 6
+/** Días hacia atrás donde buscarlos. */
+const HISTORY_LOOKBACK_DAYS = 12
+/** Piezas mínimas para que un turno entre al historial (bajo eso no hubo proceso). */
+const HISTORY_MIN_PIECES = 50
+
+/**
+ * Turnos anteriores de la línea, para poder deslizar hacia atrás desde el link.
+ *
+ * Reusa lo ya publicado (`prevHistory`) en vez de recomponer los seis en cada
+ * refresco: **un turno cerrado ya no cambia**, y recomponerlo cuesta leer su
+ * subcolección de máquinas más el rescate de piezas fuera de horario. Se
+ * recompone solo el más reciente del historial, que todavía puede moverse por
+ * el re-sync móvil (reescribe ayer cada hora y hace 2-3 días una vez al día).
+ *
+ * @returns {Promise<Array<{shiftDocId: string, dateKey: string, shiftId: string, live: object}>>}
+ */
+async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory = []) {
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const desde = shiftDateKey(nowWall, -HISTORY_LOOKBACK_DAYS)
+
+  const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+  const candidatos = refs.filter(r =>
+    r.id !== currentShiftDocId &&
+    r.id.slice(0, 10) >= desde &&
+    !/unscheduled/i.test(r.id),
+  )
+  if (candidatos.length === 0) return []
+
+  const snaps = await db.getAll(...candidatos)
+  const turnos = []
+  for (const snap of snaps) {
+    if (!snap.exists) continue
+    const d = snap.data() || {}
+    const start = toDate(d.scheduledStart)
+    const pieces = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+    // Ordenar por el horario REAL y no por el id: "Turno 1" de Chonchi arranca
+    // 21:30 y "Turno 2" a las 09:00, así que alfabéticamente quedan al revés.
+    if (start && pieces >= HISTORY_MIN_PIECES) turnos.push({ id: snap.id, start, pieces })
+  }
+  turnos.sort((a, b) => b.start.getTime() - a.start.getTime())
+
+  const previos = new Map((prevHistory || []).map(h => [h.shiftDocId, h]))
+  const out = []
+  for (let i = 0; i < turnos.length && out.length < HISTORY_MAX; i++) {
+    const { id } = turnos[i]
+    const cacheado = previos.get(id)
+    // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
+    if (cacheado?.live && i > 0) { out.push(cacheado); continue }
+    try {
+      const live = await buildMonitorLive(db, plantSlug, id)
+      if (live) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), live })
+    } catch {
+      if (cacheado?.live) out.push(cacheado)
+    }
+  }
+  return out
+}
+
 /**
  * Refresca un monitor. En modo `line` además re-resuelve qué turno está
  * vigente, así que devuelve también los campos de identidad del turno para que
@@ -590,8 +650,12 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   if (!plantSlug) return null
 
   if (monitor.mode !== 'line') {
+    // Un link de turno fijo tampoco tiene por qué ser una isla: se le publican
+    // igual los turnos anteriores para poder deslizar.
     const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId)
-    return live ? { live } : null
+    if (!live) return null
+    const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history)
+    return { live, history }
   }
 
   // Modo línea: el turno vigente se resuelve una vez por planta y se reusa
@@ -608,6 +672,7 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
 
   return {
     live,
+    history: await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history),
     shiftDocId,
     dateKey: shiftDocId.slice(0, 10),
     shiftId: shiftDocId.slice(11),
@@ -650,6 +715,9 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
 
   const shiftDocId = await resolveCurrentShiftDocId(db, plantSlug)
   const live = shiftDocId ? await buildMonitorLive(db, plantSlug, shiftDocId) : null
+  // Con historial desde el minuto uno: un link recién creado ya se puede
+  // deslizar hacia atrás, sin esperar al primer refresco del trigger.
+  const history = shiftDocId ? await buildMonitorHistory(db, plantSlug, shiftDocId, []) : []
 
   const token = require('crypto').randomUUID()
   await db.collection(COLLECTION).doc(token).set({
@@ -671,6 +739,7 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
     expiresAt: nuevoVencimiento,
     ttlHours: ttlDays * 24,
     live,
+    history,
   })
   return { token, created: true }
 }
@@ -678,6 +747,7 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
 module.exports = {
   COLLECTION,
   buildMonitorLive,
+  buildMonitorHistory,
   buildMonitorPatch,
   resolveCurrentShiftDocId,
   ensureLineMonitor,

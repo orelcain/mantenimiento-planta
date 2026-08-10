@@ -97,6 +97,7 @@ async function main() {
       expiresAt: new Date(now.getTime() + 3 * 3600 * 1000).toISOString(),
       ttlHours: 3,
       live,
+      history: await require('../functions/publicMonitor').buildMonitorHistory(db, plantSlug, shiftDocId, []),
     })
     console.log(`\n✅ Monitor de prueba creado (vence en 3 h):\n   /monitor/${token}`)
     console.log(`   borrar con: node scripts/public-monitor-probe.js --revoke ${token}`)

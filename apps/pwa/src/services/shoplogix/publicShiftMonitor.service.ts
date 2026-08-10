@@ -98,6 +98,12 @@ export interface PublicShiftMonitorDoc {
   expiresAt: string
   ttlHours: number
   live: PublicMonitorLive | null
+  /**
+   * Turnos anteriores de la línea, del más reciente al más viejo, para poder
+   * deslizar hacia atrás sin sesión. Los compone el backend con el mismo
+   * formato que `live`. Ausente en docs creados antes de esta función.
+   */
+  history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
 }
 
 /** Duraciones que acepta el backend (horas). 720 = 30 días. */
