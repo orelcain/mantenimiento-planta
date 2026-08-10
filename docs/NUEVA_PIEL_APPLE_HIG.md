@@ -34,8 +34,8 @@ Eso debe ser lo más grande/primero. Todo lo demás cede.
 |---|---|---|
 | fondo | `#F2F2F7` | systemGroupedBackground — el lienzo gris |
 | tarjeta | `#FFFFFF` | secondarySystemGroupedBackground — grupos/tarjetas |
-| texto primario | `#000000` | label — SOLO títulos y contenido principal |
-| texto secundario | `rgba(60,60,67,.60)` | secondaryLabel — subtítulos, metadatos |
+| texto primario | `#1C1C1E` | label. **Desviación deliberada**: el HIG usa `#000` puro; se suaviza por el reporte de fatiga de contraste (sigue 17:1 sobre card) |
+| texto secundario | `#6E6E71` | secondaryLabel. **Desviación medida**: el `.60` del HIG da 3.44:1 y reprueba AA; esto equivale a ~`.75` → 5.08:1 card / 4.55:1 fondo |
 | texto terciario | `rgba(60,60,67,.30)` | tertiaryLabel — placeholders, deshabilitado |
 | separador | `rgba(60,60,67,.29)` | separator — líneas entre celdas |
 | relleno de control | `rgba(120,120,128,.12)` | systemFill — fondos de search, segmented, sev |
@@ -79,10 +79,59 @@ Apple tiene DOS juegos oscuros. El "base" (fondo `#000`) se descartó por dureza
 | neutro / sin programar | `#8E8E93` | `#636366` |
 
 **Regla de uso (híbrido con la decisión de julio):** los tintes vivos van SOLO en
-superficies chicas — puntos de estado, pills (texto tinte + fondo tinte al 14%), deltas,
-íconos < 30 px. Para RELLENOS GRANDES (segmentos de Gantt, paretos, fondos de sección)
-sigue vigente el −50% croma de `softenAccentHex()` (decisión Orel 2026-07-19, PRs #240/#248).
-No se revierte esa decisión: se acota a su caso real.
+superficies chicas — puntos de estado, deltas, íconos < 30 px. Para RELLENOS GRANDES
+(segmentos de Gantt, paretos, fondos de sección) sigue vigente el −50% croma de
+`softenAccentHex()` (decisión Orel 2026-07-19, PRs #240/#248). No se revierte esa
+decisión: se acota a su caso real.
+
+**Regla de la Pill — MEDIDA, no estimada (2026-08-09, revisada el mismo día):**
+`texto = tono 600` sobre `fondo = tono 500 al 15%`. Se llegó ahí midiendo, no a ojo:
+
+- el tinte vivo como TEXTO sobre su propio fondo reprueba AA en rojo oscuro (3.51:1);
+- con el tono 600 pero fondo al 14% seguía reprobando el rojo (4.24:1 oscuro / 4.47:1 claro);
+- al 8% cumplían los seis casos, pero **al verlo en pantalla el relleno era casi invisible**
+  en tema claro: pasaba el contraste y fallaba el propósito (agrupar visualmente);
+- se resolvió al revés: fijar el tinte en **15%** —visualmente sólido— y DERIVAR la tinta que
+  cumple AA sobre ese fondo, tono por tono. Los 11 colores (3 semánticos + 8 categóricos)
+  pasan en ambos temas. El azul de marca puro reprueba sobre su propio tinte (3.98:1), así
+  que los chips informativos usan `--brand-ink`, una variante propia.
+
+El 14% que figuraba antes acá era invención propia, no del HIG. Los tres tonos 600
+también se corrigieron contra la medición: el verde accesible de Apple (`#248A3D`) da
+4.40:1 y reprueba → se usa `#217E38`; y `secondaryLabel` al 60% da 3.44:1 → se usa
+`#6E6E71` (equivale a ~75% de opacidad). Todo esto está verificado permanentemente en
+`scripts/check-contrast.mjs` (sección "NUEVA PIEL").
+
+### 1.6 Paleta CATEGÓRICA (agregada 2026-08-09, al barrer Bodega)
+
+Hueco real del sistema: los semánticos de §1.4 dicen **estado** (hay un bueno y un malo),
+pero la app también usa color para **categorizar** — tipo de repuesto, causal, turno, área —
+donde no hay orden. Forzar categorías en la escala semántica hace que *un rodamiento se lea
+como alerta*. Son cosas distintas y necesitan escalas distintas.
+
+8 tonos sin jerarquía, derivados de los system colors de Apple. Cada uno con `ink` (texto)
+y `tint` (fondo al 8%, la misma proporción medida de la Pill). Tokens `--cat-N-ink` /
+`--cat-N-tint` en `index.css`, theme-aware.
+
+| # | Tono | ink claro | ink oscuro |
+|---|---|---|---|
+| 1 | azul | `#0040DD` | `#409CFF` |
+| 2 | verde | `#217E38` | `#30DB5B` |
+| 3 | índigo | `#3634A3` | `#8F8CFF` |
+| 4 | naranja | `#C93400` | `#FFB340` |
+| 5 | rosa | `#D30F45` | `#FF6482` |
+| 6 | púrpura | `#8944AB` | `#DA8FFF` |
+| 7 | teal | `#0C7E78` | `#5DE7DF` |
+| 8 | café | `#7F5539` | `#C3A084` |
+
+Los 16 pares pasan AA sobre su propio tinte (medido; vigilado en `check-contrast.mjs`).
+Dos se corrigieron contra la medición: índigo oscuro (`#7D7AFF` daba 3.78:1) y teal claro
+(`#0C817B` daba 4.41:1).
+
+**Uso**: siempre por el primitivo `<Tag tone={1..8}>`, nunca `text-cat-3-ink` suelto —
+escribirlo a mano vuelve a dispersar la decisión, que es el problema que se está barriendo.
+El tono se asigna por **índice estable**, no por hash del texto, para que una categoría
+conserve su color entre pantallas y sesiones.
 
 ### 1.5 Pendiente de decisión de Orel
 

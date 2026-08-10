@@ -662,16 +662,24 @@ export function AnalisisGraderWizardPage() {
   const isManual = lineConfig.manualCapture === true
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-border/50">
-        <div className="flex items-center gap-4 flex-wrap min-w-0">
-          <div>
-            <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
+    // `gap-6` en vez de `space-y-4`: el aire entre secciones es la mitad de lo
+    // que hace que una pantalla se lea como Apple y no como panel denso.
+    <div className="flex flex-col gap-6">
+      {/*
+        Encabezado con TÍTULO GRANDE (rol `display`, §2). Antes era `text-xl` con
+        un ícono al lado y una regla dura debajo — tres cosas que aplastaban la
+        jerarquía: el título competía con los subtítulos de las tarjetas, el
+        ícono delante del H1 no es un patrón de Apple (el título va solo), y la
+        línea divisoria hacía de "techo" pegando el contenido al encabezado.
+        Ahora la separación la da el espacio.
+      */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
               Análisis de Turno
             </h1>
-            <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
+            <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData
                 ? lineConfig.isClassificationPlant === false
                   ? `${lineConfig.label} · eviscerado simplificado — Excel del Marelec`
@@ -689,9 +697,9 @@ export function AnalisisGraderWizardPage() {
             <Badge
               variant="outline"
               className={
-                autosaveState === 'saved' ? 'text-emerald-600 border-emerald-500/40' :
-                autosaveState === 'saving' ? 'text-sky-600 border-sky-500/40' :
-                autosaveState === 'error' ? 'text-amber-600 border-amber-500/40' :
+                autosaveState === 'saved' ? 'text-ink-ok border-emerald-500/[0.25]' :
+                autosaveState === 'saving' ? 'text-sky-600 border-primary/[0.25]' :
+                autosaveState === 'error' ? 'text-ink-warn border-amber-500/[0.25]' :
                 'text-muted-foreground border-muted'
               }
             >
@@ -714,13 +722,13 @@ export function AnalisisGraderWizardPage() {
           vivía al fondo de la página (bajo el calendario) y el usuario no lo
           veía → daba la impresión de que "no pasaba nada". */}
       {multiDayInfo && !savedToCalendar && (
-        <Card className="border-sky-500/40 bg-sky-500/10 shadow-md ring-1 ring-sky-500/20">
+        <Card className="border-primary/[0.25] bg-primary/[0.15] shadow-md ring-1 ring-sky-500/20">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
               <Upload className="h-4 w-4 text-sky-400 shrink-0 animate-pulse" />
               <div className="text-sm min-w-0">
                 <p>
-                  <span className="font-semibold text-sky-900 dark:text-sky-100">
+                  <span className="font-semibold text-primary">
                     {multiDayInfo.isP0Only
                       ? `Archivo P0 — ${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''}`
                       : multiDayInfo.uniqueDays > 1
@@ -734,7 +742,7 @@ export function AnalisisGraderWizardPage() {
                     {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                   </span>
                 </p>
-                <p className="text-[11px] text-sky-800/90 dark:text-sky-300/70 mt-0.5">
+                <p className="text-caption text-sky-800/90 dark:text-sky-300/70 mt-0.5">
                   Se guardará en <b>{lineConfig.label}</b>
                   {multiDayCounts && multiDayCounts.replace > 0 && (
                     <>
@@ -762,30 +770,30 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {savedToCalendar && (
-        <Card className="border-emerald-500/40 bg-emerald-500/10">
+        <Card className="border-emerald-500/[0.25] bg-emerald-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+            <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
+            <p className="text-sm text-ink-ok font-medium">
               Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
             </p>
           </CardContent>
         </Card>
       )}
       {saveError && (
-        <Card className="border-red-500/40 bg-red-500/10">
+        <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
           <CardContent className="py-3 px-4 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 text-ink-crit shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-red-800 dark:text-red-300 font-medium">No se pudo guardar el turno</p>
+              <p className="text-sm text-ink-crit font-medium">No se pudo guardar el turno</p>
               <p className="text-xs text-red-700/90 dark:text-red-200/80 mt-0.5 break-words">{saveError}</p>
-              <p className="text-[11px] text-red-700/70 dark:text-red-200/60 mt-1">
+              <p className="text-caption text-red-700/70 dark:text-red-200/60 mt-1">
                 El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
               </p>
             </div>
             <Button
               size="sm"
               variant="ghost"
-              className="text-red-700 dark:text-red-300 hover:bg-red-500/20 shrink-0"
+              className="text-ink-crit hover:bg-red-500/[0.15] shrink-0"
               onClick={() => setSaveError(null)}
             >
               Cerrar
@@ -824,19 +832,19 @@ export function AnalisisGraderWizardPage() {
               `lineId` de la pestaña activa se propaga al guardar el doc
               con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
           {lineConfig.hasGraderData && (
-            <div className="rounded-lg border border-blue-500/25 bg-blue-500/10">
+            <div className="rounded-card border border-primary/[0.25] bg-primary/[0.15]">
               <button
                 type="button"
                 onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 text-[11px] text-blue-700/90 dark:text-blue-300/80 hover:bg-blue-500/15 transition-colors rounded-lg"
+                className="w-full flex items-center gap-2 px-2.5 py-2 text-caption text-blue-700/90 dark:text-blue-300/80 hover:bg-primary/[0.15] transition-colors rounded-card"
                 title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
               >
                 <Upload className="h-3 w-3 shrink-0" />
                 <span className="flex-1 text-left">
-                  Cargar Excel del Grader · <b className="text-blue-800 dark:text-blue-200">{lineConfig.label}</b>
+                  Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
                 </span>
                 {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-800 dark:text-blue-200 font-medium">
+                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-medium">
                     {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
                   </span>
                 )}

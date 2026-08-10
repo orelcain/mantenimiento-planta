@@ -86,7 +86,7 @@ export function RepuestoManualModal({
               cuando el equipo sí tiene documentación). */}
           {manualesHeredados.length > 0 && (
             <div>
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
                 <BookOpen className="h-3.5 w-3.5" /> Manuales del equipo ({manualesHeredados.length})
               </p>
               <div className="space-y-2">

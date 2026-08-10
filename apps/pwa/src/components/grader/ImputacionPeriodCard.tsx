@@ -15,6 +15,7 @@
 import { ListChecks } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { Disclosure } from '@/components/piel'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 
 export type TendenciaImputacion = { dir: 'sube' | 'baja' | 'estable'; deltaPts: number } | null
@@ -43,9 +44,9 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * ActionPlanPanel.
  */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-emerald-800 dark:text-emerald-400', bar: 'bg-emerald-500/70', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-amber-800 dark:text-amber-400', bar: 'bg-amber-500/70', label: 'Parcial' }
-  : { text: 'text-rose-800 dark:text-rose-400', bar: 'bg-rose-500/70', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
+  : { text: 'text-cat-5-ink', bar: 'bg-cat-5-tint/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null
@@ -57,15 +58,15 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
   const serie = imputacion.porTurno
 
   return (
-    <Card className="border-sky-500/25 bg-sky-500/5">
+    <Card className="border-primary/[0.25] bg-primary/[0.15]">
       <CardContent className="py-1.5 px-4 space-y-1.5">
         <div className="flex items-center gap-1.5">
           <ListChecks className="w-3 h-3 text-sky-400 shrink-0" />
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          <p className="text-caption font-semibold text-muted-foreground tracking-wide">
             Imputación del período
           </p>
           <span
-            className={cn('text-[9px] px-1.5 rounded border border-current/30 ml-auto', th.text)}
+            className={cn('text-caption px-1.5 rounded-ctl border border-current/30 ml-auto', th.text)}
             title="Del tiempo detenido del período, cuánto llegó con una causal anotada en Shoplogix. No mide a Mantención: mide si los turnos quedaron documentados."
           >
             {th.label}
@@ -77,7 +78,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
             <p className={cn('text-lg font-bold leading-none tabular-nums', th.text)}>
               {pct.toFixed(0)}%
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">con causal</p>
+            <p className="text-caption text-muted-foreground mt-0.5">con causal</p>
           </div>
 
           {/* La serie es el punto de la card: un 60% que viene de 20% es una
@@ -97,13 +98,13 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
                   )
                 })}
               </div>
-              <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+              <div className="flex justify-between text-caption text-muted-foreground mt-0.5">
                 <span className="tabular-nums">{serie[0]!.dateKey.slice(5)}</span>
                 {tend && (
                   <span className={cn(
                     'tabular-nums',
-                    tend.dir === 'sube' ? 'text-emerald-800 dark:text-emerald-400'
-                    : tend.dir === 'baja' ? 'text-rose-800 dark:text-rose-400' : '',
+                    tend.dir === 'sube' ? 'text-ink-ok'
+                    : tend.dir === 'baja' ? 'text-cat-5-ink' : '',
                   )}>
                     {tend.dir === 'sube' ? '▲' : tend.dir === 'baja' ? '▼' : '='}{' '}
                     {tend.dir === 'estable'
@@ -117,7 +118,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
           <span className="tabular-nums">
             <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
           </span>
@@ -131,17 +132,28 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           </span>
         </div>
 
+        {/* §22: el % y la tendencia responden la pregunta de la tarjeta; el
+            reparto por causal es DETALLE. Se despliega en línea (variante
+            `inline`) para no crear tarjeta dentro de tarjeta (§7). */}
         {imputacion.topCategorias.length > 0 && (
+          <Disclosure
+            variant="inline"
+            title="Ver reparto por causal"
+            summary={`${imputacion.topCategorias.length} causales`}
+            defaultOpen={false}
+            storageKey="grader-imputacion-causales"
+          >
           <div className="flex flex-wrap gap-1">
             {imputacion.topCategorias.slice(0, 5).map((c) => (
               <span
                 key={c.label}
-                className="text-[9px] px-1.5 py-px rounded bg-muted border border-border text-muted-foreground tabular-nums"
+                className="text-caption px-2 py-0.5 rounded-full bg-muted text-muted-foreground tabular-nums"
               >
                 {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
               </span>
             ))}
           </div>
+          </Disclosure>
         )}
       </CardContent>
     </Card>

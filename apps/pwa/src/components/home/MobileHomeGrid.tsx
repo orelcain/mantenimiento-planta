@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
+import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
@@ -38,13 +39,13 @@ interface TileGroup {
 // ─── Paleta de colores ────────────────────────────────────────────────────────
 
 const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label: string }> = {
-  red:     { bg: 'bg-red-500/15',     border: 'border-red-500/30',     icon: 'text-red-500',     label: 'text-red-700 dark:text-red-400' },
-  blue:    { bg: 'bg-blue-500/15',    border: 'border-blue-500/30',    icon: 'text-blue-500',    label: 'text-blue-700 dark:text-blue-400' },
-  amber:   { bg: 'bg-amber-500/15',   border: 'border-amber-500/30',   icon: 'text-amber-500',   label: 'text-amber-700 dark:text-amber-400' },
-  green:   { bg: 'bg-green-500/15',   border: 'border-green-500/30',   icon: 'text-green-500',   label: 'text-green-700 dark:text-green-400' },
-  purple:  { bg: 'bg-purple-500/15',  border: 'border-purple-500/30',  icon: 'text-purple-500',  label: 'text-purple-700 dark:text-purple-400' },
-  emerald: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', icon: 'text-emerald-500', label: 'text-emerald-700 dark:text-emerald-400' },
-  orange:  { bg: 'bg-orange-500/15',  border: 'border-orange-500/30',  icon: 'text-orange-500',  label: 'text-orange-700 dark:text-orange-400' },
+  red:     { bg: 'bg-red-500/[0.15]',     border: 'border-red-500/[0.25]',     icon: 'text-red-500',     label: 'text-ink-crit' },
+  blue:    { bg: 'bg-primary/[0.15]',    border: 'border-primary/[0.25]',    icon: 'text-blue-500',    label: 'text-ink-info' },
+  amber:   { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25]',   icon: 'text-amber-500',   label: 'text-ink-warn' },
+  green:   { bg: 'bg-green-500/[0.15]',   border: 'border-green-500/[0.25]',   icon: 'text-green-500',   label: 'text-ink-ok' },
+  purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-purple-500',  label: 'text-cat-6-ink' },
+  emerald: { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]', icon: 'text-emerald-500', label: 'text-ink-ok' },
+  orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-orange-500',  label: 'text-cat-4-ink' },
   slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
 }
 
@@ -222,7 +223,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
       <button
         onClick={onTap}
         className={cn(
-          'shrink-0 text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
+          'shrink-0 text-caption font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
           onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
         )}
       >
@@ -235,7 +236,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
     <div
       onClick={onTap}
       className={cn(
-        'absolute inset-0 overflow-hidden rounded-xl z-10',
+        'absolute inset-0 overflow-hidden rounded-card z-10',
         onTap ? 'cursor-pointer' : 'pointer-events-none',
       )}
     >
@@ -246,67 +247,6 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
         en desarrollo
       </div>
     </div>
-  )
-}
-
-// ─── Confirmar liberación (overlay sobre el chip) ────────────────────────────
-
-function ReleaseConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: (e: React.MouseEvent) => void }) {
-  return (
-    <div
-      className="absolute inset-0 bg-background/92 rounded-xl flex flex-col items-center justify-center gap-1.5 z-20"
-      onClick={(e) => e.preventDefault()}
-    >
-      <span className="text-[9px] font-semibold text-center leading-tight px-1">¿Marcar<br/>como listo?</span>
-      <div className="flex gap-1.5">
-        <button
-          onClick={(e) => { e.preventDefault(); onConfirm() }}
-          className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
-        >✓</button>
-        <button
-          onClick={onCancel}
-          className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
-        >✗</button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Chip ─────────────────────────────────────────────────────────────────────
-
-function Chip({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  const c = COLOR[tile.color]
-  const Icon = tile.icon
-
-  return (
-    <Link
-      to={tile.href}
-      className={cn(
-        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative overflow-hidden',
-        'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
-        c.bg, c.border,
-      )}
-    >
-      {showWip && !confirming && (
-        <WipRibbon
-          variant="chip"
-          onTap={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
-        />
-      )}
-      {confirming && (
-        <ReleaseConfirm
-          onConfirm={() => { onRelease?.(); setConfirming(false) }}
-          onCancel={(e) => { e.preventDefault(); setConfirming(false) }}
-        />
-      )}
-      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
-        <Icon className={cn('h-3.5 w-3.5', c.icon)} />
-      </div>
-      <span className={cn('text-[10px] font-medium text-center leading-tight line-clamp-2 w-full', c.label)}>
-        {tile.label}
-      </span>
-    </Link>
   )
 }
 
@@ -321,12 +261,12 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
     <Link
       to={tile.href}
       className={cn(
-        'flex items-center gap-3 px-4 py-3.5 rounded-xl border mb-2 overflow-hidden relative',
+        'flex items-center gap-3 px-4 py-3.5 rounded-card border mb-2 overflow-hidden relative',
         'transition-all active:scale-[0.98] touch-manipulation select-none',
         c.bg, c.border,
       )}
     >
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', c.bg)}>
+      <div className={cn('w-9 h-9 rounded-card flex items-center justify-center shrink-0', c.bg)}>
         <Icon className={cn('h-5 w-5', c.icon)} />
       </div>
       <div className="flex-1 min-w-0">
@@ -343,11 +283,11 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
         <div className="flex gap-1.5 shrink-0">
           <button
             onClick={(e) => { e.preventDefault(); onRelease?.(); setConfirming(false) }}
-            className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+            className="text-caption bg-emerald-500 text-white rounded-card w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
           >✓</button>
           <button
             onClick={(e) => { e.preventDefault(); setConfirming(false) }}
-            className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
+            className="text-caption bg-muted text-muted-foreground rounded-card w-7 h-7 flex items-center justify-center active:scale-90"
           >✗</button>
         </div>
       )}
@@ -371,14 +311,14 @@ function AppShareCard() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-muted overflow-hidden">
+    <div className="rounded-card border border-border bg-muted overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2.5 px-4 py-3 active:bg-muted/80 transition-colors touch-manipulation"
       >
         <QrCode className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="flex-1 text-sm font-medium text-left">Compartir app</span>
-        <span className="text-[10px] text-muted-foreground mr-1">Invitar usuarios</span>
+        <span className="text-caption text-muted-foreground mr-1">Invitar usuarios</span>
         {open
           ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -386,17 +326,17 @@ function AppShareCard() {
       </button>
       {open && (
         <div className="px-4 pb-4 flex flex-col items-center gap-3 border-t border-border/60 pt-3">
-          <div className="p-2 bg-white rounded-xl shadow-sm">
+          <div className="p-2 bg-white rounded-card shadow-sm">
             <QRCodeSVG value={appUrl} size={148} level="M" />
           </div>
           <p className="text-xs text-center text-muted-foreground leading-snug max-w-[200px]">
             Escanea para abrir la app.<br />
             Inicia sesión con <strong>Google</strong> o con tu cuenta si ya estás registrado.
           </p>
-          <p className="text-[10px] text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
+          <p className="text-caption text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
+            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-card bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
           >
             <Share2 className="h-3.5 w-3.5" />
             Compartir enlace
@@ -410,6 +350,7 @@ function AppShareCard() {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
+  const navigate = useNavigate()
   const user           = useAuthStore((s) => s.user)
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const role: UserRole = user?.rol ?? 'usuario'
@@ -425,7 +366,7 @@ export function MobileHomeGrid() {
         {/* Botón Menú — a la izquierda del nombre */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
+          className="w-9 h-9 rounded-card bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
           aria-label="Menú"
         >
           <Menu className="h-4 w-4 text-foreground" />
@@ -450,7 +391,7 @@ export function MobileHomeGrid() {
 
         return (
           <div key={group.label} className="space-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
+            <p className="text-caption font-semibold tracking-widest text-muted-foreground px-0.5">
               {group.label}
             </p>
 
@@ -463,16 +404,35 @@ export function MobileHomeGrid() {
             )}
 
             {chipTiles.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none snap-x snap-mandatory">
-                {chipTiles.map((tile) => (
-                  <Chip
-                    key={tile.id}
-                    tile={tile}
-                    showWip={isWip(tile.id, tile.wip)}
-                    onRelease={isAdmin ? () => toggleRelease(tile.id) : undefined}
-                  />
-                ))}
-              </div>
+              /*
+                LISTA AGRUPADA, no una grilla de mosaicos de color.
+                Esta es LA diferencia que se nota al comparar con un iPhone:
+                dentro de una app de iOS no hay mosaicos tintados —eso es
+                lenguaje de launcher— hay filas con ícono, título y chevron,
+                como Ajustes. La grilla obligaba además a desplazar en
+                horizontal, que en iOS solo se usa para carruseles de
+                contenido, nunca para navegar.
+              */
+              <ListGroup>
+                {chipTiles.map((tile) => {
+                  const c = COLOR[tile.color]
+                  const Icon = tile.icon
+                  const wip = isWip(tile.id, tile.wip)
+                  return (
+                    <ListCell
+                      key={tile.id}
+                      leading={
+                        <span className={cn('flex size-7 items-center justify-center rounded-ctl', c.bg)}>
+                          <Icon className={cn('size-4', c.icon)} />
+                        </span>
+                      }
+                      title={tile.label}
+                      trailing={wip ? <Pill tone="warning">En desarrollo</Pill> : undefined}
+                      onClick={() => navigate(tile.href)}
+                    />
+                  )
+                })}
+              </ListGroup>
             )}
           </div>
         )

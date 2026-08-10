@@ -44,6 +44,13 @@ const EXCLUDE = [
   /Hmi[A-Z]?\w*\.tsx$/,
   /Visor3D/i,
   /simulador/i,
+  // Módulo de mapa: excluido POR CONSISTENCIA con `audit-theme.mjs`, que ya lo
+  // dejaba fuera junto a HMIs y 3D (su editor Leaflet es oscuro a propósito,
+  // con grises literales). Contarlo acá inflaba la deuda con archivos que
+  // nadie va a migrar — y una métrica que incluye lo que no se va a arreglar
+  // deja de servir para decidir.
+  /[\\/]components[\\/]map[\\/]/,
+  /[\\/]pages[\\/](Map\w*|Mapa\w*)\.tsx$/,
   /[\\/]components[\\/]piel[\\/]/,
   /[\\/]pages[\\/]dev[\\/]/,
 ];
@@ -64,6 +71,15 @@ const RULES = [
     key: 'radiosFueraEscala',
     label: 'Radios fuera de la escala única (usar tokens de radio)',
     re: /\brounded(?:-(?:sm|md|lg|xl|2xl|3xl))?\b(?!-)/g,
+  },
+  {
+    // Constitución §7 (no cards dentro de cards) + §38 (separar con espacio,
+    // no con línea). Una sub-superficie se marca con RELLENO **o** con borde,
+    // nunca con los dos: eso es el "doble marcado" que produce la sensación de
+    // caja dentro de caja. El relleno gana, porque separa sin sumar línea.
+    key: 'cajasDobleMarcadas',
+    label: 'Cajas con relleno Y borde (elegir uno — §7/§38)',
+    re: /(?:bg-(?:muted|card|background)|bg-[a-z0-9-]+\/\[0\.[0-9]+\])\s+rounded-(?:ctl|card|panel)[^"']*?\s+border\s+border-/g,
   },
   {
     key: 'chipsTranslucidos',

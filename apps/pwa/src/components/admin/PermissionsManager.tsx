@@ -174,7 +174,7 @@ export function PermissionsManager() {
       </div>
 
       {hasChanges && (
-        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning rounded-card">
           <AlertCircle className="h-4 w-4 text-warning" />
           <span className="text-sm">Hay cambios sin guardar</span>
         </div>
@@ -186,7 +186,7 @@ export function PermissionsManager() {
           <button
             key={role}
             onClick={() => setSelectedRole(role)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-card font-medium transition-colors ${
               selectedRole === role
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted hover:bg-muted/80'
@@ -232,7 +232,7 @@ export function PermissionsManager() {
                     return (
                       <div
                         key={perm.key}
-                        className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                        className={`flex items-start gap-3 p-3 rounded-card border transition-colors ${
                           isActive
                             ? 'bg-primary/10 border-primary'
                             : 'bg-muted border-muted'

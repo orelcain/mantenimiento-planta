@@ -72,7 +72,7 @@ export function CauseTooltip({ meta }: Props) {
           ref={tooltipRef}
           role="tooltip"
           className={cn(
-            'absolute z-30 w-72 sm:w-80 rounded-lg border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed',
+            'absolute z-30 w-72 sm:w-80 rounded-card border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed',
             'right-0 top-6',
           )}
           onClick={(e) => e.stopPropagation()}
@@ -84,7 +84,7 @@ export function CauseTooltip({ meta }: Props) {
               <span className="font-semibold text-sm">{meta.label}</span>
               <span
                 className={cn(
-                  'text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border font-medium shrink-0',
+                  'text-caption tracking-wider px-1.5 py-0.5 rounded-full border font-medium shrink-0',
                   meta.level === 'official'
                     ? 'border-primary/40 text-primary bg-primary/5'
                     : 'border-muted-foreground/30 text-muted-foreground bg-muted',
@@ -93,7 +93,7 @@ export function CauseTooltip({ meta }: Props) {
                 {LEVEL_LABELS[meta.level]}
               </span>
             </div>
-            <p className="text-muted-foreground/80 italic text-[11px]">
+            <p className="text-muted-foreground/80 italic text-caption">
               Marelec HMI: &ldquo;{meta.translation}&rdquo;
             </p>
           </div>
@@ -101,28 +101,28 @@ export function CauseTooltip({ meta }: Props) {
           {/* Secciones */}
           <div className="space-y-2 pt-2">
             <section>
-              <p className="font-medium text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+              <p className="font-medium text-caption tracking-wide text-muted-foreground mb-0.5">
                 ¿Qué significa?
               </p>
               <p>{meta.shortDescription}</p>
             </section>
 
             <section>
-              <p className="font-medium text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+              <p className="font-medium text-caption tracking-wide text-muted-foreground mb-0.5">
                 Cómo se detecta
               </p>
               <p className="text-muted-foreground">{meta.howDetected}</p>
             </section>
 
             <section>
-              <p className="font-medium text-[11px] uppercase tracking-wide text-emerald-500 mb-0.5">
+              <p className="font-medium text-caption tracking-wide text-emerald-500 mb-0.5">
                 Qué hacer
               </p>
               <p>{meta.actionHint}</p>
             </section>
 
             <section>
-              <p className="font-medium text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+              <p className="font-medium text-caption tracking-wide text-muted-foreground mb-0.5">
                 Ejemplo
               </p>
               <p className="text-muted-foreground italic">&ldquo;{meta.exampleTrigger}&rdquo;</p>

@@ -5,7 +5,8 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
+import { Disclosure } from '@/components/piel'
+import { TrendingDown, TrendingUp, BarChart3, Sun, Moon, Sunset, Sunrise, Clock } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
@@ -159,9 +160,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Header ── */}
       <div>
-        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
+        <p className="text-caption text-muted-foreground font-semibold tracking-wide">Resumen del mes</p>
         <p className="text-sm font-bold leading-tight">{monthLabel}</p>
-        <p className="text-[10px] text-muted-foreground/60 mt-0">
+        <p className="text-caption text-muted-foreground/60 mt-0">
           {daysCount} días · {turnosCount} turnos
         </p>
       </div>
@@ -171,12 +172,12 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         {/* Grader */}
         <Card className={stats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">P0% promedio</p>
+            <p className="text-caption text-muted-foreground mb-0.5">P0% promedio</p>
             <p className={`text-xl font-bold leading-none tabular-nums ${p0Color}`}>
               {stats ? `${fmtDec(stats.p0Avg, 2)}%` : '—'}
             </p>
             {stats && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+              <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                 {fmt(stats.totalPieces)} pz
                 {stats.totalWeightKg > 0 && <> · {fmtDec(stats.totalWeightKg / 1000, 1)} t</>}
               </p>
@@ -187,8 +188,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         {/* Shoplogix */}
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
-            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-sky-700 dark:text-sky-400' : 'text-muted-foreground'}`}>
+            <p className="text-caption text-muted-foreground mb-0.5">Ciclos Baader</p>
+            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-primary' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
@@ -196,9 +197,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 : '—'}
             </p>
             {slxStats && (
-              <p className={`text-[10px] mt-0.5 ${
-                slxStats.avgUptimePct >= 70 ? 'text-emerald-700 dark:text-emerald-400'
-                : slxStats.avgUptimePct >= 40 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-700 dark:text-rose-400'
+              <p className={`text-caption mt-0.5 ${
+                slxStats.avgUptimePct >= 70 ? 'text-ink-ok'
+                : slxStats.avgUptimePct >= 40 ? 'text-ink-warn' : 'text-cat-5-ink'
               }`}>
                 {slxStats.avgUptimePct.toFixed(0)}% uptime
               </p>
@@ -209,33 +210,35 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
 
       {/* ── Fila 2: Mejor / Peor turno ── */}
       <div className="grid grid-cols-2 gap-2">
-        <Card className={`border-emerald-500/20 bg-emerald-500/15 ${!best ? 'opacity-40' : ''}`}>
+        {/* Tinte SIN borde: el relleno ya delimita. Sumarle contorno era
+            duplicar la línea y es de lo que más carga la pantalla. */}
+        <Card className={`border-0 bg-emerald-500/[0.15] ${!best ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <p className="text-caption text-ink-ok font-medium">
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
+            <p className="text-lg font-bold text-ink-ok leading-none tabular-nums">
               {best?.value ?? '—'}
             </p>
-            {best && <p className="text-[10px] text-muted-foreground mt-0.5">{best.date}</p>}
+            {best && <p className="text-caption text-muted-foreground mt-0.5">{best.date}</p>}
           </CardContent>
         </Card>
 
-        <Card className={`border-rose-500/20 bg-rose-500/15 ${!worst ? 'opacity-40' : ''}`}>
+        <Card className={`border-0 bg-cat-5-tint/[0.15] ${!worst ? 'opacity-40' : ''}`}>
           <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
-              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+              <p className="text-caption text-cat-5-ink font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+            <p className="text-lg font-bold text-cat-5-ink leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
-            {worst && <p className="text-[10px] text-muted-foreground mt-0.5">{worst.date}</p>}
+            {worst && <p className="text-caption text-muted-foreground mt-0.5">{worst.date}</p>}
           </CardContent>
         </Card>
       </div>
@@ -246,19 +249,19 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           de Shoplogix, sin inventar Día/Noche). */}
       <Card>
         <CardContent className="py-1.5 px-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
+          <p className="text-caption text-muted-foreground tracking-wide text-center mb-1">Turnos</p>
           {isClassificationPlant || !useNumberedShiftGrid ? (
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sun className="w-3 h-3 text-amber-500" /> Día
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{nightShifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> Noche
                 </p>
               </div>
@@ -267,21 +270,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
             <div className="flex justify-around text-center">
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t1Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunrise className="w-3 h-3 text-amber-400" /> T1
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t2Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunset className="w-3 h-3 text-orange-400" /> T2
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t3Shifts}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> T3
                 </p>
               </div>
@@ -299,11 +302,11 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           concreta para pedirle a planta que configure ese turno si el bloque
           se repite seguido. Se oculta si el mes no tuvo nada fuera de turno. */}
       {slxStats && slxStats.unscheduled.cycles > 0 && (
-        <Card className="border-slate-500/25 bg-slate-500/10">
+        <Card className="border-0 bg-muted-foreground/[0.10]">
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+              <p className="text-caption font-semibold text-muted-foreground tracking-wide">
                 Fuera de turno configurado
               </p>
             </div>
@@ -314,21 +317,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                     ? `${(slxStats.unscheduled.cycles / 1000).toFixed(1)}k`
                     : slxStats.unscheduled.cycles.toLocaleString('es-CL')}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">ciclos</p>
+                <p className="text-caption text-muted-foreground mt-0.5">ciclos</p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {fmtSecPanoramic(slxStats.unscheduled.uptimeSec)}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">horas-máquina</p>
+                <p className="text-caption text-muted-foreground mt-0.5">horas-máquina</p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-lg font-bold leading-none tabular-nums text-foreground">
                   {slxStats.unscheduled.daysWithData}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-caption text-muted-foreground mt-0.5">
                   día{slxStats.unscheduled.daysWithData === 1 ? '' : 's'}
                 </p>
               </div>
@@ -346,39 +349,40 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
 
-      {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ── */}
+      {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
+          §22 divulgación progresiva: el desglose completo es DETALLE, no dato de
+          entrada. Plegado deja el total —que es lo que responde "¿cuánto P0
+          hubo?"— y el reparto por causa se abre solo si se está investigando.
+          Antes eran ~8 filas con barra siempre a la vista compitiendo con los
+          KPIs del turno. */}
       {stats && stats.causas.length > 0 && (
-        <Card>
-          <CardContent className="py-2 px-3 space-y-1.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                Causas P0 del mes
-              </p>
-              <p className="text-[10px] text-muted-foreground/60 ml-auto tabular-nums">
-                {stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz P0
-              </p>
-            </div>
+        <Disclosure
+          title="Causas P0 del mes"
+          summary={`${stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz`}
+          defaultOpen={false}
+          storageKey="grader-causas-p0"
+        >
+          <div className="space-y-1.5">
             {stats.causas.map(({ error, pieces, pct, barPct }) => (
               <div key={error} className="space-y-0.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] font-medium leading-tight truncate min-w-0">
+                  <span className="text-caption font-medium leading-tight truncate min-w-0">
                     {getCauseLabel(error)}
                   </span>
-                  <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                  <span className="text-caption tabular-nums text-muted-foreground shrink-0">
                     {pieces.toLocaleString('es-CL')} pz · <span className="font-semibold text-foreground">{pct.toFixed(2)}%</span>
                   </span>
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-amber-500/70 transition-all"
+                    className="h-full rounded-full bg-amber-500/[0.15] transition-all"
                     style={{ width: `${barPct.toFixed(1)}%` }}
                   />
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </Disclosure>
       )}
 
     </div>

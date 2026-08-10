@@ -80,7 +80,7 @@ export function ClimaPortoTestCard() {
               key={opt.value}
               disabled={state !== 'idle'}
               onClick={() => setSelectedDelay(opt.value)}
-              className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+              className={`px-3 py-1.5 rounded-ctl text-sm border transition-colors ${
                 selectedDelay === opt.value
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-background hover:bg-muted border-border'
@@ -99,7 +99,7 @@ export function ClimaPortoTestCard() {
         )}
 
         {state === 'scheduled' && (
-          <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+          <div className="flex items-center justify-between rounded-card border bg-muted/50 px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Spinner size="sm" />
               Cierra la app ahora
@@ -109,14 +109,14 @@ export function ClimaPortoTestCard() {
         )}
 
         {state === 'done' && (
-          <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900 dark:bg-green-950">
-            <p className="text-sm text-green-700 dark:text-green-400">Notificación enviada</p>
+          <div className="flex items-center justify-between rounded-card border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900 dark:bg-green-950">
+            <p className="text-sm text-ink-ok">Notificación enviada</p>
             <Button size="sm" variant="ghost" onClick={() => setState('idle')}>Reiniciar</Button>
           </div>
         )}
 
         {state === 'error' && (
-          <div className="flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <div className="flex items-start justify-between gap-3 rounded-card border border-destructive/30 bg-destructive/5 px-4 py-3">
             <p className="text-sm text-destructive">{errorMsg || 'Error al enviar'}</p>
             <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setState('idle')}>Reintentar</Button>
           </div>

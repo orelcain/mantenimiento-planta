@@ -29,7 +29,7 @@ export function TopActionsCard({ attribution }: Props) {
         ) : (
           <div className="space-y-3">
             {/* Cabecera tabla */}
-            <div className="grid grid-cols-[1fr_6rem_4rem_5rem] text-[10px] text-muted-foreground uppercase tracking-wide font-medium gap-2 pb-1 border-b">
+            <div className="grid grid-cols-[1fr_6rem_4rem_5rem] text-caption text-muted-foreground tracking-wide font-medium gap-2 pb-1 border-b">
               <span>Campo ajustado</span>
               <span className="text-right">Impacto total</span>
               <span className="text-right">Veces</span>
@@ -46,9 +46,9 @@ export function TopActionsCard({ attribution }: Props) {
                   ? 'text-red-500'
                   : 'text-zinc-400'
               const valueColor = improved
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-ink-ok'
                 : worsened
-                  ? 'text-red-600 dark:text-red-400'
+                  ? 'text-ink-crit'
                   : 'text-muted-foreground'
 
               return (
@@ -57,18 +57,18 @@ export function TopActionsCard({ attribution }: Props) {
                   className="grid grid-cols-[1fr_6rem_4rem_5rem] items-center gap-2 text-xs"
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-muted-foreground shrink-0 tabular-nums w-4 text-[11px]">
+                    <span className="text-muted-foreground shrink-0 tabular-nums w-4 text-caption">
                       {i + 1}.
                     </span>
                     <Icon className={cn('h-3.5 w-3.5 shrink-0', iconColor)} />
-                    <span className="truncate font-mono text-[11px]">{action.field}</span>
+                    <span className="truncate font-mono text-caption">{action.field}</span>
                   </div>
                   <span className={cn('text-right font-mono font-medium', valueColor)}>
                     {action.totalDelta >= 0 ? '+' : ''}
                     {action.totalDelta.toFixed(2)} pp
                   </span>
                   <span className="text-right text-muted-foreground">{action.timesApplied}×</span>
-                  <span className={cn('text-right font-mono text-[11px]', valueColor)}>
+                  <span className={cn('text-right font-mono text-caption', valueColor)}>
                     {action.avgDelta >= 0 ? '+' : ''}
                     {action.avgDelta.toFixed(2)}
                   </span>
@@ -83,8 +83,8 @@ export function TopActionsCard({ attribution }: Props) {
                   className={cn(
                     'font-mono font-medium',
                     avgImprovementPerAction < 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-red-600 dark:text-red-400',
+                      ? 'text-ink-ok'
+                      : 'text-ink-crit',
                   )}
                 >
                   {avgImprovementPerAction >= 0 ? '+' : ''}

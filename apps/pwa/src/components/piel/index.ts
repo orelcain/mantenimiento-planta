@@ -12,6 +12,7 @@
  */
 export { Button, buttonVariants, type PielButtonProps } from './Button'
 export { Pill, type PillProps, type PillTone } from './Pill'
+export { Tag, tagToneClasses, type TagProps, type TagTone } from './Tag'
 export {
   ListGroup,
   ListCell,
@@ -20,5 +21,6 @@ export {
   type ListCellProps,
 } from './GroupedList'
 export { Sheet, type SheetProps } from './Sheet'
+export { Disclosure, type DisclosureProps } from './Disclosure'
 export { StatRing, type StatRingProps } from './StatRing'
 export { TabBar, type TabBarProps, type TabItem } from './TabBar'

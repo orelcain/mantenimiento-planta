@@ -89,7 +89,7 @@ function EstadoChip({ estado }: { estado: EstadoFicha }) {
   const color = COLOR_ESTADO[estado]
   return (
     <span
-      className="inline-flex items-center gap-2 rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap"
+      className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-caption font-medium whitespace-nowrap"
       style={{ color, background: tinte.suave(color) }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
@@ -141,14 +141,14 @@ function SimuladorPSR() {
 
   return (
     <div
-      className="flex flex-col gap-6 rounded-lg p-5"
+      className="flex flex-col gap-6 rounded-card p-5"
       style={{ background: '#0f1418', border: '1px solid #2b3238' }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <span className="font-mono text-[13px] font-bold tracking-[0.22em]" style={{ color: '#e8422e' }}>
+        <span className="font-mono text-footnote font-bold tracking-[0.22em]" style={{ color: '#e8422e' }}>
           ABB
         </span>
-        <span className="font-mono text-[11px]" style={{ color: '#6d7d8a' }}>
+        <span className="font-mono text-caption" style={{ color: '#6d7d8a' }}>
           PSR60-600-70 · Ue 208…600 V · Uc 100…240 V AC
         </span>
       </div>
@@ -157,7 +157,7 @@ function SimuladorPSR() {
         {POTENCIOMETROS_PSR.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-2 text-center">
             <Perilla valor={v(p.id)} min={p.min} max={p.max} />
-            <span className="font-mono text-[11px] uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
+            <span className="font-mono text-caption uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
               {p.nombre}
             </span>
             <span className="font-mono text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
@@ -174,13 +174,13 @@ function SimuladorPSR() {
               style={{ accentColor: '#f5a623' }}
               onChange={(e) => setValores((v) => ({ ...v, [p.id]: Number(e.target.value) }))}
             />
-            <span className="font-mono text-[11px]" style={{ color: '#5d6b76' }}>{p.rango}</span>
+            <span className="font-mono text-caption" style={{ color: '#5d6b76' }}>{p.rango}</span>
           </div>
         ))}
       </div>
 
       <dl
-        className="grid gap-px overflow-hidden rounded"
+        className="grid gap-px overflow-hidden rounded-ctl"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', background: '#232a30', border: '1px solid #232a30' }}
       >
         {[
@@ -189,7 +189,7 @@ function SimuladorPSR() {
           ['Corriente nominal', '60 A'],
         ].map(([rotulo, valor]) => (
           <div key={rotulo} className="flex flex-col gap-1 px-3 py-3" style={{ background: '#131a20' }}>
-            <dt className="font-mono text-[11px] uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
+            <dt className="font-mono text-caption uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
               {rotulo}
             </dt>
             <dd className="m-0 font-mono text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
@@ -308,7 +308,7 @@ function NavegadorParametros({
                   setResaltado(null)
                 }}
                 aria-pressed={on}
-                className={`rounded px-3 py-2 text-[13px] transition-colors ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
                 style={{
                   background: on ? tinte.suave(C.aqua) : C.bgPanel,
                   border: `1px solid ${on ? C.aqua : C.border}`,
@@ -336,7 +336,7 @@ function NavegadorParametros({
             }}
             placeholder="Buscar: nCr, rampa, corriente…"
             aria-label="Buscar parámetro"
-            className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
@@ -344,7 +344,7 @@ function NavegadorParametros({
           <button
             onClick={() => setSoloPlaca((v) => !v)}
             aria-pressed={soloPlaca}
-            className={`rounded px-3 py-2 text-[13px] transition-colors ${FOCO}`}
+            className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
             style={{
               background: soloPlaca ? tinte.suave(C.warn) : C.bgPanel,
               border: `1px solid ${soloPlaca ? C.warn : C.border}`,
@@ -362,14 +362,14 @@ function NavegadorParametros({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
+      <div className="overflow-x-auto rounded-ctl" style={{ border: `1px solid ${C.border}` }}>
         <table className="w-full border-collapse text-[14px]" style={{ minWidth: 600 }}>
           <thead>
             <tr>
               {['Cód.', 'Descripción', 'Rango', 'Fábrica'].map((h, i) => (
                 <th
                   key={h}
-                  className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
+                  className="whitespace-nowrap px-3 py-3 text-left text-footnote font-semibold"
                   style={{
                     background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
                     // Columna fija: en un celular la tabla scrollea y el código no puede perderse de vista.
@@ -384,7 +384,7 @@ function NavegadorParametros({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                <td colSpan={4} className="px-3 py-6 text-center text-footnote" style={{ color: C.inkMid }}>
                   {q.trim() ? `Nada con «${q.trim()}» en esta ficha.` : 'Esta ficha no tiene datos de placa.'}
                 </td>
               </tr>
@@ -419,7 +419,7 @@ function NavegadorParametros({
                 >
                   {r.codigo}
                   {(global || marcado) && (
-                    <span className="mt-1 block font-sans text-[11px] font-normal" style={{ color: C.inkLo }}>
+                    <span className="mt-1 block font-sans text-caption font-normal" style={{ color: C.inkLo }}>
                       {r.menu.split(' ')[0]}
                     </span>
                   )}
@@ -428,7 +428,7 @@ function NavegadorParametros({
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium"
+                      className="ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -439,7 +439,7 @@ function NavegadorParametros({
                   {equivalenciaDe(r.codigo) && (
                     <button
                       onClick={() => onComparar(r.codigo)}
-                      className={`ml-2 inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium align-middle ${FOCO}`}
+                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium align-middle ${FOCO}`}
                       style={{
                         color: C.aquaBright,
                         background: tinte.suave(C.aqua),
@@ -453,7 +453,7 @@ function NavegadorParametros({
                   )}
                   {r.nota && (
                     <span
-                      className="mt-2 block max-w-[56ch] pl-2 text-[13px]"
+                      className="mt-2 block max-w-[56ch] pl-2 text-footnote"
                       style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}`, lineHeight: 1.5 }}
                     >
                       {r.nota}
@@ -462,14 +462,14 @@ function NavegadorParametros({
                   {r.opciones && (
                     <ul className="mt-2 flex list-none flex-col gap-2 pl-0">
                       {r.opciones.map((o) => (
-                        <li key={o.valor} className="text-[13px]" style={{ lineHeight: 1.5 }}>
+                        <li key={o.valor} className="text-footnote" style={{ lineHeight: 1.5 }}>
                           <span className="mr-2 font-mono font-semibold" style={{ color: C.aquaBright }}>
                             {o.valor}
                           </span>
                           <span style={{ color: C.ink }}>{o.que}</span>
                           {o.cuando && <span style={{ color: C.inkMid }}> — {o.cuando}</span>}
                           {o.requiere && (
-                            <span className="ml-2 whitespace-nowrap text-[11px]" style={{ color: C.inkLo }}>
+                            <span className="ml-2 whitespace-nowrap text-caption" style={{ color: C.inkLo }}>
                               ({o.requiere})
                             </span>
                           )}
@@ -478,10 +478,10 @@ function NavegadorParametros({
                     </ul>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] tabular-nums" style={{ color: C.inkMid }}>
+                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-footnote tabular-nums" style={{ color: C.inkMid }}>
                   {r.rango}
                 </td>
-                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] tabular-nums" style={{ color: C.inkMid }}>
+                <td className="whitespace-nowrap px-3 py-3 align-top font-mono text-footnote tabular-nums" style={{ color: C.inkMid }}>
                   {r.fabrica}
                 </td>
               </tr>
@@ -493,7 +493,7 @@ function NavegadorParametros({
 
       <MetaText>
         <span
-          className="mr-2 inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+          className="mr-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
           style={{ color: C.warn, background: tinte.suave(C.warn) }}
         >
           Placa
@@ -530,13 +530,13 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Escribe el código que muestra el display: OLF, O-I, StF…"
           aria-label="Buscar código de falla"
-          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
 
       {visibles.length === 0 && (
-        <p className="py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+        <p className="py-6 text-center text-footnote" style={{ color: C.inkMid }}>
           Nada con «{q.trim()}». Puede ser un código de otro menú, o de comunicación.
         </p>
       )}
@@ -544,12 +544,12 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
       {visibles.map((f) => (
         <div
           key={f.codigo}
-          className="flex flex-col gap-3 rounded-lg p-4"
+          className="flex flex-col gap-3 rounded-card p-4"
           style={panelEstilo}
         >
           <div className="flex flex-wrap items-baseline gap-3">
             <span
-              className="rounded px-2 py-1 font-mono text-[15px] font-bold"
+              className="rounded-ctl px-2 py-1 font-mono text-[15px] font-bold"
               style={{ color: C.crit, background: tinte.suave(C.crit) }}
             >
               {f.codigo}
@@ -560,13 +560,13 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <MetaText>Por qué pasa</MetaText>
-              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-[13px]" style={{ color: C.inkMid, lineHeight: 1.5 }}>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-footnote" style={{ color: C.inkMid, lineHeight: 1.5 }}>
                 {f.causas.map((c) => <li key={c}>{c}</li>)}
               </ul>
             </div>
             <div className="flex flex-col gap-1">
               <MetaText>Qué hacer</MetaText>
-              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-[13px]" style={{ color: C.ink, lineHeight: 1.5 }}>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-4 text-footnote" style={{ color: C.ink, lineHeight: 1.5 }}>
                 {f.soluciones.map((s) => <li key={s}>{s}</li>)}
               </ul>
             </div>
@@ -601,10 +601,10 @@ function ChipSap({ codigo }: { codigo?: string }) {
   // rebotaría a /login. Mejor no ofrecer la acción que no se puede cumplir.
   const { isAuthenticated } = useAuthStore()
   const [copiado, setCopiado] = useState(false)
-  if (!codigo) return <span className="font-mono text-[12px]" style={{ color: C.inkGhost }}>—</span>
+  if (!codigo) return <span className="font-mono text-footnote" style={{ color: C.inkGhost }}>—</span>
   return (
     <span
-      className="inline-flex items-center overflow-hidden rounded"
+      className="inline-flex items-center overflow-hidden rounded-ctl"
       style={{ background: tinte.suave(C.aqua) }}
     >
       <button
@@ -615,7 +615,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           window.setTimeout(() => setCopiado(false), 1400)
         }}
         title="Copiar el código SAP"
-        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-[12px] font-medium ${FOCO}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-footnote font-medium ${FOCO}`}
         style={{ color: C.aquaBright }}
       >
         {codigo}
@@ -654,12 +654,12 @@ function PanelEvidencia() {
     : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
+    <div className="flex flex-col gap-3 rounded-card p-4" style={panelEstilo}>
       <span className="inline-flex items-center gap-2 text-[14px] font-semibold" style={{ color: C.ink }}>
         <TrendingUp className="h-4 w-4" style={{ color: C.ok }} />
         Lo que llevamos medido
       </span>
-      <div className="grid gap-px overflow-hidden rounded" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', background: C.border, border: `1px solid ${C.border}` }}>
+      <div className="grid gap-px overflow-hidden rounded-ctl" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', background: C.border, border: `1px solid ${C.border}` }}>
         {[
           ['Cambios registrados', String(r.total), null],
           ['Mediana de intervención', `${r.medianaMinutos} min`, null],
@@ -667,14 +667,14 @@ function PanelEvidencia() {
           ['A mano', r.minutosManual !== null ? `${r.minutosManual} min` : '—', `${r.manuales} cambios`],
         ].map(([rot, val, pie]) => (
           <div key={rot as string} className="flex flex-col gap-1 px-3 py-3" style={{ background: C.surface }}>
-            <span className="text-[12px]" style={{ color: C.inkMid }}>{rot}</span>
+            <span className="text-footnote" style={{ color: C.inkMid }}>{rot}</span>
             <span className="font-mono text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
-            {pie && <span className="text-[11px]" style={{ color: C.inkLo }}>{pie}</span>}
+            {pie && <span className="text-caption" style={{ color: C.inkLo }}>{pie}</span>}
           </div>
         ))}
       </div>
       {ahorro !== null && ahorro > 0 && (
-        <span className="text-[13px]" style={{ color: C.inkMid }}>
+        <span className="text-footnote" style={{ color: C.inkMid }}>
           Clonar ahorra <strong style={{ color: C.ok }}>{ahorro} min</strong> por cambio frente a
           cargar a mano — el número que justifica tener el repuesto del mismo modelo en bodega.
         </span>
@@ -766,11 +766,11 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
   if (listo) {
     return (
       <div
-        className="mt-3 flex flex-col gap-2 rounded-lg px-4 py-3"
+        className="mt-3 flex flex-col gap-2 rounded-card px-4 py-3"
         style={{ background: tinte.suave(C.ok), border: `1px solid ${tinte.borde(C.ok)}` }}
       >
         <span className="text-[14px] font-semibold" style={{ color: C.ok }}>Registrado ✓</span>
-        <span className="text-[13px]" style={{ color: C.inkMid }}>
+        <span className="text-footnote" style={{ color: C.inkMid }}>
           La incidencia quedó resuelta y el cambio anotado.
           {posicion.valores.some((v) => v.estado === 'pendiente') &&
             ' Si tienes la placa a la vista, es el momento de completar los datos que faltan arriba.'}
@@ -783,7 +783,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
     return (
       <button
         onClick={abrir}
-        className={`mt-3 inline-flex w-fit items-center gap-2 rounded px-3 py-2 text-[13px] font-medium ${FOCO}`}
+        className={`mt-3 inline-flex w-fit items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-medium ${FOCO}`}
         style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
       >
         <ClipboardCheck className="h-3.5 w-3.5" />
@@ -793,15 +793,15 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-3 rounded-lg px-4 py-3" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
+    <div className="mt-3 flex flex-col gap-3 rounded-card px-4 py-3" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
       <div className="flex flex-col gap-2">
         <MetaText>¿Qué incidencia resolvió este cambio?</MetaText>
         {incidencias === null ? (
-          <span className="inline-flex items-center gap-2 text-[13px]" style={{ color: C.inkMid }}>
+          <span className="inline-flex items-center gap-2 text-footnote" style={{ color: C.inkMid }}>
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando incidencias abiertas…
           </span>
         ) : incidencias.length === 0 && !error ? (
-          <span className="text-[13px]" style={{ color: C.warn }}>
+          <span className="text-footnote" style={{ color: C.warn }}>
             No hay incidencias abiertas. El cambio se registra cerrando una existente,
             así los KPIs no cuentan el mismo evento dos veces — si esta falla no está
             levantada, créala primero desde Incidencias.
@@ -813,7 +813,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                 key={i.id}
                 onClick={() => setElegida(i.id)}
                 aria-pressed={elegida === i.id}
-                className={`rounded px-3 py-2 text-left text-[13px] ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-left text-footnote ${FOCO}`}
                 style={{
                   background: elegida === i.id ? tinte.suave(C.aqua) : C.surface,
                   border: `1px solid ${elegida === i.id ? C.aqua : C.border}`,
@@ -822,7 +822,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
               >
                 {i.titulo}
                 {i.descripcion ? (
-                  <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
+                  <span className="mt-1 block text-footnote" style={{ color: C.inkMid }}>
                     {i.descripcion.slice(0, 90)}
                   </span>
                 ) : null}
@@ -842,7 +842,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={m}
                   onClick={() => setModo(m)}
                   aria-pressed={modo === m}
-                  className={`rounded px-3 py-2 text-[13px] ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
                   style={{
                     background: modo === m ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${modo === m ? C.aqua : C.border}`,
@@ -863,7 +863,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={r.id}
                   onClick={() => setRango(r.id)}
                   aria-pressed={rango === r.id}
-                  className={`rounded px-3 py-2 font-mono text-[13px] ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 font-mono text-footnote ${FOCO}`}
                   style={{
                     background: rango === r.id ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${rango === r.id ? C.aqua : C.border}`,
@@ -878,13 +878,13 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         </>
       )}
 
-      {error && <span className="text-[13px]" style={{ color: C.crit }}>{error}</span>}
+      {error && <span className="text-footnote" style={{ color: C.crit }}>{error}</span>}
 
       <div className="flex flex-wrap gap-2">
         <button
           onClick={guardar}
           disabled={!elegida || !modo || !rango || guardando}
-          className={`inline-flex items-center gap-2 rounded px-3 py-2 text-[13px] font-semibold disabled:opacity-45 ${FOCO}`}
+          className={`inline-flex items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-semibold disabled:opacity-45 ${FOCO}`}
           style={{ color: C.ok, background: tinte.suave(C.ok) }}
         >
           {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -892,7 +892,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         </button>
         <button
           onClick={() => setAbierto(false)}
-          className={`rounded px-3 py-2 text-[13px] ${FOCO}`}
+          className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
           style={{ color: C.inkMid }}
         >
           Cancelar
@@ -962,7 +962,7 @@ function AportarValor({
       {mios.map((a, i) => (
         <span
           key={a.id ?? i}
-          className="mt-1 block text-[12px]"
+          className="mt-1 block text-footnote"
           style={{ color: C.ok }}
         >
           Aportado desde terreno: <span className="font-mono font-semibold">{a.valor}</span>
@@ -973,7 +973,7 @@ function AportarValor({
       {isAuthenticated && !abierto && (
         <button
           onClick={() => setAbierto(true)}
-          className={`mt-1 inline-flex w-fit items-center gap-1 rounded px-2 py-1 text-[12px] ${FOCO}`}
+          className={`mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
           style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
         >
           <Plus className="h-3 w-3" />
@@ -990,13 +990,13 @@ function AportarValor({
             onKeyDown={(e) => { if (e.key === 'Enter') guardar(); if (e.key === 'Escape') setAbierto(false) }}
             placeholder={faltante ? 'Valor de la placa…' : 'Valor real…'}
             aria-label={`Valor de ${valor.codigo}`}
-            className={`rounded px-2 py-1 font-mono text-[13px] ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 font-mono text-footnote ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink, width: 130 }}
           />
           <button
             onClick={guardar}
             disabled={guardando || !texto.trim()}
-            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[12px] font-medium disabled:opacity-50 ${FOCO}`}
+            className={`inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-footnote font-medium disabled:opacity-50 ${FOCO}`}
             style={{ color: C.ok, background: tinte.suave(C.ok) }}
           >
             {guardando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -1004,12 +1004,12 @@ function AportarValor({
           </button>
           <button
             onClick={() => { setAbierto(false); setError(null) }}
-            className={`rounded px-2 py-1 text-[12px] ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
             style={{ color: C.inkMid }}
           >
             Cancelar
           </button>
-          {error && <span className="text-[12px]" style={{ color: C.crit }}>{error}</span>}
+          {error && <span className="text-footnote" style={{ color: C.crit }}>{error}</span>}
         </span>
       )}
     </>
@@ -1079,11 +1079,11 @@ function RecetasPorEquipo({
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cinta, zona, motor o código SAP…"
             aria-label="Buscar posición"
-            className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
-        <div className="flex flex-wrap gap-3 text-[12px]" style={{ color: C.inkMid }}>
+        <div className="flex flex-wrap gap-3 text-footnote" style={{ color: C.inkMid }}>
           {(['confirmado', 'pendiente', 'sugerido'] as const).map((e) => (
             <span key={e} className="inline-flex items-center gap-2">
               <span className="h-2 w-2 rounded-full" style={{ background: COLOR_VALOR[e] }} />
@@ -1093,14 +1093,14 @@ function RecetasPorEquipo({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-        <table className="w-full border-collapse text-[13px] sm:min-w-[860px]">
+      <div className="overflow-x-auto rounded-ctl" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-footnote sm:min-w-[860px]">
           <thead>
             <tr>
               {COLS.map((h, k) => (
                 <th
                   key={h}
-                  className={`whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold${
+                  className={`whitespace-nowrap px-3 py-3 text-left text-footnote font-semibold${
                     k > 0 && k < COLS.length - 1 ? ' hidden sm:table-cell' : ''
                   }`}
                   style={{
@@ -1116,7 +1116,7 @@ function RecetasPorEquipo({
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={COLS.length} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                <td colSpan={COLS.length} className="px-3 py-6 text-center text-footnote" style={{ color: C.inkMid }}>
                   Ninguna posición coincide con «{q.trim()}».
                 </td>
               </tr>
@@ -1148,17 +1148,17 @@ function RecetasPorEquipo({
                         />
                         <span className="min-w-0">
                           <span className="block font-medium leading-snug" style={{ color: C.ink }}>{p.equipo}</span>
-                          <span className="block text-[12px]" style={{ color: C.inkMid }}>{p.zona}</span>
+                          <span className="block text-footnote" style={{ color: C.inkMid }}>{p.zona}</span>
                           {/* En celular las columnas del medio se ocultan: su contenido reaparece acá. */}
                           <span className="mt-2 flex flex-col gap-1 sm:hidden">
-                            <span className="text-[12px]" style={{ color: C.aquaBright }}>
+                            <span className="text-footnote" style={{ color: C.aquaBright }}>
                               {fam ? fam.nombre : 'Variador por identificar'}
                             </span>
-                            <span className="font-mono text-[12px] leading-snug" style={{ color: C.inkMid }}>
+                            <span className="font-mono text-footnote leading-snug" style={{ color: C.inkMid }}>
                               {p.motor}
                             </span>
                             {p.sapMotor && (
-                              <span className="font-mono text-[12px]" style={{ color: C.inkMid }}>
+                              <span className="font-mono text-footnote" style={{ color: C.inkMid }}>
                                 SAP {p.sapMotor}
                               </span>
                             )}
@@ -1170,7 +1170,7 @@ function RecetasPorEquipo({
                       {fam ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
-                          className={`rounded text-left font-medium hover:underline ${FOCO}`}
+                          className={`rounded-ctl text-left font-medium hover:underline ${FOCO}`}
                           style={{ color: C.aquaBright }}
                         >
                           {fam.nombre}
@@ -1179,17 +1179,17 @@ function RecetasPorEquipo({
                         <span style={{ color: C.warn }}>Por identificar</span>
                       )}
                       {p.variadorEtiqueta && (
-                        <span className="mt-1 block text-[12px]" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
+                        <span className="mt-1 block text-footnote" style={{ color: C.warn }}>{p.variadorEtiqueta}</span>
                       )}
                     </td>
-                    <td className="hidden px-3 py-3 align-top font-mono text-[12px] sm:table-cell" style={{ color: C.inkMid, minWidth: 200 }}>
+                    <td className="hidden px-3 py-3 align-top font-mono text-footnote sm:table-cell" style={{ color: C.inkMid, minWidth: 200 }}>
                       {p.motor}
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-3 align-top sm:table-cell"><ChipSap codigo={p.sapMotor} /></td>
                     <td className="hidden whitespace-nowrap px-3 py-3 align-top sm:table-cell"><ChipSap codigo={p.sapVariador} /></td>
                     <td className="whitespace-nowrap px-3 py-3 align-top">
                       <span
-                        className="inline-flex items-center gap-2 rounded px-2 py-1 text-[12px] font-medium tabular-nums"
+                        className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-footnote font-medium tabular-nums"
                         style={{
                           color: completo ? C.ok : C.warn,
                           background: `color-mix(in srgb, ${completo ? C.ok : C.warn} 16%, transparent)`,
@@ -1209,14 +1209,14 @@ function RecetasPorEquipo({
                             {p.valores.map((val) => (
                               <li key={val.codigo} className="flex flex-col gap-1">
                                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                  <span className="font-mono text-[13px] font-semibold" style={{ color: C.aquaBright }}>
+                                  <span className="font-mono text-footnote font-semibold" style={{ color: C.aquaBright }}>
                                     {val.codigo}
                                   </span>
-                                  <span className="font-mono text-[13px] tabular-nums" style={{ color: C.ink }}>
+                                  <span className="font-mono text-footnote tabular-nums" style={{ color: C.ink }}>
                                     {val.valor}
                                   </span>
                                   <span
-                                    className="rounded px-2 py-1 text-[11px]"
+                                    className="rounded-ctl px-2 py-1 text-caption"
                                     style={{
                                       color: COLOR_VALOR[val.estado],
                                       background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
@@ -1226,7 +1226,7 @@ function RecetasPorEquipo({
                                   </span>
                                 </span>
                                 {val.nota && (
-                                  <span className="max-w-[70ch] text-[12px] leading-snug" style={{ color: C.inkMid }}>
+                                  <span className="max-w-[70ch] text-footnote leading-snug" style={{ color: C.inkMid }}>
                                     {val.nota}
                                   </span>
                                 )}
@@ -1241,7 +1241,7 @@ function RecetasPorEquipo({
                           </ul>
                           {p.nota && (
                             <span
-                              className="block pl-2 text-[13px] leading-snug"
+                              className="block pl-2 text-footnote leading-snug"
                               style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
                             >
                               {p.nota}
@@ -1262,7 +1262,7 @@ function RecetasPorEquipo({
 
       <PanelEvidencia />
 
-      <p className="m-0 text-[13px] tabular-nums" style={{ color: C.inkMid }}>
+      <p className="m-0 text-footnote tabular-nums" style={{ color: C.inkMid }}>
         {RESUMEN_RECETAS.posiciones} posiciones · {RESUMEN_RECETAS.confirmados} de{' '}
         {RESUMEN_RECETAS.total} valores confirmados. Los SAP de variador se agregan cuando se
         levanten; los de motor salen de la hoja «Motores nuevos planta» — confirmar que esa
@@ -1301,9 +1301,9 @@ function ReemplazoOtraMarca({
   if (posicion.variadorId === null || alternativas.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg p-3" style={panelEstilo}>
+    <div className="flex flex-col gap-3 rounded-card p-3" style={panelEstilo}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] font-semibold" style={{ color: C.ink }}>
+        <span className="text-footnote font-semibold" style={{ color: C.ink }}>
           Si hay que reemplazarlo, voy a poner un:
         </span>
         {alternativas.map((f) => {
@@ -1313,7 +1313,7 @@ function ReemplazoOtraMarca({
               key={f.id}
               onClick={() => setDestinoId(on ? null : f.id)}
               aria-pressed={on}
-              className={`rounded px-3 py-2 text-[12px] transition-colors ${FOCO}`}
+              className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
               style={{
                 background: on ? tinte.suave(C.aqua) : C.bgPanel,
                 border: `1px solid ${on ? C.aqua : C.border}`,
@@ -1332,7 +1332,7 @@ function ReemplazoOtraMarca({
           {/* Un partidor suave no reemplaza al variador de una cinta. */}
           {!t.compatible && (
             <div
-              className="rounded px-3 py-2 text-[13px] leading-snug"
+              className="rounded-ctl px-3 py-2 text-footnote leading-snug"
               style={aviso(C.danger)}
             >
               <strong>No sirve para esta cinta.</strong> {t.motivo} Al revés sí se puede: un
@@ -1342,14 +1342,14 @@ function ReemplazoOtraMarca({
 
           {t.compatible && (
             <>
-              <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-                <table className="w-full border-collapse text-[13px]" style={{ minWidth: 520 }}>
+              <div className="overflow-x-auto rounded-ctl" style={{ border: `1px solid ${C.border}` }}>
+                <table className="w-full border-collapse text-footnote" style={{ minWidth: 520 }}>
                   <thead>
                     <tr>
                       {['Qué es', 'Ahora', `En el ${t.destino.nombre}`, 'Valor'].map((h) => (
                         <th
                           key={h}
-                          className="whitespace-nowrap px-3 py-2 text-left text-[12px] font-semibold"
+                          className="whitespace-nowrap px-3 py-2 text-left text-footnote font-semibold"
                           style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
                         >
                           {h}
@@ -1363,12 +1363,12 @@ function ReemplazoOtraMarca({
                         <td className="px-3 py-2 align-top" style={{ color: C.ink, lineHeight: 1.5 }}>
                           {f.concepto}
                           {f.codigoDestino === null && (
-                            <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
+                            <span className="mt-1 block text-footnote" style={{ color: C.inkMid }}>
                               El {t.destino.nombre} no lo pide. No es un dato que falte.
                             </span>
                           )}
                           {f.codigoDestino !== null && !f.valorTransferible && (
-                            <span className="mt-1 block text-[12px]" style={{ color: C.warn }}>
+                            <span className="mt-1 block text-footnote" style={{ color: C.warn }}>
                               Mismo concepto, pero cada marca lo expresa distinto: NO copiar el
                               valor. Abrir el parámetro y cargarlo en las unidades del repuesto.
                             </span>
@@ -1383,7 +1383,7 @@ function ReemplazoOtraMarca({
                               onClick={() =>
                                 onAbrirFicha(t.destino.id, 'parametros', { codigo: f.codigoDestino as string })
                               }
-                              className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                              className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
                               style={{ color: C.aquaBright }}
                             >
                               {f.codigoDestino}
@@ -1403,7 +1403,7 @@ function ReemplazoOtraMarca({
                         >
                           {f.valor}
                           <span
-                            className="ml-2 rounded px-2 py-1 text-[11px] font-sans"
+                            className="ml-2 rounded-ctl px-2 py-1 text-caption font-sans"
                             style={{
                               color: COLOR_VALOR[f.estado],
                               background: tinte.suave(COLOR_VALOR[f.estado]),
@@ -1420,7 +1420,7 @@ function ReemplazoOtraMarca({
 
               {/* El punto ciego: lo que el repuesto pide y la receta no traía. */}
               {t.pideAdemas.length > 0 && (
-                <div className="rounded px-3 py-2 text-[13px] leading-relaxed" style={aviso(C.warn)}>
+                <div className="rounded-ctl px-3 py-2 text-footnote leading-relaxed" style={aviso(C.warn)}>
                   <strong>
                     El {t.destino.nombre} pide {t.pideAdemas.length}{' '}
                     {t.pideAdemas.length === 1 ? 'parámetro' : 'parámetros'} que esta receta no
@@ -1432,21 +1432,21 @@ function ReemplazoOtraMarca({
                       <li key={x.codigo}>
                         <button
                           onClick={() => onAbrirFicha(t.destino.id, 'parametros', { codigo: x.codigo })}
-                          className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                          className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
                           style={{ color: C.aquaBright }}
                         >
                           {x.codigo}
                         </button>{' '}
                         <span style={{ color: C.ink }}>{x.concepto}</span>
                         {x.menu && (
-                          <span className="ml-2 font-mono text-[11px]" style={{ color: C.inkLo }}>
+                          <span className="ml-2 font-mono text-caption" style={{ color: C.inkLo }}>
                             menú {x.menu.split(' ')[0]}
                             {x.rango && x.rango !== '—' ? ` · ${x.rango}` : ''}
                             {x.fabrica && x.fabrica !== '—' ? ` · fábrica ${x.fabrica}` : ''}
                           </span>
                         )}
                         {x.nota && (
-                          <span className="mt-1 block text-[12px]" style={{ color: C.inkMid }}>
+                          <span className="mt-1 block text-footnote" style={{ color: C.inkMid }}>
                             {x.nota}
                           </span>
                         )}
@@ -1538,7 +1538,7 @@ function BuscadorParametros({
           }}
           placeholder="nCr · P-08 · 1-24 · corriente · rampa · tensión…"
           aria-label="Buscar parámetro en todas las familias"
-          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1559,14 +1559,14 @@ function BuscadorParametros({
             return (
               <div
                 key={`${h.fichaId}-${h.menu}-${h.parametro.codigo}-${i}`}
-                className="flex flex-col gap-2 rounded-lg px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 style={panelEstilo}
               >
                 <button
                   onClick={() =>
                     onAbrirFicha(h.fichaId, 'parametros', { codigo: h.parametro.codigo, menu: h.menu })
                   }
-                  className={`flex flex-1 flex-col gap-1 rounded text-left ${FOCO}`}
+                  className={`flex flex-1 flex-col gap-1 rounded-ctl text-left ${FOCO}`}
                 >
                   <span className="flex flex-wrap items-baseline gap-2">
                     <span className="font-mono text-[14px] font-semibold" style={{ color: C.aquaBright }}>
@@ -1574,14 +1574,14 @@ function BuscadorParametros({
                     </span>
                     <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
                     {h.parametro.dePlaca && (
-                      <span className="rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>Placa</span>
+                      <span className="rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>Placa</span>
                     )}
                   </span>
-                  <span className="text-[12px]" style={{ color: C.inkMid }}>
+                  <span className="text-footnote" style={{ color: C.inkMid }}>
                     {h.fichaNombre} · menú <span className="font-mono">{h.menu}</span>
                   </span>
                   {(h.parametro.rango !== '—' || h.parametro.fabrica !== '—') && (
-                    <span className="font-mono text-[12px] tabular-nums" style={{ color: C.inkLo }}>
+                    <span className="font-mono text-footnote tabular-nums" style={{ color: C.inkLo }}>
                       {h.parametro.rango !== '—' ? h.parametro.rango : ''}
                       {h.parametro.rango !== '—' && h.parametro.fabrica !== '—' ? '  ·  fábrica ' : ''}
                       {h.parametro.fabrica !== '—' ? h.parametro.fabrica : ''}
@@ -1591,7 +1591,7 @@ function BuscadorParametros({
                 {suEquiv && (
                   <button
                     onClick={() => setElegida(suEquiv)}
-                    className={`shrink-0 self-start rounded px-3 py-2 text-[12px] font-medium sm:self-auto ${FOCO}`}
+                    className={`shrink-0 self-start rounded-ctl px-3 py-2 text-footnote font-medium sm:self-auto ${FOCO}`}
                     style={{
                       color: C.aquaBright,
                       background: tinte.suave(C.aqua),
@@ -1627,24 +1627,24 @@ function PanelComparacion({
   const celdas = useMemo(() => compararEquivalencia(equiv), [equiv])
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg p-4" style={panelEstilo}>
+    <div className="flex flex-col gap-3 rounded-card p-4" style={panelEstilo}>
       <span className="text-[15px] font-semibold" style={{ color: C.ink }}>
         {equiv.concepto}
         {equiv.dePlaca && (
-          <span className="ml-2 rounded px-2 py-1 text-[11px] font-medium" style={chipEstilo(C.warn)}>
+          <span className="ml-2 rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>
             Dato de placa
           </span>
         )}
       </span>
 
-      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 560 }}>
+      <div className="overflow-x-auto rounded-ctl" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-footnote" style={{ minWidth: 560 }}>
           <thead>
             <tr>
               {['Marca', 'Código', 'Menú', 'Rango', 'Fábrica'].map((h) => (
                 <th
                   key={h}
-                  className="whitespace-nowrap px-3 py-2 text-left text-[12px] font-semibold"
+                  className="whitespace-nowrap px-3 py-2 text-left text-footnote font-semibold"
                   style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
                 >
                   {h}
@@ -1677,13 +1677,13 @@ function PanelComparacion({
                   >
                     {c.codigo ?? '—'}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 align-top font-mono text-[12px]" style={{ color: C.inkMid }}>
+                  <td className="whitespace-nowrap px-3 py-2 align-top font-mono text-footnote" style={{ color: C.inkMid }}>
                     {u ? u.menu.split(' ')[0] : '—'}
                   </td>
-                  <td className="px-3 py-2 align-top font-mono text-[12px] tabular-nums" style={{ color: C.inkMid }}>
+                  <td className="px-3 py-2 align-top font-mono text-footnote tabular-nums" style={{ color: C.inkMid }}>
                     {u?.parametro.rango ?? '—'}
                   </td>
-                  <td className="px-3 py-2 align-top font-mono text-[12px] tabular-nums" style={{ color: C.inkMid }}>
+                  <td className="px-3 py-2 align-top font-mono text-footnote tabular-nums" style={{ color: C.inkMid }}>
                     {u?.parametro.fabrica ?? '—'}
                   </td>
                 </tr>
@@ -1697,7 +1697,7 @@ function PanelComparacion({
 
       {equiv.nota && (
         <span
-          className="max-w-[70ch] pl-2 text-[13px] leading-relaxed"
+          className="max-w-[70ch] pl-2 text-footnote leading-relaxed"
           style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}` }}
         >
           {equiv.nota}
@@ -1744,17 +1744,17 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por concepto o por código: corriente, nCr, P-08…"
           aria-label="Buscar equivalencia"
-          className={`w-full rounded py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
 
-      <div className="overflow-x-auto rounded" style={{ border: `1px solid ${C.border}` }}>
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 720 }}>
+      <div className="overflow-x-auto rounded-ctl" style={{ border: `1px solid ${C.border}` }}>
+        <table className="w-full border-collapse text-footnote" style={{ minWidth: 720 }}>
           <thead>
             <tr>
               <th
-                className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
+                className="whitespace-nowrap px-3 py-3 text-left text-footnote font-semibold"
                 style={{
                   background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}`,
                   position: 'sticky', left: 0, zIndex: 2, borderRight: `1px solid ${C.border}`,
@@ -1765,7 +1765,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
               {COLUMNAS_EQUIVALENCIA.map((col) => (
                 <th
                   key={col.id}
-                  className="whitespace-nowrap px-3 py-3 text-left text-[13px] font-semibold"
+                  className="whitespace-nowrap px-3 py-3 text-left text-footnote font-semibold"
                   style={{ background: C.bgPanel, color: C.inkMid, borderBottom: `1px solid ${C.border}` }}
                 >
                   {col.titulo}
@@ -1776,7 +1776,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={COLUMNAS_EQUIVALENCIA.length + 1} className="px-3 py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                <td colSpan={COLUMNAS_EQUIVALENCIA.length + 1} className="px-3 py-6 text-center text-footnote" style={{ color: C.inkMid }}>
                   Nada con «{q.trim()}».
                 </td>
               </tr>
@@ -1801,7 +1801,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                   {e.concepto}
                   {e.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+                      className="ml-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -1809,7 +1809,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                   )}
                   {e.nota && (
                     <span
-                      className="mt-2 block max-w-[62ch] pl-2 text-[13px]"
+                      className="mt-2 block max-w-[62ch] pl-2 text-footnote"
                       style={{ color: C.inkMid, borderLeft: `2px solid ${C.border}`, lineHeight: 1.5 }}
                     >
                       {e.nota}
@@ -1819,7 +1819,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                 {(celdasPorConcepto[e.concepto] ?? []).map((c) => (
                   <td
                     key={c.columna}
-                    className="whitespace-nowrap px-3 py-3 align-top font-mono text-[13px] font-semibold"
+                    className="whitespace-nowrap px-3 py-3 align-top font-mono text-footnote font-semibold"
                     style={{ color: c.codigo ? C.aquaBright : C.inkGhost }}
                   >
                     {/* El código no es solo texto: lleva al parámetro en su ficha. */}
@@ -1831,7 +1831,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                             menu: c.ubicacion!.menu,
                           })
                         }
-                        className={`rounded font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                        className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
                         style={{ color: C.aquaBright }}
                         title={`Ir a ${c.codigo} · ${c.ubicacion.fichaNombre}`}
                       >
@@ -1950,7 +1950,7 @@ export function VariadoresPage() {
         <header className="flex flex-col gap-3">
           <button
             onClick={() => navigate('/aprendizaje')}
-            className={`inline-flex w-fit items-center gap-2 rounded text-[14px] font-medium ${FOCO}`}
+            className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
             style={{ color: C.aquaBright }}
           >
             <ArrowLeft className="h-4 w-4" /> Centro de Aprendizaje
@@ -1969,7 +1969,7 @@ export function VariadoresPage() {
 
         {fichaRota && (
           <div
-            className="flex gap-3 rounded px-4 py-3 text-[13px]"
+            className="flex gap-3 rounded-ctl px-4 py-3 text-footnote"
             style={{
               color: C.inkMid,
               background: tinte.fila(C.crit),
@@ -1999,7 +1999,7 @@ export function VariadoresPage() {
                   key={v}
                   onClick={() => cambiarVista(v)}
                   aria-pressed={on}
-                  className={`rounded px-4 py-2 text-[13px] transition-colors ${FOCO}`}
+                  className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
                   style={{
                     background: on ? tinte.suave(C.aqua) : C.bgPanel,
                     border: `1px solid ${on ? C.aqua : C.border}`,
@@ -2031,7 +2031,7 @@ export function VariadoresPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar marca, modelo o dónde se usa…"
                 aria-label="Buscar familia de variador"
-                className={`w-full rounded-lg py-3 pl-10 pr-3 text-sm ${FOCO}`}
+                className={`w-full rounded-card py-3 pl-10 pr-3 text-sm ${FOCO}`}
                 style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
               />
             </div>
@@ -2050,17 +2050,17 @@ export function VariadoresPage() {
                       <button
                         key={`${r.fichaId}-${r.falla.codigo}`}
                         onClick={() => abrirFicha(r.fichaId, 'fallas')}
-                        className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-4 py-3 text-left transition-colors ${FOCO}`}
+                        className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card px-4 py-3 text-left transition-colors ${FOCO}`}
                         style={panelEstilo}
                       >
                         <span
-                          className="rounded px-2 py-1 font-mono text-[13px] font-bold"
+                          className="rounded-ctl px-2 py-1 font-mono text-footnote font-bold"
                           style={{ color: C.crit, background: tinte.suave(C.crit) }}
                         >
                           {r.falla.codigo}
                         </span>
                         <span className="text-[14px] font-medium" style={{ color: C.ink }}>{r.falla.nombre}</span>
-                        <span className="text-[13px]" style={{ color: C.inkMid }}>· {r.fichaNombre}</span>
+                        <span className="text-footnote" style={{ color: C.inkMid }}>· {r.fichaNombre}</span>
                       </button>
                     ))}
                   </div>
@@ -2076,7 +2076,7 @@ export function VariadoresPage() {
                   <button
                     key={f.id}
                     onClick={() => abrirFicha(f.id)}
-                    className={`flex flex-col gap-3 rounded-lg p-4 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)] ${FOCO}`}
+                    className={`flex flex-col gap-3 rounded-card p-4 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)] ${FOCO}`}
                     style={panelEstilo}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -2088,7 +2088,7 @@ export function VariadoresPage() {
                       </div>
                       <EstadoChip estado={f.estado} />
                     </div>
-                    <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{f.donde}</span>
+                    <span className="text-footnote leading-snug" style={{ color: C.inkMid }}>{f.donde}</span>
                     <span
                       className="mt-1 pt-2 text-xs tabular-nums"
                       style={{ color: C.inkMid, borderTop: `1px solid ${C.border}` }}
@@ -2101,7 +2101,7 @@ export function VariadoresPage() {
                 )
               })}
               {visibles.length === 0 && (
-                <p className="py-6 text-center text-[13px]" style={{ color: C.inkMid }}>
+                <p className="py-6 text-center text-footnote" style={{ color: C.inkMid }}>
                   Ninguna familia coincide con esa búsqueda.
                 </p>
               )}
@@ -2120,7 +2120,7 @@ export function VariadoresPage() {
                 {MOTORES_CINTAS.map((m) => (
                   <div
                     key={m.modelo}
-                    className="flex flex-col gap-3 rounded-lg p-4"
+                    className="flex flex-col gap-3 rounded-card p-4"
                     style={panelEstilo}
                   >
                     <h3 className="m-0 font-mono text-sm font-semibold tracking-[-0.01em]" style={{ color: C.aquaBright }}>
@@ -2128,7 +2128,7 @@ export function VariadoresPage() {
                       {m.porConfirmar && <span className="ml-2" style={{ color: C.warn }}>⏳</span>}
                     </h3>
                     <dl
-                      className="grid grid-cols-3 gap-px overflow-hidden rounded"
+                      className="grid grid-cols-3 gap-px overflow-hidden rounded-ctl"
                       style={{ background: C.border, border: `1px solid ${C.border}` }}
                     >
                       {[
@@ -2137,7 +2137,7 @@ export function VariadoresPage() {
                         ['RPM salida', m.rpmSalida],
                       ].map(([rot, val]) => (
                         <div key={rot} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
-                          <dt className="text-[11px]" style={{ color: C.inkMid }}>{rot}</dt>
+                          <dt className="text-caption" style={{ color: C.inkMid }}>{rot}</dt>
                           <dd className="m-0 font-mono text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
                             {val}
                           </dd>
@@ -2148,14 +2148,14 @@ export function VariadoresPage() {
                       {FALTAN_DE_PLACA.map((f) => (
                         <span
                           key={f}
-                          className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium"
+                          className="inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
                           style={{ color: C.warn, background: tinte.suave(C.warn) }}
                         >
                           {f}
                         </span>
                       ))}
                     </div>
-                    <span className="text-[13px] leading-snug" style={{ color: C.inkMid }}>{m.usos}</span>
+                    <span className="text-footnote leading-snug" style={{ color: C.inkMid }}>{m.usos}</span>
                   </div>
                 ))}
               </div>
@@ -2181,13 +2181,13 @@ export function VariadoresPage() {
           <>
             <button
               onClick={() => abrirFicha(null)}
-              className={`inline-flex w-fit items-center gap-2 rounded text-[14px] font-medium ${FOCO}`}
+              className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
               style={{ color: C.aquaBright }}
             >
               <ArrowLeft className="h-4 w-4" /> Volver al catálogo
             </button>
 
-            <div className="overflow-hidden rounded-lg" style={panelEstilo}>
+            <div className="overflow-hidden rounded-card" style={panelEstilo}>
               <div
                 className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4"
                 style={{ background: C.bgPanel, borderBottom: `1px solid ${C.border}` }}
@@ -2196,7 +2196,7 @@ export function VariadoresPage() {
                   <h2 className="m-0 text-[18px] font-semibold tracking-[-0.01em]" style={{ color: C.ink }}>
                     {ficha.nombre}
                   </h2>
-                  <span className="mt-1 block text-[13px]" style={{ color: C.inkMid }}>
+                  <span className="mt-1 block text-footnote" style={{ color: C.inkMid }}>
                     {ficha.tipo} · {ficha.donde}
                   </span>
                 </div>
@@ -2206,7 +2206,7 @@ export function VariadoresPage() {
               <div className="flex flex-col gap-4 p-5">
                 {ficha.aviso && (
                   <div
-                    className="flex gap-3 rounded px-4 py-3 text-[13px]"
+                    className="flex gap-3 rounded-ctl px-4 py-3 text-footnote"
                     style={{
                       color: C.inkMid,
                       background: tinte.fila(C.warn),
@@ -2231,7 +2231,7 @@ export function VariadoresPage() {
                           key={s}
                           onClick={() => setSeccion(s)}
                           aria-pressed={on}
-                          className={`rounded px-4 py-2 text-[13px] transition-colors ${FOCO}`}
+                          className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
                           style={{
                             background: on ? tinte.suave(C.aqua) : C.bgPanel,
                             border: `1px solid ${on ? C.aqua : C.border}`,
@@ -2255,7 +2255,7 @@ export function VariadoresPage() {
                 )}
 
                 <div
-                  className="flex gap-3 rounded px-4 py-3 text-[13px]"
+                  className="flex gap-3 rounded-ctl px-4 py-3 text-footnote"
                   style={{
                     color: C.inkMid,
                     background: tinte.fila(C.aqua),

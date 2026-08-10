@@ -156,7 +156,7 @@ export function EquipmentForm({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {validationErrors.general && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{validationErrors.general}</div>
+            <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">{validationErrors.general}</div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
@@ -179,7 +179,7 @@ export function EquipmentForm({
               onChange={(e) => setFormData({ ...formData, nombreComun: e.target.value })}
               placeholder='Cómo le dicen en planta (ej. "Motor cinta larga grader")'
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               El “Nombre” viene del SAP y no se edita. El nombre común es buscable.
             </p>
           </div>

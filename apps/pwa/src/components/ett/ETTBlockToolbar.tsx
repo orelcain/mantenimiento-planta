@@ -77,7 +77,7 @@ export function ETTBlockToolbar({ onAdd, compact = false }: ETTBlockToolbarProps
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-50 border border-dashed border-gray-300 rounded mt-2">
+    <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-50 border border-dashed border-gray-300 rounded-ctl mt-2">
       <span className="text-xs text-gray-500 font-medium">
         <Plus className="inline h-3 w-3 mr-1" />
         Agregar bloque:

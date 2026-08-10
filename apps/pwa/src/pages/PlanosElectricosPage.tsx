@@ -80,7 +80,7 @@ function Catalogo() {
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5" style={{ color: 'var(--lc-ink)' }}>
       <header>
         <h1 className="m-0 text-xl font-semibold">Planos eléctricos</h1>
-        <p className="m-0 mt-1 text-[13px]" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
           El plano del fabricante, navegable: los saltos entre hojas se siguen tocando,
           cada aparato dice dónde más aparece, y los rótulos se leen en castellano.
         </p>
@@ -89,23 +89,23 @@ function Catalogo() {
                   style={{ color: 'var(--lc-ink-ghost)' }} />
           <input value={q} onChange={(e) => setQ(e.target.value)} type="search"
                  placeholder="Buscar en todos los planos: K7, RL33, sellado, excavador…"
-                 className="w-full rounded-lg border bg-transparent py-2 pl-8 pr-2 font-mono text-[13px] outline-none"
+                 className="w-full rounded-card border bg-transparent py-2 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
         {v.length >= 2 && (
           <div className="mt-2 flex flex-col gap-0.5">
             {cargandoIdx && (
-              <p className="m-0 text-[11.5px]" style={{ color: 'var(--lc-ink-ghost)' }}>Buscando en los {PLANOS.length} planos…</p>
+              <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>Buscando en los {PLANOS.length} planos…</p>
             )}
             {!cargandoIdx && !hits.length && (
-              <p className="m-0 text-[11.5px]" style={{ color: 'var(--lc-ink-ghost)' }}>Sin coincidencias en ningún plano.</p>
+              <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>Sin coincidencias en ningún plano.</p>
             )}
             {hits.map((h, i) => (
               <Link key={i} to={h.href}
-                    className="flex items-baseline justify-between gap-3 rounded-md px-2 py-1.5 no-underline hover:opacity-80"
+                    className="flex items-baseline justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
                     style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
-                <span className="font-mono text-[12.5px]" style={{ color: 'var(--lc-aqua-bright)' }}>{h.clave}</span>
-                <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
+                <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{h.clave}</span>
+                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
               </Link>
             ))}
           </div>
@@ -114,18 +114,18 @@ function Catalogo() {
 
       {PLANOS.map((p) => (
         <Link key={p.slug} to={`/aprendizaje/planos/${p.slug}`}
-              className="flex flex-col gap-2 rounded-lg border p-4 no-underline transition-opacity hover:opacity-90"
+              className="flex flex-col gap-2 rounded-card border p-4 no-underline transition-opacity hover:opacity-90"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'inherit' }}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-[15px] font-semibold">{p.maquina}</span>
-            <span className="font-mono text-[11px]" style={{ color: 'var(--lc-aqua-bright)' }}>
+            <span className="font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
               {p.numero} · {p.revision}
             </span>
           </div>
-          <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+          <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
             {p.descripcion}
           </p>
-          <div className="flex flex-wrap gap-3 font-mono text-[11px]" style={{ color: 'var(--lc-ink-lo)' }}>
+          <div className="flex flex-wrap gap-3 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
             <span>{p.hojas} hojas</span>
             <span>{p.aplicaA}</span>
             {!!p.faltantes.length && (
@@ -404,8 +404,8 @@ function Visor({ slug }: { slug: string }) {
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         <Link to="/aprendizaje/planos" className="flex flex-col leading-tight no-underline" style={{ color: 'inherit' }}>
-          <span className="text-[13px] font-semibold">{cat?.maquina ?? indice.maquina}</span>
-          <span className="font-mono text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+          <span className="text-footnote font-semibold">{cat?.maquina ?? indice.maquina}</span>
+          <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
             {indice.plano} · {indice.rev}
           </span>
         </Link>
@@ -414,16 +414,16 @@ function Visor({ slug }: { slug: string }) {
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} type="search"
                  placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…' : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
-                 className="w-full rounded-lg border bg-transparent py-1.5 pl-8 pr-2 font-mono text-[12.5px] outline-none"
+                 className="w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
 
-        <div className={`${sinIdiomas ? 'hidden' : 'flex'} overflow-hidden rounded-lg border`} style={{ borderColor: 'var(--lc-border)' }}>
+        <div className={`${sinIdiomas ? 'hidden' : 'flex'} overflow-hidden rounded-card border`} style={{ borderColor: 'var(--lc-border)' }}>
           {([['DE', false], ['ES', true]] as const).map(([txt, v]) => (
             <button key={txt} type="button"
                     onClick={() => { setMostrarEs(v); localStorage.setItem('plano-idioma', v ? 'es' : 'de') }}
                     aria-pressed={mostrarEs === v}
-                    className="px-3 py-1.5 text-[12px] font-semibold"
+                    className="px-3 py-1.5 text-footnote font-semibold"
                     style={mostrarEs === v
                       ? { background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }
                       : { color: 'var(--lc-ink-mid)' }}>
@@ -433,29 +433,29 @@ function Visor({ slug }: { slug: string }) {
         </div>
 
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
-                className="hidden rounded p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="hidden rounded-ctl p-1.5 md:block" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
         </button>
         <BotonOffline slug={slug} indice={indice} />
         <button type="button" title="Copiar link de esta vista"
                 onClick={() => { void navigator.clipboard?.writeText(window.location.href) }}
-                className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
           <LinkIcon size={15} />
         </button>
         <button type="button" title="QR de este punto del plano" onClick={() => setMostrarQR(true)}
-                className="rounded p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="rounded-ctl p-1.5" style={{ color: 'var(--lc-ink-mid)' }}>
           <QrCode size={15} />
         </button>
-        <div className="flex items-center gap-1 font-mono text-[12px]">
+        <div className="flex items-center gap-1 font-mono text-footnote">
           <button type="button" disabled={!anterior} onClick={() => anterior && void irA(anterior.blatt)}
-                  className="rounded p-1 disabled:opacity-30" title="Hoja anterior">
+                  className="rounded-ctl p-1 disabled:opacity-30" title="Hoja anterior">
             <ChevronLeft size={16} />
           </button>
           {/* Select nativo: en el teléfono el índice lateral no existe y sin
               esto la única forma de moverse era de a una hoja con las flechas. */}
           <select value={hoja.blatt} onChange={(e) => void irA(Number(e.target.value))}
                   aria-label="Ir a hoja"
-                  className="cursor-pointer appearance-none rounded border-0 bg-transparent py-1 pr-0.5 font-mono text-[12px] tabular-nums outline-none"
+                  className="cursor-pointer appearance-none rounded-ctl border-0 bg-transparent py-1 pr-0.5 font-mono text-footnote tabular-nums outline-none"
                   style={{ color: 'var(--lc-ink)' }}>
             {(['circuitos', 'bornes'] as const).map((sec) => (
               <optgroup key={sec} label={sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}>
@@ -468,7 +468,7 @@ function Visor({ slug }: { slug: string }) {
           <span className="tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>/ {indice.hojasTotales}</span>
           <button type="button" disabled={!siguiente}
                   onClick={() => siguiente && void irA(siguiente.blatt)}
-                  className="rounded p-1 disabled:opacity-30" title="Hoja siguiente">
+                  className="rounded-ctl p-1 disabled:opacity-30" title="Hoja siguiente">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -477,17 +477,17 @@ function Visor({ slug }: { slug: string }) {
       {mostrarQR && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6"
              onClick={() => setMostrarQR(false)}>
-          <div className="flex flex-col items-center gap-3 rounded-2xl p-5"
+          <div className="flex flex-col items-center gap-3 rounded-panel p-5"
                style={{ background: 'var(--lc-surface)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="rounded-lg bg-white p-3">
+            <div className="rounded-card bg-white p-3">
               <QRCodeSVG value={window.location.href} size={208} />
             </div>
-            <p className="m-0 max-w-[240px] text-center text-[11.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+            <p className="m-0 max-w-[240px] text-center text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
               Este QR abre exactamente esta vista: hoja {hoja.blatt}
               {sel?.tipo === 'aparato' ? ` con la ficha de ${sel.tag}` : ''}. Imprímelo y pégalo en el tablero.
             </p>
             <button type="button" onClick={() => setMostrarQR(false)}
-                    className="rounded-md border px-3 py-1.5 text-[12px]"
+                    className="rounded-ctl border px-3 py-1.5 text-footnote"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
               Cerrar
             </button>
@@ -503,7 +503,7 @@ function Visor({ slug }: { slug: string }) {
             if (!grupo.length) return null
             return (
               <section key={sec}>
-                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider"
+                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-caption font-semibold tracking-wider"
                     style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)', borderColor: 'var(--lc-border)' }}>
                   {sec === 'circuitos' ? 'Esquema de circuitos' : 'Plano de bornes'}
                   <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
@@ -514,17 +514,17 @@ function Visor({ slug }: { slug: string }) {
                     return (
                       <button key={h.blatt} type="button" onClick={() => void irA(h.blatt)}
                               aria-current={activa}
-                              className="mb-0.5 flex w-full items-center gap-2 rounded-md py-1.5 pl-1.5 pr-2 text-left"
+                              className="mb-0.5 flex w-full items-center gap-2 rounded-ctl py-1.5 pl-1.5 pr-2 text-left"
                               style={activa
                                 ? { background: 'var(--lc-aqua-soft)', boxShadow: 'inset 2px 0 0 var(--lc-aqua)' }
                                 : {}}>
-                        <span className="w-7 shrink-0 rounded py-0.5 text-center font-mono text-[11px] tabular-nums"
+                        <span className="w-7 shrink-0 rounded-ctl py-0.5 text-center font-mono text-caption tabular-nums"
                               style={activa
                                 ? { background: 'var(--lc-aqua)', color: '#fff' }
                                 : { background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                           {h.blatt}
                         </span>
-                        <span className="line-clamp-2 min-w-0 flex-1 text-[10.5px] leading-snug"
+                        <span className="line-clamp-2 min-w-0 flex-1 text-caption leading-snug"
                               style={{ color: activa ? 'var(--lc-ink)' : 'var(--lc-ink-mid)' }}>
                           {limpiarTitulo(mostrarEs ? h.tituloEs : h.titulo)}
                         </span>
@@ -553,7 +553,7 @@ function Visor({ slug }: { slug: string }) {
           </button>
           {historial.length > 0 && (
             <button type="button" onClick={volver}
-                    className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11.5px] shadow-lg"
+                    className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-card border px-2.5 py-1.5 font-mono text-footnote shadow-lg"
                     style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}
                     title="Deshacer el salto (Backspace)">
               <ChevronLeft size={13} /> Hoja {historial[historial.length - 1]}
@@ -561,7 +561,7 @@ function Visor({ slug }: { slug: string }) {
           )}
           {cargando && (
             <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
-              <span className="rounded-full border px-3 py-1 text-[11px] shadow"
+              <span className="rounded-full border px-3 py-1 text-caption shadow"
                     style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
                 Cargando hoja…
               </span>
@@ -581,7 +581,7 @@ function Visor({ slug }: { slug: string }) {
 
         <aside
           ref={asideRef}
-          className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-2 bottom-3 z-50 max-h-[55dvh] overflow-y-auto rounded-2xl border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-0 md:border-l md:pb-3 md:shadow-none`}
+          className={`${abiertoMovil ? 'fixed' : 'hidden'} inset-x-2 bottom-3 z-50 max-h-[55dvh] overflow-y-auto rounded-panel border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-2xl md:static md:z-auto md:block md:max-h-none md:w-72 md:shrink-0 md:rounded-none md:border-0 md:border-l md:pb-3 md:shadow-none`}
           style={{
             background: 'var(--lc-surface)', borderColor: 'var(--lc-border)',
             ...(esMovil && minimizada ? { height: 52, overflowY: 'hidden' as const } : {}),
@@ -606,20 +606,20 @@ function Visor({ slug }: { slug: string }) {
             <div className="mx-auto h-1 w-12 rounded-full" style={{ background: 'var(--lc-border)' }} />
             <button type="button" aria-label={minimizada ? 'Expandir panel' : 'Minimizar panel'}
                     onClick={() => { setMinimizada((m) => !m) }}
-                    className="absolute -top-1 right-8 rounded p-1.5"
+                    className="absolute -top-1 right-8 rounded-ctl p-1.5"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               {minimizada ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             <button type="button" aria-label="Cerrar panel"
                     onClick={() => { setSel(null); setBusca(''); setAyuda(false); setMinimizada(false); setAltoHoja(null) }}
-                    className="absolute -top-1 right-0 rounded p-1.5"
+                    className="absolute -top-1 right-0 rounded-ctl p-1.5"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               <X size={16} />
             </button>
           </div>
           {esMovil && minimizada && (
             <button type="button" onClick={() => setMinimizada(false)}
-                    className="flex w-full items-center gap-2 px-1 text-left text-[12.5px] font-semibold"
+                    className="flex w-full items-center gap-2 px-1 text-left text-footnote font-semibold"
                     style={{ color: 'var(--lc-ink)' }}>
               {sel ? etiquetaSel(sel) : busca.trim() ? `Resultados de “${busca.trim()}”` : 'Panel'}
             </button>
@@ -627,7 +627,7 @@ function Visor({ slug }: { slug: string }) {
           {!(esMovil && minimizada) && <>
           {!busca.trim() && pilaSel.length > 0 && (
             <button type="button" onClick={volverSel}
-                    className="mb-2 flex w-full items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11.5px]"
+                    className="mb-2 flex w-full items-center gap-1.5 rounded-ctl border px-2 py-1.5 text-left text-footnote"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
               <ChevronLeft size={13} /> Volver a {etiquetaSel(pilaSel[pilaSel.length - 1]!.s)}
             </button>
@@ -642,12 +642,12 @@ function Visor({ slug }: { slug: string }) {
             : esVisor
             ? <>
                 <Titulo>Notas de la hoja {hoja.blatt}</Titulo>
-                <p className="m-0 mb-2 text-[11.5px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+                <p className="m-0 mb-2 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
                   Este plano viene sin texto seleccionable (modo visor): navega con el
                   índice y deja acá lo que conviene saber de esta hoja — fotos incluidas.
                 </p>
                 {notas.error && (
-                  <p className="m-0 mb-2 text-[11.5px]" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
+                  <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
                 )}
                 <NotasAparato
                   anclaId={`hoja ${hoja.blatt}`}
@@ -695,7 +695,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
     return (
       <>
         <Titulo>Cómo se usa</Titulo>
-        <p className="m-0 text-[12px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
           Toca cualquier marca de color sobre el plano.
           <br /><br />
           <b style={{ color: 'var(--lc-nuevo)' }}>Verde</b> — salto a otra hoja: te lleva y marca dónde caíste.
@@ -708,14 +708,14 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
         </p>
         {recientes.length > 0 && (
           <>
-            <h2 className="m-0 mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider"
+            <h2 className="m-0 mb-2 mt-4 text-caption font-semibold tracking-wider"
                 style={{ color: 'var(--lc-ink-ghost)' }}>
               Recientes
             </h2>
             <div className="flex flex-wrap gap-1.5">
               {recientes.map((t) => (
                 <button key={t} type="button" onClick={() => onAbrirAparato(t)}
-                        className="rounded border px-2 py-1 font-mono text-[11.5px]"
+                        className="rounded-ctl border px-2 py-1 font-mono text-footnote"
                         style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
                   {t}
                 </button>
@@ -731,7 +731,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
     return (
       <>
         <Titulo>Salto de hoja</Titulo>
-        <p className="m-0 text-[12.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
           El circuito continúa en la <b>hoja {sel.h}</b>, columna <b>{sel.c}</b>.
         </p>
       </>
@@ -745,7 +745,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
         <p className="m-0 font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-nuevo)' }}>
           {sel.t}
         </p>
-        <p className="m-0 mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 mt-1 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
           Su columna de cableado está en la <b>hoja {sel.h}</b> del plano de bornes:
           ahí dice qué cable llega, su color y hacia dónde sigue.
         </p>
@@ -757,17 +757,17 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
     return (
       <>
         <Titulo>Borne {sel.l.t}</Titulo>
-        <p className="m-0 text-[12px] leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
           El plano no dice de qué regla es este {sel.l.t} — existe en{' '}
           {sel.l.op.length} reglas. Las nombradas en esta misma hoja van primero:
         </p>
         <div className="mt-2 flex flex-col gap-1.5">
           {sel.l.op.map((o) => (
             <button key={o.k} type="button" onClick={() => onIr(o.h, undefined, o.tb)}
-                    className="flex items-baseline justify-between rounded border px-2.5 py-1.5 text-left"
+                    className="flex items-baseline justify-between rounded-ctl border px-2.5 py-1.5 text-left"
                     style={{ borderColor: 'var(--lc-border)' }}>
-              <b className="font-mono text-[13px]" style={{ color: 'var(--lc-nuevo)' }}>{o.k}</b>
-              <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
+              <b className="font-mono text-footnote" style={{ color: 'var(--lc-nuevo)' }}>{o.k}</b>
+              <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
             </button>
           ))}
         </div>
@@ -795,19 +795,19 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
         {sel.tag}
       </p>
       {!esSenal && indice.descs?.[sel.tag] && (
-        <p className="m-0 mt-1.5 rounded-md border-l-2 py-1 pl-2 text-[11.5px] leading-relaxed"
+        <p className="m-0 mt-1.5 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
            style={{ color: 'var(--lc-ink-mid)', borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
           {indice.descs[sel.tag]}
         </p>
       )}
-      <p className="m-0 mt-1 text-[11.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+      <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
         {esSenal
           ? `Este potencial recorre ${new Set(puntos.map((p) => p.h)).size} hojas del plano. Síguelo:`
           : `Aparece en ${puntos.length} punto${puntos.length !== 1 ? 's' : ''} del plano.`}
       </p>
       {enEstaHoja > 1 && (
         <button type="button" onClick={onResaltar} aria-pressed={resaltar}
-                className="mt-2 w-full rounded-md border px-2 py-1.5 text-[11.5px] font-medium"
+                className="mt-2 w-full rounded-ctl border px-2 py-1.5 text-footnote font-medium"
                 style={resaltar
                   ? { background: 'var(--lc-aqua)', borderColor: 'var(--lc-aqua)', color: '#fff' }
                   : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -817,7 +817,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
         {puntos.map((p) => (
           <button key={`${p.h}.${p.c}`} type="button" onClick={() => onIr(p.h, undefined, p.b)}
-                  className="rounded border px-2 py-1 font-mono text-[11.5px] tabular-nums"
+                  className="rounded-ctl border px-2 py-1 font-mono text-footnote tabular-nums"
                   style={p.h === hojaActual
                     ? { borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)', background: 'var(--lc-aqua-soft)' }
                     : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -830,7 +830,7 @@ function Panel({ sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato
 
       <Titulo>Notas y fotos</Titulo>
       {notas.error && (
-        <p className="m-0 mb-2 text-[11.5px]" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
+        <p className="m-0 mb-2 text-footnote" style={{ color: 'var(--lc-danger)' }}>{notas.error}</p>
       )}
       <NotasAparato
         anclaId={sel.tag}
@@ -917,7 +917,7 @@ function Resultados({ items, onIr }: {
     <>
       <Titulo>{items.length} resultado{items.length !== 1 ? 's' : ''}</Titulo>
       {!items.length && (
-        <p className="m-0 text-[12px]" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-ghost)' }}>
           Sin coincidencias. Prueba con una designación (K7, Q1) o una palabra
           del plano en alemán o castellano.
         </p>
@@ -925,9 +925,9 @@ function Resultados({ items, onIr }: {
       {items.map((r) => (
         <button key={`${r.clave}${r.detalle}`} type="button"
                 onClick={() => onIr(r.blatt, r.col, r.caja, r.aparato)}
-                className="flex w-full items-baseline justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:opacity-80">
-          <b className="font-mono text-[12.5px]">{r.clave}</b>
-          <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
+                className="flex w-full items-baseline justify-between gap-2 rounded-ctl px-2 py-1.5 text-left hover:opacity-80">
+          <b className="font-mono text-footnote">{r.clave}</b>
+          <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
         </button>
       ))}
     </>
@@ -955,29 +955,29 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
         const bajo = f.stockActual != null && f.stockMinimo != null
           && f.stockActual > 0 && f.stockActual < f.stockMinimo
         return (
-          <div key={f.sap} className="mb-3 rounded-lg border p-3"
+          <div key={f.sap} className="mb-3 rounded-card border p-3"
                style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[13px] font-semibold leading-snug">
+              <span className="text-footnote font-semibold leading-snug">
                 {f.nombre ?? 'SAP sin catalogar'}
               </span>
-              <span className="shrink-0 font-mono text-[11px]" style={{ color: 'var(--lc-aqua-bright)' }}>
+              <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
                 {f.sap}
               </span>
             </div>
             {(f.marca || f.modeloTipo || f.codigoFabricante) && (
-              <p className="m-0 mt-1 font-mono text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>
+              <p className="m-0 mt-1 font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
                 {[f.marca, f.modeloTipo, f.codigoFabricante].filter(Boolean).join(' · ')}
               </p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {f.stockActual == null ? (
-                <span className="rounded px-2 py-0.5 text-[10.5px]"
+                <span className="rounded-ctl px-2 py-0.5 text-caption"
                       style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                   sin registro de bodega
                 </span>
               ) : (
-                <span className="rounded px-2 py-0.5 font-mono text-[11px] font-semibold"
+                <span className="rounded-ctl px-2 py-0.5 font-mono text-caption font-semibold"
                       style={sinStock
                         ? { background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }
                         : bajo
@@ -987,10 +987,10 @@ function FichasSap({ notas }: { notas: ReturnType<typeof usePlanoNotas>['notas']
                 </span>
               )}
               {f.ubicacionBodega && (
-                <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
+                <span className="text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
               )}
               <Link to={`/repuestos?q=${encodeURIComponent(f.sap)}`}
-                    className="ml-auto text-[11px] underline-offset-2 hover:underline"
+                    className="ml-auto text-caption underline-offset-2 hover:underline"
                     style={{ color: 'var(--lc-aqua-bright)' }}>
                 Ver en Repuestos
               </Link>
@@ -1048,7 +1048,7 @@ function BotonOffline({ slug, indice }: { slug: string; indice: PlanoIndice | nu
     <button type="button"
             title={estado === 'si' ? 'Guardado para usar sin señal' : 'Guardar para usar sin señal'}
             onClick={() => { if (estado === 'no') void bajar() }}
-            className="flex items-center gap-1 rounded p-1.5 font-mono text-[10.5px]"
+            className="flex items-center gap-1 rounded-ctl p-1.5 font-mono text-caption"
             style={{ color: estado === 'si' ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
       {estado === 'bajando' ? <><Loader2 size={14} className="animate-spin" />{avance}%</>
         : estado === 'si' ? <><Check size={14} /><Download size={12} /></>
@@ -1077,7 +1077,7 @@ function etiquetaSel(s: NonNullable<Seleccion>): string {
 
 function Titulo({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="m-0 mb-2 text-[10px] font-semibold uppercase tracking-wider"
+    <h2 className="m-0 mb-2 text-caption font-semibold tracking-wider"
         style={{ color: 'var(--lc-ink-ghost)' }}>
       {children}
     </h2>
@@ -1086,7 +1086,7 @@ function Titulo({ children }: { children: React.ReactNode }) {
 
 function Aviso({ texto }: { texto: string }) {
   return (
-    <div className="flex h-[100dvh] items-center justify-center gap-2 text-[13px]"
+    <div className="flex h-[100dvh] items-center justify-center gap-2 text-footnote"
          style={{ background: 'var(--lc-bg)', color: 'var(--lc-ink-mid)' }}>
       <Zap size={15} /> {texto}
     </div>

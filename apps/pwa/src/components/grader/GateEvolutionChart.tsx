@@ -179,17 +179,17 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
         <CardTitle className="text-sm flex items-center gap-2">
           <Activity className="w-4 h-4 text-muted-foreground" />
           Evolución de gates
-          <span className="text-[11px] font-normal text-muted-foreground">
+          <span className="text-caption font-normal text-muted-foreground">
             piezas/min por gate
           </span>
           {configChanges.length > 0 && (
-            <span className="text-[10px] text-amber-400/70">
+            <span className="text-caption text-amber-400/70">
               {configChanges.length} cambio{configChanges.length > 1 ? 's' : ''} marcado{configChanges.length > 1 ? 's' : ''}
             </span>
           )}
           <button
             onClick={() => setOpen(v => !v)}
-            className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors"
           >
             {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
@@ -208,7 +208,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
                   key={n}
                   onClick={() => toggleGate(n)}
                   className={cn(
-                    'w-7 h-6 text-[10px] font-semibold rounded transition-all border',
+                    'w-7 h-6 text-caption font-semibold rounded-ctl transition-all border',
                     selected
                       ? 'opacity-100 border-transparent'
                       : 'opacity-25 border-border/30 bg-transparent',
@@ -223,7 +223,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
             })}
             <button
               onClick={() => setSelectedGates(activeGates)}
-              className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground px-1.5 transition-colors ml-1"
+              className="text-caption text-muted-foreground/50 hover:text-muted-foreground px-1.5 transition-colors ml-1"
             >
               reset
             </button>
@@ -240,7 +240,7 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
           </div>
 
           {configChanges.length > 0 && (
-            <p className="text-[10px] text-muted-foreground/40">
+            <p className="text-caption text-muted-foreground/40">
               Líneas verticales: cambios de configuración de gates
             </p>
           )}

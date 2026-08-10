@@ -92,15 +92,15 @@ export function GateChangeImpactCard({
         <CardTitle className="text-sm flex items-center gap-2">
           <Zap className="w-4 h-4 text-muted-foreground" />
           Impacto de cambios
-          <span className="text-[11px] font-normal text-muted-foreground">
+          <span className="text-caption font-normal text-muted-foreground">
             P0% ±{WINDOW_MIN} min
           </span>
-          <span className="text-[10px] text-muted-foreground/50 font-normal">
+          <span className="text-caption text-muted-foreground/50 font-normal">
             {segments.length} cambio{segments.length > 1 ? 's' : ''}
           </span>
           <button
             onClick={() => setOpen(v => !v)}
-            className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors"
           >
             {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
@@ -124,19 +124,19 @@ export function GateChangeImpactCard({
                   className="flex items-center gap-2 py-1.5 border-b border-border/20 last:border-0 flex-wrap"
                 >
                   {/* Hora + label */}
-                  <span className="text-[10px] text-muted-foreground/50 tabular-nums shrink-0 w-10">
+                  <span className="text-caption text-muted-foreground/50 tabular-nums shrink-0 w-10">
                     {fmtTime(seg.snapshotAt)}
                   </span>
                   <span className="text-xs font-medium flex-1 min-w-0 truncate">{seg.label}</span>
                   {seg.changedBy && (
-                    <span className="text-[10px] text-muted-foreground/40 truncate hidden sm:block max-w-[6rem]">
+                    <span className="text-caption text-muted-foreground/40 truncate hidden sm:block max-w-[6rem]">
                       {seg.changedBy}
                     </span>
                   )}
 
                   {/* Antes */}
                   <span className={cn(
-                    'text-[11px] tabular-nums shrink-0 w-12 text-right',
+                    'text-caption tabular-nums shrink-0 w-12 text-right',
                     seg.p0Before === null
                       ? 'text-muted-foreground/30'
                       : seg.p0Before > 5 ? 'text-red-400' : 'text-muted-foreground',
@@ -148,9 +148,9 @@ export function GateChangeImpactCard({
 
                   {/* Después */}
                   <span className={cn(
-                    'text-[11px] tabular-nums shrink-0 w-14 text-right',
+                    'text-caption tabular-nums shrink-0 w-14 text-right',
                     inProgress
-                      ? 'text-amber-400/70 italic text-[10px]'
+                      ? 'text-amber-400/70 italic text-caption'
                       : seg.p0After === null
                         ? 'text-muted-foreground/30'
                         : improved ? 'text-emerald-400'
@@ -165,9 +165,9 @@ export function GateChangeImpactCard({
                   {/* Delta badge */}
                   {!inProgress && delta !== null && (
                     <span className={cn(
-                      'flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
-                      improved  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                        : worsened ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400'
+                      'flex items-center gap-0.5 text-caption px-1.5 py-0.5 rounded-ctl font-semibold shrink-0',
+                      improved  ? 'bg-emerald-500/[0.15] text-ink-ok'
+                        : worsened ? 'bg-red-500/[0.15] text-ink-crit'
                           : 'bg-muted text-muted-foreground',
                     )}>
                       {improved  ? <TrendingDown className="w-2.5 h-2.5" />
@@ -181,7 +181,7 @@ export function GateChangeImpactCard({
             })}
           </div>
 
-          <p className="text-[10px] text-muted-foreground/40 mt-2.5">
+          <p className="text-caption text-muted-foreground/40 mt-2.5">
             Ventana de {WINDOW_MIN} min antes/después de cada cambio · solo piezas clasificadas
           </p>
         </CardContent>

@@ -142,7 +142,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
               return (
                 <tr key={gateNum} className="border-b hover:bg-muted/30">
                   <td className="py-1 px-2 text-center">
-                    <span className="inline-flex items-center rounded border px-1 py-0.5 text-xs">{gateNum}</span>
+                    <span className="inline-flex items-center rounded-ctl border px-1 py-0.5 text-xs">{gateNum}</span>
                   </td>
                   <td className="py-1 px-2">
                     <Input type="number" step="0.5" min="0.5" max="30"
@@ -167,7 +167,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
                     {(tTotal * 1000).toFixed(0)}ms
                   </td>
                   <td className={cn('py-1 px-2 text-right tabular-nums font-mono text-xs',
-                    pEff >= 5 ? 'text-emerald-600' : pEff >= 3 ? 'text-amber-600' : 'text-red-600',
+                    pEff >= 5 ? 'text-ink-ok' : pEff >= 3 ? 'text-ink-warn' : 'text-ink-crit',
                   )}>
                     {pEff.toFixed(1)}
                   </td>
@@ -177,7 +177,7 @@ export function NeumaticaTab({ physicalConfig, setPhysicalConfig }: NeumaticaTab
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-muted-foreground mt-2 italic">
+      <p className="text-caption text-muted-foreground mt-2 italic">
         Medir largo de tubo real desde manifold (bloque de electroválvulas) siguiendo el recorrido del tubo hasta cada flipper.
         Default: estimación lineal (1.5m base + 1.5m × gate).
       </p>

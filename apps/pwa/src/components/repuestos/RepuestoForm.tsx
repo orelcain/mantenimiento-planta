@@ -220,7 +220,7 @@ export function RepuestoFormModal({
 
           {/* Aviso de duplicado (no bloquea: solo advierte) */}
           {duplicate && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-card border border-amber-500/[0.25] bg-amber-500/[0.15] px-3 py-2 text-xs text-ink-warn">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 Ya existe un material parecido: <span className="font-semibold">{duplicate.textoBreve}</span>
@@ -316,7 +316,7 @@ export function RepuestoFormModal({
 
           {/* Stock en bodega — solo con SAP (el stock vive en `bodega` por SAP) */}
           {form.codigoSAP.trim() ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted p-3">
+            <div className="space-y-3 rounded-card border border-border bg-muted p-3">
               <Label className="text-xs font-semibold text-muted-foreground">
                 Stock en bodega <span className="font-normal">· se guarda por SAP</span>
               </Label>
@@ -344,18 +344,18 @@ export function RepuestoFormModal({
 
           {/* Destino y multi-equipo (solo en crear) */}
           {mode === 'create' && (
-            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted">
+            <div className="space-y-3 rounded-card border border-border p-3 bg-muted">
               {/* Toggle: propio vs compartido */}
               {hasLinkedMachine && (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Destino</Label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setTarget('own')}
-                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${target === 'own' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'own' ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-emerald-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                       Propio de {equipmentName || 'este equipo'}
                     </button>
                     <button type="button" onClick={() => setTarget('shared')}
-                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${target === 'shared' ? 'border-blue-500/40 bg-blue-500/10 text-blue-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'shared' ? 'border-primary/[0.25] bg-primary/[0.15] text-blue-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                       Compartido ({machineName || 'máquina'})
                     </button>
                   </div>
@@ -376,7 +376,7 @@ export function RepuestoFormModal({
                             if (checked) next.delete(s.id); else next.add(s.id)
                             return next
                           })}
-                          className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-all ${checked ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                          className={`px-2 py-1 rounded-ctl text-caption font-medium border transition-all ${checked ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                           {s.nombre}
                         </button>
                       )

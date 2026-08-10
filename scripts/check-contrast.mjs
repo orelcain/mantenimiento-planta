@@ -162,10 +162,11 @@ check('ink sobre fondo', AL.ink, AL.bg, 4.5)
 check('secundario sobre card', AL.sub, AL.card, 4.5)
 check('secundario sobre fondo (peor caso)', AL.sub, AL.bg, 4.5)
 check('marca sobre card', '#2E75B6', AL.card, 4.5)
-check('rojo-600 texto sobre fondo', '#d70015', AL.bg, 4.5)
-check('verde-600 texto sobre fondo', '#217e38', AL.bg, 4.5)
-check('naranja-600 texto sobre fondo', '#c93400', AL.bg, 4.5)
+check('rojo-600 texto sobre fondo', '#c42d25', AL.bg, 4.5)
+check('verde-600 texto sobre fondo', '#217d38', AL.bg, 4.5)
+check('naranja-600 texto sobre fondo', '#9e5c00', AL.bg, 4.5)
 check('separador sobre card (no textual)', AL.sep, AL.card, 1.5)
+check('marca-ink sobre tinte marca 15%', '#2a6aa6', composite(AL.card, '#2E75B6', 0.15), 4.5)
 
 console.log('\n=== NUEVA PIEL (Apple) — OSCURO (elevado) ===')
 const AD = { bg: '#1c1c1e', card: '#2c2c2e', ink: '#ffffff', sub: '#9f9fa5', sep: '#38383a' }
@@ -173,26 +174,48 @@ check('ink sobre card', AD.ink, AD.card, 4.5)
 check('secundario sobre card', AD.sub, AD.card, 4.5)
 check('secundario sobre fondo', AD.sub, AD.bg, 4.5)
 check('marca adaptativa sobre card', '#5AA0DC', AD.card, 4.5)
-check('rojo-600 texto sobre card', '#ff6961', AD.card, 4.5)
-check('verde-600 texto sobre card', '#30db5b', AD.card, 4.5)
-check('naranja-600 texto sobre card', '#ffb340', AD.card, 4.5)
+check('marca-ink sobre tinte marca 15%', '#71ade1', composite(AD.card, '#5AA0DC', 0.15), 4.5)
+check('rojo-600 texto sobre card', '#ff776f', AD.card, 4.5)
+check('verde-600 texto sobre card', '#30d158', AD.card, 4.5)
+check('naranja-600 texto sobre card', '#ff9f0a', AD.card, 4.5)
 // Chips/Pill de la piel nueva. REGLA descubierta al medir (2026-08-09): el tinte
 // vivo como TEXTO sobre su propio fondo al 14% reprueba en rojo oscuro (3.51:1).
 // Por eso la Pill es: texto = tono 600 (variante accesible) · fondo = tono 500 al
 // 8%. El vivo queda para puntos/íconos (no textuales), donde AA no aplica igual.
 for (const [name, ink, tint] of [
-  ['crítica', '#ff6961', '#ff453a'],
-  ['media', '#ffb340', '#ff9f0a'],
-  ['ok', '#30db5b', '#30d158'],
+  ['crítica', '#ff776f', '#ff453a'],
+  ['media', '#ff9f0a', '#ff9f0a'],
+  ['ok', '#30d158', '#30d158'],
 ]) {
-  check(`chip ${name} DARK (texto 600 sobre tinte 8%)`, ink, composite(AD.card, tint, 0.08), 4.5)
+  check(`chip ${name} DARK (texto 600 sobre tinte 15%)`, ink, composite(AD.card, tint, 0.15), 4.5)
 }
 for (const [name, ink, tint] of [
-  ['crítica', '#d70015', '#ff3b30'],
-  ['media', '#c93400', '#ff9500'],
-  ['ok', '#217e38', '#34c759'],
+  ['crítica', '#c42d25', '#ff3b30'],
+  ['media', '#9e5c00', '#ff9500'],
+  ['ok', '#217d38', '#34c759'],
 ]) {
-  check(`chip ${name} LIGHT (texto 600 sobre tinte 8%)`, ink, composite(AL.card, tint, 0.08), 4.5)
+  check(`chip ${name} LIGHT (texto 600 sobre tinte 15%)`, ink, composite(AL.card, tint, 0.15), 4.5)
+}
+
+// ── Paleta CATEGÓRICA (index.css, docs §1.6) ────────────────────────────────
+// Existe porque la app usa color para CATEGORIZAR (tipo de repuesto, causal,
+// área), no solo para dar estado. Cada tono se lee sobre su propio tinte al 8%.
+// Dos hubo que corregirlos contra la medición: índigo oscuro (3.78:1) y teal
+// claro (4.41:1). Si alguien los "redondea" a los valores de Apple, esto falla.
+console.log('\n=== PALETA CATEGÓRICA — CLARO / OSCURO ===')
+const CATS = [
+  ['1 azul', '#0064d1', '#007aff', '#4ca5ff', '#0a84ff'],
+  ['2 verde', '#217d38', '#34c759', '#30d158', '#30d158'],
+  ['3 índigo', '#5856d6', '#5856d6', '#9695ef', '#5e5ce6'],
+  ['4 naranja', '#9e5c00', '#ff9500', '#ff9f0a', '#ff9f0a'],
+  ['5 rosa', '#c72342', '#ff2d55', '#ff718d', '#ff375f'],
+  ['6 púrpura', '#9345ba', '#af52de', '#d085f5', '#bf5af2'],
+  ['7 teal', '#207685', '#30b0c7', '#40c8e0', '#40c8e0'],
+  ['8 café', '#7e6749', '#a2845e', '#bca385', '#ac8e68'],
+]
+for (const [name, inkL, tintL, inkD, tintD] of CATS) {
+  check(`cat ${name} CLARO`, inkL, composite('#ffffff', tintL, 0.15), 4.5)
+  check(`cat ${name} OSCURO`, inkD, composite('#2c2c2e', tintD, 0.15), 4.5)
 }
 
 const fails = results.filter(r => !r.pass)

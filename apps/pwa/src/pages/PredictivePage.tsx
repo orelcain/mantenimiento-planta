@@ -35,7 +35,7 @@ function Sparkline({
 }) {
   const values = points.filter((p) => Number.isFinite(p))
   if (values.length < 2) {
-    return <div className="h-14 rounded border bg-muted" />
+    return <div className="h-14 rounded-ctl border bg-muted" />
   }
 
   const min = Math.min(...values)
@@ -624,7 +624,7 @@ export function PredictivePage() {
               )}
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded border p-3 space-y-3">
+                <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Temperatura (°C)</div>
                   <div className="space-y-2">
                     <Label>Advertencia baja: {thresholds.tempWarnLow.toFixed(1)}°C</Label>
@@ -716,7 +716,7 @@ export function PredictivePage() {
                   </div>
                 </div>
 
-                <div className="rounded border p-3 space-y-3">
+                <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Humedad (%)</div>
                   <div className="space-y-2">
                     <Label>Advertencia baja: {thresholds.humWarnLow.toFixed(1)}%</Label>
@@ -810,7 +810,7 @@ export function PredictivePage() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded border p-3 space-y-3">
+                <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Tendencia temperatura (°C/min)</div>
                   <div className="space-y-2">
                     <Label>Advertencia: {thresholds.tempSlopeWarn.toFixed(2)}</Label>
@@ -858,7 +858,7 @@ export function PredictivePage() {
                   </div>
                 </div>
 
-                <div className="rounded border p-3 space-y-3">
+                <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Tendencia humedad (%/min)</div>
                   <div className="space-y-2">
                     <Label>Advertencia: {thresholds.humSlopeWarn.toFixed(2)}</Label>
@@ -906,7 +906,7 @@ export function PredictivePage() {
                   </div>
                 </div>
 
-                <div className="rounded border p-3 space-y-3">
+                <div className="rounded-ctl border p-3 space-y-3">
                   <div className="text-sm font-medium">Offline</div>
                   <div className="space-y-2">
                     <Label>Tiempo sin reporte: {Math.round(thresholds.offlineMs / 60000)} min</Label>
@@ -933,7 +933,7 @@ export function PredictivePage() {
                 </div>
               </div>
 
-              <div className="rounded border p-3 space-y-3">
+              <div className="rounded-ctl border p-3 space-y-3">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium">Modo prueba</div>
@@ -1062,7 +1062,7 @@ export function PredictivePage() {
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="p-3 rounded border">
+                  <div className="p-3 rounded-ctl border">
                     <div className="text-xs text-muted-foreground">Temperatura</div>
                     <div className="text-xl font-semibold">
                       {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
@@ -1073,7 +1073,7 @@ export function PredictivePage() {
                       fuente: {lastReading?.source ?? displaySummary?.temperatura?.source ?? '—'}
                     </div>
                   </div>
-                  <div className="p-3 rounded border">
+                  <div className="p-3 rounded-ctl border">
                     <div className="text-xs text-muted-foreground">Humedad</div>
                     <div className="text-xl font-semibold">
                       {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
@@ -1086,7 +1086,7 @@ export function PredictivePage() {
                   </div>
                 </div>
 
-                <div className="p-3 rounded border">
+                <div className="p-3 rounded-ctl border">
                   <div className="text-xs text-muted-foreground">Sensor vinculado</div>
                   {linkedDevice ? (
                     <div className="mt-1 space-y-1 text-sm">
@@ -1143,7 +1143,7 @@ export function PredictivePage() {
                   Confianza estimada: {Math.round(prediction.confianza * 100)}%
                 </div>
 
-                <div className="p-3 rounded border space-y-2">
+                <div className="p-3 rounded-ctl border space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-xs text-muted-foreground">Predicción IA (opcional)</div>
                     <Button
@@ -1190,7 +1190,7 @@ export function PredictivePage() {
                 ) : (
                   <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded border p-2">
+                      <div className="rounded-ctl border p-2">
                         <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(displayReadings.length, 60)})</div>
                         <Sparkline
                           points={displayReadings.slice(-60).map((r) => r.temperature)}
@@ -1202,7 +1202,7 @@ export function PredictivePage() {
                             : '—'}
                         </div>
                       </div>
-                      <div className="rounded border p-2">
+                      <div className="rounded-ctl border p-2">
                         <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(displayReadings.length, 60)})</div>
                         <Sparkline
                           points={displayReadings.slice(-60).map((r) => r.humidity)}
@@ -1225,7 +1225,7 @@ export function PredictivePage() {
                         .slice(-12)
                         .reverse()
                         .map((r) => (
-                          <div key={r.timestamp} className="flex items-center justify-between p-2 rounded border">
+                          <div key={r.timestamp} className="flex items-center justify-between p-2 rounded-ctl border">
                             <div className="text-sm">
                               <div className="font-medium">
                                 {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%

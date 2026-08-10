@@ -81,7 +81,7 @@ export function LearningAdminMachinePage() {
       {/* Header */}
       <button
         onClick={() => navigate('/aprendizaje/admin')}
-        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-card transition-colors text-muted-foreground hover:text-foreground"
         style={{ minHeight: '44px' }}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -90,7 +90,7 @@ export function LearningAdminMachinePage() {
 
       <div className="flex items-center gap-3 mb-6">
         <div
-          className="flex items-center justify-center w-14 h-14 rounded-2xl flex-shrink-0"
+          className="flex items-center justify-center w-14 h-14 rounded-panel flex-shrink-0"
           style={{
             background: `${machine.color}18`,
             border: `1px solid ${machine.color}40`,
@@ -104,7 +104,7 @@ export function LearningAdminMachinePage() {
         </div>
         <button
           onClick={() => window.open(previewUrl, '_blank', 'noopener')}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm text-primary-700 dark:text-[#9DC3E6] hover:bg-muted transition-colors flex-shrink-0"
+          className="flex items-center gap-2 px-3 py-2 rounded-card border border-border text-sm text-primary-700 dark:text-[#9DC3E6] hover:bg-muted transition-colors flex-shrink-0"
           title="Ver como lo ve el técnico — solo lectura, abre en pestaña nueva"
           style={{ minHeight: '40px' }}
         >
@@ -303,7 +303,7 @@ function ProcedureForm({
           value={procedure.title}
           onChange={e => setProcedure({ ...procedure, title: e.target.value })}
           placeholder="Ej: Calibración de celdas de carga"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
@@ -313,19 +313,19 @@ function ProcedureForm({
           onChange={e => setProcedure({ ...procedure, description: e.target.value })}
           placeholder="Qué hace este procedimiento y cuándo se usa"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
       {/* Steps */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold tracking-wider text-muted-foreground">
             Pasos <span className="text-destructive dark:text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addStep}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir paso
@@ -334,7 +334,7 @@ function ProcedureForm({
 
         <div className="space-y-3">
           {procedure.steps.map((step, index) => (
-            <div key={index} className="p-3 rounded-lg border border-border bg-card/50">
+            <div key={index} className="p-3 rounded-card border border-border bg-card/50">
               <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-1">
                   <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-xs">
@@ -344,7 +344,7 @@ function ProcedureForm({
                     <button
                       onClick={() => moveStep(index, -1)}
                       disabled={index === 0}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                      className="p-0.5 hover:bg-muted rounded-ctl disabled:opacity-30"
                       title="Subir"
                     >
                       <ChevronUp className="h-3 w-3" />
@@ -352,7 +352,7 @@ function ProcedureForm({
                     <button
                       onClick={() => moveStep(index, 1)}
                       disabled={index === procedure.steps.length - 1}
-                      className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                      className="p-0.5 hover:bg-muted rounded-ctl disabled:opacity-30"
                       title="Bajar"
                     >
                       <ChevronDown className="h-3 w-3" />
@@ -365,14 +365,14 @@ function ProcedureForm({
                     value={step.title}
                     onChange={e => updateStep(index, { title: e.target.value })}
                     placeholder="Título del paso"
-                    className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-ring/60"
+                    className="w-full px-2.5 py-1.5 rounded-ctl border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-ring/60"
                   />
                   <textarea
                     value={step.description}
                     onChange={e => updateStep(index, { description: e.target.value })}
                     placeholder="Descripción detallada del paso"
                     rows={2}
-                    className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring/60"
+                    className="w-full px-2.5 py-1.5 rounded-ctl border border-border bg-card text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring/60"
                   />
                   <StepImageUploader
                     machineSlug={machineSlug}
@@ -384,7 +384,7 @@ function ProcedureForm({
                 <button
                   onClick={() => removeStep(index)}
                   disabled={procedure.steps.length <= 1}
-                  className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded disabled:opacity-30"
+                  className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
                   title="Eliminar paso"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -449,7 +449,7 @@ function StepImageUploader({
           <img
             src={imageUrl}
             alt="Imagen del paso"
-            className="max-h-32 rounded border border-border"
+            className="max-h-32 rounded-ctl border border-border"
           />
           <button
             onClick={handleRemove}
@@ -464,7 +464,7 @@ function StepImageUploader({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl disabled:opacity-50"
         >
           {uploading ? (
             <>
@@ -490,7 +490,7 @@ function StepImageUploader({
           e.target.value = ''
         }}
       />
-      {error && <p className="text-[11px] text-destructive dark:text-[#e0697d] mt-1">{error}</p>}
+      {error && <p className="text-caption text-destructive dark:text-[#e0697d] mt-1">{error}</p>}
     </div>
   )
 }
@@ -643,7 +643,7 @@ function ManualSectionForm({
             min={1}
             value={section.order}
             onChange={e => setSection({ ...section, order: Number(e.target.value) || 1 })}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
         <FormField label="Título de la sección" required className="flex-1">
@@ -652,7 +652,7 @@ function ManualSectionForm({
             value={section.title}
             onChange={e => setSection({ ...section, title: e.target.value })}
             placeholder="Ej: Ajuste de cuchillas"
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
       </div>
@@ -663,7 +663,7 @@ function ManualSectionForm({
           onChange={e => setManualFields(fields => ({ ...fields, description: e.target.value }))}
           placeholder="Texto del manual. Soporta saltos de línea."
           rows={3}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
@@ -708,7 +708,7 @@ function ManualSectionForm({
 
       {/* ─ Bloque didáctico (Dossier de campo): Objetivo · Por qué importa · Autoevaluación ─ */}
       <div className="pt-3 mt-1 border-t border-dashed border-border space-y-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+        <p className="text-caption font-semibold tracking-wider text-muted-foreground/80">
           Didáctico · se muestra como Objetivo (arriba), Por qué importa y Autoevaluación al pie
         </p>
 
@@ -718,7 +718,7 @@ function ManualSectionForm({
             onChange={e => setSection({ ...section, objetivo: e.target.value })}
             placeholder="Qué sabrá hacer quien lea la sección. Ej: Al terminar vas a poder calibrar un pocket con la fórmula fsWc."
             rows={2}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
 
@@ -728,7 +728,7 @@ function ManualSectionForm({
             onChange={e => setSection({ ...section, porque: e.target.value })}
             placeholder="Ej: un pocket descalibrado manda pescado al calibre equivocado todo el turno y arruina la contrastación."
             rows={2}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
 
@@ -779,10 +779,10 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Autoevaluación</label>
+        <label className="text-xs font-semibold tracking-wider text-muted-foreground">Autoevaluación</label>
         <button
           onClick={addQuestion}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           Añadir pregunta
@@ -790,13 +790,13 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
       </div>
 
       {items.length === 0 ? (
-        <p className="px-1 py-2 text-[11px] text-muted-foreground/80">Sin preguntas. La sección no mostrará autoevaluación.</p>
+        <p className="px-1 py-2 text-caption text-muted-foreground/80">Sin preguntas. La sección no mostrará autoevaluación.</p>
       ) : (
         <div className="space-y-4">
           {items.map((q, qi) => (
-            <div key={qi} className="space-y-2.5 rounded-lg border border-border bg-background p-3">
+            <div key={qi} className="space-y-2.5 rounded-card border border-border bg-background p-3">
               <div className="flex items-start gap-2">
-                <span className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary-400/15 text-[11px] font-bold text-primary-600 dark:text-primary-400">
+                <span className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary-400/15 text-caption font-bold text-primary-600 dark:text-primary-400">
                   {qi + 1}
                 </span>
                 <textarea
@@ -804,11 +804,11 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                   onChange={e => updateItem(qi, { question: e.target.value })}
                   placeholder="Pregunta"
                   rows={2}
-                  className="flex-1 resize-y rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                  className="flex-1 resize-y rounded-card border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                 />
                 <button
                   onClick={() => removeQuestion(qi)}
-                  className="mt-0.5 flex-shrink-0 rounded p-1.5 text-destructive dark:text-[#e0697d] hover:bg-destructive/15"
+                  className="mt-0.5 flex-shrink-0 rounded-ctl p-1.5 text-destructive dark:text-[#e0697d] hover:bg-destructive/15"
                   title="Eliminar pregunta"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -816,15 +816,15 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
               </div>
 
               <div className="space-y-1.5 pl-8">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80">Opciones · marcá la correcta</p>
+                <p className="text-caption tracking-wider text-muted-foreground/80">Opciones · marcá la correcta</p>
                 {q.options.map((opt, oi) => (
                   <div key={oi} className="flex items-center gap-2">
                     <button
                       onClick={() => updateItem(qi, { correctIndex: oi })}
                       title={oi === q.correctIndex ? 'Opción correcta' : 'Marcar como correcta'}
                       className={oi === q.correctIndex
-                        ? 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold'
-                        : 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-bold text-muted-foreground'}
+                        ? 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-caption font-bold'
+                        : 'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border text-caption font-bold text-muted-foreground'}
                       style={oi === q.correctIndex
                         ? { background: LC.nuevo, borderColor: LC.nuevo, color: '#0d1722' }
                         : undefined}
@@ -836,12 +836,12 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                       value={opt}
                       onChange={e => updateOption(qi, oi, e.target.value)}
                       placeholder={`Opción ${String.fromCharCode(65 + oi)}`}
-                      className="flex-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                      className="flex-1 rounded-ctl border border-border bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                     />
                     <button
                       onClick={() => removeOption(qi, oi)}
                       disabled={q.options.length <= 2}
-                      className="flex-shrink-0 rounded p-1 text-destructive dark:text-[#e0697d] hover:bg-destructive/15 disabled:opacity-30"
+                      className="flex-shrink-0 rounded-ctl p-1 text-destructive dark:text-[#e0697d] hover:bg-destructive/15 disabled:opacity-30"
                       title="Eliminar opción"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -850,7 +850,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                 ))}
                 <button
                   onClick={() => addOption(qi)}
-                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10"
+                  className="inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10"
                 >
                   <Plus className="h-3 w-3" /> Añadir opción
                 </button>
@@ -860,7 +860,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
                   onChange={e => updateItem(qi, { explanation: e.target.value })}
                   placeholder="Explicación (se muestra al responder)"
                   rows={2}
-                  className="mt-1 w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                  className="mt-1 w-full resize-y rounded-card border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                 />
               </div>
             </div>
@@ -982,10 +982,10 @@ function EditableTextList({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
+        <label className="text-xs font-semibold tracking-wider text-muted-foreground">{label}</label>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           {addLabel}
@@ -994,7 +994,7 @@ function EditableTextList({
       <div className="space-y-2">
         {items.map((item, index) => (
           <div key={index} className="flex items-start gap-2">
-            <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-[11px]">
+            <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption">
               {index + 1}
             </span>
             <textarea
@@ -1002,11 +1002,11 @@ function EditableTextList({
               onChange={e => onChange(index, e.target.value)}
               placeholder={placeholder}
               rows={2}
-              className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
+              className="flex-1 px-3 py-2 rounded-card border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
             />
             <button
               onClick={() => onRemove(index)}
-              className="p-1.5 mt-1 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded"
+              className="p-1.5 mt-1 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl"
               title="Eliminar"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1056,7 +1056,7 @@ function ManualImagesEditor({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Referencias visuales</label>
+          <label className="text-xs font-semibold tracking-wider text-muted-foreground">Referencias visuales</label>
           <p className="mt-1 text-xs text-muted-foreground/80">
             Agrega una o varias imagenes. Puedes subir archivo o pegar una URL existente.
           </p>
@@ -1064,26 +1064,26 @@ function ManualImagesEditor({
         <button
           type="button"
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+          className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
         >
           <Plus className="h-3.5 w-3.5" />
           Agregar referencia
         </button>
       </div>
       {error && (
-        <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive/80 dark:text-[#f1a3ae]">
+        <p className="mb-2 rounded-card border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive/80 dark:text-[#f1a3ae]">
           {error}
         </p>
       )}
       {images.length === 0 ? (
-        <p className="text-xs text-muted-foreground/80 rounded-lg border border-dashed border-border px-3 py-3">
+        <p className="text-xs text-muted-foreground/80 rounded-card border border-dashed border-border px-3 py-3">
           Sin imagenes asociadas.
         </p>
       ) : (
         <div className="space-y-3">
           {images.map((image, index) => (
-            <div key={index} className="grid gap-3 p-3 rounded-lg border border-border bg-card/50 lg:grid-cols-[132px_1fr_auto]">
-              <div className="flex h-24 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
+            <div key={index} className="grid gap-3 p-3 rounded-card border border-border bg-card/50 lg:grid-cols-[132px_1fr_auto]">
+              <div className="flex h-24 items-center justify-center overflow-hidden rounded-card border border-border bg-background">
                 {image.url ? (
                   <img src={image.url} alt={image.label || 'Referencia visual'} className="h-full w-full object-contain" />
                 ) : (
@@ -1096,17 +1096,17 @@ function ManualImagesEditor({
                   value={image.label}
                   onChange={e => onChange(index, { label: e.target.value })}
                   placeholder="Etiqueta visible"
-                  className="px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                  className="px-3 py-2 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                 />
                 <input
                   type="text"
                   value={image.url}
                   onChange={e => onChange(index, { url: e.target.value })}
                   placeholder="URL de imagen o ruta publica"
-                  className="px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                  className="px-3 py-2 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10">
+                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-ctl px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10">
                     <ImagePlus className="h-3.5 w-3.5" />
                     {uploadingIndex === index ? 'Subiendo...' : 'Subir imagen'}
                     <input
@@ -1126,7 +1126,7 @@ function ManualImagesEditor({
                       href={image.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                      className="inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
                     >
                       <Eye className="h-3.5 w-3.5" />
                       Probar enlace
@@ -1137,7 +1137,7 @@ function ManualImagesEditor({
               <button
                 type="button"
                 onClick={() => onRemove(index)}
-                className="p-2 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded justify-self-start"
+                className="p-2 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl justify-self-start"
                 title="Eliminar imagen"
               >
                 <Trash2 className="h-4 w-4" />
@@ -1288,7 +1288,7 @@ function FlowForm({
           value={flow.title}
           onChange={e => setFlow({ ...flow, title: e.target.value })}
           placeholder="Ej: ¿Qué hago cuando el motor se detiene?"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
@@ -1298,18 +1298,18 @@ function FlowForm({
           onChange={e => setFlow({ ...flow, trigger: e.target.value })}
           placeholder="Condición que dispara este flujo (ej: alarma de sobretemperatura)"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold tracking-wider text-muted-foreground">
             Acciones a seguir <span className="text-destructive dark:text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addAction}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir acción
@@ -1320,21 +1320,21 @@ function FlowForm({
           {flow.actions.map((action, index) => (
             <div key={index} className="flex items-start gap-2">
               <div className="flex flex-col items-center pt-1.5">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-[11px]">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption">
                   {index + 1}
                 </span>
                 <div className="flex flex-col">
                   <button
                     onClick={() => moveAction(index, -1)}
                     disabled={index === 0}
-                    className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                    className="p-0.5 hover:bg-muted rounded-ctl disabled:opacity-30"
                   >
                     <ChevronUp className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => moveAction(index, 1)}
                     disabled={index === flow.actions.length - 1}
-                    className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                    className="p-0.5 hover:bg-muted rounded-ctl disabled:opacity-30"
                   >
                     <ChevronDown className="h-3 w-3" />
                   </button>
@@ -1345,12 +1345,12 @@ function FlowForm({
                 onChange={e => updateAction(index, e.target.value)}
                 placeholder="Describir acción"
                 rows={2}
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
+                className="flex-1 px-3 py-2 rounded-card border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
               />
               <button
                 onClick={() => removeAction(index)}
                 disabled={flow.actions.length <= 1}
-                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded disabled:opacity-30"
+                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
                 title="Eliminar acción"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1499,7 +1499,7 @@ function DiagnosisForm({
           value={entry.title}
           onChange={e => setEntry({ ...entry, title: e.target.value })}
           placeholder="Ej: Mal corte / apertura de vientre deficiente"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
@@ -1509,18 +1509,18 @@ function DiagnosisForm({
           onChange={e => setEntry({ ...entry, symptom: e.target.value })}
           placeholder="Ej: El pescado sale con el corte de vientre irregular o incompleto"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <label className="text-xs font-semibold tracking-wider text-muted-foreground">
             Causas posibles <span className="text-destructive dark:text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addCause}
-            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-400/10 px-2 py-1 rounded-ctl"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir causa
@@ -1530,7 +1530,7 @@ function DiagnosisForm({
         <div className="space-y-2">
           {entry.possibleCauses.map((cause, index) => (
             <div key={index} className="flex items-start gap-2">
-              <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-orange-500/15 text-orange-500 font-bold text-[11px]">
+              <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-cat-4-tint/[0.15] text-orange-500 font-bold text-caption">
                 {index + 1}
               </span>
               <input
@@ -1538,12 +1538,12 @@ function DiagnosisForm({
                 value={cause}
                 onChange={e => updateCause(index, e.target.value)}
                 placeholder="Causa probable"
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+                className="flex-1 px-3 py-2 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
               />
               <button
                 onClick={() => removeCause(index)}
                 disabled={entry.possibleCauses.length <= 1}
-                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded disabled:opacity-30"
+                className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl disabled:opacity-30"
                 title="Eliminar causa"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1559,7 +1559,7 @@ function DiagnosisForm({
           onChange={e => setEntry({ ...entry, solution: e.target.value })}
           placeholder="Procedimiento de corrección recomendado"
           rows={4}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
       </FormField>
 
@@ -1711,7 +1711,7 @@ function ComponentPhotoForm({
             min={1}
             value={photo.order}
             onChange={e => setPhoto({ ...photo, order: Number(e.target.value) || 1 })}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
         <FormField label="Título" required className="flex-1">
@@ -1720,7 +1720,7 @@ function ComponentPhotoForm({
             value={photo.title}
             onChange={e => setPhoto({ ...photo, title: e.target.value })}
             placeholder="Ej: Fotocélula — receptor"
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
+            className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/60"
           />
         </FormField>
       </div>
@@ -1731,7 +1731,7 @@ function ComponentPhotoForm({
           value={photo.file}
           onChange={e => { setPhoto({ ...photo, file: e.target.value }); setImgError(false) }}
           placeholder="grader-foto-ejemplo.jpg"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-card text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/60"
+          className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
         <p className="mt-1 text-xs text-muted-foreground/80">
           El archivo debe subirse manualmente a esa carpeta del repo (esta pantalla aún no sube fotos).
@@ -1741,7 +1741,7 @@ function ComponentPhotoForm({
       {previewUrl && (
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label className="text-xs font-semibold tracking-wider text-muted-foreground">
               Puntos — clic en la foto para agregar uno, arrastra para moverlo
             </label>
             <span className="text-xs text-muted-foreground/80 font-mono">
@@ -1749,7 +1749,7 @@ function ComponentPhotoForm({
             </span>
           </div>
           {imgError ? (
-            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground/80">
+            <p className="rounded-card border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground/80">
               No se encontró la foto en esa ruta. Verifica el nombre del archivo.
             </p>
           ) : (
@@ -1766,9 +1766,9 @@ function ComponentPhotoForm({
           {photo.points.length > 0 && (
             <div className="mt-3 space-y-2">
               {photo.points.map((pt, i) => (
-                <div key={pt.id} className="p-3 rounded-lg border border-border bg-card/50">
+                <div key={pt.id} className="p-3 rounded-card border border-border bg-card/50">
                   <div className="flex items-start gap-2">
-                    <span className="flex items-center justify-center w-6 h-6 mt-1 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-[11px] flex-shrink-0">
+                    <span className="flex items-center justify-center w-6 h-6 mt-1 rounded-full bg-primary-400/15 text-primary-600 dark:text-primary-400 font-bold text-caption flex-shrink-0">
                       {i + 1}
                     </span>
                     <div className="flex-1 space-y-2 min-w-0">
@@ -1777,19 +1777,19 @@ function ComponentPhotoForm({
                         value={pt.label}
                         onChange={e => updatePoint(pt.id, { label: e.target.value })}
                         placeholder="Nombre del punto"
-                        className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-ring/60"
+                        className="w-full px-2.5 py-1.5 rounded-ctl border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-ring/60"
                       />
                       <textarea
                         value={pt.description}
                         onChange={e => updatePoint(pt.id, { description: e.target.value })}
                         placeholder="Nota que se muestra al tocar el punto"
                         rows={2}
-                        className="w-full px-2.5 py-1.5 rounded border border-border bg-card text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring/60"
+                        className="w-full px-2.5 py-1.5 rounded-ctl border border-border bg-card text-xs resize-none focus:outline-none focus:ring-1 focus:ring-ring/60"
                       />
                     </div>
                     <button
                       onClick={() => removePoint(pt.id)}
-                      className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded flex-shrink-0"
+                      className="p-1.5 hover:bg-destructive/15 text-destructive dark:text-[#e0697d] rounded-ctl flex-shrink-0"
                       title="Eliminar punto"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1869,7 +1869,7 @@ function PointEditorImage({
     <div
       ref={containerRef}
       onClick={handleContainerClick}
-      className="relative rounded-lg border border-border overflow-hidden bg-background"
+      className="relative rounded-card border border-border overflow-hidden bg-background"
       style={{ cursor: 'crosshair', userSelect: 'none', maxWidth: 480 }}
     >
       <img
@@ -1885,7 +1885,7 @@ function PointEditorImage({
           key={p.id}
           onMouseDown={e => handlePointMouseDown(p.id, e)}
           title={p.label}
-          className="absolute flex items-center justify-center rounded-full text-[11px] font-bold text-white"
+          className="absolute flex items-center justify-center rounded-full text-caption font-bold text-white"
           style={{
             left: `${p.x}%`,
             top: `${p.y}%`,
@@ -1940,7 +1940,7 @@ function CollectionListView({
         </p>
         <button
           onClick={onNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="flex items-center gap-2 px-4 py-2 rounded-card text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]"
           style={{ minHeight: '40px', background: `linear-gradient(90deg, ${LC.aqua}, ${LC.aquaBright})`, color: '#fff' }}
         >
           <Plus className="h-4 w-4" />
@@ -1954,7 +1954,7 @@ function CollectionListView({
           Cargando...
         </div>
       ) : count === 0 ? (
-        <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40">
+        <div className="p-8 text-center rounded-card border border-dashed border-border bg-card/40">
           <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/80 opacity-60" />
           <p className="text-sm font-medium mb-1">{emptyTitle}</p>
           <p className="text-xs text-muted-foreground">{emptyHint}</p>
@@ -1980,26 +1980,26 @@ function ItemCard({
   onDelete: () => void
 }) {
   return (
-    <div className="group p-4 rounded-xl border border-border bg-card hover:border-border hover:bg-muted transition-colors">
+    <div className="group p-4 rounded-card border border-border bg-card hover:border-border hover:bg-muted transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm">{title}</h3>
           {subtitle && (
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>
           )}
-          {meta && <p className="text-[11px] text-muted-foreground mt-1.5">{meta}</p>}
+          {meta && <p className="text-caption text-muted-foreground mt-1.5">{meta}</p>}
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onEdit}
-            className="p-2 rounded hover:bg-muted transition-colors"
+            className="p-2 rounded-ctl hover:bg-muted transition-colors"
             title="Editar"
           >
             <Edit3 className="h-4 w-4" />
           </button>
           <button
             onClick={onDelete}
-            className="p-2 rounded hover:bg-destructive/15 text-destructive dark:text-[#e0697d] transition-colors"
+            className="p-2 rounded-ctl hover:bg-destructive/15 text-destructive dark:text-[#e0697d] transition-colors"
             title="Eliminar"
           >
             <Trash2 className="h-4 w-4" />
@@ -2023,7 +2023,7 @@ function FormField({
 }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-muted-foreground">
+      <label className="block text-xs font-semibold tracking-wider mb-1.5 text-muted-foreground">
         {label} {required && <span className="text-destructive dark:text-[#e0697d]">*</span>}
       </label>
       {children}
@@ -2047,7 +2047,7 @@ function FormActions({
       <button
         onClick={onCancel}
         disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-muted transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-card border border-border text-sm hover:bg-muted transition-colors"
       >
         <X className="h-4 w-4" />
         Cancelar
@@ -2055,7 +2055,7 @@ function FormActions({
       <button
         onClick={onSave}
         disabled={!canSave || saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+        className="flex items-center gap-2 px-4 py-2 rounded-card text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
         style={{ background: `linear-gradient(90deg, ${LC.aqua}, ${LC.aquaBright})`, color: '#fff' }}
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

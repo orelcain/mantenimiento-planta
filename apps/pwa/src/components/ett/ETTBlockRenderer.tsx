@@ -373,7 +373,7 @@ export function ETTBlockRenderer({
   }
 
   return (
-    <div className="relative group border border-transparent hover:border-gray-200 hover:bg-gray-50/50 rounded px-2 -mx-2 transition-colors">
+    <div className="relative group border border-transparent hover:border-gray-200 hover:bg-muted-foreground/[0.10] rounded-ctl px-2 -mx-2 transition-colors">
       {/* Controles flotantes del bloque */}
       <div className="absolute -left-10 top-2 flex-col gap-0.5 hidden group-hover:flex">
         <Button

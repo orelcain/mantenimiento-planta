@@ -41,13 +41,13 @@ export function DevModulesPage() {
           <div className="text-sm font-medium flex items-center gap-1.5">
             {item.name}
             {item.locked && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 font-normal">
+              <span className="inline-flex items-center gap-1 text-caption text-muted-foreground/70 font-normal">
                 <Lock className="w-3 h-3" />
                 fijo
               </span>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground font-mono truncate">
+          <div className="text-caption text-muted-foreground font-mono truncate">
             {item.group} · {item.href}
           </div>
         </div>
@@ -85,15 +85,15 @@ export function DevModulesPage() {
         </p>
       </div>
 
-      <Card className="border-amber-500/20 bg-amber-500/15">
-        <CardContent className="p-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+      <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
+        <CardContent className="p-3 flex items-start gap-2 text-xs text-ink-warn">
           <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             Visibles ahora: <b>{visibleCount}</b> de {ALL_NAV_ITEMS.length}.
             <Button
               variant="link"
               size="sm"
-              className="text-xs text-amber-800 dark:text-amber-300 underline ml-1 h-auto p-0"
+              className="text-xs text-ink-warn underline ml-1 h-auto p-0"
               onClick={reset}
             >
               <RotateCcw className="w-3 h-3 mr-1 inline" />
@@ -127,7 +127,7 @@ export function DevModulesPage() {
         </CardContent>
       </Card>
 
-      <p className="text-[11px] text-muted-foreground/70 px-1">
+      <p className="text-caption text-muted-foreground/70 px-1">
         Los cambios se aplican al instante. Si no ves un item después de
         activarlo, refrescá la página.
       </p>

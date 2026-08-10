@@ -37,9 +37,9 @@ import { shortMachineName } from '@/services/grader/graderMachineNames'
 /** Categorías de causa — definen a quién le pertenece el minuto perdido. */
 const CATEGORIAS = [
   { id: 'mantencion',  label: 'Mantención', icon: Wrench,        cls: 'border-primary/50 bg-primary/15 text-primary' },
-  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-300' },
-  { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-slate-500/50 bg-slate-500/15 text-slate-700 dark:text-slate-300' },
-  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+  { id: 'operacion',   label: 'Operación',  icon: Users,         cls: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
+  { id: 'externo',     label: 'Externo',    icon: CloudOff,      cls: 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground' },
+  { id: 'planificado', label: 'Planificado', icon: CalendarClock, cls: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
 ] as const
 
 type Categoria = typeof CATEGORIAS[number]['id']
@@ -241,7 +241,7 @@ export function SensorStopsCausePanel({
             />
           </CardTitle>
           {sinCausa.length > 0 && (
-            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10">
+            <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]">
               {sinCausa.length} sin causa · {Math.round(minutosSinCausa)} min
               {piezasSinCausa > 0 && ` · ≈${piezasSinCausa.toLocaleString('es-CL')} pz`}
             </Badge>
@@ -266,8 +266,8 @@ export function SensorStopsCausePanel({
             <div
               key={stop.key}
               className={cn(
-                'rounded-md border px-2.5 py-2 text-xs',
-                causaTexto ? 'border-border bg-muted/50' : 'border-amber-500/30 bg-amber-500/[0.06]',
+                'rounded-ctl border px-2.5 py-2 text-xs',
+                causaTexto ? 'border-border bg-muted/50' : 'border-amber-500/[0.25] bg-amber-500/[0.06]',
               )}
             >
               <div className="flex items-center gap-2 flex-wrap">
@@ -289,15 +289,15 @@ export function SensorStopsCausePanel({
                 {causaTexto ? (
                   <span className="flex items-center gap-1.5 min-w-0">
                     {catMeta && (
-                      <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 h-4', catMeta.cls)}>
+                      <Badge variant="outline" className={cn('text-caption px-1.5 py-0 h-4', catMeta.cls)}>
                         {catMeta.label}
                       </Badge>
                     )}
                     <span className="truncate max-w-[14rem]" title={causaTexto}>{causaTexto}</span>
-                    {anotada && <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                    {anotada && <CheckCircle2 className="w-3 h-3 text-ink-ok shrink-0" />}
                   </span>
                 ) : (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/40 text-amber-700 dark:text-amber-300">
+                  <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] text-ink-warn">
                     sin causa
                   </Badge>
                 )}
@@ -305,7 +305,7 @@ export function SensorStopsCausePanel({
                 <Button
                   size="sm"
                   variant={causaTexto ? 'ghost' : 'outline'}
-                  className={cn('h-6 px-2 text-[11px]', !causaTexto && 'border-primary/40 text-primary hover:bg-primary/10')}
+                  className={cn('h-6 px-2 text-caption', !causaTexto && 'border-primary/40 text-primary hover:bg-primary/10')}
                   onClick={() => (abierto ? setOpenKey(null) : abrir(stop))}
                 >
                   {abierto
@@ -337,7 +337,7 @@ export function SensorStopsCausePanel({
                           type="button"
                           onClick={() => setCategoria(c.id)}
                           className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] transition-colors',
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-ctl border text-caption transition-colors',
                             activa ? c.cls : 'border-border text-muted-foreground hover:text-foreground',
                           )}
                         >
@@ -346,28 +346,28 @@ export function SensorStopsCausePanel({
                       )
                     })}
                     <div className="flex-1" />
-                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={limpiarConIA} disabled={refining || !texto.trim()}>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-caption" onClick={limpiarConIA} disabled={refining || !texto.trim()}>
                       {refining ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
                       Limpiar con IA
                     </Button>
                   </div>
 
                   {categoria === 'mantencion' && (
-                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-caption text-muted-foreground cursor-pointer">
                       <input type="checkbox" checked={alHistorial} onChange={(e) => setAlHistorial(e.target.checked)} className="accent-primary" />
                       Registrar también en el historial de Mantención del área
                     </label>
                   )}
 
                   {error && (
-                    <p className="text-[11px] text-rose-600 dark:text-rose-400">{error}</p>
+                    <p className="text-caption text-cat-5-ink">{error}</p>
                   )}
 
                   <div className="flex justify-end gap-1.5">
-                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => setOpenKey(null)} disabled={saving}>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-caption" onClick={() => setOpenKey(null)} disabled={saving}>
                       Cancelar
                     </Button>
-                    <Button size="sm" className="h-6 px-2.5 text-[11px]" onClick={() => guardar(stop)} disabled={saving || !texto.trim()}>
+                    <Button size="sm" className="h-6 px-2.5 text-caption" onClick={() => guardar(stop)} disabled={saving || !texto.trim()}>
                       {saving ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Guardando…</> : 'Guardar causa'}
                     </Button>
                   </div>
@@ -380,7 +380,7 @@ export function SensorStopsCausePanel({
           <button
             type="button"
             onClick={() => setVerTodos((v) => !v)}
-            className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted pt-0.5"
+            className="text-caption text-muted-foreground hover:text-foreground underline decoration-dotted pt-0.5"
           >
             {verTodos
               ? (sinCausa.length > 0 ? 'Ver solo los paros sin causa' : `Ver solo los ${TOP_WHEN_ALL_EXPLAINED} paros más largos`)

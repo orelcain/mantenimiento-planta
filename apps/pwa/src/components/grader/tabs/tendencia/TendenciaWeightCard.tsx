@@ -60,12 +60,12 @@ export function TendenciaWeightCard({
                   : 'Modo detallado: incluye media móvil y bandas ±1σ'}
               </p>
             </div>
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5 shrink-0">
+            <div className="inline-flex rounded-ctl border bg-muted/30 p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => onSetWeightChartMode('simple')}
                 className={cn(
-                  'px-2.5 py-1 text-[11px] rounded transition-colors',
+                  'px-2.5 py-1 text-caption rounded-ctl transition-colors',
                   weightChartMode === 'simple'
                     ? 'bg-background shadow-sm font-medium'
                     : 'text-muted-foreground hover:text-foreground',
@@ -77,7 +77,7 @@ export function TendenciaWeightCard({
                 type="button"
                 onClick={() => onSetWeightChartMode('detailed')}
                 className={cn(
-                  'px-2.5 py-1 text-[11px] rounded transition-colors',
+                  'px-2.5 py-1 text-caption rounded-ctl transition-colors',
                   weightChartMode === 'detailed'
                     ? 'bg-background shadow-sm font-medium'
                     : 'text-muted-foreground hover:text-foreground',
@@ -89,13 +89,13 @@ export function TendenciaWeightCard({
           </div>
           {trendForecastView && (
             <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 Cobertura: {trendForecastView.completionPct.toFixed(1)}% ({trendForecastView.observedBuckets}/{trendForecastView.totalBuckets} intervalos)
               </Badge>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 Turno: {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel}
               </Badge>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 Piezas proyectadas cierre: {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
               </Badge>
             </div>
@@ -188,7 +188,7 @@ export function TendenciaWeightCard({
             }}
           />
           {trendForecastView?.hasProjection && (
-            <p className="text-[11px] text-muted-foreground mt-2">
+            <p className="text-caption text-muted-foreground mt-2">
               La línea punteada muestra tendencia probable del resto del turno usando el comportamiento observado hasta ahora.
             </p>
           )}
@@ -198,9 +198,9 @@ export function TendenciaWeightCard({
       {trendForecastView && (() => {
         const projSeverity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
         const projBadgeClass =
-          projSeverity === 'critical' ? 'border-red-500/60 text-red-600 dark:text-red-400 bg-red-500/10' :
-          projSeverity === 'warn' ? 'border-amber-500/60 text-amber-600 dark:text-amber-400 bg-amber-500/10' :
-          'border-emerald-500/60 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+          projSeverity === 'critical' ? 'border-red-500/[0.25] text-ink-crit bg-red-500/[0.15]' :
+          projSeverity === 'warn' ? 'border-amber-500/[0.25] text-ink-warn bg-amber-500/[0.15]' :
+          'border-emerald-500/[0.25] text-ink-ok bg-emerald-500/[0.15]'
         return (
           <Card>
             <CardHeader>
@@ -212,14 +212,14 @@ export function TendenciaWeightCard({
                   </p>
                 </div>
                 <div className={cn(
-                  'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-lg border-2 shrink-0',
+                  'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-card border-2 shrink-0',
                   projBadgeClass,
                 )}>
-                  <p className="text-[9px] uppercase tracking-wide opacity-80">P0 al cierre</p>
+                  <p className="text-caption tracking-wide opacity-80">P0 al cierre</p>
                   <p className="text-lg font-bold tabular-nums leading-none">
                     {trendForecastView.projectedPointZeroPct.toFixed(2)}%
                   </p>
-                  <p className="text-[10px] tabular-nums opacity-90">
+                  <p className="text-caption tabular-nums opacity-90">
                     {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas
                   </p>
                 </div>
@@ -270,7 +270,7 @@ export function TendenciaWeightCard({
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Detalle por Intervalo</CardTitle>
-          <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
             <span>🟢 &lt;8%</span>
             <span>🟡 8-11.9%</span>

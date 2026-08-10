@@ -177,7 +177,7 @@ export function BeltRpmModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-1 text-[11px] text-muted-foreground mb-1">
+        <div className="space-y-1 text-caption text-muted-foreground mb-1">
           Ingresá el RPM que muestra el display de cada variador.
         </div>
 
@@ -187,7 +187,7 @@ export function BeltRpmModal({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium">{BELT_LABELS[beltId]}</span>
                 {!calibrated && (
-                  <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                  <span className="flex items-center gap-1 text-caption text-amber-400">
                     <AlertTriangle className="w-2.5 h-2.5" />
                     Sin factor calibrado
                   </span>
@@ -205,12 +205,12 @@ export function BeltRpmModal({
                     min={0}
                     max={max ?? 9999}
                     className={cn(
-                      'w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+                      'w-full rounded-ctl border border-input bg-background px-3 py-2 text-sm',
                       'placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring',
                       'tabular-nums',
                     )}
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-caption text-muted-foreground pointer-events-none">
                     RPM
                   </span>
                 </div>
@@ -219,7 +219,7 @@ export function BeltRpmModal({
 
                 {/* m/s calculado */}
                 <div className={cn(
-                  'w-24 text-right text-sm tabular-nums rounded-md px-2.5 py-2 border',
+                  'w-24 text-right text-sm tabular-nums rounded-ctl px-2.5 py-2 border',
                   mps !== null
                     ? 'border-border bg-muted text-foreground'
                     : 'border-border/30 bg-transparent text-muted-foreground/30',
@@ -230,14 +230,14 @@ export function BeltRpmModal({
 
               {/* Referencia: velocidad base calibrada */}
               {currentSpeedMps !== undefined && (
-                <p className="text-[10px] text-muted-foreground/50 pl-0.5">
+                <p className="text-caption text-muted-foreground/50 pl-0.5">
                   Base calibrada: {currentSpeedMps.toFixed(3)} m/s
                   {min && max ? ` · Rango VFD: ${min}–${max} RPM` : ''}
                 </p>
               )}
 
               {!calibrated && (
-                <p className="text-[10px] text-amber-400/70 pl-0.5">
+                <p className="text-caption text-amber-400/70 pl-0.5">
                   Calibrá effectiveMpsPerRpm en Config Física → Cintas
                 </p>
               )}
@@ -252,7 +252,7 @@ export function BeltRpmModal({
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="ej. Bajé velocidad por lote pequeño…"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-ctl border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         </div>

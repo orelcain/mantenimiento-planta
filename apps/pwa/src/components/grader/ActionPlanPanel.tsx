@@ -42,9 +42,9 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/20 border-amber-500/20' },
-  oficina: { label: 'Oficina', icon: Monitor, color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/20 border-blue-500/20' },
-  verificar: { label: 'Verificar', icon: Eye, color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/20 border-purple-500/20' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-amber-500/[0.25]' },
+  oficina: { label: 'Oficina', icon: Monitor, color: 'text-primary', bg: 'bg-primary/[0.15] border-primary/[0.25]' },
+  verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-cat-6-tint/[0.25]' },
 }
 
 const SEVERITY_ICON: Record<SuggestedAction['severity'], typeof AlertTriangle> = {
@@ -98,7 +98,7 @@ function ActionItem({
   return (
     <div
       className={cn(
-        'border rounded-lg overflow-hidden transition-opacity',
+        'border rounded-card overflow-hidden transition-opacity',
         checked && 'opacity-50',
       )}
     >
@@ -131,7 +131,7 @@ function ActionItem({
           {action.actionTrigger && (
             <button
               onClick={handleTrigger}
-              className="mt-2 flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-medium"
+              className="mt-2 flex items-center gap-1 text-caption px-2 py-1 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-medium"
             >
               {action.actionLabel ?? TRIGGER_LABELS[action.actionTrigger]}
               <ArrowRight className="w-3 h-3" />
@@ -240,7 +240,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
             ? 'Acciones sugeridas para el turno en curso — marcá las que ya realizaste'
             : 'Resumen de acciones para este turno'}
           {rulesDescriptor && (
-            <span className="block mt-1 text-[10px] text-muted-foreground/70 italic">
+            <span className="block mt-1 text-caption text-muted-foreground/70 italic">
               {rulesDescriptor}
             </span>
           )}
@@ -253,7 +253,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
           const Icon = meta.icon
           return (
             <div key={cat}>
-              <div className={cn('flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-md border', meta.bg, meta.color)}>
+              <div className={cn('flex items-center gap-1.5 text-xs font-semibold tracking-wider mb-2 px-2 py-1 rounded-ctl border', meta.bg, meta.color)}>
                 <Icon className="w-3.5 h-3.5" />
                 {meta.label}
               </div>
@@ -274,7 +274,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
 
         {relatedRunbooks.length > 0 && (
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded-md border bg-zinc-500/20 border-zinc-500/20 text-zinc-700 dark:text-zinc-400">
+            <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider mb-2 px-2 py-1 rounded-ctl border bg-muted-foreground/[0.10] border-muted-foreground/[0.10] text-muted-foreground">
               <Eye className="w-3.5 h-3.5" />
               Runbooks relacionados
             </div>

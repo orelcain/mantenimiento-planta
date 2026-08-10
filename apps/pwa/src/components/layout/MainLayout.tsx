@@ -28,10 +28,9 @@ import {
   Droplets,
   BookOpen,
   GraduationCap,
-  Upload,
-  History,
   Shield,
   FolderArchive,
+  Plus,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -436,37 +435,35 @@ export function MainLayout() {
     }
   }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Bottom nav: 3 fijas + 2 contextuales según módulo activo
+  /**
+   * Barra inferior con destinos FIJOS (Constitución §18, §20, §61).
+   *
+   * Antes las pestañas eran CONTEXTUALES: cambiaban según el módulo en el que
+   * estuvieras. Eso rompe el modelo mental — en iOS una tab bar es un mapa
+   * estable de la app: siempre los mismos destinos, siempre en el mismo orden.
+   * Si cambian bajo el dedo, deja de ser navegación y pasa a ser una barra de
+   * acciones. La §18 lo pide explícito: "extremadamente predecible".
+   *
+   * Cinco es el máximo de la §20, y el quinto es "Más", que abre el cajón con
+   * el resto de módulos. Incidencias entra sí o sí por la §55: la información
+   * crítica no se esconde detrás de menús.
+   */
   type BottomNavItem = { name: string; href: string; icon: React.ElementType; module?: AppModule }
   const fixedTabs: BottomNavItem[] = [
-    { name: 'Inicio',   href: '/',           icon: LayoutDashboard, module: 'dashboard' },
-    { name: 'Equipos',  href: '/equipment',  icon: Wrench,          module: 'equipos' },
+    { name: 'Inicio',      href: '/',           icon: LayoutDashboard, module: 'dashboard' },
+    { name: 'Incidencias', href: '/incidents',  icon: AlertTriangle,   module: 'incidencias' },
+    { name: 'Repuestos',   href: '/repuestos',  icon: Package,         module: 'repuestos' },
   ]
-  const contextualTabsMap: Record<string, BottomNavItem[]> = {
-    '/analisis-grader': [
-      { name: 'Grader',    href: '/analisis-grader',          icon: Upload },
-      { name: 'Historial', href: '/analisis-grader/periodo',  icon: History },
-    ],
-    '/repuestos': [
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-    ],
-    '/equipment': [
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-    ],
-    '/incidents': [
-      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-    ],
-  }
-  const defaultContextual: BottomNavItem[] = [
-    { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
-    { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
-  ]
-  const activeContext = Object.keys(contextualTabsMap).find(prefix => location.pathname.startsWith(prefix))
-  const contextualTabs = (activeContext ? contextualTabsMap[activeContext] : undefined) ?? defaultContextual
-  const bottomNavItems = [...fixedTabs, ...contextualTabs]
+  /**
+   * El ＋ central ocupa el 4º de los cinco slots que permite la §20. Salió
+   * "Equipos" a cambio: se llega desde el inicio y desde cualquier incidencia,
+   * mientras que REGISTRAR es el gesto más frecuente en planta —técnico de pie,
+   * con guantes, apurado— y hasta ahora exigía navegar hasta Incidencias y
+   * buscar el botón. No es decoración: es el principio de deferencia (la UI
+   * cede ante la tarea principal) hecho geometría.
+   */
+  const registrarIncidencia = () => navigate('/incidents?nueva=1')
+  const bottomNavItems = [...fixedTabs]
     .filter(item => !item.module || canSee(item.module))
     // Respetar la misma visibilidad que el sidebar: si el href está oculto
     // (dev no activado o producción ocultada), sacarlo también del bottom nav.
@@ -514,7 +511,7 @@ export function MainLayout() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Skip to content - accesibilidad */}
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-ctl">
         Ir al contenido principal
       </a>
 
@@ -535,14 +532,14 @@ export function MainLayout() {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
+              <div className="p-2 bg-primary/10 rounded-card">
                 <Wrench className="h-5 w-5 text-primary" />
               </div>
               <span className="font-semibold">Mantenimiento</span>
             </div>
             <button
               onClick={toggleSidebarCollapse}
-              className="p-1.5 hover:bg-muted rounded-md transition-colors"
+              className="p-1.5 hover:bg-muted rounded-ctl transition-colors"
               aria-label="Contraer menú"
               title="Contraer menú"
             >
@@ -558,7 +555,7 @@ export function MainLayout() {
                 <div key={group.id}>
                   <button
                     onClick={() => toggleGroup(group.id)}
-                    className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                    className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                   >
                     <span>{group.label}</span>
                     <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
@@ -571,10 +568,14 @@ export function MainLayout() {
                         onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
                         className={({ isActive }) =>
                           cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                            // Píldora INSETADA (mx-1), no fila a sangre: es lo
+                            // que separa una barra lateral de macOS de una lista
+                            // de links. El ícono acompaña al texto en el acento.
+                            'mx-1 flex items-center gap-2.5 rounded-ctl px-2.5 py-2 text-sm font-medium transition-colors',
+                            '[&_svg]:size-[18px]',
                             isActive
                               ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-active-foreground)]'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              : 'text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground'
                           )
                         }
                       >
@@ -594,7 +595,7 @@ export function MainLayout() {
               tooltip, para soporte. */}
           <div className="px-4 pb-2">
             <div
-              className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+              className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-ctl"
               title={versionTooltip}
             >
               <span className="tabular-nums">{formatUpdatedLabel()}</span>
@@ -617,7 +618,7 @@ export function MainLayout() {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors"
+                className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10 text-primary text-xs">
@@ -650,7 +651,7 @@ export function MainLayout() {
 
               {/* User dropdown */}
               {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-lg shadow-lg overflow-hidden">
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -676,13 +677,13 @@ export function MainLayout() {
           <aside
             role="navigation"
             aria-label="Menú principal"
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-surface)] border-r"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-surface)]"
           >
             <div className="flex flex-col h-full">
               {/* Logo */}
               <div className="flex items-center justify-between h-16 px-4 border-b">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-lg">
+                  <div className="p-2 bg-primary/10 rounded-card">
                     <Wrench className="h-5 w-5 text-primary" />
                   </div>
                   <span className="font-semibold">Mantenimiento</span>
@@ -691,13 +692,13 @@ export function MainLayout() {
                   <button
                     onClick={toggleTheme}
                     title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                    className="p-1.5 rounded-card text-muted-foreground hover:text-foreground hover:bg-muted"
                   >
                     {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </button>
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="p-1 hover:bg-muted rounded"
+                    className="p-1 hover:bg-muted rounded-ctl"
                     aria-label="Cerrar menú"
                   >
                     <X className="h-5 w-5" />
@@ -713,7 +714,7 @@ export function MainLayout() {
                     <div key={group.id}>
                       <button
                         onClick={() => toggleGroup(group.id)}
-                        className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                        className="flex items-center justify-between w-full px-2 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded-ctl"
                       >
                         <span>{group.label}</span>
                         <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
@@ -726,10 +727,12 @@ export function MainLayout() {
                             onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
                             className={({ isActive }) =>
                               cn(
-                                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                                // Mismo tratamiento que la barra de escritorio.
+                                'mx-1 flex items-center gap-2.5 rounded-ctl px-2.5 py-2 text-sm font-medium transition-colors',
+                                '[&_svg]:size-[18px]',
                                 isActive
                                   ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-active-foreground)]'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground'
                               )
                             }
                           >
@@ -746,7 +749,7 @@ export function MainLayout() {
               {/* Version label (mobile) — el toggle de tema vive en la cabecera del drawer */}
               <div className="px-4 pb-2 flex items-center gap-2">
                 <div
-                  className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded"
+                  className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded-ctl"
                   title={versionTooltip}
                 >
                   <span className="tabular-nums">{formatUpdatedLabel()}</span>
@@ -758,7 +761,7 @@ export function MainLayout() {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors"
+                    className="flex items-center gap-3 w-full p-2 rounded-card hover:bg-muted transition-colors"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-primary/10 text-primary text-xs">
@@ -779,7 +782,7 @@ export function MainLayout() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-lg shadow-lg overflow-hidden">
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -832,7 +835,7 @@ export function MainLayout() {
           </div>
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-lg text-muted-foreground"
+            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-card text-muted-foreground"
             aria-label="Abrir menú completo"
             aria-expanded={sidebarOpen}
           >
@@ -862,7 +865,7 @@ export function MainLayout() {
           <div className="hidden lg:flex items-center gap-3">
             {(pendingWrites > 0 || lastSyncLabel) && (
               <button
-                className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl hover:bg-amber-500/[0.15] transition-colors"
                 title={pendingSummary || lastSyncLabel || undefined}
                 onClick={() => setShowSyncPanel((prev) => !prev)}
               >
@@ -871,7 +874,7 @@ export function MainLayout() {
               </button>
             )}
             {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded-ctl">
               <span className="tabular-nums" title={versionTooltip}>{formatBuildDateShort()}</span>
               {isAdmin && (
                 <Button
@@ -888,7 +891,7 @@ export function MainLayout() {
             <button
               onClick={toggleTheme}
               title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-              className="p-1.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="p-1.5 rounded-card transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -906,7 +909,7 @@ export function MainLayout() {
 
         {/* Syncing banner (mobile) */}
         {isOnline && pendingWrites > 0 && (
-          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-2 rounded-card flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Sincronizando...</span>
@@ -922,7 +925,7 @@ export function MainLayout() {
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/[0.15] border border-amber-500/[0.25] text-ink-warn px-4 py-3 rounded-card flex items-center justify-between gap-3">
             <AlertTriangle className="h-5 w-5" />
             <div>
               <span className="font-medium block">Sin conexion a internet</span>
@@ -936,7 +939,7 @@ export function MainLayout() {
               )}
             </div>
             {pendingWrites > 0 && (
-              <div className="ml-auto text-xs font-medium bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-1 rounded">
+              <div className="ml-auto text-xs font-medium bg-amber-500/[0.15] text-ink-warn px-2 py-1 rounded-ctl">
                 {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
               </div>
             )}
@@ -944,7 +947,7 @@ export function MainLayout() {
         )}
 
         {showSyncPanel && (pendingEntries.length > 0 || uploadItems.length > 0 || lastSyncLabel) && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-lg shadow-sm p-4">
+          <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-card shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium">Sincronizacion</h3>
@@ -956,7 +959,7 @@ export function MainLayout() {
                 <label className="text-xs text-muted-foreground">
                   <span className="sr-only">Filtro</span>
                   <select
-                    className="text-xs bg-transparent border rounded px-2 py-1"
+                    className="text-xs bg-transparent border rounded-ctl px-2 py-1"
                     value={syncFilter}
                     onChange={(e) => setSyncFilter(e.target.value)}
                   >
@@ -988,7 +991,7 @@ export function MainLayout() {
             </div>
 
             {syncTotalCount > 0 && (
-              <div className="mt-3 rounded-md border p-2">
+              <div className="mt-3 rounded-ctl border p-2">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">
                     Progreso: {syncProcessedCount}/{syncTotalCount} ({syncProgress}%)
@@ -997,7 +1000,7 @@ export function MainLayout() {
                     Pendientes: {syncPendingCount} · Errores: {syncErrorCount}
                   </span>
                 </div>
-                <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                <div className="h-2 w-full rounded-ctl bg-muted overflow-hidden">
                   <div
                     className="h-2 bg-primary transition-all"
                     style={{ width: `${syncProgress}%` }}
@@ -1104,7 +1107,7 @@ export function MainLayout() {
 
         {/* Banner de actualización disponible */}
         {hasUpdate && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="mx-4 mt-4 lg:mx-6 bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
             <div className="flex items-center gap-3">
               <RefreshCw className="h-5 w-5" />
               <div>
@@ -1172,14 +1175,14 @@ export function MainLayout() {
 
         {isReadOnly && (
           <div className="fixed inset-0 z-40 flex items-start justify-center pt-24 pointer-events-none">
-            <div className="pointer-events-auto bg-amber-500/95 text-amber-950 px-4 py-3 rounded-lg shadow-lg border border-amber-600/30 max-w-md">
+            <div className="pointer-events-auto bg-amber-500/[0.15] text-amber-950 px-4 py-3 rounded-card shadow-lg border border-amber-500/[0.25] max-w-md">
               <div className="font-medium">Modo solo lectura</div>
               <div className="text-sm opacity-90">
                 Estas en una seccion critica sin conexion. Conectate para editar o vuelve al inicio.
               </div>
               <div className="mt-2 flex gap-2">
                 <button
-                  className="text-xs px-2 py-1 rounded bg-white/70 hover:bg-white"
+                  className="text-xs px-2 py-1 rounded-ctl bg-white/70 hover:bg-white"
                   onClick={() => navigate('/')}
                 >
                   Ir al inicio
@@ -1213,7 +1216,9 @@ export function MainLayout() {
       {/* Oculto en home (/) — el home mobile tiene su propio botón de menú arriba */}
       <nav
         className={cn(
-          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border',
+          // §36: la translucidez es para el CROMO de navegación — este es su
+          // sitio. §38: separador de 1 px casi invisible, no un borde marcado.
+          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/80 backdrop-blur-xl border-t border-border/40',
           location.pathname === '/' && 'hidden',
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -1230,23 +1235,51 @@ export function MainLayout() {
                 to={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:scale-95 relative',
+                  // §16: 44px mínimo de área táctil (uso con guantes).
+                  'flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium transition-colors active:scale-[0.97] relative',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
                 aria-label={item.name}
               >
-                {isActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />}
-                <item.icon className={cn('h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.5px]')} />
+                {/* La barrita superior era un patrón de Material Design. En iOS
+                    el estado activo se comunica con el COLOR del ícono y del
+                    texto, y con más peso de trazo — nada más (§17). */}
+                <item.icon className={cn('h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.4px]')} />
                 <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
               </NavLink>
             )
-          })}
+          }).flatMap((el, idx) =>
+            // El ＋ va al MEDIO de la barra: es el punto que el pulgar alcanza
+            // sin recolocar la mano, y así lo trata iOS cuando una app tiene
+            // una acción de creación dominante.
+            idx === 1
+              ? [el, (
+                  <div key="registrar" className="flex flex-1 justify-center">
+                    <button
+                      type="button"
+                      onClick={registrarIncidencia}
+                      aria-label="Registrar incidencia"
+                      className={cn(
+                        'flex size-[3.25rem] -mt-6 items-center justify-center rounded-full',
+                        'bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(var(--brand)/0.45)]',
+                        'transition-transform duration-200 active:scale-[0.94]',
+                        'motion-reduce:transition-none',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card',
+                        '[@media(max-height:500px)]:size-9 [@media(max-height:500px)]:mt-0',
+                      )}
+                    >
+                      <Plus className="size-7 [@media(max-height:500px)]:size-5" />
+                    </button>
+                  </div>
+                )]
+              : [el],
+          )}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium text-muted-foreground transition-colors active:scale-95"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium text-muted-foreground transition-colors active:scale-[0.97]"
             aria-label="Más opciones"
           >
-            <Menu className="h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
+            <Menu className="h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
             <span className="[@media(max-height:500px)]:hidden">Más</span>
           </button>
         </div>

@@ -55,7 +55,7 @@ import { useAppStore, useAuthStore } from '@/store'
 import { getEquipments, updateEquipment, addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { EquipmentForm } from '@/components/equipment/EquipmentForm'
-import { formatRelativeTime, generateId } from '@/lib/utils'
+import { formatRelativeTime, generateId, cn } from '@/lib/utils'
 import { debounce } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { FichaTecnicaNFPA70B } from '@/components/equipment/FichaTecnicaNFPA70B'
@@ -950,7 +950,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
+          <div className="p-2 bg-primary/10 rounded-card">
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
@@ -1040,7 +1040,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
           <div className="flex flex-col gap-3">
             {/* Badge filtro activo desde jerarquía */}
             {filterSelectedIds.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-ctl">
                 <div className="flex-1 text-sm text-blue-700">
                   Mostrando {filterSelectedIds.size} {filterSelectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'} desde jerarquía
                 </div>
@@ -1498,7 +1498,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
                       const selectedNotesSet = selectedNotesByEquipment.get(eq.id) || new Set()
                       
                       return (
-                        <div key={eq.id} className="bg-gray-50 p-2 rounded">
+                        <div key={eq.id} className="bg-gray-50 p-2 rounded-ctl">
                           <p className="text-xs font-semibold text-gray-700 mb-1">{eq.nombre}</p>
                           <div className="space-y-1">
                             {eqNotes.map((note, idx) => {
@@ -1685,15 +1685,15 @@ function EquipmentCard({
     ? 'text-xs leading-snug line-clamp-3 group-hover:text-primary transition-colors'
     : 'text-sm leading-snug line-clamp-3 group-hover:text-primary transition-colors'
 
-  const codeBadgeClassName = compact ? 'font-mono text-[10px]' : 'font-mono text-[11px]'
-  const metaBadgeTextClassName = compact ? 'text-[10px]' : 'text-[11px]'
+  const codeBadgeClassName = compact ? 'font-mono text-caption' : 'font-mono text-caption'
+  const metaBadgeTextClassName = compact ? 'text-caption' : 'text-caption'
   const headerClassName = compact ? 'p-3 pb-2' : 'p-3.5 pb-2.5'
   const contentClassName = compact ? 'p-3 pt-0 space-y-2' : 'p-3.5 pt-0 space-y-2.5'
   const statusIconSizeClassName = compact ? 'h-4 w-4' : 'h-5 w-5'
   const favButtonClassName = compact ? 'h-7 w-7' : 'h-8 w-8'
   const favIconSizeClassName = compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-  const smallTextClassName = compact ? 'text-[11px]' : 'text-xs'
-  const actionButtonClassName = compact ? 'h-6 text-[11px]' : 'h-7 text-xs'
+  const smallTextClassName = compact ? 'text-caption' : 'text-xs'
+  const actionButtonClassName = compact ? 'h-6 text-caption' : 'h-7 text-xs'
 
   if (viewMode === 'list') {
     return (
@@ -1709,7 +1709,7 @@ function EquipmentCard({
                   <div
                     className={
                       compact
-                        ? 'text-[11px] text-muted-foreground font-mono truncate'
+                        ? 'text-caption text-muted-foreground font-mono truncate'
                         : 'text-sm text-muted-foreground font-mono truncate'
                     }
                   >
@@ -1982,16 +1982,67 @@ function EquipmentDetailDialog({
           </div>
         )}
 
+        {/*
+          LA MÁQUINA COMO HUB (Constitución §21, §24, §40).
+
+          Siete pestañas es demasiado para un teléfono: se apelotonan, se cortan
+          y obligan a adivinar qué hay detrás de cada una. La §40 dice que en
+          móvil puede cambiar la ARQUITECTURA, no solo el tamaño — así que la
+          misma información se presenta con dos formas distintas:
+
+            · Móvil     → LISTA de secciones (una fila por sección, con su
+                          contador y su chevron). Es el patrón de una ficha en
+                          iOS: la máquina es el eje y sus secciones se abren.
+            · Escritorio → pestañas, que ahí sí funcionan y evitan un clic.
+
+          Son los mismos `TabsTrigger` en ambos casos, así que el estado, el
+          teclado y la accesibilidad de Radix se conservan sin duplicar lógica.
+        */}
         <Tabs defaultValue={initialTab ?? 'info'}>
-          <TabsList>
-            <TabsTrigger value="info">Información</TabsTrigger>
-            <TabsTrigger value="ficha">Ficha NFPA 70B</TabsTrigger>
-            <TabsTrigger value="tablero">Tablero</TabsTrigger>
-            <TabsTrigger value="photos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
-            <TabsTrigger value="history">Historial ({incidents.length})</TabsTrigger>
-            <TabsTrigger value="notes">Notas ({notes.length})</TabsTrigger>
-            <TabsTrigger value="qr">QR</TabsTrigger>
-          </TabsList>
+          {(() => {
+            const SECCIONES: { value: string; label: string; count?: number }[] = [
+              { value: 'info',    label: 'Información' },
+              { value: 'ficha',   label: 'Ficha NFPA 70B' },
+              { value: 'tablero', label: 'Tablero' },
+              { value: 'photos',  label: 'Fotos',     count: equipment.photos?.length || 0 },
+              { value: 'history', label: 'Historial', count: incidents.length },
+              { value: 'notes',   label: 'Notas',     count: notes.length },
+              { value: 'qr',      label: 'QR' },
+            ]
+            return (
+              <>
+                {/* Escritorio: pestañas */}
+                <TabsList className="hidden md:inline-flex">
+                  {SECCIONES.map((s) => (
+                    <TabsTrigger key={s.value} value={s.value}>
+                      {s.label}{s.count !== undefined ? ` (${s.count})` : ''}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {/* Móvil: la ficha como lista de secciones */}
+                <TabsList className="flex h-auto w-full flex-col items-stretch gap-0 overflow-hidden rounded-card bg-card p-0 md:hidden">
+                  {SECCIONES.map((s, i) => (
+                    <TabsTrigger
+                      key={s.value}
+                      value={s.value}
+                      className={cn(
+                        'flex min-h-11 w-full items-center gap-3 rounded-none px-4 py-2.5 text-left text-body',
+                        'data-[state=active]:bg-accent data-[state=active]:text-primary data-[state=active]:shadow-none',
+                        i > 0 && 'border-t border-border',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium">{s.label}</span>
+                      {s.count !== undefined && (
+                        <span className="shrink-0 text-footnote tabular-nums text-muted-foreground">{s.count}</span>
+                      )}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </>
+            )
+          })()}
 
           <TabsContent value="info">
             <Card>
@@ -2060,7 +2111,7 @@ function EquipmentDetailDialog({
                 {equipment.photos && equipment.photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {equipment.photos.map((photoUrl, idx) => (
-                      <div key={photoUrl} className="relative group aspect-square rounded-lg overflow-hidden border">
+                      <div key={photoUrl} className="relative group aspect-square rounded-card overflow-hidden border">
                         <img
                           src={photoUrl}
                           alt={`Foto ${idx + 1}`}
@@ -2253,7 +2304,7 @@ function EquipmentDetailDialog({
                 {/* QR Code Visual */}
                 <div className="flex flex-col items-center gap-4">
                   <div className="text-sm font-medium text-center">Código QR del Equipo</div>
-                  <div className="p-4 bg-white rounded-lg border-2 border-border">
+                  <div className="p-4 bg-white rounded-card border-2 border-border">
                     <QRCodeSVG
                       value={`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                       size={200}
@@ -2270,7 +2321,7 @@ function EquipmentDetailDialog({
                 {/* Texto del QR */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">URL del equipo</div>
-                  <div className="font-mono text-xs p-3 rounded-md bg-muted break-all">
+                  <div className="font-mono text-xs p-3 rounded-ctl bg-muted break-all">
                     {`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                   </div>
                 </div>
@@ -2278,7 +2329,7 @@ function EquipmentDetailDialog({
                 {/* Código del equipo */}
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Código del equipo</div>
-                  <div className="font-mono text-sm p-3 rounded-md bg-muted break-all">
+                  <div className="font-mono text-sm p-3 rounded-ctl bg-muted break-all">
                     {equipment.qrCode || equipment.codigo}
                   </div>
                 </div>

@@ -29,8 +29,11 @@ export function ListGroup({ title, action, footer, className, children, ...props
     <section className={cn('flex flex-col', className)} {...props}>
       {(title || action) && (
         <header className="flex items-baseline gap-2 px-4 pb-2">
+          {/* Sentence case, no MAYÚSCULAS (Constitución §10). iOS moderno hizo el
+              mismo cambio en los encabezados de lista agrupada: "Notificaciones",
+              no "NOTIFICACIONES". */}
           {title && (
-            <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+            <h3 className="text-caption font-semibold text-muted-foreground">
               {title}
             </h3>
           )}
@@ -102,16 +105,29 @@ export function ListCell({
       {...props}
     >
       {leading && <div className="shrink-0">{leading}</div>}
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[0.88rem] font-semibold leading-tight">{title}</div>
+      {/*
+        En pantalla angosta el título puede ocupar DOS líneas y el valor baja a
+        su propia línea. Antes competían por el mismo ancho y ambos quedaban
+        cortados ("correa dañada en el…", "Pe… · telegra…"), que es justo lo que
+        la §25 prohíbe: nunca recortar el texto para evitar scroll. La §40 pide
+        además que en móvil la arquitectura cambie, no que solo se encoja.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="line-clamp-2 text-body font-semibold leading-tight sm:truncate">{title}</div>
         {subtitle && (
-          <div className="truncate text-[0.76rem] leading-tight text-muted-foreground">{subtitle}</div>
+          <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{subtitle}</div>
+        )}
+        {(value || valueSub) && (
+          <div className="mt-0.5 flex items-baseline gap-1.5 tabular-nums sm:hidden">
+            {value && <span className="text-footnote font-semibold">{value}</span>}
+            {valueSub && <span className="text-caption text-muted-foreground">{valueSub}</span>}
+          </div>
         )}
       </div>
       {(value || valueSub) && (
-        <div className="shrink-0 text-right tabular-nums">
-          {value && <div className="text-[0.82rem] font-semibold leading-tight">{value}</div>}
-          {valueSub && <div className="text-[0.72rem] leading-tight text-muted-foreground">{valueSub}</div>}
+        <div className="hidden shrink-0 text-right tabular-nums sm:block">
+          {value && <div className="text-footnote font-semibold leading-tight">{value}</div>}
+          {valueSub && <div className="text-caption leading-tight text-muted-foreground">{valueSub}</div>}
         </div>
       )}
       {trailing && <div className="shrink-0">{trailing}</div>}

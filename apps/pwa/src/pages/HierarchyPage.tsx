@@ -656,7 +656,7 @@ export function HierarchyPage() {
     return (
       <>
         {before}
-        <span className="bg-yellow-200 text-yellow-900 font-semibold px-0.5 rounded">
+        <span className="bg-yellow-200 text-yellow-900 font-semibold px-0.5 rounded-ctl">
           {match}
         </span>
         {after}
@@ -728,10 +728,10 @@ export function HierarchyPage() {
         >
           <div
             className={cn(
-              'flex items-center gap-2 p-2 rounded-lg transition-colors group',
+              'flex items-center gap-2 p-2 rounded-card transition-colors group',
               'border',
               isActive
-                ? 'border-emerald-500/30 bg-emerald-500/10 dark:border-emerald-400/20 dark:bg-emerald-400/5'
+                ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] dark:border-emerald-500/[0.25] dark:bg-emerald-500/[0.15]'
                 : 'border-transparent hover:border-border hover:bg-muted',
               !node.activo && 'opacity-60'
             )}
@@ -742,7 +742,7 @@ export function HierarchyPage() {
             {hasChildren ? (
               <button
                 onClick={() => toggleNode(node.id)}
-                className="p-1 hover:bg-muted-foreground/10 rounded"
+                className="p-1 hover:bg-muted-foreground/10 rounded-ctl"
               >
                 {isExpanded ? (
                   <ChevronDown className="h-4 w-4" />
@@ -874,7 +874,7 @@ export function HierarchyPage() {
             <div style={{ paddingLeft: `${indent + 32}px` }} className="mt-1">
               <button
                 onClick={() => toggleEquipmentNode(node.id)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground p-1 rounded-ctl hover:bg-muted"
               >
                 {expandedEquipmentNodes.has(node.id) ? (
                   <ChevronDown className="h-3 w-3" />
@@ -890,7 +890,7 @@ export function HierarchyPage() {
                   {equipmentByNode.get(node.id)!.map((eq) => (
                     <div
                       key={eq.id}
-                      className="flex items-center gap-2 p-2 rounded border border-border hover:border-primary/50 bg-background"
+                      className="flex items-center gap-2 p-2 rounded-ctl border border-border hover:border-primary/50 bg-background"
                     >
                       <Checkbox
                         checked={selectedEquipmentIds.has(eq.id)}
@@ -938,7 +938,7 @@ export function HierarchyPage() {
     <div className="space-y-6">
       {/* Banner de actualizaciones disponibles */}
       {hasUpdates && (
-        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg flex items-center justify-between">
+        <div className="bg-primary/[0.15] border border-primary/[0.25] text-ink-info px-4 py-3 rounded-card flex items-center justify-between">
           <div className="flex items-center gap-3">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">
@@ -1075,7 +1075,7 @@ export function HierarchyPage() {
 
           <div className="space-y-4">
             {parentForNew && (
-              <div className="p-3 bg-muted rounded-lg text-sm">
+              <div className="p-3 bg-muted rounded-card text-sm">
                 <span className="text-muted-foreground">Padre:</span>
                 <span className="font-medium ml-2">{parentForNew.nombre}</span>
               </div>
@@ -1119,7 +1119,7 @@ export function HierarchyPage() {
             </div>
 
             {saveError && (
-              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg">
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-card">
                 {saveError}
               </div>
             )}
@@ -1183,7 +1183,7 @@ export function HierarchyPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted">
+            <div className="flex items-center justify-between p-3 rounded-card border border-border bg-muted">
               <div>
                 <p className="text-sm font-medium">Activo</p>
                 <p className="text-xs text-muted-foreground">
@@ -1208,7 +1208,7 @@ export function HierarchyPage() {
             </div>
 
             {saveError && (
-              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg">
+              <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-card">
                 {saveError}
               </div>
             )}

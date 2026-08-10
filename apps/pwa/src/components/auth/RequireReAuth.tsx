@@ -106,7 +106,7 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-md">
-      <Card className="border-amber-500/40">
+      <Card className="border-amber-500/[0.25]">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-amber-400" />

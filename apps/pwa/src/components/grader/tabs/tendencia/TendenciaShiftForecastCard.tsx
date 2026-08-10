@@ -29,13 +29,13 @@ export function TendenciaShiftForecastCard({
 
   const severity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
   const severityBorder =
-    severity === 'critical' ? 'border-red-500/60 bg-red-500/10' :
-    severity === 'warn' ? 'border-amber-500/60 bg-amber-500/10' :
-    'border-emerald-500/60 bg-emerald-500/10'
+    severity === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.15]' :
+    severity === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' :
+    'border-emerald-500/[0.25] bg-emerald-500/[0.15]'
   const severityText =
-    severity === 'critical' ? 'text-red-600 dark:text-red-400' :
-    severity === 'warn' ? 'text-amber-600 dark:text-amber-400' :
-    'text-emerald-600 dark:text-emerald-400'
+    severity === 'critical' ? 'text-ink-crit' :
+    severity === 'warn' ? 'text-ink-warn' :
+    'text-ink-ok'
   const severityLabel =
     severity === 'critical' ? 'CRÍTICO' :
     severity === 'warn' ? 'ALERTA' :
@@ -45,8 +45,8 @@ export function TendenciaShiftForecastCard({
     shiftProgressView.weightTrend === 'down' ? TrendingDown :
     Minus
   const trendColor =
-    shiftProgressView.weightTrend === 'up' ? 'text-blue-600 dark:text-blue-400' :
-    shiftProgressView.weightTrend === 'down' ? 'text-orange-600 dark:text-orange-400' :
+    shiftProgressView.weightTrend === 'up' ? 'text-primary' :
+    shiftProgressView.weightTrend === 'down' ? 'text-cat-4-ink' :
     'text-muted-foreground'
   const trendLabel =
     shiftProgressView.weightTrend === 'up' ? 'Subiendo' :
@@ -67,8 +67,8 @@ export function TendenciaShiftForecastCard({
       <CardContent>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Tiempo restante */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tiempo restante</p>
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
+            <p className="text-caption text-muted-foreground tracking-wide">Tiempo restante</p>
             <p className="text-2xl font-bold tabular-nums">{shiftProgressView.remainingLabel}</p>
             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
               <div
@@ -76,54 +76,54 @@ export function TendenciaShiftForecastCard({
                 style={{ width: `${Math.min(100, shiftProgressView.elapsedPct)}%` }}
               />
             </div>
-            <p className="text-[10px] text-muted-foreground">{shiftProgressView.elapsedPct.toFixed(0)}% del turno</p>
+            <p className="text-caption text-muted-foreground">{shiftProgressView.elapsedPct.toFixed(0)}% del turno</p>
           </div>
 
           {/* P0 proyectado al cierre */}
-          <div className={cn('flex flex-col gap-1 p-3 rounded-lg bg-background border-2', severityBorder)}>
+          <div className={cn('flex flex-col gap-1 p-3 rounded-card bg-background border-2', severityBorder)}>
             <div className="flex items-center justify-between">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">P0 al cierre</p>
-              <Badge variant="outline" className={cn('text-[9px] px-1.5 py-0', severityText, 'border-current')}>
+              <p className="text-caption text-muted-foreground tracking-wide">P0 al cierre</p>
+              <Badge variant="outline" className={cn('text-caption px-1.5 py-0', severityText, 'border-current')}>
                 {severityLabel}
               </Badge>
             </div>
             <p className={cn('text-2xl font-bold tabular-nums', severityText)}>
               {trendForecastView.projectedPointZeroPct.toFixed(2)}%
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas proyectadas
             </p>
-            <p className="text-[9px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               umbral warn {pointZeroWarnThreshold}% / crítico {pointZeroCriticalThreshold}%
             </p>
           </div>
 
           {/* Piezas proyectadas al cierre */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Piezas al cierre</p>
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
+            <p className="text-caption text-muted-foreground tracking-wide">Piezas al cierre</p>
             <p className="text-2xl font-bold tabular-nums">
               {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               observadas: {trendForecastView.observedPieces.toLocaleString('es-CL')}
             </p>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               proyectadas: {(trendForecastView.projectedTotalPieces - trendForecastView.observedPieces).toLocaleString('es-CL')}
             </p>
           </div>
 
           {/* Tendencia del peso */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-background border">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tendencia peso</p>
+          <div className="flex flex-col gap-1 p-3 rounded-card bg-background border">
+            <p className="text-caption text-muted-foreground tracking-wide">Tendencia peso</p>
             <div className="flex items-center gap-2">
               <TrendIcon className={cn('h-6 w-6', trendColor)} />
               <p className={cn('text-2xl font-bold', trendColor)}>{trendLabel}</p>
             </div>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Δ {shiftProgressView.weightDeltaGrams >= 0 ? '+' : ''}{shiftProgressView.weightDeltaGrams.toFixed(1)} g
               {' '}({shiftProgressView.weightDeltaPct >= 0 ? '+' : ''}{shiftProgressView.weightDeltaPct.toFixed(2)}%)
             </p>
-            <p className="text-[9px] text-muted-foreground">inicio vs último observado</p>
+            <p className="text-caption text-muted-foreground">inicio vs último observado</p>
           </div>
         </div>
       </CardContent>

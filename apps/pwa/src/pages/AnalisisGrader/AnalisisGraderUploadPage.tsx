@@ -59,12 +59,12 @@ const KIND_LABELS: Record<MatrixFileKind, string> = {
 }
 
 const KIND_COLORS: Record<MatrixFileKind, string> = {
-  PIEZA_PIEZA: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  PUERTA_0: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  PORC_CALIDAD: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  TOTALES_PRODUCCION: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  PIEZA_PIEZA: 'bg-primary/[0.15] text-primary',
+  PUERTA_0: 'bg-red-500/[0.15] text-ink-crit',
+  PORC_CALIDAD: 'bg-green-500/[0.15] text-ink-ok',
+  TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.15] text-cat-6-ink',
+  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.15] text-ink-warn',
+  UNKNOWN: 'bg-muted-foreground/[0.10] text-muted-foreground',
 }
 
 const ACCEPTED_KINDS: MatrixFileKind[] = ['PIEZA_PIEZA', 'PUERTA_0']
@@ -389,8 +389,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           onClick={() => inputRef.current?.click()}
           disabled={parsing}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors',
-            'border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10',
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-ctl border text-sm font-medium transition-colors',
+            'border-primary/[0.25] text-primary hover:bg-primary/[0.15]',
             parsing && 'opacity-60 cursor-wait',
           )}
         >
@@ -400,7 +400,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           }
           Cargar Excel
           {files.length > 0 && (
-            <Badge className={cn('text-[10px] h-4 px-1 ml-0.5', files.length > 0 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : '')}>
+            <Badge className={cn('text-caption h-4 px-1 ml-0.5', files.length > 0 ? 'bg-primary/[0.15] text-primary' : '')}>
               {files.length}
             </Badge>
           )}
@@ -415,7 +415,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               setError(null)
               if (inputRef.current) inputRef.current.value = ''
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-red-500/[0.25] text-red-500 text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
             title="Cancelar — limpia los archivos en cola"
           >
             <X className="h-3 w-3" />
@@ -461,7 +461,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
             onClick={() => inputRef.current?.click()}
             className={cn(
-              'border-2 border-dashed rounded-xl p-5 lg:p-8 text-center cursor-pointer transition-all duration-200 group',
+              'border-2 border-dashed rounded-card p-5 lg:p-8 text-center cursor-pointer transition-all duration-200 group',
               dragOver
                 ? 'border-primary bg-primary/10 scale-[1.02] shadow-lg shadow-primary/10'
                 : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/10',
@@ -476,9 +476,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             <p className="text-sm font-semibold">
               {parsing ? 'Procesando...' : 'Arrastra los Excel de Matrix aquí'}
             </p>
-            <p className="text-[11px] lg:text-xs text-muted-foreground mt-1">.xlsx o .xls (grader Pieza-Pieza / Punto Cero)</p>
+            <p className="text-caption lg:text-xs text-muted-foreground mt-1">.xlsx o .xls (grader Pieza-Pieza / Punto Cero)</p>
             {!parsing && (
-              <p className="text-[10px] text-primary/60 mt-2 hidden lg:block">o haz clic para seleccionar archivos</p>
+              <p className="text-caption text-primary/60 mt-2 hidden lg:block">o haz clic para seleccionar archivos</p>
             )}
             {parsing && <Loader2 className="h-4 w-4 animate-spin mx-auto mt-2 text-muted-foreground" />}
           </div>
@@ -495,9 +495,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           {files.length > 0 && (
             <div className="space-y-1.5">
               {files.map((f) => (
-                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded px-2 py-1.5 text-xs">
+                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted rounded-ctl px-2 py-1.5 text-xs">
                   <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                  <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
+                  <Badge className={cn('text-caption h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
                     {KIND_LABELS[f.fileMeta.kind]}
                   </Badge>
                   <span className="truncate flex-1">{f.fileMeta.name}</span>
@@ -523,8 +523,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Turno detectado */}
           {turnoRange && (
-            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-md px-3 py-2">
-              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-ctl px-3 py-2">
+              <CheckCircle className="h-3.5 w-3.5 text-ink-ok shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
               <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>
             </div>
@@ -532,7 +532,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Aviso Puerta 0 faltante */}
           {hasPiezaPieza && files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && (
-            <p className="text-[11px] text-amber-600 flex items-center gap-1">
+            <p className="text-caption text-ink-warn flex items-center gap-1">
               <Info className="h-3 w-3" />
               Sin Puerta 0: el desglose de errores será inferido desde los pesos
             </p>

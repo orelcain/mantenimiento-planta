@@ -151,7 +151,7 @@ export function GraderShiftPeriodMatrix({
                   <div
                     key={dk}
                     className={cn(
-                      'text-center text-[10px] font-mono leading-tight pb-1',
+                      'text-center text-caption font-mono leading-tight pb-1',
                       isWeekend(dk) ? 'text-primary font-semibold' : 'text-muted-foreground',
                     )}
                   >
@@ -188,14 +188,14 @@ export function GraderShiftPeriodMatrix({
                       meta.borderColorClass)}>
                       <Icon className={cn('h-3.5 w-3.5 shrink-0', meta.textColorClass)} aria-hidden />
                       <span className="min-w-0">
-                        <span className="block text-[11.5px] font-semibold leading-tight truncate">
+                        <span className="block text-footnote font-semibold leading-tight truncate">
                           {/* Los turnos llevan el nombre FIEL de Shoplogix. El
                               residuo sin turno no ES un turno — mostrar el
                               string interno "Unscheduled" se leía como bug; se
                               nombra por lo que significa y lo que hay que hacer. */}
                           {isOutOfShift ? 'Sin turno' : displayShiftName(shiftId)}
                         </span>
-                        <span className="block text-[9px] text-muted-foreground font-mono leading-tight">
+                        <span className="block text-caption text-muted-foreground font-mono leading-tight">
                           {isOutOfShift ? 'configurar en Shoplogix' : meta.scheduleHint}
                         </span>
                       </span>
@@ -208,7 +208,7 @@ export function GraderShiftPeriodMatrix({
                         return (
                           <div
                             key={dk}
-                            className="rounded-sm min-h-[40px]"
+                            className="rounded-ctl min-h-[40px]"
                             style={{ background: 'var(--shift-empty)' }}
                             aria-hidden
                           />
@@ -236,7 +236,7 @@ export function GraderShiftPeriodMatrix({
                           aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}${s.mergedFrom ? `, ${s.mergedFrom.length} jornadas` : ''}`}
                           aria-pressed={selected}
                           className={cn(
-                            'relative rounded-sm min-h-[40px]',
+                            'relative rounded-ctl min-h-[40px]',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             'focus-visible:ring-offset-1 focus-visible:z-10',
                             selected && 'ring-2 ring-foreground ring-offset-1 z-10',
@@ -265,7 +265,7 @@ export function GraderShiftPeriodMatrix({
                             />
                           )}
                           {(s.crossesMidnight || s.startDayOffset > 0) && (
-                            <span aria-hidden className="absolute top-0 right-[2px] text-[8px] font-bold opacity-90">
+                            <span aria-hidden className="absolute top-0 right-[2px] text-caption font-bold opacity-90">
                               {s.startDayOffset > 0 ? '⁺¹' : '→'}
                             </span>
                           )}
@@ -275,7 +275,7 @@ export function GraderShiftPeriodMatrix({
                           {s.mergedFrom && (
                             <span
                               aria-hidden
-                              className="absolute bottom-0 left-[2px] text-[8px] font-bold opacity-90 leading-none"
+                              className="absolute bottom-0 left-[2px] text-caption font-bold opacity-90 leading-none"
                             >
                               ×{s.mergedFrom.length}
                             </span>
@@ -294,9 +294,9 @@ export function GraderShiftPeriodMatrix({
                   className="grid gap-[2px] mt-2 pt-2 border-t border-border"
                   style={{ gridTemplateColumns: gridCols }}
                 >
-                  <div className="pl-2 text-[11px] text-muted-foreground">Σ 24 h</div>
+                  <div className="pl-2 text-caption text-muted-foreground">Σ 24 h</div>
                   {days.map(dk => (
-                    <div key={dk} className="text-center text-[9px] font-mono tabular-nums text-muted-foreground">
+                    <div key={dk} className="text-center text-caption font-mono tabular-nums text-muted-foreground">
                       {totals.get(dk) ? Math.round(totals.get(dk)!).toLocaleString('es-CL') : ''}
                     </div>
                   ))}
@@ -312,7 +312,7 @@ export function GraderShiftPeriodMatrix({
                           text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               {kpiMeta.scaleLo}
-              <span className="inline-flex rounded-sm overflow-hidden" aria-hidden>
+              <span className="inline-flex rounded-ctl overflow-hidden" aria-hidden>
                 {[1, 2, 3, 4].map(i => (
                   <span key={i} className="block w-5 h-2.5" style={{ background: `var(--shift-ramp-${i})` }} />
                 ))}
@@ -320,7 +320,7 @@ export function GraderShiftPeriodMatrix({
               {kpiMeta.scaleHi}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm border border-border" style={{ background: 'var(--shift-empty)' }} aria-hidden />
+              <span className="w-3 h-3 rounded-ctl border border-border" style={{ background: 'var(--shift-empty)' }} aria-hidden />
               sin proceso
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -366,7 +366,7 @@ export function GraderShiftPeriodMatrix({
             {hovered.mergedFrom && (
               <div className="mt-0.5 pl-1.5 border-l border-border/60 space-y-0.5">
                 {hovered.mergedFrom.map(inst => (
-                  <div key={inst.key} className="font-mono text-[10px] text-muted-foreground">
+                  <div key={inst.key} className="font-mono text-caption text-muted-foreground">
                     {formatShiftWindow(inst)} · {inst.cycles.toLocaleString('es-CL')} cic
                   </div>
                 ))}
@@ -390,7 +390,7 @@ export function GraderShiftPeriodMatrix({
         {/* Panel del turno SELECCIONADO — permanente, con el acceso al análisis.
             En tablet (sin hover) es la única superficie de lectura. */}
         <div className={cn(
-          'mt-3 rounded-md border px-3 py-2 text-xs transition-colors',
+          'mt-3 rounded-ctl border px-3 py-2 text-xs transition-colors',
           // Alto reservado: sin esto, al seleccionar un turno el panel pasa de
           // una linea de placeholder a una fila de datos (que ademas envuelve
           // a 2 en pantallas medianas) y toda la pagina da un salto.

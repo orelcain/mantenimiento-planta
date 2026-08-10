@@ -144,7 +144,7 @@ export function AriaMonitorPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-500/15 rounded-lg">
+          <div className="p-2 bg-cat-6-tint/[0.15] rounded-card">
             <Brain className="h-5 w-5 text-purple-500" />
           </div>
           <div>
@@ -234,7 +234,7 @@ export function AriaMonitorPanel() {
                   Voz de ARIA
                 </label>
                 <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="w-full h-9 rounded-ctl border border-input bg-background px-3 text-sm"
                   value={ARIA_VOICE_OPTIONS.some(o => o.uri === config.voiceURI) ? config.voiceURI : ARIA_VOICE_OPTIONS[0]!.uri}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                     const uri = e.target.value
@@ -307,15 +307,15 @@ export function AriaMonitorPanel() {
         <CardContent>
           {/* Resumen */}
           <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="text-center p-3 bg-muted/50 rounded-card">
               <div className="text-2xl font-bold">{todayUsage?.totalRequests || 0}</div>
               <div className="text-xs text-muted-foreground">Requests totales</div>
             </div>
-            <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="text-center p-3 bg-muted/50 rounded-card">
               <div className="text-2xl font-bold">{todayUsage?.users.length || 0}</div>
               <div className="text-xs text-muted-foreground">Usuarios activos</div>
             </div>
-            <div className="text-center p-3 bg-muted/50 rounded-lg">
+            <div className="text-center p-3 bg-muted/50 rounded-card">
               <div className="text-2xl font-bold">
                 {todayUsage?.totalTokens ? Math.round(todayUsage.totalTokens / 1000) + 'K' : '0'}
               </div>
@@ -332,9 +332,9 @@ export function AriaMonitorPanel() {
                   {usedPercent}%
                 </span>
               </div>
-              <div className="h-2 w-full rounded bg-muted overflow-hidden">
+              <div className="h-2 w-full rounded-ctl bg-muted overflow-hidden">
                 <div
-                  className={`h-2 transition-all rounded ${
+                  className={`h-2 transition-all rounded-ctl ${
                     usedPercent > 90 ? 'bg-red-500' : usedPercent > 70 ? 'bg-amber-500' : 'bg-purple-500'
                   }`}
                   style={{ width: `${Math.min(100, usedPercent)}%` }}
@@ -363,9 +363,9 @@ export function AriaMonitorPanel() {
                         <AlertTriangle className="h-3 w-3 text-amber-500" />
                       )}
                     </div>
-                    <div className="w-20 h-1.5 rounded bg-muted overflow-hidden">
+                    <div className="w-20 h-1.5 rounded-ctl bg-muted overflow-hidden">
                       <div
-                        className={`h-full rounded ${pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-purple-500'}`}
+                        className={`h-full rounded-ctl ${pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-purple-500'}`}
                         style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>
@@ -395,9 +395,9 @@ export function AriaMonitorPanel() {
               {history.map((day) => (
                 <div key={day.date} className="flex items-center gap-3 text-sm py-1">
                   <span className="text-xs text-muted-foreground w-20 font-mono">{day.date.slice(5)}</span>
-                  <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
+                  <div className="flex-1 h-4 bg-muted rounded-ctl overflow-hidden">
                     <div
-                      className="h-full bg-purple-500/70 rounded transition-all"
+                      className="h-full bg-cat-6-tint/[0.15] rounded-ctl transition-all"
                       style={{
                         width: `${Math.min(100, history.length > 0 ? (day.totalRequests / Math.max(...history.map(h => h.totalRequests), 1)) * 100 : 0)}%`,
                       }}

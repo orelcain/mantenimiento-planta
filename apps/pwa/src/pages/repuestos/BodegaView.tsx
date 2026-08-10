@@ -28,6 +28,8 @@ import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { useBodega } from '@/hooks/repuestos/useBodega'
+// `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
+import { Tag as CatTag, type TagTone } from '@/components/piel'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
 import type {
   BodegaMergedItem, BodegaStockData, MovimientoBodega,
@@ -40,27 +42,36 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
 
-const INPUT = 'w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
+const INPUT = 'w-full px-3 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
-function tipoBadgeColor(tipo?: string): string {
-  if (!tipo) return 'bg-muted text-muted-foreground'
+/**
+ * Tono CATEGÓRICO por tipo de repuesto (primitivo <Tag>, docs §1.6).
+ *
+ * Antes esta función devolvía clases Tailwind crudas con el patrón
+ * `bg-X-500/15 text-X-700 dark:text-X-400`. Ese patrón es exactamente el que la
+ * auditoría de julio marcó como riesgo: sobre fondo al 15% varios de esos pares
+ * caían BAJO 4.5:1 (emerald 4.09, red 3.99). Los tonos de <Tag> están medidos y
+ * cumplen AA en ambos temas.
+ *
+ * Los tonos NO son semánticos: un motor en tono 5 no es "peor" que un
+ * rodamiento en tono 1, solo es otra cosa.
+ */
+function tipoTag(tipo?: string): TagTone {
+  if (!tipo) return 'neutral'
   const t = tipo.toUpperCase()
-  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
-  if (['SELLO/JUNTA', 'ANILLO', 'SELLO'].includes(t)) return 'bg-green-500/15 text-green-700 dark:text-green-400'
-  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/15 text-red-700 dark:text-red-400'
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 1
+  if (['SELLO/JUNTA', 'ANILLO', 'SELLO'].includes(t)) return 2
+  if (['MOTOR', 'BOMBA'].includes(t)) return 5
   if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR',
-    'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t))
-    return 'bg-purple-500/15 text-purple-700 dark:text-purple-400'
-  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t))
-    return 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-400'
-  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
-  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t))
-    return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400'
-  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-yellow-500/15 text-yellow-500'
-  if (['RESORTE'].includes(t)) return 'bg-teal-500/15 text-teal-700 dark:text-teal-400'
-  if (['SOPORTE', 'CARCASA/TAPA', 'ESTRUCTURA'].includes(t)) return 'bg-slate-500/15 text-slate-700 dark:text-slate-400'
-  if (['AMORTIGUADOR'].includes(t)) return 'bg-rose-500/15 text-rose-700 dark:text-rose-400'
-  return 'bg-muted text-muted-foreground'
+    'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 6
+  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'neutral'
+  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 4
+  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 7
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 8
+  if (['RESORTE'].includes(t)) return 7
+  if (['SOPORTE', 'CARCASA/TAPA', 'ESTRUCTURA'].includes(t)) return 'neutral'
+  if (['AMORTIGUADOR'].includes(t)) return 5
+  return 'neutral'
 }
 
 // ══════════════════════════════════════════════
@@ -151,7 +162,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
     <div className="flex flex-col gap-3 p-3 sm:p-6 max-w-6xl mx-auto">
       {/* Sub-tabs: compactas en móvil (sin ícono, menos padding) para que las 4
           quepan en 375px — antes "Estadísticas" quedaba cortada fuera de vista. */}
-      <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-fit max-w-full overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1 bg-muted p-1 rounded-card w-fit max-w-full overflow-x-auto no-scrollbar">
         {SUB_TABS.map(t => {
           const Icon = t.icon
           const active = subTab === t.id
@@ -160,14 +171,14 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
               key={t.id}
               onClick={() => setSubTab(t.id)}
               className={[
-                'flex shrink-0 items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                'flex shrink-0 items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-ctl text-xs font-medium transition-all',
                 active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               ].join(' ')}
             >
               <Icon className="hidden sm:block h-3.5 w-3.5" />
               {t.label}
               {t.id === 'stock' && bodega.stats.bajoStock + bodega.stats.sinStock > 0 && (
-                <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/80 text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="h-4 min-w-[16px] px-1 rounded-full bg-red-500/[0.15] text-white text-caption font-bold flex items-center justify-center">
                   {bodega.stats.bajoStock + bodega.stats.sinStock}
                 </span>
               )}
@@ -278,12 +289,12 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-        <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-blue-700 dark:text-blue-400" bg="bg-blue-500/15" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
-        <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-emerald-700 dark:text-emerald-400" bg="bg-emerald-500/15" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
-        <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-amber-700 dark:text-amber-400" bg="bg-amber-500/15" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
-        <StatCard icon={PackageX} label="Sin stock" value={stats.sinStock} color="text-red-700 dark:text-red-400" bg="bg-red-500/15" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
-        <StatCard icon={Settings2} label="Sin configurar" value={stats.sinConfig} color="text-zinc-700 dark:text-zinc-400" bg="bg-zinc-500/15" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
-        <StatCard icon={Star} label="Favoritos" value={favCount} color="text-yellow-700 dark:text-yellow-400" bg="bg-yellow-500/15" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
+        <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-primary" bg="bg-primary/[0.15]" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
+        <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-ink-ok" bg="bg-emerald-500/[0.15]" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
+        <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
+        <StatCard icon={PackageX} label="Sin stock" value={stats.sinStock} color="text-ink-crit" bg="bg-red-500/[0.15]" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
+        <StatCard icon={Settings2} label="Sin configurar" value={stats.sinConfig} color="text-muted-foreground" bg="bg-muted-foreground/[0.10]" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
+        <StatCard icon={Star} label="Favoritos" value={favCount} color="text-ink-warn" bg="bg-amber-500/[0.15]" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
       </div>
 
       {/* Search + Actions */}
@@ -291,21 +302,21 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input type="text" placeholder="Buscar por nombre, SAP, tipo, ubicación…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
+            className="w-full pl-9 pr-8 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
+          {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-ctl hover:bg-muted"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
         </div>
-        <button onClick={() => setShowBatchMov(true)} title="Movimiento en lote" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors shrink-0">
+        <button onClick={() => setShowBatchMov(true)} title="Movimiento en lote" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-card hover:bg-emerald-500/[0.15] text-ink-ok transition-colors shrink-0">
           <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lote</span>
         </button>
-        <button onClick={() => setShowCargaRapida(true)} title="Carga rápida de stock y ubicación, ítem por ítem" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-amber-500/15 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 transition-colors shrink-0">
+        <button onClick={() => setShowCargaRapida(true)} title="Carga rápida de stock y ubicación, ítem por ítem" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card hover:bg-amber-500/[0.15] text-ink-warn transition-colors shrink-0">
           <MapPin className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Carga rápida</span>
         </button>
         {stats.sinConfig > 0 && (
-          <button onClick={() => setShowBulkConfig(true)} title="Configurar múltiples" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary transition-colors shrink-0">
+          <button onClick={() => setShowBulkConfig(true)} title="Configurar múltiples" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-primary transition-colors shrink-0">
             <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config.</span>
           </button>
         )}
-        <button onClick={() => exportCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-lg hover:bg-muted text-muted-foreground transition-colors shrink-0">
+        <button onClick={() => exportCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground transition-colors shrink-0">
           <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">CSV</span>
         </button>
       </div>
@@ -317,14 +328,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
 
       {/* Sort bar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Ordenar:</span>
+        <span className="text-caption text-muted-foreground font-medium tracking-wider">Ordenar:</span>
         {([['nombre', 'Nombre'], ['stock', 'Stock'], ['valor', 'Valor'], ['equipos', 'Equipos']] as [SortField, string][]).map(([field, label]) => (
           <button key={field} onClick={() => toggleSort(field)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${sortField === field ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+            className={`flex items-center gap-1 px-2 py-1 rounded-ctl text-caption font-medium transition-colors ${sortField === field ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
             {label} <SortIcon field={field} />
           </button>
         ))}
-        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{filtered.length} de {items.length}</span>
+        <span className="ml-auto text-caption text-muted-foreground tabular-nums">{filtered.length} de {items.length}</span>
       </div>
 
       {/* Cards grid */}
@@ -427,29 +438,29 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
   if (resumenFinal) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="h-16 w-16 rounded-2xl bg-emerald-500/15 flex items-center justify-center">
-          <CheckCircle2 className="h-8 w-8 text-emerald-700 dark:text-emerald-400" />
+        <div className="h-16 w-16 rounded-panel bg-emerald-500/[0.15] flex items-center justify-center">
+          <CheckCircle2 className="h-8 w-8 text-ink-ok" />
         </div>
         <h3 className="text-lg font-bold text-foreground">Inventario finalizado</h3>
         <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <div className="bg-card border border-border rounded-card p-4 text-center">
             <p className="text-2xl font-bold text-foreground">{resumenFinal.contados}</p>
-            <p className="text-[10px] text-muted-foreground">Ítems contados</p>
+            <p className="text-caption text-muted-foreground">Ítems contados</p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{resumenFinal.ajustados}</p>
-            <p className="text-[10px] text-muted-foreground">Con diferencia</p>
+          <div className="bg-card border border-border rounded-card p-4 text-center">
+            <p className="text-2xl font-bold text-ink-warn">{resumenFinal.ajustados}</p>
+            <p className="text-caption text-muted-foreground">Con diferencia</p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">${resumenFinal.valorDif.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
-            <p className="text-[10px] text-muted-foreground">Valor diferencias</p>
+          <div className="bg-card border border-border rounded-card p-4 text-center">
+            <p className="text-2xl font-bold text-cat-6-ink">${resumenFinal.valorDif.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
+            <p className="text-caption text-muted-foreground">Valor diferencias</p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
-            <p className={`text-2xl font-bold ${resumenFinal.precision >= 95 ? 'text-emerald-700 dark:text-emerald-400' : resumenFinal.precision >= 80 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'}`}>{resumenFinal.precision}%</p>
-            <p className="text-[10px] text-muted-foreground">Precisión</p>
+          <div className="bg-card border border-border rounded-card p-4 text-center">
+            <p className={`text-2xl font-bold ${resumenFinal.precision >= 95 ? 'text-ink-ok' : resumenFinal.precision >= 80 ? 'text-ink-warn' : 'text-ink-crit'}`}>{resumenFinal.precision}%</p>
+            <p className="text-caption text-muted-foreground">Precisión</p>
           </div>
         </div>
-        <button onClick={() => setResumenFinal(null)} className="mt-4 px-6 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90">
+        <button onClick={() => setResumenFinal(null)} className="mt-4 px-6 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90">
           Volver a inventarios
         </button>
       </div>
@@ -470,18 +481,18 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
             <h3 className="text-base font-bold text-foreground">{activeSesion.nombre}</h3>
             <p className="text-xs text-muted-foreground">
               {contados.length}/{conteos.length} contados • {conDif.length} con diferencia
-              {activeSesion.estado === 'finalizado' && <span className="ml-2 text-emerald-700 dark:text-emerald-400 font-semibold">✓ Finalizado</span>}
+              {activeSesion.estado === 'finalizado' && <span className="ml-2 text-ink-ok font-semibold">✓ Finalizado</span>}
             </p>
           </div>
           {activeSesion.estado === 'en_curso' && (
             <button onClick={handleFinalizar}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-500 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-card hover:bg-emerald-500 transition-colors">
               <CheckCircle2 className="h-4 w-4" /> Finalizar y ajustar
             </button>
           )}
         </div>
 
-        <div className="bg-muted rounded-lg p-3 border border-border">
+        <div className="bg-muted rounded-card p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
             <span>Progreso</span>
             <span>{conteos.length > 0 ? Math.round((contados.length / conteos.length) * 100) : 0}%</span>
@@ -498,7 +509,7 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
 
   return (
     <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-4">
+      <div className="bg-card border border-border rounded-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Nuevo inventario periódico</h3>
         <div className="flex items-end gap-3">
           <div className="flex-1">
@@ -507,18 +518,18 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
               placeholder={`Inventario ${new Date().toLocaleDateString('es-CL')}`} className={INPUT} />
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer shrink-0 pb-2">
-            <input type="checkbox" checked={soloConStock} onChange={e => setSoloConStock(e.target.checked)} className="rounded" />
+            <input type="checkbox" checked={soloConStock} onChange={e => setSoloConStock(e.target.checked)} className="rounded-ctl" />
             Solo con stock configurado
           </label>
           <button onClick={handleCrear} disabled={creando || !nuevoNombre.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0">
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0">
             {creando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Crear
           </button>
         </div>
         {soloConStock && items.filter(i => i.bodegaId).length === 0 ? (
-          <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-2 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" />No hay ítems con stock configurado.</p>
+          <p className="text-caption text-ink-warn mt-2 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" />No hay ítems con stock configurado.</p>
         ) : (
-          <p className="text-[10px] text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
+          <p className="text-caption text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
         )}
       </div>
 
@@ -530,21 +541,21 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
         <div className="space-y-2">
           {sesiones.map(s => (
             <button key={s.id} onClick={() => handleOpenSesion(s)}
-              className="w-full flex items-center gap-4 p-4 bg-card border border-border rounded-xl hover:bg-muted transition-colors text-left">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/15' : 'bg-amber-500/15'}`}>
-                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" /> : <ClipboardList className="h-5 w-5 text-amber-700 dark:text-amber-400" />}
+              className="w-full flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
+              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
+                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{s.nombre}</p>
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-3 text-caption text-muted-foreground mt-0.5">
                   <span>{s.contados}/{s.totalItems} contados</span>
-                  {s.conDiferencia > 0 && <span className="text-amber-700 dark:text-amber-400">{s.conDiferencia} con diferencia</span>}
+                  {s.conDiferencia > 0 && <span className="text-ink-warn">{s.conDiferencia} con diferencia</span>}
                   <span>{s.creadoPorNombre}</span>
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold uppercase shrink-0">En curso</span>}
-              {s.estado === 'finalizado' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-semibold uppercase shrink-0">Finalizado</span>}
+              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold uppercase shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold uppercase shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -599,19 +610,19 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
     <div>
       <div className="flex items-center gap-1 mb-3">
         {[
-          { id: 'pendientes' as const, label: 'Pendientes', count: pendientes.length, color: 'text-amber-700 dark:text-amber-400' },
-          { id: 'contados' as const, label: 'Contados', count: contados.length, color: 'text-emerald-700 dark:text-emerald-400' },
-          { id: 'diferencias' as const, label: 'Diferencias', count: conDif.length, color: 'text-red-700 dark:text-red-400' },
+          { id: 'pendientes' as const, label: 'Pendientes', count: pendientes.length, color: 'text-ink-warn' },
+          { id: 'contados' as const, label: 'Contados', count: contados.length, color: 'text-ink-ok' },
+          { id: 'diferencias' as const, label: 'Diferencias', count: conDif.length, color: 'text-ink-crit' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${tab === t.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            className={`px-3 py-1.5 rounded-card text-xs font-medium transition-all ${tab === t.id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
             {t.label} <span className={t.color}>{t.count}</span>
           </button>
         ))}
         <div className="flex-1" />
         {!isFinalizado && tab === 'pendientes' && (
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
-            <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded h-3 w-3" />
+          <label className="flex items-center gap-1.5 text-caption text-muted-foreground cursor-pointer">
+            <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded-ctl h-3 w-3" />
             <Zap className="h-3 w-3" /> Escaneo rápido
           </label>
         )}
@@ -621,7 +632,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input type="text" placeholder="Buscar por nombre o SAP…" value={conteoSearch} onChange={e => setConteoSearch(e.target.value)}
-            className="w-full pl-8 pr-7 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
+            className="w-full pl-8 pr-7 py-1.5 text-xs bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
           {conteoSearch && <button onClick={() => setConteoSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3 w-3 text-muted-foreground" /></button>}
         </div>
       )}
@@ -629,54 +640,54 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
       {visible.length === 0 ? (
         <EmptyState message={conteoSearch ? 'Sin coincidencias' : tab === 'pendientes' ? 'Todo contado' : 'Sin ítems'} />
       ) : (
-        <div className="border border-border rounded-xl overflow-hidden bg-card divide-y divide-border/50 max-h-[50vh] overflow-y-auto">
+        <div className="border border-border rounded-card overflow-hidden bg-card divide-y divide-border/50 max-h-[50vh] overflow-y-auto">
           {visible.map(c => (
             <div key={c.codigoSAP} className="px-4 py-2.5 hover:bg-muted transition-colors">
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{c.textoBreve}</p>
-                  <span className="text-[10px] font-mono text-blue-700 dark:text-blue-400">{c.codigoSAP}</span>
+                  <span className="text-caption font-mono text-primary">{c.codigoSAP}</span>
                 </div>
                 <div className="text-center shrink-0 w-16">
-                  <p className="text-[9px] text-muted-foreground uppercase">Sistema</p>
+                  <p className="text-caption text-muted-foreground uppercase">Sistema</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{c.stockSistema}</p>
                 </div>
                 {c.stockFisico !== null ? (
                   <>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-[9px] text-muted-foreground uppercase">Físico</p>
+                      <p className="text-caption text-muted-foreground uppercase">Físico</p>
                       <p className="text-sm font-bold text-foreground tabular-nums">{c.stockFisico}</p>
                     </div>
                     <div className="text-center shrink-0 w-16">
-                      <p className="text-[9px] text-muted-foreground uppercase">Dif.</p>
-                      <p className={`text-sm font-bold tabular-nums ${c.diferencia > 0 ? 'text-emerald-700 dark:text-emerald-400' : c.diferencia < 0 ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      <p className="text-caption text-muted-foreground uppercase">Dif.</p>
+                      <p className={`text-sm font-bold tabular-nums ${c.diferencia > 0 ? 'text-ink-ok' : c.diferencia < 0 ? 'text-ink-crit' : 'text-muted-foreground'}`}>
                         {c.diferencia > 0 ? '+' : ''}{c.diferencia}
                       </p>
                     </div>
                     {!isFinalizado && (
                       <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockFisico!); setEditObs(c.observaciones || '') }}
-                        className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                        className="p-1.5 rounded-ctl hover:bg-muted text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                     )}
                   </>
                 ) : (
                   editingSAP === c.codigoSAP ? (
                     <div className="flex items-center gap-2 shrink-0">
                       <input type="number" min={0} value={editValue} onChange={e => setEditValue(Number(e.target.value))}
-                        className="w-20 px-2 py-1 text-sm text-center bg-muted border border-border rounded-lg tabular-nums font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground" autoFocus
+                        className="w-20 px-2 py-1 text-sm text-center bg-muted border border-border rounded-card tabular-nums font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground" autoFocus
                         onKeyDown={e => { if (e.key === 'Enter') handleSave(c.codigoSAP) }} />
-                      {!quickScan && <input type="text" value={editObs} onChange={e => setEditObs(e.target.value)} placeholder="Obs." className="w-28 px-2 py-1 text-xs bg-muted border border-border rounded-lg text-foreground" />}
-                      <button onClick={() => handleSave(c.codigoSAP)} className="p-1 rounded bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => setEditingSAP(null)} className="p-1 rounded hover:bg-muted text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
+                      {!quickScan && <input type="text" value={editObs} onChange={e => setEditObs(e.target.value)} placeholder="Obs." className="w-28 px-2 py-1 text-xs bg-muted border border-border rounded-card text-foreground" />}
+                      <button onClick={() => handleSave(c.codigoSAP)} className="p-1 rounded-ctl bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => setEditingSAP(null)} className="p-1 rounded-ctl hover:bg-muted text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
                     </div>
                   ) : (
                     <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockSistema) }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors shrink-0">
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-card hover:bg-primary/20 transition-colors shrink-0">
                       <CircleDot className="h-3.5 w-3.5" /> Contar
                     </button>
                   )
                 )}
               </div>
-              {c.observaciones && c.stockFisico !== null && <p className="text-[10px] text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
+              {c.observaciones && c.stockFisico !== null && <p className="text-caption text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
             </div>
           ))}
         </div>
@@ -743,17 +754,17 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
     <div className="space-y-3">
       <div className="grid grid-cols-4 gap-2">
         {[
-          { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length, icon: History, color: 'text-blue-700 dark:text-blue-400', border: 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' },
-          { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas, icon: ArrowDownCircle, color: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500/40 bg-emerald-500/15 ring-1 ring-emerald-500/20' },
-          { f: 'salida' as MovFilter, label: 'Salidas', count: salidas, icon: ArrowUpCircle, color: 'text-red-700 dark:text-red-400', border: 'border-red-500/40 bg-red-500/15 ring-1 ring-red-500/20' },
-          { f: 'ajuste' as MovFilter, label: 'Ajustes', count: ajustes, icon: Settings2, color: 'text-blue-700 dark:text-blue-400', border: 'border-blue-500/40 bg-blue-500/15 ring-1 ring-blue-500/20' },
+          { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length, icon: History, color: 'text-primary', border: 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' },
+          { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas, icon: ArrowDownCircle, color: 'text-ink-ok', border: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] ring-1 ring-emerald-500/20' },
+          { f: 'salida' as MovFilter, label: 'Salidas', count: salidas, icon: ArrowUpCircle, color: 'text-ink-crit', border: 'border-red-500/[0.25] bg-red-500/[0.15] ring-1 ring-red-500/20' },
+          { f: 'ajuste' as MovFilter, label: 'Ajustes', count: ajustes, icon: Settings2, color: 'text-primary', border: 'border-primary/[0.25] bg-primary/[0.15] ring-1 ring-blue-500/20' },
         ].map(o => {
           const I = o.icon
           return (
             <button key={o.f} onClick={() => setFiltroTipo(o.f)}
-              className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === o.f ? o.border : 'border-border bg-card hover:bg-muted'}`}>
+              className={`flex items-center gap-2 p-3 rounded-card border transition-all text-left ${filtroTipo === o.f ? o.border : 'border-border bg-card hover:bg-muted'}`}>
               <I className={`h-4 w-4 ${o.color}`} />
-              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-[10px] text-muted-foreground">{o.label}</p></div>
+              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-caption text-muted-foreground">{o.label}</p></div>
             </button>
           )
         })}
@@ -763,10 +774,10 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input type="text" placeholder="Buscar por SAP, motivo, usuario…" value={searchMov} onChange={e => setSearchMov(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
-          {searchMov && <button onClick={() => setSearchMov('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
+            className="w-full pl-9 pr-8 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
+          {searchMov && <button onClick={() => setSearchMov('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-ctl hover:bg-muted"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
         </div>
-        <button onClick={() => exportMovsCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-lg hover:bg-muted text-muted-foreground transition-colors shrink-0">
+        <button onClick={() => exportMovsCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground transition-colors shrink-0">
           <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Exportar</span>
         </button>
       </div>
@@ -774,31 +785,31 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {filtered.length === 0 ? (
         <EmptyState message={movimientos.length === 0 ? 'Sin movimientos registrados' : 'Sin resultados'} />
       ) : (
-        <div className="border border-border rounded-xl overflow-hidden bg-card">
-          <div className="hidden sm:grid grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2 bg-muted border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+        <div className="border border-border rounded-card overflow-hidden bg-card">
+          <div className="hidden sm:grid grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2 bg-muted border-b border-border text-caption tracking-wider font-semibold text-muted-foreground">
             <span>Fecha</span><span>Tipo</span><span>Motivo</span><span className="text-center">Cantidad</span><span className="text-center">Stock</span><span>Realizado por</span>
           </div>
           <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
             {filtered.map(m => {
               const tipoConfig = {
-                entrada: { label: 'Entrada', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/15', icon: ArrowDownCircle },
-                salida: { label: 'Salida', color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500/15', icon: ArrowUpCircle },
-                ajuste: { label: 'Ajuste', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/15', icon: Settings2 },
+                entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', icon: ArrowDownCircle },
+                salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', icon: ArrowUpCircle },
+                ajuste: { label: 'Ajuste', color: 'text-primary', bg: 'bg-primary/[0.15]', icon: Settings2 },
               }[m.tipo]
               const TIcon = tipoConfig.icon
               return (
                 <div key={m.id} className="sm:grid sm:grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2.5 hover:bg-muted transition-colors">
                   <div className="text-xs text-muted-foreground tabular-nums">
                     <p>{m.createdAt.toLocaleDateString('es-CL')}</p>
-                    <p className="text-[10px] text-muted-foreground/60">{m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-caption text-muted-foreground/60">{m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className={`h-6 w-6 rounded flex items-center justify-center shrink-0 ${tipoConfig.bg}`}><TIcon className={`h-3.5 w-3.5 ${tipoConfig.color}`} /></div>
-                    <span className={`text-[10px] font-semibold ${tipoConfig.color}`}>{tipoConfig.label}</span>
+                    <div className={`h-6 w-6 rounded-ctl flex items-center justify-center shrink-0 ${tipoConfig.bg}`}><TIcon className={`h-3.5 w-3.5 ${tipoConfig.color}`} /></div>
+                    <span className={`text-caption font-semibold ${tipoConfig.color}`}>{tipoConfig.label}</span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-foreground truncate">{m.motivo || '—'}</p>
-                    <span className="text-[10px] font-mono text-blue-700 dark:text-blue-400">{m.bodegaItemId}</span>
+                    <span className="text-caption font-mono text-primary">{m.bodegaItemId}</span>
                   </div>
                   <div className="flex items-center justify-center">
                     <span className={`text-sm font-bold tabular-nums ${tipoConfig.color}`}>
@@ -912,24 +923,24 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
     <div className="space-y-4">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KpiCard label="Total ítems SAP" value={stats.total} icon={Package} color="text-blue-700 dark:text-blue-400" />
-        <KpiCard label="Con stock configurado" value={stats.conStock} icon={PackageCheck} color="text-emerald-700 dark:text-emerald-400" sub={`${coberturaPct}% cobertura`} />
-        <KpiCard label="Valor inventario" value={`$${stats.valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`} icon={DollarSign} color="text-violet-700 dark:text-violet-400" />
-        <KpiCard label="Bajo / Sin stock" value={`${stats.bajoStock} / ${stats.sinStock}`} icon={AlertTriangle} color="text-amber-700 dark:text-amber-400" />
+        <KpiCard label="Total ítems SAP" value={stats.total} icon={Package} color="text-primary" />
+        <KpiCard label="Con stock configurado" value={stats.conStock} icon={PackageCheck} color="text-ink-ok" sub={`${coberturaPct}% cobertura`} />
+        <KpiCard label="Valor inventario" value={`$${stats.valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`} icon={DollarSign} color="text-cat-6-ink" />
+        <KpiCard label="Bajo / Sin stock" value={`${stats.bajoStock} / ${stats.sinStock}`} icon={AlertTriangle} color="text-ink-warn" />
       </div>
 
       {/* Salud + Cobertura */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Salud del inventario</p>
+        <div className="bg-card border border-border rounded-card p-4">
+          <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Salud del inventario</p>
           <div className="flex items-center gap-3 mb-3">
             {[
-              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/15' },
-              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/15' },
-              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500/15' },
+              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]' },
+              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]' },
+              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]' },
             ].map(s => (
-              <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border border-border bg-muted">
-                <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-[9px] text-muted-foreground">{s.label}</span>
+              <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-card border border-border bg-muted">
+                <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-caption text-muted-foreground">{s.label}</span>
               </div>
             ))}
           </div>
@@ -941,8 +952,8 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             </div>
           )}
         </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Cobertura de bodega</p>
+        <div className="bg-card border border-border rounded-card p-4">
+          <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Cobertura de bodega</p>
           <div className="flex items-center justify-center">
             <div className="relative h-28 w-28">
               <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
@@ -953,11 +964,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-2xl font-bold text-foreground tabular-nums">{coberturaPct}%</span>
-                <span className="text-[9px] text-muted-foreground">configurados</span>
+                <span className="text-caption text-muted-foreground">configurados</span>
               </div>
             </div>
           </div>
-          <div className="flex justify-center gap-4 mt-3 text-[10px] text-muted-foreground">
+          <div className="flex justify-center gap-4 mt-3 text-caption text-muted-foreground">
             <span><strong className="text-foreground">{stats.conStock}</strong> configurados</span>
             <span><strong className="text-foreground">{stats.sinConfig}</strong> sin configurar</span>
           </div>
@@ -965,24 +976,24 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       </div>
 
       {/* Clasificación ABC automática */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-violet-500/15">
-          <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wide flex items-center gap-1.5">
+      <div className="bg-card border border-border rounded-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-cat-6-tint/[0.15]">
+          <p className="text-xs font-semibold text-cat-6-ink tracking-wide flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5" /> Clasificación ABC (por valor inventario)
           </p>
         </div>
         <div className="p-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
             {[
-              { label: 'A — Crítico', data: abcData.A, color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500/15', desc: '80% del valor' },
-              { label: 'B — Importante', data: abcData.B, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/15', desc: '15% del valor' },
-              { label: 'C — Estándar', data: abcData.C, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/15', desc: '5% del valor' },
+              { label: 'A — Crítico', data: abcData.A, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', desc: '80% del valor' },
+              { label: 'B — Importante', data: abcData.B, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]', desc: '15% del valor' },
+              { label: 'C — Estándar', data: abcData.C, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', desc: '5% del valor' },
             ].map(cat => (
-              <div key={cat.label} className={`rounded-lg border border-border p-3 ${cat.bg}`}>
+              <div key={cat.label} className={`rounded-card border border-border p-3 ${cat.bg}`}>
                 <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
                 <p className="text-xl font-bold text-foreground tabular-nums mt-1">{cat.data.length}</p>
-                <p className="text-[9px] text-muted-foreground">{cat.desc}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-caption text-muted-foreground">{cat.desc}</p>
+                <p className="text-caption text-muted-foreground mt-1">
                   ${cat.data.reduce((s, r) => s + r.valorTotal, 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}
                 </p>
               </div>
@@ -991,9 +1002,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           {/* Barra proporcional */}
           {abcData.totalValor > 0 && (
             <div className="h-4 rounded-full overflow-hidden flex bg-muted">
-              {abcData.A.length > 0 && <div className="bg-red-500/70 h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
-              {abcData.B.length > 0 && <div className="bg-amber-500/70 h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
-              {abcData.C.length > 0 && <div className="bg-emerald-500/70 h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
+              {abcData.A.length > 0 && <div className="bg-red-500/[0.15] h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
+              {abcData.B.length > 0 && <div className="bg-amber-500/[0.15] h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
+              {abcData.C.length > 0 && <div className="bg-emerald-500/[0.15] h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
             </div>
           )}
         </div>
@@ -1002,9 +1013,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {/* Stock muerto + Rotación */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Stock sin movimiento */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-zinc-500/15">
-            <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
+        <div className="bg-card border border-border rounded-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted-foreground/[0.10]">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5">
               <Archive className="h-3.5 w-3.5" /> Stock sin movimiento
             </p>
           </div>
@@ -1013,25 +1024,25 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           ) : (
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 rounded-lg border border-border bg-amber-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-amber-700 dark:text-amber-400 tabular-nums">{deadStock.noMov90.length}</p>
-                  <p className="text-[9px] text-muted-foreground">+90 días</p>
+                <div className="flex-1 rounded-card border border-border bg-amber-500/[0.15] p-3 text-center">
+                  <p className="text-xl font-bold text-ink-warn tabular-nums">{deadStock.noMov90.length}</p>
+                  <p className="text-caption text-muted-foreground">+90 días</p>
                 </div>
-                <div className="flex-1 rounded-lg border border-border bg-red-500/15 p-3 text-center">
-                  <p className="text-xl font-bold text-red-700 dark:text-red-400 tabular-nums">{deadStock.noMov180.length}</p>
-                  <p className="text-[9px] text-muted-foreground">+180 días</p>
+                <div className="flex-1 rounded-card border border-border bg-red-500/[0.15] p-3 text-center">
+                  <p className="text-xl font-bold text-ink-crit tabular-nums">{deadStock.noMov180.length}</p>
+                  <p className="text-caption text-muted-foreground">+180 días</p>
                 </div>
               </div>
               {deadStock.noMov180.length > 0 && (
-                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border rounded-lg">
+                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border rounded-card">
                   {deadStock.noMov180.slice(0, 8).map(item => (
                     <div key={item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
                       <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                      <span className="text-[10px] font-mono text-blue-700 dark:text-blue-400 shrink-0">{item.codigoSAP}</span>
+                      <span className="text-caption font-mono text-primary shrink-0">{item.codigoSAP}</span>
                       <span className="text-xs font-bold text-muted-foreground tabular-nums shrink-0">{item.stockActual}</span>
                     </div>
                   ))}
-                  {deadStock.noMov180.length > 8 && <p className="px-3 py-1.5 text-[10px] text-muted-foreground text-center">+{deadStock.noMov180.length - 8} más</p>}
+                  {deadStock.noMov180.length > 8 && <p className="px-3 py-1.5 text-caption text-muted-foreground text-center">+{deadStock.noMov180.length - 8} más</p>}
                 </div>
               )}
             </div>
@@ -1039,9 +1050,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         </div>
 
         {/* Rotación */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-blue-500/15">
-            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide flex items-center gap-1.5">
+        <div className="bg-card border border-border rounded-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-primary/[0.15]">
+            <p className="text-xs font-semibold text-primary tracking-wide flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5" /> Rotación de inventario
             </p>
           </div>
@@ -1049,20 +1060,20 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
           ) : (
             <div className="p-4 space-y-3">
-              <div className="rounded-lg border border-border bg-blue-500/15 p-3 text-center">
-                <p className="text-xl font-bold text-blue-700 dark:text-blue-400 tabular-nums">{rotacionData.avgRotacion.toFixed(2)}</p>
-                <p className="text-[9px] text-muted-foreground">Rotación promedio</p>
+              <div className="rounded-card border border-border bg-primary/[0.15] p-3 text-center">
+                <p className="text-xl font-bold text-primary tabular-nums">{rotacionData.avgRotacion.toFixed(2)}</p>
+                <p className="text-caption text-muted-foreground">Rotación promedio</p>
               </div>
               {rotacionData.itemRotacion.filter(r => r.salidas > 0).length > 0 && (
-                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border rounded-lg">
-                  <div className="px-3 py-1 bg-muted text-[9px] text-muted-foreground font-semibold flex items-center">
+                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border rounded-card">
+                  <div className="px-3 py-1 bg-muted text-caption text-muted-foreground font-semibold flex items-center">
                     <span className="flex-1">Ítem</span><span className="w-14 text-center">Salidas</span><span className="w-14 text-right">Rotación</span>
                   </div>
                   {rotacionData.itemRotacion.filter(r => r.salidas > 0).slice(0, 8).map(r => (
                     <div key={r.item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
                       <span className="text-xs text-foreground truncate flex-1">{r.item.textoBreve}</span>
                       <span className="text-xs font-bold text-muted-foreground tabular-nums w-14 text-center">{r.salidas}</span>
-                      <span className="text-xs font-bold text-blue-700 dark:text-blue-400 tabular-nums w-14 text-right">{r.rotacion.toFixed(1)}</span>
+                      <span className="text-xs font-bold text-primary tabular-nums w-14 text-right">{r.rotacion.toFixed(1)}</span>
                     </div>
                   ))}
                 </div>
@@ -1074,27 +1085,27 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Alertas */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-red-500/15">
-            <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
+        <div className="bg-card border border-border rounded-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-red-500/[0.15]">
+            <p className="text-xs font-semibold text-ink-crit tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.alertas.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas</p>
             : stats.alertas.map(item => (
               <div key={item.codigoSAP} className="px-4 py-2.5 flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/15' : 'bg-amber-500/15'}`}>
-                  {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-red-700 dark:text-red-400" /> : <TrendingDown className="h-4 w-4 text-amber-700 dark:text-amber-400" />}
+                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
+                  {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit" /> : <TrendingDown className="h-4 w-4 text-ink-warn" />}
                 </div>
-                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] font-mono text-blue-700 dark:text-blue-400">{item.codigoSAP}</p></div>
-                <div className="text-right shrink-0"><p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{item.stockActual}</p><p className="text-[9px] text-muted-foreground">mín: {item.stockMinimo}</p></div>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption font-mono text-primary">{item.codigoSAP}</p></div>
+                <div className="text-right shrink-0"><p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</p><p className="text-caption text-muted-foreground">mín: {item.stockMinimo}</p></div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Distribución por tipo */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-muted"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Distribución por tipo</p></div>
+        <div className="bg-card border border-border rounded-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted"><p className="text-xs font-semibold text-muted-foreground tracking-wide">Distribución por tipo</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.tipoDistribution.map(([tipo, count]) => (
               <div key={tipo} className="px-4 py-2 flex items-center justify-between">
@@ -1106,24 +1117,24 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         </div>
 
         {/* Top por valor */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-violet-500/15"><p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wide">Top 10 por valor</p></div>
+        <div className="bg-card border border-border rounded-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-cat-6-tint/[0.15]"><p className="text-xs font-semibold text-cat-6-ink tracking-wide">Top 10 por valor</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.topByValue.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin datos</p>
             : stats.topByValue.map((item, i) => (
               <div key={item.codigoSAP} className="px-4 py-2 flex items-center gap-3">
-                <span className="text-[10px] text-muted-foreground/50 w-4 text-right shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p></div>
-                <span className="text-xs font-bold text-violet-700 dark:text-violet-400 tabular-nums shrink-0">${item.valorInventario.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
+                <span className="text-caption text-muted-foreground/50 w-4 text-right shrink-0">{i + 1}</span>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p></div>
+                <span className="text-xs font-bold text-cat-6-ink tabular-nums shrink-0">${item.valorInventario.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Movimientos recientes */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> Movimientos recientes {!movLoading && <span className="text-muted-foreground/50">({movEntradas}↓ {movSalidas}↑ {movAjustes}⟳)</span>}
             </p>
           </div>
@@ -1132,12 +1143,12 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             : movimientos.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin movimientos</p>
             : movimientos.slice(0, 15).map(m => (
               <div key={m.id} className="px-4 py-2 flex items-center gap-2">
-                <span className={`text-[10px] font-bold w-12 shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
+                <span className={`text-caption font-bold w-12 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
                   {m.tipo === 'entrada' ? '↓ Entr.' : m.tipo === 'salida' ? '↑ Sal.' : '⟳ Ajuste'}
                 </span>
                 <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">{m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}</span>
                 <span className="text-xs text-muted-foreground truncate flex-1">{m.motivo || m.bodegaItemId}</span>
-                <span className="text-[10px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
+                <span className="text-caption text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
               </div>
             ))}
           </div>
@@ -1168,16 +1179,16 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         const totalUnidadesEquipos = equipoRows.reduce((s, r) => s + r.unidades, 0)
 
         return equipoRows.length > 0 ? (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border bg-teal-500/15">
-              <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wide flex items-center gap-1.5">
+          <div className="bg-card border border-border rounded-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-cat-7-tint/[0.15]">
+              <p className="text-xs font-semibold text-cat-7-ink tracking-wide flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5" /> Cobertura por equipo
               </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-muted text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                  <tr className="bg-muted text-caption tracking-wider text-muted-foreground/60">
                     <th className="px-4 py-2 text-left font-semibold">Equipo</th>
                     <th className="px-2 py-2 text-center font-semibold">Repuestos</th>
                     <th className="px-2 py-2 text-center font-semibold">Con stock</th>
@@ -1191,9 +1202,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                     <tr key={row.id} className="hover:bg-muted transition-colors">
                       <td className="px-4 py-2 font-medium text-foreground truncate max-w-[200px]">{row.nombre}</td>
                       <td className="px-2 py-2 text-center text-muted-foreground tabular-nums">{row.total}</td>
-                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">{row.conStock}</td>
+                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-ink-ok">{row.conStock}</td>
                       <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.unidades.toLocaleString('es-CL')}</td>
-                      <td className="px-2 py-2 text-right tabular-nums font-medium text-violet-700 dark:text-violet-400">${row.valor.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-2 py-2 text-right tabular-nums font-medium text-cat-6-ink">${row.valor.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
@@ -1202,7 +1213,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>
-                          <span className={`text-[10px] font-bold tabular-nums w-8 text-right ${row.pct >= 50 ? 'text-emerald-700 dark:text-emerald-400' : row.pct >= 20 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'}`}>
+                          <span className={`text-caption font-bold tabular-nums w-8 text-right ${row.pct >= 50 ? 'text-ink-ok' : row.pct >= 20 ? 'text-ink-warn' : 'text-ink-crit'}`}>
                             {row.pct}%
                           </span>
                         </div>
@@ -1214,15 +1225,15 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                   <tr className="border-t-2 border-border bg-muted font-bold text-foreground">
                     <td className="px-4 py-2.5">TOTAL PLANTA</td>
                     <td className="px-2 py-2.5 text-center tabular-nums">{stats.total}</td>
-                    <td className="px-2 py-2.5 text-center tabular-nums text-emerald-700 dark:text-emerald-400">{stats.conStock}</td>
+                    <td className="px-2 py-2.5 text-center tabular-nums text-ink-ok">{stats.conStock}</td>
                     <td className="px-2 py-2.5 text-center tabular-nums">{totalUnidadesEquipos.toLocaleString('es-CL')}</td>
-                    <td className="px-2 py-2.5 text-right tabular-nums text-violet-700 dark:text-violet-400">${totalValorEquipos.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-cat-6-ink">${totalValorEquipos.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${coberturaPct}%` }} />
                         </div>
-                        <span className="text-[10px] font-bold tabular-nums w-8 text-right text-primary">{coberturaPct}%</span>
+                        <span className="text-caption font-bold tabular-nums w-8 text-right text-primary">{coberturaPct}%</span>
                       </div>
                     </td>
                   </tr>
@@ -1252,16 +1263,16 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           .sort((a, b) => b.total - a.total)
 
         return tipoRows.length > 0 ? (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border bg-indigo-500/15">
-              <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+          <div className="bg-card border border-border rounded-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-cat-3-tint/[0.15]">
+              <p className="text-xs font-semibold text-cat-3-ink tracking-wide flex items-center gap-1.5">
                 <Tag className="h-3.5 w-3.5" /> Resumen por tipo de repuesto
               </p>
             </div>
             <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-card z-10">
-                  <tr className="bg-muted text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                  <tr className="bg-muted text-caption tracking-wider text-muted-foreground/60">
                     <th className="px-4 py-2 text-left font-semibold">Tipo</th>
                     <th className="px-2 py-2 text-center font-semibold">Total</th>
                     <th className="px-2 py-2 text-center font-semibold">Con stock</th>
@@ -1274,14 +1285,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                   {tipoRows.map(row => (
                     <tr key={row.tipo} className="hover:bg-muted transition-colors">
                       <td className="px-4 py-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${tipoBadgeColor(row.tipo === 'SIN TIPO' ? undefined : row.tipo)}`}>
+                        <CatTag tone={tipoTag(row.tipo === 'SIN TIPO' ? undefined : row.tipo)} className="uppercase">
                           {row.tipo}
-                        </span>
+                        </CatTag>
                       </td>
                       <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.total}</td>
-                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">{row.conStock}</td>
+                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-ink-ok">{row.conStock}</td>
                       <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.fisicos}</td>
-                      <td className="px-2 py-2 text-right tabular-nums font-medium text-violet-700 dark:text-violet-400">
+                      <td className="px-2 py-2 text-right tabular-nums font-medium text-cat-6-ink">
                         {row.valor > 0 ? `$${row.valor.toLocaleString('es-CL', { maximumFractionDigits: 0 })}` : '—'}
                       </td>
                       <td className="px-4 py-2">
@@ -1292,7 +1303,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
                               style={{ width: `${Math.min(row.pct, 100)}%` }}
                             />
                           </div>
-                          <span className="text-[10px] font-bold tabular-nums w-8 text-right text-muted-foreground">{row.pct}%</span>
+                          <span className="text-caption font-bold tabular-nums w-8 text-right text-muted-foreground">{row.pct}%</span>
                         </div>
                       </td>
                     </tr>
@@ -1306,15 +1317,15 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
       {/* Proveedores */}
       {proveedores.length > 0 && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})</p>
+            <p className="text-xs font-semibold text-muted-foreground tracking-wide flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})</p>
           </div>
           <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
             {proveedores.map(([prov, count]) => (
               <div key={prov} className="px-4 py-2 flex items-center justify-between">
                 <span className="text-xs text-foreground truncate">{prov}</span>
-                <div className="flex items-center gap-2 shrink-0"><div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${(count / items.length) * 100}%` }} /></div><span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span></div>
+                <div className="flex items-center gap-2 shrink-0"><div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary/[0.15] rounded-full" style={{ width: `${(count / items.length) * 100}%` }} /></div><span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span></div>
               </div>
             ))}
           </div>
@@ -1332,12 +1343,12 @@ function StatCard({ icon: Icon, label, value, color, bg, onClick, active, sublab
   icon: typeof Package; label: string; value: string | number; color: string; bg: string; onClick: () => void; active: boolean; sublabel?: string
 }) {
   return (
-    <button onClick={onClick} className={['flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left',
+    <button onClick={onClick} className={['flex items-center gap-2.5 p-3 rounded-card border transition-all text-left',
       active ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-card hover:bg-muted'].join(' ')}>
-      <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}><Icon className={`h-4 w-4 ${color}`} /></div>
+      <div className={`h-9 w-9 rounded-card flex items-center justify-center shrink-0 ${bg}`}><Icon className={`h-4 w-4 ${color}`} /></div>
       <div className="min-w-0">
         <p className="text-lg font-bold text-foreground leading-tight truncate">{value}</p>
-        <p className="text-[10px] text-muted-foreground leading-tight">{active && sublabel ? sublabel : label}</p>
+        <p className="text-caption text-muted-foreground leading-tight">{active && sublabel ? sublabel : label}</p>
       </div>
     </button>
   )
@@ -1347,9 +1358,9 @@ function KpiCard({ label, value, icon: Icon, color, sub }: {
   label: string; value: string | number; icon: typeof Package; color: string; sub?: string
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-      <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-muted"><Icon className={`h-5 w-5 ${color}`} /></div>
-      <div><p className="text-xl font-bold text-foreground tabular-nums">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p>{sub && <p className="text-[9px] text-muted-foreground/60 mt-0.5">{sub}</p>}</div>
+    <div className="bg-card border border-border rounded-card p-4 flex items-center gap-3">
+      <div className="h-10 w-10 rounded-card flex items-center justify-center shrink-0 bg-muted"><Icon className={`h-5 w-5 ${color}`} /></div>
+      <div><p className="text-xl font-bold text-foreground tabular-nums">{value}</p><p className="text-caption text-muted-foreground">{label}</p>{sub && <p className="text-caption text-muted-foreground/60 mt-0.5">{sub}</p>}</div>
     </div>
   )
 }
@@ -1359,7 +1370,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data: number[]; width?: number; height?: number; color?: string }) {
-  if (data.length < 2) return <span className="text-[9px] text-muted-foreground">—</span>
+  if (data.length < 2) return <span className="text-caption text-muted-foreground">—</span>
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -1388,7 +1399,7 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
   return (
     <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
       <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-amber-400/60" style={{ left: `${minimoPct}%` }} />}
+      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-amber-500/[0.15]" style={{ left: `${minimoPct}%` }} />}
     </div>
   )
 }
@@ -1418,20 +1429,20 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
           ? 'border-l-zinc-400/40 dark:border-l-zinc-500/40'
           : 'border-l-emerald-500/80'
   const stockColor = isSin
-    ? 'text-red-600 dark:text-red-400'
+    ? 'text-ink-crit'
     : isBajo
-      ? 'text-amber-600 dark:text-amber-400'
+      ? 'text-ink-warn'
       : isCeroNeutro
-        ? 'text-zinc-500 dark:text-zinc-400'
-        : 'text-emerald-600 dark:text-emerald-400'
+        ? 'text-muted-foreground'
+        : 'text-ink-ok'
 
   return (
     <div
       className={[
-        'group relative flex flex-col rounded-xl border border-l-4 transition-all cursor-pointer',
+        'group relative flex flex-col rounded-card border border-l-4 transition-all cursor-pointer',
         accent,
-        isSin ? 'border-red-500/30 bg-red-500/15 hover:bg-red-500/10' :
-        isBajo ? 'border-amber-500/30 bg-amber-500/15 hover:bg-amber-500/10' :
+        isSin ? 'border-red-500/[0.25] bg-red-500/[0.15] hover:bg-red-500/[0.15]' :
+        isBajo ? 'border-amber-500/[0.25] bg-amber-500/[0.15] hover:bg-amber-500/[0.15]' :
         'border-border bg-card hover:bg-muted',
       ].join(' ')}
       onClick={onOpenDrawer}
@@ -1440,7 +1451,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
         {/* Nombre (2 líneas, sin cortar lo importante) + foto real si existe + favorito */}
         <div className="flex items-start gap-2">
           {foto && (
-            <img src={foto} alt="" className="h-10 w-10 shrink-0 rounded-md border border-border object-cover" loading="lazy" />
+            <img src={foto} alt="" className="h-10 w-10 shrink-0 rounded-ctl border border-border object-cover" loading="lazy" />
           )}
           {item.textoBreve ? (
             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">{item.textoBreve}</p>
@@ -1448,8 +1459,8 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
             <p className="min-w-0 flex-1 text-sm font-medium italic leading-snug text-muted-foreground line-clamp-2">(sin nombre — SAP {item.codigoSAP})</p>
           )}
           <div className="shrink-0" onClick={e => e.stopPropagation()}>
-            <button onClick={onToggleWatch} className="-m-1 p-1.5 rounded hover:bg-yellow-500/10 transition-colors">
-              <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-700 dark:text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
+            <button onClick={onToggleWatch} className="-m-1 p-1.5 rounded-ctl hover:bg-amber-500/[0.15] transition-colors">
+              <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-ink-warn fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
             </button>
           </div>
         </div>
@@ -1459,18 +1470,18 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
           {has ? (
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className={`text-2xl font-bold leading-none tabular-nums ${stockColor}`}>{item.stockActual}</span>
-              <span className="text-[11px] text-muted-foreground">{item.unidad}</span>
-              {isSin && <span className="text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">sin stock</span>}
-              {isBajo && <span className="text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">bajo mín</span>}
+              <span className="text-caption text-muted-foreground">{item.unidad}</span>
+              {isSin && <span className="text-caption font-semibold uppercase text-ink-crit">sin stock</span>}
+              {isBajo && <span className="text-caption font-semibold uppercase text-ink-warn">bajo mín</span>}
               {!isSin && !isBajo && item.stockMinimo > 0 && (
-                <span className="text-[10px] text-muted-foreground">mín {item.stockMinimo}</span>
+                <span className="text-caption text-muted-foreground">mín {item.stockMinimo}</span>
               )}
             </div>
           ) : (
-            <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">Sin configurar</span>
+            <span className="rounded-ctl bg-muted px-2 py-1 text-caption text-muted-foreground">Sin configurar</span>
           )}
           {item.ubicacionBodega && (
-            <span className="inline-flex max-w-[55%] items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground" title={item.ubicacionBodega}>
+            <span className="inline-flex max-w-[55%] items-center gap-1 rounded-ctl bg-muted px-2 py-1 text-xs font-medium text-foreground" title={item.ubicacionBodega}>
               <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate">{item.ubicacionBodega}</span>
             </span>
@@ -1485,15 +1496,15 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
 
         {/* Meta secundaria */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="rounded bg-blue-500/15 px-1.5 py-0.5 font-mono text-[10px] text-blue-600 dark:text-blue-400">{item.codigoSAP}</span>
-          {item.tipo && <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
+          <span className="rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-caption text-primary">{item.codigoSAP}</span>
+          {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
           {item.equipos.length > 0 && (
-            <span className="flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" title={item.equipos.map(e => e.machineName).join(', ')}>
+            <span className="flex items-center gap-0.5 rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground" title={item.equipos.map(e => e.machineName).join(', ')}>
               <Layers className="h-2.5 w-2.5" />{item.equipos.length}
             </span>
           )}
           {valorTotal > 0 && (
-            <span className="ml-auto text-[10px] font-medium tabular-nums text-violet-600 dark:text-violet-400">
+            <span className="ml-auto text-caption font-medium tabular-nums text-cat-6-ink">
               ${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
             </span>
           )}
@@ -1503,18 +1514,18 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
       {/* Acciones: fila propia en móvil; en desktop flotan sobre la esquina al
           hacer hover (sin reservar una franja vacía en cada card). */}
       <div
-        className="flex items-center justify-end gap-0.5 px-3 pb-2 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:rounded-lg sm:border sm:border-border sm:bg-card/90 sm:p-0.5 sm:px-1 sm:pb-0.5 sm:shadow-sm sm:backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+        className="flex items-center justify-end gap-0.5 px-3 pb-2 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:rounded-card sm:border sm:border-border sm:bg-card/90 sm:p-0.5 sm:px-1 sm:pb-0.5 sm:shadow-sm sm:backdrop-blur-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
         onClick={e => e.stopPropagation()}
       >
-        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors">
+        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-ctl hover:bg-emerald-500/[0.15] text-ink-ok transition-colors">
           <ArrowDownCircle className="h-3.5 w-3.5" />
         </button>
         {has && (
-          <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-colors">
+          <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-ctl hover:bg-primary/[0.15] text-primary transition-colors">
             <History className="h-3.5 w-3.5" />
           </button>
         )}
-        <button onClick={onEdit} title={has ? 'Editar' : 'Configurar'} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground transition-colors">
+        <button onClick={onEdit} title={has ? 'Editar' : 'Configurar'} className="p-1.5 rounded-ctl hover:bg-muted text-muted-foreground transition-colors">
           {has ? <Pencil className="h-3.5 w-3.5" /> : <Settings2 className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -1595,23 +1606,23 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className="min-w-0 flex-1">
               <p className={item.textoBreve ? 'text-base font-bold text-foreground' : 'text-base font-bold italic text-muted-foreground'}>{item.textoBreve || `(sin nombre — SAP ${item.codigoSAP})`}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-400 font-mono">{item.codigoSAP}</span>
-                {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-700 dark:text-violet-400 font-mono">{item.codigoFabricante}</span>}
-                {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
-                {item.categoria && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.categoria === 'A' ? 'bg-red-500/15 text-red-700 dark:text-red-400' : item.categoria === 'B' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'}`}>ABC: {item.categoria}</span>}
+                <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
+                {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
+                {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
+                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>
-            <button onClick={onClose} className="p-1 rounded hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
+            <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-emerald-500/[0.25] rounded-card hover:bg-emerald-500/[0.15] text-ink-ok">
               <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
             </button>
-            <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-lg hover:bg-muted text-muted-foreground">
+            <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
               <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
             </button>
             {onSearchSimilar && (
-              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-500/15 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 text-blue-700 dark:text-blue-400">
+              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-primary/[0.25] rounded-card hover:bg-primary/[0.15] text-primary">
                 <Search className="h-3.5 w-3.5" />
               </button>
             )}
@@ -1621,24 +1632,24 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
         <div className="px-5 py-4 space-y-4">
           {/* Foto principal */}
           {item.fotos && item.fotos.length > 0 && (
-            <div className="rounded-lg overflow-hidden border border-border bg-muted">
+            <div className="rounded-card overflow-hidden border border-border bg-muted">
               <img src={item.fotos[0]} alt={item.textoBreve} className="w-full h-32 object-contain" />
             </div>
           )}
 
           {/* Stock actual */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-border p-3 text-center">
-              <p className={`text-2xl font-bold tabular-nums ${isSin ? 'text-red-700 dark:text-red-400' : isBajo ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>{item.stockActual}</p>
-              <p className="text-[9px] text-muted-foreground">Stock actual</p>
+            <div className="rounded-card border border-border p-3 text-center">
+              <p className={`text-2xl font-bold tabular-nums ${isSin ? 'text-ink-crit' : isBajo ? 'text-ink-warn' : 'text-foreground'}`}>{item.stockActual}</p>
+              <p className="text-caption text-muted-foreground">Stock actual</p>
             </div>
-            <div className="rounded-lg border border-border p-3 text-center">
+            <div className="rounded-card border border-border p-3 text-center">
               <p className="text-2xl font-bold text-muted-foreground tabular-nums">{item.stockMinimo}</p>
-              <p className="text-[9px] text-muted-foreground">Mínimo</p>
+              <p className="text-caption text-muted-foreground">Mínimo</p>
             </div>
-            <div className="rounded-lg border border-border p-3 text-center">
-              <p className="text-2xl font-bold text-violet-700 dark:text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
-              <p className="text-[9px] text-muted-foreground">Valor</p>
+            <div className="rounded-card border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-cat-6-ink tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
+              <p className="text-caption text-muted-foreground">Valor</p>
             </div>
           </div>
 
@@ -1646,7 +1657,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           {has && item.stockMinimo > 0 && (
             <div className="space-y-1">
               <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
-              <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+              <div className="flex items-center justify-between text-caption text-muted-foreground">
                 <span>0</span>
                 <span>Mín: {item.stockMinimo}</span>
                 <span>{item.stockMaximo || item.stockMinimo * 2}</span>
@@ -1656,8 +1667,8 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 
           {/* Sparkline */}
           {sparkData.length >= 2 && (
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
+            <div className="rounded-card border border-border p-3">
+              <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
               <div className="flex items-center justify-center">
                 <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} />
               </div>
@@ -1666,39 +1677,39 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 
           {/* Punto de reorden */}
           {reorder && (
-            <div className={`rounded-lg border p-3 ${reorder.necesitaPedir ? 'border-red-500/30 bg-red-500/15' : 'border-border'}`}>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border'}`}>
+              <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
-                {reorder.necesitaPedir && <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-700 dark:text-red-400 font-bold uppercase">Pedir ahora</span>}
+                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold uppercase">Pedir ahora</span>}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-lg font-bold text-foreground tabular-nums">{reorder.puntoReorden}</p>
-                  <p className="text-[8px] text-muted-foreground">Pto. reorden</p>
+                  <p className="text-caption text-muted-foreground">Pto. reorden</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-blue-700 dark:text-blue-400 tabular-nums">{reorder.consumoDiario.toFixed(1)}</p>
-                  <p className="text-[8px] text-muted-foreground">Consumo/día</p>
+                  <p className="text-lg font-bold text-primary tabular-nums">{reorder.consumoDiario.toFixed(1)}</p>
+                  <p className="text-caption text-muted-foreground">Consumo/día</p>
                 </div>
                 <div className="text-center">
-                  <p className={`text-lg font-bold tabular-nums ${reorder.diasRestantes < 14 ? 'text-red-700 dark:text-red-400' : reorder.diasRestantes < 30 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  <p className={`text-lg font-bold tabular-nums ${reorder.diasRestantes < 14 ? 'text-ink-crit' : reorder.diasRestantes < 30 ? 'text-ink-warn' : 'text-ink-ok'}`}>
                     {reorder.diasRestantes === Infinity ? '∞' : reorder.diasRestantes}
                   </p>
-                  <p className="text-[8px] text-muted-foreground">Días restantes</p>
+                  <p className="text-caption text-muted-foreground">Días restantes</p>
                 </div>
               </div>
-              {item.leadTime && <p className="text-[9px] text-muted-foreground text-center mt-2">Lead time proveedor: {item.leadTime} días</p>}
+              {item.leadTime && <p className="text-caption text-muted-foreground text-center mt-2">Lead time proveedor: {item.leadTime} días</p>}
             </div>
           )}
 
           {/* Fotos */}
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border flex items-center justify-between">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <Image className="h-3 w-3" /> Fotos ({item.fotos?.length || 0})
               </p>
               {addPhoto && (
-                <label className="flex items-center gap-1 text-[10px] text-primary cursor-pointer hover:underline">
+                <label className="flex items-center gap-1 text-caption text-primary cursor-pointer hover:underline">
                   <Camera className="h-3 w-3" /> Agregar
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                 </label>
@@ -1707,17 +1718,17 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             {uploading && (
               <div className="px-3 py-2 flex items-center gap-2">
                 <Loader2 className="h-3 w-3 text-primary animate-spin" />
-                <span className="text-[10px] text-muted-foreground">Subiendo foto...</span>
+                <span className="text-caption text-muted-foreground">Subiendo foto...</span>
               </div>
             )}
             {item.fotos && item.fotos.length > 0 ? (
               <div className="p-2 grid grid-cols-4 gap-1.5">
                 {item.fotos.map((url, i) => (
-                  <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border cursor-pointer" onClick={() => setLightboxIndex(i)}>
+                  <div key={i} className="relative group aspect-square rounded-card overflow-hidden border border-border cursor-pointer" onClick={() => setLightboxIndex(i)}>
                     <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     {removePhoto && (
                       <button onClick={e => { e.stopPropagation(); removePhoto(item.codigoSAP, url) }}
-                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded-ctl bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
                         <X className="h-3 w-3" />
                       </button>
                     )}
@@ -1725,14 +1736,14 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 ))}
               </div>
             ) : (
-              <p className="px-3 py-3 text-[10px] text-muted-foreground text-center">Sin fotos. Agrega una para identificación visual.</p>
+              <p className="px-3 py-3 text-caption text-muted-foreground text-center">Sin fotos. Agrega una para identificación visual.</p>
             )}
           </div>
 
           {/* Código QR */}
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-card border border-border overflow-hidden">
             <button onClick={() => setShowQR(q => !q)} className="w-full px-3 py-2 bg-muted flex items-center justify-between hover:bg-muted transition-colors">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <QrCode className="h-3 w-3" /> Código QR
               </p>
               <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showQR ? 'rotate-180' : ''}`} />
@@ -1740,12 +1751,12 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             {showQR && (
               <div className="p-4 flex flex-col items-center gap-3">
                 <QRCodeSVG id="bodega-qr-svg" value={qrValue} size={180} level="H" includeMargin />
-                <p className="text-[9px] text-muted-foreground text-center break-all max-w-[200px]">{item.codigoSAP}</p>
+                <p className="text-caption text-muted-foreground text-center break-all max-w-[200px]">{item.codigoSAP}</p>
                 <div className="flex gap-2">
-                  <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-muted border border-border rounded-lg hover:bg-muted text-muted-foreground">
+                  <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
                     <Download className="h-3 w-3" /> Descargar PNG
                   </button>
-                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary">
+                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-caption font-medium bg-primary/10 border border-primary/30 rounded-card hover:bg-primary/20 text-primary">
                     <QrCode className="h-3 w-3" /> Imprimir
                   </button>
                 </div>
@@ -1754,7 +1765,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           </div>
 
           {/* Detalles */}
-          <div className="rounded-lg border border-border divide-y divide-border/50">
+          <div className="rounded-card border border-border divide-y divide-border/50">
             {[
               { label: 'Ubicación', value: item.ubicacionBodega || '—' },
               { label: 'Proveedor', value: item.proveedor || '—' },
@@ -1764,16 +1775,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               { label: 'Lead time', value: item.leadTime ? `${item.leadTime} días` : '—' },
             ].map(d => (
               <div key={d.label} className="flex items-center justify-between px-3 py-2">
-                <span className="text-[10px] text-muted-foreground">{d.label}</span>
+                <span className="text-caption text-muted-foreground">{d.label}</span>
                 <span className="text-xs text-foreground font-medium">{d.value}</span>
               </div>
             ))}
           </div>
 
           {/* Equipos vinculados */}
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <Layers className="h-3 w-3" /> Equipos ({item.equipos.length})
               </p>
             </div>
@@ -1784,7 +1795,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                   {onViewInEquipo && (
                     <button
                       onClick={() => { onViewInEquipo(e.machineId); onClose() }}
-                      className="shrink-0 text-[9px] text-primary hover:text-primary/80 hover:underline transition-colors"
+                      className="shrink-0 text-caption text-primary hover:text-primary/80 hover:underline transition-colors"
                     >
                       Ver en Áreas
                     </button>
@@ -1795,26 +1806,26 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           </div>
 
           {/* Historial de movimientos */}
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-card border border-border overflow-hidden">
             <div className="px-3 py-2 bg-muted border-b border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+              <p className="text-caption text-muted-foreground tracking-wide font-semibold flex items-center gap-1">
                 <History className="h-3 w-3" /> Movimientos recientes
               </p>
             </div>
             {loading ? <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
-            : movs.length === 0 ? <p className="p-3 text-[10px] text-muted-foreground text-center">Sin movimientos</p>
+            : movs.length === 0 ? <p className="p-3 text-caption text-muted-foreground text-center">Sin movimientos</p>
             : (
               <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
                 {movs.map(m => (
                   <div key={m.id} className="px-3 py-2 flex items-center gap-2">
-                    <span className={`text-[10px] font-bold w-10 shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-700 dark:text-emerald-400' : m.tipo === 'salida' ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
+                    <span className={`text-caption font-bold w-10 shrink-0 ${m.tipo === 'entrada' ? 'text-ink-ok' : m.tipo === 'salida' ? 'text-ink-crit' : 'text-primary'}`}>
                       {m.tipo === 'entrada' ? '↓ Ent' : m.tipo === 'salida' ? '↑ Sal' : '⟳ Aj'}
                     </span>
                     <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">
                       {m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground truncate flex-1">{m.motivo || '—'}</span>
-                    <span className="text-[9px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
+                    <span className="text-caption text-muted-foreground truncate flex-1">{m.motivo || '—'}</span>
+                    <span className="text-caption text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
                   </div>
                 ))}
               </div>
@@ -1822,8 +1833,8 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           </div>
 
           {item.observaciones && (
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Observaciones</p>
+            <div className="rounded-card border border-border p-3">
+              <p className="text-caption text-muted-foreground tracking-wide mb-1">Observaciones</p>
               <p className="text-xs text-foreground">{item.observaciones}</p>
             </div>
           )}
@@ -1851,27 +1862,27 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
   const bajoStock = alertas.filter(a => a.stockActual > 0)
 
   return (
-    <div className="bg-red-500/15 border border-red-500/20 rounded-xl overflow-hidden">
+    <div className="bg-red-500/[0.15] border border-red-500/[0.25] rounded-card overflow-hidden">
       <button onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-red-500/10 transition-colors">
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-red-500/[0.15] transition-colors">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-700 dark:text-red-400" />
-          <span className="text-xs font-semibold text-red-700 dark:text-red-400">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock</span>
-          {sinStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-700 dark:text-red-400 font-bold">{sinStock.length} sin stock</span>}
-          {bajoStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold">{bajoStock.length} bajo mínimo</span>}
+          <AlertTriangle className="h-4 w-4 text-ink-crit" />
+          <span className="text-xs font-semibold text-ink-crit">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock</span>
+          {sinStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">{sinStock.length} sin stock</span>}
+          {bajoStock.length > 0 && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn font-bold">{bajoStock.length} bajo mínimo</span>}
         </div>
-        <ChevronDown className={`h-4 w-4 text-red-700 dark:text-red-400/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 text-ink-crit/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
       {expanded && (
-        <div className="border-t border-red-500/10 divide-y divide-red-500/10 max-h-[200px] overflow-y-auto">
+        <div className="border-t border-red-500/[0.25] divide-y divide-red-500/10 max-h-[200px] overflow-y-auto">
           {alertas.slice(0, 10).map(item => (
             <div key={item.codigoSAP} className="flex items-center gap-3 px-4 py-2">
-              {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-red-700 dark:text-red-400 shrink-0" /> : <TrendingDown className="h-4 w-4 text-amber-700 dark:text-amber-400 shrink-0" />}
-              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><span className="text-[10px] font-mono text-blue-700 dark:text-blue-400">{item.codigoSAP}</span></div>
-              <div className="text-right shrink-0"><span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{item.stockActual}</span><span className="text-[9px] text-muted-foreground ml-1">/ {item.stockMinimo}</span></div>
+              {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit shrink-0" /> : <TrendingDown className="h-4 w-4 text-ink-warn shrink-0" />}
+              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><span className="text-caption font-mono text-primary">{item.codigoSAP}</span></div>
+              <div className="text-right shrink-0"><span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn'}`}>{item.stockActual}</span><span className="text-caption text-muted-foreground ml-1">/ {item.stockMinimo}</span></div>
             </div>
           ))}
-          {alertas.length > 10 && <div className="px-4 py-2 text-center"><button onClick={() => onFilter('bajo')} className="text-[10px] text-primary hover:underline">Ver todas →</button></div>}
+          {alertas.length > 10 && <div className="px-4 py-2 text-center"><button onClick={() => onFilter('bajo')} className="text-caption text-primary hover:underline">Ver todas →</button></div>}
         </div>
       )}
     </div>
@@ -1881,7 +1892,7 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
 function ModalBackdrop({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
+      <div className={`bg-card border border-border rounded-t-2xl sm:rounded-panel shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   )
 }
@@ -1906,7 +1917,7 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-base font-bold">{item.bodegaId ? 'Editar stock' : 'Configurar stock'}</h3>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve}</p>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-400 font-mono">{item.codigoSAP}</span>
+          <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-primary font-mono">{item.codigoSAP}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-4 gap-3">
@@ -1931,8 +1942,8 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
           <Field label="Observaciones"><textarea value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} rows={2} className={`${INPUT} resize-none`} /></Field>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg">Cancelar</button>
-          <button type="submit" disabled={saving} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">Cancelar</button>
+          <button type="submit" disabled={saving} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Guardar
           </button>
         </div>
@@ -1982,9 +1993,9 @@ function MovimientoModal({ item, onSave, onClose }: {
   const handleTipoChange = (t: typeof tipo) => { setTipo(t); setMotivoKey('') }
 
   const OPTS = [
-    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30' },
-    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-red-700 dark:text-red-400 bg-red-500/15 border-red-500/30' },
-    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-blue-700 dark:text-blue-400 bg-blue-500/15 border-blue-500/30' },
+    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-emerald-500/[0.25]' },
+    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-red-500/[0.25]' },
+    { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-primary bg-primary/[0.15] border-primary/[0.25]' },
   ]
 
   return (
@@ -1992,13 +2003,13 @@ function MovimientoModal({ item, onSave, onClose }: {
       <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(tipo, cantidad, motivoFinal) } finally { setSaving(false) } }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div><h3 className="text-base font-bold">Registrar movimiento</h3><p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve} — {item.codigoSAP}</p></div>
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
+          <button type="button" onClick={onClose} className="p-1 rounded-ctl hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div className="grid grid-cols-3 gap-2">
             {OPTS.map(o => { const I = o.icon; return (
               <button key={o.v} type="button" onClick={() => handleTipoChange(o.v)}
-                className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === o.v ? o.c : 'border-border bg-muted text-muted-foreground hover:bg-muted'}`}>
+                className={`flex flex-col items-center gap-1 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === o.v ? o.c : 'border-border bg-muted text-muted-foreground hover:bg-muted'}`}>
                 <I className="h-5 w-5" />{o.l}
               </button>
             )})}
@@ -2006,18 +2017,18 @@ function MovimientoModal({ item, onSave, onClose }: {
           <Field label={tipo === 'ajuste' ? 'Nuevo stock' : 'Cantidad'}>
             <input type="number" min={0} value={cantidad} onChange={e => setCantidad(Number(e.target.value))} className={`${INPUT} text-lg font-bold tabular-nums text-center`} autoFocus />
           </Field>
-          <div className="flex items-center justify-center gap-3 py-2 px-4 rounded-lg bg-muted border border-border">
+          <div className="flex items-center justify-center gap-3 py-2 px-4 rounded-card bg-muted border border-border">
             <span className="text-sm text-muted-foreground">Actual: <strong className="text-foreground">{item.stockActual}</strong></span>
             <span className="text-muted-foreground">→</span>
-            <span className="text-sm text-muted-foreground">Nuevo: <strong className={preview <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}>{preview}</strong></span>
+            <span className="text-sm text-muted-foreground">Nuevo: <strong className={preview <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? 'text-ink-warn' : 'text-ink-ok'}>{preview}</strong></span>
           </div>
           <Field label="Motivo"><select value={motivoKey} onChange={e => setMotivoKey(e.target.value)} className={INPUT}><option value="">— Seleccionar motivo —</option>{motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
           <Field label="Referencia (opcional)"><input type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: OC #123, OT #456…" className={INPUT} /></Field>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg">Cancelar</button>
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">Cancelar</button>
           <button type="submit" disabled={saving || !motivoKey || (cantidad <= 0 && tipo !== 'ajuste')}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar
           </button>
         </div>
@@ -2041,19 +2052,19 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
     <ModalBackdrop onClose={onClose}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div><h3 className="text-base font-bold">Historial</h3><p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve} — {item.codigoSAP}</p></div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
+        <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
       </div>
       <div className="px-5 py-4 max-h-[400px] overflow-y-auto">
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
           : movs.length === 0 ? <p className="text-center text-sm text-muted-foreground py-8">Sin movimientos</p>
           : <div className="space-y-2">{movs.map(m => {
-            const cfg = { entrada: { l: 'Entrada', c: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/15', i: ArrowDownCircle },
-              salida: { l: 'Salida', c: 'text-red-700 dark:text-red-400 bg-red-500/15', i: ArrowUpCircle },
-              ajuste: { l: 'Ajuste', c: 'text-blue-700 dark:text-blue-400 bg-blue-500/15', i: Settings2 } }[m.tipo]
+            const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-emerald-500/[0.15]', i: ArrowDownCircle },
+              salida: { l: 'Salida', c: 'text-ink-crit bg-red-500/[0.15]', i: ArrowUpCircle },
+              ajuste: { l: 'Ajuste', c: 'text-primary bg-primary/[0.15]', i: Settings2 } }[m.tipo]
             const I = cfg.i
             return (
-              <div key={m.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${cfg.c}`}><I className="h-4 w-4" /></div>
+              <div key={m.id} className="flex items-start gap-3 p-3 rounded-card bg-muted border border-border">
+                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${cfg.c}`}><I className="h-4 w-4" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-semibold ${cfg.c.split(' ')[0]}`}>{cfg.l}</span>
@@ -2061,7 +2072,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
                     <span className="text-xs text-muted-foreground">(stock: {m.stockResultante})</span>
                   </div>
                   {m.motivo && <p className="text-xs text-muted-foreground mt-0.5">{m.motivo}</p>}
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground/70">
+                  <div className="flex items-center gap-2 mt-1 text-caption text-muted-foreground/70">
                     <span>{m.realizadoPorNombre || 'Usuario'}</span><span>•</span>
                     <span>{m.createdAt.toLocaleDateString('es-CL')} {m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -2071,7 +2082,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
           })}</div>}
       </div>
       <div className="px-5 py-3 border-t border-border flex justify-end">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg">Cerrar</button>
+        <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">Cerrar</button>
       </div>
     </ModalBackdrop>
   )
@@ -2141,7 +2152,7 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
       <div className="px-5 py-4 space-y-3">
         {done ? (
           <div className="text-center py-6">
-            <CheckCircle2 className="h-10 w-10 text-emerald-700 dark:text-emerald-400 mx-auto mb-3" />
+            <CheckCircle2 className="h-10 w-10 text-ink-ok mx-auto mb-3" />
             <p className="text-sm font-medium text-foreground">{selected.size} movimientos registrados</p>
             <p className="text-xs text-muted-foreground mt-1">{tipo === 'entrada' ? 'Entradas' : 'Salidas'} — {motivoLabel}</p>
           </div>
@@ -2150,11 +2161,11 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setTipo('entrada'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-emerald-500/[0.15] border-emerald-500/[0.25]' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowDownCircle className="h-5 w-5" /> Entrada
               </button>
               <button type="button" onClick={() => { setTipo('salida'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-red-700 dark:text-red-400 bg-red-500/15 border-red-500/30' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-red-500/[0.15] border-red-500/[0.25]' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowUpCircle className="h-5 w-5" /> Salida
               </button>
             </div>
@@ -2166,25 +2177,25 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             </div>
 
             {/* Selección de ítems con cantidad */}
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-border rounded-card overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
                 <span className="text-xs text-muted-foreground font-semibold">{selected.size} seleccionados</span>
                 <div className="flex-1" />
-                <input type="text" value={searchBatch} onChange={e => setSearchBatch(e.target.value)} placeholder="Filtrar…" className="w-40 px-2 py-1 text-[10px] bg-muted border border-border rounded text-foreground" />
+                <input type="text" value={searchBatch} onChange={e => setSearchBatch(e.target.value)} placeholder="Filtrar…" className="w-40 px-2 py-1 text-caption bg-muted border border-border rounded-ctl text-foreground" />
               </div>
               <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
                 {visible.slice(0, 100).map(item => {
                   const isSelected = selected.has(item.codigoSAP)
                   return (
                     <div key={item.codigoSAP} className={`flex items-center gap-2 px-3 py-2 ${isSelected ? 'bg-primary/5' : 'hover:bg-muted'}`}>
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleItem(item.codigoSAP)} className="rounded" />
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleItem(item.codigoSAP)} className="rounded-ctl" />
                       <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                      <span className="text-[10px] font-mono text-blue-700 dark:text-blue-400 shrink-0 w-20">{item.codigoSAP}</span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 w-12 text-right">stk: {item.stockActual}</span>
+                      <span className="text-caption font-mono text-primary shrink-0 w-20">{item.codigoSAP}</span>
+                      <span className="text-caption text-muted-foreground shrink-0 w-12 text-right">stk: {item.stockActual}</span>
                       {isSelected && (
                         <input type="number" min={0} value={selected.get(item.codigoSAP) || 1}
                           onChange={e => setCant(item.codigoSAP, Number(e.target.value))}
-                          className="w-16 px-2 py-0.5 text-xs text-center bg-muted border border-border rounded tabular-nums font-bold text-foreground shrink-0"
+                          className="w-16 px-2 py-0.5 text-xs text-center bg-muted border border-border rounded-ctl tabular-nums font-bold text-foreground shrink-0"
                           onClick={e => e.stopPropagation()} />
                       )}
                     </div>
@@ -2194,7 +2205,7 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             </div>
 
             {saving && (
-              <div className="bg-muted rounded-lg p-3 border border-border">
+              <div className="bg-muted rounded-card p-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Procesando…</span><span>{progress}%</span></div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
               </div>
@@ -2203,10 +2214,10 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
         )}
       </div>
       <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg">{done ? 'Cerrar' : 'Cancelar'}</button>
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">{done ? 'Cerrar' : 'Cancelar'}</button>
         {!done && (
           <button onClick={handleApply} disabled={saving || selected.size === 0 || !motivoKey}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Registrar {selected.size} {tipo === 'entrada' ? 'entradas' : 'salidas'}
           </button>
@@ -2267,7 +2278,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
       <div className="px-5 py-4 space-y-3">
         {done ? (
           <div className="text-center py-6">
-            <CheckCircle2 className="h-10 w-10 text-emerald-700 dark:text-emerald-400 mx-auto mb-3" />
+            <CheckCircle2 className="h-10 w-10 text-ink-ok mx-auto mb-3" />
             <p className="text-sm font-medium text-foreground">{selected.size} ítems configurados</p>
             <p className="text-xs text-muted-foreground mt-1">Stock mín: {stockMinimo} | Unidad: {unidad}</p>
           </div>
@@ -2280,12 +2291,12 @@ function BulkConfigModal({ items, saveStock, onClose }: {
               </select></Field>
               <Field label="Ubicación"><input type="text" value={ubicacion} onChange={e => setUbicacion(e.target.value)} placeholder="Opcional" className={INPUT} /></Field>
             </div>
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-border rounded-card overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
-                <input type="checkbox" checked={selected.size === visible.length && visible.length > 0} onChange={toggleAll} className="rounded" />
+                <input type="checkbox" checked={selected.size === visible.length && visible.length > 0} onChange={toggleAll} className="rounded-ctl" />
                 <span className="text-xs text-muted-foreground">{selected.size} seleccionados</span>
                 <div className="flex-1" />
-                <input type="text" value={searchBulk} onChange={e => setSearchBulk(e.target.value)} placeholder="Filtrar…" className="w-32 px-2 py-1 text-[10px] bg-muted border border-border rounded text-foreground" />
+                <input type="text" value={searchBulk} onChange={e => setSearchBulk(e.target.value)} placeholder="Filtrar…" className="w-32 px-2 py-1 text-caption bg-muted border border-border rounded-ctl text-foreground" />
               </div>
               <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
                 {visible.slice(0, 100).map(item => (
@@ -2294,15 +2305,15 @@ function BulkConfigModal({ items, saveStock, onClose }: {
                       const next = new Set(selected)
                       if (next.has(item.codigoSAP)) { next.delete(item.codigoSAP) } else { next.add(item.codigoSAP) }
                       setSelected(next)
-                    }} className="rounded" />
+                    }} className="rounded-ctl" />
                     <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
-                    <span className="text-[10px] font-mono text-blue-700 dark:text-blue-400 shrink-0">{item.codigoSAP}</span>
+                    <span className="text-caption font-mono text-primary shrink-0">{item.codigoSAP}</span>
                   </label>
                 ))}
               </div>
             </div>
             {saving && (
-              <div className="bg-muted rounded-lg p-3 border border-border">
+              <div className="bg-muted rounded-card p-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Configurando…</span><span>{progress}%</span></div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
               </div>
@@ -2311,10 +2322,10 @@ function BulkConfigModal({ items, saveStock, onClose }: {
         )}
       </div>
       <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg">{done ? 'Cerrar' : 'Cancelar'}</button>
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">{done ? 'Cerrar' : 'Cancelar'}</button>
         {!done && (
           <button onClick={handleApply} disabled={saving || selected.size === 0}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             Configurar {selected.size} ítems
           </button>

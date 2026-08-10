@@ -313,7 +313,7 @@ export function ImageLightbox({ photos, initialIndex = 0, onClose }: ImageLightb
             <button
               key={i}
               onClick={() => setIndex(i)}
-              className={`w-12 h-12 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
+              className={`w-12 h-12 rounded-card overflow-hidden border-2 transition-all flex-shrink-0 ${
                 i === index ? 'border-white scale-110' : 'border-white/20 opacity-60 hover:opacity-100'
               }`}
             >

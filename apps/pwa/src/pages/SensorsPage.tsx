@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers } from 'lucide-react'
+import { Pill } from '@/components/piel'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -276,15 +277,15 @@ export function SensorsPage() {
     const q = getRssiQuality(rssi, online)
     switch (q) {
       case 'Excelente':
-        return 'text-emerald-600 dark:text-emerald-400'
+        return 'text-ink-ok'
       case 'Buena':
-        return 'text-green-600 dark:text-green-400'
+        return 'text-ink-ok'
       case 'Regular':
-        return 'text-yellow-600 dark:text-yellow-400'
+        return 'text-ink-warn'
       case 'Mala':
-        return 'text-orange-600 dark:text-orange-400'
+        return 'text-cat-4-ink'
       default:
-        return 'text-red-600 dark:text-red-400'
+        return 'text-ink-crit'
     }
   }
 
@@ -908,7 +909,7 @@ export function SensorsPage() {
       </div>
 
       {loadError && (
-        <div className="rounded border border-destructive/50 bg-destructive/10 p-4">
+        <div className="rounded-ctl border border-destructive/50 bg-destructive/10 p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
             <div className="flex-1">
@@ -944,11 +945,11 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Online</div>
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  <div className="text-2xl font-bold text-ink-ok">
                     {devices.filter((d) => isDeviceFresh(d, panelNowMs)).length}
                   </div>
                 </div>
-                <Activity className="h-8 w-8 text-green-600 dark:text-green-400" />
+                <Activity className="h-8 w-8 text-ink-ok" />
               </div>
             </CardContent>
           </Card>
@@ -957,11 +958,11 @@ export function SensorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-muted-foreground">Asignados</div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-2xl font-bold text-primary">
                     {devices.filter(d => d.assignedEquipmentId).length}
                   </div>
                 </div>
-                <Link2 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                <Link2 className="h-8 w-8 text-primary" />
               </div>
             </CardContent>
           </Card>
@@ -1035,17 +1036,17 @@ export function SensorsPage() {
                     <div className="mt-1.5 text-xs text-muted-foreground">
                       {filteredDevices.length} de {devices.length} dispositivo(s)
                       {deviceSearch && filteredDevices.length === 0 && (
-                        <span className="text-amber-600 dark:text-amber-400 ml-2">
+                        <span className="text-ink-warn ml-2">
                           • No hay resultados, limpia el filtro
                         </span>
                       )}
                       {usbDevices.length > 0 && (
-                        <span className="text-green-600 dark:text-green-400 ml-2">
-                          • {usbDevices.length} USB detectado(s) 🔌
+                        <span className="text-ink-ok ml-2">
+                          • {usbDevices.length} USB detectado(s)
                         </span>
                       )}
                       {usbError && (
-                        <span className="text-red-600 dark:text-red-400 ml-2">
+                        <span className="text-ink-crit ml-2">
                           • {usbError}
                         </span>
                       )}
@@ -1065,7 +1066,7 @@ export function SensorsPage() {
                       return (
                         <div
                           key={d.deviceId}
-                          className={`rounded-lg border transition-all ${
+                          className={`rounded-card border transition-all ${
                             isSelected 
                               ? 'border-primary bg-primary/5 shadow-sm' 
                               : 'hover:border-muted-foreground/20'
@@ -1087,7 +1088,7 @@ export function SensorsPage() {
                                 )}
                                 {d.apSsid && (
                                   <div className="text-xs text-muted-foreground mt-1">
-                                    📶 {d.apSsid}
+                                    <Signal className="inline size-3.5" /> {d.apSsid}
                                   </div>
                                 )}
                               </div>
@@ -1095,11 +1096,11 @@ export function SensorsPage() {
                             </div>
 
                             {assignedEquip && (
-                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
-                                <div className="font-medium text-blue-900 dark:text-blue-100">
+                              <div className="mt-2 p-2 bg-primary/[0.15] rounded-ctl text-xs">
+                                <div className="font-medium text-primary">
                                   {assignedEquip.nombre}
                                 </div>
-                                <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                                <div className="text-primary mt-0.5">
                                   {assignedEquip.codigo}
                                 </div>
                               </div>
@@ -1107,7 +1108,7 @@ export function SensorsPage() {
 
                             {!assignedEquip && (
                               <div className="mt-2 text-xs">
-                                <Badge variant="secondary" className="text-amber-600 dark:text-amber-400">
+                                <Badge variant="secondary" className="text-ink-warn">
                                   Sin asignar
                                 </Badge>
                               </div>
@@ -1208,9 +1209,9 @@ export function SensorsPage() {
                     <div className="space-y-3">
                     {/* Temperatura */}
                     {displayTelemetry.temperatura && (
-                      <div className="rounded border p-3 bg-orange-50 dark:bg-orange-950/20">
+                      <div className="rounded-ctl border p-3 bg-cat-4-tint/[0.15]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <Thermometer className="h-4 w-4 text-cat-4-ink" />
                           <span className="text-sm font-medium">Temperatura</span>
                         </div>
                         <div className="text-2xl font-bold">
@@ -1231,9 +1232,9 @@ export function SensorsPage() {
 
                     {/* Humedad */}
                     {displayTelemetry.humedad && (
-                      <div className="rounded border p-3 bg-blue-50 dark:bg-blue-950/20">
+                      <div className="rounded-ctl border p-3 bg-primary/[0.15]">
                         <div className="flex items-center gap-2 mb-2">
-                          <Droplets className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <Droplets className="h-4 w-4 text-primary" />
                           <span className="text-sm font-medium">Humedad</span>
                         </div>
                         <div className="text-2xl font-bold">
@@ -1290,16 +1291,16 @@ export function SensorsPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="line">📈 Línea de tiempo</SelectItem>
-                                  <SelectItem value="area">🌊 Área suavizada</SelectItem>
-                                  <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
-                                  <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
-                                  <SelectItem value="bar">📊 Barras por hora</SelectItem>
-                                  <SelectItem value="radar">🕸️ Radar de estado</SelectItem>
-                                  <SelectItem value="gauge">🧭 Gauge (Temperatura)</SelectItem>
-                                  <SelectItem value="heatmap">🧩 Heatmap (Día vs Hora)</SelectItem>
-                                  <SelectItem value="candlestick">🕯️ Candlestick (OHLC)</SelectItem>
-                                  <SelectItem value="mixed">🧪 Mixed (Combinado)</SelectItem>
+                                  <SelectItem value="line"><LineChart className="mr-1.5 inline size-3.5" />Línea de tiempo</SelectItem>
+                                  <SelectItem value="area"><AreaChart className="mr-1.5 inline size-3.5" />Área suavizada</SelectItem>
+                                  <SelectItem value="dual-axis"><Crosshair className="mr-1.5 inline size-3.5" />Doble eje (recomendado)</SelectItem>
+                                  <SelectItem value="scatter"><ScatterChart className="mr-1.5 inline size-3.5" />Scatter (correlación)</SelectItem>
+                                  <SelectItem value="bar"><BarChart3 className="mr-1.5 inline size-3.5" />Barras por hora</SelectItem>
+                                  <SelectItem value="radar"><Radar className="mr-1.5 inline size-3.5" />Radar de estado</SelectItem>
+                                  <SelectItem value="gauge"><Gauge className="mr-1.5 inline size-3.5" />Gauge (temperatura)</SelectItem>
+                                  <SelectItem value="heatmap"><Grid3x3 className="mr-1.5 inline size-3.5" />Heatmap (día vs hora)</SelectItem>
+                                  <SelectItem value="candlestick"><CandlestickChart className="mr-1.5 inline size-3.5" />Candlestick (OHLC)</SelectItem>
+                                  <SelectItem value="mixed"><Layers className="mr-1.5 inline size-3.5" />Mixed (combinado)</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1312,21 +1313,21 @@ export function SensorsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="1h">⏱️ Última hora</SelectItem>
-                                  <SelectItem value="6h">🕐 Últimas 6 horas</SelectItem>
-                                  <SelectItem value="12h">🕛 Últimas 12 horas</SelectItem>
-                                  <SelectItem value="24h">📅 Últimas 24 horas</SelectItem>
-                                  <SelectItem value="48h">📆 Últimos 2 días</SelectItem>
-                                  <SelectItem value="7d">📊 Última semana</SelectItem>
+                                  <SelectItem value="6h"><Clock className="mr-1.5 inline size-3.5" />Últimas 6 horas</SelectItem>
+                                  <SelectItem value="12h"><Clock className="mr-1.5 inline size-3.5" />Últimas 12 horas</SelectItem>
+                                  <SelectItem value="24h"><Clock className="mr-1.5 inline size-3.5" />Últimas 24 horas</SelectItem>
+                                  <SelectItem value="48h"><CalendarDays className="mr-1.5 inline size-3.5" />Últimos 2 días</SelectItem>
+                                  <SelectItem value="7d"><CalendarDays className="mr-1.5 inline size-3.5" />Última semana</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           </div>
 
                           {/* Gráfico */}
-                          <div className="rounded border bg-card p-4">
+                          <div className="rounded-ctl border bg-card p-4">
                             {historyLoading ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
-                                🔄 Cargando historial...
+                                <RefreshCw className="inline size-3.5 animate-spin" /> Cargando historial…
                               </div>
                             ) : historyData.length === 0 ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
@@ -1352,7 +1353,7 @@ export function SensorsPage() {
                                       defaultPreset={timeRange}
                                     />
                                     <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                      💡 Zoom: scroll | Pan: Ctrl+arrastrar
+                                      <Lightbulb className="inline size-3.5" /> Zoom: scroll · Pan: Ctrl+arrastrar
                                     </div>
                                   </div>
                                 </div>
@@ -1389,13 +1390,13 @@ export function SensorsPage() {
                 <CardContent className="space-y-3">
                   {/* WiFi Principal (Station Mode) */}
                   {selectedDevice.wifiSsid && (
-                    <div className={`rounded border p-3 ${selectedDeviceIsFresh
+                    <div className={`rounded-ctl border p-3 ${selectedDeviceIsFresh
                       ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800'
                       : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800'
                       }`}>
                       <div className={`text-xs font-semibold mb-2 flex items-center gap-1 ${selectedDeviceIsFresh
-                        ? 'text-green-700 dark:text-green-300'
-                        : 'text-amber-700 dark:text-amber-300'
+                        ? 'text-ink-ok'
+                        : 'text-ink-warn'
                         }`}>
                         <Wifi className="h-3 w-3" />
                         {selectedDeviceIsFresh ? 'WiFi Principal (Conectado)' : 'WiFi Principal (Configurada)'}
@@ -1407,11 +1408,11 @@ export function SensorsPage() {
                             <span className="font-mono text-sm font-medium">{selectedDevice.wifiSsid}</span>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.wifiSsid || '', 'ssid')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-ink-ok" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -1427,7 +1428,7 @@ export function SensorsPage() {
                               </span>
                               <button
                                 onClick={() => setShowApPassword(!showApPassword)}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                                 title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                               >
                                 {showApPassword ? (
@@ -1438,11 +1439,11 @@ export function SensorsPage() {
                               </button>
                               <button
                                 onClick={() => copyToClipboard(selectedDevice.wifiPassword || '', 'password')}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
-                                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                  <Check className="h-3 w-3 text-ink-ok" />
                                 ) : (
                                   <Copy className="h-3 w-3 text-muted-foreground" />
                                 )}
@@ -1485,8 +1486,8 @@ export function SensorsPage() {
                   )}
 
                   {/* Configurar nueva WiFi principal */}
-                  <div className="rounded border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-                    <div className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-1">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+                    <div className="text-xs font-semibold text-ink-warn mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Cambiar WiFi Principal
                     </div>
@@ -1522,7 +1523,7 @@ export function SensorsPage() {
                               onClick={() => setWifiStaSsid(n.ssid || '')}
                               className="text-xs"
                             >
-                              {n.ssid || '(oculta)'} {typeof n.rssi === 'number' ? `· ${n.rssi} dBm` : ''}{n.secure ? ' 🔒' : ''}
+                              {n.ssid || '(oculta)'} {typeof n.rssi === 'number' ? `· ${n.rssi} dBm` : ''}{n.secure && <Lock className="ml-1 inline size-3" aria-label="Red protegida" />}
                             </Button>
                           ))}
                         </div>
@@ -1549,7 +1550,7 @@ export function SensorsPage() {
                           onChange={(e) => setWifiStaPassword(e.target.value)}
                           placeholder="(opcional)"
                         />
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-caption text-muted-foreground">
                           Si la red es abierta, deja vacío.
                         </div>
                       </div>
@@ -1571,7 +1572,7 @@ export function SensorsPage() {
                       )}
 
                       {wifiSaveOk && (
-                        <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        <div className="text-sm text-ink-ok font-medium">
                           {wifiSaveOk}
                         </div>
                       )}
@@ -1580,8 +1581,8 @@ export function SensorsPage() {
 
                   {/* WiFi AP Local */}
                   {selectedDevice.apSsid && (
-                    <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-                      <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                    <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                      <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                         <Wifi className="h-3 w-3" />
                         WiFi Local (Access Point)
                       </div>
@@ -1592,11 +1593,11 @@ export function SensorsPage() {
                             <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                               title="Copiar SSID"
                             >
                               {copiedField === 'ssid' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-ink-ok" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -1612,7 +1613,7 @@ export function SensorsPage() {
                               </span>
                               <button
                                 onClick={() => setShowApPassword(!showApPassword)}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                                 title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                               >
                                 {showApPassword ? (
@@ -1623,11 +1624,11 @@ export function SensorsPage() {
                               </button>
                               <button
                                 onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
-                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                                 title="Copiar contraseña"
                               >
                                 {copiedField === 'password' ? (
-                                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                  <Check className="h-3 w-3 text-ink-ok" />
                                 ) : (
                                   <Copy className="h-3 w-3 text-muted-foreground" />
                                 )}
@@ -1645,7 +1646,7 @@ export function SensorsPage() {
                             rel="noopener noreferrer"
                             className="text-xs text-primary hover:underline flex items-center gap-1"
                           >
-                            🌐 Abrir panel local
+                            <Globe className="inline size-3.5" /> Abrir panel local
                           </a>
                         )}
                       </div>
@@ -1653,8 +1654,8 @@ export function SensorsPage() {
                   )}
 
                   {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
-                    <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
-                      ⚠️ Este dispositivo no ha reportado información de WiFi aún
+                    <div className="text-xs text-muted-foreground bg-amber-500/[0.15] p-2 rounded-ctl border border-amber-200 dark:border-amber-800">
+                      <AlertTriangle className="inline size-3.5" /> Este dispositivo no ha reportado información de WiFi aún
                     </div>
                   )}
                 </CardContent>
@@ -1712,7 +1713,7 @@ export function SensorsPage() {
                     )}
                   </div>
 
-                <div className="rounded border p-3 bg-muted">
+                <div className="rounded-ctl border p-3 bg-muted">
                   <div className="text-sm font-medium mb-1">Asignación actual</div>
                   <div className="text-xs">
                     {assignedEquipment ? (
@@ -1723,7 +1724,7 @@ export function SensorsPage() {
                     ) : selectedDevice.assignedEquipmentId ? (
                       <div className="text-muted-foreground">ID: {selectedDevice.assignedEquipmentId}</div>
                     ) : (
-                      <div className="text-amber-600 dark:text-amber-400">Sin asignar</div>
+                      <div className="text-ink-warn">Sin asignar</div>
                     )}
                   </div>
                 </div>
@@ -1746,20 +1747,20 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded">
-                      <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                        🔄 Cargando equipos...
+                    <div className="p-4 text-sm bg-primary/[0.15] border border-blue-200 dark:border-blue-800 rounded-ctl">
+                      <div className="font-medium text-primary mb-1">
+                        <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
                       </div>
-                      <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <div className="text-xs text-primary">
                         Por favor espera un momento
                       </div>
                     </div>
                   ) : equipment.length === 0 ? (
-                    <div className="p-4 text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded">
-                      <div className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                        ⚠️ No hay equipos disponibles
+                    <div className="p-4 text-sm bg-amber-500/[0.15] border border-amber-200 dark:border-amber-800 rounded-ctl">
+                      <div className="font-medium text-ink-warn mb-1">
+                        <AlertTriangle className="inline size-3.5" /> No hay equipos disponibles
                       </div>
-                      <div className="text-xs text-amber-700 dark:text-amber-300">
+                      <div className="text-xs text-ink-warn">
                         Ve a la página de Equipos para agregar equipos a la jerarquía.
                       </div>
                     </div>
@@ -1953,7 +1954,7 @@ export function SensorsPage() {
                       </Select>
                     </div>
                     <div className="flex items-end">
-                      <label className="flex items-center gap-2 cursor-pointer h-10 px-3 rounded-md border bg-background hover:bg-muted/50 transition-colors w-full">
+                      <label className="flex items-center gap-2 cursor-pointer h-10 px-3 rounded-ctl border bg-background hover:bg-muted/50 transition-colors w-full">
                         <input
                           type="checkbox"
                           checked={filterSinSensor}
@@ -2022,7 +2023,7 @@ export function SensorsPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted">
+                    <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-ctl bg-muted">
                       {equipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
                           <div className="text-muted-foreground">⏳ Cargando equipos...</div>
@@ -2032,7 +2033,7 @@ export function SensorsPage() {
                         </div>
                       ) : filteredEquipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
-                          <div className="text-amber-600 dark:text-amber-400 font-medium">❌ No se encontraron equipos con esos filtros</div>
+                          <div className="text-ink-warn font-medium">❌ No se encontraron equipos con esos filtros</div>
                           <div className="text-xs text-muted-foreground space-y-1">
                             <div>• Verifica que la combinación de Planta/Sector/Área sea correcta</div>
                             <div>• Prueba cambiar los filtros de Estado o Criticidad</div>
@@ -2042,8 +2043,8 @@ export function SensorsPage() {
                       ) : (
                         <>
                           {filteredEquipment.length > 5 && (
-                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-blue-50 dark:bg-blue-950/30 border-b text-blue-700 dark:text-blue-300">
-                              💡 Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-primary/[0.15] border-b text-primary">
+                              <ChevronsDown className="inline size-3.5" /> Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
                             </div>
                           )}
                           <div className="divide-y">
@@ -2064,7 +2065,7 @@ export function SensorsPage() {
                                     </div>
                                     {e.hierarchyPath && (
                                       <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                        <span className="opacity-60">📍</span>
+                                        <MapPin className="size-3 opacity-60" />
                                         <span className="truncate">{e.hierarchyPath}</span>
                                       </div>
                                     )}
@@ -2088,7 +2089,9 @@ export function SensorsPage() {
                                       }
                                       className="text-xs"
                                     >
-                                      {e.criticidad === 'alta' ? '🔴 Alta' : e.criticidad === 'media' ? '🟡 Media' : '🟢 Baja'}
+                                      <Pill tone={e.criticidad === 'alta' ? 'critical' : e.criticidad === 'media' ? 'warning' : 'ok'} dot>
+                                        {e.criticidad === 'alta' ? 'Alta' : e.criticidad === 'media' ? 'Media' : 'Baja'}
+                                      </Pill>
                                     </Badge>
                                   </div>
                                 </div>
@@ -2109,7 +2112,7 @@ export function SensorsPage() {
                   {/* Resumen de selección y botones de acción */}
                   <div className="flex flex-col gap-3">
                     {selectedEquipmentId && equipment.find(e => e.id === selectedEquipmentId) && (
-                      <div className="p-3 rounded-md bg-primary/10 border border-primary/30">
+                      <div className="p-3 rounded-ctl bg-primary/10 border border-primary/30">
                         <div className="text-xs font-medium text-primary mb-1">✓ Equipo seleccionado:</div>
                         <div className="text-sm font-medium">
                           {equipment.find(e => e.id === selectedEquipmentId)?.nombre}
@@ -2145,21 +2148,21 @@ export function SensorsPage() {
                     </div>
 
                     {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
-                      <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
-                        💡 Selecciona un equipo de la lista arriba para asignarlo a este sensor
+                      <div className="text-xs text-muted-foreground bg-primary/[0.15] p-2 rounded-ctl border border-blue-200 dark:border-blue-800">
+                        <Lightbulb className="inline size-3.5" /> Selecciona un equipo de la lista arriba para asignarlo a este sensor
                       </div>
                     )}
                   </div>
 
                   {saveError && (
-                    <div className="text-sm text-destructive flex items-center gap-2 bg-destructive/10 p-2 rounded">
+                    <div className="text-sm text-destructive flex items-center gap-2 bg-destructive/10 p-2 rounded-ctl">
                       <AlertTriangle className="h-4 w-4" />
                       {saveError}
                     </div>
                   )}
 
                   {saveOk && (
-                    <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-2 rounded border border-green-200 dark:border-green-800">
+                    <div className="text-sm text-ink-ok bg-green-500/[0.15] p-2 rounded-ctl border border-green-200 dark:border-green-800">
                       ✓ {saveOk}
                     </div>
                   )}
@@ -2196,8 +2199,8 @@ export function SensorsPage() {
                 </div>
 
                 {selectedDevice.apSsid && (
-                  <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
-                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                    <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Configuración Actual del AP
                     </div>
@@ -2208,11 +2211,11 @@ export function SensorsPage() {
                           <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
                           <button
                             onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
-                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                             title="Copiar SSID"
                           >
                             {copiedField === 'ssid' ? (
-                              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <Check className="h-3 w-3 text-ink-ok" />
                             ) : (
                               <Copy className="h-3 w-3 text-muted-foreground" />
                             )}
@@ -2228,7 +2231,7 @@ export function SensorsPage() {
                             </span>
                             <button
                               onClick={() => setShowApPassword(!showApPassword)}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                               title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                             >
                               {showApPassword ? (
@@ -2239,11 +2242,11 @@ export function SensorsPage() {
                             </button>
                             <button
                               onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                               title="Copiar contraseña"
                             >
                               {copiedField === 'password' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-ink-ok" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -2259,8 +2262,8 @@ export function SensorsPage() {
                 )}
 
                 {selectedDevice && (
-                  <div className="rounded border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
-                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-2 flex items-center gap-1">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                    <div className="text-xs font-semibold text-ink-ok mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Información OTA (WiFi)
                     </div>
@@ -2271,11 +2274,11 @@ export function SensorsPage() {
                           <span className="font-mono text-sm font-medium">{otaHostLabel || '--'}</span>
                           <button
                             onClick={() => copyToClipboard(otaHostLabel || '', 'otaHost')}
-                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                             title="Copiar hostname"
                           >
                             {copiedField === 'otaHost' ? (
-                              <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <Check className="h-3 w-3 text-ink-ok" />
                             ) : (
                               <Copy className="h-3 w-3 text-muted-foreground" />
                             )}
@@ -2287,7 +2290,7 @@ export function SensorsPage() {
                         {otaPasswordState === 'idle' && (
                           <button
                             onClick={fetchOtaPassword}
-                            className="text-xs px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
+                            className="text-xs px-2 py-0.5 rounded-ctl border border-emerald-300 dark:border-emerald-700 hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
                           >
                             Mostrar (solo admin)
                           </button>
@@ -2296,18 +2299,18 @@ export function SensorsPage() {
                           <span className="text-xs text-muted-foreground">Cargando…</span>
                         )}
                         {otaPasswordState === 'error' && (
-                          <span className="text-xs text-red-600 dark:text-red-400">Solo administradores</span>
+                          <span className="text-xs text-ink-crit">Solo administradores</span>
                         )}
                         {otaPasswordState === 'ok' && (
                           <div className="flex items-center gap-1">
                             <span className="font-mono text-sm font-medium">{otaPassword}</span>
                             <button
                               onClick={() => copyToClipboard(otaPassword, 'otaPassword')}
-                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded-ctl transition-colors"
                               title="Copiar contraseña OTA"
                             >
                               {copiedField === 'otaPassword' ? (
-                                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <Check className="h-3 w-3 text-ink-ok" />
                               ) : (
                                 <Copy className="h-3 w-3 text-muted-foreground" />
                               )}
@@ -2329,7 +2332,7 @@ export function SensorsPage() {
                       id="ap-enabled"
                       checked={apEnabled}
                       onChange={(e) => setApEnabled(e.target.checked)}
-                      className="rounded border-gray-300"
+                      className="rounded-ctl border-gray-300"
                     />
                     <Label htmlFor="ap-enabled" className="text-sm cursor-pointer">
                       AP siempre activo (AP+STA)
@@ -2374,7 +2377,7 @@ export function SensorsPage() {
                       <button
                         type="button"
                         onClick={() => setShowApPassword(!showApPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded transition-colors"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-ctl transition-colors"
                         title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                       >
                         {showApPassword ? (
@@ -2400,16 +2403,16 @@ export function SensorsPage() {
                           </div>
                           <span className={`text-xs font-medium ${
                             apPassword.length < 8
-                              ? 'text-red-600 dark:text-red-400'
+                              ? 'text-ink-crit'
                               : apPassword.length < 12
-                                ? 'text-yellow-600 dark:text-yellow-400'
-                                : 'text-green-600 dark:text-green-400'
+                                ? 'text-ink-warn'
+                                : 'text-ink-ok'
                           }`}>
                             {apPassword.length < 8 ? 'Débil' : apPassword.length < 12 ? 'Media' : 'Fuerte'}
                           </span>
                         </div>
                         {apPassword.length < 8 && (
-                          <div className="text-xs text-red-600 dark:text-red-400 flex items-start gap-1">
+                          <div className="text-xs text-ink-crit flex items-start gap-1">
                             <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                             <span>WPA2 requiere mínimo 8 caracteres</span>
                           </div>
@@ -2417,7 +2420,9 @@ export function SensorsPage() {
                       </div>
                     )}
                     <div className="text-xs text-muted-foreground mt-1">
-                      {apPassword.length === 0 ? '⚠️ Vacío = red abierta (sin contraseña)' : `${apPassword.length} caracteres`}
+                      {apPassword.length === 0
+                          ? <><AlertTriangle className="inline size-3" /> Vacío = red abierta (sin contraseña)</>
+                          : `${apPassword.length} caracteres`}
                     </div>
                   </div>
 
@@ -2438,7 +2443,7 @@ export function SensorsPage() {
                   )}
 
                   {apSaveOk && (
-                    <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                    <div className="text-sm text-ink-ok font-medium">
                       {apSaveOk}
                     </div>
                   )}
@@ -2499,8 +2504,8 @@ export function SensorsPage() {
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
                           <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
-                          <p className={sendInterval <= 10 ? 'text-amber-600 dark:text-amber-400' : ''}>
-                            {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
+                          <p className={sendInterval <= 10 ? 'text-ink-warn' : ''}>
+                            {sendInterval <= 10 && <AlertTriangle className="inline size-3" />}{' '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
                             {sendInterval <= 10 && ' (alto consumo)'}
                           </p>
                         </div>
@@ -2523,7 +2528,7 @@ export function SensorsPage() {
                       )}
 
                       {intervalSaveOk && (
-                        <div className="text-sm text-green-600 dark:text-green-400 font-medium">
+                        <div className="text-sm text-ink-ok font-medium">
                           {intervalSaveOk}
                         </div>
                       )}

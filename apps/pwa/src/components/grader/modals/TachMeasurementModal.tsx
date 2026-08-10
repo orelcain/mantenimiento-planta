@@ -130,25 +130,25 @@ export function TachMeasurementModal({
                 type="button"
                 onClick={() => setMethod('linear')}
                 className={cn(
-                  'rounded border text-xs px-2 py-1.5 text-left',
+                  'rounded-ctl border text-xs px-2 py-1.5 text-left',
                   method === 'linear' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                 )}
               >
                 <div className="font-medium">Rueda sobre cinta</div>
-                <div className="text-muted-foreground text-[10px]">Lectura directa m/s</div>
+                <div className="text-muted-foreground text-caption">Lectura directa m/s</div>
               </button>
               <button
                 type="button"
                 onClick={() => setMethod('shaft')}
                 disabled={!effectiveMpsPerRpm}
                 className={cn(
-                  'rounded border text-xs px-2 py-1.5 text-left',
+                  'rounded-ctl border text-xs px-2 py-1.5 text-left',
                   method === 'shaft' ? 'border-primary bg-primary/15 text-primary' : 'border-muted hover:bg-muted/30',
                   !effectiveMpsPerRpm && 'opacity-50 cursor-not-allowed',
                 )}
               >
                 <div className="font-medium">Óptico en eje</div>
-                <div className="text-muted-foreground text-[10px]">
+                <div className="text-muted-foreground text-caption">
                   {effectiveMpsPerRpm ? 'RPM → m/s con factor' : 'Falta effectiveMpsPerRpm'}
                 </div>
               </button>
@@ -170,7 +170,7 @@ export function TachMeasurementModal({
               className="font-mono"
             />
             {method === 'shaft' && effectiveMpsPerRpm && validNum && (
-              <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+              <p className="text-caption text-muted-foreground mt-1 font-mono">
                 {numValue} RPM × {effectiveMpsPerRpm.toFixed(6)} m/s/RPM = {beltMps.toFixed(3)} m/s
               </p>
             )}
@@ -202,7 +202,7 @@ export function TachMeasurementModal({
 
           {/* Comparación con actual */}
           {validNum && beltMps > 0 && (
-            <div className="bg-muted rounded p-2 text-xs space-y-1">
+            <div className="bg-muted rounded-ctl p-2 text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Medido:</span>
                 <span className="font-mono font-medium">{beltMps.toFixed(3)} m/s</span>
@@ -212,10 +212,10 @@ export function TachMeasurementModal({
                 <Badge
                   variant="outline"
                   className={cn(
-                    'text-[10px] font-mono',
-                    Math.abs(deltaPct) < 3 ? 'border-green-500/40 text-green-700 dark:text-green-400' :
-                    Math.abs(deltaPct) < 10 ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' :
-                    'border-red-500/40 text-red-700 dark:text-red-400',
+                    'text-caption font-mono',
+                    Math.abs(deltaPct) < 3 ? 'border-green-500/[0.25] text-ink-ok' :
+                    Math.abs(deltaPct) < 10 ? 'border-amber-500/[0.25] text-ink-warn' :
+                    'border-red-500/[0.25] text-ink-crit',
                   )}
                 >
                   {delta >= 0 ? '+' : ''}{delta.toFixed(3)} m/s ({deltaPct >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
@@ -230,7 +230,7 @@ export function TachMeasurementModal({
               type="checkbox"
               checked={applyToConfig}
               onChange={(e) => setApplyToConfig(e.target.checked)}
-              className="rounded"
+              className="rounded-ctl"
             />
             Aplicar como velocidad actual (marca como <strong>verificada</strong>)
           </label>

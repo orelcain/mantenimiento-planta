@@ -22,8 +22,8 @@ type Species = 'coho' | 'salar'
 
 const SPECIES_LABEL: Record<Species, string> = { coho: 'Coho', salar: 'Salar' }
 const SPECIES_CSS: Record<Species, string> = {
-  coho: 'bg-teal-500/20 text-teal-700 dark:text-teal-400 border-teal-500/20',
-  salar: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/20',
+  coho: 'bg-cat-7-tint/[0.15] text-cat-7-ink border-cat-7-tint/[0.25]',
+  salar: 'bg-primary/[0.15] text-primary border-primary/[0.25]',
 }
 
 function inferSpecies(breakdown?: Record<string, number>): Species | null {
@@ -117,13 +117,13 @@ export function ShiftConfigPanel({
 
           {/* Especie del turno */}
           {displaySpecies ? (
-            <span className={cn('flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-normal', SPECIES_CSS[displaySpecies])}>
+            <span className={cn('flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl border font-normal', SPECIES_CSS[displaySpecies])}>
               <Fish className="w-2.5 h-2.5" />
               {SPECIES_LABEL[displaySpecies]}
               {isExcelInferred && <span className="opacity-50 ml-0.5">· Excel</span>}
             </span>
           ) : (
-            allowEdit && <span className="text-[10px] text-muted-foreground/40">especie?</span>
+            allowEdit && <span className="text-caption text-muted-foreground/40">especie?</span>
           )}
 
           {allowEdit && (
@@ -137,13 +137,13 @@ export function ShiftConfigPanel({
           )}
 
           {/* Activas */}
-          <span className="text-[11px] font-normal text-muted-foreground">
+          <span className="text-caption font-normal text-muted-foreground">
             {activeCount} de 12 activas
           </span>
 
           {/* Distribución calidades */}
           {Object.keys(qualityCount).length > 0 && (
-            <span className="flex items-center gap-0.5 text-[10px] font-normal text-muted-foreground/70">
+            <span className="flex items-center gap-0.5 text-caption font-normal text-muted-foreground/70">
               {Object.entries(qualityCount).sort().flatMap(([q, n], i) => [
                 ...(i > 0 ? [<span key={`sep-${i}`} className="text-muted-foreground/30 mx-0.5">·</span>] : []),
                 <span key={q} className={qualityColorTextClass(q)}>{n}×{q}</span>,
@@ -153,14 +153,14 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+            <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-amber-500/[0.25]">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}
 
           {isSynthetic && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border cursor-help"
+              className="text-caption px-1.5 py-0.5 rounded-ctl bg-muted text-muted-foreground border border-border cursor-help"
               title="Inferida desde la última asignación efectiva — no se subió un snapshot manual al inicio del turno."
             >
               inferida
@@ -172,14 +172,14 @@ export function ShiftConfigPanel({
             <>
               <button
                 onClick={() => setGateModalOpen(true)}
-                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
               >
                 <GitBranch className="w-2.5 h-2.5" />
                 Cambié gate
               </button>
               <button
                 onClick={() => setRpmModalOpen(true)}
-                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-muted-foreground/20 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-caption px-2 py-0.5 rounded-ctl border border-muted-foreground/20 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Gauge className="w-2.5 h-2.5" />
                 Ajusté RPM
@@ -190,7 +190,7 @@ export function ShiftConfigPanel({
           {/* Expand toggle */}
           <button
             onClick={() => setOpen(v => !v)}
-            className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors"
           >
             {snapshotAt && <span>desde {snapshotAt}</span>}
             {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -208,7 +208,7 @@ export function ShiftConfigPanel({
               disabled={savingSpecies}
               onClick={() => void handleSpeciesSave(s)}
               className={cn(
-                'text-xs px-2.5 py-0.5 rounded border transition-colors disabled:opacity-50',
+                'text-xs px-2.5 py-0.5 rounded-ctl border transition-colors disabled:opacity-50',
                 displaySpecies === s && !isExcelInferred
                   ? cn(SPECIES_CSS[s], 'font-medium')
                   : 'border-border text-muted-foreground hover:bg-muted',
@@ -221,7 +221,7 @@ export function ShiftConfigPanel({
             <button
               disabled={savingSpecies}
               onClick={() => void handleSpeciesSave(null)}
-              className="text-[10px] text-muted-foreground/50 hover:text-destructive transition-colors px-1"
+              className="text-caption text-muted-foreground/50 hover:text-destructive transition-colors px-1"
               title="Quitar override — vuelve a leer del Excel"
             >
               Quitar override
@@ -254,14 +254,14 @@ export function ShiftConfigPanel({
                   </span>
                 )}
                 {!g.active && (
-                  <span className="shrink-0 text-[10px] text-muted-foreground/50">inactiva</span>
+                  <span className="shrink-0 text-caption text-muted-foreground/50">inactiva</span>
                 )}
               </div>
             ))}
           </div>
 
           {latest.changedBy?.name && (
-            <p className="mt-2 text-[10px] text-muted-foreground/50">
+            <p className="mt-2 text-caption text-muted-foreground/50">
               Último cambio por {latest.changedBy.name} · {snapshotAt}
               {latest.reason && ` · "${latest.reason}"`}
             </p>
@@ -273,13 +273,13 @@ export function ShiftConfigPanel({
             const last = history[history.length - 1]!
             return (
               <div className="mt-2.5 pt-2 border-t border-border/20">
-                <p className="text-[10px] text-muted-foreground/50 mb-1">
+                <p className="text-caption text-muted-foreground/50 mb-1">
                   Velocidades registradas · {fmtTime(last.at)}
                   {last.note && ` · "${last.note}"`}
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                   {last.belts.map(b => (
-                    <span key={b.beltId} className="text-[10px] text-muted-foreground tabular-nums">
+                    <span key={b.beltId} className="text-caption text-muted-foreground tabular-nums">
                       <span className="font-medium text-foreground/70">
                         {b.beltId === 'zeta' ? 'Z-Belt' : b.beltId === 'accel1' ? 'Accel 1' : 'Accel 2'}
                       </span>
@@ -288,7 +288,7 @@ export function ShiftConfigPanel({
                   ))}
                 </div>
                 {history.length > 1 && (
-                  <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+                  <p className="text-caption text-muted-foreground/40 mt-0.5">
                     {history.length} ajuste{history.length > 1 ? 's' : ''} registrado{history.length > 1 ? 's' : ''} en el turno
                   </p>
                 )}

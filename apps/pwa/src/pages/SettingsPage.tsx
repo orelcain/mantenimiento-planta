@@ -632,7 +632,7 @@ function InvitesSettings() {
                     )}
                   >
                     <div className="flex items-center gap-4">
-                      <code className="bg-muted px-3 py-1 rounded text-lg font-mono">
+                      <code className="bg-muted px-3 py-1 rounded-ctl text-lg font-mono">
                         {invite.code}
                       </code>
                       <div>
@@ -804,7 +804,7 @@ function SystemSettings() {
           ) : (
             <>
               {/* Estado del sistema */}
-              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between p-4 rounded-card bg-muted/50">
                 <div className="space-y-1">
                   <p className="font-medium">Estado del Sistema</p>
                   <p className="text-sm text-muted-foreground">
@@ -844,14 +844,14 @@ function SystemSettings() {
 
               {/* Mensajes de estado */}
               {initSuccess && (
-                <div className="p-3 rounded-lg bg-green-500/15 text-green-700 dark:text-green-400 flex items-center gap-2">
+                <div className="p-3 rounded-card bg-green-500/[0.15] text-ink-ok flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
                   <span className="text-sm">Sistema inicializado correctamente</span>
                 </div>
               )}
 
               {initError && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive flex items-center gap-2">
+                <div className="p-3 rounded-card bg-destructive/10 text-destructive flex items-center gap-2">
                   <Shield className="h-4 w-4" />
                   <span className="text-sm">{initError}</span>
                 </div>
@@ -909,7 +909,7 @@ function SystemSettings() {
 
               {/* Advertencia */}
               {!isInitialized && (
-                <div className="p-3 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400 text-sm">
+                <div className="p-3 rounded-card bg-amber-500/[0.15] text-ink-warn text-sm">
                   <strong>Nota:</strong> La inicialización creará la estructura base de Aquachile Antarfood Chonchi 
                   con 4 áreas principales y ejemplos de sub-estructuras.
                 </div>
@@ -996,7 +996,7 @@ function HmiTooltipPwdCard() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+            <div className="flex items-center justify-between p-3 rounded-card bg-muted/50 text-sm">
               <span>Clave actual: <span className="font-mono font-semibold">{showCurrentPwd ? currentPwd : '•'.repeat(Math.max(currentPwd.length, 6))}</span></span>
               <button
                 onClick={() => setShowCurrentPwd(v => !v)}
@@ -1031,10 +1031,10 @@ function HmiTooltipPwdCard() {
                 />
               </div>
               {error && (
-                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+                <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">{error}</div>
               )}
               {success && (
-                <div className="p-3 rounded-lg bg-green-500/15 text-green-700 dark:text-green-400 flex items-center gap-2 text-sm">
+                <div className="p-3 rounded-card bg-green-500/[0.15] text-ink-ok flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4" /> Clave guardada en Firestore
                 </div>
               )}
@@ -1106,10 +1106,10 @@ function FixPCBOButton() {
       </Button>
 
       {result && (
-        <div className={`p-3 rounded-lg ${
+        <div className={`p-3 rounded-card ${
           result.success 
-            ? 'bg-green-500/15 text-green-700 dark:text-green-400' 
-            : 'bg-red-500/15 text-red-700 dark:text-red-400'
+            ? 'bg-green-500/[0.15] text-ink-ok' 
+            : 'bg-red-500/[0.15] text-ink-crit'
         }`}>
           {result.success ? (
             <div>

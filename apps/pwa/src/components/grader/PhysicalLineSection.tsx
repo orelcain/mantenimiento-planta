@@ -113,7 +113,7 @@ export function PhysicalLineSection({ plantLineId }: Props = {}) {
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
-            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+            className={`px-3 py-1 text-xs rounded-ctl transition-colors ${
               subTab === t.id
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-muted text-muted-foreground hover:text-foreground'

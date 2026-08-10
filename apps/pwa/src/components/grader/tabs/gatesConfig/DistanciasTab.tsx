@@ -27,7 +27,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
             Distancia física desde fotocélula (m) y valor Z2 programado (mm) por gate.
           </p>
         </div>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge variant="outline" className="text-caption">
           Δ negativo = Z2 dispara antes (normal)
         </Badge>
       </div>
@@ -46,16 +46,16 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
             <div
               key={gateNum}
               className={cn(
-                'rounded-lg border bg-muted dark:bg-slate-900/40 p-3 space-y-2',
-                isCritical ? 'border-red-500/50 bg-red-500/15 dark:bg-red-500/5' : 'border-border dark:border-slate-700/60',
+                'rounded-card border bg-muted dark:bg-muted-foreground/[0.10] p-3 space-y-2',
+                isCritical ? 'border-red-500/[0.25] bg-red-500/[0.15]' : 'border-border dark:border-muted-foreground/[0.10]',
               )}
             >
               {/* Header */}
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">Gate {gateNum}</span>
                 <div className="flex items-center gap-1">
-                  {isCritical && <Badge className="text-[9px] px-1 py-0 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Crítico</Badge>}
-                  {isWarning && <Badge className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Ajustado</Badge>}
+                  {isCritical && <Badge className="text-caption px-1 py-0 bg-red-500/[0.15] text-ink-crit">Crítico</Badge>}
+                  {isWarning && <Badge className="text-caption px-1 py-0 bg-amber-500/[0.15] text-ink-warn">Ajustado</Badge>}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -70,7 +70,7 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
 
               {/* Físico */}
               <div className="space-y-0.5">
-                <p className="text-[10px] text-sky-400 font-medium">Físico</p>
+                <p className="text-caption text-sky-400 font-medium">Físico</p>
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number"
@@ -80,16 +80,16 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                     onChange={(e) => fp && updateFlipperDistance(gateNum, Number(e.target.value))}
                     className="h-6 text-xs font-mono px-1.5 py-0 w-20"
                   />
-                  <span className="text-[10px] text-muted-foreground">m</span>
+                  <span className="text-caption text-muted-foreground">m</span>
                 </div>
-                <p className="text-[10px] font-mono text-muted-foreground">
+                <p className="text-caption font-mono text-muted-foreground">
                   {physTimeSec.toFixed(2)} s reacción
                 </p>
               </div>
 
               {/* Z2 */}
-              <div className="space-y-0.5 border-t border-slate-700/40 pt-1.5">
-                <p className="text-[10px] text-violet-400 font-medium">Z2 programado</p>
+              <div className="space-y-0.5 border-t border-muted-foreground/[0.10] pt-1.5">
+                <p className="text-caption text-violet-400 font-medium">Z2 programado</p>
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number"
@@ -104,14 +104,14 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
                     }}
                     className="h-6 text-xs font-mono px-1.5 py-0 w-20"
                   />
-                  <span className="text-[10px] text-muted-foreground">mm</span>
+                  <span className="text-caption text-muted-foreground">mm</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-mono text-muted-foreground">
+                  <p className="text-caption font-mono text-muted-foreground">
                     {z2TimeSec != null ? `${z2TimeSec.toFixed(2)} s` : '—'}
                   </p>
                   {deltaMm != null && (
-                    <p className={cn('text-[10px] font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>
+                    <p className={cn('text-caption font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>
                       {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
                     </p>
                   )}

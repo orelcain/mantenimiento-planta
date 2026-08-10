@@ -109,7 +109,7 @@ const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
 const CALENDAR_LOCAL_CACHE_KEY = 'calendario_mantencion_state_local_v1'
-const CONTROL_CLASS = 'h-8 rounded border border-border bg-background px-2 text-xs text-foreground [color-scheme:dark]'
+const CONTROL_CLASS = 'h-8 rounded-ctl border border-border bg-background px-2 text-xs text-foreground [color-scheme:dark]'
 
 function defaultHoursConfig(): HoursConfig {
   return {
@@ -899,9 +899,9 @@ export function CalendarioMantencionPage() {
   }, [dayCols, syncCalendarToFirebase])
 
   const syncIndicator = useMemo(() => {
-    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/40' }
-    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40' }
-    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/15 text-red-800 dark:text-red-300 border-red-500/40' }
+    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]' }
+    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-emerald-500/[0.25]' }
+    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
@@ -1468,9 +1468,9 @@ export function CalendarioMantencionPage() {
 
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
-    if (key === 'A') return 'border-cyan-500/50 bg-cyan-500/15 text-cyan-800 dark:text-cyan-200'
-    if (key === 'B') return 'border-amber-500/50 bg-amber-500/15 text-amber-800 dark:text-amber-200'
-    if (key === 'C') return 'border-violet-500/50 bg-violet-500/15 text-violet-800 dark:text-violet-200'
+    if (key === 'A') return 'border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] text-cat-7-ink'
+    if (key === 'B') return 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn'
+    if (key === 'C') return 'border-cat-6-tint/[0.25] bg-cat-6-tint/[0.15] text-cat-6-ink'
     return 'border-border bg-muted text-foreground'
   }
 
@@ -1751,19 +1751,19 @@ export function CalendarioMantencionPage() {
 
   // ── Helpers vista móvil ──
   function shiftToMobileBadge(shift: string | undefined): { letter: string; cls: string } {
-    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-zinc-400 dark:text-zinc-700' }
+    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-muted-foreground' }
     const s = shift.trim().toUpperCase()
-    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-sky-500/25 text-sky-800 dark:text-sky-300' }
-    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/20 text-amber-800 dark:text-amber-300' }
-    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-zinc-400/50 dark:bg-zinc-700/60 text-zinc-700 dark:text-zinc-400' }
+    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-primary/[0.15] text-primary' }
+    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/[0.15] text-ink-warn' }
+    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground' }
     // Detectar por hora de inicio (robusto ante turnos reducidos y variantes)
     const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
     if (startTime) {
-      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-violet-500/25 text-violet-800 dark:text-violet-300' }
-      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/25 text-amber-800 dark:text-amber-200' }
-      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-blue-500/25 text-blue-800 dark:text-blue-300' }
+      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink' }
+      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/[0.15] text-ink-warn' }
+      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-primary/[0.15] text-primary' }
     }
-    return { letter: '·', cls: 'text-zinc-400 dark:text-zinc-700' }
+    return { letter: '·', cls: 'text-muted-foreground' }
   }
 
   // isReducedShift ya definida arriba (línea ~1286)
@@ -1848,21 +1848,21 @@ export function CalendarioMantencionPage() {
 
           {isLandscape ? (
             /* ── LANDSCAPE: una sola fila compacta ── */
-            <div className="flex items-center gap-1 rounded-lg border bg-card px-1.5 py-0.5 shrink-0">
+            <div className="flex items-center gap-1 rounded-card border bg-card px-1.5 py-0.5 shrink-0">
               <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
-                className="h-6 w-6 shrink-0 flex items-center justify-center rounded border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+                className="h-6 w-6 shrink-0 flex items-center justify-center rounded-ctl border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
               <div className="text-center min-w-0 flex-1">
-                <span className="text-[10px] font-semibold text-foreground">{mobileWeekLabel}</span>
+                <span className="text-caption font-semibold text-foreground">{mobileWeekLabel}</span>
                 {isCurrentWeek
-                  ? <span className="ml-1 text-[8px] text-yellow-400">● hoy</span>
+                  ? <span className="ml-1 text-caption text-yellow-400">● hoy</span>
                   : weekKeys.includes(todayWeekKey) && (
                     <button onClick={() => setSelectedWeek(todayWeekKey)}
-                      className="ml-1.5 h-5 px-1.5 text-[9px] font-medium text-yellow-800 dark:text-yellow-300 border border-yellow-500/50 rounded bg-yellow-500/15 active:bg-yellow-500/25 select-none">↩ Ir a hoy</button>
+                      className="ml-1.5 h-5 px-1.5 text-caption font-medium text-ink-warn border border-amber-500/[0.25] rounded-ctl bg-amber-500/[0.15] active:bg-amber-500/[0.15] select-none">↩ Ir a hoy</button>
                   )
                 }
               </div>
               <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
-                className="h-6 w-6 shrink-0 flex items-center justify-center rounded border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
+                className="h-6 w-6 shrink-0 flex items-center justify-center rounded-ctl border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
               <div className="w-px h-4 bg-border/50 mx-0.5 shrink-0" />
               {([
                 { id: 'badges',  label: 'D/T/N' },
@@ -1870,36 +1870,36 @@ export function CalendarioMantencionPage() {
                 { id: 'reduced', label: '↓R' },
               ] as const).map(v => (
                 <button key={v.id} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
-                  className={`h-6 px-2 rounded border text-[10px] font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground active:bg-muted'}`}>
+                  className={`h-6 px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground active:bg-muted'}`}>
                   {v.label}</button>
               ))}
               <button
                 onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                className={`h-6 px-2 rounded border text-[10px] font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}>✏</button>
+                className={`h-6 px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}>✏</button>
               <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
             </div>
           ) : (
             /* ── PORTRAIT: dos filas ── */
             <>
-              <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2 py-1 shrink-0">
+              <div className="flex items-center gap-1.5 rounded-card border bg-card px-2 py-1 shrink-0">
                 <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
-                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded-ctl border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
                 <div className="flex-1 text-center min-w-0">
-                  <div className="text-[11px] font-semibold text-foreground truncate leading-tight">
+                  <div className="text-caption font-semibold text-foreground truncate leading-tight">
                     {mobileWeekLabel}
-                    {isCurrentWeek && <span className="ml-1 text-[9px] text-yellow-400 font-normal">● hoy</span>}
+                    {isCurrentWeek && <span className="ml-1 text-caption text-yellow-400 font-normal">● hoy</span>}
                   </div>
-                  <div className="text-[9px] text-muted-foreground/70 leading-tight">
+                  <div className="text-caption text-muted-foreground/70 leading-tight">
                     {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}
                   </div>
                 </div>
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
-                    className="shrink-0 h-6 px-1.5 rounded border border-yellow-500/50 bg-yellow-500/15 text-[9px] font-medium text-yellow-800 dark:text-yellow-300 active:bg-yellow-500/25 select-none">↩ Hoy</button>
+                    className="shrink-0 h-6 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none">↩ Hoy</button>
                 )}
                 <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
-                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
+                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded-ctl border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {([
@@ -1908,19 +1908,19 @@ export function CalendarioMantencionPage() {
                   { id: 'reduced', label: '↓Reducc', title: 'Destaca solo los turnos con reducción horaria' },
                 ] as const).map(v => (
                   <button key={v.id} title={v.title} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
-                    className={`flex-1 h-6 rounded border text-[11px] font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>
+                    className={`flex-1 h-6 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>
                     {v.label}</button>
                 ))}
                 <button
                   onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
-                  className={`h-6 px-2.5 rounded border text-[11px] font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>✏</button>
+                  className={`h-6 px-2.5 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>✏</button>
               </div>
             </>
           )}
 
           {/* Grilla semanal */}
           <div
-            className="flex-1 min-h-0 overflow-auto rounded-lg border bg-card"
+            className="flex-1 min-h-0 overflow-auto rounded-card border bg-card"
             onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null }}
             onTouchEnd={(e) => {
               if (touchStartX.current === null) return
@@ -1934,19 +1934,19 @@ export function CalendarioMantencionPage() {
                 <span>No hay datos cargados.<br/>Usa <strong>"Editar"</strong> para cargar el calendario.</span>
               </div>
             ) : (
-              <table className={`border-collapse text-[11px] ${isLandscape ? 'w-full table-fixed' : 'min-w-max'}`}>
+              <table className={`border-collapse text-caption ${isLandscape ? 'w-full table-fixed' : 'min-w-max'}`}>
                 <thead className="sticky top-0 z-[15]">
                   <tr className="bg-muted text-foreground border-b border-border">
                     <th className="sticky left-0 z-[25] bg-muted px-1.5 py-1.5 text-left font-semibold"
                       style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
-                      {mobileEditMode ? <span className="text-emerald-800 dark:text-emerald-300 text-[10px]">✏ Toca un día</span> : <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Técnico</span>}
+                      {mobileEditMode ? <span className="text-ink-ok text-caption">✏ Toca un día</span> : <span className="text-muted-foreground text-caption tracking-wide">Técnico</span>}
                     </th>
                     {weekDays.map((d) => {
                       const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
                       return (
-                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-300' : ''}`}
+                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-amber-500/[0.15] text-ink-warn' : ''}`}
                           style={isLandscape ? undefined : { minWidth: 46 }}>
-                          <div className="text-[9px] font-normal text-muted-foreground">{shortWeekday(d.dateObj)}</div>
+                          <div className="text-caption font-normal text-muted-foreground">{shortWeekday(d.dateObj)}</div>
                           <div className="font-bold leading-tight text-foreground">{d.dateObj?.getDate()}</div>
                         </th>
                       )
@@ -1955,13 +1955,13 @@ export function CalendarioMantencionPage() {
                       style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}
                       title="Horas trabajadas esta semana · este mes">
                       {isLandscape ? (
-                        <div className="flex items-center justify-around text-[8px] font-normal opacity-90 px-1 gap-0.5">
+                        <div className="flex items-center justify-around text-caption font-normal opacity-90 px-1 gap-0.5">
                           <span className="whitespace-nowrap">h·sem</span>
                           <span className="opacity-40">|</span>
                           <span className="whitespace-nowrap opacity-70">h·mes</span>
                         </div>
                       ) : (
-                        <div className="text-[9px] font-normal opacity-90 text-right pr-0.5 leading-tight">
+                        <div className="text-caption font-normal opacity-90 text-right pr-0.5 leading-tight">
                           <div>h.sem</div>
                           <div className="opacity-70">h.mes</div>
                         </div>
@@ -1974,15 +1974,15 @@ export function CalendarioMantencionPage() {
                     const turnoKey = tech.turno.trim().toUpperCase()
                     const nextTurno = techRows[idx + 1]?.turno.trim().toUpperCase()
                     const isLastOfGroup = nextTurno && nextTurno !== turnoKey
-                    const rowBg = turnoKey === 'A' ? 'bg-cyan-500/10' : turnoKey === 'B' ? 'bg-amber-500/10' : turnoKey === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
-                    const stickyBg = turnoKey === 'A' ? 'bg-cyan-500/20 dark:bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-500/20 dark:bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-500/20 dark:bg-violet-950/60' : 'bg-card'
+                    const rowBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.15]' : turnoKey === 'B' ? 'bg-amber-500/[0.15]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.15]' : idx % 2 === 1 ? 'bg-muted' : ''
+                    const stickyBg = turnoKey === 'A' ? 'bg-cat-7-tint/[0.15]' : turnoKey === 'B' ? 'bg-amber-500/[0.15]' : turnoKey === 'C' ? 'bg-cat-6-tint/[0.15]' : 'bg-card'
                     const cellPy = isLandscape ? 'py-0' : 'py-1.5'
                     return (
                     <tr key={tech.r} className={`${isLastOfGroup ? 'border-b-2 border-border' : 'border-b border-border/40'} ${rowBg}`}>
                       <td className={`sticky left-0 z-[5] ${stickyBg} border-r border-border/30 px-1.5 ${cellPy}`}
                         style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
                         <div className="flex items-center gap-1.5">
-                          <span className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded border text-[9px] font-bold ${turnoBadgeClass(tech.turno)}`}>
+                          <span className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-ctl border text-caption font-bold ${turnoBadgeClass(tech.turno)}`}>
                             {tech.turno || '·'}
                           </span>
                           <span className="truncate font-medium text-foreground">{shortName(tech.name)}</span>
@@ -2007,16 +2007,16 @@ export function CalendarioMantencionPage() {
                           cellContent = (
                             <button
                               onClick={() => openMobileEdit(tech, d)}
-                              className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded border text-[10px] font-bold transition-colors ${
+                              className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl border text-caption font-bold transition-colors ${
                                 isEditing
-                                  ? 'border-emerald-400 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                                  ? 'border-emerald-400 bg-emerald-500/[0.15] text-ink-ok'
                                   : 'border-dashed border-border/60 hover:border-primary/60 active:bg-muted'
                               } ${badge.cls}`}
                             >
                               {times ? (
                                 <>
-                                  <span className="text-[8px] leading-none">{times.start}</span>
-                                  <span className="text-[8px] leading-none opacity-60">{times.end}</span>
+                                  <span className="text-caption leading-none">{times.start}</span>
+                                  <span className="text-caption leading-none opacity-60">{times.end}</span>
                                 </>
                               ) : badge.letter}
                             </button>
@@ -2025,8 +2025,8 @@ export function CalendarioMantencionPage() {
                           if (isLandscape) {
                             // Landscape D/T/N: solo letra, sin hora
                             cellContent = (
-                              <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>
-                                <span className="text-[12px] leading-none">{badge.letter}</span>
+                              <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>
+                                <span className="text-footnote leading-none">{badge.letter}</span>
                               </span>
                             )
                           } else if (isTapped && times) {
@@ -2034,10 +2034,10 @@ export function CalendarioMantencionPage() {
                             cellContent = (
                               <button
                                 onClick={() => setMobileTappedCell(null)}
-                                className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-muted text-foreground`}
+                                className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl bg-muted text-foreground`}
                               >
-                                <span className="text-[8px] leading-none">{times.start}</span>
-                                <span className="text-[8px] leading-none opacity-70">{times.end}</span>
+                                <span className="text-caption leading-none">{times.start}</span>
+                                <span className="text-caption leading-none opacity-70">{times.end}</span>
                               </button>
                             )
                           } else {
@@ -2045,7 +2045,7 @@ export function CalendarioMantencionPage() {
                             cellContent = (
                               <button
                                 onClick={() => times && setMobileTappedCell({ techR: tech.r, dayC: d.c })}
-                                className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls} ${times ? 'active:opacity-70' : ''}`}
+                                className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls} ${times ? 'active:opacity-70' : ''}`}
                               >
                                 {badge.letter}
                               </button>
@@ -2054,27 +2054,27 @@ export function CalendarioMantencionPage() {
                         } else if (mobileViewMode === 'times') {
                           // Vista HH:MM — horarios con color de turno
                           cellContent = times ? (
-                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded ${badge.cls}`}>
-                              <span className="text-[9px] font-bold leading-tight">{times.start}</span>
-                              <span className="text-[9px] leading-tight opacity-70">{times.end}</span>
+                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl ${badge.cls}`}>
+                              <span className="text-caption font-bold leading-tight">{times.start}</span>
+                              <span className="text-caption leading-tight opacity-70">{times.end}</span>
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>{badge.letter}</span>
+                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>{badge.letter}</span>
                           )
                         } else {
                           // Vista C — reducidos destacados, normales como letra
                           cellContent = isReduced && times ? (
-                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-orange-500/10 border border-orange-500/30`}>
-                              <span className="text-[9px] font-semibold text-orange-800 dark:text-orange-300 leading-tight">{times.start}</span>
-                              <span className="text-[9px] text-orange-400/70 leading-tight">{times.end}</span>
+                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded-ctl bg-cat-4-tint/[0.15] border border-cat-4-tint/[0.25]`}>
+                              <span className="text-caption font-semibold text-cat-4-ink leading-tight">{times.start}</span>
+                              <span className="text-caption text-orange-400/70 leading-tight">{times.end}</span>
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>{badge.letter}</span>
+                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded-ctl font-bold ${badge.cls}`}>{badge.letter}</span>
                           )
                         }
 
                         return (
-                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
+                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-amber-500/[0.15]' : ''}`}>
                             {cellContent}
                           </td>
                         )
@@ -2102,12 +2102,12 @@ export function CalendarioMantencionPage() {
                               /* Landscape: sem | mes lado a lado */
                               <div className="flex items-center justify-around px-1 h-full gap-1">
                                 <div className="flex flex-col items-center">
-                                  <span className={`text-[12px] font-bold leading-none ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
+                                  <span className={`text-footnote font-bold leading-none ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
                                   <span className="text-[7px] text-muted-foreground/40 leading-tight">h·sem</span>
                                 </div>
                                 <div className="w-px self-stretch bg-border/30 my-1" />
                                 <div className="flex flex-col items-center">
-                                  <span className={`text-[12px] font-bold leading-none ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
+                                  <span className={`text-footnote font-bold leading-none ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
                                   <span className="text-[7px] text-muted-foreground/40 leading-tight">h·mes</span>
                                 </div>
                               </div>
@@ -2115,14 +2115,14 @@ export function CalendarioMantencionPage() {
                               /* Portrait: icono + número compacto */
                               <div className="flex flex-col items-end pr-0.5 leading-none gap-0.5">
                                 <div className="flex items-center gap-0.5">
-                                  <span className={`text-[8px] ${wCls}`}>{wDelta > tol * 4 ? '⚡' : wDelta >= -tol ? '✓' : wDelta >= -tol * 6 ? '⚠' : '✗'}</span>
-                                  <span className={`text-[10px] font-bold ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
-                                  <span className="text-[8px] text-muted-foreground/50">h·s</span>
+                                  <span className={`text-caption ${wCls}`}>{wDelta > tol * 4 ? '⚡' : wDelta >= -tol ? '✓' : wDelta >= -tol * 6 ? '⚠' : '✗'}</span>
+                                  <span className={`text-caption font-bold ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
+                                  <span className="text-caption text-muted-foreground/50">h·s</span>
                                 </div>
                                 <div className="flex items-center gap-0.5">
-                                  <span className={`text-[8px] ${mCls}`}>{mDelta > tol * 16 ? '⚡' : mDelta >= -tol * 4 ? '✓' : mDelta >= -tol * 24 ? '⚠' : '✗'}</span>
-                                  <span className={`text-[10px] font-bold ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
-                                  <span className="text-[8px] text-muted-foreground/50">h·m</span>
+                                  <span className={`text-caption ${mCls}`}>{mDelta > tol * 16 ? '⚡' : mDelta >= -tol * 4 ? '✓' : mDelta >= -tol * 24 ? '⚠' : '✗'}</span>
+                                  <span className={`text-caption font-bold ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
+                                  <span className="text-caption text-muted-foreground/50">h·m</span>
                                 </div>
                               </div>
                             )}
@@ -2135,7 +2135,7 @@ export function CalendarioMantencionPage() {
                   {/* Fila resumen: personal trabajando por día */}
                   <tr className="border-t border-border/40 bg-muted">
                     <td className="sticky left-0 z-[5] bg-muted border-r border-border/30 px-1.5 py-1" style={{ minWidth: 110, maxWidth: 110 }}>
-                      <span className="text-[9px] text-muted-foreground font-medium">Trabajando</span>
+                      <span className="text-caption text-muted-foreground font-medium">Trabajando</span>
                     </td>
                     {weekDays.map((d) => {
                       const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
@@ -2144,15 +2144,15 @@ export function CalendarioMantencionPage() {
                       const pct = techRows.length > 0 ? count / techRows.length : 0
                       const countCls = pct >= 0.8 ? 'text-emerald-400' : pct >= 0.5 ? 'text-amber-400' : 'text-red-400'
                       return (
-                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
-                          <span className={`text-[10px] font-bold ${countCls}`}>{count}</span>
-                          {isLandscape && libre > 0 && <span className="text-[8px] text-muted-foreground ml-0.5">/{libre}L</span>}
+                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-amber-500/[0.15]' : ''}`}>
+                          <span className={`text-caption font-bold ${countCls}`}>{count}</span>
+                          {isLandscape && libre > 0 && <span className="text-caption text-muted-foreground ml-0.5">/{libre}L</span>}
                         </td>
                       )
                     })}
                     <td className="sticky right-0 z-[5] bg-muted border-l border-border/30 px-1 py-1 text-center"
                       style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
-                      <span className="text-[9px] text-muted-foreground/50">/{techRows.length}</span>
+                      <span className="text-caption text-muted-foreground/50">/{techRows.length}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -2165,41 +2165,41 @@ export function CalendarioMantencionPage() {
             {mobileViewMode === 'badges' && !mobileEditMode && (
               <div className="flex items-center gap-2 px-1 flex-wrap">
                 {([
-                  { letter: 'D', cls: 'bg-blue-500/25 text-blue-800 dark:text-blue-300', label: 'Día' },
-                  { letter: 'T', cls: 'bg-amber-500/25 text-amber-800 dark:text-amber-200', label: 'Tarde' },
-                  { letter: 'N', cls: 'bg-violet-500/25 text-violet-800 dark:text-violet-300', label: 'Noche' },
-                  { letter: 'L', cls: 'bg-zinc-400/50 dark:bg-zinc-700/60 text-zinc-700 dark:text-zinc-400', label: 'Libre' },
-                  { letter: 'V', cls: 'bg-sky-500/25 text-sky-800 dark:text-sky-300', label: 'Vac.' },
+                  { letter: 'D', cls: 'bg-primary/[0.15] text-primary', label: 'Día' },
+                  { letter: 'T', cls: 'bg-amber-500/[0.15] text-ink-warn', label: 'Tarde' },
+                  { letter: 'N', cls: 'bg-cat-6-tint/[0.15] text-cat-6-ink', label: 'Noche' },
+                  { letter: 'L', cls: 'bg-muted-foreground/[0.10] text-muted-foreground', label: 'Libre' },
+                  { letter: 'V', cls: 'bg-primary/[0.15] text-primary', label: 'Vac.' },
                 ] as const).map(({ letter, cls, label }) => (
                   <div key={letter} className="flex items-center gap-1">
-                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${cls}`}>{letter}</span>
-                    <span className="text-[10px] text-muted-foreground">{label}</span>
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-ctl text-caption font-bold ${cls}`}>{letter}</span>
+                    <span className="text-caption text-muted-foreground">{label}</span>
                   </div>
                 ))}
-                <span className="text-[10px] text-muted-foreground ml-1">· Tap celda = ver hora</span>
+                <span className="text-caption text-muted-foreground ml-1">· Tap celda = ver hora</span>
               </div>
             )}
             {mobileViewMode === 'reduced' && !mobileEditMode && (
               <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded border border-orange-500/30 bg-orange-500/10 text-[9px] text-orange-800 dark:text-orange-300">08:00 / 15:00</span>
-                <span className="text-[10px] text-muted-foreground">= turno con reducción horaria</span>
+                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-ctl border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] text-caption text-cat-4-ink">08:00 / 15:00</span>
+                <span className="text-caption text-muted-foreground">= turno con reducción horaria</span>
               </div>
             )}
             {mobileEditMode && (
               <div className="flex items-center gap-2 px-1">
-                <span className="text-[10px] text-emerald-400">✏ Modo edición activo — toca cualquier día para ajustar su horario</span>
+                <span className="text-caption text-emerald-400">✏ Modo edición activo — toca cualquier día para ajustar su horario</span>
               </div>
             )}
 
-            <details className="rounded-lg border bg-card group">
+            <details className="rounded-card border bg-card group">
               <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground select-none">
                 <span>⚙ Editar calendario</span>
                 <span className="text-sm leading-none transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="border-t border-border p-2 space-y-2">
-                <div className="text-[11px] text-muted-foreground">Para configurar horarios base, técnicos o exportar Excel, accede desde escritorio o tablet.</div>
-                <div className={`rounded border px-2 py-1 text-[11px] ${syncIndicator.className}`}>{syncIndicator.label}</div>
-                <div className="text-[10px] text-muted-foreground">{originalFilename}</div>
+                <div className="text-caption text-muted-foreground">Para configurar horarios base, técnicos o exportar Excel, accede desde escritorio o tablet.</div>
+                <div className={`rounded-ctl border px-2 py-1 text-caption ${syncIndicator.className}`}>{syncIndicator.label}</div>
+                <div className="text-caption text-muted-foreground">{originalFilename}</div>
               </div>
             </details>
           </div>
@@ -2217,19 +2217,19 @@ export function CalendarioMantencionPage() {
               </div>
               <div className="flex gap-3">
                 <div className="flex-1 space-y-1">
-                  <label className="text-[10px] text-muted-foreground">Hora inicio</label>
+                  <label className="text-caption text-muted-foreground">Hora inicio</label>
                   <input
                     type="time"
-                    className="w-full h-10 rounded border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
+                    className="w-full h-10 rounded-ctl border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
                     value={mobileEditStart}
                     onChange={(e) => setMobileEditStart(e.target.value)}
                   />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <label className="text-[10px] text-muted-foreground">Hora fin</label>
+                  <label className="text-caption text-muted-foreground">Hora fin</label>
                   <input
                     type="time"
-                    className="w-full h-10 rounded border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
+                    className="w-full h-10 rounded-ctl border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
                     value={mobileEditEnd}
                     onChange={(e) => setMobileEditEnd(e.target.value)}
                   />
@@ -2238,11 +2238,11 @@ export function CalendarioMantencionPage() {
               <div className="flex gap-2">
                 <button
                   onClick={saveMobileEdit}
-                  className="flex-1 h-10 rounded bg-primary text-sm font-medium text-primary-foreground active:opacity-90"
+                  className="flex-1 h-10 rounded-ctl bg-primary text-sm font-medium text-primary-foreground active:opacity-90"
                 >Guardar</button>
                 <button
                   onClick={() => setMobileEditCell(null)}
-                  className="flex-1 h-10 rounded border border-border text-sm text-muted-foreground active:bg-muted"
+                  className="flex-1 h-10 rounded-ctl border border-border text-sm text-muted-foreground active:bg-muted"
                 >Cancelar</button>
               </div>
             </div>
@@ -2254,7 +2254,7 @@ export function CalendarioMantencionPage() {
       {/* ── Modal: Clave de edición (móvil) ── */}
       {mobileAdminGateOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-6">
-          <div className="w-full max-w-xs rounded-xl border border-border bg-card p-5 shadow-2xl">
+          <div className="w-full max-w-xs rounded-card border border-border bg-card p-5 shadow-2xl">
             <p className="mb-3 text-sm font-semibold text-foreground">Clave de edición</p>
             <form
               onSubmit={async (e) => {
@@ -2277,7 +2277,7 @@ export function CalendarioMantencionPage() {
                 value={mobileAdminGateInput}
                 onChange={(e) => { setMobileAdminGateInput(e.target.value); setMobileAdminGateError('') }}
                 placeholder="Ingresa la clave…"
-                className="w-full h-10 px-3 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
+                className="w-full h-10 px-3 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
               />
               {mobileAdminGateError && (
                 <p className="text-xs text-destructive">{mobileAdminGateError}</p>
@@ -2286,12 +2286,12 @@ export function CalendarioMantencionPage() {
                 <button
                   type="button"
                   onClick={() => setMobileAdminGateOpen(false)}
-                  className="flex-1 h-10 rounded border border-border text-sm text-muted-foreground active:bg-muted"
+                  className="flex-1 h-10 rounded-ctl border border-border text-sm text-muted-foreground active:bg-muted"
                 >Cancelar</button>
                 <button
                   type="submit"
                   disabled={!mobileAdminGateInput.trim()}
-                  className="flex-1 h-10 rounded bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 active:opacity-90"
+                  className="flex-1 h-10 rounded-ctl bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 active:opacity-90"
                 >Confirmar</button>
               </div>
             </form>
@@ -2302,7 +2302,7 @@ export function CalendarioMantencionPage() {
       {/* ══════════════════════════════════════════
           VISTA DESKTOP — panel de tabs + tabla
           ══════════════════════════════════════════ */}
-      {!isMobile && <section className="sticky top-0 z-20 rounded-lg border bg-card p-2">
+      {!isMobile && <section className="sticky top-0 z-20 rounded-card border bg-card p-2">
         {/* ── Tab bar ── */}
         <div className="flex items-center gap-1 border-b border-border pb-1 mb-2">
           {TAB_ITEMS.map((tab) => (
@@ -2334,12 +2334,12 @@ export function CalendarioMantencionPage() {
             </div>
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Exportar calendario</label>
-              <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
+              <button className="h-8 rounded-ctl border text-xs" onClick={exportWorkbook}>Exportar</button>
               <div className="grid grid-cols-2 gap-1">
-                <button className="h-8 rounded border text-xs" onClick={() => extendCalendarByDays(28)}>Extender +4 semanas</button>
-                <button className="h-8 rounded border text-xs" onClick={() => extendCalendarByDays(31)}>Extender +1 mes</button>
+                <button className="h-8 rounded-ctl border text-xs" onClick={() => extendCalendarByDays(28)}>Extender +4 semanas</button>
+                <button className="h-8 rounded-ctl border text-xs" onClick={() => extendCalendarByDays(31)}>Extender +1 mes</button>
               </div>
-              <div className="grid grid-cols-3 gap-1 text-[11px]">
+              <div className="grid grid-cols-3 gap-1 text-caption">
                 <select className={CONTROL_CLASS + ' h-7'} value={exportScope} onChange={(e) => setExportScope(e.target.value as ExportScope)}>
                   <option value="month">Mes actual</option>
                   <option value="week">Semana actual</option>
@@ -2357,7 +2357,7 @@ export function CalendarioMantencionPage() {
                   disabled={!(exportScope === 'weeks' || exportScope === 'months')}
                   title="Cantidad para N semanas/N meses"
                 />
-                <div className="h-7 rounded border border-border px-2 flex items-center text-muted-foreground">
+                <div className="h-7 rounded-ctl border border-border px-2 flex items-center text-muted-foreground">
                   {selectedExportCols().length} días
                 </div>
               </div>
@@ -2386,7 +2386,7 @@ export function CalendarioMantencionPage() {
             <label className="text-muted-foreground self-center">Libre</label>
             <input className={CONTROL_CLASS} value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
             <div className="col-span-2 sm:col-span-4">
-              <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
+              <button className="mt-1 h-8 w-full rounded-ctl bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
             </div>
           </div>
         )}
@@ -2416,7 +2416,7 @@ export function CalendarioMantencionPage() {
             <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
             <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
               <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
-              <span className="text-[10px] text-muted-foreground">{monthCalendarDays} días calendario</span>
+              <span className="text-caption text-muted-foreground">{monthCalendarDays} días calendario</span>
             </div>
             <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
@@ -2452,27 +2452,27 @@ export function CalendarioMantencionPage() {
               <input type="checkbox" checked={hoursConfig.holidayBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayBusinessDaysOnly: e.target.checked }))} />
               <span title="Activado: el feriado solo se considera en días hábiles. Desactivado: se considera sin restricción de día.">Feriados descuentan solo días hábiles</span>
             </label>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               Jornada objetivo diaria legal = Jornada objetivo semanal / Días trabajo/semana = {expectedWeekBase.toFixed(1)} / {workDaysPerWeekBase} = {legalDailyTarget.toFixed(2)} h.
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               {hoursConfig.expectedFromPlannedDays
                 ? 'Semanal esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en la semana.'
                 : `Semanal esperado (prorrateo) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: ${expectedWeekBase.toFixed(1)} × (${weekDays.length}/7).`}
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               {hoursConfig.expectedFromPlannedDays
                 ? 'Mensual esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en el mes.'
                 : `Mensual esperado (prorrateo) = Jornada semanal legal × (días calendario del mes / 7). En este período: ${expectedWeekBase.toFixed(1)} × (${monthCalendarDays}/7) = ${expectedMonthAutoBase.toFixed(1)} h.`}
             </div>
-            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+            <div className="col-span-2 sm:col-span-4 rounded-ctl border border-border/80 bg-muted px-2 py-1 text-caption text-muted-foreground">
               {legalWeekLabel}
             </div>
             <div className="col-span-2 sm:col-span-4">
-              <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
+              <button className="mt-1 h-8 w-full rounded-ctl bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
             </div>
           </div>
         )}
@@ -2502,16 +2502,16 @@ export function CalendarioMantencionPage() {
             </div>
 
             <div className="flex items-center justify-end gap-2">
-              <button className="h-8 rounded border border-border px-3 text-xs text-muted-foreground hover:bg-muted" onClick={handleAddPlaceholders} title="Agrega 6 placeholders: A3/A4, B3/B4, C3/C4">+ Placeholders turno</button>
-              <button className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
+              <button className="h-8 rounded-ctl border border-border px-3 text-xs text-muted-foreground hover:bg-muted" onClick={handleAddPlaceholders} title="Agrega 6 placeholders: A3/A4, B3/B4, C3/C4">+ Placeholders turno</button>
+              <button className="h-8 rounded-ctl bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
             </div>
 
             {/* Cards — móvil */}
             <div className="md:hidden space-y-2">
               {techRows.map((tech) => (
-                <div key={tech.r} className="rounded border border-border bg-muted p-3 space-y-2">
+                <div key={tech.r} className="rounded-ctl border border-border bg-muted p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded border text-xs font-bold ${turnoBadgeClass(tech.turno)}`}>
+                    <span className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-ctl border text-xs font-bold ${turnoBadgeClass(tech.turno)}`}>
                       {tech.turno || '-'}
                     </span>
                     <span className="text-sm font-medium text-foreground truncate">{tech.name}</span>
@@ -2519,7 +2519,7 @@ export function CalendarioMantencionPage() {
                   <div className="text-xs text-muted-foreground">{tech.rut || 'Sin RUT'}</div>
                   <div className="flex gap-2">
                     <div className="flex-1 grid gap-1">
-                      <label className="text-[10px] text-muted-foreground">Grupo</label>
+                      <label className="text-caption text-muted-foreground">Grupo</label>
                       <select
                         className={CONTROL_CLASS + ' w-full'}
                         value={tech.turno || ''}
@@ -2531,7 +2531,7 @@ export function CalendarioMantencionPage() {
                       </select>
                     </div>
                     <div className="flex-1 grid gap-1">
-                      <label className="text-[10px] text-muted-foreground">Área</label>
+                      <label className="text-caption text-muted-foreground">Área</label>
                       <input
                         className={CONTROL_CLASS + ' w-full'}
                         value={tech.area || ''}
@@ -2544,8 +2544,8 @@ export function CalendarioMantencionPage() {
             </div>
 
             {/* Tabla — desktop */}
-            <div className="hidden md:block rounded border overflow-auto">
-              <table className="w-full text-[11px]">
+            <div className="hidden md:block rounded-ctl border overflow-auto">
+              <table className="w-full text-caption">
                 <thead className="bg-muted text-foreground">
                   <tr>
                     <th className="px-2 py-1 text-left">Técnico</th>
@@ -2562,7 +2562,7 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">{tech.rut || '-'}</td>
                       <td className="px-2 py-1">
                         <select
-                          className={CONTROL_CLASS + ' h-7 text-[11px]'}
+                          className={CONTROL_CLASS + ' h-7 text-caption'}
                           value={tech.turno || ''}
                           onChange={(e) => handleUpdateTechnicianField(tech.r, 'turno', e.target.value)}
                         >
@@ -2573,7 +2573,7 @@ export function CalendarioMantencionPage() {
                       </td>
                       <td className="px-2 py-1">
                         <input
-                          className={CONTROL_CLASS + ' h-7 text-[11px]'}
+                          className={CONTROL_CLASS + ' h-7 text-caption'}
                           value={tech.area || ''}
                           onChange={(e) => handleUpdateTechnicianField(tech.r, 'area', e.target.value)}
                         />
@@ -2594,7 +2594,7 @@ export function CalendarioMantencionPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
                   <label className="font-medium text-foreground">Semana</label>
-                  <span className="text-[10px] text-muted-foreground">({weekDays.length} días)</span>
+                  <span className="text-caption text-muted-foreground">({weekDays.length} días)</span>
                 </div>
                 <select className={CONTROL_CLASS + ' w-full'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                   {Object.entries(weeks).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -2604,57 +2604,57 @@ export function CalendarioMantencionPage() {
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-2 w-2 rounded-full bg-indigo-500" />
                   <label className="font-medium text-foreground">Mes</label>
-                  <span className="text-[10px] text-muted-foreground">({monthDays.length} días)</span>
+                  <span className="text-caption text-muted-foreground">({monthDays.length} días)</span>
                 </div>
                 <select className={CONTROL_CLASS + ' w-full'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
               </div>
             </div>
-            <div className="rounded-lg border border-border/40 overflow-hidden">
+            <div className="rounded-card border border-border/40 overflow-hidden">
               <div className="overflow-x-auto">
-              <table className="w-full text-[11px] border-collapse">
+              <table className="w-full text-caption border-collapse">
                 <thead>
                   <tr>
                     <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-muted px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
-                    <th colSpan={6} className="border-b border-l border-border/30 bg-blue-500/10 dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                    <th colSpan={6} className="border-b border-l border-border/30 bg-primary/[0.15] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-primary">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
                     </th>
-                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-indigo-500/10 dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />Resumen Mensual</span>
                     </th>
                     <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-muted px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
-                      <div className="text-[10px] font-bold text-foreground">Vac.</div>
-                      <div className="text-[9px] font-normal text-muted-foreground">Acum.</div>
+                      <div className="text-caption font-bold text-foreground">Vac.</div>
+                      <div className="text-caption font-normal text-muted-foreground">Acum.</div>
                     </th>
                   </tr>
                   <tr className="bg-muted">
-                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
-                      <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
+                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-caption font-semibold text-primary/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
+                      <div>Horas</div><div className="font-normal text-caption text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días efectivamente trabajados (turnos asignados)">
-                      <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días efectivamente trabajados (turnos asignados)">
+                      <div>Días</div><div className="font-normal text-caption text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
-                      <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
+                      <div>Días</div><div className="font-normal text-caption text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-700 dark:text-blue-400/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
-                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
-                      <div>Horas</div><div className="font-normal text-[9px] text-muted-foreground">Real / Esp</div>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-primary/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
+                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-caption font-semibold text-cat-3-ink/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
+                      <div>Horas</div><div className="font-normal text-caption text-muted-foreground">Real / Esp</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días efectivamente trabajados en el mes">
-                      <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Trab.</div>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días efectivamente trabajados en el mes">
+                      <div>Días</div><div className="font-normal text-caption text-muted-foreground">Trab.</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
-                      <div>Días</div><div className="font-normal text-[9px] text-muted-foreground">Libres</div>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
+                      <div>Días</div><div className="font-normal text-caption text-muted-foreground">Libres</div>
                     </th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días de vacaciones del mes">Vac.</th>
-                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-700 dark:text-indigo-400/90" title="Días feriados del mes">Fer.</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días de vacaciones del mes">Vac.</th>
+                    <th className="px-1 py-1 text-center text-caption font-semibold text-cat-3-ink/90" title="Días feriados del mes">Fer.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2671,13 +2671,13 @@ export function CalendarioMantencionPage() {
                     const isRisk = wUnder || mUnder
                     const isOvertime = wOver || mOver
                     const zebra = idx % 2 === 1 ? 'bg-muted' : ''
-                    const rowBg = isRisk ? 'bg-red-500/10 dark:bg-red-950/15 hover:bg-red-500/15 dark:hover:bg-red-950/25' : isOvertime ? 'bg-orange-500/10 dark:bg-orange-950/15 hover:bg-orange-500/15 dark:hover:bg-orange-950/25' : `${zebra} hover:bg-muted/50`
+                    const rowBg = isRisk ? 'bg-red-500/[0.15] hover:bg-red-500/[0.15] dark:hover:bg-red-500/[0.15]' : isOvertime ? 'bg-cat-4-tint/[0.15] hover:bg-cat-4-tint/[0.15] dark:hover:bg-cat-4-tint/[0.15]' : `${zebra} hover:bg-muted/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
                         <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
                           <div className="flex items-center gap-1.5">
                             {row.tech.turno && (
-                              <span className={`shrink-0 inline-flex h-[18px] w-[18px] items-center justify-center rounded text-[9px] font-bold border ${turnoBadgeClass(row.tech.turno)}`}>
+                              <span className={`shrink-0 inline-flex h-[18px] w-[18px] items-center justify-center rounded-ctl text-caption font-bold border ${turnoBadgeClass(row.tech.turno)}`}>
                                 {row.tech.turno}
                               </span>
                             )}
@@ -2694,7 +2694,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${wOver ? 'bg-orange-500' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${wOver ? 'bg-orange-500/15 text-orange-400' : riskW ? 'bg-red-500/15 text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.15] text-orange-400' : riskW ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2705,12 +2705,12 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-zinc-700">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-800 dark:text-sky-300" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-800 dark:text-amber-300" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
@@ -2723,7 +2723,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${mOver ? 'bg-orange-500' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${mOver ? 'bg-orange-500/15 text-orange-400' : riskM ? 'bg-red-500/15 text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.15] text-orange-400' : riskM ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaMonth)}
                             </span>
                           </div>
@@ -2734,17 +2734,17 @@ export function CalendarioMantencionPage() {
                         <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-zinc-700">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
-                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-800 dark:text-sky-300" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
+                            ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-800 dark:text-amber-300" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-zinc-700">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
                           {row.totalVacationDays > 0
-                            ? <span className="font-bold text-sky-800 dark:text-sky-300">{row.totalVacationDays}</span>
+                            ? <span className="font-bold text-primary">{row.totalVacationDays}</span>
                             : <span className="text-zinc-600">0</span>}
                         </td>
                       </tr>
@@ -2759,18 +2759,18 @@ export function CalendarioMantencionPage() {
 
         <div className="mt-1 flex items-center justify-between gap-2">
           <div className="text-xs text-muted-foreground">{status}</div>
-          <div className={`max-w-[55%] truncate rounded border px-2 py-0.5 text-[11px] ${syncIndicator.className}`} title={syncIndicator.label}>
+          <div className={`max-w-[55%] truncate rounded-ctl border px-2 py-0.5 text-caption ${syncIndicator.className}`} title={syncIndicator.label}>
             {syncIndicator.label}
           </div>
         </div>
       </section>}
 
-      {!isMobile && <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
+      {!isMobile && <section className="min-h-0 flex-1 rounded-card border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold">Calendario Mantención</div>
           <div className="flex items-center gap-1">
             <button
-              className="h-7 rounded border px-2 text-xs"
+              className="h-7 rounded-ctl border px-2 text-xs"
               onClick={() => setShowAllCols((p) => !p)}
             >
               {isMobile
@@ -2778,7 +2778,7 @@ export function CalendarioMantencionPage() {
                 : (showAllCols ? 'Ocultar CeCo/Cargo/Dirección/RUT' : 'Mostrar CeCo/Cargo/Dirección/RUT')}
             </button>
             <button
-              className="h-7 rounded border px-2 text-xs disabled:opacity-50"
+              className="h-7 rounded-ctl border px-2 text-xs disabled:opacity-50"
               onClick={scrollToToday}
               disabled={!todayDayCol}
             >
@@ -2789,17 +2789,17 @@ export function CalendarioMantencionPage() {
         {!isMobile && <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Turno reducido · Flechas ←↑↓→ = Navegar · Ctrl+Z = Deshacer · Ctrl+Y / Ctrl+Shift+Z = Rehacer</div>
           <div className="flex items-center gap-1">
-            <div className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
+            <div className="shrink-0 rounded-ctl border border-border bg-muted px-2 py-0.5 text-caption text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
               Undo {undoStackRef.current.length} · Redo {redoStackRef.current.length}
             </div>
-            <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
+            <div className={`shrink-0 rounded-ctl border px-2 py-0.5 text-caption ${calendarShortcutsActive ? 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' : 'border-border bg-muted text-muted-foreground'}`}>
               Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
             </div>
           </div>
         </div>}
         <div ref={calendarSectionRef}>
-        <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
-          <table className="border-collapse text-[11px] min-w-max">
+        <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded-ctl border">
+          <table className="border-collapse text-caption min-w-max">
             <thead>
               <tr className="bg-muted text-foreground">
                 {visibleMetaIndices.map((gi, vi) => (
@@ -2808,13 +2808,13 @@ export function CalendarioMantencionPage() {
                     className="sticky top-0 z-[60] border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none"
                     style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                   >
-                    {gi === 0 ? <span className="text-muted-foreground text-[10px] uppercase tracking-wide">Planta</span> : ''}
+                    {gi === 0 ? <span className="text-muted-foreground text-caption tracking-wide">Planta</span> : ''}
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
                   <th
                     key={`day-${d.c}`}
-                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-400/60 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25] shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2823,7 +2823,7 @@ export function CalendarioMantencionPage() {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-foreground">{d.dayLabel}</span>
-                      {isWeekStart(idx) ? <span className="rounded bg-cyan-500/15 px-1 text-[9px] text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
+                      {isWeekStart(idx) ? <span className="rounded-ctl bg-cat-7-tint/[0.15] px-1 text-caption text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
                     </div>
                   </th>
                 ))}
@@ -2832,7 +2832,7 @@ export function CalendarioMantencionPage() {
                 {visibleMetaIndices.map((gi, vi) => (
                   <th
                     key={`head2-${META_COLS[gi]}`}
-                    className="sticky top-[30px] z-[60] border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none text-muted-foreground text-[10px] uppercase tracking-wide"
+                    className="sticky top-[30px] z-[60] border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none text-muted-foreground text-caption tracking-wide"
                     style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                   >
                     {META_COLS[gi]}
@@ -2841,7 +2841,7 @@ export function CalendarioMantencionPage() {
                 {dayCols.map((d, idx) => (
                   <th
                     key={`date-${d.c}`}
-                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-yellow-400/60 font-semibold text-yellow-800 dark:text-yellow-300 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-amber-500/[0.25] font-semibold text-ink-warn shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2858,7 +2858,7 @@ export function CalendarioMantencionPage() {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 const dtk = tech.turno.trim().toUpperCase()
-                const dRowBg = dtk === 'A' ? 'bg-cyan-500/10' : dtk === 'B' ? 'bg-amber-500/10' : dtk === 'C' ? 'bg-violet-500/10' : idx % 2 === 1 ? 'bg-muted' : ''
+                const dRowBg = dtk === 'A' ? 'bg-cat-7-tint/[0.15]' : dtk === 'B' ? 'bg-amber-500/[0.15]' : dtk === 'C' ? 'bg-cat-6-tint/[0.15]' : idx % 2 === 1 ? 'bg-muted' : ''
                 return (
                   <tr key={tech.r} className={`border-b border-border/20 ${dRowBg} ${isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}`}>
                     {visibleMetaIndices.map((gi, vi) => (
@@ -2869,7 +2869,7 @@ export function CalendarioMantencionPage() {
                         title={metaValues[gi]}
                       >
                         {gi === 0 ? (
-                          <span className={`inline-flex min-w-6 justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${turnoBadgeClass(String(metaValues[gi] || ''))}`}>
+                          <span className={`inline-flex min-w-6 justify-center rounded-ctl border px-1.5 py-0.5 text-caption font-semibold ${turnoBadgeClass(String(metaValues[gi] || ''))}`}>
                             {metaValues[gi] || '-'}
                           </span>
                         ) : metaValues[gi]}
@@ -2882,7 +2882,7 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-zinc-600/15' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-300/90' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value}
                           onClick={() => {

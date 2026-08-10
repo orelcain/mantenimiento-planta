@@ -1,9 +1,10 @@
 {
-  "updated": "2026-08-09",
+  "updated": "2026-08-10",
   "counts": {
-    "emojis": 380,
-    "coloresCrudos": 4480,
-    "radiosFueraEscala": 1673,
-    "chipsTranslucidos": 1356
+    "emojis": 232,
+    "coloresCrudos": 2146,
+    "radiosFueraEscala": 22,
+    "cajasDobleMarcadas": 0,
+    "chipsTranslucidos": 99
   }
 }

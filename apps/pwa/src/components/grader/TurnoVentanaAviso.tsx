@@ -46,7 +46,7 @@ export function TurnoVentanaAviso({
     <div className={cn('flex flex-col gap-1.5', className)}>
       {missingHeadMin > 0 && (
         <div
-          className="rounded-md border px-3 py-2 text-xs flex items-start gap-2"
+          className="rounded-ctl border px-3 py-2 text-xs flex items-start gap-2"
           style={{ borderColor: 'var(--lc-warn)' }}
           data-testid="aviso-arranque-sin-datos"
         >
@@ -67,7 +67,7 @@ export function TurnoVentanaAviso({
 
       {earlyStartMin > 0 && (
         <div
-          className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground"
+          className="rounded-ctl border border-border px-3 py-2 text-xs text-muted-foreground"
           data-testid="aviso-arranque-anticipado"
         >
           ⏱ El turno arrancó{' '}

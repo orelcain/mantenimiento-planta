@@ -159,9 +159,9 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
 
                   return (
                       <div key={node.id} className="py-0.5">
-                          <div className="flex items-center gap-2 hover:bg-muted/50 rounded p-1 group">
+                          <div className="flex items-center gap-2 hover:bg-muted/50 rounded-ctl p-1 group">
                                 {hasChildren && node.type !== 'item' ? (
-                                    <button onClick={(e) => { e.stopPropagation(); handleToggleExpand(node.id) }} className="p-0.5 hover:bg-muted rounded text-muted-foreground">
+                                    <button onClick={(e) => { e.stopPropagation(); handleToggleExpand(node.id) }} className="p-0.5 hover:bg-muted rounded-ctl text-muted-foreground">
                                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                     </button>
                                 ) : <span className="w-5" />}
@@ -172,7 +172,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                 >
                                     {state === 'checked' && <CheckSquare className="h-4 w-4 text-primary shrink-0" />}
                                     {state === 'unchecked' && <Square className="h-4 w-4 shrink-0" />}
-                                    {state === 'indeterminate' && <div className="h-4 w-4 flex items-center justify-center shrink-0"><div className="h-2 w-2 bg-primary rounded-sm" /></div>}
+                                    {state === 'indeterminate' && <div className="h-4 w-4 flex items-center justify-center shrink-0"><div className="h-2 w-2 bg-primary rounded-ctl" /></div>}
                                     
                                     <span className={`text-sm select-none truncate ${node.type === 'category' ? 'font-semibold text-foreground' : ''} ${node.type === 'item' ? 'text-muted-foreground' : ''}`}>
                                         {node.label}
@@ -235,7 +235,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                  <DialogDescription>Selecciona ítems y formato de salida</DialogDescription>
             </div>
             
-            <div className="flex bg-muted rounded-lg p-1">
+            <div className="flex bg-muted rounded-card p-1">
                 <Button 
                     variant={filterMode === 'all' ? 'secondary' : 'ghost'} 
                     size="sm" 
@@ -260,7 +260,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         <div className="flex flex-1 overflow-hidden">
             {/* Sidebar: Tree Selection */}
             <div className="w-[45%] border-r flex flex-col bg-background">
-                <div className="p-3 border-b bg-muted font-medium text-xs uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                <div className="p-3 border-b bg-muted font-medium text-xs tracking-wider text-muted-foreground flex justify-between items-center">
                     <span>Árbol de Navegación</span>
                     <div className="space-x-1">
                         <Button variant="ghost" className="h-6 text-xs" onClick={() => setSelectedIds(new Set())}>Ninguno</Button>
@@ -289,7 +289,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
             {/* Right Panel: Options */}
             <div className="w-[55%] flex flex-col p-6 space-y-8 bg-muted overflow-y-auto">
                 <div className="space-y-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground flex items-center gap-2">
+                    <h3 className="font-semibold text-sm tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
                         Formato de Reporte
                     </h3>
@@ -297,10 +297,10 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0">
                             <TabsTrigger 
                                 value="technical_sheet" 
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-lg"
+                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg shrink-0 mt-0.5">
+                                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-card shrink-0 mt-0.5">
                                         <ClipboardList className="h-5 w-5"/>
                                     </div>
                                     <div className="text-left space-y-1">
@@ -313,10 +313,10 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             </TabsTrigger>
                             <TabsTrigger 
                                 value="catalog" 
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-lg"
+                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-orange-50 text-orange-600 rounded-lg shrink-0 mt-0.5">
+                                    <div className="p-2.5 bg-orange-50 text-orange-600 rounded-card shrink-0 mt-0.5">
                                         <FileText className="h-5 w-5"/>
                                     </div>
                                     <div className="text-left space-y-1">
@@ -329,10 +329,10 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             </TabsTrigger>
                             <TabsTrigger 
                                 value="excel" 
-                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-lg"
+                                className="justify-start px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-4">
-                                    <div className="p-2.5 bg-green-50 text-green-600 rounded-lg shrink-0 mt-0.5">
+                                    <div className="p-2.5 bg-green-50 text-ink-ok rounded-card shrink-0 mt-0.5">
                                         <FileSpreadsheet className="h-5 w-5"/>
                                     </div>
                                     <div className="text-left space-y-1">
@@ -348,12 +348,12 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 </div>
 
                 <div className="space-y-4">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground flex items-center gap-2">
+                    <h3 className="font-semibold text-sm tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
                         Configuración
                     </h3>
                     
-                    <div className="p-4 border rounded-lg bg-background shadow-sm">
+                    <div className="p-4 border rounded-card bg-background shadow-sm">
                          <div className="flex items-start space-x-3">
                             <Checkbox id="include-images" checked={includeImages} onCheckedChange={(c) => setIncludeImages(!!c)} className="mt-1" />
                             <div className="grid gap-1.5 leading-none">

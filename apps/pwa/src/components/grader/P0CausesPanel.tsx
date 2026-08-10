@@ -59,16 +59,16 @@ const CAUSE_HEX_BORDERS: Record<MatrixP0Cause, string> = {
   otro:                 '#71717a',
 }
 
-const FALLBACK_COLOR = { badge: 'bg-zinc-500/15 text-zinc-400', bar: 'bg-zinc-500' }
+const FALLBACK_COLOR = { badge: 'bg-muted-foreground/[0.10] text-zinc-400', bar: 'bg-zinc-500' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
-  red:     { badge: 'bg-red-500/15 text-red-400',       bar: 'bg-red-500'   },
-  orange:  { badge: 'bg-orange-500/15 text-orange-400', bar: 'bg-orange-500'},
-  purple:  { badge: 'bg-purple-500/15 text-purple-400', bar: 'bg-purple-500'},
-  cyan:    { badge: 'bg-cyan-500/15 text-cyan-400',     bar: 'bg-cyan-500'  },
-  emerald: { badge: 'bg-emerald-500/15 text-emerald-400', bar: 'bg-emerald-500' },
-  amber:   { badge: 'bg-amber-500/15 text-amber-400',   bar: 'bg-amber-500' },
-  brown:   { badge: 'bg-amber-900/20 text-amber-700 dark:text-amber-300', bar: 'bg-amber-800' },
-  blue:    { badge: 'bg-blue-500/15 text-blue-400',     bar: 'bg-blue-500'  },
+  red:     { badge: 'bg-red-500/[0.15] text-red-400',       bar: 'bg-red-500'   },
+  orange:  { badge: 'bg-cat-4-tint/[0.15] text-orange-400', bar: 'bg-orange-500'},
+  purple:  { badge: 'bg-cat-6-tint/[0.15] text-purple-400', bar: 'bg-purple-500'},
+  cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cyan-400',     bar: 'bg-cyan-500'  },
+  emerald: { badge: 'bg-emerald-500/[0.15] text-emerald-400', bar: 'bg-emerald-500' },
+  amber:   { badge: 'bg-amber-500/[0.15] text-amber-400',   bar: 'bg-amber-500' },
+  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-amber-800' },
+  blue:    { badge: 'bg-primary/[0.15] text-blue-400',     bar: 'bg-blue-500'  },
   zinc:    FALLBACK_COLOR,
 }
 
@@ -119,7 +119,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
   return (
     <div
       className={cn(
-        'border rounded-lg overflow-hidden transition-all',
+        'border rounded-card overflow-hidden transition-all',
         !hasPieces && 'opacity-40',
         selected && 'ring-2 ring-offset-1 ring-offset-background',
       )}
@@ -141,7 +141,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
           onClick={onToggle}
           type="button"
         >
-          <span className={cn('p-1.5 rounded-md', colors.badge)}>
+          <span className={cn('p-1.5 rounded-ctl', colors.badge)}>
             <Icon className="w-4 h-4" />
           </span>
           <div className="flex-1 min-w-0">
@@ -159,9 +159,9 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
           <div className="text-right shrink-0 min-w-[60px] sm:min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
-              <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+              <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
             </div>
-            <div className="text-[10px] text-muted-foreground font-mono">
+            <div className="text-caption text-muted-foreground font-mono">
               {stats.pct.toFixed(1)}% del P0
             </div>
             <div className="text-xs text-muted-foreground">{stats.pieces.toLocaleString('es-CL')} pzas</div>
@@ -224,7 +224,7 @@ function UmbrellaCauseRow({
   return (
     <div
       className={cn(
-        'border rounded-lg overflow-hidden transition-all',
+        'border rounded-card overflow-hidden transition-all',
         !hasPieces && 'opacity-40',
         selected && 'ring-2 ring-offset-1 ring-offset-background',
       )}
@@ -246,13 +246,13 @@ function UmbrellaCauseRow({
           onClick={onToggle}
           type="button"
         >
-          <span className={cn('p-1.5 rounded-md', colors.badge)}>
+          <span className={cn('p-1.5 rounded-ctl', colors.badge)}>
             <Icon className="w-4 h-4" />
           </span>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm flex flex-wrap items-center gap-1.5 min-w-0">
               <span className="break-words">{def.label}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted font-mono text-muted-foreground shrink-0">
+              <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-muted font-mono text-muted-foreground shrink-0">
                 paraguas · 6 sub
               </span>
             </div>
@@ -267,9 +267,9 @@ function UmbrellaCauseRow({
           <div className="text-right shrink-0 min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
-              <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+              <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
             </div>
-            <div className="text-[10px] text-muted-foreground font-mono">
+            <div className="text-caption text-muted-foreground font-mono">
               {umbrellaStats.pct.toFixed(1)}% del P0
             </div>
             <div className="text-xs text-muted-foreground">{umbrellaStats.pieces.toLocaleString('es-CL')} pzas</div>
@@ -282,7 +282,7 @@ function UmbrellaCauseRow({
       </div>
       {expanded && hasPieces && (
         <div className="px-3 pb-3 pt-1 bg-muted/20 border-t space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          <p className="text-caption tracking-wider text-muted-foreground font-semibold">
             Desglose — análisis nuestro con config gates
           </p>
           <div className="space-y-1">
@@ -307,7 +307,7 @@ function UmbrellaCauseRow({
               />
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-border/40">
+          <p className="text-caption text-muted-foreground italic pt-1 border-t border-border/40">
             El paraguas suma exactamente la suma del desglose.
             Si una causa no se identifica, cae en "Otro".
           </p>
@@ -337,7 +337,7 @@ function SubCauseRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all',
+        'flex items-center gap-2 px-2 py-1.5 rounded-ctl text-xs transition-all',
         hasPieces ? 'bg-background' : 'opacity-40',
         selected && 'ring-1 ring-offset-1 ring-offset-background',
       )}
@@ -352,7 +352,7 @@ function SubCauseRow({
           aria-label={`Seleccionar ${def.label} para filtrar timeline`}
         />
       )}
-      <span className={cn('p-1 rounded', colors.badge)}>
+      <span className={cn('p-1 rounded-ctl', colors.badge)}>
         <Icon className="w-3 h-3" />
       </span>
       <span className="flex-1 min-w-0 truncate">
@@ -360,7 +360,7 @@ function SubCauseRow({
       </span>
       <div className="text-right shrink-0 font-mono tabular-nums">
         <span className="font-semibold">{pctOfTotal.toFixed(2)}%</span>
-        <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+        <span className="text-caption font-normal text-muted-foreground/80 ml-0.5">total</span>
         <span className="text-muted-foreground ml-2">({stats.pct.toFixed(1)}% del P0)</span>
         <span className="text-muted-foreground ml-2">{stats.pieces.toLocaleString('es-CL')} pzas</span>
       </div>
@@ -400,7 +400,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
 
       <CardContent className="space-y-4">
         {!hasCauseData && (
-          <div className="text-xs text-muted-foreground bg-muted/40 rounded-md p-3">
+          <div className="text-xs text-muted-foreground bg-muted/40 rounded-ctl p-3">
             {noDataCopy}
           </div>
         )}
@@ -409,10 +409,10 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
           <>
             {/* ─── Vista Matrix oficial — 4 filas, paraguas expandible ─ */}
             <section>
-              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+              <h3 className="text-caption font-semibold text-muted-foreground tracking-wider mb-2 flex items-center gap-2">
                 <span>{sectionTitle}</span>
                 <span className="h-px flex-1 bg-border" />
-                <span className="text-[9px] font-normal normal-case tracking-normal">{sectionSubtitle}</span>
+                <span className="text-caption font-normal normal-case tracking-normal">{sectionSubtitle}</span>
               </h3>
               <div className="space-y-2">
                 {MATRIX_CAUSE_ORDER_OFFICIAL.map(cause => {
@@ -472,7 +472,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
 
             {/* ─── Footer: total unsorted pcs ──────────────────────────── */}
             {typeof unsortedPcs === 'number' && unsortedPcs > 0 && (
-              <div className="text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+              <div className="text-caption text-muted-foreground pt-1 border-t border-border/40">
                 {isClassificationPlant ? (
                   <>
                     Total <span className="font-mono text-muted-foreground/80">unsorted pcs</span> (Matrix):{' '}

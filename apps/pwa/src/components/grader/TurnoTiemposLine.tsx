@@ -84,7 +84,7 @@ export function TurnoTiemposLine({
 
       {atrasoNotable && (
         <span
-          className={cn('flex items-center gap-1 text-amber-600 dark:text-amber-400 cursor-help')}
+          className={cn('flex items-center gap-1 text-ink-warn cursor-help')}
           title="Tiempo entre la hora programada de inicio y la primera pieza registrada. No es un paro de máquina: es turno que nunca arrancó."
         >
           <AlertTriangle className="w-3 h-3 shrink-0" />

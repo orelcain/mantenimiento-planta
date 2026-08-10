@@ -131,7 +131,7 @@ export function FailureAnalysis() {
 
   if (incidents.length === 0) {
       return (
-          <div className="p-8 text-center border rounded-lg bg-muted">
+          <div className="p-8 text-center border rounded-card bg-muted">
               <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
               <p>No hay suficientes datos para realizar un análisis de fallas aún.</p>
           </div>
@@ -262,7 +262,7 @@ export function FailureAnalysis() {
                         <div key={inc.id} className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 last:border-0 last:pb-0 gap-2">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <Badge variant={inc.prioridad === 'critica' ? 'destructive' : 'warning'} className="text-[10px] px-1 py-0 h-5">
+                                    <Badge variant={inc.prioridad === 'critica' ? 'destructive' : 'warning'} className="text-caption px-1 py-0 h-5">
                                         {inc.prioridad.toUpperCase()}
                                     </Badge>
                                     <span className="font-medium text-sm">{inc.titulo}</span>
@@ -273,7 +273,7 @@ export function FailureAnalysis() {
                             </div>
                             <div className="flex flex-wrap gap-1">
                                 {inc.sintomas?.slice(0, 3).map(s => (
-                                    <Badge key={s} variant="secondary" className="text-[10px] h-5 font-normal bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                    <Badge key={s} variant="secondary" className="text-caption h-5 font-normal bg-blue-50 text-blue-700 hover:bg-blue-100">
                                         {s}
                                     </Badge>
                                 ))}
@@ -292,7 +292,7 @@ export function FailureAnalysis() {
 
         {/* Modal Detalle de Síntomas */}
         <Dialog open={!!selectedSymptom} onOpenChange={(open) => !open && setSelectedSymptom(null)}>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto w-[95%] rounded-xl">
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto w-[95%] rounded-card">
                 <DialogHeader className="pb-4 border-b">
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <AlertTriangle className="h-6 w-6 text-orange-500" />
@@ -307,7 +307,7 @@ export function FailureAnalysis() {
                              <div 
                                 key={inc.id} 
                                 onClick={() => setSelectedIncident(inc)}
-                                className="border rounded-lg p-4 bg-card hover:bg-muted transition-colors animate-in slide-in-from-bottom-2 duration-300 cursor-pointer group"
+                                className="border rounded-card p-4 bg-card hover:bg-muted transition-colors animate-in slide-in-from-bottom-2 duration-300 cursor-pointer group"
                              >
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-2">
                                     <h4 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{inc.titulo}</h4>
@@ -329,7 +329,7 @@ export function FailureAnalysis() {
                                        {inc.status?.toUpperCase()}
                                     </div>
                                     {inc.equipmentId && (
-                                       <Badge variant="secondary" className="text-[10px] ml-auto">
+                                       <Badge variant="secondary" className="text-caption ml-auto">
                                             EQUIPO REF.
                                        </Badge>
                                     )}
@@ -349,7 +349,7 @@ export function FailureAnalysis() {
 
         {/* Modal Detalle de Incidencia */}
         <Dialog open={!!selectedIncident} onOpenChange={(open) => !open && setSelectedIncident(null)}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95%] rounded-xl">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95%] rounded-card">
                  {selectedIncident && (
                     <>
                         <DialogHeader className="pb-4 border-b">
@@ -377,8 +377,8 @@ export function FailureAnalysis() {
                         <div className="space-y-6 mt-4">
                             {/* Descripción */}
                             <div>
-                                <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Descripción del Hallazgo</h4>
-                                <div className="p-4 bg-muted rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
+                                <h4 className="text-sm font-semibold mb-2 text-muted-foreground tracking-wider">Descripción del Hallazgo</h4>
+                                <div className="p-4 bg-muted rounded-card text-sm leading-relaxed whitespace-pre-wrap">
                                     {selectedIncident.descripcion}
                                 </div>
                             </div>
@@ -386,7 +386,7 @@ export function FailureAnalysis() {
                             {/* Equipo y Ubicación */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {selectedIncident.equipmentId && (
-                                    <div className="border rounded-lg p-3">
+                                    <div className="border rounded-card p-3">
                                         <div className="text-xs text-muted-foreground mb-1">Equipo Afectado</div>
                                         <div className="font-medium flex items-center gap-2">
                                             <BrainCircuit className="h-4 w-4 text-blue-500" />
@@ -394,7 +394,7 @@ export function FailureAnalysis() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="border rounded-lg p-3">
+                                <div className="border rounded-card p-3">
                                     <div className="text-xs text-muted-foreground mb-1">Reportado Por</div>
                                     <div className="font-medium truncate">
                                         {selectedIncident.creadoPorNombre || 'Usuario del Sistema'}
@@ -405,7 +405,7 @@ export function FailureAnalysis() {
                             {/* Síntomas Detectados */}
                             {selectedIncident.sintomas && selectedIncident.sintomas.length > 0 && (
                                 <div>
-                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Síntomas Identificados</h4>
+                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground tracking-wider">Síntomas Identificados</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {selectedIncident.sintomas.map(s => (
                                             <Badge key={s} variant="secondary" className="px-3 py-1 text-secondary-foreground">
@@ -419,10 +419,10 @@ export function FailureAnalysis() {
                             {/* Evidencias / Fotos */}
                             {selectedIncident.fotos && selectedIncident.fotos.length > 0 && (
                                 <div>
-                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Evidencia Fotográfica</h4>
+                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground tracking-wider">Evidencia Fotográfica</h4>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                         {selectedIncident.fotos.map((foto, idx) => (
-                                            <a key={idx} href={foto} target="_blank" rel="noopener noreferrer" className="relative aspect-square rounded-lg overflow-hidden border group cursor-zoom-in">
+                                            <a key={idx} href={foto} target="_blank" rel="noopener noreferrer" className="relative aspect-square rounded-card overflow-hidden border group cursor-zoom-in">
                                                 <img src={foto} alt={`Evidencia ${idx + 1}`} className="object-cover w-full h-full transition-transform group-hover:scale-105" />
                                             </a>
                                         ))}
@@ -432,12 +432,12 @@ export function FailureAnalysis() {
 
                             {/* Resolución (si existe) */}
                             {selectedIncident.resolucion && (
-                                <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                                    <h4 className="text-sm font-semibold mb-1 text-green-800 dark:text-green-400 flex items-center gap-2">
+                                <div className="bg-green-500/[0.15] border border-green-200 dark:border-green-800 rounded-card p-4">
+                                    <h4 className="text-sm font-semibold mb-1 text-ink-ok flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Resolución Aplicada
                                     </h4>
-                                    <p className="text-sm text-green-700 dark:text-green-300">
+                                    <p className="text-sm text-ink-ok">
                                         {selectedIncident.resolucion}
                                     </p>
                                 </div>

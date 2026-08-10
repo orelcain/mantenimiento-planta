@@ -214,7 +214,7 @@ export function DashboardPage() {
               {criticalIncidents.slice(0, 3).map((incident) => (
                 <div key={incident.id} className="space-y-1">
                   <div
-                    className="flex items-center justify-between p-2 bg-card rounded cursor-pointer hover:bg-muted"
+                    className="flex items-center justify-between p-2 bg-card rounded-ctl cursor-pointer hover:bg-muted"
                     onClick={() => {
                       setSelectedIncident(incident)
                       navigate('/incidents')
@@ -231,7 +231,7 @@ export function DashboardPage() {
                   {incident.equipmentId && iotDetails[incident.equipmentId] && (
                     <div className="pl-6 text-xs text-muted-foreground space-y-1">
                       {iotDetails[incident.equipmentId]?.source === 'simulated' && (
-                        <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
+                        <div className="text-caption tracking-wide text-amber-600">Dato simulado</div>
                       )}
                       {iotDetails[incident.equipmentId]?.temp && (
                         <div>
@@ -314,7 +314,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
+        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-card border-x-0 sm:border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Tasa Resolución
@@ -342,7 +342,7 @@ export function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Últimas incidencias */}
-        <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
+        <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-card border-x-0 sm:border">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Últimas Incidencias</span>
@@ -366,7 +366,7 @@ export function DashboardPage() {
                 {recentIncidents.map((incident) => (
                   <div
                     key={incident.id}
-                    className="flex items-start gap-3 cursor-pointer hover:bg-muted px-3 py-3 rounded-lg"
+                    className="flex items-start gap-3 cursor-pointer hover:bg-muted px-3 py-3 rounded-card"
                     onClick={() => setSelectedIncident(incident)}
                   >
                     <div
@@ -383,7 +383,7 @@ export function DashboardPage() {
                       
                       {/* Estado y Tiempos */}
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0 font-normal">
+                        <Badge variant="outline" className="text-caption h-5 px-1.5 py-0 font-normal">
                           {incident.status === 'pendiente' && 'Pendiente'}
                           {incident.status === 'confirmada' && 'Confirmada'}
                           {incident.status === 'en_proceso' && 'En proceso'}
@@ -413,7 +413,7 @@ export function DashboardPage() {
                       {incident.equipmentId && iotDetails[incident.equipmentId] && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                           {iotDetails[incident.equipmentId]?.source === 'simulated' && (
-                            <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
+                            <div className="text-caption tracking-wide text-amber-600">Dato simulado</div>
                           )}
                           {iotDetails[incident.equipmentId]?.temp && (
                             <div>
@@ -438,7 +438,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Resumen por zona */}
-        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
+        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-card border-x-0 sm:border">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Incidencias por Zona</span>
@@ -466,11 +466,11 @@ export function DashboardPage() {
                   return (
                     <div
                       key={zone.id}
-                      className="flex items-center gap-4 cursor-pointer hover:bg-muted px-3 py-3 rounded-lg"
+                      className="flex items-center gap-4 cursor-pointer hover:bg-muted px-3 py-3 rounded-card"
                       onClick={() => setSelectedZoneForDetail(zone)}
                     >
                       <div
-                        className="w-4 h-4 rounded"
+                        className="w-4 h-4 rounded-ctl"
                         style={{ backgroundColor: zone.color || '#2196f3' }}
                       />
                       <div className="flex-1">
@@ -502,7 +502,7 @@ export function DashboardPage() {
 
       {/* Zone Detail Modal */}
       <Dialog open={!!selectedZoneForDetail} onOpenChange={(open) => !open && setSelectedZoneForDetail(null)}>
-        <DialogContent className="max-w-md w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
+        <DialogContent className="max-w-md w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-card">
           <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
@@ -524,7 +524,7 @@ export function DashboardPage() {
                 .map(incident => (
                   <div
                     key={incident.id}
-                    className="flex items-center gap-3 cursor-pointer hover:bg-muted p-3 rounded-lg border bg-card/50"
+                    className="flex items-center gap-3 cursor-pointer hover:bg-muted p-3 rounded-card border bg-card/50"
                     onClick={() => {
                       setSelectedZoneForDetail(null)
                       setSelectedIncident(incident)

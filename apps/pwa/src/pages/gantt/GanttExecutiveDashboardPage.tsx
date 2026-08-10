@@ -143,7 +143,7 @@ export function GanttExecutiveDashboardPage() {
             const task = tasks.find((item) => item.id === taskId)
             if (!task) return null
             return (
-              <div key={task.id} className="rounded border p-3 flex flex-col gap-1">
+              <div key={task.id} className="rounded-ctl border p-3 flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{task.titulo}</p>
                   <Badge variant={task.status === 'completada' ? 'success' : 'destructive'}>{task.status}</Badge>
@@ -160,7 +160,7 @@ export function GanttExecutiveDashboardPage() {
         <CardContent className="space-y-2">
           {delayedCritical.length === 0 && <p className="text-sm text-muted-foreground">No hay atrasos críticos en este momento.</p>}
           {delayedCritical.map((task) => (
-            <div key={task.id} className="rounded border border-destructive/40 p-3">
+            <div key={task.id} className="rounded-ctl border border-destructive/40 p-3">
               <p className="font-medium text-destructive">{task.titulo}</p>
               <p className="text-xs text-muted-foreground">Fin planificado: {task.endDate.toLocaleString('es-CL')} · Responsable: {task.responsibleName ?? 'Sin asignar'}</p>
             </div>
@@ -173,7 +173,7 @@ export function GanttExecutiveDashboardPage() {
         <CardContent className="space-y-2">
           {resourceLoad.length === 0 && <p className="text-sm text-muted-foreground">No hay carga activa para analizar.</p>}
           {resourceLoad.map((row) => (
-            <div key={row.responsible} className="rounded border p-3">
+            <div key={row.responsible} className="rounded-ctl border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{row.responsible}</p>
                 <Badge variant={row.status === 'sobrecargado' ? 'destructive' : row.status === 'alto' ? 'warning' : 'success'}>

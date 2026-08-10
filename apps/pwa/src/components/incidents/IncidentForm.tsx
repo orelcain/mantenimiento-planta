@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, MapPin } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, MapPin, PenLine, ClipboardList, Search } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -452,16 +452,16 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Ubicación jerárquica - Solo en modo creación */}
           {!isEditMode && (
             <div className="space-y-1">
-              <Label className="text-sm font-medium">📍 Ubicación *</Label>
+              <Label className="flex items-center gap-1.5 text-body font-medium"><MapPin className="size-4 text-muted-foreground" /> Ubicación *</Label>
               
               <div 
-                className="border rounded-lg p-3 bg-muted hover:bg-accent cursor-pointer transition-colors flex items-center justify-between group"
+                className="border rounded-card p-3 bg-muted hover:bg-accent cursor-pointer transition-colors flex items-center justify-between group"
                 onClick={() => setIsLocationModalOpen(true)}
               >
                   <div className="flex flex-col gap-1 overflow-hidden">
                       {formData.hierarchyNodeId ? (
                         <div className="flex flex-col">
-                             <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Ubicación Seleccionada</span>
+                             <span className="text-xs text-muted-foreground tracking-wider font-semibold">Ubicación Seleccionada</span>
                              <div className="text-sm font-medium text-primary flex items-center gap-1.5 truncate">
                                 {/* Componente de visualización de ID o fetch del nombre */}
                                 {/* Dado que solo tenemos el ID aquí, mostraremos algo genérico o el ID 
@@ -526,7 +526,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                       type="button"
                       onClick={() => setFormData({ ...formData, zoneId: zone.id })}
                       className={cn(
-                        'p-2 rounded-lg border text-left transition-all text-xs',
+                        'p-2 rounded-card border text-left transition-all text-xs',
                         formData.zoneId === zone.id 
                           ? 'border-primary bg-primary/10' 
                           : 'border-muted hover:border-primary/50'
@@ -556,7 +556,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               </Label>
               
               {mapLocation ? (
-                <div className="border rounded-lg p-3 bg-muted">
+                <div className="border rounded-card p-3 bg-muted">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -618,7 +618,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
           {/* Prioridad - Botones compactos */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">⚠️ Prioridad *</Label>
+            <Label className="flex items-center gap-1.5 text-body font-medium"><AlertTriangle className="size-4 text-muted-foreground" /> Prioridad *</Label>
             <div className="grid grid-cols-4 gap-2">
               {PRIORITY_OPTIONS.map((opt) => (
                 <button
@@ -626,7 +626,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   type="button"
                   onClick={() => setFormData({ ...formData, prioridad: opt.value as IncidentPriority })}
                   className={cn(
-                    'p-2 rounded-lg border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
+                    'p-2 rounded-card border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
                     formData.prioridad === opt.value 
                       ? `${opt.color} text-white border-transparent ring-2 ring-offset-1 ring-offset-background`
                       : 'bg-card border-muted hover:border-sidebar-accent hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground'
@@ -643,7 +643,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   )} />
                   <span className="font-semibold text-xs relative z-10">{opt.label}</span>
                   <span className={cn(
-                      "text-[10px] leading-tight mt-1 relative z-10",
+                      "text-caption leading-tight mt-1 relative z-10",
                       formData.prioridad === opt.value ? "text-white/90" : "text-muted-foreground"
                   )}>{opt.desc}</span>
                 </button>
@@ -666,7 +666,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
           {/* Título con Mic y Magia */}
           <div className="space-y-2">
-            <Label htmlFor="titulo" className="text-sm font-medium">📝 Título *</Label>
+            <Label htmlFor="titulo" className="flex items-center gap-1.5 text-body font-medium"><PenLine className="size-4 text-muted-foreground" /> Título *</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <SpeechTextarea
@@ -700,7 +700,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Descripción */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="descripcion" className="text-sm font-medium">📋 Descripción *</Label>
+              <Label htmlFor="descripcion" className="flex items-center gap-1.5 text-body font-medium"><ClipboardList className="size-4 text-muted-foreground" /> Descripción *</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -727,7 +727,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               name="descripcion"
               value={formData.descripcion}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              placeholder="Describe el problema con detalle... (o usa el micrófono 🎤)"
+              placeholder="Describe el problema con detalle…"
               rows={3}
               className="text-base"
               required
@@ -741,7 +741,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {!isEditMode && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
+                <Label className="flex items-center gap-1.5 text-body font-medium"><Search className="size-4 text-muted-foreground" /> Síntomas (opcional)</Label>
                 <div className="flex items-center gap-2">
                    {/* Botón Mágico para Síntomas */}
                    <Button
@@ -774,7 +774,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                       title="Proponer variantes de síntomas"
                    >
                        <Sparkles className="h-3 w-3 mr-1" />
-                       <span className="text-[10px]">Sugerir</span>
+                       <span className="text-caption">Sugerir</span>
                    </Button>
 
                    {selectedEquipment && (
@@ -869,14 +869,14 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Fotos - Solo en modo creación */}
           {!isEditMode && (
             <div className="space-y-2">
-              <Label className="text-sm font-medium">📷 Fotos (máx. 5)</Label>
+              <Label className="flex items-center gap-1.5 text-body font-medium"><Camera className="size-4 text-muted-foreground" /> Fotos (máx. 5)</Label>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                 {photoPreview.map((preview, index) => (
                   <div key={index} className="relative aspect-square group">
                     <img
                       src={preview}
                       alt={`Foto ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg border"
+                      className="w-full h-full object-cover rounded-card border"
                       loading="lazy"
                     />
                     {/* Botón eliminar */}
@@ -889,7 +889,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     </button>
                     {/* Metadatos (overlay en hover o siempre visible pequeño) */}
                     {photoMeta[index] && (
-                       <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-white p-1 text-center truncate rounded-b-lg backdrop-blur-[2px] leading-tight">
+                       <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-caption text-white p-1 text-center truncate rounded-b-lg backdrop-blur-[2px] leading-tight">
                          <div className="font-semibold text-yellow-300">{photoMeta[index].compressed} ({photoMeta[index].format})</div>
                          <div className="opacity-75">{photoMeta[index].dim}</div>
                          <div className="scale-[0.8] opacity-50 line-through">{photoMeta[index].original}</div>
@@ -903,7 +903,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
+                    className="aspect-square border-2 border-dashed border-muted rounded-card flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
                   >
                     <Camera className="h-8 w-8" />
                     <span className="text-xs mt-1">Cámara</span>
@@ -912,7 +912,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   <button
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
+                    className="aspect-square border-2 border-dashed border-muted rounded-card flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted"
                   >
                     <ImageIcon className="h-8 w-8" />
                     <span className="text-xs mt-1">Galería</span>
@@ -947,7 +947,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Botones de acción */}
           <div className="flex flex-col gap-2 pt-4 border-t">
             {validationErrors.general && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">
                 {validationErrors.general}
               </div>
             )}

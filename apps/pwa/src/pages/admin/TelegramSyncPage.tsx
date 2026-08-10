@@ -72,7 +72,7 @@ function CorridaRow({ corrida }: { corrida: TelegramSyncCorrida }) {
           {corrida.motivo && <span className="text-muted-foreground"> · {corrida.motivo}</span>}
         </span>
         {corrida.solicitadaPor && (
-          <span className="text-[11px] text-muted-foreground hidden sm:inline truncate max-w-[10rem]">
+          <span className="text-caption text-muted-foreground hidden sm:inline truncate max-w-[10rem]">
             {corrida.solicitadaPor}
           </span>
         )}
@@ -234,13 +234,13 @@ export function TelegramSyncPage() {
           <CardTitle className="text-sm">Periodicidad automática</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+          <div className="flex gap-1 rounded-card bg-muted p-1 w-fit">
             {MODOS.map((m) => (
               <button
                 key={m.value}
                 onClick={() => setModoDraft(m.value)}
                 className={[
-                  'px-3 py-1.5 text-sm rounded-md transition-colors',
+                  'px-3 py-1.5 text-sm rounded-ctl transition-colors',
                   modo === m.value
                     ? 'bg-background text-foreground shadow-sm font-medium'
                     : 'text-muted-foreground hover:text-foreground',

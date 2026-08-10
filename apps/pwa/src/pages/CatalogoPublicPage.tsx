@@ -38,7 +38,7 @@ export function CatalogoPublicPage() {
           <ScanSearch className="h-5 w-5 shrink-0 text-primary" />
           <div className="min-w-0">
             <h1 className="truncate text-sm font-bold text-foreground">Códigos de fabricante · Antarfood</h1>
-            <p className="truncate text-[11px] text-muted-foreground">Consulta de despieces oficiales · solo lectura</p>
+            <p className="truncate text-caption text-muted-foreground">Consulta de despieces oficiales · solo lectura</p>
           </div>
         </div>
       </header>

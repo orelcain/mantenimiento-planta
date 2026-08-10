@@ -314,12 +314,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     <div className="space-y-4" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* ── Navegación entre turnos (mas visible + swipe) ──────────── */}
       {sortedAllTurns.length > 1 && (
-        <div className="flex items-center justify-between bg-muted rounded-lg px-2 py-1.5">
+        <div className="flex items-center justify-between bg-muted rounded-card px-2 py-1.5">
           <button
             type="button"
             disabled={!prevTurn}
             onClick={() => prevTurn && goToTurn(prevTurn)}
-            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <ChevronLeft className="h-5 w-5" />
             <span className="hidden sm:inline">{prevTurn ? `${prevTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${prevTurn.dateKey.slice(5)} ${prevTurn.shiftId.replace('Turno ', '')}` : ''}</span>
@@ -332,7 +332,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             type="button"
             disabled={!nextTurn}
             onClick={() => nextTurn && goToTurn(nextTurn)}
-            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-card font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <span className="hidden sm:inline">{nextTurn ? `${nextTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}</span>
             <span className="sm:hidden">{nextTurn ? 'Siguiente' : 'Final'}</span>
@@ -346,7 +346,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide flex items-center gap-1.5">
                 <span className="text-base">{summary.shiftId.includes('día') ? '☀️' : '🌙'}</span>
                 {summary.shiftId} · {summary.totalPieces.toLocaleString('es-CL')} piezas
               </p>
@@ -369,12 +369,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-[10px] bg-red-500/15 text-red-600 border-red-500/30">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-[10px] bg-red-500/15 text-red-600 border-red-500/30">
+                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-red-500/[0.25]">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -382,7 +382,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               )}
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">P0%</p>
+              <p className="text-xs text-muted-foreground tracking-wide">P0%</p>
               <p className={cn('text-5xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(summary.pointZeroPct)))}>
                 {summary.pointZeroPct}%
               </p>
@@ -395,23 +395,23 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Piezas totales</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Piezas totales</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {summary.totalPieces.toLocaleString('es-CL')}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-caption text-muted-foreground mt-0.5">
               {summary.pointZeroPieces.toLocaleString('es-CL')} en P0
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Peso clasificado</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Peso clasificado</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatWeight(summary.totalWeightKg)}
             </p>
             {summary.avgWeightGrams != null && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-caption text-muted-foreground mt-0.5">
                 ~{summary.avgWeightGrams} g/pza
               </p>
             )}
@@ -419,21 +419,21 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tasa producción</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Tasa producción</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {displayRate != null ? displayRate.toLocaleString('es-CL') : '—'}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">pz/hora</p>
+            <p className="text-caption text-muted-foreground mt-0.5">pz/hora</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Duración turno</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Duración turno</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
               {formatDuration(displayMinutes)}
             </p>
             {displayMinutes != null && displayMinutes > 0 && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-caption text-muted-foreground mt-0.5">
                 {displayMinutes} min
               </p>
             )}
@@ -512,7 +512,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {/* Causas P0 como badges informativos */}
               {topCauses.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                  <span className="text-[10px] text-muted-foreground">Causas P0:</span>
+                  <span className="text-caption text-muted-foreground">Causas P0:</span>
                   {topCauses.slice(0, 4).map((c, i) => {
                     const pctTotal = summary.totalPieces > 0 ? +((c.pieces / summary.totalPieces) * 100).toFixed(2) : 0
                     return (
@@ -520,9 +520,9 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         key={i}
                         variant="outline"
                         className={cn(
-                          'text-[9px] py-0',
-                          c.pct >= 50 ? 'border-red-500/40 text-red-500' :
-                          c.pct >= 25 ? 'border-amber-500/40 text-amber-500' :
+                          'text-caption py-0',
+                          c.pct >= 50 ? 'border-red-500/[0.25] text-red-500' :
+                          c.pct >= 25 ? 'border-amber-500/[0.25] text-amber-500' :
                           'border-muted-foreground/30 text-muted-foreground'
                         )}
                       >
@@ -633,7 +633,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                 />
               </div>
               {/* Leyenda de colores P0 */}
-              <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-4 mt-2 text-caption text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
                   P0% {'<'} 2% (OK)
@@ -660,7 +660,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <CardTitle className="text-base flex items-center gap-2">
               <Zap className="h-4 w-4 text-muted-foreground" />
               Alertas automáticas
-              <Badge variant="outline" className="text-[10px] ml-auto">
+              <Badge variant="outline" className="text-caption ml-auto">
                 {insights.length} alerta{insights.length !== 1 ? 's' : ''}
               </Badge>
             </CardTitle>
@@ -669,27 +669,27 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
-              const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/15'
-                : sev === 'warn' ? 'border-amber-400/40 bg-amber-500/15'
-                : 'border-blue-400/30 bg-blue-500/15'
+              const borderCls = sev === 'critical' ? 'border-red-500/[0.25] bg-red-500/[0.15]'
+                : sev === 'warn' ? 'border-amber-500/[0.25] bg-amber-500/[0.15]'
+                : 'border-primary/[0.25] bg-primary/[0.15]'
               const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 : <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
               return (
-                <div key={ins.id} className={cn('rounded-lg border p-3 space-y-1.5', borderCls)}>
+                <div key={ins.id} className={cn('rounded-card border p-3 space-y-1.5', borderCls)}>
                   <div className="flex items-start gap-2">
                     {icon}
                     <p className="text-xs font-semibold">{ins.title}</p>
                   </div>
                   <ul className="pl-5 space-y-0.5">
                     {ins.evidence.map((e, i) => (
-                      <li key={i} className="text-[11px] text-muted-foreground list-disc">{e}</li>
+                      <li key={i} className="text-caption text-muted-foreground list-disc">{e}</li>
                     ))}
                   </ul>
                   {ins.recommendations.length > 0 && (
                     <ul className="pl-5 space-y-0.5 pt-1 border-t border-dashed border-muted">
                       {ins.recommendations.map((r, i) => (
-                        <li key={i} className="text-[11px] list-disc">{r}</li>
+                        <li key={i} className="text-caption list-disc">{r}</li>
                       ))}
                     </ul>
                   )}
@@ -707,7 +707,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <Card className="lg:col-span-2">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-2">Distribución por Calibre
-              <Badge variant="outline" className="text-[10px] font-normal">{summary.totalPieces.toLocaleString('es-CL')} pz</Badge>
+              <Badge variant="outline" className="text-caption font-normal">{summary.totalPieces.toLocaleString('es-CL')} pz</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -797,7 +797,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <Card className="lg:col-span-3">
           <CardHeader className="pb-1">
             <CardTitle className="text-sm flex items-center gap-2">Distribución por Compuerta (G1–G12)
-              <Badge variant="outline" className="text-[10px] font-normal">12 gates</Badge>
+              <Badge variant="outline" className="text-caption font-normal">12 gates</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -848,7 +848,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               Desglose Punto Cero
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 P0: {summary.pointZeroPct}% ({summary.pointZeroPieces.toLocaleString('es-CL')} de {summary.totalPieces.toLocaleString('es-CL')})
               </Badge>
             </CardTitle>
@@ -915,8 +915,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             </p>
           )}
           {aiError && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-300 text-sm">
-              <div className="flex items-center gap-2 text-red-600">
+            <div className="p-3 rounded-card bg-red-500/[0.15] border border-red-300 text-sm">
+              <div className="flex items-center gap-2 text-ink-crit">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de análisis IA</span>
               </div>

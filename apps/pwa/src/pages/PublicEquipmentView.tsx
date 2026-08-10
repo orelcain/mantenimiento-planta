@@ -279,7 +279,7 @@ export function PublicEquipmentView() {
                 <CardContent className="space-y-6 pt-6">
                   {/* Ubicación */}
                   {equipment.hierarchyPath && (
-                    <div className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg">
+                    <div className="flex items-start gap-3 p-3 bg-muted/20 rounded-card">
                       <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Ubicación</p>
@@ -291,24 +291,24 @@ export function PublicEquipmentView() {
                   {/* Datos técnicos */}
                   {(equipment.marca || equipment.modelo || equipment.numeroSerie) && (
                     <div>
-                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground tracking-wide">
                         Datos Técnicos
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {equipment.marca && (
-                          <div className="p-3 bg-muted/20 rounded-lg">
+                          <div className="p-3 bg-muted/20 rounded-card">
                             <p className="text-xs text-muted-foreground mb-1">Marca</p>
                             <p className="font-medium">{equipment.marca}</p>
                           </div>
                         )}
                         {equipment.modelo && (
-                          <div className="p-3 bg-muted/20 rounded-lg">
+                          <div className="p-3 bg-muted/20 rounded-card">
                             <p className="text-xs text-muted-foreground mb-1">Modelo</p>
                             <p className="font-medium">{equipment.modelo}</p>
                           </div>
                         )}
                         {equipment.numeroSerie && (
-                          <div className="p-3 bg-muted/20 rounded-lg">
+                          <div className="p-3 bg-muted/20 rounded-card">
                             <p className="text-xs text-muted-foreground mb-1">Número de Serie</p>
                             <p className="font-medium font-mono text-sm">{equipment.numeroSerie}</p>
                           </div>
@@ -320,7 +320,7 @@ export function PublicEquipmentView() {
                   {/* Fotos con Lightbox */}
                   {equipment.photos && equipment.photos.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground tracking-wide flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" />
                         Fotos ({equipment.photos.length})
                       </h3>
@@ -329,7 +329,7 @@ export function PublicEquipmentView() {
                           <button
                             key={idx}
                             onClick={() => openLightbox(photo, idx, equipment.photos?.length || 0)}
-                            className="relative group overflow-hidden rounded-lg border-2 border-transparent hover:border-primary transition-all aspect-square"
+                            className="relative group overflow-hidden rounded-card border-2 border-transparent hover:border-primary transition-all aspect-square"
                           >
                             <img
                               src={photo}
@@ -337,7 +337,7 @@ export function PublicEquipmentView() {
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
                             />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
-                              <div className="bg-white/90 px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="bg-white/90 px-2 py-1 rounded-ctl text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                                 Ver ampliada
                               </div>
                             </div>
@@ -350,13 +350,13 @@ export function PublicEquipmentView() {
                   {/* Notas */}
                   {equipmentNotes.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground tracking-wide flex items-center gap-2">
                         <FileText className="h-4 w-4" />
                         Notas ({equipmentNotes.length})
                       </h3>
                       <div className="space-y-2">
                         {equipmentNotes.map((note) => (
-                          <div key={note.id} className="p-3 bg-muted/20 rounded-lg border">
+                          <div key={note.id} className="p-3 bg-muted/20 rounded-card border">
                             <p className="text-sm">{note.text}</p>
                             <p className="text-xs text-muted-foreground mt-1">{note.createdAt}</p>
                           </div>
@@ -368,13 +368,13 @@ export function PublicEquipmentView() {
                   {/* Últimas Incidencias */}
                   {equipmentIncidents.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground tracking-wide flex items-center gap-2">
                         <Clock className="h-4 w-4" />
                         Últimas Incidencias ({equipmentIncidents.length})
                       </h3>
                       <div className="space-y-2">
                         {equipmentIncidents.slice(0, 3).map((incident) => (
-                          <div key={incident.id} className="p-3 bg-muted/20 rounded-lg border">
+                          <div key={incident.id} className="p-3 bg-muted/20 rounded-card border">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <p className="font-medium text-sm">{incident.titulo}</p>
                               <Badge variant="outline" className="text-xs shrink-0">
@@ -395,8 +395,8 @@ export function PublicEquipmentView() {
                   )}
 
                   {/* QR Code */}
-                  <div className="flex flex-col items-center gap-3 p-4 bg-muted/20 rounded-lg">
-                    <div className="bg-white p-3 rounded-lg shadow-sm">
+                  <div className="flex flex-col items-center gap-3 p-4 bg-muted/20 rounded-card">
+                    <div className="bg-white p-3 rounded-card shadow-sm">
                       <QRCodeSVG
                         value={`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                         size={120}
@@ -415,7 +415,7 @@ export function PublicEquipmentView() {
         </div>
 
         {/* Footer info */}
-        <div className="mt-8 p-6 text-center border-t bg-muted/20 rounded-lg">
+        <div className="mt-8 p-6 text-center border-t bg-muted/20 rounded-card">
           <Package className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm font-medium mb-1">Vista pública de solo lectura</p>
           <p className="text-xs text-muted-foreground">
@@ -456,7 +456,7 @@ export function PublicEquipmentView() {
             <img
               src={lightboxPhoto.url}
               alt={`Foto ${lightboxPhoto.index + 1} de ${lightboxPhoto.total}`}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              className="max-w-full max-h-[85vh] object-contain rounded-card"
             />
             
             {lightboxPhoto.index < lightboxPhoto.total - 1 && (

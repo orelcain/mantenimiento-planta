@@ -123,6 +123,29 @@ export default {
           DEFAULT: '#c08e5f',
           foreground: '#000000',
         },
+        // Paleta CATEGÓRICA (index.css). Se consume por el primitivo <Tag>,
+        // no a mano: `text-cat-3-ink` suelto vuelve a dispersar la decisión.
+        ...Object.fromEntries(
+          Array.from({ length: 8 }, (_, i) => [
+            `cat-${i + 1}`,
+            {
+              ink: `rgb(var(--cat-${i + 1}-ink) / <alpha-value>)`,
+              tint: `rgb(var(--cat-${i + 1}-tint) / <alpha-value>)`,
+            },
+          ]),
+        ),
+        // Tinta de marca para texto SOBRE tinte de marca (el primary puro
+        // reprueba AA sobre su propio tinte al 15% — medido).
+        'brand-ink': 'rgb(var(--brand-ink) / <alpha-value>)',
+        // TINTA ADAPTATIVA: reemplaza el patrón `text-X-700 dark:text-X-400`
+        // por UNA clase que ya cambia con el tema. No usar los -600 para esto:
+        // esos tienen dueño (la decisión de julio de bajar croma) y reutilizarlos
+        // lavó los colores de producción.
+        'ink-crit': 'rgb(var(--ink-crit) / <alpha-value>)',
+        'ink-warn': 'rgb(var(--ink-warn) / <alpha-value>)',
+        'ink-ok': 'rgb(var(--ink-ok) / <alpha-value>)',
+        'ink-info': 'rgb(var(--ink-info) / <alpha-value>)',
+        'card-edge': 'rgb(var(--card-edge) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
         input: 'rgb(var(--border) / <alpha-value>)',
         ring: '#5aa6e8',
@@ -133,13 +156,33 @@ export default {
         sm: '0.25rem',
         // Escala ÚNICA de la nueva piel (docs/NUEVA_PIEL_APPLE_HIG.md §3).
         // Reemplaza la mezcla rounded/-sm/-md/-lg/-xl en TODO componente nuevo.
-        ctl: '10px',    // controles: botón, input, segmented, chip cuadrado
-        card: '14px',   // tarjeta / grupo de lista
-        panel: '18px',  // contenedor grande, sheet, modal
+        // Valores por VARIABLE: la piel actual conserva sus proporciones y la
+        // nueva trae la geometría Apple. Ver index.css para el porqué.
+        ctl: 'var(--r-ctl)',      // controles: botón, input, segmented, chip
+        card: 'var(--r-card)',    // tarjeta / grupo de lista
+        panel: 'var(--r-panel)',  // contenedor grande, sheet, modal
+      },
+      fontSize: {
+        // ── ESCALA TIPOGRÁFICA de la Constitución (§9) ────────────────────────
+        // En PX a propósito: el `html` de esta app está al 87.5%, así que los
+        // `rem` no dan los tamaños que la norma pide.
+        // El piso de la escala es 11px: por debajo es "texto diminuto", que la
+        // §64 prohíbe explícitamente. La app tenía 1.125 usos por debajo (8, 9
+        // y 10px) — esa era la causa real de que se viera densa y no Apple.
+        caption:   ['11px', { lineHeight: '1.35' }],
+        footnote:  ['13px', { lineHeight: '1.4' }],
+        body:      ['15px', { lineHeight: '1.45' }],
+        headline:  ['17px', { lineHeight: '1.35', fontWeight: '600' }],
+        title3:    ['20px', { lineHeight: '1.25', fontWeight: '600' }],
+        title2:    ['23px', { lineHeight: '1.2',  fontWeight: '600' }],
+        title1:    ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
+        display:   ['33px', { lineHeight: '1.1',  letterSpacing: '-0.028em', fontWeight: '700' }],
       },
       fontFamily: {
         // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)
-        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        // §8: familia del sistema primero — en Apple resuelve a SF Pro, que es
+        // lo que le da el aire correcto; IBM Plex queda de respaldo con carácter.
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Segoe UI Variable Text"', '"IBM Plex Sans"', 'system-ui', 'sans-serif'],
         // Mono técnico para datos/lecturas (KPIs, códigos, timestamps, IDs)
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },

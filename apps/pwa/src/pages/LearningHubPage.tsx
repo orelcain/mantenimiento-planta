@@ -238,7 +238,7 @@ export function LearningHubPage() {
             <button
               onClick={() => navigate('/aprendizaje/admin')}
               title="Administrar contenido — pedirá confirmar identidad"
-              className="absolute top-4 right-5 sm:top-5 sm:right-8 z-10 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors active:scale-95"
+              className="absolute top-4 right-5 sm:top-5 sm:right-8 z-10 flex items-center gap-1.5 rounded-card px-2.5 py-1.5 text-caption font-semibold tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors active:scale-95"
               style={{ background: C.surface, border: `1px solid ${C.borderHi}`, color: C.aquaLight }}
             >
               <Lock className="h-3.5 w-3.5" />
@@ -246,7 +246,7 @@ export function LearningHubPage() {
             </button>
           )}
           <div
-            className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 rounded-lg p-5 sm:p-6"
+            className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 rounded-card p-5 sm:p-6"
             style={{ background: C.surface, border: `1px solid ${C.border}` }}
           >
             <div className="min-w-0">
@@ -278,14 +278,14 @@ export function LearningHubPage() {
               onChange={e => setQuery(e.target.value)}
               placeholder="Buscar máquina o simulador…"
               aria-label="Buscar en el Centro de Aprendizaje"
-              className="w-full rounded-lg py-3 pl-10 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-shadow sm:py-2.5"
+              className="w-full rounded-card py-3 pl-10 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-shadow sm:py-2.5"
               style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
             />
             {query && (
               <button
                 onClick={() => setQuery('')}
                 aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-ctl outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8]"
                 style={{ color: C.inkLo }}
               >
                 <X className="h-4 w-4" />
@@ -301,7 +301,7 @@ export function LearningHubPage() {
           <section>
             <SectionLabel n="">Resultados para "{query.trim()}"</SectionLabel>
             {noResults ? (
-              <div className="mt-5 rounded-lg p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+              <div className="mt-5 rounded-card p-8 text-center" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <p className="text-sm" style={{ color: C.inkMid }}>Sin resultados para "{query.trim()}".</p>
                 <p className="text-xs mt-1" style={{ color: C.inkLo }}>Probá con el nombre de la máquina o un síntoma más general.</p>
               </div>
@@ -328,7 +328,7 @@ export function LearningHubPage() {
                 )}
                 {symptomHits.length > 0 && (
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider font-semibold mb-2" style={{ color: C.inkLo }}>
+                    <p className="text-caption tracking-wider font-semibold mb-2" style={{ color: C.inkLo }}>
                       Síntomas de diagnóstico
                     </p>
                     <ul className="space-y-1.5">
@@ -338,16 +338,16 @@ export function LearningHubPage() {
                           <li key={`${hit.machineSlug}-${hit.diagnosisId}`}>
                             <button
                               onClick={() => navigate(`/aprendizaje/maquina/${hit.machineSlug}`)}
-                              className="group w-full text-left flex items-center gap-3 rounded-lg px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors"
+                              className="group w-full text-left flex items-center gap-3 rounded-card px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors"
                               style={{ background: C.surface, border: `1px solid ${C.border}` }}
                             >
                               <Stethoscope className="h-4 w-4 flex-shrink-0" style={{ color: C.aquaLight }} />
                               <span className="flex-1 min-w-0">
                                 <span className="block text-sm truncate" style={{ color: C.ink }}>{hit.title || hit.symptom}</span>
                                 {hit.title && hit.symptom && (
-                                  <span className="block text-[11px] truncate" style={{ color: C.inkMid }}>{hit.symptom}</span>
+                                  <span className="block text-caption truncate" style={{ color: C.inkMid }}>{hit.symptom}</span>
                                 )}
-                                {m && <span className="block text-[11px]" style={{ color: C.inkLo }}>{m.name}</span>}
+                                {m && <span className="block text-caption" style={{ color: C.inkLo }}>{m.name}</span>}
                               </span>
                               <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1" style={{ color: C.aquaBright }} />
                             </button>
@@ -415,7 +415,7 @@ export function LearningHubPage() {
 
                   {pending.length > 0 && (
                     <div className="mt-4">
-                      <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-semibold mb-2.5" style={{ color: C.inkLo }}>
+                      <p className="flex items-center gap-1.5 text-caption tracking-wider font-semibold mb-2.5" style={{ color: C.inkLo }}>
                         <Clock className="h-3 w-3" />
                         En preparación
                         <span className="tabular-nums" style={{ color: C.inkGhost }}>· {pending.length}</span>
@@ -435,7 +435,7 @@ export function LearningHubPage() {
       </main>
 
       <footer className="py-8 text-center" style={{ borderTop: `1px solid ${C.border}` }}>
-        <p className="text-xs uppercase tracking-wider font-medium" style={{ color: C.inkLo }}>
+        <p className="text-xs tracking-wider font-medium" style={{ color: C.inkLo }}>
           Acceso libre · No requiere inicio de sesión
         </p>
       </footer>
@@ -448,7 +448,7 @@ function SectionLabel({ n, children }: { n: string; children: React.ReactNode })
   return (
     <div className="flex items-center gap-2.5">
       {n && <span className="text-xs font-semibold tabular-nums" style={{ color: C.inkLo }}>{n}</span>}
-      <h2 className="text-[13px] font-semibold" style={{ color: C.inkMid }}>{children}</h2>
+      <h2 className="text-footnote font-semibold" style={{ color: C.inkMid }}>{children}</h2>
     </div>
   )
 }
@@ -468,7 +468,7 @@ function HubMetric({
   color: string
 }) {
   return (
-    <div className="rounded-md px-3 py-2" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
+    <div className="rounded-ctl px-3 py-2" style={{ background: C.bgPanel, border: `1px solid ${C.border}` }}>
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5" style={{ color }} />
         <span className="text-xs" style={{ color: C.inkLo }}>
@@ -478,7 +478,7 @@ function HubMetric({
       <p className="mt-1 text-sm font-semibold" style={{ color: C.ink }}>
         {value}
       </p>
-      <p className="text-[11px] leading-snug" style={{ color: C.inkLo }}>
+      <p className="text-caption leading-snug" style={{ color: C.inkLo }}>
         {detail}
       </p>
     </div>
@@ -488,7 +488,7 @@ function HubMetric({
 function QuickRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-semibold mr-1" style={{ color: C.inkLo }}>
+      <span className="inline-flex items-center gap-1 text-caption tracking-wider font-semibold mr-1" style={{ color: C.inkLo }}>
         {icon}{label}
       </span>
       {children}
@@ -516,7 +516,7 @@ function PendingChip({ machine, onClick }: { machine: LearningMachine; onClick: 
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors hover:brightness-125"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-card text-footnote outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors hover:brightness-125"
       style={{ background: C.bgPanel, border: `1px dashed ${C.border}`, color: C.inkMid }}
     >
       <Icon className="h-3.5 w-3.5" style={{ color: machine.color, opacity: 0.7 }} />
@@ -580,7 +580,7 @@ function MachineCard({
     <div data-card className="relative">
       <button
         onClick={onClick}
-        className="group w-full text-left rounded-lg overflow-hidden flex flex-col transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
+        className="group w-full text-left rounded-card overflow-hidden flex flex-col transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
         style={{ background: C.surface, border: `1px solid ${C.border}`, opacity: ready ? 1 : 0.72 }}
       >
         {/* Thumbnail de identidad — banda de color con el ícono grande (estilo plataforma de cursos) */}
@@ -625,7 +625,7 @@ function MachineCard({
           {ready && quizBest != null && (
             <div className="mt-3">
               <span
-                className="text-[11px] font-mono tabular-nums"
+                className="text-caption font-mono tabular-nums"
                 style={{ color: quizPassed ? C.ok : C.inkMid }}
               >
                 {quizPassed
@@ -642,7 +642,7 @@ function MachineCard({
         onClick={onToggleFav}
         aria-label={isFav ? `Quitar ${machine.name} de favoritos` : `Agregar ${machine.name} a favoritos`}
         aria-pressed={isFav}
-        className="absolute top-3 right-2.5 p-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-transform hover:scale-110 active:scale-95"
+        className="absolute top-3 right-2.5 p-1.5 rounded-ctl outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-transform hover:scale-110 active:scale-95"
       >
         <Star className="h-4 w-4" style={{ color: isFav ? C.star : C.inkGhost, fill: isFav ? C.star : 'none' }} />
       </button>
@@ -657,10 +657,10 @@ function SimulatorCard({ mod, onClick }: { mod: SpecialModule; onClick: () => vo
     <button
       data-card
       onClick={onClick}
-      className="group text-left rounded-lg p-5 flex flex-col h-full transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
+      className="group text-left rounded-card p-5 flex flex-col h-full transition-[transform,box-shadow] duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1722] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-16px_rgba(0,0,0,0.6)] active:translate-y-0"
       style={{ background: C.surface, border: `1px solid ${C.border}` }}
     >
-      <div className="flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+      <div className="flex items-center justify-center w-11 h-11 rounded-card mb-4"
         style={{ background: `${mod.tint}1a`, border: `1px solid ${mod.tint}33` }}>
         <Icon className="h-5 w-5" style={{ color: mod.tint }} />
       </div>
@@ -671,7 +671,7 @@ function SimulatorCard({ mod, onClick }: { mod: SpecialModule; onClick: () => vo
       <p className="text-xs mt-0.5" style={{ color: C.inkMid }}>{mod.subtitle}</p>
       <p className="text-sm leading-relaxed mt-2 flex-1" style={{ color: C.inkMid }}>{mod.description}</p>
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${C.border}` }}>
-        <span className="text-[11px]" style={{ color: C.inkLo }}>{mod.stats}</span>
+        <span className="text-caption" style={{ color: C.inkLo }}>{mod.stats}</span>
         <span className="inline-flex items-center gap-1 text-sm font-bold" style={{ color: mod.tint }}>
           Abrir <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </span>

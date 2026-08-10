@@ -161,7 +161,7 @@ function TurnoViewTabs({
           >
             {TURNO_VIEW_LABEL[view]}
             {view === 'gates' && !!gatesBadge && (
-              <span className={`text-[10px] tabular-nums px-1.5 rounded-full ${
+              <span className={`text-caption tabular-nums px-1.5 rounded-full ${
                 isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/15'
               }`}>
                 {gatesBadge}
@@ -1460,7 +1460,7 @@ export function AnalisisGraderTurnoPage() {
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
       {/* M18 — Banner offline */}
       {!isOnline && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-amber-500/[0.25] text-amber-400 text-sm">
           <WifiOff className="w-4 h-4 shrink-0" />
           <span>
             Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
@@ -1504,7 +1504,7 @@ export function AnalisisGraderTurnoPage() {
                 </span>
                 {shiftScheduleInfo && (
                   <span
-                    className="text-[11px] tabular-nums text-muted-foreground/80 shrink-0"
+                    className="text-caption tabular-nums text-muted-foreground/80 shrink-0"
                     title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftMeta.period})`}
                   >
                     {shiftScheduleInfo.startTime}–{shiftScheduleInfo.endTime}
@@ -1515,7 +1515,7 @@ export function AnalisisGraderTurnoPage() {
                 {summary?.turnoLabel && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] px-1.5 py-0 shrink-0 border-violet-500/40 text-violet-400"
+                    className="text-caption px-1.5 py-0 shrink-0 border-cat-6-tint/[0.25] text-violet-400"
                     title="Turno de producción (columna Turno del Excel)"
                   >
                     Turno {summary.turnoLabel}
@@ -1524,9 +1524,9 @@ export function AnalisisGraderTurnoPage() {
                 {shiftWindow && (
                   <Badge
                     variant="outline"
-                    className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                    className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
-                        ? 'border-red-500/50 text-red-400'
+                        ? 'border-red-500/[0.25] text-red-400'
                         : 'border-muted-foreground/30 text-muted-foreground'
                     }`}
                   >
@@ -1546,7 +1546,7 @@ export function AnalisisGraderTurnoPage() {
               variant="outline"
               size="sm"
               onClick={() => setNextPauseOpen(true)}
-              className="gap-1.5 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              className="gap-1.5 text-ink-warn border-amber-500/[0.25] hover:bg-amber-500/[0.15]"
               title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
             >
               <Tag className="w-3.5 h-3.5" />
@@ -1699,7 +1699,7 @@ export function AnalisisGraderTurnoPage() {
               Mobile: texto en línea propia (basis-full) para evitar comprimirse
               en una columna vertical de 1 palabra cuando los botones le roban
               ancho. Desktop: una sola línea con todos los elementos. */}
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-700 dark:text-sky-400 text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-primary text-sm">
             <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
               <Activity className="w-4 h-4 shrink-0" />
               <span className="flex-1 min-w-0">
@@ -1711,7 +1711,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* Contador de tiempo desde último sync */}
             {slxBestSyncedAt && (
-              <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+              <span className={`flex items-center gap-1 text-caption font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
                 {slxSyncing ? 'sincronizando…' : syncAge.label}
               </span>
@@ -1721,7 +1721,7 @@ export function AnalisisGraderTurnoPage() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs border-sky-500/40 text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 shrink-0"
+              className="h-7 text-xs border-primary/[0.25] text-primary hover:bg-primary/[0.15] shrink-0"
               onClick={handleSlxRefresh}
               disabled={slxSyncing}
               title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -1734,7 +1734,7 @@ export function AnalisisGraderTurnoPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-sky-500/40 text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 shrink-0"
+                className="h-7 text-xs border-primary/[0.25] text-primary hover:bg-primary/[0.15] shrink-0"
                 onClick={() => navigate(wizardUrl)}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
@@ -1800,32 +1800,32 @@ export function AnalisisGraderTurnoPage() {
       {!loading && !summary && !upstreamLine.loading
         && shiftWindow?.status !== 'live'
         && upstreamLine.source !== 'firestore' && (
-        <Card className="border-slate-700/50">
+        <Card className="border-muted-foreground/[0.10]">
           <CardContent className="p-5 space-y-3">
             <p className="text-sm font-medium text-foreground">
               Sin datos registrados para este turno
             </p>
 
             {/* Shoplogix — automático */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-500/10 border border-violet-500/30 dark:bg-violet-950/30 dark:border-violet-900/40">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-cat-6-tint/[0.25] dark:bg-cat-6-tint/[0.15] dark:border-cat-6-tint/[0.25]">
               <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Shoplogix — Evisceradoras Baader 142</p>
+                <p className="text-sm font-medium text-cat-6-ink">Shoplogix — Evisceradoras Baader 142</p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Se sincroniza automáticamente cada 5 min cuando las máquinas están en operación.
                   No requiere acción manual.
                 </p>
               </div>
-              <Badge variant="outline" className="text-[10px] border-violet-700/60 text-violet-400 shrink-0 mt-0.5">
+              <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-violet-400 shrink-0 mt-0.5">
                 automático
               </Badge>
             </div>
 
             {/* Grader — manual */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-sky-950/30 border border-sky-900/40">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-primary/[0.15] border border-primary/[0.25]">
               <Upload className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sky-800 dark:text-sky-300">Grader Matrix — Informe de turno</p>
+                <p className="text-sm font-medium text-primary">Grader Matrix — Informe de turno</p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Exportar Excel de Matrix al cierre del turno y cargarlo para ver P0%, causas y timeline.
                 </p>
@@ -1834,7 +1834,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-sky-700/60 text-sky-400 hover:bg-sky-950 shrink-0 mt-0.5"
+                  className="h-7 text-xs border-primary/[0.25] text-sky-400 hover:bg-sky-950 shrink-0 mt-0.5"
                   onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
@@ -1846,15 +1846,15 @@ export function AnalisisGraderTurnoPage() {
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 dark:bg-amber-950/30 dark:border-amber-900/40">
+              <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-amber-500/[0.25] dark:bg-amber-500/[0.15] dark:border-amber-500/[0.25]">
                 <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Marel HG — Corta-cabeza</p>
+                  <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>
                 </div>
-                <Badge variant="outline" className="text-[10px] border-amber-700/60 text-amber-400 shrink-0 mt-0.5">
+                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-amber-400 shrink-0 mt-0.5">
                   requiere Grader
                 </Badge>
               </div>
@@ -1981,15 +1981,15 @@ export function AnalisisGraderTurnoPage() {
               historial → ajustes del turno. Antes estaban repartidos a lo largo
               de toda la página, separados por diez bloques de otra cosa. */}
           {activeView === 'gates' && (
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-md bg-sky-500/10 border border-sky-500/30 text-sm">
-              <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-sky-600 dark:text-sky-400" />
+            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
+              <Globe2 className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
               <p className="text-muted-foreground flex-1">
                 Acá se ajusta <span className="font-medium text-foreground">este turno</span>. La
                 línea física, los umbrales base y los rangos de calibre valen para todos los turnos
                 y se editan en{' '}
                 <button
                   onClick={() => navigate(`/analisis-grader/config?linea=${plantLineCfg.id}`)}
-                  className="font-medium text-sky-700 dark:text-sky-400 underline underline-offset-2 hover:text-sky-600"
+                  className="font-medium text-primary underline underline-offset-2 hover:text-sky-600"
                 >
                   Configuración del Grader
                 </button>.
@@ -2049,14 +2049,14 @@ export function AnalisisGraderTurnoPage() {
           {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
               <span
-                className="text-[11px] text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
+                className="text-caption text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
                 title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / paros afectan directamente al throughput del Grader."
               >
                 Línea upstream · Baader 142
               </span>
               <div className="flex items-center gap-2">
                 {slxBestSyncedAt && (
-                  <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+                  <span className={`flex items-center gap-1 text-caption font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
                     {slxSyncing ? 'sincronizando…' : syncAge.label}
                   </span>
@@ -2064,7 +2064,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-[11px] text-muted-foreground hover:text-sky-400 px-2"
+                  className="h-6 text-caption text-muted-foreground hover:text-sky-400 px-2"
                   onClick={handleSlxRefresh}
                   disabled={slxSyncing}
                   title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
@@ -2213,7 +2213,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
           {activeView === 'resumen' && summary && isAdmin && (
-            <div className="rounded-lg border border-border bg-muted p-3 space-y-2">
+            <div className="rounded-card border border-border bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Compartir turno</span>
@@ -2232,12 +2232,12 @@ export function AnalisisGraderTurnoPage() {
               {shareUrl && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                    <code className="flex-1 truncate rounded-ctl bg-muted px-2 py-1 text-caption text-muted-foreground">
                       {shareUrl}
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded bg-amber-500/80 hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:bg-amber-500 text-white text-caption px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -2254,7 +2254,7 @@ export function AnalisisGraderTurnoPage() {
                         setRevoking(false)
                       }}
                       disabled={revoking}
-                      className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
+                      className="shrink-0 text-caption text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
                       title="Revocar link (lo invalida para quien lo tenga)"
                     >
                       {revoking ? '…' : 'Revocar'}
@@ -2262,22 +2262,22 @@ export function AnalisisGraderTurnoPage() {
                   </div>
                   {/* QR code para escanear desde celular */}
                   <div className="flex items-start gap-3 pt-1">
-                    <div className="rounded-lg border border-border/40 bg-white p-1.5">
+                    <div className="rounded-card border border-border/40 bg-white p-1.5">
                       <QRCodeSVG value={shareUrl} size={100} level="M" includeMargin={false} />
                     </div>
                     <div className="flex flex-col justify-center gap-1 pt-1">
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1 text-caption text-muted-foreground">
                         <QrCode className="w-3 h-3" />
                         Escanear con el celular
                       </div>
-                      <p className="text-[10px] text-muted-foreground/50">
+                      <p className="text-caption text-muted-foreground/50">
                         Abre la vista de turno sin necesidad de login
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground/40">
+              <p className="text-caption text-muted-foreground/40">
                 Link válido 24 horas · sin login · solo lectura
               </p>
             </div>

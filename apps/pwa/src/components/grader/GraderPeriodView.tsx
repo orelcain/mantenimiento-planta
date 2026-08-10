@@ -555,7 +555,7 @@ export function GraderPeriodView({ data }: Props) {
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <p className="text-xs font-medium text-muted-foreground tracking-wide">
                 Período analizado
               </p>
               <h2 className="text-lg font-bold mt-0.5">{range.label}</h2>
@@ -564,16 +564,16 @@ export function GraderPeriodView({ data }: Props) {
               </p>
               {visibleRangeLabel && (
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-600 dark:text-purple-400">
+                  <Badge variant="outline" className="text-caption border-cat-6-tint/[0.25] text-cat-6-ink">
                     🔍 Filtrado a zoom: {visibleRangeLabel}
                   </Badge>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-caption text-muted-foreground">
                     {visibleStats.daysCount} día{visibleStats.daysCount !== 1 ? 's' : ''} · {visibleStats.shiftsCount} turno{visibleStats.shiftsCount !== 1 ? 's' : ''}
                   </span>
                   <button
                     type="button"
                     onClick={handleResetZoom}
-                    className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                    className="text-caption text-cat-6-ink hover:underline"
                   >
                     limpiar
                   </button>
@@ -581,7 +581,7 @@ export function GraderPeriodView({ data }: Props) {
               )}
             </div>
             <div className="text-right shrink-0">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">P0% ponderado</p>
+              <p className="text-caption text-muted-foreground tracking-wide">P0% ponderado</p>
               <p className={cn('text-4xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
                 {visibleStats.p0PctWeighted}%
               </p>
@@ -594,27 +594,27 @@ export function GraderPeriodView({ data }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Piezas</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Piezas</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {visibleStats.totalPieces >= 1e6
                 ? `${(visibleStats.totalPieces / 1e6).toFixed(1)}M`
                 : `${(visibleStats.totalPieces / 1e3).toFixed(1)}k`}
             </p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalPieces)}</p>
+            <p className="text-caption text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalPieces)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">P0 piezas</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">P0 piezas</p>
             <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
               {(visibleStats.totalP0Pieces / 1e3).toFixed(1)}k
             </p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalP0Pieces)}</p>
+            <p className="text-caption text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalP0Pieces)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Peso total</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Peso total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatWeight(visibleStats.totalWeightKg)}
             </p>
@@ -622,16 +622,16 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tasa promedio</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Tasa promedio</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatNumber(visibleStats.avgProductionRatePerHour)}
             </p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">pz/hora</p>
+            <p className="text-caption text-muted-foreground mt-0.5">pz/hora</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Duración total</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Duración total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {formatDurationH(visibleStats.totalDurationMinutes)}
             </p>
@@ -639,7 +639,7 @@ export function GraderPeriodView({ data }: Props) {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Días · Turnos</p>
+            <p className="text-caption font-medium text-muted-foreground tracking-wider">Días · Turnos</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
               {visibleStats.daysCount} · {visibleStats.shiftsCount}
             </p>
@@ -652,18 +652,18 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-emerald-500/30 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/15 transition-colors"
+              className="border-emerald-500/[0.25] bg-emerald-500/[0.15] cursor-pointer hover:bg-emerald-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Mejor día</p>
+                    <p className="text-caption tracking-wide text-muted-foreground">Mejor día</p>
                     <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold tabular-nums text-emerald-600">
+                <p className="text-2xl font-bold tabular-nums text-ink-ok">
                   {visibleStats.minP0Day.p0Pct}%
                 </p>
               </CardContent>
@@ -671,14 +671,14 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-red-500/30 bg-red-500/10 cursor-pointer hover:bg-red-500/15 transition-colors"
+              className="border-red-500/[0.25] bg-red-500/[0.15] cursor-pointer hover:bg-red-500/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Peor día</p>
+                    <p className="text-caption tracking-wide text-muted-foreground">Peor día</p>
                     <p className="text-sm font-semibold">{visibleStats.maxP0Day.dateKey}</p>
                   </div>
                 </div>
@@ -693,9 +693,9 @@ export function GraderPeriodView({ data }: Props) {
 
       {/* ── Panel de insights automáticos ───────────────────────────────── */}
       {insights && (
-        <Card className="border-blue-500/20 bg-blue-500/10">
+        <Card className="border-primary/[0.25] bg-primary/[0.15]">
           <CardHeader className="pb-1">
-            <CardTitle className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <CardTitle className="text-sm text-primary flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Insights automáticos · {insights.totalDays} días analizados
             </CardTitle>
@@ -703,42 +703,42 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               {/* Tendencia */}
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
+              <div className="rounded-card border border-border bg-background px-3 py-2">
+                <p className="text-caption text-muted-foreground tracking-wider mb-1">Tendencia período</p>
                 <p className={cn(
                   'font-semibold text-sm',
-                  insights.trendDir === 'better' && 'text-emerald-600',
+                  insights.trendDir === 'better' && 'text-ink-ok',
                   insights.trendDir === 'worse'  && 'text-red-500',
                   insights.trendDir === 'stable' && 'text-muted-foreground',
                 )}>
                   {insights.trendDir === 'better' ? '↓ Mejorando' : insights.trendDir === 'worse' ? '↑ Empeorando' : '→ Estable'}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-caption text-muted-foreground mt-0.5">
                   inicio {insights.firstAvg}% → fin {insights.lastAvg}%
                   {' '}({insights.delta > 0 ? '+' : ''}{insights.delta}pp)
                 </p>
               </div>
               {/* Días críticos */}
-              <div className="rounded-lg border border-border bg-background px-3 py-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
-                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-emerald-600')}>
+              <div className="rounded-card border border-border bg-background px-3 py-2">
+                <p className="text-caption text-muted-foreground tracking-wider mb-1">Días críticos ≥3.5%</p>
+                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-ink-ok')}>
                   {insights.criticalCount} / {insights.totalDays}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-caption text-muted-foreground mt-0.5">
                   {insights.criticalPct}% del período
                   {insights.maxStreak > 1 && ` · racha máx ${insights.maxStreak}d`}
                 </p>
               </div>
               {/* Día vs Noche */}
               {insights.diaAvg !== null && insights.nocheAvg !== null && (
-                <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Día vs Noche (prom.)</p>
+                <div className="rounded-card border border-border bg-background px-3 py-2">
+                  <p className="text-caption text-muted-foreground tracking-wider mb-1">Día vs Noche (prom.)</p>
                   <p className="font-semibold text-sm">
                     <span className="text-amber-500">{insights.diaAvg}%</span>
                     <span className="text-muted-foreground mx-1">/</span>
                     <span className="text-indigo-400">{insights.nocheAvg}%</span>
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-caption text-muted-foreground mt-0.5">
                     {Math.abs(insights.diaAvg - insights.nocheAvg) < 0.2
                       ? 'Turnos parejos'
                       : insights.diaAvg < insights.nocheAvg
@@ -749,10 +749,10 @@ export function GraderPeriodView({ data }: Props) {
               )}
               {/* Mejor semana */}
               {insights.bestWeekStart && (
-                <div className="rounded-lg border border-border bg-background px-3 py-2">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
-                  <p className="font-semibold text-sm text-emerald-600">{insights.bestWeekAvg}% P0 prom.</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                <div className="rounded-card border border-border bg-background px-3 py-2">
+                  <p className="text-caption text-muted-foreground tracking-wider mb-1">Mejor semana</p>
+                  <p className="font-semibold text-sm text-ink-ok">{insights.bestWeekAvg}% P0 prom.</p>
+                  <p className="text-caption text-muted-foreground mt-0.5">
                     semana del {formatShortDate(insights.bestWeekStart)}
                   </p>
                 </div>
@@ -779,12 +779,12 @@ export function GraderPeriodView({ data }: Props) {
                 </>
               )}
             </CardTitle>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-caption text-muted-foreground">
               <span>Scroll para zoom · arrastra para panear</span>
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="inline-flex items-center gap-1 rounded border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
+                className="inline-flex items-center gap-1 rounded-ctl border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
               >
                 <RotateCcw className="h-3 w-3" />
                 Reset zoom
@@ -792,7 +792,7 @@ export function GraderPeriodView({ data }: Props) {
             </div>
           </div>
           {useHourlyView && (
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-caption text-muted-foreground mt-1">
               <Clock className="inline h-3 w-3 mr-1" />
               Vista horaria activada — {hourlyFiltered.length} horas en rango. Zoom y panea para navegar. Para detalle minuto a minuto, abre el turno con "Ver detalle".
             </p>
@@ -810,7 +810,7 @@ export function GraderPeriodView({ data }: Props) {
           ) : (
             <p className="text-xs text-muted-foreground py-8 text-center">Sin datos diarios</p>
           )}
-          <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+          <div className="flex items-center gap-4 mt-2 text-caption text-muted-foreground flex-wrap">
             {useHourlyView ? (
               <>
                 <span className="flex items-center gap-1">
@@ -830,7 +830,7 @@ export function GraderPeriodView({ data }: Props) {
                   <span className="inline-block w-3 h-0.5" style={{ background: CRITICAL_LINE }} /> Critical ≥3.5%
                 </span>
                 {hourlySeries.length > 0 && (
-                  <span className="text-purple-600 dark:text-purple-400">
+                  <span className="text-cat-6-ink">
                     💡 Haz zoom ≤ 2 días para ver drill-down horario
                   </span>
                 )}
@@ -932,14 +932,14 @@ export function GraderPeriodView({ data }: Props) {
               <div
                 key={g.shiftId}
                 className={cn(
-                  'rounded-lg border px-4 py-3',
+                  'rounded-card border px-4 py-3',
                   p0StatusBorderClass(p0StatusFromPct(g.p0PctWeighted)),
                 )}
               >
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold">{g.shiftId}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {g.count} turno{g.count !== 1 ? 's' : ''}
                     </p>
                   </div>
@@ -948,11 +948,11 @@ export function GraderPeriodView({ data }: Props) {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                  <div className="rounded bg-background px-2 py-1">
+                  <div className="rounded-ctl bg-background px-2 py-1">
                     <p className="text-muted-foreground">Piezas</p>
                     <p className="font-semibold">{formatNumber(g.totalPieces)}</p>
                   </div>
-                  <div className="rounded bg-background px-2 py-1">
+                  <div className="rounded-ctl bg-background px-2 py-1">
                     <p className="text-muted-foreground">P0 pz</p>
                     <p className="font-semibold">{formatNumber(g.totalP0Pieces)}</p>
                   </div>
@@ -971,7 +971,7 @@ export function GraderPeriodView({ data }: Props) {
             <button
               type="button"
               onClick={() => exportToCSV(sortedShifts, range.label)}
-              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/50 rounded px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
+              className="inline-flex items-center gap-1.5 text-caption text-muted-foreground hover:text-foreground border border-border/50 rounded-ctl px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
             >
               <Download className="h-3 w-3" />
               Exportar CSV
@@ -1024,9 +1024,9 @@ export function GraderPeriodView({ data }: Props) {
                       <Badge
                         variant="outline"
                         className={cn(
-                          'text-[10px]',
-                          s.shiftId === 'Turno día'   && 'border-amber-500/40 text-amber-600',
-                          s.shiftId === 'Turno noche' && 'border-indigo-500/40 text-indigo-600',
+                          'text-caption',
+                          s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-ink-warn',
+                          s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-indigo-600',
                         )}
                       >
                         {shiftShortName(s.shiftId)}
@@ -1046,7 +1046,7 @@ export function GraderPeriodView({ data }: Props) {
                       <button
                         type="button"
                         onClick={() => navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}`)}
-                        className="text-primary hover:underline text-[11px] flex items-center gap-1"
+                        className="text-primary hover:underline text-caption flex items-center gap-1"
                       >
                         Ver <ExternalLink className="h-3 w-3" />
                       </button>
@@ -1058,7 +1058,7 @@ export function GraderPeriodView({ data }: Props) {
           </div>
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-3 pt-2 border-t">
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sortedShifts.length)} de {sortedShifts.length} turnos
               </p>
               <div className="flex items-center gap-1">
@@ -1066,18 +1066,18 @@ export function GraderPeriodView({ data }: Props) {
                   type="button"
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ‹ Anterior
                 </button>
-                <span className="text-[11px] text-muted-foreground px-2">
+                <span className="text-caption text-muted-foreground px-2">
                   {page + 1} / {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-2.5 py-1 rounded-ctl text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente ›
                 </button>

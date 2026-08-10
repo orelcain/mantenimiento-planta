@@ -23,9 +23,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/50 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/50 bg-amber-500/20 text-amber-800 dark:text-amber-300' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/50 bg-red-500/20 text-red-800 dark:text-red-300' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-emerald-500/[0.25] bg-emerald-500/[0.15] text-ink-ok' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-amber-500/[0.25] bg-amber-500/[0.15] text-ink-warn' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-red-500/[0.25] bg-red-500/[0.15] text-ink-crit' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -122,23 +122,23 @@ export function InterventionEditDialog({
         <div className="space-y-3">
           {/* Fecha y hora */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Fecha y hora</label>
+            <label className="text-caption font-medium text-muted-foreground">Fecha y hora</label>
             <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm bg-background" />
           </div>
 
           {/* Equipo */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Equipo</label>
+            <label className="text-caption font-medium text-muted-foreground">Equipo</label>
             <EquipoCombobox options={equipoOptions} value={equipoId} onChange={setEquipoId} placeholder="Área general / buscar equipo…" />
           </div>
 
           {/* Tipo */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Tipo de mantención</label>
+            <label className="text-caption font-medium text-muted-foreground">Tipo de mantención</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {TIPOS.map((t) => (
                 <button key={t.id} type="button" onClick={() => setTipo(t.id)}
-                  className={cn('px-2 py-2 rounded-md border text-xs font-medium transition-colors',
+                  className={cn('px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                     tipo === t.id ? 'border-primary/50 bg-primary/20 text-primary'
                       : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   {t.label}
@@ -149,17 +149,17 @@ export function InterventionEditDialog({
 
           {/* Condición */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">Condición</label>
+            <label className="text-caption font-medium text-muted-foreground">Condición</label>
             <div className="grid grid-cols-3 gap-1.5">
               {SEVS.map((s) => (
                 <button key={s.id} type="button" onClick={() => setSeveridad(s.id)}
-                  className={cn('flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border text-xs font-medium transition-colors',
+                  className={cn('flex items-center justify-center gap-1.5 px-2 py-2 rounded-ctl border text-xs font-medium transition-colors',
                     severidad === s.id ? s.active : 'border-border bg-background text-muted-foreground hover:bg-muted')}>
                   <span className={cn('h-2 w-2 rounded-full', s.dot)} />{s.label}
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
+            <p className="text-caption text-muted-foreground leading-relaxed">
               Estado en que queda u observás el equipo (vale para cualquier tipo · criterio basado en NFPA 70B):
               {' '}🟢 <b>1</b> como nuevo ·{' '}🟡 <b>2</b> con desvíos, requiere seguimiento ·{' '}🔴 <b>3</b> acción correctiva inmediata / fuera de servicio.
             </p>
@@ -167,29 +167,29 @@ export function InterventionEditDialog({
 
           {/* Detalle */}
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Detalle</label>
+            <label className="text-caption font-medium text-muted-foreground">Detalle</label>
             <Textarea value={hallazgo} onChange={(e) => setHallazgo(e.target.value)} rows={3} className="text-sm bg-background resize-none" />
           </div>
 
           {/* SAP */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">N° Aviso SAP</label>
+              <label className="text-caption font-medium text-muted-foreground">N° Aviso SAP</label>
               <Input value={sapAviso} onChange={(e) => setSapAviso(e.target.value)} placeholder="ej. 10012345" className="text-sm bg-background" inputMode="numeric" />
             </div>
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground">N° Orden (OT) SAP</label>
+              <label className="text-caption font-medium text-muted-foreground">N° Orden (OT) SAP</label>
               <Input value={sapOrden} onChange={(e) => setSapOrden(e.target.value)} placeholder="ej. 40098765" className="text-sm bg-background" inputMode="numeric" />
             </div>
           </div>
           {!sapOrden.trim() && (
-            <Badge variant="outline" className="text-[10px] text-amber-800 dark:text-amber-300 border-amber-500/40">
+            <Badge variant="outline" className="text-caption text-ink-warn border-amber-500/[0.25]">
               SAP pendiente · falta crear la OT
             </Badge>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-red-800 dark:text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-red-500/[0.25] rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -199,7 +199,7 @@ export function InterventionEditDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {isAdmin ? (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleting || saving}
-              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10">
+              className="text-ink-crit hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/[0.15]">
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
               Eliminar
             </Button>

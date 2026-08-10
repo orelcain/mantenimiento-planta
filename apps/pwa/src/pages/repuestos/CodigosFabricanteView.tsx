@@ -227,7 +227,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           />
         )}
       </div>
-      <p className="mb-4 text-[12.5px] text-muted-foreground">
+      <p className="mb-4 text-footnote text-muted-foreground">
         Despieces oficiales extraídos de los manuales. Escribe el código grabado en la pieza
         (ej. <span className="font-mono">3000544810</span>) o palabras de la descripción
         (ej. <span className="italic">placa cobertora</span>).
@@ -252,7 +252,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         <p className="text-sm text-muted-foreground">Sin resultados en los catálogos ({piezas.length.toLocaleString('es-CL')} filas indexadas).</p>
       )}
       {piezas && query.trim().length < 3 && (
-        <p className="text-[12px] text-muted-foreground/70">
+        <p className="text-footnote text-muted-foreground/70">
           {piezas.length.toLocaleString('es-CL')} filas de despiece indexadas · catálogos: {CATALOGOS.map((c) => c.maquina).join(', ')}.
         </p>
       )}
@@ -262,41 +262,41 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
           // undefined = aún no verificado · null = no existe · objeto = ya creado
           const existe = existentes.get(normCodigo(p.codigo))
           return (
-          <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-lg border border-border bg-card p-3">
+          <div key={`${p.codigo}-${p.fuente}-${p.pagina}-${i}`} className="rounded-card border border-border bg-card p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-bold text-foreground">{p.codigo}</span>
-              {p.maquina && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">{p.maquina}</span>}
-              <button onClick={() => copiar(p.codigo)} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Copiar código">
+              {p.maquina && <span className="rounded-ctl bg-primary/10 px-1.5 py-0.5 text-caption font-medium text-primary">{p.maquina}</span>}
+              <button onClick={() => copiar(p.codigo)} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Copiar código">
                 {copiado === p.codigo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
-              {p.cantidad && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">×{p.cantidad} en el conjunto</span>}
+              {p.cantidad && <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground">×{p.cantidad} en el conjunto</span>}
               {/* Estado en el maestro: lo que falta sembrar se ve de un vistazo */}
               {existe === undefined ? null : existe ? (
                 <span
-                  className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                  className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-ok"
                   title={existe.textoBreve || 'Ya está en el maestro'}
                 >
                   <CircleCheck className="h-3 w-3" />
                   {existe.codigoSAP ? `En repuestos · SAP ${existe.codigoSAP}` : 'En repuestos · sin SAP'}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                <span className="inline-flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">
                   <CirclePlus className="h-3 w-3" /> No está en repuestos
                 </span>
               )}
             </div>
-            <div className="mt-1 text-[13px] font-medium text-foreground">
+            <div className="mt-1 text-footnote font-medium text-foreground">
               {p.descripcion}
-              {p.descripcionEn && <span className="ml-1.5 text-[11.5px] font-normal text-muted-foreground">({p.descripcionEn})</span>}
+              {p.descripcionEn && <span className="ml-1.5 text-footnote font-normal text-muted-foreground">({p.descripcionEn})</span>}
             </div>
-            {p.especificacion && <div className="font-mono text-[11.5px] text-muted-foreground">{p.especificacion}</div>}
+            {p.especificacion && <div className="font-mono text-footnote text-muted-foreground">{p.especificacion}</div>}
             {/* Códigos equivalentes: distribuidor local (envuelve al de fabricante) y SAP */}
             {(p.codigoProveedor || p.codigoSap) && (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {p.codigoProveedor && (
                   <button
                     onClick={() => copiar(p.codigoProveedor!)}
-                    className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-sky-600 hover:bg-sky-500/20 dark:text-sky-400"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-primary/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-sky-600 hover:bg-primary/[0.15] dark:text-sky-400"
                     title={`Código ${p.proveedor || 'del distribuidor'} — clic para copiar`}
                   >
                     {p.proveedor || 'Distribuidor'}: {p.codigoProveedor}
@@ -306,7 +306,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 {p.codigoSap && (
                   <button
                     onClick={() => copiar(p.codigoSap!)}
-                    className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-violet-600 hover:bg-violet-500/20 dark:text-violet-400"
+                    className="inline-flex items-center gap-1 rounded-ctl bg-cat-6-tint/[0.15] px-1.5 py-0.5 font-mono text-caption font-medium text-violet-600 hover:bg-cat-6-tint/[0.15] dark:text-violet-400"
                     title="Código SAP ya creado para esta pieza — clic para copiar"
                   >
                     SAP: {p.codigoSap}
@@ -315,7 +315,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                 )}
               </div>
             )}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
               <span className="inline-flex items-center gap-1"><BookMarked className="h-3 w-3" /> {p.conjunto || 'conjunto s/n'}</span>
               <span>pág. {p.pagina}{p.posicion ? ` · pos. ${p.posicion}` : ''}</span>
               <span className="min-w-0 truncate" title={p.fuente}>{p.fuente}</span>
@@ -327,7 +327,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                   href={`${manualUrls[p.manualId]}#page=${p.pagina}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted hover:text-primary"
+                  className="inline-flex items-center gap-1 rounded-ctl border border-border px-2 py-1 text-caption font-medium text-foreground transition hover:bg-muted hover:text-primary"
                   title={`Abrir ${p.fuente} en la página ${p.pagina}`}
                 >
                   <BookOpen className="h-3.5 w-3.5" /> Ver manual · pág. {p.pagina}
@@ -337,7 +337,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
               {existe && onBuscarEnRepuestos ? (
                 <button
                   onClick={() => onBuscarEnRepuestos(existe.codigoSAP || p.codigo)}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted hover:text-primary"
+                  className="inline-flex items-center gap-1 rounded-ctl border border-border px-2 py-1 text-caption font-medium text-foreground transition hover:bg-muted hover:text-primary"
                   title={existe.textoBreve || 'Abrir en Áreas'}
                 >
                   <PackagePlus className="h-3.5 w-3.5" /> Ver repuesto
@@ -352,7 +352,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
                     equipoCodigos: p.equipoCodigos || [],
                     equipoNombre: p.equipoNombre || '',
                   })}
-                  className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-primary/10"
+                  className="inline-flex items-center gap-1 rounded-ctl border border-primary/40 bg-primary/5 px-2 py-1 text-caption font-medium text-primary transition hover:bg-primary/10"
                   title="Crear este repuesto en el maestro, prellenado"
                 >
                   <PackagePlus className="h-3.5 w-3.5" /> Agregar a repuestos

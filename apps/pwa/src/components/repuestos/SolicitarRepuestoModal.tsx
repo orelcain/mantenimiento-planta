@@ -109,14 +109,14 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
         <div className="space-y-4">
           {/* Repuesto: fijo (preseleccionado) o selector */}
           {repuesto ? (
-            <div className="rounded-lg border border-border bg-muted px-3 py-2">
+            <div className="rounded-card border border-border bg-muted px-3 py-2">
               <div className="text-sm font-medium text-foreground">{repuesto.textoBreve || '(sin nombre)'}</div>
               <div className="font-mono text-xs text-muted-foreground">SAP {repuesto.codigoSAP}</div>
             </div>
           ) : selected ? (
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Repuesto</label>
-              <div className="flex items-start justify-between gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+              <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Repuesto</label>
+              <div className="flex items-start justify-between gap-2 rounded-card border border-primary/40 bg-primary/5 px-3 py-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{selected.textoBreve || '(sin nombre)'}</div>
                   <div className="font-mono text-xs text-muted-foreground">SAP {selected.codigoSAP}</div>
@@ -124,7 +124,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
                 <button
                   type="button"
                   onClick={() => { setSap(''); setQuery('') }}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="shrink-0 rounded-ctl p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label="Quitar repuesto seleccionado"
                 >
                   <X className="h-4 w-4" />
@@ -133,7 +133,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
             </div>
           ) : (
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Repuesto</label>
+              <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Repuesto</label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -144,7 +144,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
                   autoFocus
                 />
               </div>
-              <div className="mt-1 max-h-52 overflow-y-auto rounded-lg border border-border">
+              <div className="mt-1 max-h-52 overflow-y-auto rounded-card border border-border">
                 {filtered.length === 0 ? (
                   <p className="px-3 py-3 text-sm text-muted-foreground">Sin coincidencias en el área.</p>
                 ) : (
@@ -156,12 +156,12 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
                       className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
                     >
                       <span className="min-w-0 truncate text-sm text-foreground">{o.textoBreve || o.codigoSAP}</span>
-                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{o.codigoSAP}</span>
+                      <span className="shrink-0 font-mono text-caption text-muted-foreground">{o.codigoSAP}</span>
                     </button>
                   ))
                 )}
                 {filtered.length === MAX_RESULTADOS && (
-                  <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">Mostrando {MAX_RESULTADOS} — afina la búsqueda para ver el resto.</p>
+                  <p className="border-t border-border px-3 py-1.5 text-caption text-muted-foreground">Mostrando {MAX_RESULTADOS} — afina la búsqueda para ver el resto.</p>
                 )}
               </div>
             </div>
@@ -169,7 +169,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
 
           {/* Cantidad */}
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Cantidad</label>
+            <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Cantidad</label>
             <Input
               type="number"
               min={1}
@@ -181,7 +181,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
 
           {/* Observaciones */}
           <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Observaciones (opcional)</label>
+            <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Observaciones (opcional)</label>
             <Textarea
               value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}

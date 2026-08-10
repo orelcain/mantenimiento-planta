@@ -37,13 +37,13 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:      { bg: 'bg-rose-500/15 dark:bg-rose-950/40',    border: 'border-rose-500/40 dark:border-rose-900/60',    text: 'text-rose-800 dark:text-rose-300',    icon: AlertTriangle, label: 'Causa upstream' },
-  upstream_majority:    { bg: 'bg-amber-500/15 dark:bg-amber-950/40',   border: 'border-amber-500/40 dark:border-amber-900/60',   text: 'text-amber-800 dark:text-amber-300',   icon: AlertTriangle, label: 'Upstream parcial' },
-  upstream_single:      { bg: 'bg-muted dark:bg-slate-900/60',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
+  upstream_global:      { bg: 'bg-cat-5-tint/[0.15]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-ink-warn',   icon: AlertTriangle, label: 'Upstream parcial' },
+  upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
   // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
-  coincidental_planned: { bg: 'bg-cyan-500/15 dark:bg-cyan-950/30',    border: 'border-cyan-500/40 dark:border-cyan-900/40',    text: 'text-cyan-800 dark:text-cyan-300',    icon: Info,          label: 'Coincidencia programada' },
-  no_correlation:       { bg: 'bg-emerald-500/15 dark:bg-emerald-950/30', border: 'border-emerald-500/40 dark:border-emerald-900/40', text: 'text-emerald-800 dark:text-emerald-400', icon: CheckCircle2,  label: 'Interna' },
+  coincidental_planned: { bg: 'bg-cat-7-tint/[0.15]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
+  no_correlation:       { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25] dark:border-emerald-500/[0.25]', text: 'text-ink-ok', icon: CheckCircle2,  label: 'Interna' },
 }
 
 function CorrelationRow({ corr, expanded, onToggle }: {
@@ -58,7 +58,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
     <div className="py-2">
       <button
         onClick={onToggle}
-        className={`w-full flex items-center gap-2 text-left p-2 rounded border ${s.bg} ${s.border} group`}
+        className={`w-full flex items-center gap-2 text-left p-2 rounded-ctl border ${s.bg} ${s.border} group`}
         aria-expanded={expanded}
       >
         {expanded
@@ -68,13 +68,13 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <span className="text-xs text-slate-400 tabular-nums flex-shrink-0">
           {fmtTime(corr.pauseStart)}
         </span>
-        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
+        <Badge variant="outline" className={`text-caption px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
           {fmtDurationSec(corr.pauseDurSec)}
         </Badge>
         <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
           variant="outline"
-          className={`ml-auto text-[10px] px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
+          className={`ml-auto text-caption px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
           title={`Confianza ${Math.round(corr.confidence * 100)}% (alta ≥70%, media 40-70%, baja <40%)`}
         >
           confianza {conf.text}
@@ -82,7 +82,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
       </button>
 
       {expanded && corr.contributors.length > 0 && (
-        <div className="mt-2 ml-6 space-y-1 text-[11px] text-muted-foreground border-l-2 border-border/60 pl-3">
+        <div className="mt-2 ml-6 space-y-1 text-caption text-muted-foreground border-l-2 border-border/60 pl-3">
           {corr.contributors.map(c => (
             <div key={c.machineid} className="flex items-center gap-2">
               <span className="text-foreground min-w-[9rem]">{shortMachineName(c.machineName)}</span>
@@ -160,7 +160,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
 
           {summary.upstreamCaused > 0 && (
             <div
-              className="flex items-center gap-1.5 text-xs text-rose-800 dark:text-rose-300 tabular-nums"
+              className="flex items-center gap-1.5 text-xs text-cat-5-ink tabular-nums"
               title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -177,7 +177,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         {/* Sub-info: cuántos paros fueron coincidentales (colación, etc.) — claridad
             sobre por qué el conteo upstream excluye esas filas cyan abajo */}
         {coincidentalCount > 0 && (
-          <div className="text-[11px] text-cyan-400/80 mb-2 flex items-center gap-1.5">
+          <div className="text-caption text-cyan-400/80 mb-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
             {coincidentalCount} paro{coincidentalCount !== 1 ? 's' : ''} coincide{coincidentalCount === 1 ? '' : 'n'} con paros programados de Baader (colación, reunión) — excluido{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
           </div>
@@ -192,8 +192,8 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           <>
             {/* Breakdown por máquina — qué Baader atender primero */}
             {summary.byMachine.length > 0 && (
-              <div className="mb-3 p-2 rounded border border-border/80 bg-muted/40">
-                <div className="text-[10px] text-muted-foreground mb-1.5 flex items-center gap-1">
+              <div className="mb-3 p-2 rounded-ctl border border-border/80 bg-muted/40">
+                <div className="text-caption text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Factory className="w-3 h-3" />
                   Impacto por máquina (paros del Grader donde la máquina contribuyó)
                 </div>
@@ -211,7 +211,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     return (
                       <div
                         key={m.machineid}
-                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-800 dark:text-rose-300' : 'text-muted-foreground'}`}
+                        className={`flex items-center gap-2 text-caption tabular-nums ${isTop ? 'text-cat-5-ink' : 'text-muted-foreground'}`}
                       >
                         <span className="min-w-[8rem]">{shortMachineName(m.machineName)}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
@@ -229,7 +229,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                     )
                   })}
                 </div>
-                <div className="text-[9px] text-muted-foreground mt-1.5">
+                <div className="text-caption text-muted-foreground mt-1.5">
                   Recomendación: priorizar mantención en la máquina con mayor overlap.
                 </div>
               </div>
@@ -245,7 +245,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                 />
               ))}
               {sorted.length > 10 && (
-                <div className="text-[11px] text-muted-foreground py-2 text-center">
+                <div className="text-caption text-muted-foreground py-2 text-center">
                   … y {sorted.length - 10} paros más
                 </div>
               )}

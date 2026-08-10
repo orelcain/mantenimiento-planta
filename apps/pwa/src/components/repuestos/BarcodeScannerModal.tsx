@@ -246,7 +246,7 @@ export function BarcodeScannerModal({
                 Toma una foto del código y selecciónala.
               </p>
               <label className="flex flex-col items-center gap-2 cursor-pointer">
-                <div className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
+                <div className="flex items-center gap-2 rounded-ctl bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
                   <Camera className="h-4 w-4" />
                   Abrir cámara / seleccionar imagen
                 </div>
@@ -263,7 +263,7 @@ export function BarcodeScannerModal({
 
           {/* Visor de cámara */}
           {!useFallback && (
-            <div className="relative overflow-hidden rounded-lg bg-black aspect-[4/3]">
+            <div className="relative overflow-hidden rounded-card bg-black aspect-[4/3]">
               <video
                 ref={videoRef}
                 className="absolute inset-0 h-full w-full object-cover"
@@ -276,8 +276,8 @@ export function BarcodeScannerModal({
               {/* Overlay: guía visual */}
               {scanning && !detected && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-40 w-40 rounded-xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" />
-                  <div className="absolute bottom-2 w-full text-center text-[10px] text-white/70">
+                  <div className="h-40 w-40 rounded-card border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" />
+                  <div className="absolute bottom-2 w-full text-center text-caption text-white/70">
                     Alineá el código dentro del recuadro
                   </div>
                 </div>
@@ -286,7 +286,7 @@ export function BarcodeScannerModal({
               {/* Resultado detectado */}
               {detected && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                  <div className="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow">
+                  <div className="rounded-card bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow">
                     ✓ {detected}
                   </div>
                 </div>
@@ -308,7 +308,7 @@ export function BarcodeScannerModal({
 
           {/* Error */}
           {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <p className="rounded-ctl bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {error}
             </p>
           )}

@@ -266,12 +266,12 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
         return (
           <div
             key={r.reason}
-            className="flex items-center gap-1.5 text-[10px]"
+            className="flex items-center gap-1.5 text-caption"
             title={`${r.reason || 'Sin categoría'} · ${r.count} evento${r.count !== 1 ? 's' : ''} · ${fmtDurationSec(r.durationSec)} total`}
           >
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
-              className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-slate-900/60"
+              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-slate-900/60"
               style={{ backgroundColor: softenAccentHex(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
@@ -353,10 +353,10 @@ function ShiftAvailabilityBar({
       <Timer className="w-3 h-3 shrink-0" />
       {/* Barra apilada — overflow-hidden recorta los divs al borde redondeado */}
       <div className="flex h-2 w-14 rounded-full overflow-hidden bg-muted/60 shrink-0">
-        {upPct    > 0 && <div className="h-full bg-emerald-500/75" style={{ width: `${upPct}%`    }} />}
-        {breakPct > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${breakPct}%` }} />}
-        {downPct  > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${downPct}%`  }} />}
-        {setupPct > 0 && <div className="h-full bg-violet-500/60"  style={{ width: `${setupPct}%` }} />}
+        {upPct    > 0 && <div className="h-full bg-emerald-500/[0.15]" style={{ width: `${upPct}%`    }} />}
+        {breakPct > 0 && <div className="h-full bg-amber-500/[0.15]"   style={{ width: `${breakPct}%` }} />}
+        {downPct  > 0 && <div className="h-full bg-cat-5-tint/[0.15]"    style={{ width: `${downPct}%`  }} />}
+        {setupPct > 0 && <div className="h-full bg-cat-6-tint/[0.15]"  style={{ width: `${setupPct}%` }} />}
       </div>
       <span className="tabular-nums">{fmtPct(shiftRuntime)}</span>
     </span>
@@ -372,7 +372,7 @@ function ShiftAvailabilityBar({
 export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
   if (points.length < 2) {
     return (
-      <p className="text-[10px] text-muted-foreground italic py-1">
+      <p className="text-caption text-muted-foreground italic py-1">
         Sin suficientes turnos históricos aún (mín. 2)
       </p>
     )
@@ -493,7 +493,7 @@ export function TrendBarsWithMovingAverage({
   const hasAnyData = built.some((s) => s.values.some((v) => v != null))
   if (!hasAnyData) {
     return (
-      <p className="text-[10px] text-muted-foreground italic py-1">
+      <p className="text-caption text-muted-foreground italic py-1">
         Sin datos de este turno en el mes aún
       </p>
     )
@@ -615,7 +615,7 @@ function StateTimeline({
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
 
   if (totalMs <= 0 || shift.states.length === 0) {
-    return <div className="h-5 rounded-md bg-muted/60" />
+    return <div className="h-5 rounded-ctl bg-muted/60" />
   }
 
   return (
@@ -624,7 +624,7 @@ function StateTimeline({
           con el chart Grader y los demás Gantts del mismo turno (Fase 2 del
           Synchronized Timeline). Mantiene el rendering visual del HTML viejo
           pero con interactividad nativa de ECharts. */}
-      <div className="rounded-md overflow-hidden bg-muted/60 border border-border/70 shadow-inner">
+      <div className="rounded-ctl overflow-hidden bg-muted/60 border border-border/70 shadow-inner">
         <StateTimelineEC
           shift={shift}
           windowStart={windowStart}
@@ -681,7 +681,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
     <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
       <Badge
         variant="outline"
-        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-emerald-900 text-emerald-300 tabular-nums text-caption px-2 py-0.5 h-5"
         title="Tiempo total procesando (suma de las 3 Baaders)"
       >
         ▲ {fmtDurationSec(totals.uptimeSec)}
@@ -689,7 +689,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           ⏸ {fmtDurationSec(totals.downtimeSec)}
@@ -698,7 +698,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+          className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
           ☕ {fmtDurationSec(totals.breakSec)}
@@ -721,7 +721,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       <Badge
         variant="outline"
-        className="bg-muted border-border text-muted-foreground dark:bg-slate-900/60 dark:border-slate-700 dark:text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] dark:border-slate-700 dark:text-slate-300 tabular-nums text-caption px-2 py-0.5 h-5"
         title={
           `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
           `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`
@@ -734,21 +734,21 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-emerald-500/[0.15] border-emerald-900 text-emerald-300 tabular-nums text-caption px-2 py-0.5 h-5"
         title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-amber-500/[0.15] border-amber-900 text-amber-300 tabular-nums text-caption px-2 py-0.5 h-5"
         title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        className="bg-cat-5-tint/[0.15] border-rose-900 text-rose-300 tabular-nums text-caption px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -770,9 +770,9 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // `bg` = tinte tenue del color de acento (10%) mezclado sobre la superficie
 // normal — "que se vea rápido" sin tener que leer el borde (Orel 2026-07-23).
 const MACHINE_ACCENT = [
-  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-sky-500/10' },
-  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-violet-500/10' },
-  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/10' },
+  { border: 'border-l-sky-500/70',    dot: 'bg-sky-400',    bg: 'bg-primary/[0.15]' },
+  { border: 'border-l-violet-500/70', dot: 'bg-violet-400', bg: 'bg-cat-6-tint/[0.15]' },
+  { border: 'border-l-amber-500/70',  dot: 'bg-amber-400',  bg: 'bg-amber-500/[0.15]' },
 ] as const
 
 function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, windowEnd, microAlert }: {
@@ -862,7 +862,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
   const accent = MACHINE_ACCENT[machineIndex % MACHINE_ACCENT.length]!
 
   return (
-    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-md border-l-4', accent.bg, accent.border)}>
+    <div className={cn('py-3 pl-3 pr-1 space-y-2 rounded-ctl border-l-4', accent.bg, accent.border)}>
       {/* Row header — clickeable para expandir */}
       <button
         onClick={onToggle}
@@ -877,12 +877,12 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           <Factory className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <span className="font-medium text-sm truncate">{shortMachineName(shift.machineName)}</span>
           {machineTypeLabel(shift.machineType) && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground">
+            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-border text-muted-foreground">
               {machineTypeLabel(shift.machineType)}
             </Badge>
           )}
           {microAlert && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-900/70 bg-amber-950/50 text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
+            <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] bg-amber-500/[0.15] text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
               <AlertTriangle className="w-3 h-3" /> Atención
             </Badge>
           )}
@@ -906,7 +906,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
         {isZoomActive && (
           <Badge
             variant="outline"
-            className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+            className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
             title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
           >
             <span>✂</span> del rango
@@ -948,7 +948,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
       </div>
 
       {/* Mini stats footer */}
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-4 text-caption text-muted-foreground">
         <ShiftAvailabilityBar
           breakdown={shift.shiftRuntimeBreakdown}
           shiftRuntime={shift.shiftRuntime}
@@ -978,7 +978,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
             )}
           </span>
         )}
-        <span className="ml-auto text-[10px] text-muted-foreground">
+        <span className="ml-auto text-caption text-muted-foreground">
           {fmtTime(shift.shiftStart)} – {fmtTime(shift.shiftEnd)}
         </span>
       </div>
@@ -989,7 +989,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
       {shift.comments.length > 0 && !expanded && (
         <button
           onClick={onToggle}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors"
           title="Comentarios del operador — expandir para verlos junto a su motivo"
         >
           <MessageSquare className="w-3 h-3 shrink-0" />
@@ -999,7 +999,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
 
       {/* Detalle expandido */}
       {expanded && (
-        <div className="mt-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground space-y-1">
+        <div className="mt-2 pt-2 border-t border-border/60 text-caption text-muted-foreground space-y-1">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div>
               <div className="text-muted-foreground">Intervalos</div>
@@ -1023,7 +1023,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
                     title={`Diferencia entre runtime real y esperado de Shoplogix. ${varianceLabel(dir)}.`}
                   >
                     {shift.runtimeVariance >= 0 ? '+' : ''}{fmtPct(shift.runtimeVariance, 2)}
-                    <span className="text-[10px] opacity-70 ml-1">({varianceLabel(dir)})</span>
+                    <span className="text-caption opacity-70 ml-1">({varianceLabel(dir)})</span>
                   </div>
                 )
               })()}
@@ -1037,8 +1037,8 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           {analisis.eventos.length > 0 && (
             <div className="mt-2">
               <div className="text-muted-foreground mb-1">Análisis del turno ({analisis.eventos.length} eventos)</div>
-              <div className="max-h-64 overflow-y-auto rounded border border-border/60">
-                <table className="w-full text-[10px] tabular-nums">
+              <div className="max-h-64 overflow-y-auto rounded-ctl border border-border/60">
+                <table className="w-full text-caption tabular-nums">
                   <thead className="text-muted-foreground sticky top-0 bg-muted/95 backdrop-blur">
                     <tr>
                       <th className="text-left  px-2 py-1 font-medium">Inicio</th>
@@ -1061,7 +1061,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
                           <td className="px-2 py-1 text-right text-foreground whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
                           <td className="px-2 py-1">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
-                              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                              <span className="w-2 h-2 rounded-ctl shrink-0" style={{ background: color }} />
                               <span className="text-foreground truncate">{motivo}</span>
                             </span>
                           </td>
@@ -1084,12 +1084,12 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
               {/* Comentarios sin evento que calce — nunca se descartan. */}
               {analisis.orphans.length > 0 && (
                 <div className="mt-1.5 space-y-0.5">
-                  <div className="flex items-center gap-1 text-[10px] text-amber-500/80">
+                  <div className="flex items-center gap-1 text-caption text-amber-500/80">
                     <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
                     Comentarios sin evento asociado
                   </div>
                   {analisis.orphans.map((c) => (
-                    <p key={c.key} className="text-muted-foreground italic text-[10px] pl-3.5">
+                    <p key={c.key} className="text-muted-foreground italic text-caption pl-3.5">
                       <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-muted-foreground" />
                       {c.reasonValue ? `[${c.reasonValue}] ${c.text}` : c.text}
                     </p>
@@ -1302,14 +1302,14 @@ export function UpstreamMachinesPanel({
               <span className="sm:hidden">{lineLabel ? `Línea ${lineLabel}` : 'Línea'}</span>
             </span>
             {snapshot && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400 shrink-0">
+              <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-cat-6-tint/[0.25] text-violet-400 shrink-0">
                 {snapshot.machines.length} máq
               </Badge>
             )}
             {dataSource === 'demo' && (
               <Badge
                 variant="outline"
-                className="text-[10px] px-1.5 py-0 h-4 border-amber-700/60 text-amber-400 bg-amber-950/30"
+                className="text-caption px-1.5 py-0 h-4 border-amber-500/[0.25] text-amber-400 bg-amber-500/[0.15]"
                 title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
               >
                 DEMO
@@ -1336,7 +1336,7 @@ export function UpstreamMachinesPanel({
                     `Click para acotarlo a las horas con producción.`)
               }
               className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded border shrink-0 transition-colors',
+                'text-caption px-1.5 py-0.5 rounded-ctl border shrink-0 transition-colors',
                 framedOnProduction
                   ? 'border-primary/50 bg-primary/15 text-primary hover:bg-primary/25'
                   : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -1357,7 +1357,7 @@ export function UpstreamMachinesPanel({
             {isLineZoomActive && (
               <Badge
                 variant="outline"
-                className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+                className="bg-cat-6-tint/[0.15] border-violet-800 text-violet-300 text-caption px-1.5 py-0.5 h-5 gap-1"
                 title="KPIs recalculados sólo del rango temporal visible"
               >
                 <span>✂</span> del rango
@@ -1369,7 +1369,7 @@ export function UpstreamMachinesPanel({
             {correlationSummary && correlationSummary.upstreamCaused > 0 && (
               <Badge
                 variant="outline"
-                className="bg-orange-950/60 border-orange-800 text-orange-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-4-tint/[0.15] border-orange-800 text-orange-300 text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
                   `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
@@ -1396,7 +1396,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-rose-950/60 border-rose-800 text-rose-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-cat-5-tint/[0.15] border-rose-800 text-rose-300 text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
@@ -1430,7 +1430,7 @@ export function UpstreamMachinesPanel({
                     filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
                   }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))
                 }}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded border border-border hover:border-foreground/30"
+                className="flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1 rounded-ctl border border-border hover:border-foreground/30"
                 title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
               >
                 <Download className="w-3 h-3" />
@@ -1473,7 +1473,7 @@ export function UpstreamMachinesPanel({
             {snapshot && snapshot.machines.length > 0 && (
               <div className="mb-3 pb-3 border-b border-border/60">
                 <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  <p className="text-caption text-muted-foreground tracking-wider">
                     Tasa de producción por máquina · pz/min
                   </p>
                   {/* Solo con UNA máquina: la brecha se apila sobre la barra, y
@@ -1484,9 +1484,9 @@ export function UpstreamMachinesPanel({
                     onClick={() => setShowRateGap((v) => !v)}
                     title="Apila sobre cada barra lo que faltó para llegar al objetivo de ese tramo."
                     className={cn(
-                      'text-[10px] px-1.5 py-0.5 rounded border transition-colors',
+                      'text-caption px-1.5 py-0.5 rounded-ctl border transition-colors',
                       showRateGap
-                        ? 'border-rose-500/45 bg-rose-500/12 text-rose-700 dark:text-rose-300'
+                        ? 'border-cat-5-tint/[0.25] bg-cat-5-tint/[0.15] text-cat-5-ink'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
@@ -1495,7 +1495,7 @@ export function UpstreamMachinesPanel({
                   )}
                 </div>
                 {slxWindowMismatch && (
-                  <p className="text-[10px] text-rose-400/70 mb-1">
+                  <p className="text-caption text-rose-400/70 mb-1">
                     ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
                   </p>
                 )}
@@ -1558,7 +1558,7 @@ export function UpstreamMachinesPanel({
             )}
 
             {snapshot && syncedAt && (
-              <div className="mt-2 pt-2 border-t border-border text-[11px] text-muted-foreground text-right">
+              <div className="mt-2 pt-2 border-t border-border text-caption text-muted-foreground text-right">
                 Sincronizado: {syncedAt.toLocaleString('es-CL')}
               </div>
             )}

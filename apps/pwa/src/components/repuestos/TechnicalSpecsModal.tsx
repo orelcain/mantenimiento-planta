@@ -335,7 +335,7 @@ export function TechnicalSpecsModal({
           {/* Tipo de Componente */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground tracking-wider">
                 Tipo de Componente
               </span>
               <div className="flex items-center gap-1.5">
@@ -368,20 +368,20 @@ export function TechnicalSpecsModal({
           </div>
 
           {/* Datos Comunes */}
-          <div className="space-y-3 p-3 bg-blue-500/15 rounded-lg border border-blue-500/20">
+          <div className="space-y-3 p-3 bg-primary/[0.15] rounded-card">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Datos Generales</h3>
               </div>
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+              <Badge variant="outline" className="text-caption px-1.5 py-0">
                 {filledCommon}/{Object.keys(COMMON_FIELDS).length}
               </Badge>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(COMMON_FIELDS).map(([key, label]) => (
                 <div key={key} className="space-y-1">
-                  <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                  <label className="text-caption font-medium text-muted-foreground uppercase">{label}</label>
                   <Input
                     disabled={readOnly}
                     value={specs.standardValues[key]?.toString() || ''}
@@ -396,7 +396,7 @@ export function TechnicalSpecsModal({
 
           {/* Campos Específicos del Tipo */}
           {Object.keys(currentTemplate.fields).length > 0 && (
-            <div className="space-y-3 p-3 bg-muted rounded-lg border border-border">
+            <div className="space-y-3 p-3 bg-muted rounded-card">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon className={`h-3.5 w-3.5 ${currentTemplate.color}`} />
@@ -404,14 +404,14 @@ export function TechnicalSpecsModal({
                     Datos {currentTemplate.label}
                   </h3>
                 </div>
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                <Badge variant="outline" className="text-caption px-1.5 py-0">
                   {filledSpecific}/{Object.keys(currentTemplate.fields).length}
                 </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(currentTemplate.fields).map(([key, label]) => (
                   <div key={key} className="space-y-1">
-                    <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                    <label className="text-caption font-medium text-muted-foreground uppercase">{label}</label>
                     <Input
                       disabled={readOnly}
                       value={specs.standardValues[key]?.toString() || ''}
@@ -432,7 +432,7 @@ export function TechnicalSpecsModal({
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
                 {filledCustom > 0 && (
-                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">{filledCustom}</Badge>
+                  <Badge variant="outline" className="text-caption px-1.5 py-0">{filledCustom}</Badge>
                 )}
               </div>
               {!readOnly && (
@@ -443,7 +443,7 @@ export function TechnicalSpecsModal({
             </div>
 
             {specs.customFields.length === 0 ? (
-              <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-lg">
+              <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-card">
                 No hay campos personalizados
               </div>
             ) : (

@@ -98,7 +98,7 @@ export function PhotoUploader({
           <div
             key={photo.id}
             className={
-              `relative aspect-square rounded-lg overflow-hidden bg-muted group ` +
+              `relative aspect-square rounded-card overflow-hidden bg-muted group ` +
               (selectedPhotoId && selectedPhotoId === photo.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '')
             }
           >
@@ -124,13 +124,13 @@ export function PhotoUploader({
 
         {/* Botón de agregar */}
         {canAddMore && (
-          <div className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+          <div className="aspect-square rounded-card border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
             {isLoading ? (
               <Spinner className="w-6 h-6" />
             ) : (
               <div className="flex flex-col items-center gap-1">
                 <Plus className="w-6 h-6 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">Agregar</span>
+                <span className="text-caption text-muted-foreground">Agregar</span>
               </div>
             )}
           </div>

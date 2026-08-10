@@ -1366,16 +1366,16 @@ function ImageLightbox({
           <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--dp-ink)' }}>{label}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => zoom(-0.25)} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Alejar">
+          <button type="button" onClick={() => zoom(-0.25)} className="rounded-ctl p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Alejar">
             <ZoomOut className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => zoom(0.25)} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Acercar">
+          <button type="button" onClick={() => zoom(0.25)} className="rounded-ctl p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Acercar">
             <ZoomIn className="h-4 w-4" />
           </button>
-          <button type="button" onClick={reset} className="rounded-md p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Restablecer zoom">
+          <button type="button" onClick={reset} className="rounded-ctl p-2" style={{ color: 'var(--dp-ink-soft)' }} aria-label="Restablecer zoom">
             <RotateCcw className="h-4 w-4" />
           </button>
-          <button type="button" onClick={onClose} className="rounded-md p-2" style={{ color: 'var(--dp-accent)' }} aria-label="Cerrar visor">
+          <button type="button" onClick={onClose} className="rounded-ctl p-2" style={{ color: 'var(--dp-accent)' }} aria-label="Cerrar visor">
             <X className="h-4 w-4" />
           </button>
         </div>

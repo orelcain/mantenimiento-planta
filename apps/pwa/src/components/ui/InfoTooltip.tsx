@@ -198,7 +198,7 @@ export function InfoTooltip({
           onMouseLeave={hide}
           className={cn(
             'fixed z-[9999]',
-            'rounded-lg shadow-2xl',
+            'rounded-card shadow-2xl',
             'bg-slate-800 text-slate-100',
             'text-xs leading-relaxed',
             'transition-all duration-150 ease-out',
@@ -223,7 +223,7 @@ export function InfoTooltip({
           {hasRichContent ? (
             <span className="space-y-1.5 block">
               {title && (
-                <span className="font-semibold text-[13px] text-white block">
+                <span className="font-semibold text-footnote text-white block">
                   {title}
                 </span>
               )}
@@ -233,12 +233,12 @@ export function InfoTooltip({
                 </span>
               )}
               {formula && (
-                <span className="block font-mono text-[11px] bg-slate-700/80 text-emerald-300 px-2 py-1.5 rounded border border-slate-600/50">
+                <span className="block font-mono text-caption bg-muted-foreground/[0.10] text-emerald-300 px-2 py-1.5 rounded-ctl border border-muted-foreground/[0.10]">
                   {formula}
                 </span>
               )}
               {example && (
-                <span className="block text-slate-400 italic text-[11px]">
+                <span className="block text-slate-400 italic text-caption">
                   Ej: {example}
                 </span>
               )}

@@ -114,7 +114,7 @@ export function GraderQuickChangePage() {
 
       {/* Cambio rápido no aplica a plantas sin clasificación (Yal) */}
       {!isClassificationPlant ? (
-        <Card className="border-amber-500/30 bg-amber-500/15">
+        <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
           <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
             <AlertCircle className="w-8 h-8 text-amber-400" />
             <p className="font-medium">Cambio de gate no aplica</p>
@@ -138,13 +138,13 @@ export function GraderQuickChangePage() {
         <>
           {/* Banner: EN VIVO (turno activo) o RETROACTIVO (override por param) */}
           {overrideDisplay ? (
-            <Card className="border-amber-500/30 bg-amber-500/15">
+            <Card className="border-amber-500/[0.25] bg-amber-500/[0.15]">
               <CardContent className="p-4 flex items-center gap-3">
                 <History className="w-5 h-5 text-amber-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">RETROACTIVO</Badge>
+                    <Badge className="bg-amber-500/[0.15] text-amber-400 border-amber-500/[0.25] text-caption">RETROACTIVO</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {overrideDisplay.dateKey}
@@ -161,13 +161,13 @@ export function GraderQuickChangePage() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-red-500/30 bg-red-500/15">
+            <Card className="border-red-500/[0.25] bg-red-500/[0.15]">
               <CardContent className="p-4 flex items-center gap-3">
                 <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold capitalize">Turno {shortShift}</span>
-                    <Badge className="bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
+                    <Badge className="bg-red-500/[0.15] text-ink-crit border-red-500/[0.25] text-caption">EN VIVO</Badge>
                   </div>
                   {shiftStart && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
@@ -190,7 +190,7 @@ export function GraderQuickChangePage() {
 
           {/* Feedback de cambios guardados */}
           {savedCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-sm text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-card bg-emerald-500/[0.15] border border-emerald-500/[0.25] text-sm text-ink-ok">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               {savedCount === 1
                 ? 'Cambio registrado exitosamente'
@@ -243,7 +243,7 @@ export function GraderQuickChangePage() {
                     ))}
                 </div>
                 {latest?.changedBy?.name && (
-                  <p className="text-[10px] text-muted-foreground/50 pt-1">
+                  <p className="text-caption text-muted-foreground/50 pt-1">
                     Última config por {latest.changedBy.name}
                   </p>
                 )}

@@ -28,14 +28,14 @@ export function SuggestionsPanel({ suggestions }: Props) {
           🧠 Sugerencias del punto cero
         </span>
         <span className={cn(
-          'text-[10px] px-2 py-0.5 rounded-full font-medium',
+          'text-caption px-2 py-0.5 rounded-full font-medium',
           warnings.length > 0
-            ? 'bg-red-500/20 dark:bg-red-500/10 text-red-700 dark:text-red-400'
-            : 'bg-amber-500/20 text-amber-400',
+            ? 'bg-red-500/[0.15] text-ink-crit'
+            : 'bg-amber-500/[0.15] text-amber-400',
         )}>
           {countLabel}
         </span>
-        <span className="text-[10px] text-muted-foreground/60">· click para expandir</span>
+        <span className="text-caption text-muted-foreground/60">· click para expandir</span>
       </div>
 
       {/* Cards */}

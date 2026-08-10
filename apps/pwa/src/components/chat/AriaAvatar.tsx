@@ -101,7 +101,7 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
 
   return (
     <div
-      className={`relative w-full aspect-[7/9] rounded-xl overflow-hidden bg-black border transition-shadow duration-300 ${
+      className={`relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
         isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgba(46,117,182,0.45)]' : 'border-border shadow'
       }`}
     >

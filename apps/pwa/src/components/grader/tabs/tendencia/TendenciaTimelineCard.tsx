@@ -53,16 +53,16 @@ export function TendenciaTimelineCard({ pieceRecords, shiftId, dateKey }: Props)
             <CardTitle className="text-sm">Timeline segundo a segundo</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-caption">
               {pieceRecords.length.toLocaleString('es-CL')} registros
             </Badge>
             {withWeight.length > 0 && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 {withWeight.length.toLocaleString('es-CL')} con peso
               </Badge>
             )}
             {gate0Count > 0 && (
-              <Badge variant="outline" className="text-[10px] text-red-500">
+              <Badge variant="outline" className="text-caption text-red-500">
                 {gate0Count.toLocaleString('es-CL')} P0
               </Badge>
             )}

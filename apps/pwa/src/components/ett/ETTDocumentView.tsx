@@ -282,7 +282,7 @@ export function ETTDocumentView({ ett, onChange }: ETTDocumentViewProps) {
               {ett.imagenes.map((img, idx) => (
                 <div
                   key={img.id}
-                  className="aspect-video bg-gray-100 rounded overflow-hidden relative"
+                  className="aspect-video bg-gray-100 rounded-ctl overflow-hidden relative"
                 >
                   <img
                     src={img.url}

@@ -58,7 +58,7 @@ export function LearningAdminPage() {
       {/* Header */}
       <button
         onClick={() => navigate('/aprendizaje')}
-        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-card transition-colors text-muted-foreground hover:text-foreground"
         style={{ minHeight: '44px' }}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -66,7 +66,7 @@ export function LearningAdminPage() {
       </button>
 
       <div className="flex items-center gap-3 mb-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary-400/10 border border-border">
+        <div className="flex items-center justify-center w-12 h-12 rounded-card bg-primary-400/10 border border-border">
           <GraduationCap className="h-6 w-6 text-primary-600 dark:text-primary-400" />
         </div>
         <div>
@@ -78,7 +78,7 @@ export function LearningAdminPage() {
       </div>
 
       {/* Info banner */}
-      <div className="mt-6 p-4 rounded-lg border" style={{ background: LC.aquaSoft, borderColor: LC.border }}>
+      <div className="mt-6 p-4 rounded-card border" style={{ background: LC.aquaSoft, borderColor: LC.border }}>
         <p className="text-sm" style={{ color: LC.inkMid }}>
           Carga contenido por máquina en cuatro secciones:{' '}
           <strong className="text-primary-600 dark:text-primary-400">Procedimientos</strong> (paso a paso),{' '}
@@ -91,7 +91,7 @@ export function LearningAdminPage() {
 
       {/* Machine list */}
       <div className="mt-6">
-        <h2 className="text-xs uppercase tracking-widest font-semibold mb-3 text-muted-foreground">
+        <h2 className="text-xs tracking-widest font-semibold mb-3 text-muted-foreground">
           Máquinas disponibles
         </h2>
 
@@ -134,12 +134,12 @@ function MachineAdminCard({
   return (
     <button
       onClick={onClick}
-      className="group text-left rounded-xl border border-border bg-card hover:border-border hover:bg-muted transition-colors p-4"
+      className="group text-left rounded-card border border-border bg-card hover:border-border hover:bg-muted transition-colors p-4"
       style={{ minHeight: '88px' }}
     >
       <div className="flex items-start gap-3">
         <div
-          className="flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0"
+          className="flex items-center justify-center w-10 h-10 rounded-card flex-shrink-0"
           style={{
             background: `${machine.color}18`,
             border: `1px solid ${machine.color}40`,
@@ -151,7 +151,7 @@ function MachineAdminCard({
           <h3 className="text-sm font-semibold">{machine.name}</h3>
           <p className="text-xs text-muted-foreground">{machine.area}</p>
           {counts && (
-            <div className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2 mt-2 text-caption text-muted-foreground">
               <span>{counts.procedures} proced.</span>
               <span>·</span>
               <span>{counts.manual} manual</span>

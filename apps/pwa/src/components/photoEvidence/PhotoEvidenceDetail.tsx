@@ -60,22 +60,22 @@ interface PhotoEvidenceDetailProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-500 border-yellow-500/20',
+    color: 'bg-amber-500/[0.15] text-ink-warn border-amber-500/[0.25]',
     icon: Clock,
   },
   en_proceso: {
     label: 'En Proceso',
-    color: 'bg-blue-500/15 text-blue-700 dark:text-blue-500 border-blue-500/20',
+    color: 'bg-primary/[0.15] text-ink-info border-primary/[0.25]',
     icon: AlertCircle,
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/15 text-green-700 dark:text-green-500 border-green-500/20',
+    color: 'bg-green-500/[0.15] text-ink-ok border-green-500/[0.25]',
     icon: CheckCircle,
   },
   verificada: {
     label: 'Verificada',
-    color: 'bg-purple-500/15 text-purple-700 dark:text-purple-500 border-purple-500/20',
+    color: 'bg-cat-6-tint/[0.15] text-cat-6-ink border-cat-6-tint/[0.25]',
     icon: CheckCircle,
   },
 }
@@ -518,10 +518,10 @@ export function PhotoEvidenceDetail({
                 />
 
                 {canEditPairMeta && (
-                  <div className="mt-3 p-3 rounded-lg border border-border bg-muted space-y-3">
+                  <div className="mt-3 p-3 rounded-card border border-border bg-muted space-y-3">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
+                        <div className="p-3 rounded-card border border-red-200 dark:border-red-800 bg-red-500/[0.15]">
                           <PhotoUploader
                             photos={pairBeforePhoto}
                             onPhotosChange={(p) => {
@@ -547,7 +547,7 @@ export function PhotoEvidenceDetail({
                             </Button>
                           </div>
                         </div>
-                        <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+                        <div className="p-3 rounded-card border border-green-200 dark:border-green-800 bg-green-500/[0.15]">
                           <PhotoUploader
                             photos={pairAfterPhoto}
                             onPhotosChange={(p) => {
@@ -603,7 +603,7 @@ export function PhotoEvidenceDetail({
                         </Select>
 
                         {pairUbicacionSource === 'general' && (
-                          <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                          <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
                             {evidence.hierarchyPath ? `📍 ${evidence.hierarchyPath}` : 'Sin ubicación general'}
                           </p>
                         )}
@@ -617,7 +617,7 @@ export function PhotoEvidenceDetail({
                               disabled={isSaving}
                             />
                             {(pairUbicacionPath || pairUbicacion.trim()) && (
-                              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-ctl">
                                 📍 {pairUbicacionPath || pairUbicacion.trim()}
                               </p>
                             )}
@@ -778,7 +778,7 @@ export function PhotoEvidenceDetail({
               {evidence.descripcion && (
                 <div className="space-y-2">
                   <h3 className="font-medium text-sm">Descripción</h3>
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-card">
                     {evidence.descripcion}
                   </p>
                 </div>

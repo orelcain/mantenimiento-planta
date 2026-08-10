@@ -705,11 +705,11 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   // Mostrar skeleton mientras carga
   if (isLoading) {
     return (
-      <div style={{ height: `${height}px` }} className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div style={{ height: `${height}px` }} className="relative bg-muted-foreground/[0.10] rounded-card dark:border-gray-700 overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-            <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">
+            <p className="text-sm text-muted-foreground animate-pulse">
               Generando historial...
             </p>
           </div>
@@ -772,33 +772,33 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
     <div className="space-y-3">
       {visibleSummary && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          <div className="rounded-md border p-2 bg-card/40">
-            <div className="text-[10px] text-muted-foreground">Temperatura actual</div>
+          <div className="rounded-ctl border p-2 bg-card/40">
+            <div className="text-caption text-muted-foreground">Temperatura actual</div>
             <div className="text-sm font-semibold">{visibleSummary.temp.latest.toFixed(1)} °C</div>
           </div>
-          <div className="rounded-md border p-2 bg-card/40">
-            <div className="text-[10px] text-muted-foreground">Humedad actual</div>
+          <div className="rounded-ctl border p-2 bg-card/40">
+            <div className="text-caption text-muted-foreground">Humedad actual</div>
             <div className="text-sm font-semibold">{visibleSummary.hum.latest.toFixed(1)} %</div>
           </div>
-          <div className="rounded-md border p-2 bg-card/40">
-            <div className="text-[10px] text-muted-foreground">Temp prom. / min-max</div>
+          <div className="rounded-ctl border p-2 bg-card/40">
+            <div className="text-caption text-muted-foreground">Temp prom. / min-max</div>
             <div className="text-sm font-semibold">
               {visibleSummary.temp.avg.toFixed(1)}
               <span className="text-xs text-muted-foreground"> °C · {visibleSummary.temp.min.toFixed(1)}-{visibleSummary.temp.max.toFixed(1)}</span>
             </div>
           </div>
-          <div className="rounded-md border p-2 bg-card/40">
-            <div className="text-[10px] text-muted-foreground">Hum prom. / min-max</div>
+          <div className="rounded-ctl border p-2 bg-card/40">
+            <div className="text-caption text-muted-foreground">Hum prom. / min-max</div>
             <div className="text-sm font-semibold">
               {visibleSummary.hum.avg.toFixed(1)}
               <span className="text-xs text-muted-foreground"> % · {visibleSummary.hum.min.toFixed(1)}-{visibleSummary.hum.max.toFixed(1)}</span>
             </div>
           </div>
-          <div className="rounded-md border p-2 bg-card/40">
-            <div className="text-[10px] text-muted-foreground">Lecturas visibles</div>
+          <div className="rounded-ctl border p-2 bg-card/40">
+            <div className="text-caption text-muted-foreground">Lecturas visibles</div>
             <div className="text-sm font-semibold">{visibleSummary.points.toLocaleString('es-CL')}</div>
           </div>
-          <div className="col-span-2 lg:col-span-5 text-[10px] text-muted-foreground">
+          <div className="col-span-2 lg:col-span-5 text-caption text-muted-foreground">
             Última lectura: {visibleSummary.latestAt.toLocaleString('es-CL')}
           </div>
         </div>
@@ -810,7 +810,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={zoomToNow}
-              className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
               title="Zoom al tiempo actual"
             >
               Ahora
@@ -818,7 +818,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={resetZoom}
-              className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
               title="Restablecer zoom"
             >
               Reset
@@ -829,7 +829,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
       </div>
 
       {recentReadings.length > 0 && (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-ctl border overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted">

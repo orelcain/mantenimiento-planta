@@ -27,10 +27,10 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
         {analytics.matrixEnhanced.globalHHI > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
             <Badge variant="outline" className={cn(
-              'text-[10px]',
-              analytics.matrixEnhanced.globalHHI > 0.5 && 'text-red-600 border-red-300',
-              analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-amber-600 border-amber-300',
-              analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-emerald-600 border-emerald-300',
+              'text-caption',
+              analytics.matrixEnhanced.globalHHI > 0.5 && 'text-ink-crit border-red-300',
+              analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-ink-warn border-amber-300',
+              analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-ink-ok border-emerald-300',
             )}>
               Concentración: {
                 analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta ⚠' :
@@ -39,15 +39,15 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
               <InfoTooltip {...getTooltipProps('matrix.hhi')} iconSize={11} className="ml-1" />
             </Badge>
             <Badge variant="outline" className={cn(
-              'text-[10px]',
-              analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-red-600 border-red-300',
-              analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-amber-600 border-amber-300',
+              'text-caption',
+              analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-ink-crit border-red-300',
+              analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-ink-warn border-amber-300',
             )}>
               Desbalance: {(analytics.matrixEnhanced.imbalanceScore * 100).toFixed(1)}%
               <InfoTooltip {...getTooltipProps('matrix.imbalance')} iconSize={11} className="ml-1" />
             </Badge>
             {analytics.matrixEnhanced.maxCell && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-caption">
                 Celda Max: {analytics.matrixEnhanced.maxCell.quality}×{analytics.matrixEnhanced.maxCell.calibre} ({analytics.matrixEnhanced.maxCell.pct}%)
               </Badge>
             )}
@@ -85,15 +85,15 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                         return (
                           <td key={c} className={cn(
                             'py-2 px-2 text-center',
-                            isMax && 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-300',
-                            cell && cell.pct >= 20 && !isMax && 'bg-blue-50/50 dark:bg-blue-900/10',
+                            isMax && 'bg-primary/[0.15] ring-1 ring-blue-300',
+                            cell && cell.pct >= 20 && !isMax && 'bg-primary/[0.15]',
                           )}>
                             {cell ? (
                               <div>
                                 <span className="font-medium">{cell.pieces.toLocaleString('es-CL')}</span>
                                 <span className="text-muted-foreground text-xs ml-1">({cell.pct}%)</span>
                                 {avgW != null && (
-                                  <p className="text-[10px] text-muted-foreground">{avgW.toLocaleString('es-CL')}g</p>
+                                  <p className="text-caption text-muted-foreground">{avgW.toLocaleString('es-CL')}g</p>
                                 )}
                               </div>
                             ) : (
@@ -106,9 +106,9 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                         {hhiRow ? (
                           <span className={cn(
                             'font-medium',
-                            hhiRow.hhi > 0.5 && 'text-red-600',
-                            hhiRow.hhi > 0.25 && hhiRow.hhi <= 0.5 && 'text-amber-600',
-                            hhiRow.hhi <= 0.25 && 'text-emerald-600',
+                            hhiRow.hhi > 0.5 && 'text-ink-crit',
+                            hhiRow.hhi > 0.25 && hhiRow.hhi <= 0.5 && 'text-ink-warn',
+                            hhiRow.hhi <= 0.25 && 'text-ink-ok',
                           )}>
                             {hhiRow.hhi > 0.5 ? 'Alta' : hhiRow.hhi > 0.25 ? 'Media' : 'Baja'}
                           </span>
@@ -133,9 +133,9 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                           {hhiCol ? (
                             <span className={cn(
                               'font-medium',
-                              hhiCol.hhi > 0.5 && 'text-red-600',
-                              hhiCol.hhi > 0.25 && hhiCol.hhi <= 0.5 && 'text-amber-600',
-                              hhiCol.hhi <= 0.25 && 'text-emerald-600',
+                              hhiCol.hhi > 0.5 && 'text-ink-crit',
+                              hhiCol.hhi > 0.25 && hhiCol.hhi <= 0.5 && 'text-ink-warn',
+                              hhiCol.hhi <= 0.25 && 'text-ink-ok',
                             )}>
                               {hhiCol.hhi > 0.5 ? 'Alta' : hhiCol.hhi > 0.25 ? 'Media' : 'Baja'}
                             </span>

@@ -1,17 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, createContext, useContext, ReactNode } from 'react'
-import {
-  HelpCircle,
-  ChevronRight,
-  LayoutDashboard,
-  AlertTriangle,
-  Map,
-  Wrench,
-  CalendarClock,
-  Settings,
-  CheckCircle2,
-  Lightbulb,
-} from 'lucide-react'
+import { HelpCircle, ChevronRight, LayoutDashboard, AlertTriangle, Map, Wrench, CalendarClock, Settings, CheckCircle2, Lightbulb, Camera, Zap, Bell, MapPin, Pencil, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import {
   Button,
   Card,
@@ -100,7 +90,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'map',
     title: 'Mapa de Planta',
-    description: 'Vista visual de las zonas de la planta. Los colores indican el estado: 🟢 Sin problemas, 🔵 Medio, 🟠 Alto, 🔴 Crítico.',
+    description: 'Vista visual de las zonas de la planta. Los colores indican el estado: verde sin problemas, azul medio, 🟠 Alto, 🔴 Crítico.',
     icon: Map,
   },
   {
@@ -255,7 +245,7 @@ export function HelpModal() {
                   >
                     <CardContent className="p-4 flex items-start gap-4">
                       <div className={cn(
-                        'p-2 rounded-lg',
+                        'p-2 rounded-card',
                         currentStep === index ? 'bg-primary text-primary-foreground' : 'bg-muted'
                       )}>
                         <step.icon className="h-5 w-5" />
@@ -328,39 +318,39 @@ export function HelpModal() {
           {activeTab === 'tips' && (
             <div className="space-y-3 py-4">
               <TipCard
-                emoji="🗺️"
+                icon={Map}
                 title="Colores del Mapa"
                 description="Verde = sin incidencias, Azul = medias, Naranja = altas, Rojo = críticas"
               />
               <TipCard
-                emoji="📸"
+                icon={Camera}
                 title="Fotos en Incidencias"
                 description="Agrega fotos al reportar para documentar mejor el problema"
               />
               <TipCard
-                emoji="⚡"
+                icon={Zap}
                 title="Prioridades"
                 description="Usa 'Crítica' solo para problemas que detengan la producción"
               />
               <TipCard
-                emoji="🔔"
+                icon={Bell}
                 title="Alertas"
                 description="Las incidencias críticas aparecen destacadas en el Dashboard"
               />
               <TipCard
-                emoji="📍"
+                icon={MapPin}
                 title="Zonas"
                 description="Haz clic en una zona del mapa para ver sus incidencias activas"
               />
               {isAdmin && (
                 <>
                   <TipCard
-                    emoji="✏️"
+                    icon={Pencil}
                     title="Editar Zonas"
                     description="Usa 'Editar Zonas' en el mapa para dibujar polígonos punto a punto"
                   />
                   <TipCard
-                    emoji="🗑️"
+                    icon={Trash2}
                     title="Eliminar Mapas"
                     description="En el selector de mapas, pasa el mouse sobre uno para ver el botón de eliminar"
                   />
@@ -375,11 +365,13 @@ export function HelpModal() {
 }
 
 // Componente de tip
-function TipCard({ emoji, title, description }: { emoji: string; title: string; description: string }) {
+/** La tarjeta recibe un COMPONENTE de ícono, no un emoji: hereda color y
+ *  tamaño del tema y se ve igual en todos los sistemas operativos. */
+function TipCard({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
   return (
     <Card>
       <CardContent className="p-4 flex items-start gap-3">
-        <span className="text-2xl">{emoji}</span>
+        <Icon className="size-6 text-primary" />
         <div>
           <h4 className="font-medium">{title}</h4>
           <p className="text-sm text-muted-foreground">{description}</p>
@@ -406,7 +398,7 @@ export function ContextualTip({
   return (
     <div className="relative group">
       {children}
-      <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border rounded-lg shadow-lg text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+      <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-popover border rounded-card shadow-lg text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         {tip}
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-popover" />
       </div>
@@ -429,7 +421,7 @@ export function WelcomeModal() {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center">
-            👋 ¡Bienvenido, {user?.nombre}!
+            ¡Bienvenido, {user?.nombre}!
           </DialogTitle>
         </DialogHeader>
         <div className="text-center space-y-4 py-4">

@@ -57,7 +57,7 @@ export function RepuestoActionsMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-normal truncate">
+        <DropdownMenuLabel className="text-caption tracking-wider text-muted-foreground font-normal truncate">
           {repuesto.textoBreve || repuesto.codigoSAP || 'Repuesto'}
         </DropdownMenuLabel>
 
@@ -78,7 +78,7 @@ export function RepuestoActionsMenu({
                 <Camera className="h-4 w-4 text-indigo-500" />
                 <span>Galería</span>
                 {hasGallery && (
-                  <span className="ml-auto text-[10px] text-muted-foreground">{repuesto.gallery?.length}</span>
+                  <span className="ml-auto text-caption text-muted-foreground">{repuesto.gallery?.length}</span>
                 )}
               </DropdownMenuItem>
             )}
@@ -87,7 +87,7 @@ export function RepuestoActionsMenu({
               <DropdownMenuItem onClick={() => onViewPhotos(repuesto)} className="gap-2 cursor-pointer">
                 <Image className="h-4 w-4 text-emerald-500" />
                 <span>Fotos de referencia</span>
-                <span className="ml-auto text-[10px] text-muted-foreground">
+                <span className="ml-auto text-caption text-muted-foreground">
                   {(repuesto.fotosReales?.length || 0) + (repuesto.imagenesManual?.length || 0)}
                 </span>
               </DropdownMenuItem>
@@ -97,7 +97,7 @@ export function RepuestoActionsMenu({
               <DropdownMenuItem onClick={() => onSearchInManual(repuesto)} className="gap-2 cursor-pointer">
                 <BookOpen className="h-4 w-4 text-purple-500" />
                 <span>Buscar en Manual</span>
-                <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[60px]">
+                <span className="ml-auto text-caption font-mono text-muted-foreground truncate max-w-[60px]">
                   {repuesto.codigoFabricante}
                 </span>
               </DropdownMenuItem>
@@ -107,7 +107,7 @@ export function RepuestoActionsMenu({
               <DropdownMenuItem onClick={() => onViewInManual(repuesto)} className="gap-2 cursor-pointer">
                 <Eye className="h-4 w-4 text-green-500" />
                 <span>Ver en Manual</span>
-                <span className="ml-auto text-[10px] text-green-400">✓ ubicado</span>
+                <span className="ml-auto text-caption text-green-400">✓ ubicado</span>
               </DropdownMenuItem>
             )}
           </>

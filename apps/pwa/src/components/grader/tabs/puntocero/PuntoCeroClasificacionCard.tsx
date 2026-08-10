@@ -92,15 +92,15 @@ export function PuntoCeroClasificacionCard({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {causes.map((c) => (
-                <div key={`legend-${c.cause}`} className="rounded border bg-muted/20 px-2 py-1.5 text-xs">
+                <div key={`legend-${c.cause}`} className="rounded-ctl border bg-muted/20 px-2 py-1.5 text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCauseColor(c.cause) }} />
+                      <span className="inline-block h-2.5 w-2.5 rounded-ctl" style={{ backgroundColor: getCauseColor(c.cause) }} />
                       <span className="truncate font-medium">{c.label}</span>
                     </div>
                     <span className="text-muted-foreground">{c.pctOfPointZero}%</span>
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                  <div className="text-caption text-muted-foreground mt-0.5">
                     {c.pieces.toLocaleString('es-CL')} pz · {c.pctOfTotal}% total
                   </div>
                 </div>
@@ -112,7 +112,7 @@ export function PuntoCeroClasificacionCard({
           <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground/90">
+                <tr className="border-b border-muted/40 text-left text-caption tracking-wide text-muted-foreground/90">
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2">Causa</th>
                   <th className="py-2 px-2 text-right">Piezas</th>
@@ -130,7 +130,7 @@ export function PuntoCeroClasificacionCard({
                       <tr
                         className={cn(
                           'border-b border-muted/30 hover:bg-muted/20',
-                          i % 2 === 0 && 'bg-muted/[0.08]',
+                          i % 2 === 0 && 'bg-muted/[0.15]',
                           hasRecords && 'cursor-pointer',
                           isExpanded && 'bg-muted/20',
                         )}
@@ -148,18 +148,18 @@ export function PuntoCeroClasificacionCard({
                         <td className="py-2 px-2">
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-2">
-                              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCauseColor(c.cause) }} />
+                              <span className="inline-block h-2.5 w-2.5 rounded-ctl" style={{ backgroundColor: getCauseColor(c.cause) }} />
                               <span className="font-semibold text-sm leading-tight">{c.label}</span>
                             </div>
-                            <p className="text-[11px] text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
+                            <p className="text-caption text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
                           </div>
                         </td>
                         <td className="py-2 px-2 text-right font-medium tabular-nums">{c.pieces.toLocaleString('es-CL')}</td>
                         <td className="py-2 px-2 text-right tabular-nums">
                           <span className={cn(
                             'font-semibold',
-                            c.pctOfPointZero >= 50 && 'text-red-600',
-                            c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
+                            c.pctOfPointZero >= 50 && 'text-ink-crit',
+                            c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-ink-warn',
                           )}>
                             {c.pctOfPointZero}%
                           </span>

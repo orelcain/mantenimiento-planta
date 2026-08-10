@@ -143,7 +143,7 @@ export function GraderLotesTab({
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Comparativa de Lotes</CardTitle>
-          <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
             <span>🟢 &lt;8%</span>
             <span>🟡 8-11.9%</span>
@@ -271,7 +271,7 @@ export function GraderLotesTab({
             Dispersión por Lote (CV%)
             <InfoTooltip {...getTooltipProps('lot.cvChart')} />
           </CardTitle>
-          <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
             <span>🟢 &lt;8%</span>
             <span>🟡 8-11.9%</span>
@@ -345,7 +345,7 @@ export function GraderLotesTab({
                   <div key={action.gateNumber} className="flex items-start justify-between gap-2">
                     <p>• {action.text}</p>
                     {action.canApply && action.isApplied && (
-                      <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-600">
+                      <Badge variant="outline" className="text-caption border-emerald-500/[0.25] text-ink-ok">
                         Aplicada
                       </Badge>
                     )}
@@ -354,14 +354,14 @@ export function GraderLotesTab({
                         size="sm"
                         variant="outline"
                         onClick={() => onApplyGateAction(action)}
-                        className="h-7 px-2 text-[11px]"
+                        className="h-7 px-2 text-caption"
                       >
                         Aplicar
                       </Button>
                     )}
                   </div>
                 ))}
-                <p className="text-[11px]">Estas sugerencias se recalculan automáticamente cuando modifica gates en Configuración y vuelve al Dashboard.</p>
+                <p className="text-caption">Estas sugerencias se recalculan automáticamente cuando modifica gates en Configuración y vuelve al Dashboard.</p>
               </div>
             )}
           </div>

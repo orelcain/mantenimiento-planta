@@ -49,7 +49,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-card overflow-hidden">
       {/* Header */}
       <button
         className="w-full flex items-start gap-3 p-3 hover:bg-muted/40 transition-colors text-left"
@@ -84,8 +84,8 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
           {/* Fórmula */}
           {runbook.formula && (
             <div className="mt-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Fórmula</p>
-              <div className="bg-black/30 rounded-md p-2.5 font-mono text-sm text-amber-800 dark:text-amber-300">
+              <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-1">Fórmula</p>
+              <div className="bg-black/30 rounded-ctl p-2.5 font-mono text-sm text-ink-warn">
                 {runbook.formula.expression}
               </div>
               <div className="mt-1.5 space-y-0.5">
@@ -100,7 +100,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
 
           {/* Pasos */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-2">
               Pasos ({runbook.steps.length})
             </p>
             <ol className="space-y-2">
@@ -151,7 +151,7 @@ export function RunbookCard({ runbook, compact = false, defaultExpanded = false,
 
           {/* Criterios de éxito */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+            <p className="text-xs font-semibold text-muted-foreground tracking-wider mb-1.5">
               Criterios de éxito
             </p>
             <ul className="space-y-1">

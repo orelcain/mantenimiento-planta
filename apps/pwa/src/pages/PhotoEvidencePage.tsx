@@ -224,19 +224,19 @@ export function PhotoEvidencePage() {
 
           {/* Estadísticas rápidas */}
           <div className="grid grid-cols-4 gap-2">
-            <div className="p-2 bg-muted/50 rounded-lg text-center">
+            <div className="p-2 bg-muted/50 rounded-card text-center">
               <p className="text-2xl font-bold">{stats.total}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
-            <div className="p-2 bg-yellow-500/15 rounded-lg text-center">
+            <div className="p-2 bg-amber-500/[0.15] rounded-card text-center">
               <p className="text-2xl font-bold text-yellow-600">{stats.pendientes}</p>
               <p className="text-xs text-muted-foreground">Pendientes</p>
             </div>
-            <div className="p-2 bg-green-500/15 rounded-lg text-center">
+            <div className="p-2 bg-green-500/[0.15] rounded-card text-center">
               <p className="text-2xl font-bold text-green-600">{stats.corregidas}</p>
               <p className="text-xs text-muted-foreground">Corregidas</p>
             </div>
-            <div className="p-2 bg-purple-500/15 rounded-lg text-center">
+            <div className="p-2 bg-cat-6-tint/[0.15] rounded-card text-center">
               <p className="text-2xl font-bold text-purple-600">{stats.verificadas}</p>
               <p className="text-xs text-muted-foreground">Verificadas</p>
             </div>
@@ -267,7 +267,7 @@ export function PhotoEvidencePage() {
 
           {/* Acciones de selección */}
           {selectedForExport.size > 0 && (
-            <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg">
+            <div className="flex items-center justify-between p-2 bg-primary/10 rounded-card">
               <span className="text-sm font-medium">
                 {selectedForExport.size} seleccionada(s)
               </span>
@@ -328,7 +328,7 @@ export function PhotoEvidencePage() {
                 key={evidence.id}
                 className={cn(
                   'relative',
-                  selectedForExport.has(evidence.id) && 'ring-2 ring-primary rounded-lg'
+                  selectedForExport.has(evidence.id) && 'ring-2 ring-primary rounded-card'
                 )}
               >
                 {/* Checkbox de selección */}

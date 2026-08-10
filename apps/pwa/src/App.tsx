@@ -84,6 +84,12 @@ const PielShowcasePage = lazyWithReload(() => import('@/pages/dev/PielShowcasePa
 // Pantalla PILOTO: Análisis de Turno con la piel nueva y datos reales. Convive
 // con AnalisisGraderTurnoPage (producción, intacta) para poder compararlas.
 const TurnoPilotoPage = lazyWithReload(() => import('@/pages/dev/TurnoPilotoPage'))
+// Vitrina del módulo Grader ya barrido: monta componentes REALES del módulo con
+// datos sintéticos, para poder mirarlo sin sesión ni datos de planta.
+const GraderPielPage = lazyWithReload(() => import('@/pages/dev/GraderPielPage'))
+// Vitrina de la pantalla REAL de Incidencias ya rediseñada (componente de
+// producción, store sembrado con datos sintéticos).
+const IncidenciasPielPage = lazyWithReload(() => import('@/pages/dev/IncidenciasPielPage'))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const Visor3DInteractivePlataformaPontonPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractivePlataformaPontonPage').then((mod) => ({ default: mod.Visor3DInteractivePlataformaPontonPage })))
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
@@ -309,6 +315,24 @@ export function App() {
                 <Suspense fallback={<LoadingScreen />}>
                   <TurnoPilotoPage />
                 </Suspense>
+            }
+          />
+
+          <Route
+            path="/dev/incidencias-piel"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <IncidenciasPielPage />
+              </Suspense>
+            }
+          />
+
+          <Route
+            path="/dev/grader-piel"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <GraderPielPage />
+              </Suspense>
             }
           />
 

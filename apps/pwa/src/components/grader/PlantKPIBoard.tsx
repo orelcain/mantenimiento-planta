@@ -10,6 +10,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Disclosure } from '@/components/piel'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -123,11 +124,17 @@ interface KPICardProps {
   note?: string
 }
 
+/**
+ * Un KPI dentro de una tarjeta es un BLOQUE DE TEXTO con aire, no otra tarjeta.
+ * Antes cada baldosa traía su propio `border` + fondo: eso es lo que producía el
+ * efecto "caja dentro de caja" que hacía ver la pantalla como panel denso.
+ * La separación ahora la da la grilla, no el contorno.
+ */
 function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   return (
-    <div className="bg-muted rounded-lg px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors">
+    <div className="px-1 py-1.5">
       <div className="flex items-center justify-between gap-1 mb-1">
-        <div className="text-[10px] font-medium text-muted-foreground leading-tight truncate">{label}</div>
+        <div className="text-caption font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
       <div className={cn('text-xl font-bold tabular-nums leading-none', valueColor)}>{value}</div>
@@ -137,7 +144,7 @@ function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barC
                style={{ width: barWidth(barValue, barMax) }} />
         </div>
       )}
-      {note && <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight truncate">{note}</p>}
+      {note && <p className="text-caption text-muted-foreground/60 mt-1 leading-tight truncate">{note}</p>}
     </div>
   )
 }
@@ -215,14 +222,14 @@ export function PlantKPIBoard({
   if (!enabled) return null
 
   return (
-    <Card className="border-border">
+    <Card className="border-0 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-sky-400" />
             Indicadores de Rendimiento
             {kpis && (
-              <span className="text-[10px] font-normal text-muted-foreground">
+              <span className="text-caption font-normal text-muted-foreground">
                 · {kpis.periodLabel}
                 {kpis.shiftsCount > 1 && (
                   <span className="text-muted-foreground/60"> ({kpis.shiftsCount} turnos)</span>
@@ -232,13 +239,13 @@ export function PlantKPIBoard({
           </CardTitle>
 
           {/* Selector Día / Semana / Mes */}
-          <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
+          <div className="flex gap-0.5 bg-muted rounded-ctl p-0.5">
             {PERIODS.map(p => (
               <button
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
                 className={cn(
-                  'px-2 py-0.5 text-[11px] font-medium rounded transition-colors',
+                  'px-2 py-0.5 text-caption font-medium rounded-ctl transition-colors',
                   period === p.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -250,7 +257,7 @@ export function PlantKPIBoard({
           </div>
         </div>
         {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
-        <p className="text-[10px] text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
+        <p className="text-caption text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
@@ -276,7 +283,7 @@ export function PlantKPIBoard({
           <>
             {/* Banner informativo cuando solo hay calidad Grader */}
             {kpis.graderOnly && (
-              <p className="text-[10px] text-sky-400/80 flex items-center gap-1 pb-0.5">
+              <p className="text-caption text-sky-400/80 flex items-center gap-1 pb-0.5">
                 <AlertTriangle className="w-3 h-3 shrink-0" />
                 Sin datos Shoplogix para este período — solo calidad Grader
               </p>
@@ -292,7 +299,7 @@ export function PlantKPIBoard({
               const SIGNIFICANT_CYCLES_THRESHOLD = 100
               if (totalCycles >= SIGNIFICANT_CYCLES_THRESHOLD) return null
               return (
-                <p className="text-[10px] text-amber-400/90 flex items-start gap-1 pb-0.5">
+                <p className="text-caption text-amber-400/90 flex items-start gap-1 pb-0.5">
                   <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                   <span>
                     Período sin producción significativa ({totalCycles.toLocaleString('es-CL')} ciclos totales).
@@ -373,19 +380,19 @@ export function PlantKPIBoard({
                 barColor={kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.warnBelow ? 'bg-emerald-500' : kpis.mtbfHours >= KPI_CUTOFFS.mtbfHours.critBelow ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <div
-                className="bg-muted rounded-lg px-2.5 py-2 border border-border hover:border-muted-foreground/50 transition-colors"
+                className="px-1 py-1.5"
                 title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
-                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
+                <div className="text-caption font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
-                <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight">
+                <p className="text-caption text-muted-foreground/60 mt-1 leading-tight">
                   paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
             {/* Micro-detenciones: se reportan aparte para no inflar el MTTR */}
             {kpis.microCount > 0 && (
-              <p className="text-[10px] text-muted-foreground/70 leading-tight px-0.5">
+              <p className="text-caption text-muted-foreground/70 leading-tight px-0.5">
                 + {kpis.microCount.toLocaleString('es-CL')} micro-detenciones (&lt;5min, {fmtMin(kpis.microMin)} total) — aparte, no inflan el MTTR.
               </p>
             )}
@@ -394,7 +401,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 text-[10px] text-amber-800 dark:text-amber-300/90 bg-amber-500/[0.06] border border-amber-500/20 rounded-md px-2 py-1.5">
+              <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
@@ -412,7 +419,19 @@ export function PlantKPIBoard({
                 que es info no crítica en mobile. Desktop: ancho completo.
                 Cada KPI tiene tooltip explicativo (`title`) accesible vía hover
                 en desktop y long-press en touch. */}
-            {!kpis.graderOnly && <div className="grid gap-1 pt-0.5">
+            {/* §22: los KPI de arriba responden "¿cómo va el turno?". El desglose
+                POR MÁQUINA es el siguiente nivel — se consulta cuando ya se sabe
+                que algo anda mal y hay que ver cuál. Va en línea para no crear
+                tarjeta dentro de tarjeta (§7). */}
+            {!kpis.graderOnly && (
+            <Disclosure
+              variant="inline"
+              title="Ver detalle por máquina"
+              summary={`${kpis.machines.length} máquina${kpis.machines.length === 1 ? '' : 's'}`}
+              defaultOpen={false}
+              storageKey="grader-detalle-maquinas"
+            >
+            <div className="grid gap-1 pt-0.5">
               {kpis.machines.map((m, idx) => {
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
@@ -422,7 +441,7 @@ export function PlantKPIBoard({
                 <div
                   key={m.machineid}
                   className={cn(
-                    'flex items-center gap-2 text-[11px] bg-muted rounded px-2 py-1 border border-border',
+                    'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
                     isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\n⚠ La que más piezas pierde del grupo' : ''}`}
@@ -471,7 +490,9 @@ export function PlantKPIBoard({
                 </div>
                 )
               })}
-            </div>}
+            </div>
+            </Disclosure>
+            )}
           </>
         )}
       </CardContent>

@@ -114,7 +114,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
         </DialogHeader>
 
         {/* Guía de navegación Z2 */}
-        <div className="bg-muted rounded p-2.5 text-[11px] text-muted-foreground space-y-1">
+        <div className="bg-muted rounded-ctl p-2.5 text-caption text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground text-xs">Procedimiento en Z2:</p>
           <ol className="list-decimal list-inside space-y-0.5 pl-1">
             <li>Pantalla principal → <span className="font-mono text-foreground">Cambiar Parámetros</span></li>
@@ -133,9 +133,9 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
             return (
               <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
                 <div>
-                  <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                  <Label className="text-caption text-muted-foreground block mb-0.5">
                     {label}
-                    <span className="ml-1 font-mono text-[9px] text-sky-400/70">Z2: {z2Param}</span>
+                    <span className="ml-1 font-mono text-caption text-sky-400/70">Z2: {z2Param}</span>
                   </Label>
                   <div className="flex items-center gap-1">
                     <Input
@@ -147,10 +147,10 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                       onChange={(e) => setField(key, e.target.value)}
                       className="h-7 w-24 text-xs font-mono px-1.5"
                     />
-                    <span className="text-[10px] text-muted-foreground">ms</span>
+                    <span className="text-caption text-muted-foreground">ms</span>
                   </div>
                 </div>
-                <div className="text-[10px] text-muted-foreground text-right">
+                <div className="text-caption text-muted-foreground text-right">
                   <div>actual</div>
                   <div className="font-mono">{currentVal} ms</div>
                 </div>
@@ -158,10 +158,10 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
                   <Badge
                     variant="outline"
                     className={cn(
-                      'text-[10px] font-mono shrink-0',
+                      'text-caption font-mono shrink-0',
                       Math.abs(delta) === 0 ? 'border-muted text-muted-foreground' :
-                      Math.abs(delta) <= 50 ? 'border-amber-500/40 text-amber-600 dark:text-amber-400' :
-                      'border-red-500/40 text-red-600 dark:text-red-400',
+                      Math.abs(delta) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' :
+                      'border-red-500/[0.25] text-ink-crit',
                     )}
                   >
                     {delta >= 0 ? '+' : ''}{delta}
@@ -174,7 +174,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
 
         {/* Resumen ciclo total */}
         {allValid && (
-          <div className="bg-sky-500/15 border border-sky-500/20 rounded p-2 text-xs flex items-center justify-between gap-3">
+          <div className="bg-primary/[0.15] border border-primary/[0.25] rounded-ctl p-2 text-xs flex items-center justify-between gap-3">
             <div>
               <span className="text-muted-foreground">Ciclo total nuevo: </span>
               <span className="font-mono font-semibold text-sky-400">{cycleTotalMs} ms</span>
@@ -183,8 +183,8 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
               <Badge
                 variant="outline"
                 className={cn(
-                  'text-[10px] font-mono',
-                  Math.abs(deltaCycleMs) <= 50 ? 'border-amber-500/40 text-amber-600' : 'border-red-500/40 text-red-600',
+                  'text-caption font-mono',
+                  Math.abs(deltaCycleMs) <= 50 ? 'border-amber-500/[0.25] text-ink-warn' : 'border-red-500/[0.25] text-ink-crit',
                 )}
               >
                 Δ {deltaCycleMs >= 0 ? '+' : ''}{deltaCycleMs} ms vs actual
@@ -210,7 +210,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
             type="checkbox"
             checked={applyToConfig}
             onChange={(e) => setApplyToConfig(e.target.checked)}
-            className="rounded"
+            className="rounded-ctl"
           />
           Aplicar a configuración activa
         </label>
