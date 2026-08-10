@@ -759,7 +759,7 @@ export function AnalisisGraderWizardPage() {
               size="sm"
               disabled={savingToCalendar}
               onClick={handleSaveToCalendar}
-              className="bg-sky-600 hover:bg-sky-700 text-white shrink-0 shadow-sm"
+              className="bg-blue-500 hover:bg-blue-600 text-white shrink-0 shadow-sm"
             >
               {savingToCalendar
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>

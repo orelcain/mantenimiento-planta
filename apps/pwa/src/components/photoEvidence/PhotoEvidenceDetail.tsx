@@ -847,7 +847,7 @@ export function PhotoEvidenceDetail({
                 {canVerify && (
                   <Button
                     variant="default"
-                    className="flex-1 bg-cat-6-tint hover:bg-purple-700"
+                    className="flex-1 bg-cat-6-tint hover:bg-cat-6-tint/90"
                     onClick={handleMarkAsVerified}
                     disabled={isSaving}
                   >

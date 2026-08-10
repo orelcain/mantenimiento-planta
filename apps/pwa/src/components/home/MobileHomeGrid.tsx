@@ -45,7 +45,7 @@ const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label
   green:   { bg: 'bg-green-500/[0.15]',   border: 'border-green-500/[0.25]',   icon: 'text-green-500',   label: 'text-ink-ok' },
   purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-cat-6-ink',  label: 'text-cat-6-ink' },
   emerald: { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]', icon: 'text-emerald-500', label: 'text-ink-ok' },
-  orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-orange-500',  label: 'text-cat-4-ink' },
+  orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-cat-4-ink',  label: 'text-cat-4-ink' },
   slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
 }
 

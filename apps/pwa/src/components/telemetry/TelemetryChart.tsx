@@ -810,7 +810,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={zoomToNow}
-              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-muted"
               title="Zoom al tiempo actual"
             >
               Ahora
@@ -818,7 +818,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             <button
               type="button"
               onClick={resetZoom}
-              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-gray-900"
+              className="px-2 py-1 text-xs rounded-ctl border border-border bg-white/90 shadow-sm hover:bg-white dark:border-border dark:bg-muted-foreground/[0.10] dark:hover:bg-muted"
               title="Restablecer zoom"
             >
               Reset

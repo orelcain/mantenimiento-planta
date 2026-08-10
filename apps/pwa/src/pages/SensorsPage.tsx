@@ -299,7 +299,7 @@ export function SensorsPage() {
       case 'Regular':
         return 'bg-amber-500'
       case 'Mala':
-        return 'bg-orange-500'
+        return 'bg-cat-4-tint'
       default:
         return 'bg-red-500'
     }

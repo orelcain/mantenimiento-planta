@@ -62,9 +62,9 @@ const CAUSE_HEX_BORDERS: Record<MatrixP0Cause, string> = {
 const FALLBACK_COLOR = { badge: 'bg-muted-foreground/[0.10] text-muted-foreground', bar: 'bg-muted-foreground' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
   red:     { badge: 'bg-red-500/[0.15] text-red-400',       bar: 'bg-red-500'   },
-  orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink', bar: 'bg-orange-500'},
+  orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink', bar: 'bg-cat-4-tint'},
   purple:  { badge: 'bg-cat-6-tint/[0.15] text-cat-6-ink', bar: 'bg-cat-6-tint'},
-  cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink',     bar: 'bg-cyan-500'  },
+  cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink',     bar: 'bg-cat-7-tint'  },
   emerald: { badge: 'bg-emerald-500/[0.15] text-emerald-400', bar: 'bg-emerald-500' },
   amber:   { badge: 'bg-amber-500/[0.15] text-amber-400',   bar: 'bg-amber-500' },
   brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-amber-600' },

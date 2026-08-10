@@ -28,7 +28,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
     <Card className="border-cat-6-tint/[0.25] bg-cat-6-tint/[0.15]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Brain className="h-4 w-4 text-violet-500" />
+          <Brain className="h-4 w-4 text-cat-6-ink" />
           Patrones Multisesión
         </CardTitle>
         <p className="text-xs text-muted-foreground">

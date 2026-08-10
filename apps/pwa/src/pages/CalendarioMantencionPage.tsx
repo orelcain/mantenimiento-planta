@@ -2627,7 +2627,7 @@ export function CalendarioMantencionPage() {
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 rounded-full bg-indigo-500" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-cat-3-tint" />
                   <label className="font-medium text-foreground">Mes</label>
                   <span className="text-caption text-muted-foreground">({monthDays.length} días)</span>
                 </div>
@@ -2647,8 +2647,8 @@ export function CalendarioMantencionPage() {
                     <th colSpan={6} className="border-b border-l border-border/30 bg-primary/[0.15] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-primary">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
                     </th>
-                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] dark:bg-gradient-to-r dark:from-indigo-950/80 dark:to-indigo-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
-                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />Resumen Mensual</span>
+                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
+                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cat-3-ink" />Resumen Mensual</span>
                     </th>
                     <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-muted px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
                       <div className="text-caption font-bold text-foreground">Vac.</div>
@@ -2717,7 +2717,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-orange-500' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
+                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-cat-4-tint' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
                             <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskW ? 'bg-red-500/[0.15] text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
@@ -2746,7 +2746,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-orange-500' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
+                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-cat-4-tint' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
                             <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : riskM ? 'bg-red-500/[0.15] text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/[0.15] text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaMonth)}

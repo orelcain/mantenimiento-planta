@@ -841,12 +841,12 @@ function TrendSparkline({
       <div className="flex items-center gap-4 text-caption text-muted-foreground flex-wrap">
         {showTemp && (
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-orange-500" /> Temperatura
+            <span className="h-2 w-2 rounded-full bg-cat-4-tint" /> Temperatura
           </span>
         )}
         {showHum && (
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-cyan-500" /> Humedad
+            <span className="h-2 w-2 rounded-full bg-cat-7-tint" /> Humedad
           </span>
         )}
         {showThresholds && (
@@ -935,7 +935,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
                 </span>
               )}
               {backfillStatus?.active && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-ink-info ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-ink-info ring-1 ring-blue-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                   <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
@@ -1090,7 +1090,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               </span>
             )}
             {backfillStatus?.active && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-info ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-info ring-1 ring-blue-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                 <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
               </span>
             )}

@@ -739,7 +739,7 @@ export function AnalisisGraderGatesConfigPage({
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (
                 <div key={shift.shiftId} className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-xs bg-muted ring-1 ring-border dark:bg-zinc-800 dark:ring-zinc-700 whitespace-nowrap">{shift.shiftId}</Badge>
+                  <Badge variant="outline" className="text-xs bg-muted ring-1 ring-border whitespace-nowrap">{shift.shiftId}</Badge>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Inicio</span>
                     <Input

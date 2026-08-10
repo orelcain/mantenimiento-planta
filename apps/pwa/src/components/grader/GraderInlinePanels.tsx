@@ -215,7 +215,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
   const typeColors: Record<string, string> = {
     correction: 'text-ink-warn border-amber-500/[0.25]',
     optimization: 'text-cat-6-ink border-cat-6-tint',
-    investigate: 'text-ink-info border-sky-300',
+    investigate: 'text-ink-info border-blue-500/[0.25]',
     swap: 'text-cat-6-ink border-cat-6-tint',
     reassign: 'text-blue-600 border-blue-500/[0.25]',
     add: 'text-ink-ok border-emerald-500/[0.25]',

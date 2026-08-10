@@ -6,7 +6,7 @@ import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 const SEVERITY_STYLES = {
   warning:     { border: 'border-red-500/[0.25]',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
   recommended: { border: 'border-amber-500/[0.25]',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
-  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-primary',    dot: 'bg-sky-400'    },
+  info:        { border: 'border-primary/[0.25]',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-primary',    dot: 'bg-ink-info'    },
 } as const
 
 const CONFIDENCE_LABELS = {
@@ -124,7 +124,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.ignoreFn}
-                className="px-3 py-1.5 rounded-ctl border border-border hover:bg-slate-700 text-muted-foreground text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl border border-border hover:bg-muted text-muted-foreground text-xs transition-colors"
               >
                 Ignorar
               </button>

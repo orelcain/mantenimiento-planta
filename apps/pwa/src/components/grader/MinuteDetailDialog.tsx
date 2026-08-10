@@ -503,7 +503,7 @@ export function MinuteDetailDialog({
                       const desc = getMatrixDescription(err)
                       return (
                         <div key={err}>
-                          <span className="text-orange-700/90 dark:text-orange-300/80">●</span>{' '}
+                          <span className="text-cat-4-ink">●</span>{' '}
                           <span
                             className={cn(desc && 'underline decoration-dotted underline-offset-2 decoration-muted-foreground/50 cursor-help')}
                             title={desc}
@@ -599,7 +599,7 @@ export function MinuteDetailDialog({
                               const desc = getMatrixDescription(errorDisplay)
                               return (
                                 <span
-                                  className={cn('text-orange-700/90 dark:text-orange-300/80', desc && 'underline decoration-dotted underline-offset-2 decoration-orange-300/40 cursor-help')}
+                                  className={cn('text-cat-4-ink', desc && 'underline decoration-dotted underline-offset-2 decoration-cat-4-ink/40 cursor-help')}
                                   title={desc}
                                 >
                                   {errorDisplay}

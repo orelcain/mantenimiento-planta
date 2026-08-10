@@ -110,7 +110,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
       <Card>
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Wrench className="w-4 h-4 text-orange-500" /> Impacto de Mantención
+            <Wrench className="w-4 h-4 text-cat-4-ink" /> Impacto de Mantención
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-6 flex items-center gap-2 text-sm text-muted-foreground">
@@ -128,7 +128,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
       <CardHeader className="pb-2 pt-4">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm flex items-center gap-2 min-w-0">
-            <Wrench className="w-4 h-4 shrink-0 text-orange-500" />
+            <Wrench className="w-4 h-4 shrink-0 text-cat-4-ink" />
             <span className="truncate">Impacto de Mantención</span>
             {rel && (
               <span className="text-caption font-normal text-muted-foreground ml-1 hidden sm:inline">

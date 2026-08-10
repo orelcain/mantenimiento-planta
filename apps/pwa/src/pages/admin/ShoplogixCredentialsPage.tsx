@@ -168,8 +168,8 @@ export function ShoplogixCredentialsPage() {
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
               <div className="font-medium">Error al cargar credenciales</div>
-              <div className="text-rose-700/90 dark:text-rose-200/80 text-xs mt-0.5">{error}</div>
-              <div className="text-rose-700/70 dark:text-rose-200/60 text-caption mt-1">
+              <div className="text-cat-5-ink text-xs mt-0.5">{error}</div>
+              <div className="text-cat-5-ink text-caption mt-1">
                 Verifica que la regla Firestore <code>system/shoplogixCredentials</code> permita acceso a admins.
               </div>
             </div>
@@ -341,7 +341,7 @@ export function ShoplogixCredentialsPage() {
             <Button
               onClick={handleDelete}
               disabled={deleting}
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-red-600 hover:bg-red-600 text-white"
             >
               {deleting ? <Spinner /> : 'Eliminar'}
             </Button>
