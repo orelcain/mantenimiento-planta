@@ -24,7 +24,7 @@ type LotRow = {
 
 type LotDispersion = LotRow & {
   cvPct: number
-  cvSignal: { cls: string; emoji: string; label: string; bar: string }
+  cvSignal: { cls: string; label: string; bar: string }
 }
 
 type GateAction = {
@@ -43,7 +43,7 @@ interface Props {
   lotDispersionSummary: { mostVariable: LotDispersion | undefined; high: LotDispersion[] }
   directGateActions: GateAction[]
   lotStdDevTooltipProps: TooltipPropsLike
-  getCvSignal: (cv: number) => { cls: string; emoji: string; label: string; bar: string }
+  getCvSignal: (cv: number) => { cls: string; label: string; bar: string }
   getCalibreByWeightGrams: (weightGrams?: number | null) => string
   getPointZeroTextClass: (pct: number) => string
   getPointZeroBarColor: (pct: number) => string
@@ -145,10 +145,19 @@ export function GraderLotesTab({
           <CardTitle className="text-sm">Comparativa de Lotes</CardTitle>
           <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
-            <span>🟢 &lt;8%</span>
-            <span>🟡 8-11.9%</span>
-            <span>🟠 12-19.9%</span>
-            <span>🔴 ≥20%</span>
+            {/* Puntos de color reales en vez de emojis: heredan el tema y son
+                del mismo tamaño. El rango siempre acompaña — el color nunca es
+                el único canal (§13). */}
+            {[
+              { c: 'bg-ink-ok', r: '<8%' },
+              { c: 'bg-yellow-500', r: '8-11.9%' },
+              { c: 'bg-ink-warn', r: '12-19.9%' },
+              { c: 'bg-ink-crit', r: '≥20%' },
+            ].map(({ c, r }) => (
+              <span key={r} className="inline-flex items-center gap-1">
+                <i className={`inline-block size-2 rounded-full ${c}`} aria-hidden /> {r}
+              </span>
+            ))}
           </p>
         </CardHeader>
         <CardContent>
@@ -216,13 +225,13 @@ export function GraderLotesTab({
                               <span className={cn('font-medium tabular-nums', signal.cls)}>
                                 {lot.stdDevWeightGrams.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
-                              <span aria-hidden>{signal.emoji}</span>
+                              <i className={`inline-block size-2 shrink-0 rounded-full ${signal.bar ? '' : ''}`} style={{ background: signal.bar }} aria-hidden />
                               <InfoTooltip
                                 iconSize={11}
                                 title={`σ del lote ${lot.lot}`}
                                 text="Este valor sale al medir qué tan alejados están los pesos individuales de la media del lote."
                                 formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
-                                example={`x̄=${lot.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${lot.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${lot.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
+                                example={`x̄=${lot.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${lot.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${lot.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (dispersión ${signal.label}).`}
                               />
                             </span>
                           )
@@ -235,11 +244,11 @@ export function GraderLotesTab({
                           return (
                             <span className={cn('inline-flex items-center justify-end gap-1 font-medium tabular-nums', signal.cls)}>
                               {cv.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
-                              <span aria-hidden>{signal.emoji}</span>
+                              <i className={`inline-block size-2 shrink-0 rounded-full ${signal.bar ? '' : ''}`} style={{ background: signal.bar }} aria-hidden />
                               <InfoTooltip
                                 iconSize={11}
                                 {...getTooltipProps('lot.cv')}
-                                example={`CV=${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% en lote ${lot.lot}: ${signal.emoji} dispersión ${signal.label}. Se calcula como σ/x̄.`}
+                                example={`CV=${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% en lote ${lot.lot}: dispersión ${signal.label}. Se calcula como σ/x̄.`}
                               />
                             </span>
                           )
@@ -273,10 +282,19 @@ export function GraderLotesTab({
           </CardTitle>
           <p className="text-caption text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">Semáforo CV:</span>
-            <span>🟢 &lt;8%</span>
-            <span>🟡 8-11.9%</span>
-            <span>🟠 12-19.9%</span>
-            <span>🔴 ≥20%</span>
+            {/* Puntos de color reales en vez de emojis: heredan el tema y son
+                del mismo tamaño. El rango siempre acompaña — el color nunca es
+                el único canal (§13). */}
+            {[
+              { c: 'bg-ink-ok', r: '<8%' },
+              { c: 'bg-yellow-500', r: '8-11.9%' },
+              { c: 'bg-ink-warn', r: '12-19.9%' },
+              { c: 'bg-ink-crit', r: '≥20%' },
+            ].map(({ c, r }) => (
+              <span key={r} className="inline-flex items-center gap-1">
+                <i className={`inline-block size-2 rounded-full ${c}`} aria-hidden /> {r}
+              </span>
+            ))}
           </p>
         </CardHeader>
         <CardContent className="overflow-visible space-y-3">
@@ -303,7 +321,7 @@ export function GraderLotesTab({
                       label: (ctx) => {
                         const lot = lotDispersionView[ctx.dataIndex]
                         if (!lot) return ''
-                        return `CV: ${lot.cvPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${lot.cvSignal.emoji} ${lot.cvSignal.label})`
+                        return `CV: ${lot.cvPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (dispersión ${lot.cvSignal.label})`
                       },
                       afterBody: (items) => {
                         const idx = items[0]?.dataIndex

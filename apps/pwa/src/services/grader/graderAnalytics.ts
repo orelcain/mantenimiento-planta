@@ -678,12 +678,12 @@ export function computeAnalytics(
         )
       } else if (currentBal && currentBal.gap > 0) {
         // Eliminar un gate de un calibre con DÉFICIT → peligroso
-        reason = `⚠️ Gate ${gs.gateNumber} etiquetado como ${gs.assignedCalibre} pero recibe ${topCal}. `
+        reason = `Cuidado: gate ${gs.gateNumber} etiquetado como ${gs.assignedCalibre} pero recibe ${topCal}. `
           + `Sin embargo, ${gs.assignedCalibre} tiene DÉFICIT de gates (${currentBal.gatesAssigned}/${currentBal.idealGates}). `
           + `Verifique la configuración de la máquina: puede que el gate deba recibir ${gs.assignedCalibre} y no lo está haciendo.`
         impactScore = round(Math.min(100, gs.mismatchPct * 0.6))
         evidence.push(
-          `⚠ ${gs.assignedCalibre}: demanda ${currentBal.demandPct}% con ${currentBal.gatesAssigned} gates (necesita ${currentBal.idealGates})`,
+          `${gs.assignedCalibre}: demanda ${currentBal.demandPct}% con ${currentBal.gatesAssigned} gates (necesita ${currentBal.idealGates})`,
           `Acción recomendada: revisar por qué la máquina no envía ${gs.assignedCalibre} a este gate`,
         )
       } else {

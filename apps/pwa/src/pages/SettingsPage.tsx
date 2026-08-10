@@ -830,15 +830,18 @@ function SystemSettings() {
                 <p className="text-muted-foreground">
                   El sistema de jerarquías organiza las ubicaciones en 8 niveles:
                 </p>
-                <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>🏢 Empresa</li>
-                  <li>📍 Área</li>
-                  <li>🗂️ Sub-área</li>
-                  <li>⚙️ Sistema</li>
-                  <li>🔧 Sub-sistema</li>
-                  <li>📂 Sección</li>
-                  <li>📋 Sub-sección</li>
-                  <li>🔍 Elemento</li>
+                {/* §63 menos es más: la lista ya está NUMERADA, que es lo que
+                    comunica el orden de los niveles. Un emoji por nivel no
+                    aportaba información — solo ruido. */}
+                <ol className="ml-2 list-inside list-decimal space-y-1">
+                  <li>Empresa</li>
+                  <li>Área</li>
+                  <li>Sub-área</li>
+                  <li>Sistema</li>
+                  <li>Sub-sistema</li>
+                  <li>Sección</li>
+                  <li>Sub-sección</li>
+                  <li>Elemento</li>
                 </ol>
               </div>
 

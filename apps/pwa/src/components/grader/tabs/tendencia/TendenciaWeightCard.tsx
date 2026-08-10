@@ -18,7 +18,7 @@ import type {
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
-type CvSignal = { cls: string; emoji: string; label: string; bar: string }
+type CvSignal = { cls: string; label: string; bar: string }
 
 interface Props {
   analytics: GraderAnalyticsResult
@@ -341,13 +341,13 @@ export function TendenciaWeightCard({
                             <span className={cn('font-medium tabular-nums', signal.cls)}>
                               {b.stdDevWeightGrams.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <span aria-hidden>{signal.emoji}</span>
+                            <i className="inline-block size-2 shrink-0 rounded-full" style={{ background: signal.bar }} aria-hidden />
                             <InfoTooltip
                               iconSize={11}
                               title={`σ intervalo ${new Date(b.bucketStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`}
                               text="Este valor sale al medir qué tan alejados están los pesos del intervalo respecto a su media."
                               formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
-                              example={`x̄=${b.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${b.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${b.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
+                              example={`x̄=${b.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${b.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${b.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (dispersión ${signal.label}).`}
                             />
                           </span>
                         )
@@ -360,7 +360,7 @@ export function TendenciaWeightCard({
                         return (
                           <span className={cn('inline-flex items-center justify-end gap-1 font-medium tabular-nums', signal.cls)}>
                             {cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%
-                            <span aria-hidden>{signal.emoji}</span>
+                            <i className="inline-block size-2 shrink-0 rounded-full" style={{ background: signal.bar }} aria-hidden />
                           </span>
                         )
                       })()}

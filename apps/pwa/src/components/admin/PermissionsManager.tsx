@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Shield, Save, AlertCircle } from 'lucide-react'
+import { Shield, Save, AlertCircle, AlertTriangle, Wrench, Users, RadioTower, BarChart3 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -72,12 +73,13 @@ const DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
   ],
 }
 
-const CATEGORY_LABELS: Record<Permission['category'], { label: string; icon: string }> = {
-  incidents: { label: 'Incidencias', icon: '🚨' },
-  maintenance: { label: 'Mantenimiento', icon: '🔧' },
-  users: { label: 'Usuarios', icon: '👥' },
-  iot: { label: 'IoT y Sensores', icon: '📡' },
-  reports: { label: 'Reportes y Analytics', icon: '📊' },
+/** Ícono por categoría: COMPONENTE, no emoji — hereda color y tamaño del tema. */
+const CATEGORY_LABELS: Record<Permission['category'], { label: string; icon: LucideIcon }> = {
+  incidents: { label: 'Incidencias', icon: AlertTriangle },
+  maintenance: { label: 'Mantenimiento', icon: Wrench },
+  users: { label: 'Usuarios', icon: Users },
+  iot: { label: 'IoT y Sensores', icon: RadioTower },
+  reports: { label: 'Reportes y Analytics', icon: BarChart3 },
 }
 
 export function PermissionsManager() {
@@ -192,10 +194,10 @@ export function PermissionsManager() {
                 : 'bg-muted hover:bg-muted/80'
             }`}
           >
-            {role === 'admin' && '👑 Admin'}
-            {role === 'supervisor' && '👔 Supervisor'}
+            {role === 'admin' && 'Admin'}
+            {role === 'supervisor' && 'Supervisor'}
             {role === 'tecnico' && '🔧 Técnico'}
-            {role === 'usuario' && '👤 Usuario'}
+            {role === 'usuario' && 'Usuario'}
             <Badge variant="secondary" className="ml-2">
               {rolePerms.length}/{ALL_PERMISSIONS.length}
             </Badge>
@@ -214,7 +216,7 @@ export function PermissionsManager() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <span>{categoryConfig.icon}</span>
+                    <categoryConfig.icon className="size-4 text-muted-foreground" />
                     {categoryConfig.label}
                   </CardTitle>
                   <Badge variant={categoryActiveCount === perms.length ? 'default' : 'secondary'}>

@@ -8,6 +8,8 @@
  * - SwapSuggestionCard: tarjeta de sugerencia de intercambio de gates
  */
 import { Badge } from '@/components/ui'
+import { Tag, Zap, Search, RefreshCw, MoveRight, Plus, BarChart3, Lightbulb } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
   DeterministicInsight,
@@ -39,14 +41,14 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       <div className="mt-2 space-y-0.5">
         {insight.evidence.map((e, i) => (
           <p key={i} className="text-xs text-muted-foreground flex items-center gap-1">
-            <span className="text-blue-500">📊</span> {e}
+            <BarChart3 className="inline size-3.5 text-ink-info" /> {e}
           </p>
         ))}
       </div>
       <div className="mt-2 space-y-0.5">
         {insight.recommendations.map((r, i) => (
           <p key={i} className="text-xs flex items-center gap-1">
-            <span className="text-green-500">💡</span> {r}
+            <Lightbulb className="inline size-3.5 text-ink-ok" /> {r}
           </p>
         ))}
       </div>
@@ -218,13 +220,14 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     reassign: 'text-blue-600 border-blue-300',
     add: 'text-ink-ok border-green-300',
   }
-  const typeIcons: Record<string, string> = {
-    correction: '🏷️',
-    optimization: '⚡',
-    investigate: '🔍',
-    swap: '🔄',
-    reassign: '🔹',
-    add: '➕',
+  /** Ícono por tipo de sugerencia: componente, no emoji (§17). */
+  const typeIcons: Record<string, LucideIcon> = {
+    correction: Tag,
+    optimization: Zap,
+    investigate: Search,
+    swap: RefreshCw,
+    reassign: MoveRight,
+    add: Plus,
   }
 
   const showArrow = suggestion.type !== 'investigate' && suggestion.currentCalibre !== suggestion.suggestedCalibre
@@ -238,7 +241,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     )}>
       <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="outline" className={cn('text-caption', typeColors[suggestion.type])}>
-          {typeIcons[suggestion.type] || ''} {typeLabels[suggestion.type] || suggestion.type}
+          {(() => { const I = typeIcons[suggestion.type]; return I ? <I className="inline size-3.5" /> : null })()} {typeLabels[suggestion.type] || suggestion.type}
         </Badge>
         <span className="text-sm font-medium">
           Gate {suggestion.gateNumber}: {suggestion.currentCalibre}
@@ -253,7 +256,7 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
         <div className="mt-1.5 space-y-0.5">
           {suggestion.evidence.map((e, i) => (
             <p key={i} className="text-caption text-muted-foreground">
-              {e.startsWith('⚠') ? e : `📊 ${e}`}
+              {e}
             </p>
           ))}
         </div>
