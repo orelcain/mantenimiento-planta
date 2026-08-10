@@ -15,6 +15,7 @@
 import { ListChecks } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { Disclosure } from '@/components/piel'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 
 export type TendenciaImputacion = { dir: 'sube' | 'baja' | 'estable'; deltaPts: number } | null
@@ -131,17 +132,28 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           </span>
         </div>
 
+        {/* §22: el % y la tendencia responden la pregunta de la tarjeta; el
+            reparto por causal es DETALLE. Se despliega en línea (variante
+            `inline`) para no crear tarjeta dentro de tarjeta (§7). */}
         {imputacion.topCategorias.length > 0 && (
+          <Disclosure
+            variant="inline"
+            title="Ver reparto por causal"
+            summary={`${imputacion.topCategorias.length} causales`}
+            defaultOpen={false}
+            storageKey="grader-imputacion-causales"
+          >
           <div className="flex flex-wrap gap-1">
             {imputacion.topCategorias.slice(0, 5).map((c) => (
               <span
                 key={c.label}
-                className="text-caption px-1.5 py-px rounded-ctl bg-muted border border-border text-muted-foreground tabular-nums"
+                className="text-caption px-2 py-0.5 rounded-full bg-muted text-muted-foreground tabular-nums"
               >
                 {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
               </span>
             ))}
           </div>
+          </Disclosure>
         )}
       </CardContent>
     </Card>

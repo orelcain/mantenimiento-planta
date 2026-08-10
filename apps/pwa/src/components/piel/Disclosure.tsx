@@ -23,6 +23,13 @@ import { cn } from '@/lib/utils'
  * scroll ni el estado de lo que haya adentro.
  */
 export interface DisclosureProps {
+  /**
+   * `section` (por defecto) dibuja su propia superficie de tarjeta.
+   * `inline` NO dibuja superficie: es para desplegar detalle DENTRO de una
+   * tarjeta que ya existe. Sin esta variante, usar Disclosure ahí crearía
+   * tarjeta dentro de tarjeta, que es justo lo que prohíbe la §7.
+   */
+  variant?: 'section' | 'inline'
   title: React.ReactNode
   /** Lo que se ve cuando está PLEGADO. Sin esto, cerrar no ahorra nada. */
   summary?: React.ReactNode
@@ -35,6 +42,7 @@ export interface DisclosureProps {
 }
 
 export function Disclosure({
+  variant = 'section',
   title,
   summary,
   defaultOpen = true,
@@ -42,6 +50,7 @@ export function Disclosure({
   className,
   children,
 }: DisclosureProps) {
+  const inline = variant === 'inline'
   const id = React.useId()
   const [open, setOpen] = React.useState(() => {
     if (!storageKey) return defaultOpen
@@ -54,7 +63,7 @@ export function Disclosure({
   }, [storageKey, open])
 
   return (
-    <section className={cn('overflow-hidden rounded-card bg-card', className)}>
+    <section className={cn(!inline && 'overflow-hidden rounded-card bg-card', className)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -62,25 +71,36 @@ export function Disclosure({
         aria-controls={id}
         className={cn(
           // §16: 44px de área táctil. La cabecera ENTERA abre y cierra.
-          'flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left',
-          'transition-colors duration-150 hover:bg-accent motion-reduce:transition-none',
+          'flex w-full items-center gap-2 text-left',
+          'transition-colors duration-150 motion-reduce:transition-none',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
+          inline
+            ? 'min-h-9 text-footnote text-muted-foreground hover:text-foreground'
+            : 'min-h-11 gap-3 px-4 py-3 hover:bg-accent',
         )}
       >
         <ChevronDown
           aria-hidden
           className={cn(
-            'size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
+            'shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
+            inline ? 'size-3.5' : 'size-4',
             !open && '-rotate-90',
           )}
         />
-        <span className="min-w-0 flex-1 truncate text-headline font-semibold">{title}</span>
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate',
+            inline ? 'font-medium' : 'text-headline font-semibold',
+          )}
+        >
+          {title}
+        </span>
         {/* El resumen solo aparece plegado: abierto, el detalle ya lo dice. */}
         {summary && !open && (
           <span className="shrink-0 text-footnote text-muted-foreground">{summary}</span>
         )}
       </button>
-      <div id={id} hidden={!open} className="px-4 pb-4">
+      <div id={id} hidden={!open} className={cn(inline ? 'pt-1.5' : 'px-4 pb-4')}>
         {children}
       </div>
     </section>

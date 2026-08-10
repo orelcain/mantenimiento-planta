@@ -10,6 +10,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Disclosure } from '@/components/piel'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -418,7 +419,19 @@ export function PlantKPIBoard({
                 que es info no crítica en mobile. Desktop: ancho completo.
                 Cada KPI tiene tooltip explicativo (`title`) accesible vía hover
                 en desktop y long-press en touch. */}
-            {!kpis.graderOnly && <div className="grid gap-1 pt-0.5">
+            {/* §22: los KPI de arriba responden "¿cómo va el turno?". El desglose
+                POR MÁQUINA es el siguiente nivel — se consulta cuando ya se sabe
+                que algo anda mal y hay que ver cuál. Va en línea para no crear
+                tarjeta dentro de tarjeta (§7). */}
+            {!kpis.graderOnly && (
+            <Disclosure
+              variant="inline"
+              title="Ver detalle por máquina"
+              summary={`${kpis.machines.length} máquina${kpis.machines.length === 1 ? '' : 's'}`}
+              defaultOpen={false}
+              storageKey="grader-detalle-maquinas"
+            >
+            <div className="grid gap-1 pt-0.5">
               {kpis.machines.map((m, idx) => {
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
@@ -477,7 +490,9 @@ export function PlantKPIBoard({
                 </div>
                 )
               })}
-            </div>}
+            </div>
+            </Disclosure>
+            )}
           </>
         )}
       </CardContent>
