@@ -71,7 +71,7 @@ export function MonitorUsagePanel({ stats }: { stats: MonitorUsageStats | null }
         {ahora > 0 && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            {ahora} {ahora === 1 ? 'mirando ahora' : 'mirando ahora'}
+            {ahora === 1 ? 'Alguien mirando ahora' : `${ahora} mirando ahora`}
           </span>
         )}
       </div>
@@ -91,7 +91,7 @@ export function MonitorUsagePanel({ stats }: { stats: MonitorUsageStats | null }
         {anteriores > 0 && (
           <>
             <span className="text-muted-foreground/30">·</span>
-            <span>{anteriores} vistas a turnos anteriores</span>
+            <span>{anteriores} {anteriores === 1 ? 'vista' : 'vistas'} a turnos anteriores</span>
           </>
         )}
       </div>
