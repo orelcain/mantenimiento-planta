@@ -35,8 +35,15 @@ const COLLECTION = 'publicShiftMonitors'
 
 /** Intervalo de producción de Shoplogix: 5 minutos fijos. */
 const INTERVAL_MIN = 5
-/** Cuántos intervalos entran en la serie del sparkline (48 × 5 min = 4 h). */
-const SERIES_MAX_POINTS = 48
+/**
+ * Tope de tramos de la serie. 192 × 5 min = 16 h: alcanza para un turno
+ * completo con su cola fuera de horario.
+ *
+ * Estaba en 48 (4 h) y recortaba el gráfico por delante: el turno del 10-ago
+ * arrancó 07:55 y el eje decía "12:30–16:25", como si la mañana no hubiera
+ * existido. El gráfico tiene que cubrir el turno entero o engaña.
+ */
+const SERIES_MAX_POINTS = 192
 /** Ventana "reciente" para la cadencia instantánea. */
 const RECENT_INTERVALS = 6   // 30 min
 

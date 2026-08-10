@@ -13,6 +13,29 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Tres arreglos de la pantalla publica vistos por Orel
+
+Los tres los detecto Orel mirando la pantalla, no los tests:
+
+1. **El grafico mentia por recorte.** El eje decia "12:30–16:25" para un turno que arranco a las
+   07:55: `SERIES_MAX_POINTS` estaba en 48 tramos (4 h) y cortaba la mañana entera. Subido a 192
+   (16 h) — el turno del 10-ago pasa de 48 a **106 tramos** y el eje ahora dice 07:40–16:25. Un
+   grafico que se come la mitad del turno no es un grafico incompleto: es uno que engaña.
+2. **Chip "Sigue el turno vigente" fuera.** Redundante: el encabezado ya dice el turno y la barra de
+   navegacion ya dice "Turno actual". El pie sigue explicando que el link no caduca con el turno,
+   que es lo unico que no se deduce mirando.
+3. **Navegacion en los dos sentidos.** Habia "Turno anterior" y "Volver al actual", pero no se podia
+   avanzar de a uno. Ahora `‹ Anterior` / `Siguiente ›` (deshabilitados en los extremos) y el atajo
+   "Ir al actual" aparece solo cuando hay mas de un turno que saltar.
+
+- Archivos: `functions/publicMonitor.js`, `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`.
+- Verificacion: 202 tests functions y 1.104 del PWA en verde; tsc y eslint limpios. En el navegador
+  con datos reales: 106 barras, eje 07:40–16:25, "Siguiente" se habilita al retroceder y "Ir al
+  actual" aparece recien a 2 turnos atras.
+- Estado: HECHO (mergeado)
+- Sigue: el mismo doble conteo del monitor existe en la MATRIZ (`graderUnscheduledAttribution`) —
+  Orel pidio arreglarlo tambien; va en su propio PR porque toca una vista central.
+
 ## 2026-08-10 - claude - Telemetria anonima del monitor publico
 
 Orel: *"¿se puede mostrar quienes usan el QR?"*. Identidad no —quien abre el link no tiene sesion,
