@@ -46,12 +46,20 @@ export function IncidentsPage() {
   const { incidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [searchParams, setSearchParams] = useSearchParams()
-  const [showForm, setShowForm] = useState(false)
+  /**
+   * `?nueva=1` abre el formulario al entrar. Es lo que permite que el ＋ central
+   * de la barra inferior registre una incidencia desde CUALQUIER pantalla sin
+   * levantar estado global: la barra navega acá con el parámetro y la página
+   * lo consume y lo limpia, para que recargar o compartir el enlace no vuelva
+   * a abrir el formulario.
+   */
+  const [showForm, setShowForm] = useState(() => searchParams.get('nueva') === '1')
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '')
   const [activeFilter, setActiveFilter] = useState<string | null>(() => searchParams.get('filter'))
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
   const [selectedMapLocation, setSelectedMapLocation] = useState<string>(() => searchParams.get('location') ?? 'all')
+
   const [selectedReporter, setSelectedReporter] = useState<string>(() => searchParams.get('reporter') ?? 'all')
   const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
   const [userInfoLabels, setUserInfoLabels] = useState<Record<string, string>>({})
@@ -84,6 +92,11 @@ export function IncidentsPage() {
       if (activeFilter) p.set('filter', activeFilter); else p.delete('filter')
       if (selectedMapLocation !== 'all') p.set('location', selectedMapLocation); else p.delete('location')
       if (selectedReporter !== 'all') p.set('reporter', selectedReporter); else p.delete('reporter')
+      // `nueva` es de un solo uso: ya abrió el formulario en el estado inicial.
+      // Se borra ACÁ y no en un efecto aparte porque este es el único dueño de
+      // la URL — con dos efectos escribiendo, el segundo pisaba al primero y el
+      // parámetro sobrevivía (recargar volvía a abrir el formulario).
+      p.delete('nueva')
       return p
     }, { replace: true })
   }, [searchQuery, activeFilter, selectedMapLocation, selectedReporter, setSearchParams])

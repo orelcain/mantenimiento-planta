@@ -30,6 +30,7 @@ import {
   GraduationCap,
   Shield,
   FolderArchive,
+  Plus,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -451,9 +452,17 @@ export function MainLayout() {
   const fixedTabs: BottomNavItem[] = [
     { name: 'Inicio',      href: '/',           icon: LayoutDashboard, module: 'dashboard' },
     { name: 'Incidencias', href: '/incidents',  icon: AlertTriangle,   module: 'incidencias' },
-    { name: 'Equipos',     href: '/equipment',  icon: Wrench,          module: 'equipos' },
     { name: 'Repuestos',   href: '/repuestos',  icon: Package,         module: 'repuestos' },
   ]
+  /**
+   * El ＋ central ocupa el 4º de los cinco slots que permite la §20. Salió
+   * "Equipos" a cambio: se llega desde el inicio y desde cualquier incidencia,
+   * mientras que REGISTRAR es el gesto más frecuente en planta —técnico de pie,
+   * con guantes, apurado— y hasta ahora exigía navegar hasta Incidencias y
+   * buscar el botón. No es decoración: es el principio de deferencia (la UI
+   * cede ante la tarea principal) hecho geometría.
+   */
+  const registrarIncidencia = () => navigate('/incidents?nueva=1')
   const bottomNavItems = [...fixedTabs]
     .filter(item => !item.module || canSee(item.module))
     // Respetar la misma visibilidad que el sidebar: si el href está oculto
@@ -1239,7 +1248,32 @@ export function MainLayout() {
                 <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
               </NavLink>
             )
-          })}
+          }).flatMap((el, idx) =>
+            // El ＋ va al MEDIO de la barra: es el punto que el pulgar alcanza
+            // sin recolocar la mano, y así lo trata iOS cuando una app tiene
+            // una acción de creación dominante.
+            idx === 1
+              ? [el, (
+                  <div key="registrar" className="flex flex-1 justify-center">
+                    <button
+                      type="button"
+                      onClick={registrarIncidencia}
+                      aria-label="Registrar incidencia"
+                      className={cn(
+                        'flex size-[3.25rem] -mt-6 items-center justify-center rounded-full',
+                        'bg-primary text-primary-foreground shadow-[0_6px_18px_rgb(var(--brand)/0.45)]',
+                        'transition-transform duration-200 active:scale-[0.94]',
+                        'motion-reduce:transition-none',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card',
+                        '[@media(max-height:500px)]:size-9 [@media(max-height:500px)]:mt-0',
+                      )}
+                    >
+                      <Plus className="size-7 [@media(max-height:500px)]:size-5" />
+                    </button>
+                  </div>
+                )]
+              : [el],
+          )}
           <button
             onClick={() => setSidebarOpen(true)}
             className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium text-muted-foreground transition-colors active:scale-[0.97]"
