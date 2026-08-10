@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
+import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
@@ -249,67 +250,6 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
   )
 }
 
-// ─── Confirmar liberación (overlay sobre el chip) ────────────────────────────
-
-function ReleaseConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: (e: React.MouseEvent) => void }) {
-  return (
-    <div
-      className="absolute inset-0 bg-background/92 rounded-xl flex flex-col items-center justify-center gap-1.5 z-20"
-      onClick={(e) => e.preventDefault()}
-    >
-      <span className="text-[9px] font-semibold text-center leading-tight px-1">¿Marcar<br/>como listo?</span>
-      <div className="flex gap-1.5">
-        <button
-          onClick={(e) => { e.preventDefault(); onConfirm() }}
-          className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
-        >✓</button>
-        <button
-          onClick={onCancel}
-          className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
-        >✗</button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Chip ─────────────────────────────────────────────────────────────────────
-
-function Chip({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  const c = COLOR[tile.color]
-  const Icon = tile.icon
-
-  return (
-    <Link
-      to={tile.href}
-      className={cn(
-        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative overflow-hidden',
-        'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
-        c.bg, c.border,
-      )}
-    >
-      {showWip && !confirming && (
-        <WipRibbon
-          variant="chip"
-          onTap={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
-        />
-      )}
-      {confirming && (
-        <ReleaseConfirm
-          onConfirm={() => { onRelease?.(); setConfirming(false) }}
-          onCancel={(e) => { e.preventDefault(); setConfirming(false) }}
-        />
-      )}
-      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
-        <Icon className={cn('h-3.5 w-3.5', c.icon)} />
-      </div>
-      <span className={cn('text-[10px] font-medium text-center leading-tight line-clamp-2 w-full', c.label)}>
-        {tile.label}
-      </span>
-    </Link>
-  )
-}
-
 // ─── CTA Tile ─────────────────────────────────────────────────────────────────
 
 function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
@@ -410,6 +350,7 @@ function AppShareCard() {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
+  const navigate = useNavigate()
   const user           = useAuthStore((s) => s.user)
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const role: UserRole = user?.rol ?? 'usuario'
@@ -463,16 +404,35 @@ export function MobileHomeGrid() {
             )}
 
             {chipTiles.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none snap-x snap-mandatory">
-                {chipTiles.map((tile) => (
-                  <Chip
-                    key={tile.id}
-                    tile={tile}
-                    showWip={isWip(tile.id, tile.wip)}
-                    onRelease={isAdmin ? () => toggleRelease(tile.id) : undefined}
-                  />
-                ))}
-              </div>
+              /*
+                LISTA AGRUPADA, no una grilla de mosaicos de color.
+                Esta es LA diferencia que se nota al comparar con un iPhone:
+                dentro de una app de iOS no hay mosaicos tintados —eso es
+                lenguaje de launcher— hay filas con ícono, título y chevron,
+                como Ajustes. La grilla obligaba además a desplazar en
+                horizontal, que en iOS solo se usa para carruseles de
+                contenido, nunca para navegar.
+              */
+              <ListGroup>
+                {chipTiles.map((tile) => {
+                  const c = COLOR[tile.color]
+                  const Icon = tile.icon
+                  const wip = isWip(tile.id, tile.wip)
+                  return (
+                    <ListCell
+                      key={tile.id}
+                      leading={
+                        <span className={cn('flex size-7 items-center justify-center rounded-ctl', c.bg)}>
+                          <Icon className={cn('size-4', c.icon)} />
+                        </span>
+                      }
+                      title={tile.label}
+                      trailing={wip ? <Pill tone="warning">En desarrollo</Pill> : undefined}
+                      onClick={() => navigate(tile.href)}
+                    />
+                  )
+                })}
+              </ListGroup>
             )}
           </div>
         )
