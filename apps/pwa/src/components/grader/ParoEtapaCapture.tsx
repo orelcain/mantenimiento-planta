@@ -143,7 +143,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
     <Card className={cn('border-cat-5-tint/[0.25]', className)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
-          <PauseCircle className="h-4 w-4 text-rose-400" />
+          <PauseCircle className="h-4 w-4 text-cat-5-ink" />
           Paros de etapa (línea)
           {areaLabel && (
             <Badge variant="outline" className="ml-1 text-caption font-normal text-muted-foreground border-border/50">{areaLabel}</Badge>

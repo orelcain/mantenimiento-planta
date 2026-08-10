@@ -264,16 +264,16 @@ export function LossCascadeCard({
       id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
       pct: `${pctOfTurno(totals.mantencionSec).toFixed(1)}% del turno`,
       pct2: `${pctOfTecho(totals.mantencionSec).toFixed(1)}% del techo`,
-      bg: 'bg-cat-5-tint/[0.15]', text: 'text-rose-400',
-      ringHover: 'hover:ring-rose-400/40', ringActive: 'ring-1 ring-rose-400/70',
+      bg: 'bg-cat-5-tint/[0.15]', text: 'text-cat-5-ink',
+      ringHover: 'hover:ring-cat-5-ink/40', ringActive: 'ring-1 ring-cat-5-ink/70',
       tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
     },
     {
       id: 'sin-clasificar' as LossBucket, label: '− Sin clasif.', sec: totals.sinClasificarSec,
       pct: `${pctOfTurno(totals.sinClasificarSec).toFixed(1)}% del turno`,
       pct2: `${pctOfTecho(totals.sinClasificarSec).toFixed(1)}% del techo`,
-      bg: 'bg-cat-6-tint/[0.15]', text: 'text-violet-400',
-      ringHover: 'hover:ring-violet-400/40', ringActive: 'ring-1 ring-violet-400/70',
+      bg: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink',
+      ringHover: 'hover:ring-cat-6-ink/40', ringActive: 'ring-1 ring-cat-6-ink/70',
       tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
     },
   ].sort((a, b) => b.sec - a.sec)
@@ -428,9 +428,9 @@ export function LossCascadeCard({
               : activeBucket === 'externo'
               ? { bar: 'bg-amber-500/[0.15]', text: 'text-amber-400' }
               : activeBucket === 'mantencion'
-              ? { bar: 'bg-cat-5-tint/[0.15]', text: 'text-rose-400' }
+              ? { bar: 'bg-cat-5-tint/[0.15]', text: 'text-cat-5-ink' }
               : activeBucket === 'sin-clasificar'
-              ? { bar: 'bg-cat-6-tint/[0.15]', text: 'text-violet-400' }
+              ? { bar: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink' }
               : { bar: 'bg-muted-foreground/[0.10]', text: 'text-muted-foreground' }
             const groupLabel = activeBucket == null ? 'Uso real por máquina' : `${LOSS_BUCKET_META[activeBucket as keyof typeof LOSS_BUCKET_META]?.label ?? activeBucket} por máquina`
             return (
@@ -614,7 +614,7 @@ export function LossCascadeCard({
           )}
 
           {totals.sinClasificarSec > 0 && filter === 'all' && (
-            <p className="text-caption text-violet-400/80">
+            <p className="text-caption text-cat-6-ink">
               <AlertTriangle className="inline h-3 w-3" /> {fmtHm(totals.sinClasificarSec)} sin clasificar — causal desconocida o sin anotar en Shoplogix.
               Anotarla permite asignarle dueño (y sacarla de la duda).
             </p>

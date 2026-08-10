@@ -320,7 +320,7 @@ export function ProductoTab({
 
           {/* Sub-card C: Paleta flipper física */}
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
-            <p className="text-xs font-semibold text-violet-400">Paleta flipper física</p>
+            <p className="text-xs font-semibold text-cat-6-ink">Paleta flipper física</p>
             <div>
               <Label className="text-xs">Largo paleta (mm)</Label>
               <Input

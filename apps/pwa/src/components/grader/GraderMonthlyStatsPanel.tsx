@@ -262,7 +262,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{nightShifts}</p>
                 <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                  <Moon className="w-3 h-3 text-indigo-400" /> Noche
+                  <Moon className="w-3 h-3 text-cat-3-ink" /> Noche
                 </p>
               </div>
             </div>
@@ -278,14 +278,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t2Shifts}</p>
                 <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                  <Sunset className="w-3 h-3 text-orange-400" /> T2
+                  <Sunset className="w-3 h-3 text-cat-4-ink" /> T2
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
                 <p className="text-xl font-bold leading-none tabular-nums">{t3Shifts}</p>
                 <p className="text-caption text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                  <Moon className="w-3 h-3 text-indigo-400" /> T3
+                  <Moon className="w-3 h-3 text-cat-3-ink" /> T3
                 </p>
               </div>
             </div>

@@ -166,7 +166,7 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
               </div>
             </div>
             {error && (
-              <p className="text-xs text-rose-400">{error}</p>
+              <p className="text-xs text-cat-5-ink">{error}</p>
             )}
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? <Spinner /> : <><LogIn className="w-4 h-4 mr-2" /> Confirmar y entrar</>}

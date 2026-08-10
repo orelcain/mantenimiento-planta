@@ -153,8 +153,8 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
       <CardContent className="pb-4 space-y-4">
         {noMaintenanceData ? (
           <p className="text-sm text-muted-foreground">
-            Sin paros clasificados como <span className="text-orange-400">falla de equipo</span> o{' '}
-            <span className="text-orange-400">intervención de mantención</span> en el período.
+            Sin paros clasificados como <span className="text-cat-4-ink">falla de equipo</span> o{' '}
+            <span className="text-cat-4-ink">intervención de mantención</span> en el período.
             {rel && rel.unclassifiedPauses > 0 && (
               <> Hay <span className="font-medium text-foreground">{rel.unclassifiedPauses}</span> pausas sin clasificar — clasifícalas en “Tiempo muerto del período” para medir el impacto.</>
             )}
@@ -163,12 +163,12 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
           <>
             {/* Frase de demostración */}
             <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] px-3 py-2 text-xs text-foreground/90">
-              Mantención atendió <span className="font-semibold text-orange-400">{rel!.eventsCount}</span> paros
+              Mantención atendió <span className="font-semibold text-cat-4-ink">{rel!.eventsCount}</span> paros
               ({rel!.fallasCount} fallas · {rel!.intervencionesCount} intervenciones) por{' '}
               <span className="font-semibold">{fmt(rel!.maintenanceDowntimeSec)}</span> en el período.
               {dir && dir.deltaPct != null && (
                 <> El paro de mantención{' '}
-                  <span className={dir.down ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'}>
+                  <span className={dir.down ? 'text-emerald-400 font-medium' : 'text-cat-5-ink font-medium'}>
                     {dir.down ? 'bajó' : 'subió'} {Math.abs(dir.deltaPct).toFixed(0)}%
                   </span>{' '}entre la 1ª y la 2ª mitad.
                 </>
@@ -197,7 +197,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                 valueColor={
                   rel!.availabilityPct == null ? undefined
                     : rel!.availabilityPct >= 98 ? 'text-emerald-400'
-                    : rel!.availabilityPct >= 95 ? 'text-amber-400' : 'text-rose-400'
+                    : rel!.availabilityPct >= 95 ? 'text-amber-400' : 'text-cat-5-ink'
                 }
               />
               <KpiCard
@@ -205,7 +205,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
                 value={fmt(rel!.maintenanceDowntimeSec)}
                 sub={rel!.maintenanceShareOfDeadPct != null ? `${rel!.maintenanceShareOfDeadPct.toFixed(0)}% del muerto total` : 'del período'}
                 icon={<Wrench className="w-3.5 h-3.5" />}
-                valueColor="text-orange-400"
+                valueColor="text-cat-4-ink"
               />
             </div>
 
@@ -224,7 +224,7 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             {rel!.trend.length > 0 && (
               <div className="pt-1">
                 <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-2">
-                  {dir?.down ? <TrendingDown className="w-3.5 h-3.5 text-emerald-400" /> : <TrendingUp className="w-3.5 h-3.5 text-rose-400" />}
+                  {dir?.down ? <TrendingDown className="w-3.5 h-3.5 text-emerald-400" /> : <TrendingUp className="w-3.5 h-3.5 text-cat-5-ink" />}
                   Tendencia del paro de mantención {rel!.trend[0]?.grouped ? '· por semana' : '· por día'}
                 </div>
                 <div className="space-y-0.5 max-h-44 overflow-y-auto pr-1">

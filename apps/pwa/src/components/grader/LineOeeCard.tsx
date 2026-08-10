@@ -52,7 +52,7 @@ function oeeColor(v: number | null): string {
   if (v >= 0.85) return 'text-emerald-400'
   if (v >= 0.65) return 'text-sky-400'
   if (v >= 0.50) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMonth, areaLabel, refreshKey = 0, className }: LineOeeCardProps) {

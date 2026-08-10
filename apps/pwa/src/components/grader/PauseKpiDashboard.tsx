@@ -103,7 +103,7 @@ const DEAD_TIME_PCT_THRESHOLDS = {
 function deadTimePctColor(pct: number): string {
   if (pct <= DEAD_TIME_PCT_THRESHOLDS.okBelow) return 'text-emerald-400'
   if (pct <= DEAD_TIME_PCT_THRESHOLDS.warnBelow) return 'text-amber-400'
-  return 'text-rose-400'
+  return 'text-cat-5-ink'
 }
 
 // SIN_TAG_ID y summarizeByCategory viven en services/grader/pauseKpiAnalytics
@@ -153,8 +153,8 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
   const renderItems: React.ReactNode[] = []
   let lastCategory: string | null = null
   const CATEGORY_LABEL = {
-    operacional:    { label: 'Atacables (operacionales)',     color: 'text-rose-400/80'   },
-    organizacional: { label: 'Ineludibles (organizacionales)', color: 'text-cyan-400/80'  },
+    operacional:    { label: 'Atacables (operacionales)',     color: 'text-cat-5-ink'   },
+    organizacional: { label: 'Ineludibles (organizacionales)', color: 'text-cat-7-ink'  },
     sin_clasificar: { label: 'Sin clasificar',                color: 'text-slate-500'    },
   } as const
   for (const e of entries) {
@@ -537,14 +537,14 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                 value={fmtSec(cat.operationalSec)}
                 sub={`${evitablePct.toFixed(0)}% del muerto · falla, mantención, espera MP`}
                 icon={<TrendingDown className="w-3.5 h-3.5" />}
-                valueColor="text-rose-400"
+                valueColor="text-cat-5-ink"
               />
               <KpiCard
                 label="Ineludible (organizacional)"
                 value={fmtSec(cat.organizationalSec)}
                 sub={`${((cat.organizationalSec / cat.totalSec) * 100).toFixed(0)}% del muerto · colación, limpieza`}
                 icon={<Clock className="w-3.5 h-3.5" />}
-                valueColor="text-cyan-400"
+                valueColor="text-cat-7-ink"
               />
               {cat.unclassifiedSec > 0 && (
                 <KpiCard

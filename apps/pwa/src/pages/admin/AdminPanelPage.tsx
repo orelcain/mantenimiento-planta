@@ -103,7 +103,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Velocidad Nameplate Baader',
     description: 'Capacidad física máxima (pz/min) de cada Evisceradora. Referencia documental: hoy NO alimenta el cálculo de OEE — el Rendimiento usa el target de Shoplogix.',
     icon: <Gauge className="w-5 h-5" />,
-    iconColor: 'text-cyan-400',
+    iconColor: 'text-cat-7-ink',
     section: 'sensible',
   },
   {
@@ -111,7 +111,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Notificaciones Shoplogix',
     description: 'Configura canales (push, Telegram), período de gracia de inicio, hitos de piezas y alertas de detenciones por planta.',
     icon: <Bell className="w-5 h-5" />,
-    iconColor: 'text-orange-400',
+    iconColor: 'text-cat-4-ink',
     section: 'sensible',
   },
 
@@ -161,7 +161,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Jerarquías',
     description: 'Estructura de equipos y zonas de la planta.',
     icon: <FolderTree className="w-5 h-5" />,
-    iconColor: 'text-indigo-400',
+    iconColor: 'text-cat-3-ink',
     section: 'config',
   },
   {
@@ -169,7 +169,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Editor de Aprendizaje',
     description: 'Edita el contenido del Centro de Aprendizaje.',
     icon: <GraduationCap className="w-5 h-5" />,
-    iconColor: 'text-cyan-400',
+    iconColor: 'text-cat-7-ink',
     section: 'config',
   },
 ]

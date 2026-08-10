@@ -859,7 +859,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
   const ratioColor =
     shift.overallRatio >= 0.85 ? 'text-emerald-400'
     : shift.overallRatio >= 0.5 ? 'text-amber-400'
-    : 'text-rose-400'
+    : 'text-cat-5-ink'
 
   const RatioIcon = shift.runtimeVariance >= 0 ? TrendingUp : TrendingDown
 
@@ -961,7 +961,7 @@ function MachineRow({ shift, machineIndex = 0, expanded, onToggle, windowStart, 
           <Pause className="w-3 h-3" /> {breaks} paros
         </span>
         {micro > 0 && (
-          <span className="text-cyan-400 flex items-center gap-1" title="Micro Detenciones (<5 min)">
+          <span className="text-cat-7-ink flex items-center gap-1" title="Micro Detenciones (<5 min)">
             <Zap className="w-3 h-3" /> {micro} micro
           </span>
         )}
@@ -1292,7 +1292,7 @@ export function UpstreamMachinesPanel({
             {collapsed
               ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               : <ChevronDown  className="w-4 h-4 text-muted-foreground shrink-0" />}
-            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+            <Zap className="w-4 h-4 text-cat-6-ink shrink-0" />
             {/* 2 niveles:
                 - <sm (mobile portrait): "Línea Baader 142"
                 - sm+ (landscape mobile / tablet / desktop): "Línea upstream Baader 142"
@@ -1306,7 +1306,7 @@ export function UpstreamMachinesPanel({
               <span className="sm:hidden">{lineLabel ? `Línea ${lineLabel}` : 'Línea'}</span>
             </span>
             {snapshot && (
-              <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-cat-6-tint/[0.25] text-violet-400 shrink-0">
+              <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-cat-6-tint/[0.25] text-cat-6-ink shrink-0">
                 {snapshot.machines.length} máq
               </Badge>
             )}
@@ -1384,7 +1384,7 @@ export function UpstreamMachinesPanel({
               </Badge>
             )}
             {loading && <span>Cargando…</span>}
-            {error && <span className="text-rose-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
+            {error && <span className="text-cat-5-ink flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
             {isStale && syncedAt && (
               <span
                 className="text-amber-400 cursor-help"
@@ -1454,7 +1454,7 @@ export function UpstreamMachinesPanel({
             )}
 
             {error && (
-              <div className="text-sm text-rose-400 py-4 flex items-center gap-2">
+              <div className="text-sm text-cat-5-ink py-4 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 <span>No se pudo cargar: {error}</span>
               </div>
@@ -1502,7 +1502,7 @@ export function UpstreamMachinesPanel({
                   )}
                 </div>
                 {slxWindowMismatch && (
-                  <p className="mb-1 flex items-start gap-1 text-caption text-rose-400/70">
+                  <p className="mb-1 flex items-start gap-1 text-caption text-cat-5-ink">
                     <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
                     <span>
                       Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno

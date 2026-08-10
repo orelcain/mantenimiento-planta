@@ -190,7 +190,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
           className="w-full flex items-center justify-between gap-2 text-left"
         >
           <div className="flex items-center gap-2 min-w-0">
-            <Crosshair className="w-4 h-4 text-violet-400 shrink-0" />
+            <Crosshair className="w-4 h-4 text-cat-6-ink shrink-0" />
             <span className="font-medium text-sm">Dispersión P0 por pieza</span>
             <span
               className="text-xs text-muted-foreground tabular-nums truncate cursor-help"

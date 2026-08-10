@@ -47,7 +47,7 @@ export function TurnoOficialChip({ rollup, machines, className }: TurnoOficialCh
       {currentJob?.name && (
         <Badge
           variant="outline"
-          className="text-caption px-1.5 py-0 gap-1 border-cat-7-tint/[0.25] text-cyan-400"
+          className="text-caption px-1.5 py-0 gap-1 border-cat-7-tint/[0.25] text-cat-7-ink"
           title={currentJob.jobMaxRunRate ? `Máx ${currentJob.jobMaxRunRate} pph` : 'Especie en curso'}
         >
           <Fish className="w-3 h-3" />

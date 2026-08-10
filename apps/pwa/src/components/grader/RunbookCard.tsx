@@ -11,8 +11,8 @@ import type { Runbook, RunbookCategory } from '@/services/grader/graderRunbooks'
 const CATEGORY_META: Record<RunbookCategory, { label: string; icon: typeof Wrench; color: string }> = {
   contrastacion: { label: 'Contrastación', icon: Settings, color: 'text-blue-400' },
   calibracion:   { label: 'Calibración',   icon: Zap,      color: 'text-amber-400' },
-  mantencion:    { label: 'Mantención',    icon: Wrench,   color: 'text-orange-400' },
-  limpieza:      { label: 'Limpieza',      icon: Droplets, color: 'text-cyan-400' },
+  mantencion:    { label: 'Mantención',    icon: Wrench,   color: 'text-cat-4-ink' },
+  limpieza:      { label: 'Limpieza',      icon: Droplets, color: 'text-cat-7-ink' },
   troubleshooting: { label: 'Troubleshooting', icon: BookOpen, color: 'text-purple-400' },
 }
 

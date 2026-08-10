@@ -260,7 +260,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             <span className="flex items-center gap-1.5 cursor-help" title={MANUAL_LINE_TOOLTIP}>
               <span className="w-2 h-2 rounded-[2px] bg-cat-6-tint/[0.15]" />
               <span className="text-muted-foreground">{MANUAL_LINE_LABEL}</span>
-              <b className="tabular-nums text-violet-400">
+              <b className="tabular-nums text-cat-6-ink">
                 {manualLine.manualPieces.toLocaleString('es-CL')}
               </b>
               <span className="text-muted-foreground tabular-nums">

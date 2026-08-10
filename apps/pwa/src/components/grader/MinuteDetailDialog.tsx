@@ -355,7 +355,7 @@ export function MinuteDetailDialog({
                     <span className="text-muted-foreground"> · </span>
                     <span className="text-emerald-400">{breakdown.total - breakdown.p0} OK</span>
                     <span className="text-muted-foreground"> + </span>
-                    <span className={cn(breakdown.p0 > 0 ? 'text-orange-400' : 'text-muted-foreground')}>
+                    <span className={cn(breakdown.p0 > 0 ? 'text-cat-4-ink' : 'text-muted-foreground')}>
                       {breakdown.p0} P0
                     </span>
                     <span className="text-muted-foreground"> ({breakdown.p0Pct.toFixed(1)}%)</span>
@@ -578,7 +578,7 @@ export function MinuteDetailDialog({
                         >
                           <td className="px-2 py-1 tabular-nums text-muted-foreground">{fmtTimeWithSec(r.ts)}</td>
                           <td className="px-2 py-1 font-medium tabular-nums">
-                            {r.gate === 0 ? <span className="text-orange-400">P0</span> : r.gate}
+                            {r.gate === 0 ? <span className="text-cat-4-ink">P0</span> : r.gate}
                           </td>
                           <td className="px-2 py-1 tabular-nums text-right">
                             {r.weightKg != null ? `${r.weightKg.toFixed(2)} kg` : '—'}

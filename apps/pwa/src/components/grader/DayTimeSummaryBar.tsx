@@ -98,7 +98,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
       <span className="text-emerald-400 tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
-      <span className="text-rose-400 tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
+      <span className="text-cat-5-ink tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
         <PauseCircle className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {totals.breakSec > 0 && (

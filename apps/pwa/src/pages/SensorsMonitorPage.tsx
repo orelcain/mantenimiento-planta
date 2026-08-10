@@ -164,17 +164,17 @@ function ThresholdEditor({ deviceId, current, onClose }: {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <p className="text-caption font-medium text-orange-400 flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
+          <p className="text-caption font-medium text-cat-4-ink flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
           {field('Crít. bajo', 'tempCritLow', 'text-red-400')}
           {field('Adv. bajo', 'tempWarnLow', 'text-amber-400')}
           {field('Adv. alto', 'tempWarnHigh', 'text-amber-400')}
           {field('Crít. alto', 'tempCritHigh', 'text-red-400')}
         </div>
         <div className="space-y-1.5">
-          <p className="text-caption font-medium text-cyan-400 flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
+          <p className="text-caption font-medium text-cat-7-ink flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
           {field('Crít. bajo', 'humCritLow', 'text-blue-400')}
-          {field('Adv. bajo', 'humWarnLow', 'text-cyan-400')}
-          {field('Adv. alto', 'humWarnHigh', 'text-cyan-400')}
+          {field('Adv. bajo', 'humWarnLow', 'text-cat-7-ink')}
+          {field('Adv. alto', 'humWarnHigh', 'text-cat-7-ink')}
           {field('Crít. alto', 'humCritHigh', 'text-blue-400')}
         </div>
       </div>
@@ -736,7 +736,7 @@ function TrendSparkline({
         <div className="flex items-center gap-2 flex-wrap">
           {showTemp && (
             <div className="flex items-center gap-1">
-              <span className="text-caption text-orange-400/80">°C</span>
+              <span className="text-caption text-cat-4-ink">°C</span>
               <select
                 value={tempInterval ?? 'auto'}
                 onChange={(e) => setTempInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
@@ -755,7 +755,7 @@ function TrendSparkline({
           )}
           {showHum && (
             <div className="flex items-center gap-1">
-              <span className="text-caption text-cyan-400/80">%</span>
+              <span className="text-caption text-cat-7-ink">%</span>
               <select
                 value={humInterval ?? 'auto'}
                 onChange={(e) => setHumInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
@@ -958,24 +958,24 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
         {/* KPIs row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-4">
-            <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
+            <div className="text-xs text-cat-4-ink flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
-            <div className="text-3xl font-bold text-orange-400">
+            <div className="text-3xl font-bold text-cat-4-ink">
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">°C</span>
             </div>
-            <div className="mt-1 text-caption text-orange-400/80">{tempThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cat-4-ink">{tempThresholdInfo}</div>
           </div>
           <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-4">
-            <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
+            <div className="text-xs text-cat-7-ink flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
-            <div className="text-3xl font-bold text-cyan-400">
+            <div className="text-3xl font-bold text-cat-7-ink">
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">%</span>
             </div>
-            <div className="mt-1 text-caption text-cyan-400/80">{humThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cat-7-ink">{humThresholdInfo}</div>
           </div>
           <div className="rounded-card border border-border/40 bg-muted p-4">
             <div className="text-xs text-muted-foreground mb-1">Última actualización</div>
@@ -1105,24 +1105,24 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
 
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-card border border-cat-4-tint/[0.25] bg-cat-4-tint/[0.15] p-3">
-            <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
+            <div className="text-xs text-cat-4-ink flex items-center gap-1.5 mb-1">
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
-            <div className="text-lg font-bold text-orange-400">
+            <div className="text-lg font-bold text-cat-4-ink">
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">°C</span>
             </div>
-            <div className="mt-1 text-caption text-orange-400/80">{tempThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cat-4-ink">{tempThresholdInfo}</div>
           </div>
           <div className="rounded-card border border-cat-7-tint/[0.25] bg-cat-7-tint/[0.15] p-3">
-            <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
+            <div className="text-xs text-cat-7-ink flex items-center gap-1.5 mb-1">
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
-            <div className="text-lg font-bold text-cyan-400">
+            <div className="text-lg font-bold text-cat-7-ink">
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">%</span>
             </div>
-            <div className="mt-1 text-caption text-cyan-400/80">{humThresholdInfo}</div>
+            <div className="mt-1 text-caption text-cat-7-ink">{humThresholdInfo}</div>
           </div>
         </div>
 
