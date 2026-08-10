@@ -824,7 +824,7 @@ function ManualList({
               aria-current={!criticalMode && sec.id === activeSection.id ? 'true' : undefined}
             >
               <b>{String(sec.order).padStart(2, '0')}</b>
-              {meta?.hasSteps && <span className="dp-idx-kind" title="Tiene pasos">☑</span>}
+              {meta?.hasSteps && <span className="dp-idx-kind" title="Tiene pasos"><ListChecks className="inline size-3" /></span>}
               {meta?.hasQuiz && <span className="dp-idx-kind is-quiz" title="Tiene autoevaluación">✓?</span>}
               {sec.title}
             </button>
@@ -837,7 +837,7 @@ function ManualList({
             onClick={() => setCriticalMode(true)}
             aria-current={criticalMode ? 'true' : undefined}
           >
-            <b>⚠</b>Todo lo crítico ({allNotes.length})
+            <AlertTriangle className="inline size-3.5" />{' '}Todo lo crítico ({allNotes.length})
           </button>
         )}
       </nav>
@@ -959,7 +959,7 @@ function CriticalNotesView({
       <div className="dp-sec-code">Todas las notas operativas del manual, en un solo lugar.</div>
       {notes.map((item, index) => (
         <div className="dp-crit-item" key={index}>
-          <span className="dp-crit-ico" aria-hidden>⚠</span>
+          <span className="dp-crit-ico" aria-hidden><AlertTriangle className="inline size-3.5" /></span>
           <div className="dp-crit-txt">
             <span className="dp-lbl">{item.sectionTitle}</span>
             <p style={{ whiteSpace: 'pre-wrap' }}>{item.note}</p>

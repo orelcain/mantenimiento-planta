@@ -9,7 +9,7 @@
  */
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Info, ChevronLeft, ChevronRight, Image as ImageIcon, FileText, Loader2 } from 'lucide-react'
+import { Info, ChevronLeft, ChevronRight, Clock, Image as ImageIcon, FileText, Loader2 } from 'lucide-react'
 import { GraderShiftPeriodMatrix } from '@/components/grader/GraderShiftPeriodMatrix'
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { MATRIX_KPIS, DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
@@ -151,7 +151,7 @@ export function GraderShiftPeriodView({
             className={cn(chip(onlyOutOfShift), !onlyOutOfShift && 'border-dashed')}
             title="Ciclos que Shoplogix no pudo atribuir a ninguna ventana de turno configurada"
           >
-            ⏱ fuera de turno
+            <Clock className="h-3 w-3 shrink-0" />fuera de turno
             <span className="font-mono tabular-nums opacity-80">
               {outOfShift.pct < 1 ? '<1' : Math.round(outOfShift.pct)} %
             </span>
@@ -162,7 +162,7 @@ export function GraderShiftPeriodView({
                        border-dashed border-border text-muted-foreground cursor-help"
             title={`${outOfShift.cycles.toLocaleString('es-CL')} ciclos ocurrieron fuera de las ventanas de turno configuradas en Shoplogix; ya están sumados a sus turnos (marcados como "+N fuera de horario").`}
           >
-            ⏱ fuera de ventana
+            <Clock className="h-3 w-3 shrink-0" />fuera de ventana
             <span className="font-mono tabular-nums opacity-80">
               {outOfShift.pct < 1 ? '<1' : Math.round(outOfShift.pct)} %
             </span>

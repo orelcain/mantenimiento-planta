@@ -42,6 +42,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Dot,
+  Check,
+  HelpCircle,
+  X,
 } from 'lucide-react'
 import {
   getAllAgents,
@@ -86,9 +89,18 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   return (
     <div className={`flex items-start gap-2 p-2 rounded-ctl border text-xs ${c.active ? 'border-amber-500/[0.25] bg-amber-500/[0.15]' : 'border-border bg-muted opacity-60'}`}>
       <div className="flex-1 min-w-0">
-        <div className="text-muted-foreground truncate" title={c.userQuery}>❓ "{c.userQuery}"</div>
-        <div className="text-red-400 truncate text-caption" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
-        <div className="text-green-400 text-caption">✅ {c.correctResponse.slice(0, 120)}</div>
+        <div className="flex items-start gap-1 text-muted-foreground" title={c.userQuery}>
+          <HelpCircle className="mt-0.5 size-2.5 shrink-0" aria-label="Preguntó" />
+          <span className="truncate">"{c.userQuery}"</span>
+        </div>
+        <div className="flex items-start gap-1 text-red-400 text-caption" title={c.wrongResponse}>
+          <X className="mt-0.5 size-2.5 shrink-0" aria-label="Respuesta incorrecta" />
+          <span className="truncate">{c.wrongResponse.slice(0, 80)}...</span>
+        </div>
+        <div className="flex items-start gap-1 text-green-400 text-caption">
+          <Check className="mt-0.5 size-2.5 shrink-0" aria-label="Respuesta correcta" />
+          <span>{c.correctResponse.slice(0, 120)}</span>
+        </div>
         {c.equipmentName && <div className="flex items-center gap-1 text-caption text-muted-foreground"><Wrench className="size-2.5" /> {c.equipmentName}</div>}
         <div className="text-caption text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
       </div>

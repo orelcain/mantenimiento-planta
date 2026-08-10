@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers, Loader2, SearchX } from 'lucide-react'
 import { Pill } from '@/components/piel'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
@@ -1312,7 +1312,7 @@ export function SensorsPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="1h">⏱️ Última hora</SelectItem>
+                                  <SelectItem value="1h"><Clock className="mr-1.5 inline size-3.5" />Última hora</SelectItem>
                                   <SelectItem value="6h"><Clock className="mr-1.5 inline size-3.5" />Últimas 6 horas</SelectItem>
                                   <SelectItem value="12h"><Clock className="mr-1.5 inline size-3.5" />Últimas 12 horas</SelectItem>
                                   <SelectItem value="24h"><Clock className="mr-1.5 inline size-3.5" />Últimas 24 horas</SelectItem>
@@ -2026,14 +2026,14 @@ export function SensorsPage() {
                     <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-ctl bg-muted">
                       {equipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
-                          <div className="text-muted-foreground">⏳ Cargando equipos...</div>
+                          <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><Loader2 className="size-3.5 animate-spin" />Cargando equipos…</div>
                           <div className="text-xs text-muted-foreground/70">
                             Si esto tarda mucho, recarga la página
                           </div>
                         </div>
                       ) : filteredEquipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
-                          <div className="text-ink-warn font-medium">❌ No se encontraron equipos con esos filtros</div>
+                          <div className="flex items-center justify-center gap-1.5 font-medium text-ink-warn"><SearchX className="size-3.5 shrink-0" />No se encontraron equipos con esos filtros</div>
                           <div className="text-xs text-muted-foreground space-y-1">
                             <div>• Verifica que la combinación de Planta/Sector/Área sea correcta</div>
                             <div>• Prueba cambiar los filtros de Estado o Criticidad</div>
@@ -2503,7 +2503,7 @@ export function SensorsPage() {
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
-                          <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
+                          <p>Mínimo: 5s · Máximo: 300s (5 min)</p>
                           <p className={sendInterval <= 10 ? 'text-ink-warn' : ''}>
                             {sendInterval <= 10 && <AlertTriangle className="inline size-3" />}{' '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
                             {sendInterval <= 10 && ' (alto consumo)'}

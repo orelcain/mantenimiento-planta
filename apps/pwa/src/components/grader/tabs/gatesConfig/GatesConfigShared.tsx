@@ -1,3 +1,4 @@
+import { AlertTriangle, Check, HelpCircle } from 'lucide-react'
 import { Badge, Input, Label, Switch } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { CalibrationStatus } from '@/services/grader/types'
@@ -28,10 +29,10 @@ export const SPECIES_ALLOMETRY = {
 /** Badge de estado de calibración para parámetros físicos */
 export function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
-    return <Badge className="text-caption bg-green-500/[0.15] text-ink-ok whitespace-nowrap">✓ Verificado</Badge>
+    return <Badge className="text-caption bg-green-500/[0.15] text-ink-ok whitespace-nowrap gap-1"><Check className="h-3 w-3" />Verificado</Badge>
   if (status === 'estimated')
-    return <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap">⚠ Estimado</Badge>
-  return <Badge className="text-caption bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap">? Falta</Badge>
+    return <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap gap-1"><AlertTriangle className="h-3 w-3" />Estimado</Badge>
+  return <Badge className="text-caption bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap gap-1"><HelpCircle className="h-3 w-3" />Falta</Badge>
 }
 
 /**
@@ -198,12 +199,12 @@ export function BeltVisualizer({
         {/* Cuando el gap es muy chico o negativo, mostrarlo como advertencia */}
         {gapPx <= 20 && gapPx > 0 && (
           <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapColor} fontWeight="700">
-            gap {(gapM * 100).toFixed(0)} cm ⚠
+            gap {(gapM * 100).toFixed(0)} cm
           </text>
         )}
         {gapPx <= 0 && (
           <text x={fish1X + fishLenPx} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill="#ef4444" fontWeight="700">
-            ⚠ solapamiento — peces se pisan
+            solapamiento — peces se pisan
           </text>
         )}
 
