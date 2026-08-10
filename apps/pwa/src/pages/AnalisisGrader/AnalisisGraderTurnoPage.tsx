@@ -2268,122 +2268,6 @@ export function AnalisisGraderTurnoPage() {
               el badge del panel ConfigChangeHistory de arriba — eliminado
               para evitar duplicación con conteos divergentes. */}
 
-          {/* Monitor en vivo — link/QR sin sesión para Control de Producción.
-              No depende del Grader (por eso sirve en Filete, que no tiene Excel
-              ni P0%): la fuente es el turno de Shoplogix ya sincronizado. */}
-          {activeView === 'resumen' && isSupervisor && plantLineCfg.shoplogixEnabled
-            && upstreamLine.source === 'firestore' && upstreamLine.snapshot && (
-            <div className="rounded-card border border-border bg-muted p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-sky-500" />
-                <span className="text-sm font-medium">Monitor en vivo (link / QR)</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Comparte el avance de piezas de {plantLineCfg.machineKind?.long ?? 'la línea'} con
-                Control de Producción: piezas del turno, pz/min, pz/hora, horario y detenciones.
-                Sin login y solo lectura — se actualiza solo con cada sync.
-                {monitorMode === 'line'
-                  ? ' El link sigue el turno que esté corriendo: el mismo QR sirve mañana.'
-                  : ' El link queda fijo en este turno.'}
-              </p>
-
-              {!monitorUrl && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-[11px] text-muted-foreground" htmlFor="monitor-mode">
-                    Qué sigue
-                  </label>
-                  <select
-                    id="monitor-mode"
-                    value={monitorMode}
-                    onChange={(e) => {
-                      const m = e.target.value as MonitorMode
-                      setMonitorMode(m)
-                      // El sentido del link de línea es no regenerarlo: nace con
-                      // la vigencia larga. El de un turno puntual, con 1 día.
-                      setMonitorTtl(m === 'line' ? 720 : 24)
-                    }}
-                    className="h-7 rounded border border-border bg-background px-2 text-xs"
-                  >
-                    <option value="line">El turno vigente (no hay que regenerarlo)</option>
-                    <option value="shift">Solo este turno</option>
-                  </select>
-                  <label className="text-[11px] text-muted-foreground" htmlFor="monitor-ttl">
-                    Vigencia
-                  </label>
-                  <select
-                    id="monitor-ttl"
-                    value={monitorTtl}
-                    onChange={(e) => setMonitorTtl(Number(e.target.value) as MonitorTtlHours)}
-                    className="h-7 rounded border border-border bg-background px-2 text-xs"
-                  >
-                    {MONITOR_TTL_CHOICES.map(h => (
-                      <option key={h} value={h}>
-                        {h < 24 ? `${h} horas` : h === 24 ? '1 día' : `${h / 24} días`}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="ml-auto h-7 text-xs"
-                    onClick={() => void handleCreateMonitor()}
-                    disabled={monitorBusy}
-                  >
-                    {monitorBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Generar link'}
-                  </Button>
-                </div>
-              )}
-
-              {monitorError && <p className="text-[11px] text-destructive">{monitorError}</p>}
-
-              {monitorUrl && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 truncate rounded bg-background px-2 py-1 text-[11px] text-muted-foreground">
-                      {monitorUrl}
-                    </code>
-                    <button
-                      onClick={() => {
-                        void navigator.clipboard.writeText(monitorUrl).then(() => {
-                          setMonitorCopied(true)
-                          setTimeout(() => setMonitorCopied(false), 2000)
-                        })
-                      }}
-                      className="shrink-0 flex items-center gap-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] px-2 py-1 transition-colors"
-                      title="Copiar link"
-                    >
-                      {monitorCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {monitorCopied ? 'Copiado' : 'Copiar'}
-                    </button>
-                    <button
-                      onClick={() => void handleRevokeMonitor()}
-                      disabled={monitorBusy}
-                      className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
-                      title="Revocar el link (deja de funcionar para todos)"
-                    >
-                      {monitorBusy ? '…' : 'Revocar'}
-                    </button>
-                  </div>
-                  <div className="flex items-start gap-3 pt-1">
-                    <div className="rounded-card border border-border/40 bg-white p-1.5">
-                      <QRCodeSVG value={monitorUrl} size={116} level="M" includeMargin={false} />
-                    </div>
-                    <div className="flex flex-col justify-center gap-1 pt-1">
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <QrCode className="w-3 h-3" />
-                        Escanear con el celular
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/60">
-                        {monitorMode === 'line' ? 'Sigue el turno vigente · vence en ' : 'Este turno · vence en '}
-                        {monitorTtl < 24 ? `${monitorTtl} horas` : monitorTtl === 24 ? '1 día' : `${monitorTtl / 24} días`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
           {activeView === 'resumen' && summary && isAdmin && (
             <div className="rounded-card border border-border bg-muted p-3 space-y-2">
@@ -2502,6 +2386,124 @@ export function AnalisisGraderTurnoPage() {
             </Card>
           )}
         </>
+      )}
+
+      {/* Monitor en vivo — link/QR sin sesión para Control de Producción.
+          ⚠ VA FUERA del bloque `{summary && shiftWindow && ...}` a propósito: ese
+          `summary` es el del Excel del Grader, y Filete no tiene Grader. Estando
+          dentro, la tarjeta no aparecía justo en la línea para la que se hizo.
+          La fuente de datos es el turno de Shoplogix, no el Grader. */}
+      {activeView === 'resumen' && isSupervisor && plantLineCfg.shoplogixEnabled
+        && upstreamLine.source === 'firestore' && upstreamLine.snapshot && (
+        <div className="rounded-card border border-border bg-muted p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-sky-500" />
+            <span className="text-sm font-medium">Monitor en vivo (link / QR)</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Comparte el avance de piezas de {plantLineCfg.machineKind?.long ?? 'la línea'} con
+            Control de Producción: piezas del turno, pz/min, pz/hora, horario y detenciones.
+            Sin login y solo lectura — se actualiza solo con cada sync.
+            {monitorMode === 'line'
+              ? ' El link sigue el turno que esté corriendo: el mismo QR sirve mañana.'
+              : ' El link queda fijo en este turno.'}
+          </p>
+
+          {!monitorUrl && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-[11px] text-muted-foreground" htmlFor="monitor-mode">
+                Qué sigue
+              </label>
+              <select
+                id="monitor-mode"
+                value={monitorMode}
+                onChange={(e) => {
+                  const m = e.target.value as MonitorMode
+                  setMonitorMode(m)
+                  // El sentido del link de línea es no regenerarlo: nace con
+                  // la vigencia larga. El de un turno puntual, con 1 día.
+                  setMonitorTtl(m === 'line' ? 720 : 24)
+                }}
+                className="h-7 rounded border border-border bg-background px-2 text-xs"
+              >
+                <option value="line">El turno vigente (no hay que regenerarlo)</option>
+                <option value="shift">Solo este turno</option>
+              </select>
+              <label className="text-[11px] text-muted-foreground" htmlFor="monitor-ttl">
+                Vigencia
+              </label>
+              <select
+                id="monitor-ttl"
+                value={monitorTtl}
+                onChange={(e) => setMonitorTtl(Number(e.target.value) as MonitorTtlHours)}
+                className="h-7 rounded border border-border bg-background px-2 text-xs"
+              >
+                {MONITOR_TTL_CHOICES.map(h => (
+                  <option key={h} value={h}>
+                    {h < 24 ? `${h} horas` : h === 24 ? '1 día' : `${h / 24} días`}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7 text-xs"
+                onClick={() => void handleCreateMonitor()}
+                disabled={monitorBusy}
+              >
+                {monitorBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Generar link'}
+              </Button>
+            </div>
+          )}
+
+          {monitorError && <p className="text-[11px] text-destructive">{monitorError}</p>}
+
+          {monitorUrl && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded bg-background px-2 py-1 text-[11px] text-muted-foreground">
+                  {monitorUrl}
+                </code>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(monitorUrl).then(() => {
+                      setMonitorCopied(true)
+                      setTimeout(() => setMonitorCopied(false), 2000)
+                    })
+                  }}
+                  className="shrink-0 flex items-center gap-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] px-2 py-1 transition-colors"
+                  title="Copiar link"
+                >
+                  {monitorCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {monitorCopied ? 'Copiado' : 'Copiar'}
+                </button>
+                <button
+                  onClick={() => void handleRevokeMonitor()}
+                  disabled={monitorBusy}
+                  className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
+                  title="Revocar el link (deja de funcionar para todos)"
+                >
+                  {monitorBusy ? '…' : 'Revocar'}
+                </button>
+              </div>
+              <div className="flex items-start gap-3 pt-1">
+                <div className="rounded-card border border-border/40 bg-white p-1.5">
+                  <QRCodeSVG value={monitorUrl} size={116} level="M" includeMargin={false} />
+                </div>
+                <div className="flex flex-col justify-center gap-1 pt-1">
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <QrCode className="w-3 h-3" />
+                    Escanear con el celular
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/60">
+                    {monitorMode === 'line' ? 'Sigue el turno vigente · vence en ' : 'Este turno · vence en '}
+                    {monitorTtl < 24 ? `${monitorTtl} horas` : monitorTtl === 24 ? '1 día' : `${monitorTtl / 24} días`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* M3: Diálogo "siguiente pausa sin clasificar" */}
