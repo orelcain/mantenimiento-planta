@@ -1,5 +1,5 @@
 // Cloud Functions – mantenimiento-planta  (secret GROQ_API_KEY v3)
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore')
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
@@ -8143,4 +8143,154 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
     }
     await enviarAvisoProtocolo(msg)
   }
+)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MONITOR PÚBLICO DE TURNO — link/QR sin sesión, solo lectura
+//
+// Para que Control de Producción siga el avance de piezas de una línea (caso
+// original: la Baader 200 de Filete) sin cuenta en la PWA ni acceso a
+// Shoplogix. El token abre `/monitor/{token}`, que lee UN doc espejo público
+// (`publicShiftMonitors/{token}`). Ver functions/publicMonitor.js.
+//
+// Se escribe SIEMPRE desde acá (Admin SDK): las reglas dejan la colección en
+// `write: if false`. Así el payload público no puede ser inflado desde el
+// cliente con datos que no queremos exponer.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const publicMonitorMod = require('./publicMonitor')
+
+/** Duraciones ofrecidas al generar el link (horas). */
+const MONITOR_TTL_CHOICES = [12, 24, 72, 168]
+const MONITOR_TTL_DEFAULT = 24
+
+async function _assertSupervisorCaller(request) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
+  const snap = await db.collection('users').doc(uid).get()
+  const rol = snap.exists ? snap.data()?.rol : null
+  if (!['admin', 'supervisor'].includes(rol)) {
+    throw new HttpsError('permission-denied', 'Solo supervisores o administradores')
+  }
+  return { uid, user: snap.data() || {} }
+}
+
+/**
+ * Crea el link público de monitoreo de un turno y devuelve su token.
+ *
+ * data: { plantSlug, dateKey, shiftId, plantLineId?, areaLabel?, lineLabel?,
+ *         machineKindLong?, targetPieces?, ttlHours? }
+ */
+exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (request) => {
+  const { uid, user } = await _assertSupervisorCaller(request)
+
+  const plantSlug = String(request.data?.plantSlug ?? '').trim()
+  const dateKey   = String(request.data?.dateKey ?? '').trim()
+  const shiftId   = String(request.data?.shiftId ?? '').trim()
+  if (!plantSlug || !dateKey || !shiftId) {
+    throw new HttpsError('invalid-argument', 'plantSlug, dateKey y shiftId son obligatorios')
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    throw new HttpsError('invalid-argument', 'dateKey debe ser YYYY-MM-DD')
+  }
+
+  const ttlHours = MONITOR_TTL_CHOICES.includes(Number(request.data?.ttlHours))
+    ? Number(request.data.ttlHours)
+    : MONITOR_TTL_DEFAULT
+
+  const shiftDocId = `${dateKey}_${shiftId}`
+
+  // El turno tiene que existir: un link que nace apuntando a la nada solo se
+  // descubre cuando el destinatario lo abre y ve "sin datos".
+  const live = await publicMonitorMod.buildMonitorLive(db, plantSlug, shiftDocId)
+  if (!live) {
+    throw new HttpsError('not-found', `El turno ${shiftDocId} de ${plantSlug} no tiene datos sincronizados`)
+  }
+
+  const token = randomUUID()
+  const now = new Date()
+  const createdBy = [user.nombre, user.apellido].filter(Boolean).join(' ').trim()
+    || user.email || 'Supervisor'
+
+  await db.collection(publicMonitorMod.COLLECTION).doc(token).set({
+    token,
+    plantSlug,
+    dateKey,
+    shiftId,
+    shiftDocId,
+    // Clave de búsqueda del trigger: una sola igualdad, sin índice compuesto.
+    scope: `${plantSlug}|${shiftDocId}`,
+    plantLineId:     request.data?.plantLineId ? String(request.data.plantLineId) : null,
+    areaLabel:       request.data?.areaLabel ? String(request.data.areaLabel) : null,
+    lineLabel:       request.data?.lineLabel ? String(request.data.lineLabel) : null,
+    machineKindLong: request.data?.machineKindLong ? String(request.data.machineKindLong) : null,
+    targetPieces:    Number.isFinite(Number(request.data?.targetPieces)) && Number(request.data.targetPieces) > 0
+      ? Number(request.data.targetPieces)
+      : null,
+    createdBy,
+    createdByUid: uid,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + ttlHours * 3600 * 1000).toISOString(),
+    ttlHours,
+    live,
+  })
+
+  logger.info('[publicShiftMonitor] creado', { token, plantSlug, shiftDocId, ttlHours, uid })
+  return { token, expiresAt: new Date(now.getTime() + ttlHours * 3600 * 1000).toISOString(), ttlHours }
+})
+
+/** Revoca (borra) un link público. Lo puede revocar su creador o un admin. */
+exports.revokePublicShiftMonitor = onCall({ region: 'us-central1' }, async (request) => {
+  const { uid, user } = await _assertSupervisorCaller(request)
+  const token = String(request.data?.token ?? '').trim()
+  if (!token) throw new HttpsError('invalid-argument', 'token requerido')
+
+  const ref = db.collection(publicMonitorMod.COLLECTION).doc(token)
+  const snap = await ref.get()
+  if (!snap.exists) return { ok: true, alreadyGone: true }
+
+  if (snap.data()?.createdByUid !== uid && user.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo el creador o un admin puede revocar el link')
+  }
+
+  await ref.delete()
+  logger.info('[publicShiftMonitor] revocado', { token, uid })
+  return { ok: true }
+})
+
+/**
+ * Refresca los monitores públicos de un turno cada vez que el sync reescribe
+ * su doc padre (~cada 5 min mientras el turno corre).
+ *
+ * Se engancha al PADRE y no a `machines/{id}`: el padre se escribe una sola vez
+ * por ciclo de sync, mientras que la subcolección dispara un evento por máquina
+ * (3 en Eviscerado) y los tres compondrían el mismo payload.
+ */
+exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
+  { document: 'shoplogix/{plant}/shifts/{shiftDoc}', region: 'us-central1' },
+  async (event) => {
+    const { plant, shiftDoc } = event.params
+    const scope = `${plant}|${shiftDoc}`
+
+    const monitors = await db.collection(publicMonitorMod.COLLECTION)
+      .where('scope', '==', scope)
+      .get()
+    if (monitors.empty) return
+
+    const nowIso = new Date().toISOString()
+    const activos = monitors.docs.filter(d => String(d.data()?.expiresAt || '') > nowIso)
+    if (activos.length === 0) return
+
+    let live
+    try {
+      live = await publicMonitorMod.buildMonitorLive(db, plant, shiftDoc)
+    } catch (err) {
+      logger.error('[publicShiftMonitor] no se pudo componer el live', { scope, error: err.message })
+      return
+    }
+    if (!live) return
+
+    await Promise.all(activos.map(d => d.ref.set({ live }, { merge: true })))
+    logger.info('[publicShiftMonitor] refrescados', { scope, monitores: activos.length, piezas: live.totalPieces })
+  },
 )
