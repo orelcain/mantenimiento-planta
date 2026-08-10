@@ -1900,7 +1900,7 @@ export function CalendarioMantencionPage() {
                 onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
                 aria-label={mobileEditMode ? 'Salir del modo edición' : 'Editar calendario'}
                 className={`inline-flex h-6 items-center justify-center px-2 rounded-ctl border text-caption font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}><Pencil className="h-3 w-3" /></button>
-              <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
+              <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
             </div>
           ) : (
             /* ── PORTRAIT: dos filas ── */
@@ -1913,7 +1913,7 @@ export function CalendarioMantencionPage() {
                     {mobileWeekLabel}
                     {isCurrentWeek && <span className="ml-1 text-caption text-ink-warn font-normal">● hoy</span>}
                   </div>
-                  <div className="text-caption text-muted-foreground/70 leading-tight">
+                  <div className="text-caption text-muted-foreground leading-tight">
                     {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}
                   </div>
                 </div>
@@ -1921,7 +1921,7 @@ export function CalendarioMantencionPage() {
                   <button onClick={() => setSelectedWeek(todayWeekKey)}
                     className="shrink-0 inline-flex h-6 items-center gap-1 px-1.5 rounded-ctl border border-amber-500/[0.25] bg-amber-500/[0.15] text-caption font-medium text-ink-warn active:bg-amber-500/[0.15] select-none"><CornerUpLeft className="h-3 w-3" />Hoy</button>
                 )}
-                <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
+                <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-muted-foreground'}`} />
                 <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
                   className="h-7 w-7 shrink-0 flex items-center justify-center rounded-ctl border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
               </div>
@@ -2711,7 +2711,7 @@ export function CalendarioMantencionPage() {
                         </td>
                         <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.weekWorkedHours.toFixed(1)}h · Vac pagadas: ${row.weekVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.weekHolidayPaidHours.toFixed(1)}h · Colación: ${row.weekBreakHours.toFixed(1)}h`}>
                           <span className="text-foreground font-medium">{row.weekHours.toFixed(1)}</span>
-                          <span className="text-zinc-600 mx-0.5">/</span>
+                          <span className="text-muted-foreground mx-0.5">/</span>
                           <span className="text-muted-foreground">{row.weekExpected.toFixed(1)}</span>
                         </td>
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
@@ -2725,22 +2725,22 @@ export function CalendarioMantencionPage() {
                           </div>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums">
-                          <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{row.weekWorkedDays}</span>
+                          <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.weekWorkedDays}</span>
                         </td>
-                        <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-zinc-700">–</span>}</td>
+                        <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.weekVacationDays > 0
                             ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
-                            : <span className="text-zinc-700">–</span>}
+                            : <span className="text-muted-foreground">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
                             ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
-                            : <span className="text-zinc-700">–</span>}
+                            : <span className="text-muted-foreground">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
                           <span className="text-foreground font-medium">{row.monthHours.toFixed(1)}</span>
-                          <span className="text-zinc-600 mx-0.5">/</span>
+                          <span className="text-muted-foreground mx-0.5">/</span>
                           <span className="text-muted-foreground">{row.monthExpected.toFixed(1)}</span>
                         </td>
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
@@ -2754,23 +2754,23 @@ export function CalendarioMantencionPage() {
                           </div>
                         </td>
                         <td className="px-1.5 py-1 text-center tabular-nums">
-                          <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{row.monthWorkedDays}</span>
+                          <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>{row.monthWorkedDays}</span>
                         </td>
-                        <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-zinc-700">–</span>}</td>
+                        <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-muted-foreground">–</span>}</td>
                         <td className="px-1 py-1 text-center">
                           {row.monthVacationDays > 0
                             ? <span className="inline-block rounded-full border border-primary/[0.25] bg-primary/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-primary" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
-                            : <span className="text-zinc-700">–</span>}
+                            : <span className="text-muted-foreground">–</span>}
                         </td>
                         <td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
                             ? <span className="inline-block rounded-full border border-amber-500/[0.25] bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
-                            : <span className="text-zinc-700">–</span>}
+                            : <span className="text-muted-foreground">–</span>}
                         </td>
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
                           {row.totalVacationDays > 0
                             ? <span className="font-bold text-primary">{row.totalVacationDays}</span>
-                            : <span className="text-zinc-600">0</span>}
+                            : <span className="text-muted-foreground">0</span>}
                         </td>
                       </tr>
                     )

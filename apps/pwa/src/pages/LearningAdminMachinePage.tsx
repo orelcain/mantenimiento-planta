@@ -128,7 +128,7 @@ export function LearningAdminMachinePage() {
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
                   ? 'border-ring text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-muted-foreground/80 hover:text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <TabIcon className="h-4 w-4" />
@@ -708,7 +708,7 @@ function ManualSectionForm({
 
       {/* ─ Bloque didáctico (Dossier de campo): Objetivo · Por qué importa · Autoevaluación ─ */}
       <div className="pt-3 mt-1 border-t border-dashed border-border space-y-4">
-        <p className="text-caption font-semibold tracking-wider text-muted-foreground/80">
+        <p className="text-caption font-semibold tracking-wider text-muted-foreground">
           Didáctico · se muestra como Objetivo (arriba), Por qué importa y Autoevaluación al pie
         </p>
 
@@ -790,7 +790,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
       </div>
 
       {items.length === 0 ? (
-        <p className="px-1 py-2 text-caption text-muted-foreground/80">Sin preguntas. La sección no mostrará autoevaluación.</p>
+        <p className="px-1 py-2 text-caption text-muted-foreground">Sin preguntas. La sección no mostrará autoevaluación.</p>
       ) : (
         <div className="space-y-4">
           {items.map((q, qi) => (
@@ -816,7 +816,7 @@ function SectionQuizEditor({ quiz, onChange }: { quiz: SectionQuizItem[]; onChan
               </div>
 
               <div className="space-y-1.5 pl-8">
-                <p className="text-caption tracking-wider text-muted-foreground/80">Opciones · marcá la correcta</p>
+                <p className="text-caption tracking-wider text-muted-foreground">Opciones · marcá la correcta</p>
                 {q.options.map((opt, oi) => (
                   <div key={oi} className="flex items-center gap-2">
                     <button
@@ -1057,7 +1057,7 @@ function ManualImagesEditor({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div>
           <label className="text-xs font-semibold tracking-wider text-muted-foreground">Referencias visuales</label>
-          <p className="mt-1 text-xs text-muted-foreground/80">
+          <p className="mt-1 text-xs text-muted-foreground">
             Agrega una o varias imagenes. Puedes subir archivo o pegar una URL existente.
           </p>
         </div>
@@ -1076,7 +1076,7 @@ function ManualImagesEditor({
         </p>
       )}
       {images.length === 0 ? (
-        <p className="text-xs text-muted-foreground/80 rounded-card border border-dashed border-border px-3 py-3">
+        <p className="text-xs text-muted-foreground rounded-card border border-dashed border-border px-3 py-3">
           Sin imagenes asociadas.
         </p>
       ) : (
@@ -1087,7 +1087,7 @@ function ManualImagesEditor({
                 {image.url ? (
                   <img src={image.url} alt={image.label || 'Referencia visual'} className="h-full w-full object-contain" />
                 ) : (
-                  <ImagePlus className="h-6 w-6 text-muted-foreground/80" />
+                  <ImagePlus className="h-6 w-6 text-muted-foreground" />
                 )}
               </div>
               <div className="grid gap-2">
@@ -1733,7 +1733,7 @@ function ComponentPhotoForm({
           placeholder="grader-foto-ejemplo.jpg"
           className="w-full px-3 py-2.5 rounded-card border border-border bg-card text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/60"
         />
-        <p className="mt-1 text-xs text-muted-foreground/80">
+        <p className="mt-1 text-xs text-muted-foreground">
           El archivo debe subirse manualmente a esa carpeta del repo (esta pantalla aún no sube fotos).
         </p>
       </FormField>
@@ -1744,12 +1744,12 @@ function ComponentPhotoForm({
             <label className="text-xs font-semibold tracking-wider text-muted-foreground">
               Puntos — clic en la foto para agregar uno, arrastra para moverlo
             </label>
-            <span className="text-xs text-muted-foreground/80 font-mono">
+            <span className="text-xs text-muted-foreground font-mono">
               {photo.points.length} punto{photo.points.length !== 1 ? 's' : ''}
             </span>
           </div>
           {imgError ? (
-            <p className="rounded-card border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground/80">
+            <p className="rounded-card border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
               No se encontró la foto en esa ruta. Verifica el nombre del archivo.
             </p>
           ) : (
@@ -1955,7 +1955,7 @@ function CollectionListView({
         </div>
       ) : count === 0 ? (
         <div className="p-8 text-center rounded-card border border-dashed border-border bg-card/40">
-          <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/80 opacity-60" />
+          <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-60" />
           <p className="text-sm font-medium mb-1">{emptyTitle}</p>
           <p className="text-xs text-muted-foreground">{emptyHint}</p>
         </div>

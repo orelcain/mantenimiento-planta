@@ -200,7 +200,7 @@ export function InterventionEditDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {isAdmin ? (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleting || saving}
-              className="text-ink-crit hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/[0.15]">
+              className="text-ink-crit hover:text-ink-crit dark:hover:text-ink-crit hover:bg-red-500/[0.15]">
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
               Eliminar
             </Button>

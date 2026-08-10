@@ -76,8 +76,8 @@ function statusColor(status: AIAgent['status']): string {
     case 'online': return 'bg-green-500'
     case 'rate-limited': return 'bg-amber-500'
     case 'offline': return 'bg-red-500'
-    case 'disabled': return 'bg-gray-400'
-    default: return 'bg-gray-400'
+    case 'disabled': return 'bg-muted-foreground'
+    default: return 'bg-muted-foreground'
   }
 }
 
@@ -264,7 +264,7 @@ export function MissionControlPanel() {
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="p-2.5 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-card">
-              <Satellite className="h-6 w-6 text-purple-500" />
+              <Satellite className="h-6 w-6 text-cat-6-ink" />
             </div>
             {/* Pulse indicador */}
             <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
@@ -281,7 +281,7 @@ export function MissionControlPanel() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Radio className={`h-3 w-3 ${autoRefresh ? 'text-green-500 animate-pulse' : 'text-gray-400'}`} />
+            <Radio className={`h-3 w-3 ${autoRefresh ? 'text-green-500 animate-pulse' : 'text-muted-foreground'}`} />
             <button onClick={() => setAutoRefresh(!autoRefresh)} className="hover:underline">
               {autoRefresh ? 'Live' : 'Paused'}
             </button>
@@ -357,7 +357,7 @@ export function MissionControlPanel() {
                       {agent.provider}
                     </Badge>
                     {agent.thinking && (
-                      <Badge variant="outline" className="text-caption px-1.5 py-0 border-cat-6-tint/[0.25] text-purple-500">
+                      <Badge variant="outline" className="text-caption px-1.5 py-0 border-cat-6-tint/[0.25] text-cat-6-ink">
                         Thinking
                       </Badge>
                     )}
@@ -519,7 +519,7 @@ export function MissionControlPanel() {
                   <div className="text-caption text-muted-foreground">Satisfacción</div>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-card text-center">
-                  <div className="text-lg font-bold text-purple-500">{learningStats.totalKnowledge}</div>
+                  <div className="text-lg font-bold text-cat-6-ink">{learningStats.totalKnowledge}</div>
                   <div className="text-caption text-muted-foreground">Conocimientos</div>
                 </div>
                 <div className="p-2 bg-muted/50 rounded-card text-center">

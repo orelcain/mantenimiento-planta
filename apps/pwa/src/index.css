@@ -294,7 +294,12 @@
      blanco y REPRUEBA WCAG AA (este repo audita contraste con script). Se sube
      a ~.75 de opacidad equivalente → #6E6E71: 5.08:1 sobre card y 4.55:1 sobre el
      fondo gris (el peor caso, medido — no estimado). Misma familia, AA real. */
-  --muted-foreground: 110 110 113;  /* #6E6E71 */
+  /* #666669. Partió del secondaryLabel del HIG (60% de negro), que ya hubo que
+     bajar a #6E6E71 para pasar AA sobre la tarjeta. Medido de nuevo contra el
+     PEOR fondo — `bg-muted` (#E5E5EA), no la tarjeta blanca — todavía se quedaba
+     en 4,05:1, y el texto secundario dentro de un control con fondo muted es de
+     los usos más frecuentes. A 102 da 4,56:1. */
+  --muted-foreground: 102 102 105;
   --secondary: 209 209 214;         /* #D1D1D6 systemGray4 */
   --muted: 229 229 234;             /* #E5E5EA systemGray5 */
   --accent: 229 229 234;            /* #E5E5EA hover/selección */

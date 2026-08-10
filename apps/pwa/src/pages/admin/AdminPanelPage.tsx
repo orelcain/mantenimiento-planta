@@ -87,7 +87,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Configuración ETT',
     description: 'Parámetros del módulo de Estudios Técnicos de Trabajo.',
     icon: <FileText className="w-5 h-5" />,
-    iconColor: 'text-slate-400',
+    iconColor: 'text-muted-foreground',
     section: 'sensible',
   },
   {
@@ -95,7 +95,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Editor de sidebar',
     description: 'Personaliza el orden y visibilidad de los items del menú lateral.',
     icon: <Layers className="w-5 h-5" />,
-    iconColor: 'text-purple-400',
+    iconColor: 'text-cat-6-ink',
     section: 'sensible',
   },
   {
@@ -137,7 +137,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Módulos en desarrollo',
     description: 'Mostrar/ocultar items del menú lateral que aún están en desarrollo. La preferencia se guarda en este dispositivo.',
     icon: <Wrench className="w-5 h-5" />,
-    iconColor: 'text-purple-400',
+    iconColor: 'text-cat-6-ink',
     section: 'config',
   },
   {
@@ -153,7 +153,7 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Configuración',
     description: 'Configuración general del módulo de mantenimiento.',
     icon: <Settings className="w-5 h-5" />,
-    iconColor: 'text-slate-400',
+    iconColor: 'text-muted-foreground',
     section: 'config',
   },
   {
@@ -200,7 +200,7 @@ export function AdminPanelPage() {
         if (items.length === 0) return null
         return (
           <section key={section} className="space-y-2">
-            <h2 className="text-xs font-medium tracking-wider text-muted-foreground/80 px-1">
+            <h2 className="text-xs font-medium tracking-wider text-muted-foreground px-1">
               {SECTION_LABELS[section]}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">

@@ -273,7 +273,7 @@ export function FailureAnalysis() {
                             </div>
                             <div className="flex flex-wrap gap-1">
                                 {inc.sintomas?.slice(0, 3).map(s => (
-                                    <Badge key={s} variant="secondary" className="text-caption h-5 font-normal bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                    <Badge key={s} variant="secondary" className="text-caption h-5 font-normal bg-blue-500/[0.15] text-ink-info hover:bg-blue-500/[0.15]">
                                         {s}
                                     </Badge>
                                 ))}
@@ -325,7 +325,7 @@ export function FailureAnalysis() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                       <div className={`h-2 w-2 rounded-full ${inc.status === 'confirmada' ? 'bg-green-500' : inc.status === 'pendiente' ? 'bg-amber-500' : 'bg-gray-400'}`} />
+                                       <div className={`h-2 w-2 rounded-full ${inc.status === 'confirmada' ? 'bg-green-500' : inc.status === 'pendiente' ? 'bg-amber-500' : 'bg-muted-foreground'}`} />
                                        {inc.status?.toUpperCase()}
                                     </div>
                                     {inc.equipmentId && (
@@ -432,7 +432,7 @@ export function FailureAnalysis() {
 
                             {/* Resolución (si existe) */}
                             {selectedIncident.resolucion && (
-                                <div className="bg-green-500/[0.15] border border-green-200 dark:border-green-800 rounded-card p-4">
+                                <div className="bg-green-500/[0.15] border border-emerald-500/[0.25] rounded-card p-4">
                                     <h4 className="text-sm font-semibold mb-1 text-ink-ok flex items-center gap-2">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Resolución Aplicada

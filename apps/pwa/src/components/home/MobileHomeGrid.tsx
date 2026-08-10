@@ -43,7 +43,7 @@ const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label
   blue:    { bg: 'bg-primary/[0.15]',    border: 'border-primary/[0.25]',    icon: 'text-blue-500',    label: 'text-ink-info' },
   amber:   { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25]',   icon: 'text-amber-500',   label: 'text-ink-warn' },
   green:   { bg: 'bg-green-500/[0.15]',   border: 'border-green-500/[0.25]',   icon: 'text-green-500',   label: 'text-ink-ok' },
-  purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-purple-500',  label: 'text-cat-6-ink' },
+  purple:  { bg: 'bg-cat-6-tint/[0.15]',  border: 'border-cat-6-tint/[0.25]',  icon: 'text-cat-6-ink',  label: 'text-cat-6-ink' },
   emerald: { bg: 'bg-emerald-500/[0.15]', border: 'border-emerald-500/[0.25]', icon: 'text-emerald-500', label: 'text-ink-ok' },
   orange:  { bg: 'bg-cat-4-tint/[0.15]',  border: 'border-cat-4-tint/[0.25]',  icon: 'text-orange-500',  label: 'text-cat-4-ink' },
   slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
@@ -223,7 +223,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
       <button
         onClick={onTap}
         className={cn(
-          'shrink-0 text-caption font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
+          'shrink-0 text-caption font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-ink-warn leading-none',
           onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
         )}
       >
@@ -241,7 +241,7 @@ function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
       )}
     >
       <div
-        className="absolute bg-amber-400 text-amber-950 font-bold text-[6.5px] tracking-tight uppercase text-center leading-none py-[3.5px] shadow-sm"
+        className="absolute bg-amber-400 text-ink-warn font-bold text-[6.5px] tracking-tight uppercase text-center leading-none py-[3.5px] shadow-sm"
         style={{ width: '88px', top: '12px', right: '-22px', transform: 'rotate(38deg)' }}
       >
         en desarrollo

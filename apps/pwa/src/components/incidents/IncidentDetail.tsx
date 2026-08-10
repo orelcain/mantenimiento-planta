@@ -518,7 +518,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </div>
                   </div>
                   {iotData?.source === 'simulated' && (
-                    <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                    <Badge variant="outline" className="text-amber-600 border-amber-500/[0.25] bg-amber-500/[0.15]">
                       Dato simulado
                     </Badge>
                   )}
@@ -819,7 +819,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     Cancelar
                   </Button>
                   <Button
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-emerald-600"
                     onClick={handleResolve}
                     disabled={isLoading || !resolution.trim()}
                   >
@@ -930,7 +930,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 <Button 
                   onClick={handleConfirm} 
                   disabled={isLoading}
-                  className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                  className="bg-green-600 hover:bg-emerald-600 w-full sm:w-auto"
                 >
                   {isLoading ? <Spinner className="mr-2" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   Confirmar
@@ -972,7 +972,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && !showResolveForm && (
               <Button 
                 onClick={() => setShowResolveForm(true)}
-                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                className="bg-green-600 hover:bg-emerald-600 w-full sm:w-auto"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Resolver Incidencia

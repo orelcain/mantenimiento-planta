@@ -110,7 +110,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
           sueltos, sin decir qué medían, y un "0 s" que parecía un dato roto
           cuando en realidad es la mejor noticia posible (ese turno no paró). */}
       {totals.turnos.some(t => t.cycles > 0) && (
-        <span className="text-muted-foreground/70 flex items-center gap-1.5 flex-wrap">
+        <span className="text-muted-foreground flex items-center gap-1.5 flex-wrap">
           <span className="text-muted-foreground/50">detención por turno:</span>
           {totals.turnos.filter(t => t.cycles > 0).map(t => (
             <span

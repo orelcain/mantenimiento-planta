@@ -182,7 +182,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
   if (processed.length < MIN_PIECES) return null
 
   return (
-    <Card className="border-border bg-card dark:border-slate-800 dark:bg-muted-foreground/[0.10]">
+    <Card className="border-border bg-card dark:border-border dark:bg-muted-foreground/[0.10]">
       <CardContent className="py-3 px-4">
         {/* Header — clic para expandir/colapsar */}
         <button
@@ -229,7 +229,7 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
         {/* Chart (colapsado por defecto) */}
         {expanded && (
           <>
-            <p className="text-caption text-slate-500 mt-2 mb-1">
+            <p className="text-caption text-muted-foreground mt-2 mb-1">
               Cada punto = 1 pieza rechazada · X = hora exacta (segundos)
               {hasWeight ? ' · Y = peso por pieza (g)' : ' · Y = posición visual — sin peso disponible'}
               {' · '}Zoom con scroll o el slider inferior

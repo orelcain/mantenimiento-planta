@@ -382,10 +382,10 @@ export function PDFViewer({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96 bg-gray-100 rounded-card">
+      <div className="flex items-center justify-center h-96 bg-muted rounded-card">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando PDF...</p>
+          <p className="text-muted-foreground">Cargando PDF...</p>
         </div>
       </div>
     );
@@ -393,7 +393,7 @@ export function PDFViewer({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-96 bg-red-50 rounded-card">
+      <div className="flex items-center justify-center h-96 bg-red-500/[0.15] rounded-card">
         <div className="text-center text-ink-crit">
           <p className="flex items-center justify-center gap-1.5 font-semibold"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>
           <p className="text-sm mt-2">Verifica que el archivo PDF sea accesible</p>
@@ -405,13 +405,13 @@ export function PDFViewer({
   return (
     <div className={`flex flex-col ${className}`}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 bg-gray-100 border-b">
+      <div className="flex items-center justify-between p-3 bg-muted border-b">
         {/* Navegación */}
         <div className="flex items-center gap-2">
           <button
             onClick={prevPage}
             disabled={pageNum <= 1}
-            className="p-2 rounded-ctl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-ctl hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -421,7 +421,7 @@ export function PDFViewer({
           <button
             onClick={nextPage}
             disabled={pageNum >= numPages}
-            className="p-2 rounded-ctl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-ctl hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -429,7 +429,7 @@ export function PDFViewer({
 
         {/* Zoom */}
         <div className="flex items-center gap-2">
-          <button onClick={zoomOut} className="p-2 rounded-ctl hover:bg-gray-200">
+          <button onClick={zoomOut} className="p-2 rounded-ctl hover:bg-muted">
             <ZoomOut className="w-5 h-5" />
           </button>
           <select
@@ -441,7 +441,7 @@ export function PDFViewer({
             <option value="fit-page">Ajustar página</option>
             <option value="custom">{Math.round(customZoom * 100)}%</option>
           </select>
-          <button onClick={zoomIn} className="p-2 rounded-ctl hover:bg-gray-200">
+          <button onClick={zoomIn} className="p-2 rounded-ctl hover:bg-muted">
             <ZoomIn className="w-5 h-5" />
           </button>
         </div>
@@ -479,7 +479,7 @@ export function PDFViewer({
       {/* Visor del PDF */}
       <div
         ref={containerRef}
-        className="relative flex-1 overflow-auto bg-gray-200"
+        className="relative flex-1 overflow-auto bg-muted"
         style={{ minHeight: '500px' }}
       >
         <div className="relative inline-block">
@@ -544,7 +544,7 @@ export function PDFViewer({
 
       {/* Info de marcadores */}
       {markersOnPage.length > 0 && (
-        <div className="p-2 bg-blue-50 text-sm text-blue-800 border-t">
+        <div className="p-2 bg-blue-500/[0.15] text-sm text-ink-info border-t">
           <MapPin className="inline h-3 w-3" /> {markersOnPage.length} marcador{markersOnPage.length > 1 ? 'es' : ''} en esta página
         </div>
       )}

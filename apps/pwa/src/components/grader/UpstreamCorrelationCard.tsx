@@ -39,7 +39,7 @@ function fmtLead(sec: number): string {
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
   upstream_global:      { bg: 'bg-cat-5-tint/[0.15]',    border: 'border-cat-5-tint/[0.25] dark:border-cat-5-tint/[0.25]',    text: 'text-cat-5-ink',    icon: AlertTriangle, label: 'Causa upstream' },
   upstream_majority:    { bg: 'bg-amber-500/[0.15]',   border: 'border-amber-500/[0.25] dark:border-amber-500/[0.25]',   text: 'text-ink-warn',   icon: AlertTriangle, label: 'Upstream parcial' },
-  upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-slate-800',      text: 'text-muted-foreground dark:text-slate-400',   icon: Info,          label: 'Verificar' },
+  upstream_single:      { bg: 'bg-muted dark:bg-muted-foreground/[0.10]',   border: 'border-border dark:border-border',      text: 'text-muted-foreground dark:text-muted-foreground',   icon: Info,          label: 'Verificar' },
   // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
   // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
   coincidental_planned: { bg: 'bg-cat-7-tint/[0.15]',    border: 'border-cat-7-tint/[0.25] dark:border-cat-7-tint/[0.25]',    text: 'text-cat-7-ink',    icon: Info,          label: 'Coincidencia programada' },
@@ -62,10 +62,10 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown  className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-          : <ChevronRight className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
+          ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
         <Icon className={`w-4 h-4 flex-shrink-0 ${s.text}`} />
-        <span className="text-xs text-slate-400 tabular-nums flex-shrink-0">
+        <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
           {fmtTime(corr.pauseStart)}
         </span>
         <Badge variant="outline" className={`text-caption px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
@@ -74,7 +74,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
         <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
           variant="outline"
-          className={`ml-auto text-caption px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
+          className={`ml-auto text-caption px-1.5 py-0 h-4 border-border ${conf.color} flex-shrink-0`}
           title={`Confianza ${Math.round(corr.confidence * 100)}% (alta ≥70%, media 40-70%, baja <40%)`}
         >
           confianza {conf.text}
@@ -220,7 +220,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         {/* Barra visual proporcional al share */}
                         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden ml-1 max-w-[120px]">
                           <div
-                            className={`h-full rounded-full ${isTop ? 'bg-rose-400' : 'bg-slate-500'}`}
+                            className={`h-full rounded-full ${isTop ? 'bg-rose-400' : 'bg-muted-foreground'}`}
                             style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
                           />
                         </div>

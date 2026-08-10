@@ -428,7 +428,7 @@ export function RepuestosTable({
                           <button
                             onClick={() => onSearchInManual(rep)}
                             title="Buscar en manual de la máquina"
-                            className="text-cat-6-ink hover:text-purple-400 transition-colors"
+                            className="text-cat-6-ink hover:text-cat-6-ink transition-colors"
                           >
                             <BookOpen className="h-3.5 w-3.5" />
                           </button>
@@ -483,7 +483,7 @@ export function RepuestosTable({
                       {onSearchInManual && rep.codigoFabricante && (
                         <Tip label="Buscar en Manual">
                           <button onClick={() => onSearchInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-cat-6-ink hover:text-purple-400 hover:bg-cat-6-tint/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-cat-6-ink hover:text-cat-6-ink hover:bg-cat-6-tint/[0.15] transition-colors">
                             <BookOpen className="h-3.5 w-3.5" />
                           </button>
                         </Tip>

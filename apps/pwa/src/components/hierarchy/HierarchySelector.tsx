@@ -119,20 +119,20 @@ export function HierarchySelector({
     <div className="space-y-3">
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
-        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-200">
+        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-500/[0.25]">
           <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {breadcrumbLoading ? (
-              <span className="text-sm text-blue-700">Cargando ubicación...</span>
+              <span className="text-sm text-ink-info">Cargando ubicación...</span>
             ) : breadcrumbPath.length ? (
               breadcrumbPath.map((item, index) => (
                 <React.Fragment key={item.id}>
-                  {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
-                  <span className="text-sm font-medium text-blue-700">{item.nombre}</span>
+                  {index > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                  <span className="text-sm font-medium text-ink-info">{item.nombre}</span>
                 </React.Fragment>
               ))
             ) : (
-              <span className="text-sm font-medium text-blue-700">
+              <span className="text-sm font-medium text-ink-info">
                 {HIERARCHY_LEVEL_NAMES[HierarchyLevel.EMPRESA]}
               </span>
             )}
@@ -178,9 +178,9 @@ export function HierarchySelector({
 
       {/* Mensaje de validación */}
       {showValidation && !isMinLevelReached && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-card">
+        <div className="flex items-start gap-2 p-3 bg-amber-500/[0.15] border border-amber-500/[0.25] rounded-card">
           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-amber-800">
+          <div className="text-sm text-ink-warn">
             Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo para crear la incidencia.
           </div>
         </div>
@@ -244,10 +244,10 @@ function LevelSelector({
   if (!loading && options.length === 1 && value && options[0]) {
     return (
       <div>
-        <label className="block text-sm font-medium text-gray-500 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           {HIERARCHY_LEVEL_NAMES[nivel]}
         </label>
-        <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-card text-blue-900 font-medium">
+        <div className="px-4 py-2.5 bg-blue-500/[0.15] border border-blue-500/[0.25] rounded-card text-ink-info font-medium">
           ✓ {options[0].label}
         </div>
       </div>
@@ -256,7 +256,7 @@ function LevelSelector({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
         {HIERARCHY_LEVEL_NAMES[nivel]}
         {isRequired && <span className="text-red-500 ml-1">*</span>}
       </label>
@@ -266,7 +266,7 @@ function LevelSelector({
           onChange(e.target.value || null)
         }}
         disabled={disabled || loading}
-        className="w-full px-4 py-2.5 border border-gray-300 rounded-card focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
+        className="w-full px-4 py-2.5 border border-border rounded-card focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-muted disabled:cursor-not-allowed text-foreground"
       >
         <option value="">
           {loading ? 'Cargando...' : `Seleccionar ${HIERARCHY_LEVEL_NAMES[nivel].toLowerCase()}`}
@@ -294,7 +294,7 @@ export function HierarchyBreadcrumb({ nodeId, maxItems = 4 }: HierarchyBreadcrum
   const { path, loading } = useHierarchyPath(nodeId)
 
   if (loading || !path.length) {
-    return <span className="text-sm text-gray-400">Sin ubicación</span>
+    return <span className="text-sm text-muted-foreground">Sin ubicación</span>
   }
 
   const displayPath = maxItems && path.length > maxItems
@@ -302,10 +302,10 @@ export function HierarchyBreadcrumb({ nodeId, maxItems = 4 }: HierarchyBreadcrum
     : path
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap text-sm text-gray-600">
+    <div className="flex items-center gap-1.5 flex-wrap text-sm text-muted-foreground">
       {displayPath.map((item, index) => item && (
         <React.Fragment key={item.id}>
-          {index > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+          {index > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
           <span className="font-medium">{item.nombre}</span>
         </React.Fragment>
       ))}

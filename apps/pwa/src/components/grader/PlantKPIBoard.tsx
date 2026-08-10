@@ -257,7 +257,7 @@ export function PlantKPIBoard({
           </div>
         </div>
         {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
-        <p className="text-caption text-muted-foreground/70 mt-1 leading-tight">{scopeNote}</p>
+        <p className="text-caption text-muted-foreground mt-1 leading-tight">{scopeNote}</p>
       </CardHeader>
 
       <CardContent className="space-y-2 pb-3">
@@ -392,7 +392,7 @@ export function PlantKPIBoard({
             </div>
             {/* Micro-detenciones: se reportan aparte para no inflar el MTTR */}
             {kpis.microCount > 0 && (
-              <p className="text-caption text-muted-foreground/70 leading-tight px-0.5">
+              <p className="text-caption text-muted-foreground leading-tight px-0.5">
                 + {kpis.microCount.toLocaleString('es-CL')} micro-detenciones (&lt;5min, {fmtMin(kpis.microMin)} total) — aparte, no inflan el MTTR.
               </p>
             )}

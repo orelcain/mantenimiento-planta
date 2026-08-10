@@ -53,6 +53,12 @@ const EXCLUDE = [
   /[\\/]pages[\\/](Map\w*|Mapa\w*)\.tsx$/,
   /[\\/]components[\\/]piel[\\/]/,
   /[\\/]pages[\\/]dev[\\/]/,
+  // Editor ETT: es una vista WYSIWYG que replica cómo se verá el documento en
+  // WORD — sus grises, azules y el resaltado amarillo de los campos editables
+  // son del DOCUMENTO, no del cromo de la app. Misma categoría que los HMIs:
+  // migrarlo a los tokens de la piel lo alejaría de lo que se imprime.
+  /[\\/]components[\\/]ett[\\/]/,
+  /[\\/]pages[\\/]admin[\\/]ETTPage\.tsx$/,
 ];
 
 const RULES = [

@@ -2072,7 +2072,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
                     <span className="text-xs text-muted-foreground">(stock: {m.stockResultante})</span>
                   </div>
                   {m.motivo && <p className="text-xs text-muted-foreground mt-0.5">{m.motivo}</p>}
-                  <div className="flex items-center gap-2 mt-1 text-caption text-muted-foreground/70">
+                  <div className="flex items-center gap-2 mt-1 text-caption text-muted-foreground">
                     <span>{m.realizadoPorNombre || 'Usuario'}</span><span>•</span>
                     <span>{m.createdAt.toLocaleDateString('es-CL')} {m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>

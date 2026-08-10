@@ -72,7 +72,7 @@ export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsPr
                 {p.label}
               </span>
               {soon && (
-                <span className="inline-flex items-center text-caption leading-none mt-0.5 px-1 py-0.5 rounded-ctl bg-muted-foreground/10 text-muted-foreground/70 font-medium tracking-wide">
+                <span className="inline-flex items-center text-caption leading-none mt-0.5 px-1 py-0.5 rounded-ctl bg-muted-foreground/10 text-muted-foreground font-medium tracking-wide">
                   próx.
                 </span>
               )}

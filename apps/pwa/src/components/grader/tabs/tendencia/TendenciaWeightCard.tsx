@@ -50,7 +50,7 @@ export function TendenciaWeightCard({
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div className="min-w-0">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Activity className="h-4 w-4 text-purple-500" />
+                <Activity className="h-4 w-4 text-cat-6-ink" />
                 Tendencia de Peso en el Tiempo
                 <InfoTooltip {...getTooltipProps('wt.trend')} />
               </CardTitle>
@@ -378,7 +378,7 @@ export function TendenciaWeightCard({
                         )
                       })()}
                     </td>
-                    <td className="py-1.5 px-2 text-right text-purple-600">
+                    <td className="py-1.5 px-2 text-right text-cat-6-ink">
                       {b.movingAvg5 != null ? b.movingAvg5.toLocaleString('es-CL') : '—'}
                     </td>
                     <td className="py-1.5 px-2 text-xs">{b.dominantLot || '—'}</td>

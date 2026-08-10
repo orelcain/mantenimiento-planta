@@ -297,12 +297,12 @@ export function UpstreamScatterCard({
       : {
           icon: <Minus className="w-3 h-3" />,
           text: 'Sin tendencia significativa',
-          color: 'text-slate-400',
+          color: 'text-muted-foreground',
           tone: 'P0% del Grader no se explica por el ritmo Baader en este turno.',
         }
 
   return (
-    <Card className="border-border bg-card dark:border-slate-800 dark:bg-muted-foreground/[0.10]">
+    <Card className="border-border bg-card dark:border-border dark:bg-muted-foreground/[0.10]">
       <CardContent className="py-3 px-4">
         {/* Header: ícono + título + KPI accionable de zona crítica */}
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -331,15 +331,15 @@ export function UpstreamScatterCard({
           <div className={`flex items-center gap-1.5 text-caption mb-1 ${trendNarrative.color}`}>
             {trendNarrative.icon}
             <span className="font-medium tabular-nums">{trendNarrative.text}</span>
-            <span className="text-slate-500">— {trendNarrative.tone}</span>
+            <span className="text-muted-foreground">— {trendNarrative.tone}</span>
           </div>
         )}
 
         {/* Nota explicativa pequeña */}
-        <div className="text-caption text-slate-500 mb-2">
+        <div className="text-caption text-muted-foreground mb-2">
           Punto = 5 min · X = ciclos Baader · Y = P0% Grader · tamaño = piezas Grader (confianza).
           {' '}Líneas: <span className="text-cat-5-ink">P0% crítico {criticalThreshold}%</span>
-          {' · '}<span className="text-slate-400">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
+          {' · '}<span className="text-muted-foreground">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
         </div>
 
         {/* Stats por máquina (R² ahora secundario, en línea sutil) */}

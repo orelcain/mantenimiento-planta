@@ -775,11 +775,11 @@ export function PlataformaPontonInteractiveExperience({
         </Canvas>
 
         {animationNames.length === 0 ? (
-          <div className="pointer-events-none absolute bottom-3 right-3 rounded bg-amber-500/15 px-2 py-1 text-[10px] text-amber-700">
+          <div className="pointer-events-none absolute bottom-3 right-3 rounded bg-amber-500/15 px-2 py-1 text-[10px] text-ink-warn">
             Esperando animaciones…
           </div>
         ) : (
-          <div className="pointer-events-none absolute bottom-3 right-3 rounded bg-emerald-500/15 px-2 py-1 text-[10px] text-emerald-700">
+          <div className="pointer-events-none absolute bottom-3 right-3 rounded bg-emerald-500/15 px-2 py-1 text-[10px] text-ink-ok">
             {animationNames.length} animaciones cargadas
           </div>
         )}

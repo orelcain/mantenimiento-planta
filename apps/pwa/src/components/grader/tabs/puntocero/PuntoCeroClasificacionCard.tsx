@@ -51,7 +51,7 @@ export function PuntoCeroClasificacionCard({
   }
 
   return (
-    <Card className="border-red-200">
+    <Card className="border-red-500/[0.25]">
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
           <Target className="h-4 w-4 text-red-500" />
@@ -112,7 +112,7 @@ export function PuntoCeroClasificacionCard({
           <div className="overflow-x-auto overflow-y-visible">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-muted/40 text-left text-caption tracking-wide text-muted-foreground/90">
+                <tr className="border-b border-muted/40 text-left text-caption tracking-wide text-muted-foreground">
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2">Causa</th>
                   <th className="py-2 px-2 text-right">Piezas</th>

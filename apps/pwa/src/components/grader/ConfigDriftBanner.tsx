@@ -51,8 +51,8 @@ export function ConfigDriftBanner({
     return (
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-card border border-amber-300 bg-amber-50 px-3.5 py-3',
-          'dark:bg-amber-500/[0.15] dark:border-amber-700',
+          'flex items-center gap-2.5 rounded-card border border-amber-500/[0.25] bg-amber-500/[0.15] px-3.5 py-3',
+          'dark:bg-amber-500/[0.15] dark:border-amber-500/[0.25]',
           className,
         )}
       >
@@ -74,7 +74,7 @@ export function ConfigDriftBanner({
   return (
     <div
       className={cn(
-        'rounded-card border border-amber-300 bg-amber-500/[0.15] dark:border-amber-700',
+        'rounded-card border border-amber-500/[0.25] bg-amber-500/[0.15] dark:border-amber-500/[0.25]',
         className,
       )}
     >
@@ -102,7 +102,7 @@ export function ConfigDriftBanner({
         <div className="px-3.5 pb-3.5 pt-3 border-t border-amber-500/[0.25] dark:border-amber-500/[0.25]">
           <table className="w-full text-footnote">
             <thead>
-              <tr className="text-caption text-amber-700/80 dark:text-amber-300/80">
+              <tr className="text-caption text-ink-warn/80 dark:text-ink-warn/80">
                 <th className="text-left font-normal pb-1.5">Causa que depende de las gates</th>
                 <th className="text-right font-normal pb-1.5">guardado</th>
                 <th className="text-right font-normal pb-1.5 pl-3">config actual</th>
@@ -126,7 +126,7 @@ export function ConfigDriftBanner({
             </tbody>
           </table>
 
-          <p className="mt-2.5 text-caption leading-relaxed text-amber-800/80 dark:text-amber-300/70">
+          <p className="mt-2.5 text-caption leading-relaxed text-ink-warn/80 dark:text-ink-warn/70">
             {analyzed && <>Análisis: {analyzed} · </>}
             {changed && <>última edición de gates: {changed}{lastConfigChangeBy ? `, ${lastConfigChangeBy}` : ''} · </>}
             {drift.changedGateNumbers.length > 0 && (

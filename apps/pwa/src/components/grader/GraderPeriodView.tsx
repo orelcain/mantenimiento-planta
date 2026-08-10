@@ -769,7 +769,7 @@ export function GraderPeriodView({ data }: Props) {
             <CardTitle className="text-base flex items-center gap-2">
               {useHourlyView ? (
                 <>
-                  <Clock className="h-4 w-4 text-purple-500" />
+                  <Clock className="h-4 w-4 text-cat-6-ink" />
                   Drill-down horario · P0% por hora del día
                 </>
               ) : (

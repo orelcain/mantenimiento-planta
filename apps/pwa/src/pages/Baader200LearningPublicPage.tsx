@@ -143,7 +143,7 @@ export function Baader200LearningPublicPage() {
       <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-          <p className="text-blue-300 text-sm">Cargando Baader 200…</p>
+          <p className="text-ink-info text-sm">Cargando Baader 200…</p>
         </div>
       </div>
     )
@@ -154,7 +154,7 @@ export function Baader200LearningPublicPage() {
       <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
         <div className="flex flex-col items-center gap-3 max-w-sm px-4">
           <AlertCircle className="h-10 w-10 text-red-400" />
-          <p className="text-red-300 text-sm text-center">{error}</p>
+          <p className="text-ink-crit text-sm text-center">{error}</p>
         </div>
       </div>
     )
@@ -169,16 +169,16 @@ export function Baader200LearningPublicPage() {
         style={{ height: visualFs ? '0' : '44px', overflow: 'hidden', background: 'linear-gradient(180deg, #0d1f3c 0%, #0a1628 100%)', transition: 'height .2s' }}>
         <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-blue-300 text-caption font-bold tracking-wide uppercase truncate">BAADER 200</span>
+          <span className="text-ink-info text-caption font-bold tracking-wide uppercase truncate">BAADER 200</span>
           <span className="text-[#3a6a9a] text-caption truncate hidden xs:block">{selectedTitle || 'Manual de Ajustes'}</span>
         </div>
         <button onClick={toggleFullscreen}
-          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0"
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-ink-info transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0"
           title={(isFullscreen || visualFs) ? 'Salir' : 'Pantalla completa'}>
           {(isFullscreen || visualFs) ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
         </button>
         <button onClick={() => setQrOpen(true)}
-          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0">
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-ink-info transition-colors rounded-card border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0">
           <QrCode className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -214,7 +214,7 @@ export function Baader200LearningPublicPage() {
 
       {visualFs && (
         <button onClick={() => setVisualFs(false)}
-          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-card text-caption text-blue-200"
+          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-card text-caption text-ink-info"
           style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}>
           <Minimize className="h-3 w-3" />
         </button>
@@ -224,14 +224,14 @@ export function Baader200LearningPublicPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setQrOpen(false)}>
           <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-card p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between w-full">
-              <span className="text-blue-300 text-sm font-semibold">Compartir sección</span>
-              <button onClick={() => setQrOpen(false)} className="text-[#3a5a7a] hover:text-blue-300"><X className="h-4 w-4" /></button>
+              <span className="text-ink-info text-sm font-semibold">Compartir sección</span>
+              <button onClick={() => setQrOpen(false)} className="text-[#3a5a7a] hover:text-ink-info"><X className="h-4 w-4" /></button>
             </div>
             {selected && <p className="text-caption text-blue-400 text-center">{sections.find(s => s.id === selected)?.title}</p>}
             <div className="bg-white p-3 rounded-card"><QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} /></div>
             <div className="flex items-center gap-2 w-full">
-              <input readOnly value={learnUrl} className="flex-1 text-caption bg-[#0a1628] border border-[#1e3a5f] rounded-ctl px-2 py-1.5 text-blue-300 outline-none min-w-0" />
-              <button onClick={copyLink} className="flex items-center gap-1 px-2.5 py-1.5 rounded-ctl bg-[#1a4a8a] text-blue-200 text-caption hover:bg-[#2a5a9a] transition-colors flex-shrink-0">
+              <input readOnly value={learnUrl} className="flex-1 text-caption bg-[#0a1628] border border-[#1e3a5f] rounded-ctl px-2 py-1.5 text-ink-info outline-none min-w-0" />
+              <button onClick={copyLink} className="flex items-center gap-1 px-2.5 py-1.5 rounded-ctl bg-[#1a4a8a] text-ink-info text-caption hover:bg-[#2a5a9a] transition-colors flex-shrink-0">
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copiado' : 'Copiar'}
               </button>

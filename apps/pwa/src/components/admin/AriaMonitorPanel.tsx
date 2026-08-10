@@ -145,7 +145,7 @@ export function AriaMonitorPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-cat-6-tint/[0.15] rounded-card">
-            <Brain className="h-5 w-5 text-purple-500" />
+            <Brain className="h-5 w-5 text-cat-6-ink" />
           </div>
           <div>
             <h2 className="text-lg font-semibold">ARIA — Pensamiento Profundo</h2>
@@ -335,7 +335,7 @@ export function AriaMonitorPanel() {
               <div className="h-2 w-full rounded-ctl bg-muted overflow-hidden">
                 <div
                   className={`h-2 transition-all rounded-ctl ${
-                    usedPercent > 90 ? 'bg-red-500' : usedPercent > 70 ? 'bg-amber-500' : 'bg-purple-500'
+                    usedPercent > 90 ? 'bg-red-500' : usedPercent > 70 ? 'bg-amber-500' : 'bg-cat-6-tint'
                   }`}
                   style={{ width: `${Math.min(100, usedPercent)}%` }}
                 />
@@ -365,7 +365,7 @@ export function AriaMonitorPanel() {
                     </div>
                     <div className="w-20 h-1.5 rounded-ctl bg-muted overflow-hidden">
                       <div
-                        className={`h-full rounded-ctl ${pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-purple-500'}`}
+                        className={`h-full rounded-ctl ${pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-cat-6-tint'}`}
                         style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>

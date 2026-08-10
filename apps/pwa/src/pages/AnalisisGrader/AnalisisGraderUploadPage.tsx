@@ -549,7 +549,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </div>
       )}
       {uploadError && (
-        <div className="flex items-center gap-2 text-xs text-amber-700">
+        <div className="flex items-center gap-2 text-xs text-ink-warn">
           <AlertCircle className="h-3.5 w-3.5" />
           {uploadError}
         </div>

@@ -95,7 +95,7 @@ export function RepuestoActionsMenu({
 
             {onSearchInManual && hasFabCode && (
               <DropdownMenuItem onClick={() => onSearchInManual(repuesto)} className="gap-2 cursor-pointer">
-                <BookOpen className="h-4 w-4 text-purple-500" />
+                <BookOpen className="h-4 w-4 text-cat-6-ink" />
                 <span>Buscar en Manual</span>
                 <span className="ml-auto text-caption font-mono text-muted-foreground truncate max-w-[60px]">
                   {repuesto.codigoFabricante}

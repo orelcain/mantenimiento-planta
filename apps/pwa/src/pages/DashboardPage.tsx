@@ -394,7 +394,7 @@ export function DashboardPage() {
                       </div>
 
                       {/* Información de Creador y Asignado */}
-                      <div className="flex flex-col gap-0.5 text-xs text-muted-foreground/80 pt-0.5">
+                      <div className="flex flex-col gap-0.5 text-xs text-muted-foreground pt-0.5">
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-muted-foreground">Reportado:</span>
                           <span className="break-words whitespace-normal">

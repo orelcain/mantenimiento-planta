@@ -37,7 +37,7 @@ const ACTION_CONFIG: Record<AuditAction, { icon: typeof Plus; label: string; col
   update:   { icon: Pencil,         label: 'Editado',    color: 'text-blue-500' },
   delete:   { icon: Trash2,         label: 'Eliminado',  color: 'text-red-500' },
   restore:  { icon: RotateCcw,      label: 'Restaurado', color: 'text-amber-500' },
-  relocate: { icon: ArrowRightLeft, label: 'Reubicado',  color: 'text-purple-500' },
+  relocate: { icon: ArrowRightLeft, label: 'Reubicado',  color: 'text-cat-6-ink' },
 }
 
 function formatDate(date: Date): string {

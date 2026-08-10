@@ -29,32 +29,32 @@ const VERDICT_CONFIG = {
     label: 'Mejor que la temporada',
     Icon: TrendingDown,
     color: 'text-ink-ok',
-    bg: 'bg-emerald-500/[0.15] border-emerald-200 dark:border-emerald-800',
+    bg: 'bg-emerald-500/[0.15] border-emerald-500/[0.25]',
   },
   similar: {
     label: 'Similar a la temporada',
     Icon: Minus,
     color: 'text-ink-warn',
-    bg: 'bg-amber-500/[0.15] border-amber-200 dark:border-amber-800',
+    bg: 'bg-amber-500/[0.15] border-amber-500/[0.25]',
   },
   worse: {
     label: 'Por encima del histórico',
     Icon: TrendingUp,
     color: 'text-ink-crit',
-    bg: 'bg-red-500/[0.15] border-red-200 dark:border-red-800',
+    bg: 'bg-red-500/[0.15] border-red-500/[0.25]',
   },
 }
 
 const DOT_COLOR: Record<string, string> = {
   red: 'bg-red-500',
   orange: 'bg-orange-500',
-  purple: 'bg-purple-500',
+  purple: 'bg-cat-6-tint',
   cyan: 'bg-cyan-500',
   emerald: 'bg-emerald-500',
   amber: 'bg-amber-500',
-  brown: 'bg-amber-800',
+  brown: 'bg-amber-600',
   blue: 'bg-blue-500',
-  zinc: 'bg-zinc-400',
+  zinc: 'bg-muted-foreground',
 }
 
 export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props) {

@@ -130,7 +130,7 @@ export function GraderResumenRapido({
             {p0Pct}%
           </p>
           <p className="text-xs text-muted-foreground mt-1">Punto Cero</p>
-          <p className="text-xs text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground">
             umbral {warnTh}% / {critTh}%
           </p>
         </div>
@@ -141,7 +141,7 @@ export function GraderResumenRapido({
           </p>
           <p className="text-xs text-muted-foreground mt-1">Piezas</p>
           {kpis.pointZeroPieces > 0 && (
-            <p className="text-xs text-muted-foreground/70">
+            <p className="text-xs text-muted-foreground">
               {kpis.pointZeroPieces.toLocaleString('es-CL')} en P0
             </p>
           )}
@@ -156,7 +156,7 @@ export function GraderResumenRapido({
             </p>
             <p className="text-xs text-muted-foreground mt-1">Peso clasificado</p>
             {kpis.avgWeightGrams != null && (
-              <p className="text-xs text-muted-foreground/70">
+              <p className="text-xs text-muted-foreground">
                 ~{kpis.avgWeightGrams.toFixed(0)} g/pz
               </p>
             )}
@@ -170,7 +170,7 @@ export function GraderResumenRapido({
             </p>
             <p className="text-xs text-muted-foreground mt-1">pz / hora</p>
             {dominant && (
-              <p className="text-xs text-muted-foreground/70">
+              <p className="text-xs text-muted-foreground">
                 {dominant.calibre} {dominant.pct}%
               </p>
             )}

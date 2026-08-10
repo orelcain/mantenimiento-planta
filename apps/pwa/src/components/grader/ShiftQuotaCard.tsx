@@ -166,7 +166,7 @@ export function ShiftQuotaCard({
             <span className="text-xs text-muted-foreground">
               Sin cuota definida para este turno.
             </span>
-            <span className="ml-auto text-caption text-muted-foreground/70">
+            <span className="ml-auto text-caption text-muted-foreground">
               La define un supervisor
             </span>
           </CardContent>

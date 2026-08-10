@@ -521,7 +521,7 @@ export function PhotoEvidenceDetail({
                   <div className="mt-3 p-3 rounded-card border border-border bg-muted space-y-3">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-card border border-red-200 dark:border-red-800 bg-red-500/[0.15]">
+                        <div className="p-3 rounded-card border border-red-500/[0.25] bg-red-500/[0.15]">
                           <PhotoUploader
                             photos={pairBeforePhoto}
                             onPhotosChange={(p) => {
@@ -547,7 +547,7 @@ export function PhotoEvidenceDetail({
                             </Button>
                           </div>
                         </div>
-                        <div className="p-3 rounded-card border border-green-200 dark:border-green-800 bg-green-500/[0.15]">
+                        <div className="p-3 rounded-card border border-emerald-500/[0.25] bg-green-500/[0.15]">
                           <PhotoUploader
                             photos={pairAfterPhoto}
                             onPhotosChange={(p) => {
@@ -749,7 +749,7 @@ export function PhotoEvidenceDetail({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-red-500 text-red-600 hover:bg-red-50"
+                        className="border-red-500 text-red-600 hover:bg-red-500/[0.15]"
                         onClick={handleDeletePair}
                         disabled={isSaving}
                       >
@@ -816,7 +816,7 @@ export function PhotoEvidenceDetail({
                   <div className="space-y-1">
                     <span className="text-muted-foreground">Verificado</span>
                     <p className="flex items-center gap-1">
-                      <CheckCircle className="w-4 h-4 text-purple-500" />
+                      <CheckCircle className="w-4 h-4 text-cat-6-ink" />
                       {safeFormat(evidence.verificadaAt, "d MMM yyyy, HH:mm")}
                     </p>
                     {evidence.verificadoPor && (
@@ -847,7 +847,7 @@ export function PhotoEvidenceDetail({
                 {canVerify && (
                   <Button
                     variant="default"
-                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                    className="flex-1 bg-cat-6-tint hover:bg-purple-700"
                     onClick={handleMarkAsVerified}
                     disabled={isSaving}
                   >
@@ -879,7 +879,7 @@ export function PhotoEvidenceDetail({
 
                 <Button
                   variant="outline"
-                  className="text-red-600 hover:bg-red-50"
+                  className="text-red-600 hover:bg-red-500/[0.15]"
                   onClick={handleDelete}
                   disabled={isDeleting}
                 >

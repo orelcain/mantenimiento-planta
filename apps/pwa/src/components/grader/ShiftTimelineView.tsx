@@ -1290,7 +1290,7 @@ export function ShiftTimelineView({
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground text-caption font-medium"
               title={`Calibración/aseo detectado por lotes no-correlativos${productionWindow.dummyLots.size > 0 ? ` (${[...productionWindow.dummyLots].join(', ')})` : ' (ej. 1111)'}. ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
               Pre/post-turno: {productionWindow.excludedPieces} pzs
               {productionWindow.dummyLots.size > 0 && (
                 <span className="text-muted-foreground font-normal">· {productionWindow.dummyLots.size} lote{productionWindow.dummyLots.size > 1 ? 's' : ''} dummy</span>
@@ -1384,7 +1384,7 @@ export function ShiftTimelineView({
                 >
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
                   {label}
-                  <span className="text-muted-foreground/80 font-normal">{count.toLocaleString('es-CL')}</span>
+                  <span className="text-muted-foreground font-normal">{count.toLocaleString('es-CL')}</span>
                 </span>
               )
             })}
@@ -1509,7 +1509,7 @@ export function ShiftTimelineView({
                     <span
                       className={cn(
                         'ml-2 tabular-nums text-caption font-medium',
-                        cp.p0Delta > 0 ? 'text-cat-5-ink' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-slate-400',
+                        cp.p0Delta > 0 ? 'text-cat-5-ink' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-muted-foreground',
                       )}
                       title="Δ P0% respecto a la carga anterior"
                     >
