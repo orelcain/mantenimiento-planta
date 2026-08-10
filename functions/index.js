@@ -8331,6 +8331,8 @@ exports.createPublicShiftMonitor = onCall({ region: 'us-central1' }, async (requ
     expiresAt: new Date(now.getTime() + ttlHours * 3600 * 1000).toISOString(),
     ttlHours,
     live,
+    // Historial desde el minuto uno: el link nace pudiendo deslizar hacia atrás.
+    history: shiftDocId ? await publicMonitorMod.buildMonitorHistory(db, plantSlug, shiftDocId, []) : [],
   })
 
   logger.info('[publicShiftMonitor] creado', { token, mode, plantSlug, shiftDocId, ttlHours, uid })
