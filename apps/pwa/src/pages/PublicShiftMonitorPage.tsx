@@ -121,26 +121,102 @@ function Kpi({
 }
 
 /** Barras de 5 min. SVG puro — sin librerías de gráficos en el bundle público. */
-function Sparkbars({ series }: { series: PublicMonitorLive['series'] }) {
+/**
+ * Barras de 5 min con eje de horas, ritmo de referencia y las detenciones
+ * ubicadas encima.
+ *
+ * El gráfico anterior decía CUÁNTO se produjo y nada más: 106 barras sin
+ * referencia de ritmo, sin horas y con los baches mudos. Las tres capas de acá
+ * responden lo que se pregunta quien lo mira — si el ritmo fue bueno, a qué
+ * hora fue la caída y por qué. SVG puro, sin librerías de gráficos.
+ */
+function Sparkbars({
+  series, stopReasons, stopEvents, causaSel, onCausa,
+}: {
+  series: PublicMonitorLive['series']
+  stopReasons?: string[]
+  stopEvents?: PublicMonitorLive['stopEvents']
+  causaSel: string | null
+  onCausa: (c: string | null) => void
+}) {
   if (!series || series.length === 0) return null
+
   const max = Math.max(...series.map(p => p.pieces), 1)
   const W = 100
   const H = 28
   const gap = 0.6
   const bw = Math.max(0.5, W / series.length - gap)
 
+  // ⚠ La serie NO es continua: solo trae los tramos que el sensor registró, y
+  // durante una parada larga puede faltar más de uno. Por eso la posición de un
+  // paro se busca en la serie (índice del bucket que lo contiene) en vez de
+  // calcularse por tiempo transcurrido — ese atajo dejaba las bandas corridas
+  // varios tramos a la derecha y algunas fuera del gráfico.
+  const tiempos = series.map(p => new Date(p.t).getTime())
+  const paso = 5 * 60_000
+
+  /** Índice del tramo que contiene `ms`, o el más cercano dentro del rango. */
+  const indiceDe = (ms: number) => {
+    if (ms <= tiempos[0]!) return 0
+    for (let i = tiempos.length - 1; i >= 0; i--) {
+      if (ms >= tiempos[i]!) return i
+    }
+    return 0
+  }
+
+  // Bandas de la causa elegida. Se dibujan primero para quedar DETRÁS de las
+  // barras: la producción es el dato, la detención es el contexto.
+  const bandas = causaSel && stopEvents && stopReasons
+    ? stopEvents
+        .filter(e => stopReasons[e.r] === causaSel)
+        .map((e, i) => {
+          const desde = new Date(e.f).getTime()
+          const hasta = desde + e.s * 1000
+          const i0 = indiceDe(desde)
+          const i1 = indiceDe(hasta)
+          const x = i0 * (bw + gap)
+          // Al menos un tramo de ancho: un paro de 40 s tiene que verse.
+          const ancho = Math.max((i1 - i0 + (e.s >= paso ? 1 : 0)) * (bw + gap), bw * 0.6)
+          // La key lleva el índice: dos paros pueden arrancar en el MISMO
+          // instante con distinta duración, y con `e.f` sola React los tomaba
+          // por el mismo elemento.
+          return { x, ancho, key: `${e.f}-${e.s}-${i}` }
+        })
+    : []
+
+  // 4 marcas de hora: suficientes para ubicarse, sin amontonar en un celular.
+  const marcas = Array.from({ length: 4 }, (_, k) =>
+    series[Math.round((k / 3) * (series.length - 1))]!.t)
+
   return (
     <div className="rounded-2xl border border-border bg-card px-4 py-3">
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>Piezas por tramo de 5 min</span>
-        <span className="tabular-nums text-muted-foreground/70">
-          {fmtWallTime(series[0]!.t)}–{fmtWallTime(series[series.length - 1]!.t)}
-        </span>
+        {causaSel && (
+          <button
+            onClick={() => onCausa(null)}
+            className="rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] normal-case text-rose-800 dark:text-rose-300"
+          >
+            {causaSel} ✕
+          </button>
+        )}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-2 h-16 w-full" role="img"
+
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-2 h-20 w-full" role="img"
            aria-label="Piezas por tramo de cinco minutos">
+        {bandas.map(b => (
+          <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
+                className="fill-rose-500/25 stroke-rose-500/60" strokeWidth={0.15} />
+        ))}
+
+        {/* Ritmo de referencia: el mejor tramo que la máquina demostró en este
+            turno. Se eligió sobre el target del sensor (100 pz/tramo) porque
+            ese nunca se alcanza y dejaba todo el turno "bajo objetivo". */}
+        <line x1={0} y1={H - H * 0.98} x2={W} y2={H - H * 0.98}
+              className="stroke-amber-600 dark:stroke-amber-400" strokeWidth={0.2} strokeDasharray="1.2 1" />
+
         {series.map((p, i) => {
-          const h = (p.pieces / max) * H
+          const h = (p.pieces / max) * H * 0.98
           return (
             <rect
               key={p.t}
@@ -150,12 +226,28 @@ function Sparkbars({ series }: { series: PublicMonitorLive['series'] }) {
               height={h}
               rx={0.4}
               className={p.pieces > 0 ? 'fill-sky-500 dark:fill-sky-400/80' : 'fill-muted-foreground/20'}
-            />
+            >
+              <title>{`${fmtWallTime(p.t)} · ${fmtInt(p.pieces)} pz`}</title>
+            </rect>
           )
         })}
       </svg>
-      <div className="mt-1 text-[11px] text-muted-foreground/70">
-        Máximo del tramo: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
+
+      <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground/70">
+        {marcas.map((t, i) => <span key={`${t}-${i}`}>{fmtWallTime(t)}</span>)}
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
+          mejor ritmo del turno: <span className="tabular-nums text-muted-foreground">{fmtInt(max)}</span> pz
+        </span>
+        {causaSel && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500/25 ring-1 ring-rose-500/60" />
+            {causaSel}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -210,6 +302,8 @@ export function PublicShiftMonitorPage() {
 
   // Índice del turno que se está mirando: 0 = el vigente, 1..n = anteriores.
   const [idx, setIdx] = useState(0)
+  /** Causa de detención resaltada sobre el gráfico. */
+  const [causaSel, setCausaSel] = useState<string | null>(null)
 
   // Turnos navegables, del actual hacia atrás. El backend publica el historial
   // ya compuesto; acá solo se elige cuál se pinta.
@@ -255,6 +349,9 @@ export function PublicShiftMonitorPage() {
   const verIndice = (n: number) => {
     const destino = Math.min(vistas.length - 1, Math.max(0, n))
     setIdx(destino)
+    // Otro turno, otras detenciones: mantener la selección marcaría bandas que
+    // no existen en el turno que se acaba de abrir.
+    setCausaSel(null)
     vistaIdRef.current = vistas[destino]?.shiftDocId ?? null
   }
   const irA = (delta: number) => verIndice(idx + delta)
@@ -517,7 +614,13 @@ export function PublicShiftMonitorPage() {
           </section>
         )}
 
-        <Sparkbars series={live.series} />
+        <Sparkbars
+          series={live.series}
+          stopReasons={live.stopReasons}
+          stopEvents={live.stopEvents}
+          causaSel={causaSel}
+          onCausa={setCausaSel}
+        />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
@@ -551,17 +654,33 @@ export function PublicShiftMonitorPage() {
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Detenciones del turno
             </div>
-            <ul className="mt-2 space-y-1.5">
-              {live.topStops.map(s => (
-                <li key={s.reason} className="flex items-center gap-3 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-foreground/80">{s.reason}</span>
-                  <span className="tabular-nums text-muted-foreground">{fmtDurationSec(s.sec)}</span>
-                  <span className="w-12 text-right tabular-nums text-[11px] text-muted-foreground/70">
-                    {s.count}×
-                  </span>
-                </li>
-              ))}
+            <ul className="mt-2 space-y-0.5">
+              {live.topStops.map(s => {
+                const activa = causaSel === s.reason
+                return (
+                  <li key={s.reason}>
+                    <button
+                      onClick={() => setCausaSel(activa ? null : s.reason)}
+                      aria-pressed={activa}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-2 py-1.5 text-left text-sm transition-colors ${
+                        activa
+                          ? 'border-rose-500/50 bg-rose-500/15'
+                          : 'border-transparent hover:bg-muted'
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-foreground/80">{s.reason}</span>
+                      <span className="tabular-nums text-muted-foreground">{fmtDurationSec(s.sec)}</span>
+                      <span className="w-12 text-right tabular-nums text-[11px] text-muted-foreground/70">
+                        {s.count}×
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
+            <p className="mt-1.5 text-[11px] text-muted-foreground/60">
+              Toca una causa para ver en qué momento del turno ocurrió.
+            </p>
           </section>
         )}
 

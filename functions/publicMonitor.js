@@ -46,6 +46,10 @@ const INTERVAL_MIN = 5
 const SERIES_MAX_POINTS = 192
 /** Ventana "reciente" para la cadencia instantánea. */
 const RECENT_INTERVALS = 6   // 30 min
+/** Tope de detenciones ubicadas que se publican por turno (un turno real trae ~70). */
+const STOP_EVENTS_MAX = 300
+/** Tramos vacíos que se agregan al final para que quepan los últimos paros (1 h). */
+const SERIES_TAIL_MAX = 12
 
 /** Timestamp de Firestore / Date / string / número → Date. null si no se puede. */
 function toDate(v) {
@@ -486,6 +490,53 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     kind: ventanaTurno.start && t.start < ventanaTurno.start.getTime() ? 'antes' : 'despues',
   }))
 
+  // ── Detenciones: UNA sola fuente para la lista y para el gráfico ─────────
+  // Antes se calculaban por separado y divergían: la lista decía "Micro
+  // Detencion 85×" y el gráfico dibujaba 55 bandas. La diferencia eran states
+  // repetidos entre el doc del turno y el de la cola (57) y states de duración
+  // CERO (53), que no son un paro observable ni se pueden ubicar en el tiempo.
+  // Ahora los eventos se deduplican una vez y de ahí sale todo.
+  //
+  // El formato es comprimido a propósito (índice de razón + inicio + duración):
+  // con ~70 paros por turno y 6 turnos de historial, repetir el texto de la
+  // razón en cada evento engorda el doc sin aportar nada.
+  const stopReasons = []
+  const eventosCrudos = []
+  for (const m of machines) {
+    for (const st of m.states || []) {
+      if (st.type === 'uptime') continue
+      if (esPlannedDowntime(st)) continue
+      const desde = toDate(st.startAt)
+      const sec = st.durationSec || 0
+      if (!desde || sec <= 0) continue
+      const reason = (st.reason || st.name || 'Sin razón').trim()
+      let r = stopReasons.indexOf(reason)
+      if (r === -1) { stopReasons.push(reason); r = stopReasons.length - 1 }
+      eventosCrudos.push({ r, f: desde.toISOString(), s: sec })
+    }
+  }
+  const vistosEv = new Set()
+  const stopEvents = eventosCrudos
+    .filter(e => {
+      const k = `${e.r}|${e.f}|${e.s}`
+      if (vistosEv.has(k)) return false
+      vistosEv.add(k)
+      return true
+    })
+    .sort((a, b) => (a.f < b.f ? -1 : 1))
+    .slice(0, STOP_EVENTS_MAX)
+
+  // La lista sale de los mismos eventos: si dice "4×", el gráfico marca 4.
+  const stopAcc = new Map()
+  for (const e of stopEvents) {
+    const reason = stopReasons[e.r]
+    const prev = stopAcc.get(reason) || { reason, sec: 0, count: 0 }
+    prev.sec += e.s
+    prev.count += 1
+    stopAcc.set(reason, prev)
+  }
+  const topStops = [...stopAcc.values()].sort((a, b) => b.sec - a.sec).slice(0, 5)
+
   // ── Serie temporal (suma de todas las máquinas por bucket de 5 min) ──────
   const byBucket = new Map()
   for (const m of machines) {
@@ -499,6 +550,25 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const seriesAll = [...byBucket.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([t, pieces]) => ({ t: new Date(t).toISOString(), pieces }))
+
+  // La serie termina en el último tramo CON piezas, pero la línea sigue
+  // detenida un rato después y esas detenciones no tendrían dónde dibujarse:
+  // la lista decía "Micro Detencion 58×" y el gráfico marcaba 55. Se extiende
+  // con tramos vacíos hasta cubrir el último paro — con tope, para que un
+  // evento raro y lejano no estire el gráfico una hora de nada.
+  const ultimoParoMs = stopEvents.length > 0
+    ? Math.max(...stopEvents.map(e => new Date(e.f).getTime() + e.s * 1000))
+    : 0
+  if (seriesAll.length > 0 && ultimoParoMs > 0) {
+    let t = new Date(seriesAll[seriesAll.length - 1].t).getTime()
+    let extra = 0
+    while (t + INTERVAL_MIN * 60_000 <= ultimoParoMs && extra < SERIES_TAIL_MAX) {
+      t += INTERVAL_MIN * 60_000
+      seriesAll.push({ t: new Date(t).toISOString(), pieces: 0 })
+      extra++
+    }
+  }
+
   const series = seriesAll.slice(-SERIES_MAX_POINTS)
 
   // Cadencia reciente: últimos 30 min de intervalos sincronizados. Cero es un
@@ -535,21 +605,6 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       currentSinceAt: st ? iso(toDate(st.startAt)) : null,
     }
   })
-
-  // ── Top razones de paro (sin texto libre de operador) ────────────────────
-  const stopAcc = new Map()
-  for (const m of machines) {
-    for (const s of m.states || []) {
-      if (s.type === 'uptime') continue
-      if (esPlannedDowntime(s)) continue
-      const reason = (s.reason || s.name || 'Sin razón').trim()
-      const prev = stopAcc.get(reason) || { reason, sec: 0, count: 0 }
-      prev.sec += s.durationSec || 0
-      prev.count += 1
-      stopAcc.set(reason, prev)
-    }
-  }
-  const topStops = [...stopAcc.values()].sort((a, b) => b.sec - a.sec).slice(0, 5)
 
   // Estado de línea: produciendo si CUALQUIER máquina lo está.
   const producing = machinesOut.filter(m => m.status === 'produciendo')
@@ -610,6 +665,10 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     machines: machinesOut,
     series,
     topStops,
+    /** Razones, para que los eventos no repitan el texto en cada uno. */
+    stopReasons,
+    /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons. */
+    stopEvents,
   }
 }
 
