@@ -23,12 +23,28 @@ function esMicro(state) {
 /**
  * Totales de paros de un array de states normalizados
  * ({type, name, reason, durationSec}).
+ *
+ * ⚠ Se ignoran los states de duración CERO y los repetidos: Shoplogix emite
+ * registros instantáneos que no son una detención de nada. Contarlos inflaba el
+ * número casi a la mitad — el 10-ago Filete anunciaba 85 micro por Telegram
+ * mientras el monitor público mostraba 58 para el mismo turno, y no había forma
+ * de saber cuál creer. Las dos superficies tienen que contar igual.
  */
 function resumenParos(states) {
   const out = { macroCount: 0, macroSec: 0, microCount: 0, microSec: 0 }
+  const vistos = new Set()
   for (const s of states || []) {
     if (s?.type !== 'downtime') continue
     const dur = s.durationSec || 0
+    if (dur <= 0) continue
+    // Sin un inicio válido no se puede afirmar que dos paros sean el MISMO, así
+    // que no se deduplica: mejor contar de más que borrar un paro real.
+    const inicio = s.startAt?.toDate?.()?.getTime?.() ?? new Date(s.startAt || NaN).getTime()
+    if (Number.isFinite(inicio)) {
+      const clave = `${s.name || s.reason || ''}|${inicio}|${dur}`
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+    }
     if (esMicro(s)) {
       out.microCount += 1
       out.microSec += dur
@@ -144,7 +160,14 @@ function componerAvisoMonitor({ plantLabel, shiftId, monitorUrl }) {
  *   todavía se acuerda de lo que pasó: nombrarlos es lo que hace que se anoten.
  * @returns {string} HTML para Telegram
  */
-function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader, realSchedule, effectiveSchedule, stopsWithoutCause, plannedTargetPieces }) {
+/**
+ * @param {Object} [p.outside] — producción que la línea hizo FUERA del horario
+ *   del turno, ya sumada dentro de `machines` (ver checkShiftEndBriefs).
+ *   `{ pieces, start, end }`. Solo sirve para mostrar el desglose: sin él, el
+ *   total sería el mismo pero nadie entendería por qué no coincide con el
+ *   horario del turno que muestra Shoplogix.
+ */
+function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officialTargets, currentJob, grader, realSchedule, effectiveSchedule, stopsWithoutCause, plannedTargetPieces, outside }) {
   const ms = machines || []
   const total = ms.reduce((a, m) => a + (m.totalCycles || 0), 0)
 
@@ -155,10 +178,16 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
   const efeMin = durMin(effectiveSchedule)
   const progMin = durMin(realSchedule)
   const usarEfectiva = efeMin > 0 && (progMin <= 0 || efeMin < progMin * 0.75)
+  // Con cola, el horario del turno MIENTE: Shoplogix cerró 15:30 y la línea
+  // trabajó hasta las 16:30. Anunciar "07:45 → 15:30" arriba y "505 piezas
+  // después" abajo se lee como un error del mensaje.
+  const finReal = outside?.end && (!realSchedule?.end || outside.end > realSchedule.end)
+    ? outside.end
+    : realSchedule?.end
   if (usarEfectiva) {
     lineas.push(`🕐 Operación real: ${fmtHora(effectiveSchedule.start)} → ${fmtHora(effectiveSchedule.end)}`)
-  } else if (realSchedule?.start && realSchedule?.end) {
-    lineas.push(`🕐 Horario real: ${fmtHora(realSchedule.start)} → ${fmtHora(realSchedule.end)}`)
+  } else if (realSchedule?.start && finReal) {
+    lineas.push(`🕐 Horario real: ${fmtHora(realSchedule.start)} → ${fmtHora(finReal)}`)
   }
 
   // Producción por máquina + total
@@ -179,6 +208,16 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
     totalLinea += ` · ${emoji} ${pct.toFixed(0)}% ${etiqueta} (${fmtNum(refTotal)})`
   }
   lineas.push(totalLinea)
+  // Desglose de la cola: el turno "cerró" a una hora y la línea siguió. Sin esta
+  // línea el total no cuadra con el horario de arriba y parece un error.
+  const fueraPz = Number(outside?.pieces) || 0
+  if (fueraPz > 0) {
+    const dentro = total - fueraPz
+    const rango = outside.start && outside.end
+      ? ` (${fmtHora(outside.start)}–${fmtHora(outside.end)})`
+      : ''
+    lineas.push(`   ↳ ${fmtNum(dentro)} dentro del horario + <b>${fmtNum(fueraPz)}</b> después${rango}`)
+  }
   if (currentJob?.name) lineas.push(`🐟 Especie: ${currentJob.name}`)
 
   // Uptime promedio (shiftRuntime ya excluye planned downtime del denominador)

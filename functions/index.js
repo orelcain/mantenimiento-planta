@@ -7538,9 +7538,14 @@ exports.checkShiftStartDelays = onSchedule(
 // planta), evalúa el fin vigente y marca `endBriefSentAt` en el propio doc
 // (transacción) como idempotencia. Sin colección nueva ni índice compuesto.
 //
-// Momento de envío: max(officialSchedule.end, scheduledEnd) + delayMinutes.
+// Momento de envío: max(officialSchedule.end, scheduledEnd) + delayMinutes, y
+// además se espera a que la línea DEJE de producir (ver la cola más abajo).
 // El max cubre turnos que se alargan más allá del horario oficial (hora extra
 // al final) y el delay deja que el último sync (cada 5 min) complete la data.
+
+/** Tope de espera por la cola: pasado esto el brief sale igual. */
+const MAX_ESPERA_COLA_MS = 2 * 60 * 60_000
+
 exports.checkShiftEndBriefs = onSchedule(
   { schedule: 'every 5 minutes', timeZone: 'America/Santiago', region: 'us-central1' },
   async () => {
@@ -7595,6 +7600,73 @@ exports.checkShiftEndBriefs = onSchedule(
           const fireAt = new Date(endReal.getTime() + (config.shiftEnd.delayMinutes ?? 10) * 60_000)
           if (now < fireAt) continue
 
+          // ── La línea sigue produciendo después del horario ───────────────
+          // Shoplogix cierra el turno a hora fija y manda lo que venga después
+          // al bucket `Unscheduled`. En Filete pasa TODOS los días: el 10-ago
+          // el turno "cerró" 15:30 y la línea trabajó hasta las 16:27. Con la
+          // regla vieja el brief salía 15:40 anunciando 4.410 piezas cuando la
+          // jornada terminó en 4.915 — el mismo recorte que ya se corrigió en
+          // el monitor público y en la matriz.
+          //
+          // Se lee la cola SOLO cuando el turno ya venció (una vez por turno,
+          // no en cada corrida de 5 min) y se posterga el brief mientras siga
+          // entrando producción. `MAX_ESPERA_COLA_MS` es el tope: pase lo que
+          // pase el brief sale, aunque el sensor quede colgado en uptime.
+          let machines = []
+          let outside = null
+          let baseline = null
+          try {
+            const machinesSnap = await docSnap.ref.collection('machines').get()
+            machines = machinesSnap.docs.map((m) => {
+              const x = m.data()
+              return {
+                id: m.id,
+                // machineid hace falta para reconstruir la clave de la anotación
+                // de causa de cada paro (ver contarParosSinCausa).
+                machineid: x.machineid || m.id,
+                machineName: x.machineName || m.id,
+                totalCycles: x.totalCycles || 0,
+                shiftRuntime: x.shiftRuntime || 0,
+                intervals: x.intervals || [],
+                states: x.states || [],
+              }
+            }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
+
+            // Foto de lo que Shoplogix tiene en el doc del turno, ANTES de
+            // sumarle la cola: es contra esto que compara checkShiftReconciliation
+            // (lee `data.machines` del padre, que nunca incluye la cola). Sin
+            // esta foto, el brief reportaría 4.915 y la reconciliación vería
+            // 4.410 → una "corrección Shoplogix" falsa cada día en Filete.
+            baseline = {
+              total: machines.reduce((a, m) => a + m.totalCycles, 0),
+              perMachine: machines.map((m) => ({ name: m.machineName, totalCycles: m.totalCycles })),
+            }
+
+            outside = await publicMonitorMod.sumarColaAMaquinas(
+              db, plant, docSnap.id, data, machines,
+            )
+          } catch (e) {
+            // Sin la cola no se puede afirmar el total: se reintenta en 5 min
+            // en vez de mandar una cifra que ya sabemos incompleta.
+            logger.error('[checkShiftEndBriefs] error leyendo máquinas/cola', { plant, doc: docSnap.id, err: e.message })
+            continue
+          }
+
+          const topeEspera = new Date(endReal.getTime() + MAX_ESPERA_COLA_MS)
+          if (outside.lastPieceAt && now < topeEspera) {
+            const cierreCola = new Date(
+              outside.lastPieceAt.getTime()
+              + shoplogixPolling.chileUtcOffsetHours(now) * 3600_000
+              + (config.shiftEnd.delayMinutes ?? 10) * 60_000,
+            )
+            if (now < cierreCola) {
+              logger.info('[checkShiftEndBriefs] la línea sigue produciendo — brief postergado', {
+                plant, doc: docSnap.id, ultimaPieza: outside.lastPieceAt.toISOString(),
+              })
+              continue
+            }
+          }
+
           // Idempotencia: solo la corrida que logra estampar endBriefSentAt envía.
           const gano = await db.runTransaction(async (tx) => {
             const fresh = await tx.get(docSnap.ref)
@@ -7608,19 +7680,11 @@ exports.checkShiftEndBriefs = onSchedule(
           if (!gano) continue
 
           try {
-            const machinesSnap = await docSnap.ref.collection('machines').get()
-            const machines = machinesSnap.docs.map((m) => {
-              const x = m.data()
-              return {
-                // machineid hace falta para reconstruir la clave de la anotación
-                // de causa de cada paro (ver contarParosSinCausa).
-                machineid: x.machineid || m.id,
-                machineName: x.machineName || m.id,
-                totalCycles: x.totalCycles || 0,
-                shiftRuntime: x.shiftRuntime || 0,
-                states: x.states || [],
-              }
-            }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
+            // `machines` ya viene leída y con la cola sumada (arriba): sus
+            // `totalCycles` y `states` describen la JORNADA, no el recorte de
+            // Shoplogix. `shiftRuntime` se deja intacto a propósito — es el
+            // uptime que calcula Shoplogix para su ventana y no se puede
+            // recomponer para la cola sin inventar.
 
             // Turnos sin producción real (bucket de ruido o lote de prueba):
             // marcar y no molestar. El umbral es POR PLANTA — 50 piezas es nada
@@ -7689,6 +7753,7 @@ exports.checkShiftEndBriefs = onSchedule(
               effectiveSchedule,
               stopsWithoutCause,
               plannedTargetPieces: shoplogixMachinesMod.PLANT_SHIFT_TARGET_PIECES[plant] ?? null,
+              outside,
             })
             const eligibleIds = await getShoplogixEligibleUsers(plant)
             await dispatchShoplogixNotif(
@@ -7703,10 +7768,15 @@ exports.checkShiftEndBriefs = onSchedule(
             // Foto de lo reportado — la usa checkShiftReconciliation para
             // detectar si Shoplogix corrige el turno DESPUÉS de haberlo avisado
             // (pasa: re-etiquetado retroactivo, ver shoplogixSyncWakeup).
+            // `total`/`perMachine` describen el doc del turno SIN la cola, que es
+            // lo que la reconciliación vuelve a leer más tarde. Lo que se reportó
+            // de verdad va aparte, para que quede registro de la cifra anunciada.
             await docSnap.ref.set({
               endBriefSnapshot: {
-                total,
-                perMachine: machines.map((m) => ({ name: m.machineName, totalCycles: m.totalCycles })),
+                total: baseline.total,
+                perMachine: baseline.perMachine,
+                totalReportado: total,
+                outsidePieces: outside.pieces,
                 sentAt: new Date(),
               },
             }, { merge: true })
