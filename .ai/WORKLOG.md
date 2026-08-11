@@ -13,6 +13,25 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Fuera el bucket Unscheduled del carrusel de turnos (#457)
+
+Pedido de Orel tras ver que en Filete el "turno anterior" que ofrecian las flechas era el bucket.
+
+- `Unscheduled` NO es un turno: es donde Shoplogix deja lo que cae fuera de las ventanas
+  configuradas. Desde #451/#453 esa produccion se atribuye al turno CONTIGUO, asi que ofrecerlo como
+  destino llevaba a una pantalla con piezas que YA estan contadas en el turno de al lado.
+- Se conserva UNA excepcion: si es el que se esta mirando (si no, la vista abierta no se encontraria
+  en la cadena y las flechas saldrian de posicion).
+- Lo que quede sin atribuir (un dia entero sin turnos configurados) se sigue viendo en la MATRIZ,
+  que es donde el bloque suelto SIRVE: es la señal de que falta configurar ese turno en Shoplogix.
+- Verificacion (local, datos de prod): filete 10-ago Anterior pasa de "mismo dia · Unscheduled" a
+  "2026-08-08 · Turno Dia" (el 09 es domingo sin proceso); eviscerado sin cambios. Bundle `1b77b44`.
+- ⚠ Leer los botones por su `title`, no por `innerText`: el texto va con `hidden md:inline` y en
+  pantalla angosta el boton no tiene texto.
+- Estado: HECHO — mergeado y desplegado.
+
+---
+
 ## 2026-08-11 - claude - Anterior/Siguiente no funcionaban en Filete ni Eviscerado (#455)
 
 Orel: *"los botones de anterior y siguiente (turno) no funcionan en filete ni eviscerado; debo poder
