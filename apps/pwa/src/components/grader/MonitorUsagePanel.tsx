@@ -228,8 +228,8 @@ export function MonitorUsagePanel({ stats, token }: { stats: MonitorUsageStats |
   return (
     <div className="border-t border-border/40 pt-2 space-y-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <Dato icon={<Eye className="w-3.5 h-3.5" />} valor={String(stats.opens)} label="aperturas" />
-        <Dato icon={<Users className="w-3.5 h-3.5" />} valor={String(totalAparatos)} label="aparatos" />
+        <Dato icon={<Eye className="w-3.5 h-3.5" />} valor={String(stats.opens)} label={stats.opens === 1 ? 'apertura' : 'aperturas'} />
+        <Dato icon={<Users className="w-3.5 h-3.5" />} valor={String(totalAparatos)} label={totalAparatos === 1 ? 'aparato' : 'aparatos'} />
         <Dato icon={<Monitor className="w-3.5 h-3.5" />} valor={fmtDuracion(stats.secondsViewed ?? 0)} label="mirando" />
         {ahora > 0 && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
