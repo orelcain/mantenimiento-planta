@@ -24,7 +24,7 @@ import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
-import { getShiftDisplayDateKey, getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
+import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { TurnoOficialChip } from '@/components/grader/TurnoOficialChip'
@@ -787,12 +787,20 @@ export function AnalisisGraderTurnoPage() {
         const results = await Promise.all(queries)
         if (cancelled) return
         for (const { dk, infos } of results) {
-          // "Unscheduled" = producción SIN turno configurado en Shoplogix.
-          // Se muestra en el carrusel SOLO si tiene producción significativa
-          // (caso real Yal 2026-07-05: 11.6k ciclos nocturnos sin turno) — el
-          // Unscheduled vacío/ruido sigue fuera para no saltar a vistas vacías.
+          // "Unscheduled" NO es un turno: es el bucket donde Shoplogix deja lo
+          // que cae fuera de las ventanas configuradas. Fuera del carrusel por
+          // pedido de Orel (11-ago): desde #451/#453 esa producción se atribuye
+          // al turno CONTIGUO, así que ofrecerlo como destino llevaba a una
+          // pantalla con piezas que ya están contadas en el turno de al lado.
+          //
+          // Única excepción: si es justo el que se está mirando, se conserva —
+          // si no, la vista abierta no se encontraría en la cadena y las flechas
+          // saldrían de posición.
+          //
+          // Lo que queda sin atribuir (un día entero sin turnos configurados) se
+          // sigue viendo en la MATRIZ, que es donde corresponde: ahí el bloque
+          // suelto es justamente la señal de que falta configurar ese turno.
           const kept = infos.filter(i => i.shiftId !== 'Unscheduled'
-            || (i.totalCycles ?? 0) >= SLX_NOISE_THRESHOLD
             || (dk === dateKey && shiftLabel === 'Unscheduled'))
           slxByDay.set(dk, kept)
         }
