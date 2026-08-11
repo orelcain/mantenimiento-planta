@@ -13,6 +13,36 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Los registros "No aplicable" del Grader (#459)
+
+Orel cargo el Excel del 11-ago y no le cuadraba: el Matrix decia *"se han recuperado 13.529
+registros"* y la app mostraba 13.366 piezas.
+
+- **Diagnostico**: las 163 de diferencia son filas con `Cantidad de piezas` en 0 y `Peso de las
+  piezas` en "No aplicable" — eventos que el grader registra SIN pieza detras. El parser las
+  descartaba en silencio (`if (pieces <= 0) continue`), asi que la diferencia parecia produccion
+  perdida. **El letrero del Matrix cuenta REGISTROS; la app cuenta PIEZAS.**
+    13.529 registros = 13.366 piezas + 163 no aplicables
+- Hecho: se separan en `notApplicableRecords` **con su timestamp** (no entran a `pieceRecords`:
+  valen 0 piezas y los arrastrarian a cada calculo), se **reparten por turno** con la misma regla
+  que las piezas, el summary guarda el conteo y la tarjeta "Piezas totales" lo muestra con el
+  numero del Matrix al lado. El wizard avisa al cargar.
+- Verificacion: 1.121 tests (7 nuevos — 4 del parser con la cabecera REAL de Chonchi, incluido uno
+  que comprueba que piezas + no aplicables reconstruye el numero del letrero). Bundle `ac1b96e`.
+  El doc del turno ya cargado se completo a mano con los 163 para que cuadre sin recargar el Excel.
+- ⚠ Como se consiguio el dato: los Excel llegaron por correo y **el conector M365 trunca a 200.000
+  caracteres** (del pieza-a-pieza solo llego el 17,6%). Sirvio igual porque el patron aparece en
+  cualquier tramo, pero para contar el total hay que bajar el archivo. Un SUBAGENTE hizo esa lectura
+  para no gastar el contexto principal — patron a repetir con adjuntos grandes.
+- ⚠ Cabecera real del pieza-a-pieza de Chonchi (distinta del P0):
+  `Fecha | Hora | Peso de las piezas | Cantidad de piezas | Lote | Gate | Calidad | Conservacion |
+  Calibre | Producto | Turno`. El parser mapea por NOMBRE, no por posicion, asi que no le afecta.
+- Estado: HECHO — mergeado y desplegado.
+- Sigue: **Orel confirma en pantalla** que la tarjeta muestra "+163 no aplicables (Matrix: 13.529)";
+  no se pudo ver en el navegador de pruebas.
+
+---
+
 ## 2026-08-11 - claude - Fuera el bucket Unscheduled del carrusel de turnos (#457)
 
 Pedido de Orel tras ver que en Filete el "turno anterior" que ofrecian las flechas era el bucket.
