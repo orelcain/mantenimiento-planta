@@ -2554,7 +2554,7 @@ export function AnalisisGraderTurnoPage() {
                 </div>
               </div>
 
-              <MonitorUsagePanel stats={monitorStats} />
+              <MonitorUsagePanel stats={monitorStats} token={monitorToken} />
             </div>
           )}
         </div>

@@ -13,6 +13,46 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Apodos de aparatos: resolver con lo que sabe el usuario, no con huellas
+
+Orel: *"los aparatos tipo celular han sido los mismos, solo yo lo he probado... debemos poder
+identificar si es el mismo o va a contar uno nuevo cada vez"*.
+
+**El diagnostico primero**: los 5 "aparatos" que veia eran en su mayoria MIS pings de prueba con
+viewerIds inventados. Borrados. El mecanismo si distingue: el mismo navegador cuenta como UNO
+porque el id vive en su localStorage.
+
+**El limite real que Orel intuyo bien**: el mismo celular figura dos veces si el link se abre con
+navegadores distintos — y el caso frecuente es abrirlo desde WhatsApp/Telegram, que usan su webview
+propio con storage aparte. Resolverlo por medios tecnicos exigiria **fingerprinting** (UA +
+resolucion + huso + idioma), que es exactamente lo que esta pantalla prometio NO hacer.
+
+**La salida sin cruzar esa linea**: usar lo que el usuario SI sabe. Se le puede poner nombre a cada
+aparato ("celular de Control") y **dos filas con el mismo nombre se fusionan** — se suman sus
+aperturas y su tiempo, y el contador de arriba pasa a contar aparatos fusionados, no navegadores
+sueltos. La fila avisa "(2 navegadores)" para que la fusion sea visible y no magia.
+
+Los apodos viven en **`publicShiftMonitorLabels/{token}`**, coleccion aparte con `write: if
+isSupervisor()`. NUNCA se copian al doc publico: son notas internas y quien abre el link no tiene
+por que ver como lo llamaron del otro lado.
+
+⚠ **Bug propio detectado probando**: el guardado del nombre fallaba y el editor se cerraba igual, o
+sea que el usuario creia haber guardado. Ahora el editor se queda abierto, el borde se pone rojo y
+dice "no se pudo guardar". (El fallo era la regla sin desplegar, pero el silencio era mio.)
+
+De paso: la etiqueta "nuevo" solo aparece si el link YA lleva mas de un dia en uso — recien creado,
+todos los aparatos son nuevos por definicion y la etiqueta no distingue nada. Y `fmtDuracion` dice
+"<1 min" en vez de "0 min".
+
+- Archivos: `firestore.rules`, `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`,
+  `apps/pwa/src/components/grader/MonitorUsagePanel.tsx`,
+  `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: 1.107 tests del PWA en verde; tsc y eslint limpios. La lista se vio con datos reales
+  distinguiendo un aparato con 2 aperturas de otros con 1. **El guardado del nombre NO se pudo
+  probar todavia**: la regla se despliega con el merge.
+- Estado: HECHO (mergeado)
+- Sigue: probar el guardado del apodo end-to-end una vez desplegada la regla.
+
 ## 2026-08-10 - claude - La vista de turno tambien cuenta la cola + umbral unificado + UX
 
 Orel revisando la app en el celular. Cinco cosas:
