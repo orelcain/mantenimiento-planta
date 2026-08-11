@@ -3,6 +3,7 @@ import {
   attributeUnscheduledCycles,
   applyUnscheduledAttribution,
   MAX_ADJACENCY_MIN,
+  esColaDeEsteTurno,
   type CycleInterval,
 } from '../graderUnscheduledAttribution'
 import type { PeriodShift } from '../graderShiftPeriod'
@@ -233,5 +234,57 @@ describe('doble conteo: los minutos que el turno YA tiene no se suman otra vez',
     const t = out.find(s => s.shiftId === 'Turno Dia')!
     expect(t.cycles).toBe(4574)          // 4.410 + 164, no 4.686
     expect(t.attributedCycles).toBe(164)
+  })
+})
+
+describe('esColaDeEsteTurno — la cola es del turno que siguió de largo', () => {
+  // Regla de Orel (11-ago-2026): "solo si las piezas son continuas al turno, no
+  // sumarle piezas de otro tiempo horas después". Lo que la motivó: en Chonchi
+  // el turno NOCHE se estaba llevando 1.048 piezas de las 07:15 de la mañana.
+  const v = (a: string, b: string) => ({ start: wall(a), end: wall(b) })
+  /** Tramo cuyo `end` es el inicio del último intervalo, como agruparTramos. */
+  const tramo = (a: string, b: string) => ({ start: wall(a).getTime(), end: wall(b).getTime() })
+
+  const NOCHE = v('2026-08-10T21:15:00', '2026-08-11T05:00:00')
+  const CERRO_0715 = v('2026-08-10T00:00:00', '2026-08-10T07:15:00')
+  const DIA = v('2026-08-10T09:15:00', '2026-08-10T17:00:00')
+
+  it('el turno noche NO se lleva el bloque de las 07:15', () => {
+    const bloque = tramo('2026-08-10T07:15:00', '2026-08-10T07:40:00')
+    expect(esColaDeEsteTurno(bloque, NOCHE, [CERRO_0715, DIA])).toBe(false)
+  })
+
+  it('ese bloque es del turno que cerró justo a esa hora', () => {
+    const bloque = tramo('2026-08-10T07:15:00', '2026-08-10T07:40:00')
+    expect(esColaDeEsteTurno(bloque, CERRO_0715, [NOCHE, DIA])).toBe(true)
+  })
+
+  it('sin nadie que compita, la lejanía igual lo descarta', () => {
+    const lejos = tramo('2026-08-10T20:00:00', '2026-08-10T20:25:00')
+    expect(esColaDeEsteTurno(lejos, v('2026-08-10T07:45:00', '2026-08-10T15:30:00'), [])).toBe(false)
+  })
+
+  it('pegado al cierre es cola aunque el bloque dure horas', () => {
+    const largo = tramo('2026-08-10T15:40:00', '2026-08-10T18:35:00')
+    expect(esColaDeEsteTurno(largo, v('2026-08-10T07:45:00', '2026-08-10T15:30:00'), [])).toBe(true)
+  })
+
+  it('un arranque anticipado pegado al turno sí cuenta', () => {
+    // 07:00→07:30 (el último intervalo arranca 07:25) contra un turno de las 08:00.
+    const antes = tramo('2026-08-10T07:00:00', '2026-08-10T07:25:00')
+    expect(esColaDeEsteTurno(antes, v('2026-08-10T08:00:00', '2026-08-10T15:30:00'), [])).toBe(true)
+  })
+
+  it('a igual distancia gana el que ya cerró — y solo uno', () => {
+    const entre = tramo('2026-08-10T07:20:00', '2026-08-10T07:35:00')  // fin real 07:40
+    const cerro = v('2026-08-10T00:00:00', '2026-08-10T07:00:00')      // a 20 min
+    const abre  = v('2026-08-10T08:00:00', '2026-08-10T16:00:00')      // a 20 min
+    expect(esColaDeEsteTurno(entre, cerro, [abre])).toBe(true)
+    expect(esColaDeEsteTurno(entre, abre, [cerro])).toBe(false)
+  })
+
+  it('lo que cae DENTRO de otro turno es de ese turno', () => {
+    const dentro = tramo('2026-08-10T10:00:00', '2026-08-10T10:25:00')
+    expect(esColaDeEsteTurno(dentro, v('2026-08-10T07:45:00', '2026-08-10T09:30:00'), [DIA])).toBe(false)
   })
 })

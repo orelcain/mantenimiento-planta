@@ -192,9 +192,69 @@ async function resolveCurrentShiftDocId(db, plantSlug, nowWall = shoplogixPollin
   return yaEmpezados[0]?.id ?? null
 }
 
-/** ¿`t` cae dentro de alguna de las ventanas [start, end]? */
-function dentroDeAlguna(t, ventanas) {
-  return ventanas.some(v => v.start && v.end && t >= v.start.getTime() && t < v.end.getTime())
+/** Minutos entre `t` y la ventana [start, end]; 0 si cae dentro. */
+function distanciaA(t, ventana) {
+  if (!ventana?.start || !ventana?.end) return Number.POSITIVE_INFINITY
+  const s = ventana.start.getTime()
+  const e = ventana.end.getTime()
+  if (t >= s && t < e) return 0
+  return t < s ? s - t : t - e
+}
+
+/**
+ * Máximo hueco entre el turno y su cola para considerarla CONTINUA.
+ *
+ * La cola es la misma jornada que siguió de largo, no cualquier producción del
+ * día. Regla de Orel (11-ago-2026): "solo si las piezas son continuas al turno,
+ * no sumarle piezas de otro tiempo horas después".
+ *
+ * 1 h contra los casos reales medidos: Filete cerró 15:30 y la cola arrancó
+ * 15:40 (10 min); en Chonchi las colas arrancan en el mismo minuto del cierre; y
+ * un arranque anticipado que corre 07:00→07:30 antes de un turno de las 08:00
+ * queda a 30 min. Deja fuera lo que motivó la regla: el bloque de las 07:15 que
+ * el turno noche de Chonchi se llevaba con 14 h de distancia.
+ */
+const MAX_CONTINUIDAD_MS = 60 * 60 * 1000
+
+/**
+ * Minutos entre un TRAMO [ini, fin] y una ventana; 0 si se solapan.
+ *
+ * Se mide de borde a borde, no desde el inicio del tramo: un bloque que corre
+ * 07:00→07:30 antes de un turno que arranca 08:00 está a 30 min de él, no a 60.
+ * Medirlo desde el inicio descartaba arranques anticipados legítimos.
+ */
+function distanciaTramo(tramo, ventana) {
+  if (!ventana?.start || !ventana?.end) return Number.POSITIVE_INFINITY
+  const s = ventana.start.getTime()
+  const e = ventana.end.getTime()
+  if (tramo.end > s && tramo.start < e) return 0
+  return tramo.end <= s ? s - tramo.end : tramo.start - e
+}
+
+/**
+ * ¿El tramo en `t` es la cola de ESTE turno?
+ *
+ * Dos condiciones, y hacen falta las dos:
+ *   1. CONTINUIDAD — pegado al turno (≤ 30 min). Sin esto, en un día de un solo
+ *      turno se le colgaba cualquier producción, por lejos que estuviera.
+ *   2. CERCANÍA — ningún otro turno del día está más cerca. Si el tramo cae
+ *      DENTRO de otro turno, es de ese otro: ya lo tiene contado en su doc.
+ *
+ * ⚠ Un tramo va a UN turno, nunca a dos ni a ninguno. Por eso el empate se
+ * desempata en vez de descartarse (descartarlo perdía las piezas): gana el turno
+ * que ya CERRÓ, porque una cola es la continuación de lo que se estaba haciendo,
+ * no el adelanto de lo que viene. Como la regla solo mira los bordes, los dos
+ * turnos llegan a la misma conclusión aunque se evalúen por separado.
+ */
+function esColaDeEsteTurno(tramo, ventanaTurno, otrasVentanas) {
+  const propia = distanciaTramo(tramo, ventanaTurno)
+  if (propia > MAX_CONTINUIDAD_MS) return false
+  const yaCerro = (v) => Boolean(v?.end) && tramo.start >= v.end.getTime()
+  return otrasVentanas.every((v) => {
+    const otra = distanciaTramo(tramo, v)
+    if (propia !== otra) return propia < otra
+    return yaCerro(ventanaTurno) && !yaCerro(v)
+  })
 }
 
 /** Corte entre dos tramos de producción fuera de turno. */
@@ -273,9 +333,18 @@ function agruparTramos(intervals) {
  * habían sido ~5.033. Para Control de Producción eso es plata que no aparece.
  *
  * Qué se rescata: los intervals/states de los docs `Unscheduled` del MISMO día
- * que no caen dentro de la ventana de NINGÚN turno con nombre. El filtro por
- * ventanas es lo que evita el doble conteo — un interval que ya está dentro del
- * turno mostrado, o dentro de otro turno del día, se ignora.
+ * cuyo turno MÁS CERCANO sea el que se está mostrando.
+ *
+ * ⚠⚠ La cercanía es lo que hace correcta la atribución, y faltaba: bastaba con
+ * "no cae dentro de la ventana de ningún turno", así que CUALQUIER turno del día
+ * se quedaba con TODAS las colas del día. Caso real Chonchi 10-ago-2026: el
+ * turno noche (21:15→05:00) sumaba 1.317 piezas ajenas —1.048 de las 07:15, que
+ * son la cola del turno que cerró a esa hora, y 269 de las 17:00, del turno de
+ * día— y mostraba 13.487 en vez de 12.170. Se veía hasta en el gráfico: una
+ * barra a las 7 de la mañana dentro de un turno que arrancó a las 21:30.
+ *
+ * Mismo criterio que la matriz (`attributeUnscheduledCycles`): el turno adyacente
+ * más cercano se lleva el tramo. Así las cuatro superficies coinciden.
  *
  * @returns {Promise<Map<string, {intervals: Array, states: Array, pieces: number}>>}
  */
@@ -289,9 +358,8 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
 
   const snaps = await db.getAll(...delDia)
 
-  // Ventanas ocupadas: la del turno mostrado + la de los otros turnos con
-  // nombre. Lo que caiga ahí ya está contado por alguien.
-  const ventanas = [ventanaTurno]
+  // Los OTROS turnos con nombre del día: son los que compiten por cada tramo.
+  const otrasVentanas = []
   const unscheduled = []
   for (const snap of snaps) {
     if (!snap.exists) continue
@@ -300,7 +368,7 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
     if (esUnscheduled) {
       unscheduled.push(snap.id)
     } else {
-      ventanas.push({ start: toDate(d.scheduledStart), end: toDate(d.scheduledEnd) })
+      otrasVentanas.push({ start: toDate(d.scheduledStart), end: toDate(d.scheduledEnd) })
     }
   }
   if (unscheduled.length === 0) return extras
@@ -322,11 +390,16 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
         // infladas). El doble conteo es el peor error posible en esta pantalla:
         // nadie que mire el link tiene cómo detectarlo.
         if (yaEnElTurno.has(s.getTime())) return false
-        return !dentroDeAlguna(s.getTime(), ventanas)
+        // Lo que cae DENTRO de otro turno con nombre ya lo cuenta ese turno.
+        return !otrasVentanas.some(v => distanciaTramo({ start: s.getTime(), end: s.getTime() + 1 }, v) === 0)
       })
 
-      // Solo los tramos con producción de verdad (ver OUTSIDE_MIN_PIECES).
-      const tramos = agruparTramos(candidatos).filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+      // La pertenencia se decide sobre el TRAMO completo, no sobre cada
+      // intervalo: un bloque es la cola de este turno o no lo es, entero.
+      const tramos = agruparTramos(candidatos)
+        // Solo los tramos con producción de verdad (ver OUTSIDE_MIN_PIECES).
+        .filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+        .filter(t => esColaDeEsteTurno(t, ventanaTurno, otrasVentanas))
       if (tramos.length === 0) return
 
       const intervals = tramos.flatMap(t => t.intervals)
@@ -338,7 +411,10 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
       const states = (m.states || []).filter(st => {
         const s = toDate(st.startAt)
         const e = toDate(st.endAt)
-        if (!s || !e || dentroDeAlguna(s.getTime(), ventanas)) return false
+        if (!s || !e) return false
+        // Un state que cae dentro de otro turno es de ese turno: el solape con
+        // un tramo rescatado no alcanza para traérselo.
+        if (otrasVentanas.some(v => distanciaA(s.getTime(), v) === 0)) return false
         return tramos.some(t => e.getTime() > t.start && s.getTime() < t.end)
       })
 

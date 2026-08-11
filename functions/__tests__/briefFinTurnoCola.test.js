@@ -180,3 +180,111 @@ test('un turno sin horario definido no intenta rescatar nada', async () => {
   )
   assert.strictEqual(out.pieces, 0)
 })
+
+// ── Continuidad: la cola es del turno que siguió de largo ────────────────────
+// Regla de Orel (11-ago-2026): "solo si las piezas son continuas al turno, no
+// sumarle piezas de otro tiempo horas después". Caso que la motivó: en Chonchi
+// el turno NOCHE (21:15→05:00) se llevaba 1.048 pz de las 07:15 de la mañana
+// —que son la cola del turno que cerró a esa hora— y mostraba 13.487 en vez de
+// 12.170. Se veía hasta en el gráfico: una barra a las 7 AM en un turno que
+// arrancó a las 21:30.
+
+const NOCHE = { scheduledStart: iso(D(21, 15)), scheduledEnd: iso(Date.UTC(2026, 7, 11, 5, 0)) }
+const NOCHE_DOC = '2026-08-10_Turno 1'
+
+/** El día de Chonchi: turno que cierra 07:15, turno de día 09:15→17:00 y el noche. */
+function dbChonchi(colaIntervals) {
+  return fakeDb({
+    shiftDocId: NOCHE_DOC,
+    otros: {
+      '2026-08-10_Turno 1 Lunes': {
+        shiftId: 'Turno 1 Lunes', scheduledStart: iso(D(0, 0)), scheduledEnd: iso(D(7, 15)), machines: {},
+      },
+      '2026-08-10_Turno 2': {
+        shiftId: 'Turno 2', scheduledStart: iso(D(9, 15)), scheduledEnd: iso(D(17, 0)), machines: {},
+      },
+      '2026-08-10_Unscheduled': {
+        shiftId: 'Unscheduled', machines: { m1: { intervals: colaIntervals, states: [] } },
+      },
+    },
+  })
+}
+
+test('el turno noche NO se lleva las piezas de la mañana (caso Chonchi 10-ago)', async () => {
+  const machines = [{ id: 'm1', totalCycles: 12170, intervals: intervals(D(21, 30), 4, 100), states: [] }]
+  const out = await sumarColaAMaquinas(
+    dbChonchi(intervals(D(7, 15), 6, 175)),   // 1.050 pz a las 07:15, 14 h antes del turno
+    'chonchi', NOCHE_DOC, NOCHE, machines,
+  )
+  assert.strictEqual(out.pieces, 0)
+  assert.strictEqual(machines[0].totalCycles, 12170, 'el turno noche vale lo que produjo')
+})
+
+test('esas mismas piezas SÍ son del turno que cerró a las 07:15', async () => {
+  const machines = [{ id: 'm1', totalCycles: 9543, intervals: intervals(D(4, 50), 4, 100), states: [] }]
+  const out = await sumarColaAMaquinas(
+    fakeDb({
+      shiftDocId: '2026-08-10_Turno 1 Lunes',
+      otros: {
+        '2026-08-10_Turno 1': { shiftId: 'Turno 1', scheduledStart: iso(D(21, 15)), scheduledEnd: iso(Date.UTC(2026, 7, 11, 5, 0)), machines: {} },
+        '2026-08-10_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: intervals(D(7, 15), 6, 175), states: [] } } },
+      },
+    }),
+    'chonchi', '2026-08-10_Turno 1 Lunes',
+    { scheduledStart: iso(D(0, 0)), scheduledEnd: iso(D(7, 15)) },
+    machines,
+  )
+  assert.strictEqual(out.pieces, 1050, 'arranca en el mismo minuto en que cerró: es su cola')
+})
+
+test('sin otro turno que compita, la lejanía IGUAL descarta el bloque', async () => {
+  // Lo que el usuario pidió explícitamente: que no baste con ser el único turno
+  // del día para quedarse con producción de horas después.
+  const machines = [{ id: 'm1', totalCycles: 4410, intervals: intervals(D(8, 0), 4, 100), states: [] }]
+  const out = await sumarColaAMaquinas(
+    fakeDb({
+      shiftDocId: SHIFT_DOC,
+      otros: { '2026-08-10_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: intervals(D(20, 0), 6, 100), states: [] } } } },
+    }),
+    'filete', SHIFT_DOC, PARENT, machines,   // turno 07:45→15:30, bloque a las 20:00
+  )
+  assert.strictEqual(out.pieces, 0, '4 h 30 min después no es la misma jornada')
+})
+
+test('un bloque pegado al cierre sigue siendo cola aunque dure horas', async () => {
+  // La continuidad se mide del BORDE del bloque al turno, no de su duración: el
+  // turno se alargó 3 h y eso es exactamente lo que hay que contar.
+  const machines = [{ id: 'm1', totalCycles: 4410, intervals: intervals(D(8, 0), 4, 100), states: [] }]
+  const out = await sumarColaAMaquinas(
+    fakeDb({
+      shiftDocId: SHIFT_DOC,
+      otros: { '2026-08-10_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: intervals(D(15, 40), 36, 50), states: [] } } } },
+    }),
+    'filete', SHIFT_DOC, PARENT, machines,   // 15:40 → 18:40, arranca 10 min tras el cierre
+  )
+  assert.strictEqual(out.pieces, 1800)
+})
+
+test('entre dos turnos a la misma distancia gana el que ya cerró, y solo uno', async () => {
+  // Un tramo va a UN turno: ni a los dos (doble conteo) ni a ninguno (piezas
+  // perdidas). A 20 min del cierre de uno y del arranque del otro.
+  const cerro = { scheduledStart: iso(D(0, 0)), scheduledEnd: iso(D(7, 0)) }
+  const abre  = { shiftId: 'Turno 2', scheduledStart: iso(D(8, 0)), scheduledEnd: iso(D(16, 0)), machines: {} }
+  const cola  = intervals(D(7, 20), 4, 60)   // 07:20 → 07:40: 20 min de cada uno
+  const conf = (docId, otros) => fakeDb({ shiftDocId: docId, otros })
+
+  const mA = [{ id: 'm1', totalCycles: 1000, intervals: [], states: [] }]
+  const desdeElQueCerro = await sumarColaAMaquinas(
+    conf('2026-08-10_Turno 1', { '2026-08-10_Turno 2': abre, '2026-08-10_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: cola, states: [] } } } }),
+    'chonchi', '2026-08-10_Turno 1', cerro, mA,
+  )
+
+  const mB = [{ id: 'm1', totalCycles: 2000, intervals: [], states: [] }]
+  const desdeElQueAbre = await sumarColaAMaquinas(
+    conf('2026-08-10_Turno 2', { '2026-08-10_Turno 1': { shiftId: 'Turno 1', ...cerro, machines: {} }, '2026-08-10_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: cola, states: [] } } } }),
+    'chonchi', '2026-08-10_Turno 2', { scheduledStart: iso(D(8, 0)), scheduledEnd: iso(D(16, 0)) }, mB,
+  )
+
+  assert.strictEqual(desdeElQueCerro.pieces + desdeElQueAbre.pieces, 240, 'las piezas se cuentan UNA vez')
+  assert.strictEqual(desdeElQueCerro.pieces, 240, 'la cola es del turno que venía trabajando')
+})
