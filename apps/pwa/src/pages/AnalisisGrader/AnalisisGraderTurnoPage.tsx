@@ -749,7 +749,14 @@ export function AnalisisGraderTurnoPage() {
     toDate.setUTCDate(toDate.getUTCDate() + 20)
 
     const SLX_NEARBY_DAYS = 10  // ±10 días alrededor del actual para SLX
-    const isSlxAware = plantLineCfg.isClassificationPlant === false
+    // ⚠ Antes era `isClassificationPlant === false`, que es otra cosa: mide si la
+    // línea clasifica por calibre/calidad, no si tiene datos de Shoplogix. Con
+    // eso, EVISCERADO —que es de clasificación pero cuyo turno entero sale de
+    // Shoplogix— navegaba solo entre días con Excel del Grader cargado, y sin
+    // Excel se quedaba sin turnos vecinos (reporte de Orel, 11-ago). El flag que
+    // corresponde es `shoplogixEnabled`, que es justo "esta línea tiene datos de
+    // Shoplogix" y deja fuera los placeholders (Acopio, Riles, Empaque…).
+    const isSlxAware = plantLineCfg.shoplogixEnabled
 
     ;(async () => {
       // 1. Excel summaries en ±20 días
@@ -871,20 +878,37 @@ export function AnalisisGraderTurnoPage() {
       }
 
       if (cancelled) return
-      const idx = flat.findIndex(e => e.dateKey === dateKey && e.shiftId === shiftLabel)
-      setAdjacentShifts(idx === -1
-        ? { prev: null, next: null }
-        : {
-            prev: idx > 0                  ? flat[idx - 1]! : null,
-            next: idx < flat.length - 1    ? flat[idx + 1]! : null,
-          },
-      )
+
+      // ⚠ Si el turno abierto NO figura en la cadena, se lo INYECTA en su lugar
+      // cronológico en vez de anular la navegación. Antes se devolvía
+      // `{prev: null, next: null}` y los dos botones quedaban muertos — que es
+      // justo lo que pasaba en Filete y en Eviscerado (reporte de Orel, 11-ago):
+      //   · Eviscerado no consulta Shoplogix, así que la cadena salía solo de los
+      //     Excel del Grader; sin Excel de esa línea, cadena vacía.
+      //   · En Filete basta con que la etiqueta de la URL no calce exacto con la
+      //     de Shoplogix ("Turno día" del Grader vs "Turno Dia") para no
+      //     encontrarse a sí mismo.
+      // No poder ubicarse a uno mismo no es motivo para dejar al usuario
+      // encerrado en un turno: los vecinos existen igual.
+      let idx = flat.findIndex(e => e.dateKey === dateKey && e.shiftId === shiftLabel)
+      if (idx === -1) {
+        const minActual = fallbackStartMin(shiftLabel)
+        idx = flat.findIndex(e => e.dateKey > dateKey
+          || (e.dateKey === dateKey && fallbackStartMin(e.shiftId) > minActual))
+        if (idx === -1) idx = flat.length
+        flat.splice(idx, 0, { dateKey, shiftId: shiftLabel })
+      }
+
+      setAdjacentShifts({
+        prev: idx > 0               ? flat[idx - 1]! : null,
+        next: idx < flat.length - 1 ? flat[idx + 1]! : null,
+      })
     })().catch(() => {
       if (!cancelled) setAdjacentShifts({ prev: null, next: null })
     })
 
     return () => { cancelled = true }
-  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug, plantLineCfg.isClassificationPlant, plantSchedule])
+  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug, plantLineCfg.shoplogixEnabled, plantSchedule])
 
   const goToShift = useCallback((target: { dateKey: string; shiftId: string }) => {
     // BUGFIX: preservar ?linea= para mantener la planta activa al navegar
