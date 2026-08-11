@@ -13,6 +13,40 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Anterior/Siguiente no funcionaban en Filete ni Eviscerado (#455)
+
+Orel: *"los botones de anterior y siguiente (turno) no funcionan en filete ni eviscerado; debo poder
+cambiar de turno tanto en el de monitoreo como en el analisis de turno"*.
+
+- **Causa en Analisis de Turno** (verificada leyendo `disabled`/`title`, sin depender de clics): los
+  dos botones estaban DESHABILITADOS. `setAdjacentShifts(idx === -1 ? {prev:null,next:null} : ...)`
+  anulaba la navegacion entera si el turno abierto no figuraba en la cadena. Y no figuraba:
+  · EVISCERADO — la cadena solo consultaba Shoplogix con `isClassificationPlant === false`, que mide
+    OTRA cosa (si la linea clasifica por calibre/calidad). Eviscerado SI clasifica → navegaba solo
+    entre dias con Excel del Grader, y los 5 Excel que hay ni tienen `plantLineId`. Cadena vacia.
+    Ahora usa `shoplogixEnabled`, que es justo "esta linea tiene datos de Shoplogix".
+  · FILETE — basta que la etiqueta de la URL no calce exacto con la de Shoplogix ("Turno dia" del
+    Grader vs "Turno Dia"). Ahora, si el turno abierto no esta en la cadena, **se lo INYECTA** en su
+    lugar cronologico: no ubicarse a uno mismo no es motivo para encerrar al usuario en un turno.
+- **Monitor publico**: el turno mirado pasa de `useState`+refs a la URL (`?turno=<shiftDocId>`) y el
+  indice se DERIVA. Desaparece el efecto que restauraba la posicion y peleaba con la navegacion; la
+  eleccion sobrevive a recargas y el turno queda **compartible**.
+- Verificado (local, datos de prod): filete Anterior "mismo dia · Unscheduled" / Siguiente
+  "2026-08-11 · Turno Dia"; eviscerado Anterior "mismo dia · Turno 2" / Siguiente "2026-08-11 ·
+  Turno 2" — antes los cuatro deshabilitados. Monitor con `?turno=2026-08-10_Turno Dia` abre ese
+  turno (4.915 pz). Bundle publicado `b1cbea4`.
+- ⚠⚠ **GOTCHA DE VERIFICACION que costo una hora**: la pestaña de prueba corre en SEGUNDO PLANO y
+  React difiere el flush de los updates. Sintoma engañoso: la URL cambia, `console.log` del handler
+  aparece, y la vista NO se actualiza — parece un bug de la app y es del entorno. Se detecta porque
+  al RECARGAR con el estado en la URL sí se ve. Verificar por `disabled`/`title`/atributos (que se
+  leen del DOM ya renderizado) en vez de por el efecto de un clic.
+- Estado: HECHO — mergeado y desplegado.
+- Sigue: **Orel confirma en uso real** el sintoma "toco el boton y no pasa nada" del monitor, que no
+  se pudo reproducir de forma fiable. Menor: en Filete el turno "anterior" que ofrece es el bucket
+  `Unscheduled`; ahora que su produccion se atribuye al turno, quiza convenga sacarlo del carrusel.
+
+---
+
 ## 2026-08-11 - claude - La matriz alineada con la regla de continuidad (#453)
 
 Orel: *"alinea la matriz tambien con la regla nueva"*. Con esto las CUATRO superficies (monitor
