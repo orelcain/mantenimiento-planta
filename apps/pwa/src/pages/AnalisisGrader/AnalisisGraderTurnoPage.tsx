@@ -139,13 +139,12 @@ function parseShiftId(raw: string | undefined): [string, string] {
  * del Grader colgaban al final del Resumen, después de la cuota y antes de los
  * botones de compartir. Esta pestaña es su espejo.
  */
-const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'timeline', 'gates', 'linea', 'accion'] as const
+const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'gates', 'linea', 'accion'] as const
 type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
 
 const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
   resumen:  'Resumen',
   calidad:  'Calidad',
-  timeline: 'Timeline',
   gates:    'Gates',
   linea:    'Línea',
   accion:   '¿Qué hacer?',
@@ -1362,7 +1361,8 @@ export function AnalisisGraderTurnoPage() {
        * El gráfico del PDF lo publica ShiftTimelineView en `chartImageRef` — y
        * lo borra al desmontarse. Con el detalle en pestañas, pedir el PDF desde
        * Resumen dejaba el ref en null y el PDF salía sin timeline, en silencio.
-       * Saltamos un instante a la vista Timeline para montarlo.
+       * Saltamos un instante a la vista Calidad (donde vive el timeline) para
+       * montarlo.
        *
        * Ojo con la condición de espera: el ref se registra en el PRIMER render
        * de ShiftTimelineView, cuando ECharts todavía no tiene instancia y
@@ -1372,7 +1372,7 @@ export function AnalisisGraderTurnoPage() {
        */
       let chartImageDataUrl = chartImageRef.current?.() ?? null
       if (!isRenderedChart(chartImageDataUrl)) {
-        setActiveView('timeline')
+        setActiveView('calidad')
         await waitUntil(() => {
           chartImageDataUrl = chartImageRef.current?.() ?? null
           return isRenderedChart(chartImageDataUrl)
@@ -1387,7 +1387,7 @@ export function AnalisisGraderTurnoPage() {
       logger.error('M17: PDF export error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setPdfExporting(false)
-      if (viewBefore !== 'timeline') setActiveView(viewBefore)
+      if (viewBefore !== 'calidad') setActiveView(viewBefore)
     }
   }, [summary, pauses, pdfExporting, tagLabels, upstreamLine.snapshot, activeView, setActiveView])
 
@@ -1897,7 +1897,6 @@ export function AnalisisGraderTurnoPage() {
           badges={{ gates: configSnapshots.length, accion: accionesPendientes }}
           disabled={summary ? undefined : {
             calidad: MOTIVO_SIN_EXCEL,
-            timeline: MOTIVO_SIN_EXCEL,
             gates: MOTIVO_SIN_EXCEL,
             accion: 'Las acciones se calculan con el Excel del Grader',
           }}
@@ -2097,9 +2096,13 @@ export function AnalisisGraderTurnoPage() {
         <>
           {/* ════════ RESUMEN ════════ */}
           {activeView === 'resumen' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          /* Una sola columna a ancho completo. El grid de 3 columnas quedó
+             obsoleto al mudar "¿Qué hacer?" a su pestaña (#467): el contenido
+             seguía en `col-span-2` y la tercera columna quedaba VACÍA, así que
+             la tarjeta se veía recortada con medio ancho de aire al lado. */
+          <div className="space-y-4">
             {/* Scorecard + Marel HG capture — mobile row 1 */}
-            <div className="lg:col-span-2 lg:row-start-1 space-y-4">
+            <div className="space-y-4">
               <HeroScorecard
                 summary={summary}
                 shiftWindow={shiftWindow}
@@ -2135,7 +2138,7 @@ export function AnalisisGraderTurnoPage() {
                 un tercio del ancho de forma permanente y dejaban el resumen
                 apretado. Los MODALES se quedan acá, montados siempre, porque
                 `handleActionTrigger` puede dispararlos desde cualquier vista. */}
-            <div className="lg:col-start-3 lg:row-span-2 space-y-4" data-no-swipe>
+            <div className="contents" data-no-swipe>
               {/* Modales lanzados desde ActionPlanPanel */}
               <GateChangeModal
                 open={planGateModalOpen}
@@ -2156,7 +2159,7 @@ export function AnalisisGraderTurnoPage() {
 
             {/* El aviso de config desalineada se queda en el Resumen: afecta a
                 CÓMO leer todo el turno, no solo a la calidad. */}
-            <div className="lg:col-span-2 lg:row-start-2 space-y-3">
+            <div className="space-y-3">
               {configDrift && (
                 <ConfigDriftBanner
                   drift={configDrift}
@@ -2171,8 +2174,14 @@ export function AnalisisGraderTurnoPage() {
           )}
 
           {/* ════════ CALIDAD ════════
-              Por qué se rechazó y cómo se repartió el producto. Es el espejo de
-              "Línea": todo lo que sale del Excel del Grader, junto. */}
+              Por qué se rechazó y CUÁNDO pasó. Es el espejo de "Línea": todo lo
+              que sale del Excel del Grader, junto.
+
+              ⚠ El timeline vive acá y NO en una pestaña aparte: `selectedCauses`
+              une las dos cosas —tocás una causa en el panel y el timeline marca
+              cuándo ocurrieron esos P0—. Separarlas dejaba el efecto en otra
+              pestaña, o sea la interacción muerta (lo detectó Orel el 11-ago,
+              apenas se publicó la separación). Causas arriba, timeline abajo. */}
           {activeView === 'calidad' && (
             <P0CausesPanel
               byMatrixCause={byMatrixCause}
@@ -2253,7 +2262,7 @@ export function AnalisisGraderTurnoPage() {
           )}
 
           {/* ════════ TIMELINE ════════ */}
-          {activeView === 'timeline' && (
+          {activeView === 'calidad' && (
           <ShiftTimelineView
             timelineBuckets={enrichedTimelineBuckets}
             shiftDoc={shiftDoc}
@@ -2278,7 +2287,7 @@ export function AnalisisGraderTurnoPage() {
           )}
 
           {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
-          {activeView === 'timeline' && gate0Pieces.length >= 5 && (
+          {activeView === 'calidad' && gate0Pieces.length >= 5 && (
             <PieceScatterChart gate0Pieces={gate0Pieces} />
           )}
 
