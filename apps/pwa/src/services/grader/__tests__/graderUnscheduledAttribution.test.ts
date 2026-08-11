@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   attributeUnscheduledCycles,
   applyUnscheduledAttribution,
-  MAX_ADJACENCY_MIN,
   esColaDeEsteTurno,
   type CycleInterval,
 } from '../graderUnscheduledAttribution'
@@ -77,12 +76,15 @@ describe('un ciclo dentro de la ventana del turno va a ese turno', () => {
 })
 
 describe('no inventa atribuciones', () => {
-  it('un ciclo lejano SÍ se atribuye: al turno más cercano del día', () => {
-    // Decisión de Orel: sin límite de distancia. 07:00 está a 2 h 17 del fin
-    // del Turno 3 (04:43) y a 8 h del inicio del Turno 2 → gana el Turno 3.
+  it('un ciclo lejano YA NO se atribuye: no es continuo a ningún turno', () => {
+    // ⚠ CAMBIO DE DECISIÓN (Orel, 11-ago-2026): antes ganaba el turno más
+    // cercano sin importar la distancia. 07:00 está a 2 h 17 del fin del Turno 3
+    // (04:43) y a 8 h del inicio del Turno 2: no es la cola de ninguno de los
+    // dos. Lo que lo motivó: en Eviscerado el turno noche se quedaba con las
+    // piezas de las 07:15 de la mañana.
     const r = attributeUnscheduledCycles([iv('07:00', 29)], turnosYal10)
-    expect(r.unattributed).toBe(0)
-    expect(r.byShiftKey.get('2026-07-10__Turno 3')).toBe(29)
+    expect(r.unattributed).toBe(29)
+    expect(r.byShiftKey.size).toBe(0)
   })
 
   it('sin NINGÚN turno ese día no hay a quién atribuir', () => {
@@ -100,50 +102,64 @@ describe('no inventa atribuciones', () => {
     expect(r.unattributed).toBe(0)
   })
 
-  it('ya no hay límite de cercanía', () => {
-    expect(MAX_ADJACENCY_MIN).toBe(Number.POSITIVE_INFINITY)
+  it('ser el único turno del día no alcanza: la lejanía manda', () => {
+    // Lo que Orel pidió explícitamente el 11-ago: "no sumarle piezas de otro
+    // tiempo horas después". Sin esto, en un día de un solo turno se le colgaba
+    // cualquier producción por lejos que estuviera.
     const t = shift({ dateKey: '2026-07-10', shiftId: 'Turno 2', cycles: 100,
                       start: wall('2026-07-10T15:00:00'), end: wall('2026-07-10T23:00:00') })
-    // 10 h antes del turno y aun así se atribuye: es el único del día.
-    expect(attributeUnscheduledCycles([iv('05:00', 10)], [t]).unattributed).toBe(0)
+    // 10 h antes del turno: no es su arranque anticipado, es otro momento.
+    expect(attributeUnscheduledCycles([iv('05:00', 30)], [t]).unattributed).toBe(30)
+    // Pegado al turno sí, aunque sea el mismo turno solitario.
+    expect(attributeUnscheduledCycles([iv('14:30', 30)], [t]).byShiftKey.get(t.key)).toBe(30)
   })
 
-  it('caso real Yal 2026-08-03: los 1.835 cic de media mañana van al Turno 3', () => {
-    // El Turno 3 corrió 00:06–07:18 y la producción fue 09–11 h. Con la regla
-    // sin límite, esos ciclos se suman al turno y quedan marcados.
+  it('caso real Yal 2026-08-03: la producción de media mañana va al turno que la contiene', () => {
+    // ⚠ Este test fijaba un escenario RECORTADO (solo el Turno 3, 00:06–07:18) y
+    // por eso los 1.835 cic dependían de la regla sin límite. Contra Firestore,
+    // ese día Yal tuvo TRES turnos —T3 00:00–07:45, T1 07:45–15:00 y T2 15:00–
+    // 00:00— y la producción del Unscheduled (08:00–12:12, 3.396 cic) cae DENTRO
+    // del Turno 1. Con la regla de continuidad el resultado no cambia: lo que
+    // está dentro de una ventana es de ese turno, por suelto que esté.
     //
-    // ⚠ El total bajó de 1.836 a 1.835 el 2026-08-10, cuando Orel pidió unificar
-    // el umbral de ruido con el del monitor: ese 1 ciclo suelto de las 09:30 es
-    // un tramo por debajo de OUTSIDE_MIN_PIECES y ya no se atribuye. Convive con
-    // la decisión de "ningún ciclo sin turno" del 03-ago: esa sigue valiendo para
-    // la producción REAL; lo que se descarta ahora es el ruido de 1-19 piezas
-    // (higiene, giro en vacío) que antes inflaba el turno de al lado.
-    const t3 = shift({ dateKey: '2026-08-03', shiftId: 'Turno 3', cycles: 12000,
-                       start: wall('2026-08-03T00:06:00'), end: wall('2026-08-03T07:18:00') })
+    // El 1 ciclo de las 09:30 sí quedó fuera el 10-ago al unificar el umbral de
+    // ruido con el del monitor (tramo bajo OUTSIDE_MIN_PIECES).
+    const t3 = shift({ dateKey: '2026-08-03', shiftId: 'Turno 3', cycles: 16460,
+                       start: wall('2026-08-03T00:00:00'), end: wall('2026-08-03T07:45:00') })
+    const t1 = shift({ dateKey: '2026-08-03', shiftId: 'Turno 1', cycles: 9183,
+                       start: wall('2026-08-03T07:45:00'), end: wall('2026-08-03T15:00:00') })
     const uns = shift({ dateKey: '2026-08-03', shiftId: 'Unscheduled', cycles: 1836, unscheduled: true })
-    const out = applyUnscheduledAttribution([t3, uns], new Map([
+    const out = applyUnscheduledAttribution([t3, t1, uns], new Map([
       ['2026-08-03__Unscheduled',
        [iv('09:30', 1, '2026-08-03'), iv('10:30', 777, '2026-08-03'), iv('11:30', 1058, '2026-08-03')]],
     ]))
     expect(out.find(s => s.unscheduled)).toBeUndefined()
-    const t = out.find(s => s.shiftId === 'Turno 3')!
-    expect(t.cycles).toBe(12000 + 1835)
-    expect(t.attributedCycles).toBe(1835)
+    const t = out.find(s => s.shiftId === 'Turno 1')!
+    expect(t.cycles).toBe(9183 + 1836)
+    expect(t.attributedCycles).toBe(1836)
+    // El Turno 3, que cerró 07:45, no se lleva nada de media mañana.
+    expect(out.find(s => s.shiftId === 'Turno 3')!.cycles).toBe(16460)
   })
 
-  it('si el día tiene turnos, no queda resto: el bloque desaparece', () => {
+  it('el arranque anticipado se reparte y lo que no es continuo queda a la vista', () => {
+    // ⚠ CAMBIO (11-ago): antes NADA quedaba fuera. Los 2.296 de las 14:05 son el
+    // arranque anticipado del Turno 2 (15:15) y se le siguen sumando; los 30 de
+    // las 07:00 están a 2 h 17 del Turno 3 y a 8 h del Turno 2 — no son la cola
+    // de ninguno, así que el bloque se conserva visible en vez de colgarse del
+    // turno de al lado.
     const uns = shift({ dateKey: '2026-07-10', shiftId: 'Unscheduled', cycles: 2326, unscheduled: true })
     const out = applyUnscheduledAttribution([...turnosYal10, uns],
       new Map([['2026-07-10__Unscheduled', [iv('14:05', 2296), iv('07:00', 30)]]]))
 
-    expect(out.find(s => s.unscheduled)).toBeUndefined()
     expect(out.find(s => s.shiftId === 'Turno 2')!.cycles).toBe(20493 + 2296)
-    expect(out.find(s => s.shiftId === 'Turno 3')!.cycles).toBe(8717 + 30)
+    expect(out.find(s => s.shiftId === 'Turno 3')!.cycles).toBe(8717)
+    expect(out.find(s => s.unscheduled)!.cycles).toBe(30)
   })
 
-  it('el mismo día tiene prioridad: con turnos propios, no se cruza de día', () => {
-    // El T3 del día 11 arranca a 30 min del ciclo, pero el día 10 tiene su
-    // propio turno (a 8 h de distancia) — gana el del mismo día igual.
+  it('a las 23:30 la planta está arrancando el turno de la medianoche, no cerrando el de la tarde', () => {
+    // ⚠ CAMBIO (11-ago) Y ES MEJOR: antes ganaba el turno del MISMO DÍA aunque
+    // hubiera cerrado 8 h antes. Con la continuidad gana el T3 del día 11, que
+    // arranca 30 min después — que es lo que físicamente estaba pasando.
     const t10 = shift({ dateKey: '2026-07-10', shiftId: 'Turno 2', cycles: 5000,
                         start: wall('2026-07-10T08:00:00'), end: wall('2026-07-10T15:00:00') })
     const t11 = shift({ dateKey: '2026-07-11', shiftId: 'Turno 3', cycles: 500,
@@ -151,15 +167,21 @@ describe('no inventa atribuciones', () => {
     const uns = shift({ dateKey: '2026-07-10', shiftId: 'Unscheduled', cycles: 50, unscheduled: true })
     const out = applyUnscheduledAttribution([t10, t11, uns],
       new Map([['2026-07-10__Unscheduled', [iv('23:30', 50)]]]))
-    expect(out.find(s => s.shiftId === 'Turno 2')!.cycles).toBe(5050)
-    expect(out.find(s => s.shiftId === 'Turno 3')!.cycles).toBe(500)
+    expect(out.find(s => s.shiftId === 'Turno 2')!.cycles).toBe(5000)
+    expect(out.find(s => s.shiftId === 'Turno 3')!.cycles).toBe(550)
     expect(out.find(s => s.unscheduled)).toBeUndefined()
   })
 
-  it('caso real Chonchi 02-ago: día sin turnos → cruza al turno más cercano de otro día', () => {
-    // Decisión de Orel (reafirmada 3 veces): NINGÚN ciclo queda sin turno.
-    // La madrugada del domingo 02-ago (00:06–07:41, sin turnos ese día) se
-    // reparte por cercanía entre el T2 del sábado 01 y la madrugada del lunes 03.
+  it('caso real Chonchi 02-ago: un día sin turnos NO se cuelga del turno de otro día', () => {
+    // ⚠ CAMBIO DE DECISIÓN (Orel, 11-ago). Antes: "ningún ciclo queda sin turno"
+    // y esta madrugada del domingo se repartía entre el sábado y el lunes. Ahora
+    // manda la continuidad: estos bloques están a 10 h del turno del sábado y a
+    // 17 h del lunes, así que no son la cola de ninguno y el bloque se conserva
+    // VISIBLE. Vuelve a lo que dice la cabecera del módulo: inventar un turno ahí
+    // es peor que mostrar el resto, y la causa de fondo —que esos turnos no están
+    // configurados en Shoplogix— queda a la vista en vez de disimulada.
+    //
+    // Nada se pierde: los ciclos siguen contados en el bloque Unscheduled.
     const t2sab = shift({ dateKey: '2026-08-01', shiftId: 'Turno 2', cycles: 2397,
                           start: wall('2026-08-01T08:10:00'), end: wall('2026-08-01T14:52:00') })
     const t1lun = shift({ dateKey: '2026-08-03', shiftId: 'Turno 1 Lunes', cycles: 12000,
@@ -170,14 +192,10 @@ describe('no inventa atribuciones', () => {
        [iv('00:30', 100, '2026-08-02'), iv('03:30', 100, '2026-08-02'), iv('07:30', 93, '2026-08-02')]],
     ]))
 
-    // El bloque desaparece y no se pierde ni un ciclo.
-    expect(out.find(s => s.unscheduled)).toBeUndefined()
+    expect(out.find(s => s.unscheduled)!.cycles).toBe(293)
     const totalAntes = 2397 + 12000 + 293
-    const totalDespues = out.reduce((a, s) => a + s.cycles, 0)
-    expect(totalDespues).toBe(totalAntes)
-    // Todo lo agregado quedó marcado como atribuido (auditable).
-    const atribuidos = out.reduce((a, s) => a + (s.attributedCycles ?? 0), 0)
-    expect(atribuidos).toBe(293)
+    expect(out.reduce((a, s) => a + s.cycles, 0)).toBe(totalAntes)
+    expect(out.reduce((a, s) => a + (s.attributedCycles ?? 0), 0)).toBe(0)
   })
 })
 

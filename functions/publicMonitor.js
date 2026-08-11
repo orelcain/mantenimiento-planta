@@ -208,13 +208,18 @@ function distanciaA(t, ventana) {
  * día. Regla de Orel (11-ago-2026): "solo si las piezas son continuas al turno,
  * no sumarle piezas de otro tiempo horas después".
  *
- * 1 h contra los casos reales medidos: Filete cerró 15:30 y la cola arrancó
+ * 90 min, medido contra los casos reales: Filete cerró 15:30 y la cola arrancó
  * 15:40 (10 min); en Chonchi las colas arrancan en el mismo minuto del cierre; y
- * un arranque anticipado que corre 07:00→07:30 antes de un turno de las 08:00
- * queda a 30 min. Deja fuera lo que motivó la regla: el bloque de las 07:15 que
- * el turno noche de Chonchi se llevaba con 14 h de distancia.
+ * Yal 10-jul entró a las 14:05 para un turno que arrancaba 15:15 (65 min) — con
+ * 1 h se perdían 2.296 piezas de arranque anticipado REAL por cinco minutos.
+ * Lo que la regla debe excluir está a otra escala: el bloque de las 07:15 que el
+ * turno noche de Chonchi se llevaba está a 14 h.
+ *
+ * ⚠ Mismo número que `MAX_CONTINUIDAD_MS` de `graderUnscheduledAttribution.ts`
+ * (la matriz). Si cambia uno, cambia el otro: son la misma regla y dos pantallas
+ * del mismo turno no pueden dar números distintos.
  */
-const MAX_CONTINUIDAD_MS = 60 * 60 * 1000
+const MAX_CONTINUIDAD_MS = 90 * 60 * 1000
 
 /**
  * Minutos entre un TRAMO [ini, fin] y una ventana; 0 si se solapan.
@@ -394,12 +399,27 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
         return !otrasVentanas.some(v => distanciaTramo({ start: s.getTime(), end: s.getTime() + 1 }, v) === 0)
       })
 
-      // La pertenencia se decide sobre el TRAMO completo, no sobre cada
-      // intervalo: un bloque es la cola de este turno o no lo es, entero.
-      const tramos = agruparTramos(candidatos)
+      // La pertenencia se decide sobre el BLOQUE completo, no sobre cada
+      // intervalo: es la cola de este turno o no lo es, entero. Y los tramos se
+      // encadenan antes de decidir, porque la producción real viene con huecos:
+      // Yal 10-jul son 2.296 piezas a las 14:05, 14:40 y 15:00 antes de un turno
+      // que arrancó 15:15 — medido tramo a tramo, el primero se quedaba fuera.
+      const utiles = agruparTramos(candidatos)
         // Solo los tramos con producción de verdad (ver OUTSIDE_MIN_PIECES).
         .filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
-        .filter(t => esColaDeEsteTurno(t, ventanaTurno, otrasVentanas))
+      const cadenas = []
+      for (const t of [...utiles].sort((a, b) => a.start - b.start)) {
+        const ult = cadenas[cadenas.length - 1]
+        if (ult && t.start - ult.end <= MAX_CONTINUIDAD_MS) {
+          ult.end = Math.max(ult.end, t.end)
+          ult.tramos.push(t)
+        } else {
+          cadenas.push({ start: t.start, end: t.end, tramos: [t] })
+        }
+      }
+      const tramos = cadenas
+        .filter(c => esColaDeEsteTurno(c, ventanaTurno, otrasVentanas))
+        .flatMap(c => c.tramos)
       if (tramos.length === 0) return
 
       const intervals = tramos.flatMap(t => t.intervals)
