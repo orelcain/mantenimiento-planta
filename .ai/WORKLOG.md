@@ -13,6 +13,39 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Resumen a ancho completo y Calidad+Timeline juntas (#471)
+
+Orel, mirando el resultado de #469: *"el resumen deberia ocupar toda la pagina verdad no estar
+recortado"* y *"calidad y timeline deberian estar en la misma pestaña para al seleccionar la
+calidad las muestre en el timeline"*. Las dos observaciones eran correctas — dos regresiones
+que introdujo #467/#469.
+
+- **El Resumen se veia recortado**: al mudar "¿Que hacer?" a su pestaña quedo vivo el grid de 3
+  columnas. El contenido seguia en `col-span-2` y la tercera columna quedaba VACIA → media
+  pantalla de aire al lado de la tarjeta. Ahora es una sola columna a ancho completo (medido:
+  1189 de 1189 px utiles).
+- **Calidad y Timeline vuelven a ser UNA pestaña**. ⚠ La leccion, para no repetirla: `selectedCauses`
+  es estado COMPARTIDO entre `P0CausesPanel` y `ShiftTimelineView`. Separar dos bloques que
+  comparten estado no los separa: mata la interaccion, porque el efecto queda en una pestaña
+  que no estas mirando. **Antes de mover un bloque a otra pestaña, revisar que estado comparte
+  con lo que deja atras.** Queda comentado en el JSX de la vista `calidad`.
+- **Efecto lateral que casi se escapa**: `handleExportPdf` saltaba a `setActiveView('timeline')`
+  para montar el grafico. Con la pestaña borrada el PDF habria salido SIN grafico y en silencio
+  (el codigo ya tiene un `logger.warn` para ese caso, no un error). Ahora salta a `calidad`.
+- Archivos: `apps/pwa/src/pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx` (unico).
+- Verificacion: turno `2026-08-03__Turno 1` con Excel del Grader, local contra Firestore de prod.
+  Pestañas = `Resumen · Calidad · Gates · Linea · ¿Que hacer?`. Al marcar "Fuera de limites" el
+  timeline muestra `Fuera de limites 347 · 347 pzas con peso` con el scatter pintado. Claro,
+  oscuro y 375px. tsc 0, 1.125 tests OK. Desplegado y confirmado: `buildSha` = `70374cd`.
+- Estado: HECHO.
+- Sigue: dos preguntas de Orel sin construir todavia — (a) setear gates: el editor YA existe
+  (`ShiftConfigPanel` → `GateChangeModal`, con calidad/calibre/conservacion/producto), pero solo
+  aparece si `configSnapshots.length > 0` y con el turno `live`; el hueco real es el turno SIN
+  config, que es justo cuando querrias setearla. (b) separar "Linea": son 4 tarjetas y una de
+  ellas (`SensorStopsCausePanel`, las imputaciones) es CARGA DE DATOS mezclada con analisis.
+- Pendiente menor visto de paso (no tocado, fuera de alcance): a 375px en `P0CausesPanel` el
+  chip `paraguas · 6 sub` se superpone con `89.7% del P0`.
+
 ## 2026-08-11 - claude - Pestaña "Calidad" y herramientas fuera del Resumen (#469)
 
 Orel: *"si datos grader deberiamos tambien tener en las pestañas lo ordenado o no? como la linea"*.
