@@ -13,6 +13,35 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-10 - claude - Grafico del monitor: ubicar las detenciones y marcar el mejor ritmo (#447)
+
+Orel: *"poder seleccionar del listado el tipo de detencion y q las ubique en el grafico"* +
+*"deja el mejor ritmo real 83"*.
+
+- Hecho: al tocar una causa del listado, el grafico marca donde ocurrio cada parada de esa causa.
+  Ademas eje de horas (4 marcas) y linea de referencia punteada con el mejor tramo REAL del turno
+  (83 pz), que es contra lo que se compara cada barra.
+- **Los dos bugs que solo aparecieron al MIRAR** (todo verde antes):
+  1. El listado decia "85x" y el grafico pintaba 55 bandas. Venian de DOS calculos distintos
+     (estados duplicados + estados de duracion cero). Ahora el backend publica `stopReasons` +
+     `stopEvents` y listado y grafico salen de la MISMA fuente deduplicada.
+  2. Las bandas quedaban corridas a la derecha y 3 caian fuera del area: se ubicaban por
+     aritmetica de tiempo, pero **la serie NO es continua** (solo trae los tramos que el sensor
+     registro). Se corrigio buscando el INDICE del tramo en la serie.
+- Archivos: `functions/publicMonitor.js`, `apps/pwa/src/pages/PublicShiftMonitorPage.tsx`,
+  `apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts`. Payload +3 KB (tope 300 eventos).
+- Verificacion: 202 tests functions + 1107 PWA, tsc 0, eslint 0. **En PRODUCCION con clic real de
+  mouse** sobre el turno de Filete del 10-ago: COLACION 4x -> 4 bandas en 13:40/13:55/14:10/14:35
+  (escalonadas por grupo), REUNION INICIO TURNO 1x -> 1 banda en x=1,1 de 100 (al comienzo),
+  Micro Detencion 58x -> 58 bandas, y la "x" del chip limpia el filtro.
+- Gotcha de tooling: en el tab de claude-in-chrome el `.click()` programatico NO tomaba y el
+  screenshot fallaba por `document_idle` perpetuo (la suscripcion de Firestore deja la pagina
+  "cargando"). Se verifico con el navegador interno + clic real por `ref`.
+- Estado: HECHO — mergeado (`3c2b8b0`) y desplegado.
+- Sigue: sin pendientes de esta feature.
+
+---
+
 ## 2026-08-10 - claude - Apodos de aparatos: resolver con lo que sabe el usuario, no con huellas
 
 Orel: *"los aparatos tipo celular han sido los mismos, solo yo lo he probado... debemos poder
