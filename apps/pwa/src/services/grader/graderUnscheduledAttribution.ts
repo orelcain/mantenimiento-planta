@@ -73,6 +73,8 @@ export function intervalKey(iv: CycleInterval): string {
 
 /** Corte entre dos tramos de producción fuera de turno. */
 const TRAMO_GAP_MS = 15 * 60 * 1000
+/** Duración de un intervalo de Shoplogix: 5 min fijos. */
+const TRAMO_INTERVAL_MS = 5 * 60 * 1000
 
 /**
  * Piezas mínimas para que un tramo fuera de turno cuente como producción.
@@ -106,6 +108,61 @@ export function agruparTramos(intervals: readonly CycleInterval[]): Array<{
     }
   }
   return tramos
+}
+
+/**
+ * Máximo hueco entre un turno y su cola para considerarla CONTINUA.
+ *
+ * Regla de Orel (11-ago-2026): "solo si las piezas son continuas al turno, no
+ * sumarle piezas de otro tiempo horas después". Lo que la motivó: el turno noche
+ * de Chonchi (21:15→05:00) se llevaba 1.048 piezas de las 07:15 de la mañana
+ * —la cola del turno que cerró a esa hora— y mostraba 13.487 en vez de 12.170,
+ * con una barra a las 7 AM dentro de un turno que arrancó a las 21:30.
+ *
+ * 1 h contra los casos reales: Filete cerró 15:30 y la cola arrancó 15:40; en
+ * Chonchi las colas arrancan en el mismo minuto del cierre; un arranque
+ * anticipado que corre 07:00→07:30 antes de un turno de las 08:00 queda a 30 min.
+ */
+export const MAX_CONTINUIDAD_MS = 60 * 60 * 1000
+
+/** Ventana de un turno, para decidir de quién es un tramo. */
+export interface VentanaTurno { start: Date; end: Date }
+
+/**
+ * Minutos entre un tramo y una ventana; 0 si se solapan.
+ *
+ * ⚠ El `end` de un tramo es el INICIO de su último intervalo (ver
+ * `agruparTramos`), así que el tramo dura 5 min más de lo que dice.
+ */
+function distanciaTramo(tramo: { start: number; end: number }, v: VentanaTurno): number {
+  const fin = tramo.end + TRAMO_INTERVAL_MS
+  const s = v.start.getTime()
+  const e = v.end.getTime()
+  if (fin > s && tramo.start < e) return 0
+  return fin <= s ? s - fin : tramo.start - e
+}
+
+/**
+ * ¿El tramo es la cola de ESTE turno y no de otro del día?
+ *
+ * Dos condiciones: que sea CONTINUO al turno (≤ 1 h) y que ningún otro turno
+ * esté más cerca. Un tramo va a UN turno, nunca a dos ni a ninguno: el empate se
+ * desempata a favor del turno que ya CERRÓ —una cola es la continuación de lo
+ * que se venía haciendo— en vez de descartarse, que perdería las piezas.
+ */
+export function esColaDeEsteTurno(
+  tramo: { start: number; end: number },
+  ventana: VentanaTurno,
+  otras: readonly VentanaTurno[],
+): boolean {
+  const propia = distanciaTramo(tramo, ventana)
+  if (propia > MAX_CONTINUIDAD_MS) return false
+  const yaCerro = (v: VentanaTurno) => tramo.start >= v.end.getTime()
+  return otras.every(v => {
+    const otra = distanciaTramo(tramo, v)
+    if (propia !== otra) return propia < otra
+    return yaCerro(ventana) && !yaCerro(v)
+  })
 }
 
 export interface UnscheduledAttribution {

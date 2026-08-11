@@ -13,7 +13,7 @@
  * producción que Shoplogix reporta en los dos lados. Son 1-3 docs extra por día
  * con Unscheduled, no por turno del mes.
  */
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, documentId, getDocs, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { CycleInterval } from '@/services/grader/graderUnscheduledAttribution'
@@ -98,6 +98,49 @@ export async function loadCountedKeysForDate(
     }
   }))
   return keys
+}
+
+/** Ventana de un turno con nombre del día. */
+export interface DayShiftWindow {
+  shiftId: string
+  start: Date
+  end: Date
+}
+
+/**
+ * Ventanas de los turnos con nombre de un día.
+ *
+ * Hacen falta para saber de QUIÉN es un bloque fuera de horario: sin ellas, un
+ * turno se queda con todas las colas del día. Caso real Chonchi 10-ago-2026: el
+ * turno noche (21:15→05:00) sumaba 1.048 piezas de las 07:15 —la cola del turno
+ * que cerró a esa hora— y mostraba 13.487 en vez de 12.170.
+ *
+ * Costo: 1 query que trae los docs padre del día (2-5), sin subcolecciones.
+ */
+export async function loadDayShiftWindows(
+  dateKey: string,
+  plantSlug: PlantSlug,
+): Promise<DayShiftWindow[]> {
+  try {
+    const ref = collection(db, `shoplogix/${plantSlug}/shifts`)
+    const snap = await getDocs(query(
+      ref,
+      where(documentId(), '>=', `${dateKey}_`),
+      where(documentId(), '<=', `${dateKey}_`),
+    ))
+    const out: DayShiftWindow[] = []
+    snap.forEach(doc => {
+      const d = doc.data() as { shiftId?: string; scheduledStart?: RawInterval['startAt']; scheduledEnd?: RawInterval['startAt'] }
+      const shiftId = d.shiftId || doc.id.slice(11)
+      if (/unscheduled/i.test(shiftId)) return   // no es un turno
+      const start = toDate(d.scheduledStart)
+      const end = toDate(d.scheduledEnd)
+      if (start && end) out.push({ shiftId, start, end })
+    })
+    return out
+  } catch {
+    return []
+  }
 }
 
 /** Los tramos de todos los Unscheduled de un período, indexados por su key. */

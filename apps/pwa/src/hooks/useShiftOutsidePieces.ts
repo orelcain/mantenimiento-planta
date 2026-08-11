@@ -13,9 +13,10 @@
  */
 
 import { useEffect, useState } from 'react'
-import { loadUnscheduledIntervals } from '@/services/grader/graderUnscheduledLoad'
+import { loadDayShiftWindows, loadUnscheduledIntervals } from '@/services/grader/graderUnscheduledLoad'
 import {
   agruparTramos,
+  esColaDeEsteTurno,
   intervalKey,
   OUTSIDE_MIN_PIECES,
 } from '@/services/grader/graderUnscheduledAttribution'
@@ -47,7 +48,10 @@ export function useShiftOutsidePieces(
     if (!dateKey || !snapshot || snapshot.machines.length === 0) { setOut(VACIO); return }
     let alive = true
 
-    loadUnscheduledIntervals(dateKey, plantSlug).then(intervals => {
+    Promise.all([
+      loadUnscheduledIntervals(dateKey, plantSlug),
+      loadDayShiftWindows(dateKey, plantSlug),
+    ]).then(([intervals, ventanasDelDia]) => {
       if (!alive) return
 
       // Minutos que el turno YA tiene contados. Shoplogix repite algunos en los
@@ -63,15 +67,29 @@ export function useShiftOutsidePieces(
       const inicio = snapshot.machines[0]?.scheduledStart ?? snapshot.machines[0]?.shiftStart
       const fin = snapshot.machines[0]?.scheduledEnd ?? snapshot.machines[0]?.shiftEnd
 
+      // Los OTROS turnos del día compiten por cada tramo: sin esto, este turno
+      // se quedaba con TODAS las colas del día. Caso real Chonchi 10-ago: el
+      // turno noche sumaba 1.048 pz de las 07:15 —cola del turno que cerró a esa
+      // hora— y 269 de las 17:00, y mostraba 13.487 en vez de 12.170.
+      const propia = inicio && fin ? { start: inicio, end: fin } : null
+      const otras = ventanasDelDia.filter(v => !propia
+        || v.start.getTime() !== propia.start.getTime()
+        || v.end.getTime() !== propia.end.getTime())
+
       const candidatos = intervals.filter(iv => {
         if (yaContados.has(intervalKey(iv))) return false
         const t = iv.startAt.getTime()
         // Dentro de la ventana ya está contado por el propio turno.
         if (inicio && fin && t >= inicio.getTime() && t < fin.getTime()) return false
-        return true
+        // Dentro de la de otro turno, lo cuenta ese turno.
+        return !otras.some(v => t >= v.start.getTime() && t < v.end.getTime())
       })
 
-      const tramos = agruparTramos(candidatos).filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+      const tramos = agruparTramos(candidatos)
+        .filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+        // La pertenencia se decide sobre el TRAMO completo: es la cola de este
+        // turno o no lo es, entero (ver `esColaDeEsteTurno`).
+        .filter(t => !propia || esColaDeEsteTurno(t, propia, otras))
       setOut({
         pieces: tramos.reduce((a, t) => a + t.pieces, 0),
         ranges: tramos.map(t => {
