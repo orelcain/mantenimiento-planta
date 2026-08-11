@@ -281,3 +281,67 @@ test('componerBriefFinTurno: sin ningun target no inventa un porcentaje', () => 
   assert.ok(!msg.includes('del target'))
   assert.match(msg, /📦 Total: <b>4\.200<\/b> piezas$/m, 'el total va solo, sin porcentaje')
 })
+
+test('fin: la cola de después del horario se anuncia con desglose (caso Filete)', () => {
+  // El 10-ago Filete "cerró" 15:30 y la línea trabajó hasta las 16:30: 4.410 en
+  // el doc del turno + 505 en el bucket Unscheduled. El brief tiene que decir
+  // 4.915, o Control de Producción ve menos piezas de las que pasaron.
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Filete', shiftId: 'Turno Dia', dateKey: '2026-08-10',
+    machines: [{ machineName: 'Linea 1', totalCycles: 4915, shiftRuntime: 0.77, states: [] }],
+    plannedTargetPieces: 5000,
+    outside: { pieces: 505, start: wall(15, 40), end: wall(16, 30) },
+  })
+  assert.match(msg, /📦 Total: <b>4\.915<\/b> piezas/)
+  assert.match(msg, /4\.410 dentro del horario \+ <b>505<\/b> después \(15:40–16:30\)/)
+  // El % se mide contra la jornada real, no contra el recorte de Shoplogix.
+  assert.match(msg, /98% de lo planificado/)
+})
+
+test('fin: sin cola el mensaje queda idéntico al de siempre', () => {
+  // Chonchi y Yal ya reciben este brief: agregar la cola no puede cambiarles
+  // una sola línea cuando no hay nada fuera de horario.
+  const base = {
+    plantLabel: 'Yal', shiftId: 'Turno 2', dateKey: '2026-07-16',
+    machines: [{ machineName: 'YAL Evisceradora 1', totalCycles: 5576, shiftRuntime: 0.91, states: [] }],
+    currentJob: { name: 'SALAR' },
+  }
+  const sinCampo = componerBriefFinTurno(base)
+  assert.strictEqual(componerBriefFinTurno({ ...base, outside: null }), sinCampo)
+  assert.strictEqual(componerBriefFinTurno({ ...base, outside: { pieces: 0 } }), sinCampo)
+  assert.ok(!sinCampo.includes('dentro del horario'))
+})
+
+test('fin: la cola sin horario conocido igual se informa', () => {
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Filete', shiftId: 'Turno Dia', dateKey: '2026-08-10',
+    machines: [{ machineName: 'Linea 1', totalCycles: 1200, shiftRuntime: 0.5, states: [] }],
+    outside: { pieces: 200, start: null, end: null },
+  })
+  assert.match(msg, /1\.000 dentro del horario \+ <b>200<\/b> después$/m)
+})
+
+test('paros: los registros de duración 0 no son detenciones', () => {
+  // Shoplogix emite states instantáneos que no detuvieron nada. El 10-ago en
+  // Filete eran 27 de 85 "micro": el brief anunciaba 85 y el monitor 58.
+  const states = [
+    { type: 'downtime', name: 'Micro Detencion', durationSec: 45, startAt: wall(9, 0) },
+    { type: 'downtime', name: 'Micro Detencion', durationSec: 0, startAt: wall(9, 5) },
+    { type: 'downtime', name: 'Micro Detencion', startAt: wall(9, 10) },
+    { type: 'downtime', name: 'Detencion', durationSec: 600, startAt: wall(10, 0) },
+  ]
+  assert.deepStrictEqual(resumenParos(states), { macroCount: 1, macroSec: 600, microCount: 1, microSec: 45 })
+})
+
+test('paros: el mismo paro repetido se cuenta una vez', () => {
+  // El doc del turno y el bucket Unscheduled comparten minutos: al fusionarlos
+  // para la cola, el mismo paro llega dos veces.
+  const uno = { type: 'downtime', name: 'COLACION', durationSec: 1800, startAt: wall(13, 40) }
+  const r = resumenParos([uno, { ...uno }, { type: 'downtime', name: 'COLACION', durationSec: 1800, startAt: wall(14, 10) }])
+  assert.deepStrictEqual(r, { macroCount: 2, macroSec: 3600, microCount: 0, microSec: 0 })
+})
+
+test('paros: sin hora de inicio no se deduplica (dos paros iguales son dos paros)', () => {
+  const s = { type: 'downtime', name: 'Detencion', durationSec: 300 }
+  assert.strictEqual(resumenParos([s, { ...s }]).macroCount, 2)
+})

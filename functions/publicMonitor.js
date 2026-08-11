@@ -847,6 +847,57 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
   return { token, created: true }
 }
 
+/**
+ * Suma a cada máquina la producción que quedó FUERA del horario del turno y
+ * devuelve el desglose. La usa el brief de fin de turno (checkShiftEndBriefs)
+ * para que el mensaje de Telegram anuncie la jornada real y no el recorte de
+ * Shoplogix — el mismo número que muestran el monitor público y la matriz.
+ *
+ * ⚠ Muta `machines` a propósito: suma `totalCycles` y concatena `states`, para
+ * que el total, los paros y el % contra target del brief hablen todos de lo
+ * mismo. `shiftRuntime` NO se toca (es el uptime que calcula Shoplogix para su
+ * ventana; recomponerlo para la cola sería inventar).
+ *
+ * @param {object} parent — doc padre del turno (por su `scheduledStart/End`)
+ * @param {Array<{id:string,totalCycles:number,intervals:Array,states:Array}>} machines
+ * @returns {Promise<{pieces:number, start:Date|null, end:Date|null, lastPieceAt:Date|null}>}
+ *   `lastPieceAt` va en wall-clock-as-UTC como todo lo derivado de intervals:
+ *   quien lo compare con el reloj real tiene que convertirlo.
+ */
+async function sumarColaAMaquinas(db, plantSlug, shiftDocId, parent, machines) {
+  const vacio = { pieces: 0, start: null, end: null, lastPieceAt: null }
+  const ventanaTurno = { start: toDate(parent.scheduledStart), end: toDate(parent.scheduledEnd) }
+  if (!ventanaTurno.start || !ventanaTurno.end) return vacio
+
+  const yaContados = new Map(
+    machines.map(m => [
+      m.id,
+      new Set((m.intervals || []).map(iv => toDate(iv.startAt)?.getTime()).filter(Boolean)),
+    ]),
+  )
+
+  const extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados)
+  if (extras.size === 0) return vacio
+
+  let pieces = 0
+  let start = null
+  let end = null
+  for (const m of machines) {
+    const extra = extras.get(m.id)
+    if (!extra) continue
+    m.totalCycles = (m.totalCycles || 0) + extra.pieces
+    m.states = [...(m.states || []), ...(extra.states || [])]
+    pieces += extra.pieces
+    for (const iv of extra.intervals) {
+      const s = toDate(iv.startAt)
+      const e = toDate(iv.endAt) || s
+      if (s && (!start || s < start)) start = s
+      if (e && (!end || e > end)) end = e
+    }
+  }
+  return { pieces, start, end, lastPieceAt: end }
+}
+
 module.exports = {
   COLLECTION,
   buildMonitorLive,
@@ -854,6 +905,12 @@ module.exports = {
   buildMonitorPatch,
   resolveCurrentShiftDocId,
   ensureLineMonitor,
+  // Lo usa también el brief de fin de turno (checkShiftEndBriefs): la cola de
+  // producción fuera del horario tiene que dar el MISMO número en el monitor,
+  // en la matriz y en el mensaje de Telegram.
+  loadOutsideShiftProduction,
+  sumarColaAMaquinas,
+  OUTSIDE_MIN_PIECES,
   // exportados para tests
   currentStateOf,
   statusOf,
