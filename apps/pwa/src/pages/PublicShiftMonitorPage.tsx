@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Timer } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -300,8 +300,19 @@ export function PublicShiftMonitorPage() {
     )
   }, [token])
 
-  // Índice del turno que se está mirando: 0 = el vigente, 1..n = anteriores.
-  const [idx, setIdx] = useState(0)
+  /**
+   * Turno que se está mirando, EN LA URL (`?turno=<shiftDocId>`). Sin él, el
+   * vigente.
+   *
+   * ⚠ Vivía en `useState` + refs y los botones "no respondían" (reporte de Orel,
+   * 11-ago): al navegar, el componente se REMONTA —se ve en las trazas: el ref
+   * vuelve a `null` justo después del clic— y con él se perdía la posición, así
+   * que la pantalla saltaba de vuelta al turno actual. La URL sobrevive al
+   * remonte, y de paso el turno queda compartible: mandar "mirá el de ayer" pasa
+   * a ser copiar el link.
+   */
+  const [searchParams, setSearchParams] = useSearchParams()
+  const turnoParam = searchParams.get('turno')
   /** Causa de detención resaltada sobre el gráfico. */
   const [causaSel, setCausaSel] = useState<string | null>(null)
 
@@ -322,15 +333,14 @@ export function PublicShiftMonitorPage() {
   // ⚠ El efecto depende SOLO de `vistas`, nunca de `idx`: al depender también de
   // `idx` se disparaba en la propia navegación del usuario y lo devolvía al
   // turno actual — el botón parecía no responder.
-  const vistaIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (vistas.length === 0) return
-    if (!vistaIdRef.current) { vistaIdRef.current = vistas[0]!.shiftDocId; return }
-    const nuevo = vistas.findIndex(v => v.shiftDocId === vistaIdRef.current)
-    // Si el turno que se miraba se cayó del historial, volver al actual.
-    setIdx(nuevo >= 0 ? nuevo : 0)
-    if (nuevo < 0) vistaIdRef.current = vistas[0]!.shiftDocId
-  }, [vistas])
+  // El índice se DERIVA de la URL: sin estado que restaurar, no hay efecto que
+  // pelee con la navegación del usuario ni que lo devuelva al turno actual.
+  // Si el turno pedido se cayó del historial, cae solo al vigente.
+  const idx = useMemo(() => {
+    if (!turnoParam) return 0
+    const i = vistas.findIndex(v => v.shiftDocId === turnoParam)
+    return i >= 0 ? i : 0
+  }, [vistas, turnoParam])
 
   // Telemetría anónima de uso (ver `trackMonitorUsage`). Se engancha una sola
   // vez por token; el ref le deja consultar en qué turno está parado el usuario
@@ -348,11 +358,16 @@ export function PublicShiftMonitorPage() {
 
   const verIndice = (n: number) => {
     const destino = Math.min(vistas.length - 1, Math.max(0, n))
-    setIdx(destino)
+    // Volver al vigente es dejar de navegar: desde ahí la pantalla vuelve a
+    // seguir al turno en curso cuando arranque el siguiente.
+    // `replace` para no llenar el historial del navegador con cada flecha: el
+    // botón "atrás" del celular tiene que salir de la pantalla, no deshacer
+    // turno por turno.
+    if (destino === 0) setSearchParams({}, { replace: true })
+    else setSearchParams({ turno: vistas[destino]!.shiftDocId }, { replace: true })
     // Otro turno, otras detenciones: mantener la selección marcaría bandas que
     // no existen en el turno que se acaba de abrir.
     setCausaSel(null)
-    vistaIdRef.current = vistas[destino]?.shiftDocId ?? null
   }
   const irA = (delta: number) => verIndice(idx + delta)
 
