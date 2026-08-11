@@ -290,3 +290,35 @@ export function contarMirandoAhora(stats: MonitorUsageStats | null, min = 10): n
   const corte = Date.now() - min * 60_000
   return Object.values(stats.viewers).filter(v => (v.lastSeen || 0) >= corte).length
 }
+
+// ─── Apodos de los aparatos (nota interna) ───────────────────────────────────
+
+/**
+ * Nombre que Mantención le pone a cada aparato que abre el monitor
+ * ("celular de Control", "PC de la sala").
+ *
+ * ⚠ Es una nota INTERNA: vive en su propia colección, la lee solo gente con
+ * sesión y NUNCA se copia al doc público. Quien abre el link no ve —ni debe
+ * ver— cómo lo llamaron del otro lado.
+ */
+export function subscribeMonitorLabels(
+  token: string,
+  onUpdate: (labels: Record<string, string>) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'publicShiftMonitorLabels', token),
+    (snap) => onUpdate((snap.data()?.labels ?? {}) as Record<string, string>),
+    () => onUpdate({}),
+  )
+}
+
+/** Guarda (o borra, con nombre vacío) el apodo de un aparato. */
+export async function setMonitorLabel(token: string, viewerId: string, label: string): Promise<void> {
+  const limpio = label.trim().slice(0, 40)
+  const { setDoc, deleteField } = await import('@/services/firestoreTracked')
+  await setDoc(
+    doc(db, 'publicShiftMonitorLabels', token),
+    { labels: { [viewerId]: limpio || deleteField() }, updatedAt: new Date().toISOString() },
+    { merge: true },
+  )
+}
