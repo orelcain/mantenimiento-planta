@@ -425,8 +425,22 @@ function col(map: ColumnMap, ...variants: string[]): number | undefined {
 // PARSERS POR TIPO
 // ============================================================================
 
-function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap): PieceRecord[] {
+/**
+ * Registros del informe pieza-a-pieza que NO son una pieza: el grader los emite
+ * con `Cantidad de piezas` en 0 y `Peso de las piezas` en "No aplicable".
+ *
+ * Importan porque el Matrix los cuenta en su letrero ("se han recuperado N
+ * registros") y la app suma piezas, así que los dos números NO pueden coincidir.
+ * Caso real 11-ago-2026: Matrix 13.529 registros, app 13.366 piezas, 163 de
+ * estos. Orel perdió una tarde buscando piezas que nunca existieron, así que
+ * ahora se cuentan y se muestran en vez de descartarse en silencio.
+ */
+function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap): {
+  records: PieceRecord[]
+  notApplicable: PieceRecord[]
+} {
   const records: PieceRecord[] = []
+  const notApplicable: PieceRecord[] = []
   const iGate = col(colMap, 'gate', 'compuerta', 'puerta')
   // 'piezas real' va PRIMERO porque es el nombre exacto en Excels Yal y debe
   // ganar al exact match antes de que la variante 'piezas' caiga al fuzzy
@@ -456,7 +470,20 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
     if (!ts) continue
 
     const pieces = parseNum(iPieces != null ? row[iPieces] : undefined)
-    if (pieces == null || pieces <= 0) continue
+    // Registro válido que NO es una pieza: el grader lo emite con cantidad 0 y
+    // el peso en "No aplicable". Se guarda aparte en vez de descartarse, porque
+    // el Matrix SÍ lo cuenta en su letrero de "registros recuperados" y esa
+    // diferencia parecía un error de la app (ver `notApplicableRecords`).
+    if (pieces === 0) {
+      notApplicable.push({
+        ts,
+        gate: Math.round(parseNum(iGate != null ? row[iGate] : undefined) ?? 0),
+        pieces: 0,
+        shift: iShift != null && row[iShift] != null ? String(row[iShift]).trim() || undefined : undefined,
+      })
+      continue
+    }
+    if (pieces == null || pieces < 0) continue
 
     const gate = parseNum(iGate != null ? row[iGate] : undefined) ?? 0
 
@@ -496,7 +523,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
     }
     records.push(rec)
   }
-  return records
+  return { records, notApplicable }
 }
 
 function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): Gate0Record[] {
@@ -692,8 +719,14 @@ export async function parseFile(file: File): Promise<{
       case 'PIEZA_PIEZA': {
         // PP produce SOLO pieceRecords (todos los gates, incluyendo gate=0).
         // NUNCA produce gate0Records — eso lo hace mergeParsedData.
-        const records = parsePiezaPieza(rows, headerInfo.rowIndex, colMap)
+        const { records, notApplicable } = parsePiezaPieza(rows, headerInfo.rowIndex, colMap)
         partial.pieceRecords = records
+        if (notApplicable.length > 0) {
+          partial.notApplicableRecords = notApplicable
+          warnings.push(
+            `${notApplicable.length} registros sin pieza ("No aplicable"): el Matrix los cuenta como registros, la app no como piezas.`,
+          )
+        }
         const g0Count = records.filter((r) => r.gate === 0).length
         if (g0Count > 0) {
           warnings.push(`Se encontraron ${g0Count} registros Gate 0 en archivo pieza-pieza.`)
@@ -839,8 +872,10 @@ export function mergeParsedData(
   // ─── Paso 1: Recopilar datos de todos los archivos ───
   const realGate0Records: Gate0Record[] = []
   let hasP0File = false
+  const noAplicables: PieceRecord[] = []
 
   for (const { fileMeta, partialData } of parts) {
+    if (partialData.notApplicableRecords) pushAll(noAplicables, partialData.notApplicableRecords)
     // Detectar P0 mal clasificado como PP:
     // Un archivo donde TODOS los pieceRecords tienen gate=0 es un P0.
     const allPiecesAreGate0 = partialData.pieceRecords != null
@@ -907,6 +942,8 @@ export function mergeParsedData(
     merged.inferred.startAt = allTs[0]
     merged.inferred.endAt = allTs[allTs.length - 1]
   }
+
+  if (noAplicables.length > 0) merged.notApplicableRecords = noAplicables
 
   return merged
 }

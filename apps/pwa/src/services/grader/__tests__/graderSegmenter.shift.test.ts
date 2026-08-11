@@ -112,3 +112,43 @@ describe('shiftIdToKey — dos turnos distintos no comparten ID', () => {
     expect(new Set(['Turno 1', 'Turno 3', 'Turno 1 Lunes'].map(shiftIdToKey)).size).toBe(3)
   })
 })
+
+describe('registros "No aplicable": cuadrar con el letrero del Matrix', () => {
+  // Caso real Chonchi 11-ago-2026: el Matrix decía "se han recuperado 13.529
+  // registros" y la app mostraba 13.366 piezas. La diferencia eran 163 filas con
+  // `Cantidad de piezas` en 0 y peso "No aplicable" — registros del grader sin
+  // pieza detrás. Se cuentan aparte para que los dos números cuadren solos.
+  const pieza = (ts: string): PieceRecord => ({ ts, gate: 8, pieces: 1 })
+  const noAplica = (ts: string): PieceRecord => ({ ts, gate: 0, pieces: 0 })
+
+  it('se cuentan por turno, sin sumar a las piezas', () => {
+    const map = segmentByDayAndShift(
+      [pieza(wall('2026-08-11', '10:00')), pieza(wall('2026-08-11', '11:00'))],
+      [],
+      PRINCIPAL,
+      undefined,
+      [noAplica(wall('2026-08-11', '10:30')), noAplica(wall('2026-08-11', '11:30'))],
+    )
+    const seg = map.get('2026-08-11|Turno 2')!
+    expect(seg.pieceRecords).toHaveLength(2)
+    expect(seg.notApplicableCount).toBe(2)
+  })
+
+  it('caen en el turno donde ocurrieron, no todos en el primero', () => {
+    // Un archivo puede cubrir dos turnos: el número tiene que quedar repartido.
+    const map = segmentByDayAndShift(
+      [pieza(wall('2026-08-11', '10:00')), pieza(wall('2026-08-11', '22:00'))],
+      [],
+      PRINCIPAL,
+      undefined,
+      [noAplica(wall('2026-08-11', '10:30')), noAplica(wall('2026-08-11', '22:30')), noAplica(wall('2026-08-11', '23:00'))],
+    )
+    expect(map.get('2026-08-11|Turno 2')!.notApplicableCount).toBe(1)
+    expect(map.get('2026-08-11|Turno 1')!.notApplicableCount).toBe(2)
+  })
+
+  it('sin "No aplicable" el campo queda sin definir (no ensucia el doc)', () => {
+    const map = segmentByDayAndShift([pieza(wall('2026-08-11', '10:00'))], [], PRINCIPAL)
+    expect(map.get('2026-08-11|Turno 2')!.notApplicableCount).toBeUndefined()
+  })
+})
