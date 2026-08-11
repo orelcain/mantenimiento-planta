@@ -37,26 +37,12 @@
 import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 
 /**
- * Máxima distancia entre un ciclo suelto y el turno al que se le atribuye.
- *
- * SIN LÍMITE por decisión explícita de Orel (2026-08-03), reafirmada tras
- * plantearle el matiz: toda la producción de un día pertenece a algún turno de
- * ese día, y un bloque "Unscheduled" en la vista no le sirve a nadie en planta.
- *
- * Qué implica, para que quede escrito: un ciclo se atribuye al turno más
- * cercano del MISMO día aunque haya ocurrido horas fuera de su horario. Caso
- * real Yal 2026-08-03 — 1.836 ciclos entre las 09 y 11 h se suman al Turno 3,
- * que corrió 00:06–07:18. El número del turno pasa a incluir producción que no
- * ocurrió dentro de su ventana.
- *
- * Eso queda auditable en `attributedCycles`, que la UI muestra aparte
- * ("incluye N cic fuera de turno"), y la causa de fondo sigue siendo que esos
- * turnos no están configurados en Shoplogix.
- *
- * Se probaron 240 min y 90 min antes de quitarlo; el historial está en los
- * tests.
+ * ⚠ La distancia máxima entre un bloque y "su" turno la fija ahora
+ * `MAX_CONTINUIDAD_MS`, una sola constante compartida con el monitor público, el
+ * brief de Telegram y la vista de turno. Antes vivía acá como
+ * `MAX_ADJACENCY_MIN`; tener dos números para la misma regla es cómo empiezan a
+ * decir cosas distintas dos pantallas del mismo dato.
  */
-export const MAX_ADJACENCY_MIN = Number.POSITIVE_INFINITY
 
 /** Un tramo de producción con su ubicación en el tiempo. */
 export interface CycleInterval {
@@ -119,14 +105,59 @@ export function agruparTramos(intervals: readonly CycleInterval[]): Array<{
  * —la cola del turno que cerró a esa hora— y mostraba 13.487 en vez de 12.170,
  * con una barra a las 7 AM dentro de un turno que arrancó a las 21:30.
  *
- * 1 h contra los casos reales: Filete cerró 15:30 y la cola arrancó 15:40; en
- * Chonchi las colas arrancan en el mismo minuto del cierre; un arranque
- * anticipado que corre 07:00→07:30 antes de un turno de las 08:00 queda a 30 min.
+ * 90 min, medido contra los casos reales:
+ *   · Filete cerró 15:30 y la cola arrancó 15:40 → 10 min.
+ *   · En Chonchi las colas arrancan en el mismo minuto del cierre → 0.
+ *   · Yal 10-jul: la planta entró a las 14:05 y el Turno 2 arrancó 15:15 → 65
+ *     min. Con 1 h se perdían 2.296 piezas de arranque anticipado REAL por cinco
+ *     minutos; el umbral tiene que dejar pasar un cambio de turno con limpieza.
+ *   · Lo que la regla debe excluir está a otra escala: las 07:15 contra el turno
+ *     noche de Chonchi son 14 h, y la madrugada del 02-ago está a 10 h.
+ *
+ * ⚠ HISTORIAL, porque la decisión cambió dos veces y conviene no volver atrás
+ * sin saberlo:
+ *   1. Se probaron 240 y 90 min de tolerancia.
+ *   2. 2026-08-03 — Orel la quitó del todo: toda la producción de un día
+ *      pertenece a algún turno de ese día, y un bloque "Unscheduled" suelto en
+ *      la vista no le sirve a nadie en planta.
+ *   3. 2026-08-11 — la repone al ver el resultado en Eviscerado, ya con el
+ *      matiz correcto: continuidad, no cercanía a secas.
+ *
+ * La decisión de agosto NO se revierte del todo: lo que cae DENTRO de la ventana
+ * de un turno se le sigue atribuyendo sin discusión, por suelto que esté. Solo
+ * cambia lo de FUERA. Medido sobre agosto completo, deja de atribuirse un total
+ * de 65 piezas (chonchi 3, filete 62, yal 0); el caso Yal 03-ago no se afecta.
  */
-export const MAX_CONTINUIDAD_MS = 60 * 60 * 1000
+export const MAX_CONTINUIDAD_MS = 90 * 60 * 1000
 
 /** Ventana de un turno, para decidir de quién es un tramo. */
 export interface VentanaTurno { start: Date; end: Date }
+
+/**
+ * Une los tramos que están encadenados entre sí (≤ `MAX_CONTINUIDAD_MS`) para
+ * decidir la pertenencia sobre el bloque COMPLETO.
+ *
+ * Hace falta porque la producción real viene con huecos: el caso Yal 10-jul son
+ * 2.296 ciclos a las 14:05, 14:40 y 15:00 antes de un turno que arrancó 15:15.
+ * Medidos por separado, el primero queda a 65 min y se perdía — encadenados,
+ * el bloque llega hasta 10 min del turno y es claramente su arranque anticipado.
+ */
+export function encadenarTramos<T extends { start: number; end: number; pieces: number }>(
+  tramos: readonly T[],
+): Array<{ start: number; end: number; pieces: number }> {
+  const orden = [...tramos].sort((a, b) => a.start - b.start)
+  const out: Array<{ start: number; end: number; pieces: number }> = []
+  for (const t of orden) {
+    const ult = out[out.length - 1]
+    if (ult && t.start - (ult.end + TRAMO_INTERVAL_MS) <= MAX_CONTINUIDAD_MS) {
+      ult.end = Math.max(ult.end, t.end)
+      ult.pieces += t.pieces
+    } else {
+      out.push({ start: t.start, end: t.end, pieces: t.pieces })
+    }
+  }
+  return out
+}
 
 /**
  * Minutos entre un tramo y una ventana; 0 si se solapan.
@@ -224,37 +255,33 @@ export function attributeUnscheduledCycles(
     const t = iv.startAt.getTime()
     return usable.some(c => t >= c.start!.getTime() && t < c.end!.getTime())
   }
-  let noise = 0
-  const utiles: CycleInterval[] = nuevos.filter(dentro)
-  for (const t of agruparTramos(nuevos.filter(iv => !dentro(iv)))) {
-    if (t.pieces < OUTSIDE_MIN_PIECES) noise += t.pieces
-    else utiles.push(...t.intervals)
+  // 1. Lo que cae DENTRO de un turno es de ese turno, sin discusión.
+  for (const iv of nuevos.filter(dentro)) {
+    total += iv.cycles
+    const c = usable.find(x => iv.startAt.getTime() >= x.start!.getTime() && iv.startAt.getTime() < x.end!.getTime())!
+    byShiftKey.set(c.key, (byShiftKey.get(c.key) ?? 0) + iv.cycles)
   }
 
-  for (const iv of utiles) {
-    total += iv.cycles
-    const t = iv.startAt.getTime()
+  // 2. Lo de fuera se decide por BLOQUE, no por intervalo suelto: es la cola de
+  // un turno o no lo es, entero. Misma regla que el monitor público, el brief de
+  // Telegram y la vista de turno (ver `esColaDeEsteTurno`).
+  let noise = 0
+  const ventanaDe = (c: PeriodShift): VentanaTurno => ({ start: c.start!, end: c.end! })
+  const utiles = agruparTramos(nuevos.filter(iv => !dentro(iv))).filter(t => {
+    if (t.pieces >= OUTSIDE_MIN_PIECES) return true
+    noise += t.pieces
+    return false
+  })
 
-    // 1. contenido en un turno
-    let best = usable.find(c => t >= c.start!.getTime() && t < c.end!.getTime()) ?? null
-
-    if (!best) {
-      // 2 y 3. el turno adyacente más cercano del día. Sin tolerancia: si hay
-      // algún turno ese día, la producción es de alguno de ellos.
-      let bestGap = Infinity
-      for (const c of usable) {
-        const gap = t < c.start!.getTime()
-          ? (c.start!.getTime() - t) / 60_000     // el turno arranca después
-          : (t - c.end!.getTime()) / 60_000       // el turno terminó antes
-        if (gap >= 0 && gap <= MAX_ADJACENCY_MIN && gap < bestGap) {
-          bestGap = gap
-          best = c
-        }
-      }
-    }
-
-    if (best) byShiftKey.set(best.key, (byShiftKey.get(best.key) ?? 0) + iv.cycles)
-    else unattributed += iv.cycles
+  for (const bloque of encadenarTramos(utiles)) {
+    total += bloque.pieces
+    const dueño = usable.find(c => esColaDeEsteTurno(
+      bloque,
+      ventanaDe(c),
+      usable.filter(o => o !== c).map(ventanaDe),
+    ))
+    if (dueño) byShiftKey.set(dueño.key, (byShiftKey.get(dueño.key) ?? 0) + bloque.pieces)
+    else unattributed += bloque.pieces
   }
 
   return { byShiftKey, unattributed, total, duplicated, noise }
@@ -281,21 +308,22 @@ export function applyUnscheduledAttribution(
   for (const [unsKey, intervals] of intervalsByUnscheduledKey) {
     const uns = shifts.find(s => s.key === unsKey)
     if (!uns) continue
-    // Primero compiten los turnos del MISMO día — la atribución natural.
+    // Compiten los turnos del mismo día y de los ADYACENTES: la continuidad
+    // cruza la medianoche. Producción a las 23:30 es el arranque del turno que
+    // parte a las 00:00, no la cola de uno que cerró a las 15:00 — limitarlo al
+    // mismo día se la daba al equivocado.
     //
-    // Si el día no tiene NINGÚN turno (caso real Chonchi 2026-08-02: madrugada
-    // 00:06–07:41, 293 cic, cero turnos registrados), se abre a los turnos de
-    // TODO el período y gana el más cercano en el tiempo, aunque sea de otro
-    // día. Decisión explícita de Orel (2026-08-03, reafirmada tres veces):
-    // ningún ciclo queda sin turno. La implicación queda escrita: esa madrugada
-    // de domingo se reparte entre el T2 del sábado y la madrugada del lunes —
-    // ninguno de los dos la produjo de verdad; el turno que corresponde no
-    // existe en Shoplogix. Auditable en `attributedCycles`; la corrección de
-    // fondo sigue siendo configurar el turno (ver INFORME_UNSCHEDULED_SHOPLOGIX).
-    const sameDay = shifts.filter(s => s.dateKey === uns.dateKey && s.key !== unsKey && !s.unscheduled)
-    const candidates = sameDay.length > 0
-      ? sameDay
-      : shifts.filter(s => !s.unscheduled)
+    // Ya no hace falta la rama "si el día no tiene turnos, abrir a todo el
+    // período": la continuidad decide sola. Un día sin turnos y sin nada cerca
+    // (Chonchi 02-ago: 293 cic de madrugada, a 10 h del turno más próximo)
+    // conserva su bloque visible, que es lo que dice la cabecera del módulo —
+    // la corrección de fondo es configurar el turno en Shoplogix
+    // (ver INFORME_UNSCHEDULED_SHOPLOGIX).
+    const unsDay = Date.parse(`${uns.dateKey}T00:00:00Z`)
+    const candidates = shifts.filter(s =>
+      !s.unscheduled
+      && s.key !== unsKey
+      && Math.abs(Date.parse(`${s.dateKey}T00:00:00Z`) - unsDay) <= 86_400_000)
     const res = attributeUnscheduledCycles(intervals, candidates, countedKeysByDate?.get(uns.dateKey))
     for (const [k, v] of res.byShiftKey) added.set(k, (added.get(k) ?? 0) + v)
     restByKey.set(unsKey, res.unattributed)
