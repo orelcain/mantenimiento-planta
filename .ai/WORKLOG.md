@@ -13,6 +13,36 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - La tarjeta de turno se agrupa por PREGUNTA, no por fuente (#465)
+
+Orel: *"el de grader esta todo como desordenado, no se como explicarlo"*. Rediseño elegido por el
+en un mockup de 3 opciones (opcion B, "Dos preguntas"); la directora-creativa lo produjo con los
+dos estados lado a lado y medicion de contraste.
+
+- **El diagnostico**: la tarjeta agrupaba por PROCEDENCIA (columnas "Shoplogix" y "Grader") — 12
+  numeros ordenados por algo que no sirve para decidir. Y los dos estados eran disenos distintos,
+  asi que cargar el Excel se sentia cambiar de pantalla.
+- Ahora: izquierda *cuanto salio*, derecha *donde estuvo la limitacion*. La mitad derecha es el
+  MISMO componente en ambos estados (`ShiftMachinesHalf`) — es lo que da el parentesco.
+- Jerarquia: el numero grande pasa a ser el del turno (13.366 pz; antes el `text-5xl` se lo llevaba
+  el P0 2,3%). El uptime sube al nivel de la produccion: es el argumento de Mantencion. La
+  composicion Baader vs linea manual sube del pie (explica por que piezas ≠ ciclos).
+- Fuera: fondo tintado de toda la tarjeta y borde de 2 px de color (el estado va en el chip),
+  encabezados por fuente (al pie como procedencia), ciclos/hr suelto y "maq. con datos".
+- ⚠ Los tokens `--ink-*` YA EXISTIAN (derivados contra el peor fondo, con variante oscura). Empece
+  a crear `--ok-ink/--warn-ink/--bad-ink` y lo revertí al encontrarlos: habria sido la misma regla
+  en dos lugares (el error de #453). **Buscar el token antes de crearlo.**
+- ⚠ La barra de uptime usa el color del UPTIME, no el del veredicto combinado: con 82% de uptime y
+  ritmo bajo salia ambar con el numero verde al lado. Se detecto MIRANDO la pantalla.
+- Verificacion: en pantalla con datos de prod — oscuro, claro y 375 px, en los dos estados (11-ago
+  con Grader / 10-ago solo Shoplogix). 1.125 tests, tsc y eslint limpios. Bundle `31547dc`.
+- Estado: HECHO — mergeado y desplegado.
+- Sigue: **estandarizar las pestañas** (Resumen/Timeline/Gates/Linea aparecen y desaparecen segun
+  haya Excel; deberian estar SIEMPRE, con las que dependen del Excel deshabilitadas y el motivo).
+  Es la otra mitad del "estandar" que pidio Orel.
+
+---
+
 ## 2026-08-11 - claude - El chip decia "Turno dia" para un turno llamado "Turno 2" (#463)
 
 Orel: *"el mismo turno se ve de dos formas... el de grader esta todo como desordenado"*.
