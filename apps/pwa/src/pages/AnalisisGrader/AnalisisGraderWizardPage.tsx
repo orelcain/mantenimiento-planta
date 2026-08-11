@@ -233,7 +233,10 @@ export function AnalisisGraderWizardPage() {
     // Antes esto se llamaba SIN horario: siempre cortaba con día 07-19 /
     // noche 19-07, ignorando la config de la planta y a Shoplogix, así que un
     // turno real (T1 21:30-05:45) nunca calzaba con su tarjeta.
-    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique, shiftSchedule, slxWindows)
+    const segmentMap = segmentByDayAndShift(
+      pieceUnique, gate0Unique, shiftSchedule, slxWindows,
+      parsedData.notApplicableRecords ?? [],
+    )
     const entries = sortedSegmentEntries(segmentMap)
     if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size

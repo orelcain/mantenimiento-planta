@@ -415,6 +415,17 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <p className="text-caption text-muted-foreground mt-0.5">
               {summary.pointZeroPieces.toLocaleString('es-CL')} en P0
             </p>
+            {/* El Matrix cuenta REGISTROS y la app PIEZAS: sin esta línea la
+                diferencia parece producción perdida. Ver `notApplicableRecords`. */}
+            {summary.notApplicableRecords ? (
+              <p
+                className="text-caption text-muted-foreground/80 mt-1 border-t border-border pt-1"
+                title={`El informe del Matrix trae ${(summary.totalPieces + summary.notApplicableRecords).toLocaleString('es-CL')} registros: estos ${summary.notApplicableRecords.toLocaleString('es-CL')} vienen con cantidad 0 y peso "No aplicable", así que no son piezas.`}
+              >
+                + {summary.notApplicableRecords.toLocaleString('es-CL')} no aplicables
+                {' '}(Matrix: {(summary.totalPieces + summary.notApplicableRecords).toLocaleString('es-CL')})
+              </p>
+            ) : null}
           </CardContent>
         </Card>
         <Card>

@@ -30,6 +30,12 @@ export interface ShiftSegment {
   shiftId: string
   pieceRecords: PieceRecord[]
   gate0Records: Gate0Record[]
+  /**
+   * Registros del Excel que NO son piezas ("No aplicable", cantidad 0). Se
+   * cuentan para poder cuadrar con el letrero del Matrix, que sí los reporta.
+   * Ver `ParsedMatrixData.notApplicableRecords`.
+   */
+  notApplicableCount?: number
 }
 
 type SegmentKey = string  // `${sessionDate}|${shiftId}`
@@ -235,6 +241,7 @@ export function segmentByDayAndShift(
   gate0Records: Gate0Record[],
   schedule: GraderShiftSchedule[] = DEFAULT_SHIFT_SCHEDULE,
   shoplogixWindows?: readonly ShoplogixShiftWindow[],
+  notApplicableRecords: readonly PieceRecord[] = [],
 ): Map<SegmentKey, ShiftSegment> {
   const map = new Map<SegmentKey, ShiftSegment>()
 
@@ -264,6 +271,16 @@ export function segmentByDayAndShift(
     if (!rec.ts) continue
     const { sessionDate, shiftId } = assign(rec.ts)
     getOrCreate(sessionDate, shiftId).gate0Records.push(rec)
+  }
+
+  // Los "No aplicable" se reparten con la MISMA regla que las piezas, porque un
+  // archivo puede cubrir varios turnos y el número tiene que quedar en el turno
+  // donde ocurrió. No se suman a `pieceRecords`: valen 0 piezas.
+  for (const rec of notApplicableRecords) {
+    if (!rec.ts) continue
+    const { sessionDate, shiftId } = assign(rec.ts)
+    const seg = getOrCreate(sessionDate, shiftId)
+    seg.notApplicableCount = (seg.notApplicableCount ?? 0) + 1
   }
 
   return map
@@ -642,6 +659,7 @@ export function computeShiftSummary(
     batchUploadId,
     hasPieceData: pieceRecords.length > 0,
     hasGate0Data: gate0Records.length > 0,
+    ...(segment.notApplicableCount ? { notApplicableRecords: segment.notApplicableCount } : {}),
     updatedBy: createdBy,
     updatedAt: new Date().toISOString(),
   }

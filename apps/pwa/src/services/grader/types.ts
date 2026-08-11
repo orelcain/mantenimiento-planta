@@ -712,6 +712,17 @@ export interface GraderDailySummary {
   /** Cantidad de pausas (≥5min) persistidas en sub-coll `meta/pauses`. */
   pausesCount?: number;
 
+  /**
+   * Registros del Excel que NO son piezas: el grader los emite con cantidad 0 y
+   * el peso en "No aplicable".
+   *
+   * Se guarda para poder CUADRAR con el Matrix, que los cuenta en su letrero de
+   * "registros recuperados". Sin este número la app parece perder producción:
+   * el 11-ago-2026 el Matrix mostraba 13.529 y la app 13.366, y la diferencia
+   * eran exactamente estos 163. No son piezas — no suman al total.
+   */
+  notApplicableRecords?: number;
+
   // ── Marcadores runtime-only (NO se persisten a Firestore) ──────────────────
   /**
    * Marca un summary "virtual" construido en cliente desde datos Shoplogix
@@ -987,6 +998,20 @@ export interface ProductionSummaryRow {
 export interface ParsedMatrixData {
   files: UploadedMatrixFile[];
   pieceRecords: PieceRecord[];
+  /**
+   * Filas del informe pieza-a-pieza que NO son una pieza: el grader las emite
+   * con `Cantidad de piezas` en 0 y el peso en "No aplicable".
+   *
+   * Se conservan (con su timestamp, para poder repartirlas por turno) porque el
+   * Matrix las incluye en su letrero "se han recuperado N registros" y la app
+   * suma piezas: sin este número los dos totales no cuadran y parece un error de
+   * carga. Caso real 11-ago-2026 en Chonchi: Matrix 13.529 registros = 13.366
+   * piezas + 163 no aplicables.
+   *
+   * NO entran en `pieceRecords` a propósito: valen 0 piezas y meterlas ahí las
+   * arrastraría a cada cálculo (calibre, peso, gate 0) sin aportar nada.
+   */
+  notApplicableRecords?: PieceRecord[];
   gate0Records: Gate0Record[];
   folioRecords: FolioRecord[];
   qualitySummary: QualitySummaryRow[];
