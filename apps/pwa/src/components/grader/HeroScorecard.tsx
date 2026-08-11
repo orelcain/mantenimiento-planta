@@ -188,6 +188,21 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
             <span className="text-2xl font-bold tabular-nums">{summary.totalPieces.toLocaleString('es-CL')}</span>
             <span className="text-xs text-muted-foreground">piezas · Marelec</span>
           </div>
+          {/* El Matrix cuenta REGISTROS y esto son PIEZAS: sin esta línea la
+              diferencia parece producción perdida. El 11-ago costó una tarde de
+              búsqueda (13.529 vs 13.366). Ver `notApplicableRecords`. */}
+          {summary.notApplicableRecords ? (
+            <div
+              className="text-caption text-muted-foreground cursor-help"
+              title={`El informe del Matrix trae ${(summary.totalPieces + summary.notApplicableRecords).toLocaleString('es-CL')} registros. Estos ${summary.notApplicableRecords.toLocaleString('es-CL')} vienen con cantidad 0 y peso "No aplicable": son eventos del grader sin pieza detrás, así que no suman piezas.`}
+            >
+              + {summary.notApplicableRecords.toLocaleString('es-CL')} no aplicables
+              {' · '}
+              <span className="tabular-nums">
+                Matrix: {(summary.totalPieces + summary.notApplicableRecords).toLocaleString('es-CL')}
+              </span>
+            </div>
+          ) : null}
           <div className="grid grid-cols-3 gap-2">
             <div
               className="text-center cursor-help"
