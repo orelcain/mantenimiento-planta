@@ -13,6 +13,31 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Pestaña "Calidad" y herramientas fuera del Resumen (#469)
+
+Orel: *"si datos grader deberiamos tambien tener en las pestañas lo ordenado o no? como la linea"*.
+
+- **El diagnostico**: "Linea" se lee ordenada porque contiene UNA sola cosa (todo Shoplogix junto).
+  El Resumen mezclaba TRES: el titular del turno, el analisis del Grader (P0, calibres, calidad,
+  lotes) y herramientas (compartir, QR, IA).
+- **Regla del modulo, ya explicita en el codigo**: una pestaña = una pregunta.
+    resumen ¿como fue? · calidad ¿por que se rechazo? · timeline ¿cuando paso? ·
+    gates ¿como estaban las compuertas? · linea ¿como estuvieron las maquinas? · accion ¿que hago?
+- **Calidad** es el espejo de Linea: se lleva `P0CausesPanel`, `ShiftBreakdownsCard` y el analisis
+  IA. Sin Excel queda deshabilitada con su motivo, como Timeline y Gates.
+- **Las herramientas salen de las pestañas**: compartir turno y link/QR del monitor se abren con un
+  boton en la barra superior (junto a exportar). ⚠ Los paneles siguen renderizandose abajo —estan
+  en ramas distintas del JSX y unificarlos en un modal movia ~150 lineas—, asi que el toggle hace
+  **scrollIntoView**: un panel que aparece fuera de la vista se lee como un boton que no responde
+  (lo mismo que paso en #467 con las pestañas debajo del contenido).
+- El aviso de config desalineada se QUEDA en el Resumen: afecta a como leer todo el turno.
+- Verificacion: en el navegador con datos de prod — 6 pestañas; el Resumen ya no trae
+  P0/compartir/monitor/IA; Calidad muestra las causas; el boton despliega las herramientas desde
+  cualquier pestaña. 1.125 tests, tsc limpio. Bundle `94f045e`.
+- Estado: HECHO — mergeado y desplegado.
+
+---
+
 ## 2026-08-11 - claude - Pestañas siempre presentes + "¿Que hacer?" como pestaña (#467)
 
 Orel: *"deberiamos establecer un estandar"* y *"veamos como ocultar o agregarlo como una pestaña
