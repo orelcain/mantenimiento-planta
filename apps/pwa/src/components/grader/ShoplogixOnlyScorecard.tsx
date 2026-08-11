@@ -1,61 +1,28 @@
 /**
- * Scorecard para modo Shoplogix-only (sin Excel Grader).
- * Replica el patrón visual de HeroScorecard: card con borde coloreado,
- * hero metric grande, KPIs secundarios y breakdown por máquina.
+ * Tarjeta de resumen del turno SIN Excel del Grader (solo Shoplogix).
+ *
+ * Misma estructura que `HeroScorecard`: se agrupa por PREGUNTA —izquierda
+ * *cuánto salió*, derecha *dónde estuvo la limitación*— y la mitad derecha es
+ * literalmente el mismo componente (`ShiftMachinesHalf`). Cargar el Excel
+ * completa la mitad izquierda en vez de cambiar de pantalla; antes eran dos
+ * diseños sin parentesco y Orel lo leyó como "todo desordenado" (11-ago-2026).
  *
  * Usado en AnalisisGraderTurnoPage cuando !summary && upstreamLine.snapshot.
  */
 import { cn } from '@/lib/utils'
-import { lineMachinesLabel, machineShortLabel } from '@/services/shoplogix/shoplogixMachines'
+import { lineMachinesLabel } from '@/services/shoplogix/shoplogixMachines'
+import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { Badge, Card, CardContent, InfoTooltip } from '@/components/ui'
 import { Activity, Clock, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
-import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { ShiftMachinesHalf } from './ShiftMachinesHalf'
 
-const VERDICT_STYLE = {
-  ok: {
-    border: 'border-emerald-500',
-    bg: 'bg-emerald-500/[0.15]',
-    numColor: 'text-emerald-400',
-    label: 'Línea en buen rendimiento',
-  },
-  warn: {
-    border: 'border-amber-500',
-    bg: 'bg-amber-500/[0.15]',
-    numColor: 'text-amber-400',
-    label: 'Línea con oportunidades de mejora',
-  },
-  critical: {
-    border: 'border-red-500',
-    bg: 'bg-red-500/[0.15]',
-    numColor: 'text-red-400',
-    label: 'Línea con bajo rendimiento',
-  },
-}
-
-/** Veredicto POR MÁQUINA — combina disponibilidad (uptime) Y ritmo (ciclos
- *  reales vs objetivo Shoplogix): "qué tan óptimo va cada Baader", no solo si
- *  estuvo prendida. Pedido de Orel 2026-07-23: un vistazo rápido por Baader,
- *  no dos números sueltos que hay que leer e interpretar. Manda el peor de
- *  los dos ejes (si el ritmo es bueno pero el uptime es crítico, es crítico).
- *  Umbrales calcados de los ya usados en el resto del módulo: uptime 70/40
- *  (`uptimeTextColor` acá mismo), ritmo 85/50 (`UpstreamMachinesPanel.tsx`). */
-const MACHINE_VERDICT_STYLE = {
-  ok:       { dot: 'bg-emerald-400', text: 'text-emerald-400', border: 'border-emerald-500/[0.25]', bg: 'bg-emerald-500/[0.15]', label: 'Óptimo' },
-  warn:     { dot: 'bg-amber-400',   text: 'text-amber-400',   border: 'border-amber-500/[0.25]',   bg: 'bg-amber-500/[0.15]',   label: 'Regular' },
-  critical: { dot: 'bg-red-400',     text: 'text-red-400',     border: 'border-red-500/[0.25]',      bg: 'bg-red-500/[0.15]',     label: 'Crítico' },
-} as const
-
-function machineVerdict(uptimePct: number, ratio: number): keyof typeof MACHINE_VERDICT_STYLE {
-  const uptimeTier = uptimePct >= 70 ? 2 : uptimePct >= 40 ? 1 : 0
-  const ratioTier  = ratio >= 0.85 ? 2 : ratio >= 0.5 ? 1 : 0
-  const worst = Math.min(uptimeTier, ratioTier)
-  return worst >= 2 ? 'ok' : worst === 1 ? 'warn' : 'critical'
-}
-
+/** Colores del reparto de ciclos entre máquinas — categóricos, no semánticos:
+ *  codifican QUÉ máquina, no si está bien o mal. */
+const SEG = ['bg-cat-1-ink', 'bg-cat-3-ink', 'bg-cat-7-ink', 'bg-cat-2-ink']
 
 interface Props {
   snapshot: UpstreamLineSnapshot
@@ -82,27 +49,16 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
   // El número grande es la JORNADA: lo que la línea produjo, sin importar dónde
   // lo archivó Shoplogix. El desglose va abajo para que cuadre con sus reportes.
   const totalCycles = cyclesEnTurno + outsidePieces
-  const isClosed = shiftWindow?.status === 'closed' || shiftWindow?.status == null
 
   const avgUptime =
     snapshot.machines.length > 0
-      ? snapshot.machines.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) /
-        snapshot.machines.length
+      ? snapshot.machines.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / snapshot.machines.length
       : 0
-
-  // Para turno cerrado: máquinas que tuvieron uptime > 0
-  const machinesWithData = snapshot.machines.filter(m => (m.shiftRuntime ?? 0) > 0).length
-
-  const verdict: keyof typeof VERDICT_STYLE =
-    avgUptime >= 0.7 ? 'ok' : avgUptime >= 0.4 ? 'warn' : 'critical'
-  const style = VERDICT_STYLE[verdict]
 
   const shiftDurationMin =
     snapshot.machines[0]
       ? Math.round(
-          (snapshot.machines[0].shiftEnd.getTime() -
-            snapshot.machines[0].shiftStart.getTime()) /
-            60_000,
+          (snapshot.machines[0].shiftEnd.getTime() - snapshot.machines[0].shiftStart.getTime()) / 60_000,
         )
       : null
 
@@ -124,11 +80,6 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           ? `${shiftDurationMin} min`
           : '—'
 
-  const uptimeBarColor = (pct: number) =>
-    pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
-  const uptimeTextColor = (pct: number) =>
-    pct >= 70 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
-
   // Metadata canónica del turno (label + ícono + color) — single source of truth.
   // Horario real de Shoplogix (scheduledStart) → período/ícono por HORA, no por nombre.
   const shiftMeta = getShiftMeta(
@@ -142,9 +93,9 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
     : null
 
   return (
-    <Card className={cn('border-2 overflow-hidden', style.border)}>
+    <Card className="overflow-hidden">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b border-border">
         <div className="flex items-center gap-2 flex-wrap">
           {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
           <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
@@ -157,9 +108,6 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           {shiftWindow?.status === 'closed' && (
             <Badge variant="outline" className="text-xs px-2 py-0">CERRADO</Badge>
           )}
-          <Badge variant="outline" className="text-xs px-2 py-0 text-ink-info border-primary/[0.25]">
-            Solo Shoplogix
-          </Badge>
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="w-3 h-3" />
@@ -167,218 +115,116 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
         </div>
       </div>
 
-      {/* ── Body ───────────────────────────────────────────────────────── */}
-      <CardContent className={cn('p-3 sm:p-4 space-y-3 sm:space-y-4', style.bg)}>
+      {/* ── Body: las mismas dos preguntas que con Grader ───────────────── */}
+      <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        {/* ── Mitad 1 · Cuánto salió ──────────────────────────────────── */}
+        <div className="md:border-r md:border-border md:pr-6 min-w-0">
+          <div className="text-caption tracking-wider text-muted-foreground">Cuánto salió</div>
 
-        {/* Fila 1: hero ciclos + KPIs principales.
-            Mobile: hero arriba (full width) + KPIs abajo en grid-3.
-            Desktop: hero a la izquierda + KPIs al centro con borde. */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-          {/* Hero */}
-          <div className="shrink-0">
-            <div className={cn('text-4xl sm:text-5xl font-bold tabular-nums leading-none', style.numColor)}>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className="text-4xl font-bold tabular-nums leading-none">
               {totalCycles.toLocaleString('es-CL')}
-            </div>
-            <div className="text-xs tracking-wider text-muted-foreground mt-1">
-              ciclos · línea total
-            </div>
-            {outsidePieces > 0 && (
-              <div className="text-caption mt-1 flex items-center gap-x-1.5 gap-y-0.5 flex-wrap">
-                <span className="tabular-nums text-muted-foreground">
-                  {cyclesEnTurno.toLocaleString('es-CL')} en el turno
-                </span>
-                <span className="text-muted-foreground/40">+</span>
-                <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 tabular-nums text-amber-800 dark:text-amber-200">
-                  {outsidePieces.toLocaleString('es-CL')} fuera del horario
-                </span>
-                {(outside?.ranges ?? []).map(r => (
-                  <span key={r.from.toISOString()} className="tabular-nums text-muted-foreground/70">
-                    ({r.kind === 'antes' ? 'antes: ' : ''}{fmtTime(r.from.getTime())}–{fmtTime(r.to.getTime())})
-                  </span>
-                ))}
-              </div>
-            )}
-            {/* Cumplimiento vs lo PLANIFICADO por producción. Se rotula como
-                "planificadas" para no confundirlo con el target de cadencia que
-                reporta el sensor: son dos números distintos. */}
-            {plannedTargetPieces != null && plannedTargetPieces > 0 && (() => {
-              const pct = (totalCycles / plannedTargetPieces) * 100
-              const cls = pct >= 95 ? 'text-ink-ok'
-                : pct >= 75 ? 'text-ink-warn'
-                : 'text-cat-5-ink'
-              return (
-                <div className="text-caption mt-1 flex items-center gap-1 flex-wrap">
-                  <span className={cn('font-semibold tabular-nums', cls)}>{pct.toFixed(0)}%</span>
-                  <span className="text-muted-foreground">
-                    de {plannedTargetPieces.toLocaleString('es-CL')} planificadas
-                  </span>
-                  <InfoTooltip
-                    text={`Cumplimiento contra las piezas que producción pide por turno en esta línea (${plannedTargetPieces.toLocaleString('es-CL')}).
-
-No es el target de cadencia del sensor: ese mide velocidad instantánea, este mide el compromiso del turno.`}
-                    iconSize={10} position="top"
-                  />
-                </div>
-              )
-            })()}
-            <div className="text-xs mt-1 font-medium">{style.label}</div>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ciclos · {lineMachinesLabel(snapshot.machines) || 'línea'}
+            </span>
           </div>
 
-          {/* KPIs secundarios — borde solo en desktop (en mobile rompe línea) */}
-          <div className="flex-1 sm:border-l sm:pl-6 grid grid-cols-3 gap-2 sm:gap-3">
-            {/* Uptime promedio */}
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <div className="text-xs text-muted-foreground">
-                  <span className="hidden sm:inline">Uptime prom.</span>
-                  <span className="sm:hidden">Uptime</span>
-                </div>
-                <InfoTooltip
-                  text={`% promedio del turno en que las máquinas estuvieron activas.\n\n≥ 70% normal · 40–70% bajo · < 40% crítico\n\nPromedio de ${snapshot.machines.length} ${snapshot.machines.length === 1 ? 'máquina' : 'máquinas'}${lineMachinesLabel(snapshot.machines) ? ` ${lineMachinesLabel(snapshot.machines)}` : ''}.`}
-                  iconSize={10} position="top"
-                />
+          {/* Sin Excel no hay P0: se dice, en vez de dejar el hueco. */}
+          <div className="mt-2">
+            <span className="inline-flex items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+              P0 — se calcula con el Excel del Grader
+            </span>
+          </div>
+
+          {outsidePieces > 0 && (
+            <div className="text-caption mt-2 flex items-center gap-x-1.5 gap-y-0.5 flex-wrap">
+              <span className="tabular-nums text-muted-foreground">
+                {cyclesEnTurno.toLocaleString('es-CL')} en el turno
+              </span>
+              <span className="text-muted-foreground/40">+</span>
+              <span className="rounded-full border border-ink-warn/[0.45] bg-amber-500/[0.15] px-1.5 tabular-nums text-ink-warn">
+                {outsidePieces.toLocaleString('es-CL')} fuera del horario
+              </span>
+              {(outside?.ranges ?? []).map(r => (
+                <span key={r.from.toISOString()} className="tabular-nums text-muted-foreground/70">
+                  ({r.kind === 'antes' ? 'antes: ' : ''}{fmtTime(r.from.getTime())}–{fmtTime(r.to.getTime())})
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Reparto de ciclos entre máquinas: el mismo lugar que ocupa la
+              composición Baader/manual cuando hay Grader. */}
+          {snapshot.machines.length > 1 && totalCycles > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <div className="flex h-2 rounded-ctl overflow-hidden bg-secondary">
+                {snapshot.machines.map((m, i) => (
+                  <div
+                    key={m.machineid}
+                    className={cn('h-full', SEG[i % SEG.length])}
+                    style={{ width: `${(m.totalCycles / totalCycles) * 100}%` }}
+                  />
+                ))}
               </div>
-              <div className={cn('text-lg font-semibold tabular-nums', uptimeTextColor(avgUptime * 100))}>
-                {(avgUptime * 100).toFixed(0)}%
-              </div>
-              <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden mt-1">
-                <div className={cn('h-full rounded-full', uptimeBarColor(avgUptime * 100))}
-                     style={{ width: `${(avgUptime * 100).toFixed(1)}%` }} />
+              <div className="space-y-0.5 text-caption">
+                {snapshot.machines.map((m, i) => (
+                  <div key={m.machineid} className="flex items-center gap-1.5">
+                    <span className={cn('w-2 h-2 rounded-[2px] shrink-0', SEG[i % SEG.length])} />
+                    {/* El nombre de LA máquina, no el modelo de la línea:
+                        `lineMachinesLabel` devolvía "Baader 142" para las tres. */}
+                    <span className="text-muted-foreground truncate">{shortMachineName(m.machineName) || `Máquina ${i + 1}`}</span>
+                    <b className="tabular-nums ml-auto">{m.totalCycles.toLocaleString('es-CL')}</b>
+                    <span className="text-muted-foreground tabular-nums w-12 text-right">
+                      {((m.totalCycles / totalCycles) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Ciclos/hr */}
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <div className="text-xs text-muted-foreground">ciclos/hr</div>
+          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+            {snapshot.lineThroughputActual > 0 && (
+              <span className="flex items-center gap-1">
+                <b className="tabular-nums text-foreground">{snapshot.lineThroughputActual.toFixed(0)}</b> ciclos/h
                 <InfoTooltip
-                  text={`Ritmo de producción: piezas por hora sobre ${
+                  text={`Ritmo de producción sobre ${
                     snapshot.lineWindowSource === 'effective'
                       ? `la ventana REAL de operación (de la primera a la última pieza, ${snapshot.lineWindowHours.toFixed(1)} h)`
                       : `la ventana del turno (${snapshot.lineWindowHours.toFixed(1)} h)`
                   }.`}
                   iconSize={10} position="top"
                 />
-              </div>
-              <div className="text-lg font-semibold tabular-nums">
-                {snapshot.lineThroughputActual > 0 ? snapshot.lineThroughputActual.toFixed(0) : '—'}
-              </div>
-            </div>
+              </span>
+            )}
+            {/* Cumplimiento vs lo PLANIFICADO por producción. Se rotula como
+                "planificadas" para no confundirlo con el target de cadencia que
+                reporta el sensor: son dos números distintos. */}
+            {plannedTargetPieces != null && plannedTargetPieces > 0 && (() => {
+              const pct = (totalCycles / plannedTargetPieces) * 100
+              const cls = pct >= 95 ? 'text-ink-ok' : pct >= 75 ? 'text-ink-warn' : 'text-ink-crit'
+              return (
+                <span className="flex items-center gap-1">
+                  <b className={cn('tabular-nums', cls)}>{pct.toFixed(0)}%</b>
+                  de {plannedTargetPieces.toLocaleString('es-CL')} planificadas
+                  <InfoTooltip
+                    text={`Cumplimiento contra las piezas que producción pide por turno en esta línea (${plannedTargetPieces.toLocaleString('es-CL')}).
 
-            {/* Máquinas con registro (cerrado) / activas (live) */}
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <div className="text-xs text-muted-foreground">
-                  <span className="hidden sm:inline">{isClosed ? 'máq. con datos' : 'máq. activas'}</span>
-                  <span className="sm:hidden">{isClosed ? 'máq.' : 'activas'}</span>
-                </div>
-                <InfoTooltip
-                  text={isClosed
-                    ? 'Cantidad de máquinas de la línea que registraron actividad durante este turno cerrado.'
-                    : 'Máquinas de la línea produciendo en este momento.'}
-                  iconSize={10} position="top"
-                />
-              </div>
-              <div className="text-lg font-semibold tabular-nums">
-                {isClosed
-                  ? `${machinesWithData}/${snapshot.machines.length}`
-                  : `${snapshot.machinesProducing}/${snapshot.machines.length}`}
-              </div>
-            </div>
+No es el target de cadencia del sensor: ese mide velocidad instantánea, este mide el compromiso del turno.`}
+                    iconSize={10} position="top"
+                  />
+                </span>
+              )
+            })()}
+            {shiftWindow?.status === 'live' && shiftWindow.progressPct != null && (
+              <span className="ml-auto tabular-nums">{shiftWindow.progressPct.toFixed(0)}% del turno</span>
+            )}
           </div>
-
-          {/* Barra progreso si está en vivo */}
-          {shiftWindow?.status === 'live' && shiftWindow.progressPct != null && (
-            <div className="shrink-0 w-16 flex flex-col items-center gap-1">
-              <div className="text-xs text-muted-foreground">Progreso</div>
-              <div className="text-sm font-semibold">{shiftWindow.progressPct.toFixed(0)}%</div>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all"
-                     style={{ width: `${shiftWindow.progressPct}%` }} />
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Fila 2: breakdown por máquina */}
-        {snapshot.machines.length > 0 && (
-          <div className="border-t border-border/40 pt-3 space-y-2">
-            <div className="flex items-baseline gap-2 text-xs">
-              <span className="font-semibold text-muted-foreground tracking-wider">
-                {lineMachinesLabel(snapshot.machines) || 'Máquinas de la línea'}
-              </span>
-              <span className="tabular-nums font-semibold">{totalCycles.toLocaleString('es-CL')}</span>
-              <span className="text-muted-foreground">ciclos totales</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {snapshot.machines.map((m, idx) => {
-                const sharePct = totalCycles > 0 ? (m.totalCycles / totalCycles) * 100 : 0
-                const uptimePct = (m.shiftRuntime ?? 0) * 100
-                const ratioPct = (m.overallRatio ?? 0) * 100
-                const vStyle = MACHINE_VERDICT_STYLE[machineVerdict(uptimePct, m.overallRatio ?? 0)]
-                // Label corto en mobile. Sale del MODELO de la máquina, no de un
-                // "Ev" fijo: en Filete la máquina es una Baader 200 y aparecía
-                // como "Ev 1" (de evisceradora).
-                // Con una sola máquina el número no aporta ("B200 1" → "B200").
-                const shortLabel = snapshot.machines.length > 1
-                  ? `${machineShortLabel(m.machineType)} ${idx + 1}`
-                  : machineShortLabel(m.machineType)
-                return (
-                  <div key={m.machineid} className={cn('rounded-ctl border px-2 sm:px-3 py-1.5 sm:py-2', vStyle.bg, vStyle.border)}>
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="text-caption text-muted-foreground truncate" title={shortMachineName(m.machineName)}>
-                        <span className="hidden sm:inline">{shortMachineName(m.machineName)}</span>
-                        <span className="sm:hidden">{shortLabel}</span>
-                      </div>
-                      {/* Veredicto de un vistazo: combina uptime + ritmo vs objetivo
-                          (no solo si estuvo prendida — también si rindió al ritmo
-                          esperado). Pedido Orel 2026-07-23. */}
-                      <span
-                        className={cn('flex items-center gap-1 text-caption font-semibold tracking-wide shrink-0', vStyle.text)}
-                        title="Combina disponibilidad (uptime) y ritmo vs objetivo — manda el peor de los dos."
-                      >
-                        <span className={cn('w-1.5 h-1.5 rounded-full', vStyle.dot)} />
-                        {vStyle.label}
-                      </span>
-                    </div>
-                    <div className="text-base font-semibold tabular-nums">
-                      {m.totalCycles.toLocaleString('es-CL')}
-                      <span className="text-caption text-muted-foreground font-normal ml-1">
-                        ({sharePct.toFixed(0)}%)
-                      </span>
-                    </div>
-                    <div className="mt-1.5 space-y-1">
-                      <div>
-                        <div className="flex items-center justify-between text-caption">
-                          <span className="text-muted-foreground">uptime</span>
-                          <span className={cn('font-semibold tabular-nums', uptimeTextColor(uptimePct))}>
-                            {uptimePct.toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="h-1 bg-muted/60 rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full', uptimeBarColor(uptimePct))}
-                               style={{ width: `${uptimePct.toFixed(1)}%` }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center justify-between text-caption">
-                          <span className="text-muted-foreground" title="Ciclos reales vs objetivo Shoplogix para este turno">ritmo vs objetivo</span>
-                          <span className={cn('font-semibold tabular-nums', ratioPct >= 85 ? 'text-emerald-400' : ratioPct >= 50 ? 'text-amber-400' : 'text-red-400')}>
-                            {ratioPct.toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="h-1 bg-muted/60 rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full', ratioPct >= 85 ? 'bg-emerald-500' : ratioPct >= 50 ? 'bg-amber-500' : 'bg-red-500')}
-                               style={{ width: `${Math.min(100, ratioPct).toFixed(1)}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        {/* ── Mitad 2 · idéntica a la del turno con Grader ────────────────── */}
+        <ShiftMachinesHalf machines={snapshot.machines} avgUptime={avgUptime} />
       </CardContent>
     </Card>
   )
