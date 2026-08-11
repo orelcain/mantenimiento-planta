@@ -13,6 +13,32 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Pestañas siempre presentes + "¿Que hacer?" como pestaña (#467)
+
+Orel: *"deberiamos establecer un estandar"* y *"veamos como ocultar o agregarlo como una pestaña
+mas el que hacer"*. Cierra el estandar que empezo la tarjeta de #465.
+
+- ⚠⚠ **Las pestañas vivian DENTRO de `{summary && shiftWindow && (...)}`**: un turno sin Excel no
+  mostraba ninguna. Dos navegaciones distintas para la misma pantalla, y sin forma de saber que
+  esas vistas existen. **Tercera aparicion del mismo patron hoy** (#438 la tarjeta invisible en
+  Filete, #455 la navegacion): envolver estructura en el gate de un dato la hace desaparecer.
+- Ahora la barra va fuera del gate y ANTES del contenido. Las vistas que necesitan Excel salen
+  DESHABILITADAS con el motivo (`title`): Timeline/Gates "Necesita el Excel del Grader"; ¿Que
+  hacer? "Las acciones se calculan con el Excel". Resumen y Linea quedan usables — sin Excel las
+  dos muestran el estado de las maquinas, asi que en vez de dejar Linea muerta se la deja abrir.
+- **"¿Que hacer?" pasa de tercera columna permanente a pestaña propia**: gana ancho para leerse y
+  el Resumen recupera el ancho completo. El tab lleva el CONTADOR de acciones para que no se
+  pierda de vista (sin eso, mover el panel a una pestaña lo volveria invisible).
+- ⚠ Los modales del panel se quedan montados en el Resumen: `handleActionTrigger` puede
+  dispararlos desde cualquier vista.
+- ⚠ Al mover el bloque quedo DESPUES del contenido en el JSX y las pestañas aparecian debajo de la
+  tarjeta. Se veia solo mirando: el DOM las tenia y el test de existencia pasaba igual.
+- Verificacion: en pantalla con datos de prod — con Excel 5 pestañas y "¿Que hacer? 5"; sin Excel
+  la misma barra con 3 en gris. 1.125 tests, tsc limpio. Bundle `9139cdf`, confirmado en prod.
+- Estado: HECHO — mergeado y desplegado.
+
+---
+
 ## 2026-08-11 - claude - La tarjeta de turno se agrupa por PREGUNTA, no por fuente (#465)
 
 Orel: *"el de grader esta todo como desordenado, no se como explicarlo"*. Rediseño elegido por el
