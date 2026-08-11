@@ -124,11 +124,27 @@ function parseShiftId(raw: string | undefined): [string, string] {
  * y montando solo la vista abierta (los charts pesados dejan de renderizarse
  * todos de una).
  */
-const ALL_TURNO_VIEWS = ['resumen', 'timeline', 'gates', 'linea', 'accion'] as const
+/**
+ * Una pestaña = una pregunta. Ese es el criterio con el que se reparte esta
+ * página (mismo que ordenó la tarjeta de turno en #465):
+ *   resumen  — ¿cómo fue el turno?      (titular: piezas, cobertura, cuota)
+ *   calidad  — ¿por qué se rechazó?     (P0 por causa, calibres, calidad, lotes)
+ *   timeline — ¿cuándo pasó?
+ *   gates    — ¿cómo estaban las compuertas?
+ *   linea    — ¿cómo estuvieron las máquinas?  (upstream Shoplogix)
+ *   accion   — ¿qué hago con esto?
+ *
+ * `calidad` nació de una observación de Orel (11-ago): "Línea" se lee ordenada
+ * porque contiene UNA sola cosa —todo Shoplogix junto—, mientras que los datos
+ * del Grader colgaban al final del Resumen, después de la cuota y antes de los
+ * botones de compartir. Esta pestaña es su espejo.
+ */
+const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'timeline', 'gates', 'linea', 'accion'] as const
 type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
 
 const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
   resumen:  'Resumen',
+  calidad:  'Calidad',
   timeline: 'Timeline',
   gates:    'Gates',
   linea:    'Línea',
@@ -1186,6 +1202,26 @@ export function AnalisisGraderTurnoPage() {
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
 
+  /**
+   * Herramientas de compartir (link del turno + QR del monitor en vivo).
+   *
+   * No son datos del turno sino acciones sobre él, así que dejaron de ocupar el
+   * pie del Resumen y se abren desde la barra superior, junto a exportar
+   * (pedido de Orel, 11-ago). Los paneles siguen renderizándose abajo —están en
+   * ramas distintas del JSX y unificarlos en un modal obligaba a mover ~150
+   * líneas—, por eso al abrirlos se hace scroll: un panel que aparece fuera de
+   * la vista se lee como un botón que no responde (lo mismo que pasó con las
+   * pestañas cuando quedaron debajo del contenido).
+   */
+  const [herramientasOpen, setHerramientasOpen] = useState(false)
+  const herramientasRef = useRef<HTMLDivElement | null>(null)
+  const toggleHerramientas = useCallback(() => {
+    setHerramientasOpen(v => {
+      if (!v) requestAnimationFrame(() => herramientasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+      return !v
+    })
+  }, [])
+
   // Modales lanzados desde ActionPlanPanel (botones "Ejecutar")
   const [planGateModalOpen, setPlanGateModalOpen] = useState(false)
   const [planRpmModalOpen, setPlanRpmModalOpen] = useState(false)
@@ -1700,6 +1736,19 @@ export function AnalisisGraderTurnoPage() {
               <span className="hidden sm:inline text-xs tabular-nums">{untaggedPauses.length}</span>
             </Button>
           )}
+          {/* Compartir: link del turno + QR del monitor en vivo. Vivían al pie
+              del Resumen; son acciones sobre el turno, no datos suyos. */}
+          {(isAdmin || isSupervisor) && (
+            <Button
+              variant={herramientasOpen ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleHerramientas}
+              title="Compartir el turno y el link/QR del monitor en vivo"
+              aria-expanded={herramientasOpen}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {/* M2: Exportar turno a CSV */}
           {summary && (
             <Button
@@ -1847,6 +1896,7 @@ export function AnalisisGraderTurnoPage() {
           onChange={setActiveView}
           badges={{ gates: configSnapshots.length, accion: accionesPendientes }}
           disabled={summary ? undefined : {
+            calidad: MOTIVO_SIN_EXCEL,
             timeline: MOTIVO_SIN_EXCEL,
             gates: MOTIVO_SIN_EXCEL,
             accion: 'Las acciones se calculan con el Excel del Grader',
@@ -2104,7 +2154,8 @@ export function AnalisisGraderTurnoPage() {
               />
             </div>
 
-            {/* Causas — mobile row 3 (contexto), desktop izquierda abajo */}
+            {/* El aviso de config desalineada se queda en el Resumen: afecta a
+                CÓMO leer todo el turno, no solo a la calidad. */}
             <div className="lg:col-span-2 lg:row-start-2 space-y-3">
               {configDrift && (
                 <ConfigDriftBanner
@@ -2115,21 +2166,27 @@ export function AnalisisGraderTurnoPage() {
                   recomputing={recomputing}
                 />
               )}
-              <P0CausesPanel
-                byMatrixCause={byMatrixCause}
-                totalP0Pct={summary.pointZeroPct}
-                unsortedPcs={summary.pointZeroPieces}
-                selectedCauses={selectedCauses}
-                onToggleCause={(cause) => setSelectedCauses(prev => {
-                  const next = new Set(prev)
-                  if (next.has(cause)) next.delete(cause)
-                  else next.add(cause)
-                  return next
-                })}
-                isClassificationPlant={isClassificationPlant}
-              />
             </div>
           </div>
+          )}
+
+          {/* ════════ CALIDAD ════════
+              Por qué se rechazó y cómo se repartió el producto. Es el espejo de
+              "Línea": todo lo que sale del Excel del Grader, junto. */}
+          {activeView === 'calidad' && (
+            <P0CausesPanel
+              byMatrixCause={byMatrixCause}
+              totalP0Pct={summary.pointZeroPct}
+              unsortedPcs={summary.pointZeroPieces}
+              selectedCauses={selectedCauses}
+              onToggleCause={(cause) => setSelectedCauses(prev => {
+                const next = new Set(prev)
+                if (next.has(cause)) next.delete(cause)
+                else next.add(cause)
+                return next
+              })}
+              isClassificationPlant={isClassificationPlant}
+            />
           )}
 
           {/* ════════ ¿QUÉ HACER? ════════
@@ -2337,7 +2394,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Composición del turno (lotes + calidad + producto + conservación).
               Va en Resumen, bajo los KPI: es el "de qué estuvo hecho el turno". */}
-          {activeView === 'resumen' && (
+          {activeView === 'calidad' && (
           <ShiftBreakdownsCard
             lotsInShift={summary.lotsInShift}
             calidadBreakdown={summary.calidadBreakdown}
@@ -2362,7 +2419,7 @@ export function AnalisisGraderTurnoPage() {
               clasificación, calibres, asignación calidad — todos conceptos
               que no aplican a Yal. La IA Yal-específica está pendiente
               (banner amber arriba avisa al usuario). */}
-          {activeView === 'resumen' && isClassificationPlant && (
+          {activeView === 'calidad' && isClassificationPlant && (
             <Card>
               <CardContent className="py-3 px-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -2388,15 +2445,15 @@ export function AnalisisGraderTurnoPage() {
               </CardContent>
             </Card>
           )}
-          {activeView === 'resumen' && isClassificationPlant && aiOutput && <AIOutputPanel output={aiOutput} />}
+          {activeView === 'calidad' && isClassificationPlant && aiOutput && <AIOutputPanel output={aiOutput} />}
 
           {/* Nota: el contador de cambios de config (FASE 27) ya vive en
               el badge del panel ConfigChangeHistory de arriba — eliminado
               para evitar duplicación con conteos divergentes. */}
 
           {/* Compartir turno — solo supervisores/admins cuando hay summary */}
-          {activeView === 'resumen' && summary && isAdmin && (
-            <div className="rounded-card border border-border bg-muted p-3 space-y-2">
+          {herramientasOpen && summary && isAdmin && (
+            <div ref={herramientasRef} className="rounded-card border border-border bg-muted p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Share2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Compartir turno</span>
@@ -2519,7 +2576,7 @@ export function AnalisisGraderTurnoPage() {
           `summary` es el del Excel del Grader, y Filete no tiene Grader. Estando
           dentro, la tarjeta no aparecía justo en la línea para la que se hizo.
           La fuente de datos es el turno de Shoplogix, no el Grader. */}
-      {activeView === 'resumen' && isSupervisor && plantLineCfg.shoplogixEnabled
+      {herramientasOpen && isSupervisor && plantLineCfg.shoplogixEnabled
         && upstreamLine.source === 'firestore' && upstreamLine.snapshot && (
         <div className="rounded-card border border-border bg-muted p-3 space-y-2">
           <div className="flex items-center gap-2">
