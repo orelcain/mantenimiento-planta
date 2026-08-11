@@ -13,6 +13,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - La linea de "No aplicable" estaba en la tarjeta equivocada (#461)
+
+Orel abrio el turno del 11-ago y la linea que agregue en #459 NO estaba.
+
+- Causa: la puse en `GraderTurnoDetailView` ("Piezas totales"), pero la vista de turno CON Grader
+  pinta el `HeroScorecard` — el bloque "13.366 piezas · Marelec". Dos tarjetas distintas para el
+  mismo dato, y elegi la que esa vista no muestra.
+- ⚠⚠ La leccion, otra vez la misma: **di por bueno #459 sin mirar la pantalla**. tsc, 1.121 tests y
+  el deploy en verde, y el cambio publicado donde nadie lo veia. Es el mismo patron de #438 (la
+  tarjeta invisible en Filete). Cuando el entregable es algo que se VE, no esta hecho hasta verlo.
+- Ahora sale bajo el total: "+ 163 no aplicables · Matrix: 13.529", con el detalle en el tooltip.
+- Verificado EN PRODUCCION con screenshot (bundle `7773690`, con la sesion de Orel en el navegador).
+- Estado: HECHO — mergeado y desplegado.
+
+---
+
 ## 2026-08-11 - claude - Los registros "No aplicable" del Grader (#459)
 
 Orel cargo el Excel del 11-ago y no le cuadraba: el Matrix decia *"se han recuperado 13.529
