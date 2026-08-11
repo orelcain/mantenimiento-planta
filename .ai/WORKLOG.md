@@ -13,6 +13,37 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - El chip decia "Turno dia" para un turno llamado "Turno 2" (#463)
+
+Orel: *"el mismo turno se ve de dos formas... el de grader esta todo como desordenado"*.
+
+- **Cadena del bug** (el "desorden" tenia una causa de datos, no solo estetica):
+  1. El chip de turno vigente cae a un FALLBACK por schedule cuando ningun doc de Shoplogix
+     contiene la hora actual.
+  2. Ese fallback filtraba por una lista fija elegida con `isClassificationPlant` — que mide OTRA
+     cosa — y para Chonchi daba `['Turno dia','Turno noche']`: nombres que la planta DEJO DE EMITIR
+     en 2026-05 y que sobreviven en el schedule solo como ventanas anchas para Excels viejos.
+  3. "Turno dia" es 07:00-19:00 → a las 16:00, con el Turno 2 real ya cerrado (07:15-15:00), el chip
+     anunciaba "En curso · Turno dia".
+  4. Al tocarlo iba a `2026-08-11__Turno dia`: la MISMA jornada sin el Excel (guardado bajo
+     "Turno 2"), con el cartel "Solo Shoplogix · Sin Excel del Grader" ofreciendo cargar uno ya
+     cargado.
+- Fix: `bySpecificity()` — el fallback recorre el schedule ordenado por ventana MAS CORTA primero.
+  A las 16:00 gana "Turno 2" (8h15) sobre "Turno dia" (12h). Sin listas de nombres que mantener.
+- ⚠⚠ **Tercera vez en el dia que `isClassificationPlant` decide algo que no le corresponde** (#455
+  la navegacion, #463 el nombre del turno). Si aparece en un `if`, sospechar: solo significa "esta
+  linea clasifica por calibre/calidad".
+- Verificacion: 1.125 tests (4 nuevos con el schedule real de Chonchi, comparando el antes/despues
+  a las 16:00) + navegador. Bundle `71d48e1`.
+- Estado: HECHO — mergeado y desplegado.
+- Sigue: **rediseño de la tarjeta de turno**. Orel eligio la opcion B del mockup ("Dos preguntas":
+  izquierda cuanto salio, derecha donde estuvo la limitacion; la mitad derecha IGUAL con o sin
+  Grader). Mockup: `scratchpad/tarjeta-resumen-turno.html` + artifact. Incluye estandarizar las
+  pestañas (que existan siempre, deshabilitadas con el motivo cuando falta el Excel) y la
+  correccion de contraste de los semanticos en tema claro (miden 2,7-3,1:1 como texto).
+
+---
+
 ## 2026-08-11 - claude - La linea de "No aplicable" estaba en la tarjeta equivocada (#461)
 
 Orel abrio el turno del 11-ago y la linea que agregue en #459 NO estaba.
