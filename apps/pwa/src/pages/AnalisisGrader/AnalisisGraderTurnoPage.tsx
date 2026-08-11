@@ -124,7 +124,7 @@ function parseShiftId(raw: string | undefined): [string, string] {
  * y montando solo la vista abierta (los charts pesados dejan de renderizarse
  * todos de una).
  */
-const ALL_TURNO_VIEWS = ['resumen', 'timeline', 'gates', 'linea'] as const
+const ALL_TURNO_VIEWS = ['resumen', 'timeline', 'gates', 'linea', 'accion'] as const
 type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
 
 const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
@@ -132,42 +132,61 @@ const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
   timeline: 'Timeline',
   gates:    'Gates',
   linea:    'Línea',
+  accion:   '¿Qué hacer?',
 }
+
+/**
+ * Motivo por el que una vista no se puede abrir. Las pestañas se muestran
+ * SIEMPRE: una que aparece y desaparece según si hay Excel obliga a aprender
+ * dos navegaciones distintas, y deja al usuario sin saber que existe.
+ * Deshabilitada y diciendo por qué, la estructura es una sola y se va llenando.
+ */
+const MOTIVO_SIN_EXCEL = 'Necesita el Excel del Grader — cargalo para ver esta vista'
 
 /** Barra de vistas del turno. */
 function TurnoViewTabs({
   views,
   active,
   onChange,
-  gatesBadge,
+  badges,
+  disabled,
 }: {
   views: TurnoView[]
   active: TurnoView
   onChange: (v: TurnoView) => void
-  gatesBadge?: number
+  /** Contador junto al nombre (gates configuradas, acciones pendientes…). */
+  badges?: Partial<Record<TurnoView, number>>
+  /** Vistas que no se pueden abrir, con el motivo para el tooltip. */
+  disabled?: Partial<Record<TurnoView, string>>
 }) {
   return (
     <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist" data-no-swipe>
       {views.map(view => {
         const isActive = view === active
+        const motivo = disabled?.[view]
+        const badge = badges?.[view]
         return (
           <button
             key={view}
             role="tab"
             aria-selected={isActive}
+            disabled={!!motivo}
+            title={motivo}
             onClick={() => onChange(view)}
             className={`shrink-0 flex items-center gap-1.5 px-3 py-2 -mb-px text-sm border-b-2 transition-colors ${
-              isActive
-                ? 'border-primary text-primary font-medium'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              motivo
+                ? 'border-transparent text-muted-foreground/40 cursor-not-allowed'
+                : isActive
+                  ? 'border-primary text-primary font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             {TURNO_VIEW_LABEL[view]}
-            {view === 'gates' && !!gatesBadge && (
+            {!motivo && !!badge && (
               <span className={`text-caption tabular-nums px-1.5 rounded-full ${
                 isActive ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/15'
               }`}>
-                {gatesBadge}
+                {badge}
               </span>
             )}
           </button>
@@ -1409,6 +1428,10 @@ export function AnalisisGraderTurnoPage() {
     })
   }, [isClassificationPlant, summary, byMatrixCause, enrichedTimelineBuckets, shiftWindow, upstreamLine.snapshot])
 
+  /** Acciones del turno, para el contador de la pestaña "¿Qué hacer?".
+   *  Sin el contador, mover el panel a una pestaña lo volvería invisible. */
+  const accionesPendientes = (isClassificationPlant ? suggestions : yalSuggestions).length
+
   const triggeredRunbooks = useMemo(
     () => findTriggeredRunbooks(dominant, summary?.pointZeroPct ?? 0),
     [dominant, summary],
@@ -1811,8 +1834,33 @@ export function AnalisisGraderTurnoPage() {
         </Card>
       )}
 
-      {/* Vista Shoplogix-only: sin Excel Grader pero con datos de máquinas (Yal u otras líneas) */}
-      {!summary && !loading && upstreamLine.snapshot && (
+      {/* Las pestañas van FUERA del gate de `summary` y ANTES del contenido: son
+          la estructura de la pantalla, no contenido del Excel. Antes vivían
+          dentro del gate y un turno sin Grader no mostraba ninguna — dos
+          navegaciones distintas para la misma pantalla (pedido de Orel, 11-ago).
+          Las que necesitan el Excel se ven deshabilitadas con su motivo, así se
+          sabe que existen. */}
+      {(summary || upstreamLine.snapshot) && (
+        <TurnoViewTabs
+          views={availableViews}
+          active={activeView}
+          onChange={setActiveView}
+          badges={{ gates: configSnapshots.length, accion: accionesPendientes }}
+          disabled={summary ? undefined : {
+            timeline: MOTIVO_SIN_EXCEL,
+            gates: MOTIVO_SIN_EXCEL,
+            accion: 'Las acciones se calculan con el Excel del Grader',
+          }}
+        />
+      )}
+
+      {/* Vista Shoplogix-only: sin Excel Grader pero con datos de máquinas (Yal
+          u otras líneas).
+          Responde a "Resumen" y a "Línea": sin Excel las dos muestran lo mismo
+          —el estado de las máquinas—, así que en vez de dejar "Línea" muerta se
+          la deja abrir. Timeline, Gates y "¿Qué hacer?" sí quedan deshabilitadas
+          con su motivo, porque sin el Excel no tienen nada que mostrar. */}
+      {!summary && !loading && upstreamLine.snapshot && (activeView === 'resumen' || activeView === 'linea') && (
         <div className="space-y-4">
           {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
           <ShoplogixOnlyScorecard
@@ -1997,13 +2045,6 @@ export function AnalisisGraderTurnoPage() {
           Desktop (grid 3-col 2 filas): Scorecard + Causas izq (2 cols apilados), Acciones der (col 3 × 2 filas) */}
       {summary && shiftWindow && (
         <>
-          <TurnoViewTabs
-            views={availableViews}
-            active={activeView}
-            onChange={setActiveView}
-            gatesBadge={configSnapshots.length}
-          />
-
           {/* ════════ RESUMEN ════════ */}
           {activeView === 'resumen' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -2039,25 +2080,12 @@ export function AnalisisGraderTurnoPage() {
                 Chonchi: deriveSuggestions con reglas Marelec MS4/12 (fotocélula,
                 eye-sync, gates). Yal: deriveYalSuggestions con reglas eviscerado
                 (peso bajo, proximidad, throughput Baader, uptime upstream). */}
+            {/* Los paneles de acciones se mudaron a su propia pestaña
+                ("¿Qué hacer?", con el contador de acciones en el tab): ocupaban
+                un tercio del ancho de forma permanente y dejaban el resumen
+                apretado. Los MODALES se quedan acá, montados siempre, porque
+                `handleActionTrigger` puede dispararlos desde cualquier vista. */}
             <div className="lg:col-start-3 lg:row-span-2 space-y-4" data-no-swipe>
-              {isClassificationPlant && (
-                <ActionPlanPanel
-                  shiftDocId={shiftDocId}
-                  suggestions={suggestions}
-                  status={shiftWindow.status}
-                  relatedRunbooks={triggeredRunbooks}
-                  onActionTrigger={handleActionTrigger}
-                />
-              )}
-              {!isClassificationPlant && (
-                <ActionPlanPanel
-                  shiftDocId={shiftDocId}
-                  suggestions={yalSuggestions}
-                  status={shiftWindow.status}
-                  rulesDescriptor="Reglas: P0 vs típico Yal · peso bajo · proximidad · throughput vs target Baader · uptime upstream"
-                />
-              )}
-
               {/* Modales lanzados desde ActionPlanPanel */}
               <GateChangeModal
                 open={planGateModalOpen}
@@ -2102,6 +2130,32 @@ export function AnalisisGraderTurnoPage() {
               />
             </div>
           </div>
+          )}
+
+          {/* ════════ ¿QUÉ HACER? ════════
+              Antes ocupaba la tercera columna del Resumen de forma permanente.
+              Como pestaña propia gana ancho para leerse y el Resumen respira; el
+              contador en el tab evita que las acciones se pierdan de vista. */}
+          {activeView === 'accion' && (
+            <div className="max-w-3xl space-y-4" data-no-swipe>
+              {isClassificationPlant && (
+                <ActionPlanPanel
+                  shiftDocId={shiftDocId}
+                  suggestions={suggestions}
+                  status={shiftWindow.status}
+                  relatedRunbooks={triggeredRunbooks}
+                  onActionTrigger={handleActionTrigger}
+                />
+              )}
+              {!isClassificationPlant && (
+                <ActionPlanPanel
+                  shiftDocId={shiftDocId}
+                  suggestions={yalSuggestions}
+                  status={shiftWindow.status}
+                  rulesDescriptor="Reglas: P0 vs típico Yal · peso bajo · proximidad · throughput vs target Baader · uptime upstream"
+                />
+              )}
+            </div>
           )}
 
           {/* ════════ GATES ════════
