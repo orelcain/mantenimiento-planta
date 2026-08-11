@@ -134,3 +134,29 @@ export function shiftIdToKey(shiftId?: string): string {
     .replace(/^-+|-+$/g, '')
   return slug || 'noche'
 }
+
+/** Duración de una ventana de turno en minutos (contempla el cruce de medianoche). */
+export function shiftWindowMinutes(s: GraderShiftSchedule): number {
+  const ini = s.startHour * 60 + s.startMinute
+  const fin = s.endHour * 60 + s.endMinute
+  return fin > ini ? fin - ini : 24 * 60 - ini + fin
+}
+
+/**
+ * Ordena un schedule de la ventana MÁS CORTA a la más larga, para que ante
+ * ventanas que se solapan gane la más específica.
+ *
+ * Hace falta porque un schedule real puede tener ventanas anchas heredadas: el
+ * de Chonchi conserva `Turno día` 07:00–19:00 y `Turno noche` 19:00–07:00 (la
+ * planta dejó de emitirlos en 2026-05) junto a los turnos vigentes `Turno 1`
+ * 21:30–05:45 y `Turno 2` 09:00–17:15. Recorriendo el schedule en su orden de
+ * declaración, "Turno día" ganaba: a las 16:00, con el Turno 2 real ya cerrado,
+ * la app anunciaba "En curso · Turno día" y al tocarlo llevaba a la misma
+ * jornada SIN el Excel del Grader (que está guardado bajo "Turno 2").
+ *
+ * Ordenar por especificidad evita mantener listas de nombres por planta: si la
+ * planta renombra sus turnos, esto sigue funcionando.
+ */
+export function bySpecificity(schedule: readonly GraderShiftSchedule[]): GraderShiftSchedule[] {
+  return [...schedule].sort((a, b) => shiftWindowMinutes(a) - shiftWindowMinutes(b))
+}

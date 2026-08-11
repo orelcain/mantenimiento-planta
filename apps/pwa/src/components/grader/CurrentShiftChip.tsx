@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { Activity, ChevronRight, Sun, Moon, Sunrise, Sunset, Clock, PauseCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
-import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
+import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule, bySpecificity } from '@/services/grader/graderShiftSchedule'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
@@ -78,14 +78,24 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
     return () => clearInterval(id)
   }, [])
 
-  // Nomenclatura preferida por planta — SOLO para el fallback por schedule
-  // (cuando aún no hay docs Shoplogix del día). La detección primaria usa los
-  // nombres REALES que emite Shoplogix, sean cuales sean.
-  const preferredShiftIds = useMemo(() => {
-    return cfg.isClassificationPlant === false
-      ? ['Turno 1', 'Turno 2', 'Turno 3']
-      : ['Turno día', 'Turno noche']
-  }, [cfg.isClassificationPlant])
+  /**
+   * Orden del fallback por schedule: ante ventanas que se SOLAPAN gana la más
+   * corta, porque es la más específica.
+   *
+   * ⚠ Antes esto era una lista fija elegida con `cfg.isClassificationPlant`, que
+   * mide otra cosa (si la línea clasifica por calibre): para Chonchi devolvía
+   * `['Turno día', 'Turno noche']` — nombres que la planta DEJÓ DE EMITIR en
+   * 2026-05 y que sobreviven en el schedule solo como ventanas anchas para
+   * clasificar Excels viejos. Como "Turno día" es 07:00–19:00, a las 16:00 —con
+   * el Turno 2 real ya cerrado (07:15–15:00)— el chip anunciaba "En curso ·
+   * Turno día", y al tocarlo llevaba a `…__Turno día`: la misma jornada pero SIN
+   * el Excel del Grader, que está guardado bajo "Turno 2". Reporte de Orel,
+   * 11-ago: "el mismo turno se ve de dos formas".
+   *
+   * Con el orden por especificidad no hay lista que mantener: si mañana la
+   * planta renombra sus turnos, el chip sigue el schedule.
+   */
+  const fallbackShifts = useMemo(() => bySpecificity(schedule), [schedule])
 
   // Docs Shoplogix de hoy + ayer con horarios reales (ayer cubre turnos que
   // cruzan medianoche, ej. chonchi "Turno 1" 21:30→05:45). Re-descubre cada
@@ -163,9 +173,8 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
 
     // 2) Fallback por schedule configurado/hardcodeado (sin doc real → sin
     //    scheduledStart; getShiftMeta cae al nombre, coherente con el schedule).
-    const filtered = schedule.filter((s) => preferredShiftIds.includes(s.shiftId))
     for (const dateKey of [todayKey, ydayKey]) {
-      for (const s of filtered) {
+      for (const s of fallbackShifts) {
         const tw = computeShiftTimeWindow(dateKey, s.shiftId, schedule, nowWallUTC)
         if (tw.status === 'live') {
           return { dateKey, shiftId: s.shiftId, tw, scheduledStart: null as Date | null }
@@ -173,7 +182,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
       }
     }
     return null
-  }, [now, schedule, preferredShiftIds, dayInfos])
+  }, [now, schedule, fallbackShifts, dayInfos])
 
   // Cargar snapshot Shoplogix del turno candidato para verificar producción real.
   // El hook acepta null/undefined → no fetchea cuando no hay turno candidato.
