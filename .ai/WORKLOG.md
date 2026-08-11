@@ -13,6 +13,36 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - La cola fuera de horario se la llevaba cualquier turno del dia (#451)
+
+Orel lo vio en Eviscerado: *"para el turno noche de ayer conto unos minutos de las 7 y tanto am y
+despues de las 9 y tanto de la noche... los mostro en el grafico tambien y conto piezas demas"*.
+
+- Causa: para decidir si un tramo del `Unscheduled` era la cola del turno bastaba con que NO cayera
+  dentro de la ventana de NINGUN turno. Como esos bloques no caen en ninguna, **cualquier turno del
+  dia se los quedaba**. El turno noche (21:15→05:00) sumaba 1.317 pz ajenas —1.048 de las 07:15,
+  cola del turno que cerro a esa hora, y 269 de las 17:00— y mostraba **13.487 en vez de 12.170**.
+  La barra de las 7 AM en el grafico venia de `operacionReal`, que extiende la ventana con esos
+  rangos y corre haya Grader o no (por eso se veia en Eviscerado, que no usa el scorecard).
+- Regla nueva de Orel: la cola cuenta **solo si es continua al turno**, no piezas de horas despues.
+  CONTINUIDAD (≤1 h) + CERCANIA (ningun otro turno mas cerca). Un tramo va a UN turno, nunca a dos
+  ni a ninguno: el empate se desempata a favor del que ya CERRO en vez de descartarse.
+- ⚠ La distancia se mide del **BORDE del tramo**, no de cada intervalo suelto: un bloque 07:00→07:30
+  antes de un turno de las 08:00 esta a 30 min, no a 60. Medirlo mal descartaba arranques
+  anticipados legitimos — lo destapo el test que los fija (habria sido una regresion silenciosa).
+- Archivos: `functions/publicMonitor.js` (monitor + brief) y `apps/pwa/src/hooks/useShiftOutsidePieces.ts`
+  (que ademas ni miraba los otros turnos) + `graderUnscheduledLoad.loadDayShiftWindows` (1 lectura).
+- Verificacion: 219 tests functions + 23 front (7 nuevos). Contra Firestore REAL del 10-ago:
+  noche 12.170+0, Turno 1 Lunes 9.543+689 (07:25-07:50), Turno 2 9.902+56 (17:10-17:20),
+  Filete 4.410+505 (sin cambios). En pantalla (local, datos de prod): 12.170, rango 21:15–05:00,
+  operacion real 21:30–04:50, sin rastro de las 7 AM.
+- Estado: HECHO — mergeado (`d114da2`) y desplegado.
+- Sigue: **decision de Orel** — la MATRIZ quedo con la regla vieja (`MAX_ADJACENCY_MIN = Infinity`,
+  decision suya del 03-ago). Alinearla moveria solo 65 pz en todo agosto, pero choca con el caso
+  Yal 03-ago de los 1.835 cic que el decidio atribuir. No se toco por eso.
+
+---
+
 ## 2026-08-11 - claude - Avisos de turno de Filete por Telegram + el brief anunciaba menos piezas (#449)
 
 Orel pregunto si se podian mandar los avisos por WhatsApp. Respuesta: se puede, pero el costo es
