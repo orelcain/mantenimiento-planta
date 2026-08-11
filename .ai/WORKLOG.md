@@ -13,6 +13,38 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - La matriz alineada con la regla de continuidad (#453)
+
+Orel: *"alinea la matriz tambien con la regla nueva"*. Con esto las CUATRO superficies (monitor
+publico, brief de Telegram, vista de turno y matriz) deciden igual de quien es un bloque fuera de
+horario.
+
+- Hecho: la matriz atribuye por BLOQUE y reusa `esColaDeEsteTurno`. `MAX_ADJACENCY_MIN` (Infinity)
+  ELIMINADO — la distancia la fija `MAX_CONTINUIDAD_MS`, una sola constante compartida. Los
+  candidatos pasan a ser los turnos del mismo dia Y los ADYACENTES (la continuidad cruza medianoche:
+  las 23:30 son el arranque del turno de las 00:00, no la cola de uno que cerro a las 15:00); con eso
+  sobra la rama especial de "dia sin turnos".
+- ⚠⚠ Dos correcciones al umbral que salieron de tests reales que iban a romperse:
+  1. **ENCADENAR los tramos antes de decidir**: la produccion real viene con huecos. Yal 10-jul son
+     2.296 pz a las 14:05, 14:40 y 15:00 antes de un turno de las 15:15; tramo a tramo, la primera
+     quedaba a 65 min y se perdia entera.
+  2. **60 -> 90 min**: con 1 h ese mismo bloque quedaba fuera POR CINCO MINUTOS. Lo que la regla debe
+     excluir esta a otra escala (14 h el caso Chonchi, 10 h el 02-ago). Se cambio en los DOS lados.
+- ⚠ Cambio de comportamiento: un dia SIN turnos configurados ya no se cuelga del turno de otro dia
+  (Chonchi 02-ago, 293 cic a 10 h) — el bloque queda VISIBLE. Revierte en parte la decision del
+  03-ago pero solo para lo de FUERA: lo que cae DENTRO de una ventana se sigue atribuyendo.
+- ⚠ El test del caso Yal 03-ago fijaba un escenario RECORTADO (un solo turno 00:06-07:18). Contra
+  Firestore ese dia hubo 3 turnos y la produccion de 08:00-12:12 cae DENTRO del Turno 1: no se
+  afecta. Se reescribio el test con los turnos reales.
+- Verificacion: 219 tests functions + 23 matriz, tsc/eslint limpios. **Impacto medido sobre agosto
+  completo contra Firestore: 0 piezas dejan de atribuirse** (chonchi 4.258, yal 3.395, filete 2.661
+  siguen igual) — no mueve totales, corrige a QUIEN se asignan. Bundle publicado `dc288c3`.
+- Estado: HECHO — mergeado y desplegado.
+- Sigue: nada de esta feature. Queda de la sesion anterior ver un cierre de turno REAL de Filete
+  (que el brief espere la cola y anuncie el total completo).
+
+---
+
 ## 2026-08-11 - claude - La cola fuera de horario se la llevaba cualquier turno del dia (#451)
 
 Orel lo vio en Eviscerado: *"para el turno noche de ayer conto unos minutos de las 7 y tanto am y
