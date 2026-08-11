@@ -72,6 +72,10 @@ export interface PublicMonitorLive {
   machines: PublicMonitorMachine[]
   series: Array<{ t: string; pieces: number }>
   topStops: Array<{ reason: string; sec: number; count: number }>
+  /** Razones de detención, referenciadas por índice desde `stopEvents`. */
+  stopReasons?: string[]
+  /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */
+  stopEvents?: Array<{ r: number; f: string; s: number }>
 }
 
 /**
