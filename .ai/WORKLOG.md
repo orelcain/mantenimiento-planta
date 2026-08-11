@@ -13,6 +13,46 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Avisos de turno de Filete por Telegram + el brief anunciaba menos piezas (#449)
+
+Orel pregunto si se podian mandar los avisos por WhatsApp. Respuesta: se puede, pero el costo es
+el TRAMITE con Meta (cuenta business verificada, numero dedicado que se quema, plantillas
+pre-aprobadas, opt-in por persona, cobro por mensaje) — 1-2 semanas casi sin programar. Eligio
+encender Telegram, que da lo mismo hoy y gratis.
+
+**El hallazgo**: encender el canal NO bastaba. `componerBriefFinTurno` ya existia y estaba
+configurado para Filete (umbral 200 pz), pero:
+
+- se disparaba con el horario oficial (15:30 + 10 min) **con la linea todavia produciendo**;
+- sumaba **solo el doc del turno**. Evidencia dura: el brief de hoy ya salio por push a las 15:40
+  anunciando **4.338 piezas** cuando la jornada termino en **4.915** — 12% menos.
+
+- Hecho:
+  - `sumarColaAMaquinas` (publicMonitor.js): suma la cola fuera de horario a cada maquina y
+    devuelve el desglose. Reusa `loadOutsideShiftProduction` con su dedupe por (maquina, timestamp).
+  - El brief **espera a que la linea deje de producir**; tope de 2 h por si el sensor queda colgado.
+  - Mensaje: desglose "4.410 dentro del horario + 505 despues (15:40-16:30)" y horario hasta la
+    ultima pieza real (decia "hasta 15:30" con produccion hasta las 16:30).
+  - ⚠ `endBriefSnapshot` guarda el total SIN cola: `checkShiftReconciliation` lo compara contra el
+    doc padre y habria avisado una "correccion Shoplogix" falsa de -505 **cada dia**.
+  - ⚠ `resumenParos` ignora states de duracion CERO y repetidos: eran **27 de 85** "micro" — Telegram
+    decia 85 y el monitor 58 **del mismo turno**. Misma clase de bug que el listado vs el grafico
+    de #447: dos superficies contando distinto el mismo dato.
+  - Config `notificationConfig/filete`: telegram ON (dest `bot` = DM del admin, igual que chonchi y
+    yal), inicio + fin ON, **paros y primera pieza OFF** (Filete pidio el avance, no el ruido).
+- Archivos: `functions/publicMonitor.js`, `functions/shoplogix/turnoBrief.js`, `functions/index.js`,
+  + 2 archivos de test.
+- Verificacion: 220 tests en verde (211 + 9 nuevos). **Dry-run con los datos reales de Filete del
+  10-ago** (sin enviar nada): 4.915 pz, horario 07:45→16:30, 58 micro — coincide con el monitor
+  publico. Sin cola el mensaje queda byte a byte igual (Chonchi/Yal no cambian, con test).
+  Funcion desplegada y ACTIVE (revision 00044, updateTime 02:34).
+- Estado: HECHO — mergeado (`da650be`) y desplegado; canal encendido.
+- Sigue: **falta ver un turno real** — el proximo cierre de Filete es la primera prueba de fuego
+  (que el brief espere la cola y anuncie el total completo). Si Orel quiere que llegue al GRUPO y
+  no a su DM, es cambiar `telegramDest` a `grupo` desde el panel admin.
+
+---
+
 ## 2026-08-10 - claude - Grafico del monitor: ubicar las detenciones y marcar el mejor ritmo (#447)
 
 Orel: *"poder seleccionar del listado el tipo de detencion y q las ubique en el grafico"* +
