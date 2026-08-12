@@ -10,7 +10,9 @@ import { describe, it, expect } from 'vitest'
 import { buildMachineSpeedSummary } from '../machineSpeedMeaning'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 
-/** Máquina sintética con N piezas repartidas en tramos de 5 min. */
+const T0 = Date.parse('2026-08-11T21:15:00Z')
+
+/** Máquina sintética con N piezas repartidas en tramos de 5 min desde T0. */
 function maquina(opts: {
   id: string
   nombre: string
@@ -24,14 +26,15 @@ function maquina(opts: {
   return {
     machineid: opts.id,
     machineName: opts.nombre,
-    intervals: Array.from({ length: tramos }, () => ({
+    intervals: Array.from({ length: tramos }, (_, i) => ({
+      startAt: new Date(T0 + i * 5 * 60_000),
       cycles: porTramo,
       // targetCpmFromIntervals lee expectedCycles y divide por 5.
       expectedCycles: opts.objetivoCpm * 5,
     })),
     states: [
-      { type: 'uptime', durationSec: opts.uptimeMin * 60 },
-      { type: 'downtime', durationSec: opts.downtimeMin * 60 },
+      { type: 'uptime', startAt: new Date(T0), durationSec: opts.uptimeMin * 60 },
+      { type: 'downtime', startAt: new Date(T0 + opts.uptimeMin * 60_000), durationSec: opts.downtimeMin * 60 },
     ],
   } as unknown as UpstreamMachineShift
 }
@@ -108,12 +111,75 @@ describe('buildMachineSpeedSummary', () => {
     const solaMuerta = [maquina({ id: 'z', nombre: 'Evisceradora 1', piezas: 2, objetivoCpm: 16, uptimeMin: 30, downtimeMin: 0 })]
     expect(buildMachineSpeedSummary(solaMuerta)).toBeNull()
   })
+})
+
+describe('ventana de tiempo (el zoom del gráfico)', () => {
+  const UNA = [maquina({ id: 'a', nombre: 'Evisceradora 1', piezas: 3600, objetivoCpm: 16, uptimeMin: 300, downtimeMin: 60 })]
+
+  it('cuenta solo los tramos de la ventana', () => {
+    // 300 min de uptime en 60 tramos de 5 min → 60 pz por tramo.
+    // Primera hora = 12 tramos = 720 pz.
+    const s = buildMachineSpeedSummary(UNA, { startMs: T0, endMs: T0 + 60 * 60_000 })!
+    expect(s.rows[0]!.piezas).toBe(720)
+  })
+
+  it('RECORTA los estados a la ventana en vez de contarlos enteros o descartarlos', () => {
+    /*
+     * El uptime del turno es un solo state de 300 min. Con una ventana de 1 h:
+     * contarlo entero daría un ritmo 5 veces menor; descartarlo dejaría uptime
+     * en 0 y el ritmo en infinito. Lo correcto es la parte que solapa: 60 min.
+     */
+    const s = buildMachineSpeedSummary(UNA, { startMs: T0, endMs: T0 + 60 * 60_000 })!
+    expect(s.rows[0]!.uptimeSec).toBe(60 * 60)
+    expect(s.rows[0]!.ritmoCpm).toBeCloseTo(720 / 60, 4)
+  })
+
+  it('una ventana antes del turno no inventa datos', () => {
+    expect(buildMachineSpeedSummary(UNA, { startMs: T0 - 5 * 3600_000, endMs: T0 - 4 * 3600_000 })).toBeNull()
+  })
+
+  it('el objetivo sale del turno COMPLETO, no de la ventana', () => {
+    // Si la ventana cae sobre el tramo de detención no hay `expectedCycles`
+    // dentro, pero el objetivo de la máquina sigue siendo el mismo.
+    const s = buildMachineSpeedSummary(UNA, { startMs: T0 + 30 * 60_000, endMs: T0 + 90 * 60_000 })!
+    expect(s.rows[0]!.objetivoCpm).toBe(16)
+  })
+
+  it('el ritmo de un tramo bueno es MAYOR que el del turno completo', () => {
+    // Turno completo: 3.600 pz / 300 min = 12 pz/min, con 60 min de paro aparte.
+    const completo = buildMachineSpeedSummary(UNA)!
+    const tramo = buildMachineSpeedSummary(UNA, { startMs: T0, endMs: T0 + 30 * 60_000 })!
+    expect(tramo.rows[0]!.ritmoCpm).toBeGreaterThanOrEqual(completo.rows[0]!.ritmoCpm)
+  })
+
+  it('afloja el mínimo de piezas: 50 es "no hubo turno", no "no hubo tramo"', () => {
+    // 15 min a 12 pz/min = 180 pz — pero una ventana de 5 min da 60.
+    const s = buildMachineSpeedSummary(UNA, { startMs: T0, endMs: T0 + 5 * 60_000 })
+    expect(s).not.toBeNull()
+    expect(s!.rows[0]!.piezas).toBe(60)
+  })
+})
+
+describe('casos que no deben romper', () => {
+  it('sin nada que decir devuelve null (regresión del early return)', () => {
+    expect(buildMachineSpeedSummary([])).toBeNull()
+    const solaMuerta = [maquina({ id: 'z', nombre: 'Evisceradora 1', piezas: 2, objetivoCpm: 16, uptimeMin: 30, downtimeMin: 0 })]
+    expect(buildMachineSpeedSummary(solaMuerta)).toBeNull()
+  })
 
   it('una máquina sin objetivo reportado no inventa una brecha', () => {
     const sinObjetivo = [maquina({ id: 'a', nombre: 'Evisceradora 1', piezas: 3000, objetivoCpm: 0, uptimeMin: 250, downtimeMin: 20 })]
     const s = buildMachineSpeedSummary(sinObjetivo)!
     expect(s.rows[0]!.objetivoCpm).toBeNull()
     expect(s.rows[0]!.brechaPorHora).toBeNull()
+  })
+
+  it('da el objetivo también en pz/h — la referencia en la misma unidad', () => {
+    const s = buildMachineSpeedSummary(TRES)!
+    const ev1 = s.rows.find((r) => r.machineid === 'ev1')!
+    expect(ev1.objetivoPorHora).toBe(19 * 60)
+    const ev2 = s.rows.find((r) => r.machineid === 'ev2')!
+    expect(ev2.objetivoPorHora).toBe(16 * 60)
   })
 
   it('los totales suman las filas', () => {
