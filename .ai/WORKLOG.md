@@ -13,6 +13,31 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-12 - claude - El header de movil montaba los botones sobre el titulo (#478)
+
+Orel, con captura: *"mira se ven todos montados los botones ojo con el orden en el modo movil"*.
+
+- **No era truncado feo, era DESBORDE.** El header sticky es UNA fila: titulo en `flex-1 min-w-0`
+  y acciones en `shrink-0`. Los 7 botones ocupan ~290 de los 351 px utiles, asi que al titulo le
+  quedaban ~60 — y como sus etiquetas (turno, horario) tambien son `shrink-0`, **no se recortaban:
+  se salian del contenedor**, y los botones, que se pintan despues, quedaban ENCIMA.
+  ⚠ Patron transferible: `min-w-0` en el contenedor no alcanza si los hijos son `shrink-0`. O se
+  les saca el `shrink-0`, o el contenedor lleva `overflow-hidden`, o se cambia el layout.
+- **Arreglo**: en movil dos filas (`basis-full sm:basis-auto` en los dos grupos) — arriba QUE TURNO
+  estas mirando, abajo QUE PODES HACER con el, pegado al borde derecho. Dentro de la 2a fila:
+  primero las acciones sobre ESTE turno (clasificar, compartir, exportar) y al final
+  Anterior/Siguiente, que es irse a otro. `overflow-hidden` en el grupo del titulo como cinturon.
+- **Desktop no cambia**: los dos grupos siguen en una fila de 46 px (medido antes y despues).
+- Archivos: `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx` (solo clases).
+- Verificacion en prod (`buildSha` = `02f1637`), 375px, claro y oscuro: **0 elementos fuera del
+  header** medidos con `getBoundingClientRect` sobre TODOS sus descendientes, y sin scroll
+  horizontal (`scrollWidth === clientWidth === 375`). Caso peor probado inyectando por DOM un
+  titulo largo ("Turno 1 Lunes — Madrugada extendida") mas un badge extra: sigue sin desbordar.
+  ⚠ Medir el desborde con el DOM y no a ojo fue lo que dio la certeza: a ojo "se ve bien" no
+  distingue entre recortado y tapado.
+  tsc 0, eslint 0 nuevos, 1.162 tests OK.
+- Estado: HECHO.
+
 ## 2026-08-12 - claude - Corte de control a mitad de turno + las 12 compuertas directas (#476)
 
 Orel: *"dale con el corte de control a mitad de turno y en gates debemos poder setear directo las
