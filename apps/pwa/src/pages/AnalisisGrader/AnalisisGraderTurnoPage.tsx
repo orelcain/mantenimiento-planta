@@ -48,6 +48,7 @@ import { GateChangeModal } from '@/components/grader/modals/GateChangeModal'
 import { BeltRpmModal } from '@/components/grader/modals/BeltRpmModal'
 import type { ActionTrigger } from '@/services/grader/actionPlanSuggestions'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
+import { GatesHistoryHintCard } from '@/components/grader/GatesHistoryHintCard'
 import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
 import { ShiftQuotaCard } from '@/components/grader/ShiftQuotaCard'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
@@ -1658,6 +1659,23 @@ export function AnalisisGraderTurnoPage() {
    * umbrales base, rangos de calibre) vive en /analisis-grader/config.
    * Solo Chonchi: Yal no clasifica, sus gates no tienen calibre ni calidad.
    */
+  /*
+   * "¿Esta config aguanta lo que suele venir?" — el análisis de saturación
+   * corrido al ANTES, con el reparto de calibres de los turnos anteriores en
+   * vez del Excel de éste. Va arriba del editor en las dos ramas: es lo que
+   * uno querría leer justo antes de tocar una gate.
+   */
+  const gatesHistoryCard = isClassificationPlant ? (
+    <GatesHistoryHintCard
+      gates={turnoGates}
+      dateKey={dateKey}
+      plantLineId={plantLineCfg.id}
+      shiftDocId={shiftDocId}
+      configSnapshots={configSnapshots}
+      onSaved={reloadConfigSnapshots}
+    />
+  ) : null
+
   const gatesEditorCard = (
     <Card className="overflow-hidden">
       <button
@@ -2310,6 +2328,11 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
+          {/* Contraste contra los turnos anteriores. Va ANTES del análisis del
+              propio turno: primero "¿esta config tenía sentido?", después "¿cómo
+              rindió?". Al revés se lee como excusa. */}
+          {activeView === 'gates' && gatesHistoryCard}
+
           {/* Config de gates vigente en el turno. Solo en plantas que clasifican
               (Chonchi). Yal no clasifica → las gates del Excel son solo las que
               alimentan las 3 Baaders. */}
@@ -2761,11 +2784,12 @@ export function AnalisisGraderTurnoPage() {
             <SlidersHorizontal className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
             <p className="text-muted-foreground flex-1">
               Acá se dejan listas las <span className="font-medium text-foreground">compuertas de este turno</span>:
-              calibre, calidad, conservación y producto de cada una. El análisis de cómo
-              rindieron (saturación, reasignaciones sugeridas, evolución) aparece al cargar
-              el Excel del Grader.
+              calibre, calidad, conservación y producto de cada una. Abajo está el contraste
+              contra lo que suele venir; cómo rindieron de verdad aparece al cargar el Excel
+              del Grader.
             </p>
           </div>
+          {gatesHistoryCard}
           {gatesEditorCard}
           <ConfigChangeHistory
             shiftDocId={shiftDocId}
