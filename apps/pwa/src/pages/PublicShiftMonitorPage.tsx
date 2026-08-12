@@ -38,7 +38,7 @@ import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import { buildDayComparison, optimalPace } from '@/services/shoplogix/monitorCompare'
-import { TiempoDelTurno, ComparadorDias } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -151,6 +151,13 @@ function Sparkbars({
   causaSel: string | null
   onCausa: (c: string | null) => void
 }) {
+  /*
+   * Zoom horizontal. A 375 px, 106 tramos dan barras de 3 px: se ve la forma
+   * del turno pero no se puede leer un tramo concreto, que es justo lo que hace
+   * falta cuando uno ya sabe que a la hora 6 pasó algo. Ampliando el ancho del
+   * SVG dentro de un contenedor con scroll, cada barra crece y se puede tocar.
+   */
+  const [zoom, setZoom] = useState(1)
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -201,7 +208,7 @@ function Sparkbars({
     series[Math.round((k / 3) * (series.length - 1))]!.t)
 
   return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+    <div id="grafico-turno" className="scroll-mt-4 rounded-2xl border border-border bg-card px-4 py-3">
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>Piezas por tramo de 5 min</span>
         {causaSel && (
@@ -214,7 +221,10 @@ function Sparkbars({
         )}
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-2 h-20 w-full" role="img"
+      <div className="mt-2 overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-20"
+           style={{ width: `${zoom * 100}%`, minWidth: '100%' }} role="img"
+           data-zoom={zoom}
            aria-label="Piezas por tramo de cinco minutos">
         {bandas.map(b => (
           <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
@@ -244,9 +254,35 @@ function Sparkbars({
           )
         })}
       </svg>
+      </div>
 
-      <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground/70">
-        {marcas.map((t, i) => <span key={`${t}-${i}`}>{fmtWallTime(t)}</span>)}
+      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] tabular-nums text-muted-foreground/70">
+        <span className="flex flex-1 justify-between">
+          {marcas.map((t, i) => <span key={`${t}-${i}`}>{fmtWallTime(t)}</span>)}
+        </span>
+      </div>
+
+      {/* En un turno completo (~100 tramos) a 375 px cada barra mide 1,6 px.
+          Con 8× pasa a ~13 px: recién ahí es un blanco que se puede tocar para
+          ver la hora y las piezas del tramo. */}
+      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+        <span className="normal-case">detalle</span>
+        {[1, 2, 4, 8].map((z) => (
+          <button
+            key={z}
+            type="button"
+            onClick={() => setZoom(z)}
+            aria-pressed={zoom === z}
+            className={`rounded-full border px-2 py-0.5 tabular-nums ${
+              zoom === z
+                ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
+                : 'border-border hover:bg-muted'
+            }`}
+          >
+            {z}×
+          </button>
+        ))}
+        {zoom > 1 && <span className="normal-case">deslizá el gráfico &#8594;</span>}
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
@@ -582,16 +618,19 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
   if (rows.length === 0) return null
 
   return (
-    <section className="rounded-2xl border border-border bg-card px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-        Hora por hora
-      </div>
+    <Bloque
+      id="porhora"
+      titulo="Hora por hora"
+      extra={<span className="normal-case">desde el arranque</span>}
+    >
       <ul className="mt-2 space-y-1.5">
         {rows.map((r) => (
-          <li key={r.hourStart} className="flex items-center gap-2.5 text-sm">
-            {/* El TRAMO real, no "07h": la fila de las 07 puede ir de 07:45 a
-                08:00, y decir "07h" invita a compararla con una hora entera. */}
-            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
+          <li key={r.hourStart} className="flex items-center gap-2 text-sm">
+            {/* El nº de hora de TURNO manda, y el tramo de reloj va al lado para
+                poder cruzarlo con lo que dijo el supervisor. La hora 1 de un
+                turno que arrancó 07:45 va a las 08:45, no a las 08:00. */}
+            <span className="w-6 shrink-0 tabular-nums text-muted-foreground">h{r.index}</span>
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-[11px] text-muted-foreground/70">
               {fmtWallTime(r.from)}–{fmtWallTime(r.to)}
             </span>
             <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
@@ -619,13 +658,16 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
           </li>
         ))}
       </ul>
-      {rows.some((r) => r.partial) && (
-        <p className="mt-2 text-[11px] text-muted-foreground/70">
-          * hora incompleta — las piezas son menos porque duró menos, no porque
-          fuera más lenta. Para comparar, mirá el ritmo en pz/h.
-        </p>
-      )}
-    </section>
+      <p className="mt-2 text-[11px] text-muted-foreground/70">
+        Horas corridas desde el arranque, como cuenta Shoplogix: la hora 1 va del
+        primer ciclo a +60 min.
+        {rows.some((r) => r.partial) && (
+          <> El <span className="text-amber-700 dark:text-amber-300">*</span> marca una hora
+          incompleta — tiene menos piezas porque duró menos, no porque fuera más lenta;
+          para comparar, mirá el ritmo en pz/h.</>
+        )}
+      </p>
+    </Bloque>
   )
 }
 
@@ -800,39 +842,28 @@ export function PublicShiftMonitorPage() {
   }, [live, data?.targetPieces, now])
 
   /*
-   * Comparador con los turnos anteriores. La serie de cada uno ya viaja en el
-   * doc (`history`), así que esto no cuesta ni una lectura extra.
+   * Comparador con los turnos anteriores, a la misma altura de turno.
+   *
+   * La serie de cada dia ya viaja en el doc (`history`), asi que esto no cuesta
+   * ni una lectura extra. La recta objetivo se reparte sobre el tiempo UTIL (sin
+   * las paradas de convenio): repartir la cuota sobre el turno completo supone
+   * que no hay colacion y exige de mas desde el arranque.
    */
   const comparacion = useMemo(() => {
-    if (!live?.series?.length) return { days: [], currentHour: null }
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
+    const tb = live?.timeBreakdown
+    const opt = meta && tb
+      ? optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
+      : null
     return buildDayComparison({
-      todaySeries: live.series,
+      todaySeries: live?.series,
       todayDateKey: data?.dateKey ?? '',
       previous: (data?.history ?? []).map((h) => ({ dateKey: h.dateKey, series: h.live?.series })),
       maxDays: 2,
+      targetPieces: meta,
+      usefulMin: opt?.usefulMin ?? null,
     })
-  }, [live?.series, data?.dateKey, data?.history])
-
-  /*
-   * Lo que la cuota pediría a esta misma hora, repartida sobre el tiempo ÚTIL
-   * (sin las paradas de convenio). El reparto lineal sobre el turno completo
-   * supone que no hay colación y por eso exige de más desde la primera hora.
-   */
-  const cuotaAEstaHora = useMemo(() => {
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
-    const tb = live?.timeBreakdown
-    if (!meta || !tb || comparacion.currentHour == null || !live?.scheduledStart) return null
-    const opt = optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
-    if (!opt) return null
-    // Minutos de turno transcurridos hasta el corte, descontando la parte
-    // proporcional de lo planificado que ya ocurrió.
-    const ini = new Date(live.scheduledStart)
-    const iniMin = ini.getUTCHours() * 60 + ini.getUTCMinutes()
-    let corteMin = (comparacion.currentHour + 1) * 60 - iniMin
-    if (corteMin < 0) corteMin += 24 * 60
-    const utilTranscurrido = Math.max(0, corteMin * (opt.usefulMin / tb.windowMin))
-    return Math.round(Math.min(meta, utilTranscurrido * opt.requiredCpm))
-  }, [data?.targetPieces, live?.quotaPieces, live?.timeBreakdown, live?.scheduledStart, comparacion.currentHour])
+  }, [live?.series, live?.quotaPieces, live?.timeBreakdown, data?.dateKey, data?.history, data?.targetPieces])
 
   if (status === 'loading') {
     return (
@@ -1101,13 +1132,9 @@ export function PublicShiftMonitorPage() {
           onCausa={setCausaSel}
         />
 
-        <TiempoDelTurno tb={live.timeBreakdown} />
+        <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
 
-        <ComparadorDias
-          days={comparacion.days}
-          currentHour={comparacion.currentHour}
-          optimalAtHour={cuotaAEstaHora}
-        />
+        <ComparadorDias cmp={comparacion} />
 
         <PorHora series={live.series} />
 

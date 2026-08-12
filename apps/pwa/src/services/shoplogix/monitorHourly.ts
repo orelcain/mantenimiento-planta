@@ -10,13 +10,15 @@
  * tramos de 5 min cubriendo hasta 16 h. No hace falta tocar el backend ni
  * guardar nada nuevo.
  *
- * ── Las horas parciales son el punto ────────────────────────────────────────
+ * ── Horas CORRIDAS desde el arranque, no horas de reloj ─────────────────────
  *
- * Un turno que arranca 21:15 tiene una "primera hora" de 45 minutos. Comparar
- * sus piezas contra las de una hora completa es justamente el error que esta
- * vista viene a evitar, así que cada fila lleva las DOS cosas: las piezas que
- * salieron de verdad y el ritmo equivalente en pz/h. La afirmación "hicimos 800
- * en la primera hora" se contrasta contra el ritmo, no contra el total.
+ * La hora 1 va del arranque a +60 min: si el turno partió 07:45, va de 07:45 a
+ * 08:45 (Orel, 12-08 — es además como cuenta Shoplogix). Agrupando por hora de
+ * reloj, "la primera hora" de un turno que arranca 07:45 son 15 minutos, y
+ * contrastar contra ella la frase "en la primera hora hicieron 800" da un
+ * resultado sin sentido. Solo la ÚLTIMA fila puede ser parcial, porque el turno
+ * sigue en curso; por eso cada fila lleva las dos cosas: las piezas que salieron
+ * y el ritmo equivalente en pz/h.
  */
 
 /** Un tramo de la serie del monitor: `t` ISO wall-clock, `pieces` del tramo. */
@@ -26,20 +28,19 @@ export interface MonitorSeriesPoint {
 }
 
 export interface HourlyRow {
-  /** Inicio de la hora de reloj, ISO wall-clock. */
+  /** Inicio de la hora corrida, ISO wall-clock. Sirve de key. */
   hourStart: string
-  /** Hora de planta 0-23, ya en wall-clock. */
-  hour: number
+  /** Nº de hora del turno, 1-based: 1 = de arranque a +60 min. */
+  index: number
   /**
-   * Tramo REAL que cubre la fila, ISO wall-clock. En las horas de los extremos
-   * no es la hora entera: si el turno arrancó 07:45, la fila de las 07 va de
-   * 07:45 a 08:00. Decir "07h" a secas invitaba a compararla con una hora
-   * completa, que es justo lo que hay que evitar.
+   * Tramo REAL que cubre la fila, ISO wall-clock: 07:45–08:45, 08:45–09:45…
+   * Se muestra el tramo y no "hora 1" a secas para que se pueda cruzar con lo
+   * que dijo el supervisor, que habla en hora de reloj.
    */
   from: string
   to: string
   pieces: number
-  /** Minutos de esa hora que la serie cubre (60 salvo la primera y la última). */
+  /** Minutos de esa hora que la serie cubre (60 salvo, quizá, la última). */
   minutesCovered: number
   /** Ritmo equivalente: lo que habría dado esa hora completa a ese ritmo. */
   piecesPerHour: number
@@ -51,48 +52,46 @@ export interface HourlyRow {
 const BUCKET_MIN = 5
 
 /**
- * Agrupa la serie por hora de reloj de planta.
+ * Agrupa la serie en horas CORRIDAS desde el primer tramo con dato.
+ *
+ * El arranque es la primera pieza y no `scheduledStart`: el horario programado
+ * puede estar 20 minutos antes de que salga la primera, y esos minutos vacíos
+ * correrían todas las filas.
  *
  * ⚠ Wall-clock: los ISO del monitor llevan Z pero son hora de planta, así que
- * la hora se lee con `getUTCHours()`. Con `getHours()` el desglose se correría
- * al huso del celular de quien mira — y el supervisor y el monitor estarían
+ * el reloj se lee con `getUTC*`. Con `getHours()` los tramos se correrían al
+ * huso del celular de quien mira — y el supervisor y el monitor estarían
  * hablando de horas distintas, que es lo contrario de lo que se busca acá.
  */
 export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined): HourlyRow[] {
   if (!series || series.length === 0) return []
 
-  const byHour = new Map<number, { pieces: number; buckets: number; firstMs: number; lastMs: number }>()
-  for (const p of series) {
-    const ms = Date.parse(p.t)
-    if (Number.isNaN(ms)) continue
-    const d = new Date(ms)
-    // Inicio de la hora, en el mismo wall-clock que el resto del monitor.
-    const hourMs = Date.UTC(
-      d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), 0, 0, 0,
-    )
-    const acc = byHour.get(hourMs) ?? { pieces: 0, buckets: 0, firstMs: ms, lastMs: ms }
-    acc.pieces += p.pieces || 0
+  const puntos = series
+    .map((p) => ({ ms: Date.parse(p.t), pieces: p.pieces || 0 }))
+    .filter((p) => !Number.isNaN(p.ms))
+    .sort((a, b) => a.ms - b.ms)
+  if (puntos.length === 0) return []
+
+  const t0 = puntos[0]!.ms
+  const porHora = new Map<number, { pieces: number; buckets: number }>()
+  for (const p of puntos) {
+    const idx = Math.floor((p.ms - t0) / (60 * 60_000))
+    const acc = porHora.get(idx) ?? { pieces: 0, buckets: 0 }
+    acc.pieces += p.pieces
     acc.buckets += 1
-    acc.firstMs = Math.min(acc.firstMs, ms)
-    acc.lastMs = Math.max(acc.lastMs, ms)
-    byHour.set(hourMs, acc)
+    porHora.set(idx, acc)
   }
 
-  return [...byHour.entries()]
+  return [...porHora.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([hourMs, acc]) => {
+    .map(([idx, acc]) => {
+      const desde = t0 + idx * 60 * 60_000
       const minutesCovered = Math.min(60, acc.buckets * BUCKET_MIN)
-      /*
-       * El tramo va del primer bucket al FIN del último (+5 min), acotado a la
-       * hora: un bucket que empieza 07:55 cubre hasta las 08:00, y sin el `min`
-       * la fila de las 07 diría que llega hasta las 08:00 del cierre siguiente.
-       */
-      const to = Math.min(acc.lastMs + BUCKET_MIN * 60_000, hourMs + 60 * 60_000)
       return {
-        hourStart: new Date(hourMs).toISOString(),
-        hour: new Date(hourMs).getUTCHours(),
-        from: new Date(acc.firstMs).toISOString(),
-        to: new Date(to).toISOString(),
+        hourStart: new Date(desde).toISOString(),
+        index: idx + 1,
+        from: new Date(desde).toISOString(),
+        to: new Date(desde + minutesCovered * 60_000).toISOString(),
         pieces: acc.pieces,
         minutesCovered,
         piecesPerHour: minutesCovered > 0 ? Math.round((acc.pieces / minutesCovered) * 60) : 0,
