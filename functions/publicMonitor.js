@@ -501,6 +501,17 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
 
     /** Minutos desde medianoche del cierre de cada turno con producción real. */
     const cierres = []
+    /*
+     * Ritmo de cada turno pasado, en pz/min sobre el TIEMPO DE RELOJ de su
+     * ventana efectiva — no sobre el uptime.
+     *
+     * La base importa: el ritmo requerido se calcula sobre los minutos de reloj
+     * que faltan, y esos minutos van a incluir paradas igual que las incluyeron
+     * los turnos anteriores. Medido sobre uptime, el histórico daría 11,5 pz/min
+     * y el requerido 16 — dos números en bases distintas que no se pueden
+     * comparar, que es lo que la pantalla invita a hacer.
+     */
+    const ritmos = []
     for (const snap of snaps) {
       if (!snap.exists) continue
       const d = snap.data() || {}
@@ -509,6 +520,12 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
       const fin = toDate(d.effectiveEnd) ?? toDate(d.scheduledEnd)
       if (!fin) continue
       cierres.push(fin.getUTCHours() * 60 + fin.getUTCMinutes())
+
+      const ini = toDate(d.effectiveStart) ?? toDate(d.scheduledStart)
+      if (ini) {
+        const min = (fin.getTime() - ini.getTime()) / 60_000
+        if (min > 30) ritmos.push(piezas / min)
+      }
       if (cierres.length >= HISTORIAL_TURNOS) break
     }
     /*
@@ -531,7 +548,18 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
       Math.floor(medianaMin / 60), medianaMin % 60, 0, 0,
     ))
     if (end.getTime() <= scheduledStart.getTime()) end.setUTCDate(end.getUTCDate() + 1)
-    return { end, muestras: cierres.length }
+
+    // Mediana y mejor de los ritmos pasados. La mediana es "lo normal", el
+    // mejor es "lo que esta línea demostró que puede" — el techo realista.
+    let paceMedianCpm = null
+    let paceBestCpm = null
+    if (ritmos.length >= 2) {
+      const ord = [...ritmos].sort((a, b) => a - b)
+      const m = Math.floor(ord.length / 2)
+      paceMedianCpm = ord.length % 2 === 0 ? (ord[m - 1] + ord[m]) / 2 : ord[m]
+      paceBestCpm = ord[ord.length - 1]
+    }
+    return { end, muestras: cierres.length, paceMedianCpm, paceBestCpm, paceSamples: ritmos.length }
   } catch {
     return null
   }
@@ -901,11 +929,17 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   let plannedEndSource = null
   let plannedEndSamples = null
 
+  /*
+   * El historial se consulta SIEMPRE, incluso con el cierre fijado a mano: el
+   * pin decide la hora de cierre, pero el ritmo de los turnos pasados sigue
+   * siendo la referencia con la que se juzga si la meta es realista.
+   */
+  const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
+
   if (cfg.plannedEnd && cfg.endPinned) {
     plannedEnd = cfg.plannedEnd
     plannedEndSource = 'fijado'
   } else {
-    const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
     if (inferido) {
       plannedEnd = inferido.end
       plannedEndSource = 'historial'
@@ -933,6 +967,15 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     plannedEndSource,
     /** Turnos anteriores usados cuando se infirió del historial. */
     plannedEndSamples,
+    /*
+     * Ritmo de los turnos anteriores, en pz/min sobre tiempo de reloj. Es la
+     * referencia con la que se juzga si un "necesitás 16 pz/min" es realista:
+     * el objetivo del sensor puede decir 20 y la línea no haber pasado nunca
+     * de 12,7 — medido en Filete sobre 9 turnos.
+     */
+    paceMedianCpm: inferido?.paceMedianCpm ?? null,
+    paceBestCpm: inferido?.paceBestCpm ?? null,
+    paceSamples: inferido?.paceSamples ?? null,
     quotaPieces: planned.quotaPieces,
     /*
      * Nombre del turno tal como lo da Shoplogix. Va en el payload para que el

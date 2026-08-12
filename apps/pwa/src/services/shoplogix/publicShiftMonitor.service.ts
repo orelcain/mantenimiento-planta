@@ -61,6 +61,15 @@ export interface PublicMonitorLive {
   shiftName?: string | null
   /** Turnos anteriores usados, cuando se aprendió del historial. */
   plannedEndSamples?: number | null
+  /**
+   * Ritmo de los turnos anteriores en pz/min, sobre TIEMPO DE RELOJ (no sobre
+   * uptime) — la misma base en la que se calcula el ritmo requerido, para que
+   * los dos números se puedan comparar.
+   */
+  paceMedianCpm?: number | null
+  /** El mejor de esos turnos: lo que esta línea demostró que puede dar. */
+  paceBestCpm?: number | null
+  paceSamples?: number | null
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
   effectiveStart: string | null

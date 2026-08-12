@@ -392,8 +392,9 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
   )
 }
 
-function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, startAt }: {
+function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, startAt, historial }: {
   pace: PaceToTarget | null
+  historial: { medianCpm: number | null; bestCpm: number | null; muestras: number | null } | null
   cierre: string | null | undefined
   muestras: number | null | undefined
   fuente: PublicMonitorLive['plannedEndSource']
@@ -456,30 +457,61 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
           <dd className={`tabular-nums font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
-            {fmtInt(pace.requiredPerHour)} pz/h
+            {fmtDec(pace.requiredPerMinute)} pz/min
             <span className="ml-1 font-normal text-muted-foreground/80">
-              ({fmtDec(pace.requiredPerMinute)} pz/min)
+              = {fmtInt(pace.requiredPerHour)} pz/h
             </span>
           </dd>
         </div>
         <div className="flex items-baseline gap-2">
           <dt className="w-20 shrink-0 text-muted-foreground">Vas a</dt>
           <dd className="tabular-nums">
-            {fmtInt(pace.currentPerHour)} pz/h
-            {pace.gapPerHour > 0 && (
-              <span className="ml-1 text-muted-foreground/80">
-                → faltan {fmtInt(pace.gapPerHour)}
-              </span>
-            )}
+            {fmtDec(pace.currentPerHour / 60)} pz/min
+            <span className="ml-1 text-muted-foreground/80">= {fmtInt(pace.currentPerHour)} pz/h</span>
           </dd>
         </div>
+        {/* El TECHO explicado: no es un número abstracto, es lo mejor que esta
+            línea dio en los turnos anteriores. Sin decir de dónde sale, "techo
+            816 pz/h" no se puede ni discutir ni creer. */}
         {pace.maxPerHour != null && (
           <div className="flex items-baseline gap-2">
             <dt className="w-20 shrink-0 text-muted-foreground">Techo</dt>
-            <dd className="tabular-nums text-muted-foreground">{fmtInt(pace.maxPerHour)} pz/h</dd>
+            <dd className="tabular-nums text-muted-foreground">
+              {fmtDec(pace.maxPerHour / 60)} pz/min
+              <span className="ml-1">= {fmtInt(pace.maxPerHour)} pz/h</span>
+            </dd>
           </div>
         )}
       </dl>
+
+      {pace.maxPerHour != null && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+          El <b>techo</b> es el mejor ritmo que la línea alcanzó
+          {historial?.muestras ? ` en los últimos ${historial.muestras} turnos` : ' en turnos anteriores'} —
+          lo que ya demostró que puede, no lo que dice el objetivo.
+        </p>
+      )}
+
+      {/* La referencia histórica: hace que "necesitás 16 pz/min" se pueda
+          juzgar. El objetivo del sensor puede decir 20 y la línea no haber
+          pasado nunca de 12,7 — medido en Filete sobre 9 turnos. */}
+      {historial?.medianCpm != null && (
+        <p className="mt-1 text-[11px] text-muted-foreground/70">
+          Lo normal en esta línea:{' '}
+          <span className="tabular-nums text-foreground/80">
+            {fmtDec(historial.medianCpm)} pz/min ({fmtInt(historial.medianCpm * 60)} pz/h)
+          </span>
+          {historial.bestCpm != null && (
+            <>
+              {' '}· mejor turno{' '}
+              <span className="tabular-nums text-foreground/80">
+                {fmtDec(historial.bestCpm)} pz/min ({fmtInt(historial.bestCpm * 60)} pz/h)
+              </span>
+            </>
+          )}
+          .
+        </p>
+      )}
 
       {/* La hora extra: la pregunta que sigue a "no se alcanza". Convierte un
           "no llegamos" en una decisión que alguien puede tomar ahora. */}
@@ -496,17 +528,19 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
             <>
               bastaría con{' '}
               <b className="tabular-nums text-emerald-800 dark:text-emerald-300">
-                {fmtInt(pace.withExtraHour.requiredPerHour)} pz/h
+                {fmtDec(pace.withExtraHour.requiredPerMinute)} pz/min
               </b>{' '}
               <span className="text-muted-foreground/80">
-                ({fmtDec(pace.withExtraHour.requiredPerMinute)} pz/min)
+                ({fmtInt(pace.withExtraHour.requiredPerHour)} pz/h)
               </span>
               {' '}— <span className="text-emerald-800 dark:text-emerald-300">la meta entra</span>.
             </>
           ) : (
             <>
               harían falta{' '}
-              <b className="tabular-nums">{fmtInt(pace.withExtraHour.requiredPerHour)} pz/h</b>, que
+              <b className="tabular-nums">
+                {fmtDec(pace.withExtraHour.requiredPerMinute)} pz/min ({fmtInt(pace.withExtraHour.requiredPerHour)} pz/h)
+              </b>, que
               sigue por encima del techo de la línea. Con una hora no basta.
             </>
           )}
@@ -750,7 +784,15 @@ export function PublicShiftMonitorPage() {
       scheduledEnd: live.plannedEnd,
       nowWallMs,
       currentPerHour: live.piecesPerHour,
-      maxPerHour: lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
+      /*
+       * El techo sale del MEJOR turno real, no de `expectedPieces/horas`. Ese
+       * cálculo mezclaba lo que el sensor espera con una ventana que puede ser
+       * de otro turno, y daba números que la línea ya había superado. Lo que la
+       * línea demostró que puede es un techo que se puede defender.
+       */
+      maxPerHour: live.paceBestCpm != null
+        ? live.paceBestCpm * 60
+        : lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
     })
   }, [live, data?.targetPieces, now])
@@ -943,6 +985,11 @@ export function PublicShiftMonitorPage() {
             plantSlug={data.plantSlug}
             shiftName={live.shiftName}
             startAt={live.scheduledStart}
+            historial={live.paceMedianCpm != null ? {
+              medianCpm: live.paceMedianCpm,
+              bestCpm: live.paceBestCpm ?? null,
+              muestras: live.paceSamples ?? null,
+            } : null}
           />
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
