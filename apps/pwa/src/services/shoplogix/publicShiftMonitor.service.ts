@@ -42,6 +42,17 @@ export interface PublicMonitorLive {
   lastSyncAt: string | null
   scheduledStart: string | null
   scheduledEnd: string | null
+  /**
+   * Cierre PROGRAMADO del turno, de la config del módulo.
+   *
+   * ⚠ Distinto de `scheduledEnd`, que se deriva del último intervalo
+   * sincronizado y va corriendo detrás del reloj: con aquél el tiempo restante
+   * da siempre ~0. Para "cuánto falta para el cierre" se usa éste.
+   * Ausente en docs escritos antes de que el backend lo publicara.
+   */
+  plannedEnd?: string | null
+  /** Cuota del turno según la config del módulo. */
+  quotaPieces?: number | null
   effectiveStart: string | null
   effectiveEnd: string | null
   shiftClosed: boolean

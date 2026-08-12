@@ -454,6 +454,64 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
  *
  * @returns {Promise<object|null>} null si el turno no tiene máquinas sincronizadas.
  */
+/**
+ * Horario PROGRAMADO del turno y su cuota, desde `graderModuleConfigs`.
+ *
+ * ⚠ No confundir con el `scheduledEnd` que ya viaja en `live`: ese se deriva
+ * del ÚLTIMO intervalo sincronizado, o sea que va corriendo detrás del reloj y
+ * siempre queda unos minutos en el pasado (la nota de `shiftClosed` lo explica).
+ * Sirve para "hasta cuándo hay datos", NO para "cuánto falta para el cierre":
+ * con él, el tiempo restante da siempre ~0 y no se puede recomendar un ritmo.
+ *
+ * Devuelve `{ plannedEnd: Date|null, quotaPieces: number|null }`.
+ */
+async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
+  const vacio = { plannedEnd: null, quotaPieces: null }
+  if (!shiftId || !scheduledStart) return vacio
+  /*
+   * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
+   * deriva sin arrastrar `plantLineId` por cuatro firmas. Mismo `configDocId`
+   * que la PWA: la línea principal de Chonchi vive en 'global'.
+   */
+  const docId = { chonchi: 'global', yal: 'yal-eviscerado', filete: 'chonchi-filete' }[plantSlug]
+  if (!docId) return vacio
+  try {
+    const snap = await db.doc(`graderModuleConfigs/${docId}`).get()
+    if (!snap.exists) return vacio
+    const schedule = snap.data()?.shiftSchedule
+    if (!Array.isArray(schedule)) return vacio
+    const entry = schedule.find(s => String(s?.shiftId) === String(shiftId))
+    if (!entry) return vacio
+
+    const endH = Number(entry.endHour)
+    const endM = Number(entry.endMinute ?? 0)
+    if (!Number.isFinite(endH)) return vacio
+
+    // Wall-clock, igual que el resto del monitor: se construye sobre el DÍA del
+    // inicio y se suma un día si el turno cruza medianoche.
+    const end = new Date(Date.UTC(
+      scheduledStart.getUTCFullYear(), scheduledStart.getUTCMonth(), scheduledStart.getUTCDate(),
+      endH, endM, 0, 0,
+    ))
+    if (end.getTime() <= scheduledStart.getTime()) end.setUTCDate(end.getUTCDate() + 1)
+
+    /*
+     * `quota` es `{ value, unit }` y la unidad importa: una cuota en KG no es
+     * una meta de piezas y compararla contra los ciclos daría un disparate.
+     * Solo se toma cuando viene en piezas.
+     */
+    const quota = Number(entry.quota?.value)
+    const enPiezas = entry.quota?.unit === 'pieces'
+    return {
+      plannedEnd: end,
+      quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
+    }
+  } catch {
+    // La config es un extra: si no se puede leer, el monitor sigue igual.
+    return vacio
+  }
+}
+
 async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const parentRef = db.doc(`shoplogix/${plantSlug}/shifts/${shiftDocId}`)
   const [parentSnap, machinesSnap] = await Promise.all([
@@ -727,11 +785,22 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     ? nowWall.getTime() > scheduledEnd.getTime() + CLOSE_MARGIN_MS && producing.length === 0
     : false
 
+  const planned = await loadPlannedShift(db, plantSlug, parent.shiftId ?? machines[0]?.shiftId, scheduledStart)
+
   return {
     updatedAt: new Date().toISOString(),
     lastSyncAt: iso(toDate(parent.lastSyncAt)),
     scheduledStart: iso(scheduledStart),
     scheduledEnd: iso(scheduledEnd),
+    /*
+     * Cierre PROGRAMADO y cuota del turno, de la config del módulo. Van aparte
+     * de `scheduledEnd` a propósito: aquél se deriva del último intervalo y
+     * corre detrás del reloj, así que sirve para "hasta cuándo hay datos" pero
+     * no para "cuánto falta". Con estos dos, el monitor puede recomendar el
+     * ritmo necesario para llegar. null cuando el turno no está en la config.
+     */
+    plannedEnd: iso(planned.plannedEnd),
+    quotaPieces: planned.quotaPieces,
     effectiveStart: iso(effectiveStart),
     effectiveEnd: iso(effectiveEnd),
     shiftClosed,

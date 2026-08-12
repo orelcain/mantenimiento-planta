@@ -20,7 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -29,6 +29,7 @@ import {
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
+import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -255,6 +256,85 @@ function Sparkbars({
 }
 
 /**
+ * "¿A qué ritmo tengo que ir para llegar?" — la línea accionable de la meta.
+ *
+ * Debajo de la barra de avance, que dice dónde estás, esto dice qué hacer: las
+ * piezas que faltan, el tiempo que queda y el ritmo necesario de acá al cierre.
+ *
+ * ⚠ Cuando ese ritmo supera el techo de la línea lo dice sin rodeos. Un
+ * "necesitás 61 pz/min" en una línea que da 46 no es una meta, es una cifra que
+ * hace perder la confianza en la pantalla — y la decisión correcta ahí no es
+ * apurar, es replanificar.
+ */
+function RitmoNecesario({ pace }: { pace: PaceToTarget | null }) {
+  if (!pace) return null
+
+  if (pace.verdict === 'cumplida') {
+    return (
+      <p className="mt-2 flex items-center gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
+        <Target className="h-3.5 w-3.5 shrink-0" />
+        Meta cumplida — todo lo que salga de acá en adelante va por encima.
+      </p>
+    )
+  }
+
+  const fuera = pace.verdict === 'fuera-de-alcance'
+  return (
+    <div
+      className={`mt-2 rounded-xl border px-3 py-2 ${
+        fuera
+          ? 'border-amber-400/30 bg-amber-400/10'
+          : 'border-sky-400/25 bg-sky-400/10'
+      }`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Target className="h-3.5 w-3.5" />
+        {/* Cuál meta, siempre: sin esto no se sabe si el número persigue la
+            cuota del turno o lo que el sensor espera, que pueden diferir. */}
+        Para llegar a {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
+        <span className="normal-case tracking-normal text-muted-foreground/70">
+          ({fmtInt(pace.targetPieces)} pz
+          {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
+          {pace.targetSource === 'cuota' && ')'}
+        </span>
+      </div>
+      <p className="mt-1 text-[13px] leading-relaxed">
+        Faltan <b className="tabular-nums">{fmtInt(pace.remainingPieces)}</b> pz en{' '}
+        <b className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</b>:{' '}
+        <b className={`tabular-nums ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
+          {fmtInt(pace.requiredPerHour)} pz/h
+        </b>{' '}
+        <span className="text-muted-foreground/80">
+          ({fmtDec(pace.requiredPerMinute)} pz/min)
+        </span>
+      </p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        {pace.gapPerHour > 0 ? (
+          <>
+            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — hay que
+            subir <span className="tabular-nums text-foreground/90">{fmtInt(pace.gapPerHour)} pz/h</span>.
+          </>
+        ) : (
+          <>
+            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — con este
+            ritmo alcanza.
+          </>
+        )}
+        {' '}A ese ritmo el turno cierra en{' '}
+        <span className="tabular-nums">{fmtInt(pace.projectedPieces)} pz</span>.
+      </p>
+      {fuera && (
+        <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+          Ese ritmo está por encima de lo que la línea da a objetivo
+          {pace.maxPerHour != null && <> (<span className="tabular-nums">{fmtInt(pace.maxPerHour)} pz/h</span>)</>}
+          : la meta ya no se alcanza con el tiempo que queda.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
  * El turno hora por hora.
  *
  * Existe por un caso concreto: un supervisor dijo que "en la primera hora
@@ -452,6 +532,33 @@ export function PublicShiftMonitorPage() {
     return Math.min(100, (live.totalPieces / data.targetPieces) * 100)
   }, [live, data?.targetPieces])
 
+  /*
+   * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
+   * el resto de la página (`now`, que tictaquea solo), así que la recomendación
+   * baja sola a medida que avanza el turno.
+   *
+   * ⚠ `now` es UTC real y los horarios del turno son wall-clock de planta: hay
+   * que llevar el reloj al mismo marco antes de restar, o el tiempo restante
+   * sale corrido las horas del huso.
+   */
+  const pace = useMemo(() => {
+    if (!live) return null
+    const nowWallMs = now - new Date(now).getTimezoneOffset() * 60_000
+    return computePaceToTarget({
+      // La cuota del link primero; si no, la de la config del turno.
+      targetPieces: data?.targetPieces ?? live.quotaPieces,
+      expectedPieces: live.expectedPieces,
+      producedPieces: live.totalPieces,
+      // `plannedEnd`, no `scheduledEnd`: aquél corre detrás del reloj y dejaría
+      // el tiempo restante en ~0 durante todo el turno.
+      scheduledEnd: live.plannedEnd,
+      nowWallMs,
+      currentPerHour: live.piecesPerHour,
+      maxPerHour: lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
+      shiftClosed: live.shiftClosed,
+    })
+  }, [live, data?.targetPieces, now])
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -628,6 +735,11 @@ export function PublicShiftMonitorPage() {
               </div>
             </div>
           )}
+
+          {/* Fuera del bloque de la meta: la recomendación también aplica
+              cuando el link se creó sin cuota, midiendo contra lo que el sensor
+              espera del turno — que es la mayoría de los links repartidos. */}
+          <RitmoNecesario pace={pace} />
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
