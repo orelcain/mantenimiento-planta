@@ -28,13 +28,14 @@
  * lectura que importa: si el turno se perdió por ritmo o por máquina parada.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
+import { useTheme } from '@/hooks/useTheme'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
 const MACHINE_COLORS = [
@@ -58,14 +59,21 @@ const GAP_LABEL = 'Faltó'
 function bucketMinutesForRange(rangeMin: number): 5 | 15 {
   return rangeMin > 4 * 60 ? 15 : 5
 }
-const GRID_COLOR = '#1e293b'
-
 /**
- * Tinta de la leyenda. Sube de `#64748b` (el gris del chrome) a `#94a3b8`: la
- * leyenda es la clave para saber qué línea es cuál, así que tiene que ganarle
- * al fondo del propio gráfico, donde además pasan líneas punteadas por detrás.
+ * Tintas del chrome del gráfico, por tema.
+ *
+ * ECharts pinta en canvas y no entiende `var(--token)`: los colores hay que
+ * resolverlos en JS. Con los valores fijos del tema oscuro, en claro la leyenda
+ * (`#94a3b8` sobre `#e9f0f8`) quedaba en ~2:1 de contraste — se veía como texto
+ * deshabilitado justo donde está la clave de qué línea es cuál.
+ *
+ * La leyenda es más oscura que el resto del chrome a propósito: es lo que hay
+ * que leer, y por detrás le pasan líneas punteadas.
  */
-const LEGEND_TEXT_COLOR = '#94a3b8'
+const CHART_INK = {
+  dark:  { grid: '#1e293b', legend: '#94a3b8', axis: '#64748b', axisY: '#475569' },
+  light: { grid: '#c3d7e9', legend: '#314050', axis: '#41566a', axisY: '#41566a' },
+} as const
 
 interface Props {
   machines: UpstreamMachineShift[]
@@ -289,9 +297,52 @@ export function regroupRates(
   }
 }
 
+/**
+ * Alto de la leyenda según cuántas filas necesita para el ancho disponible.
+ *
+ * ECharts NO reserva espacio para la leyenda: la dibuja arriba y si no cabe la
+ * parte en varias filas que se meten sobre el plot. Con 3 Baader + Promedio +
+ * Objetivo + Faltó son 6 ítems, que en 306 px (un celular) ocupan tres filas y
+ * quedaban montadas sobre el gráfico y sobre sí mismas.
+ *
+ * El ancho de cada ítem se estima: cuadradito (12) + aire (4) + texto + gap.
+ * 5,4 px por carácter a 10 px de fuente es una aproximación medida sobre la
+ * fuente real de la app; sobra un poco a propósito — pasarse de fila es feo,
+ * quedarse corto vuelve a montar el texto.
+ */
+function legendRows(labels: string[], availableWidth: number): number {
+  if (availableWidth <= 0) return 1
+  const ITEM_GAP = 12
+  const widthOf = (s: string) => 12 + 4 + s.length * 5.4 + ITEM_GAP
+  let rows = 1
+  let used = 0
+  for (const l of labels) {
+    const w = widthOf(l)
+    if (used + w > availableWidth && used > 0) { rows++; used = w } else { used += w }
+  }
+  return rows
+}
+
 export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap = false }: Props) {
   const echartsRef = useRef<any>(null)
   const myHoverId  = useId()
+  const wrapRef    = useRef<HTMLDivElement>(null)
+  const [wrapWidth, setWrapWidth] = useState(0)
+  const { isDark } = useTheme()
+  const ink = isDark ? CHART_INK.dark : CHART_INK.light
+
+  // El alto de la leyenda depende del ancho REAL, no del breakpoint: el mismo
+  // gráfico vive en el detalle de turno y dentro de tarjetas más angostas.
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) setWrapWidth(entry.contentRect.width)
+    })
+    ro.observe(el)
+    setWrapWidth(el.getBoundingClientRect().width)
+    return () => ro.disconnect()
+  }, [])
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
@@ -305,6 +356,21 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
   // Gantts, acá encima de la velocidad upstream para poder "demostrar" el
   // comportamiento real de las máquinas en ese tramo (Orel 2026-07-22).
   const highlightRanges = timelineSync?.highlightRanges ?? []
+
+  /*
+   * Etiquetas de la leyenda. Se calculan FUERA del `option` porque también
+   * definen cuánto alto reservar — si cada lado armara su propia lista podrían
+   * discrepar y volveríamos al texto montado.
+   */
+  const legendLabelsForHeight = useMemo(() => {
+    const targetHasData = targetSeries.some((v) => v != null && v > 0)
+    return [
+      ...series.map((s) => s.name),
+      ...(showAvg ? ['Promedio'] : []),
+      ...(targetHasData ? [OBJETIVO_LABEL] : []),
+      ...(showGap && rateChartMode(series.length) === 'bar' ? [GAP_LABEL] : []),
+    ]
+  }, [series, showAvg, targetSeries, showGap])
 
   // Rango temporal efectivo
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
@@ -502,6 +568,11 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
           borderColor: 'rgba(176,112,109,0.45)',
           borderType: 'dashed' as const,
         },
+        /* Sin etiqueta. ECharts pinta el `name` de cada área arriba del tramo:
+           con varios tramos salían tres o cuatro "parada con objetivo" apilados
+           sobre la leyenda. El sombreado se explica una sola vez, en HTML debajo
+           del gráfico, donde el texto puede fluir. */
+        label: { show: false },
         data: stoppedWithTarget.map(([from, to]) => ([
           { xAxis: from, name: 'parada con objetivo' },
           { xAxis: to },
@@ -544,39 +615,46 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
       } : undefined,
     } : null
 
+    // Las mismas etiquetas con las que se reservó el alto, o el plot y la
+    // leyenda estarían calculando sobre listas distintas.
+    const legendLabels = legendLabelsForHeight
+    // 15 px por fila + 12 de aire. Con 14+8 la última fila quedaba pegada al
+    // "18" del eje y a la punta de la flecha del objetivo: no se montaba, pero
+    // se leía como si se montara — que para el caso es lo mismo.
+    const legendHeight = legendRows(legendLabels, wrapWidth) * 15 + 12
+
     return {
       backgroundColor: 'transparent',
       // `grid.top` DEBE reservar el alto de la leyenda: ECharts no lo hace solo.
       // Con `top: 6` la leyenda quedaba dibujada ENCIMA del área del gráfico y
       // las líneas pasaban por detrás de "Baader 1 / Baader 2 / …", que se leían
-      // tachadas. 22 px = alto de la leyenda (9 px de texto + ítem) + aire.
-      grid:   { left: 0, right: 0, top: 22, bottom: 0, containLabel: true },
+      // tachadas. 22 px = una fila de leyenda (9 px de texto + ítem) + aire; con
+      // 2 o 3 filas en pantallas angostas hay que bajar el plot otro tanto o
+      // vuelve a montarse (que es lo que reportó Orel a 375 px).
+      grid:   { left: 0, right: 0, top: legendHeight, bottom: 0, containLabel: true },
       legend: {
         show: true,
         top: 0,
-        right: 0,
+        // `left: 0` y no `right: 0`: alineada a la derecha, ECharts parte las
+        // filas desde ese borde y las etiquetas largas se pisan entre sí.
+        left: 0,
         // Texto más grande y opaco que el resto del chrome: es la clave de
         // lectura del gráfico, no una etiqueta secundaria.
-        textStyle: { color: LEGEND_TEXT_COLOR, fontSize: 10 },
+        textStyle: { color: ink.legend, fontSize: 10 },
         itemWidth: 12,
         itemHeight: 8,
         itemGap: 12,
-        data: [
-          ...series.map(s => s.name),
-          ...(showAvg ? ['Promedio'] : []),
-          ...(targetHasData ? [OBJETIVO_LABEL] : []),
-          ...(showGap && mode === 'bar' && gapSeries.length > 0 ? [GAP_LABEL] : []),
-        ],
+        data: legendLabels,
       },
       xAxis: {
         type: 'time' as const,
         min:  rangeStart.getTime(),
         max:  rangeEnd.getTime(),
         axisLine: { show: false },
-        axisTick: { show: true, lineStyle: { color: GRID_COLOR }, length: 3 },
+        axisTick: { show: true, lineStyle: { color: ink.grid }, length: 3 },
         axisLabel: {
           show: true,
-          color: '#64748b',
+          color: ink.axis,
           fontSize: 9,
           formatter: (value: number) => fmtTime(value),
         },
@@ -586,12 +664,13 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         type:  'value' as const,
         min:   0,
         max:   maxRate,
-        name:  'pz/min',
-        nameTextStyle: { color: '#475569', fontSize: 8 },
+        /* Sin `name`. Decía "pz/min" en la esquina superior izquierda, encima de
+           la leyenda —y el título de la sección YA dice "· pz/min"—: era la misma
+           unidad escrita dos veces, una de ellas pisando texto. */
         axisLine:  { show: false },
         axisTick:  { show: false },
-        axisLabel: { show: true, color: '#475569', fontSize: 9, formatter: (v: number) => v.toFixed(0) },
-        splitLine: { lineStyle: { color: GRID_COLOR, type: 'dashed' } },
+        axisLabel: { show: true, color: ink.axisY, fontSize: 9, formatter: (v: number) => v.toFixed(0) },
+        splitLine: { lineStyle: { color: ink.grid, type: 'dashed' } },
       },
       tooltip: {
         trigger: 'axis' as const,
@@ -601,7 +680,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         hideDelay: 800,
         axisPointer: {
           type:      'line' as const,
-          lineStyle: { color: '#475569', type: 'dashed', width: 1 },
+          lineStyle: { color: ink.axisY, type: 'dashed', width: 1 },
         },
         formatter: (params: any[]) => {
           if (!Array.isArray(params) || params.length === 0) return ''
@@ -633,25 +712,44 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         ...(avgS ? [avgS] : []),
       ],
     }
-  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges, showGap])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg, highlightRanges, showGap, wrapWidth, legendLabelsForHeight, ink])
 
   if (timeAxis.length < 2) return null
 
+  /*
+   * El alto crece con las filas de leyenda: con 6 ítems en un celular la
+   * leyenda ocupa 3 filas, y si el alto quedara fijo el plot se comprimía a
+   * ~90 px y las curvas se aplastaban hasta ser indistinguibles.
+   */
+  const legendRowCount = legendRows(legendLabelsForHeight, wrapWidth)
+  const chartHeight = 108 + legendRowCount * 15
+
   return (
-    <ReactECharts
-      ref={echartsRef}
-      option={option}
-      // 142 y no 120: la leyenda pasó a ocupar sus 22 px propios en vez de
-      // solaparse con el plot, así que se le devuelven al gráfico. Sin esto el
-      // área de datos quedaba en ~98 px y las curvas se aplastaban.
-      style={{ height: 142, width: '100%' }}
-      onChartReady={onChartReady}
-      onEvents={{
-        mousemove: onMouseMove,
-        mouseout:  onMouseOut,
-        dataZoom:  onDataZoom,
-      }}
-      opts={{ renderer: 'canvas' }}
-    />
+    <div ref={wrapRef}>
+      <ReactECharts
+        ref={echartsRef}
+        option={option}
+        style={{ height: chartHeight, width: '100%' }}
+        onChartReady={onChartReady}
+        onEvents={{
+          mousemove: onMouseMove,
+          mouseout:  onMouseOut,
+          dataZoom:  onDataZoom,
+        }}
+        opts={{ renderer: 'canvas' }}
+      />
+      {stoppedWithTarget.length > 0 && (
+        /* El sombreado se explica UNA vez acá, en HTML: dentro del canvas
+           ECharts repetía la etiqueta por cada tramo y se apilaban. */
+        <p className="mt-1 flex items-center gap-1.5 text-caption text-muted-foreground">
+          <span
+            className="inline-block w-4 h-2.5 shrink-0 rounded-[2px] border border-dashed"
+            style={{ background: 'rgba(176,112,109,0.16)', borderColor: 'rgba(176,112,109,0.45)' }}
+          />
+          Tramos sombreados: la máquina estaba parada mientras el objetivo corría
+          — pérdida por detención, no por ritmo lento.
+        </p>
+      )}
+    </div>
   )
 }
