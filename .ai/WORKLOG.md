@@ -13,6 +13,54 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-12 - claude - Corte de control a mitad de turno + las 12 compuertas directas (#476)
+
+Orel: *"dale con el corte de control a mitad de turno y en gates debemos poder setear directo las
+12 gates ... sin ir a la configuracion de grader"*.
+
+- **Corte de control** (`MidShiftCheckCard` + `graderMidShiftCheck.ts`): con el turno EN CURSO y un
+  Excel cargado —aunque cubra un tramo— dice qué calibre viene apretado, cuántas piezas de ese
+  calibre quedan al ritmo medido, y qué gate mover. Si el Excel quedó viejo (>90 min) eso se dice
+  PRIMERO: todo lo demás describe un turno de hace horas. El Resumen lleva un aviso de una línea
+  que abre Gates — la tarjeta vive donde se actúa, pero enterrada ahí Control de Producción no la ve.
+  Reusa `compareGatesVsHistory`/`suggestGateMoves` de #474 a propósito: los umbrales tienen que ser
+  los mismos en las tres vistas (post-turno, pre-turno, mitad de turno). NO promete "piezas mejor
+  clasificadas" — a dónde caen las que desbordan no lo dice el Excel.
+- **Las 12 compuertas directas**: la tabla ya estaba en Gates pero detrás de un acordeón cerrado Y
+  una sub-pestaña. Ahora abre por defecto y en "12 Gates" (prop `defaultTab`).
+
+### ⚠ Dos cosas para no repetir
+
+1. **CORRECCIÓN a #474.** Ahí escribí que "la mayoría de los turnos no tiene `configHistory`, la
+   config vive en plantillas". **Es falso.** Lo medí con `collection('graderShifts').get()`, que
+   devuelve 2 turnos — y en Firestore **una subcolección puede vivir bajo un documento padre que NO
+   existe**, así que esa consulta no la ve. Con `collectionGroup('configHistory')` son **386
+   turnos**. Regla general: para contar subcolecciones usar `collectionGroup`, nunca
+   `collection(padre).get()`. El fallback a plantilla sigue siendo necesario (un turno nuevo empieza
+   sin snapshot) pero por esa razón, no por la que escribí.
+2. **Snapshots fantasma de "0 cambios".** El editor de gates publica con debounce apenas monta —es
+   "esto es lo que muestro", no "el usuario cambió algo"— y `saveConfigSnapshot` NO puede
+   distinguirlo: sin snapshot previo el diff es `[]` por construcción, así que su guarda de "sin
+   cambios" no aplica y escribe igual. Al abrir el panel por defecto, CADA visita a Gates dejaba un
+   snapshot firmado por quien pasó. Cortado con una huella de la última emisión (la primera tras
+   montar nunca se guarda). En prod hay **125 de 659** snapshots así, de antes.
+   ⚠ Dos de esos 125 los generé YO en esta sesión antes de detectarlo: `2026-08-11__Turno 2`
+   (2026-08-12T00:49Z) y `2026-08-07__Turno día` (2026-08-12T00:01Z). No los borré —borrar datos
+   de producción es decisión de Orel—; quedan anotados acá.
+
+- Archivos: `services/grader/graderMidShiftCheck.ts` (nuevo, puro),
+  `components/grader/MidShiftCheckCard.tsx` (nuevo), `AnalisisGraderGatesConfigPage.tsx`
+  (prop `defaultTab`), `AnalisisGraderTurnoPage.tsx`, `GateChangeModal.tsx`,
+  `GatesHistoryHintCard.tsx` (comentarios corregidos).
+- Verificación: 15 tests nuevos sobre el reparto REAL del `2026-08-11 Turno 2`. En el navegador,
+  forzando el turno a "en curso": estima ≈5.907 piezas por pasar y ≈3.484 del calibre apretado, y
+  los dos movimientos llevan el ratio de 2,4× a 1,4×. El aviso del Resumen abre Gates. Con el turno
+  cerrado no aparece ninguno. Pruebas revertidas. Confirmado que ya no se escriben snapshots al
+  abrir Gates. Claro, oscuro y 375px. tsc 0, eslint 0 nuevos, 1.162 tests OK.
+- Estado: HECHO (`3899d2a` en prod).
+- Sigue: el camino C de la propuesta — aviso por Telegram al detectar saturación, que ahora sí
+  tiene de dónde salir (reusa el canal de los briefs de turno).
+
 ## 2026-08-11 - claude - Gates: setear sin Excel, imputaciones a "¿Que hacer?", aviso por historial (#473, #474)
 
 Orel: *"dale con las dos y pensemos como podriamos ayudar a control de produccion a corregir los
