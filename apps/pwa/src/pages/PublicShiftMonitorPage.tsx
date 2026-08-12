@@ -65,6 +65,9 @@ const fmtDec = (n: number, d = 1) =>
 
 function fmtDurationSec(sec: number): string {
   if (!Number.isFinite(sec) || sec <= 0) return '—'
+  // Las micro detenciones duran menos de un minuto: redondeadas se leían
+  // "0 min", que no existe. Bajo el minuto se muestran en segundos.
+  if (sec < 60) return `${Math.round(sec)} s`
   const min = Math.round(sec / 60)
   if (min < 60) return `${min} min`
   const h = Math.floor(min / 60)
