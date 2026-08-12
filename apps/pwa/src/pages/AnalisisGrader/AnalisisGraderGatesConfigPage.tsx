@@ -54,6 +54,8 @@ interface Props {
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
   /** Si true, muestra navegación por pestañas en lugar de cards apiladas */
   tabbed?: boolean
+  /** Pestaña con la que abre cuando la URL no trae `?tab=`. */
+  defaultTab?: ConfigTab
   /** ID del turno activo — habilita override de rangos + umbrales por turno */
   shiftDocId?: string
   /** Rangos override ya cargados desde el turno (para no re-fetchear) */
@@ -109,6 +111,7 @@ export function AnalisisGraderGatesConfigPage({
   parsedData,
   onComplete,
   tabbed = false,
+  defaultTab,
   shiftDocId,
   shiftCalibreOverride,
   onShiftRangesSaved,
@@ -121,10 +124,17 @@ export function AnalisisGraderGatesConfigPage({
   const plantLineConfig = getPlantLineConfig(plantLineId)
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
-  // Tab inicial: lee ?tab= de la URL si está presente y es válido, sino 'analisis'
+  /*
+   * Tab inicial: manda `?tab=` de la URL; si no, `defaultTab`; si no, 'analisis'.
+   *
+   * `defaultTab` existe porque en la pestaña Gates del turno lo que se quiere
+   * tocar son LAS 12 COMPUERTAS, no los umbrales: abrir en 'analisis' obligaba
+   * a un clic extra que hacía sentir que había que "ir a la configuración".
+   */
   const initialTabFromUrl = useMemo<ConfigTab>(() => {
     const t = searchParams.get('tab')
-    return (VALID_TABS as readonly string[]).includes(t ?? '') ? (t as ConfigTab) : 'analisis'
+    if ((VALID_TABS as readonly string[]).includes(t ?? '')) return t as ConfigTab
+    return defaultTab ?? 'analisis'
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // solo al montar
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTabFromUrl)

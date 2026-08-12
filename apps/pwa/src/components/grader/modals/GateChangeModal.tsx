@@ -80,12 +80,17 @@ export function GateChangeModal({
    *   2. el último snapshot del turno
    *   3. la plantilla de gates
    *
-   * El paso 3 no es un adorno: en producción la MAYORÍA de los turnos no tiene
-   * `configHistory` —la config se guarda como plantilla y se reusa—, así que
-   * sin él el modal abría con el selector de gates y ningún campo abajo. El
-   * botón "Cambiar gate" quedaba muerto justo en el turno donde todavía se
-   * podía cambiar algo. Es la misma regla de elección que usa el editor
-   * (`AnalisisGraderGatesConfigPage`): "Plantilla 1" o la primera.
+   * El paso 3 no es un adorno. Medido en producción con un `collectionGroup`
+   * sobre `configHistory`: 386 turnos tienen snapshot, pero los turnos NUEVOS
+   * empiezan sin ninguno, y ahí el modal abría con el selector de gates y
+   * ningún campo abajo — el botón "Cambiar gate" quedaba muerto justo en el
+   * turno donde todavía se podía cambiar algo. Es la misma regla de elección
+   * que usa el editor (`AnalisisGraderGatesConfigPage`): "Plantilla 1" o la
+   * primera.
+   *
+   * ⚠ Al contar snapshots NO sirve `collection('graderShifts').get()`: en
+   * Firestore una subcolección puede vivir bajo un documento padre que no
+   * existe, y esa consulta devuelve 2 turnos en vez de 386.
    */
   useEffect(() => {
     if (!open || (configSnapshots && configSnapshots.length > 0)) return

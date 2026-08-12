@@ -43,10 +43,10 @@ const LOOKBACK_DAYS = 45
 
 interface Props {
   /**
-   * Gates del snapshot del turno. Casi siempre viene VACÍO: en producción la
-   * mayoría de los turnos no tiene `configHistory` —la config real se guarda
-   * como plantilla y se reusa—, así que la tarjeta cae a la plantilla igual que
-   * el editor. Sin ese fallback no se mostraría nunca.
+   * Gates del snapshot del turno. Puede venir VACÍO —un turno recién abierto no
+   * tiene `configHistory` todavía—, y ahí la tarjeta cae a la plantilla igual
+   * que el editor. Sin ese fallback no diría nada justo cuando más sirve: al
+   * empezar el turno.
    */
   gates: GateAssignment[]
   dateKey: string
