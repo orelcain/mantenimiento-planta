@@ -454,6 +454,156 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
  *
  * @returns {Promise<object|null>} null si el turno no tiene máquinas sincronizadas.
  */
+/**
+ * Horario PROGRAMADO del turno y su cuota, desde `graderModuleConfigs`.
+ *
+ * ⚠ No confundir con el `scheduledEnd` que ya viaja en `live`: ese se deriva
+ * del ÚLTIMO intervalo sincronizado, o sea que va corriendo detrás del reloj y
+ * siempre queda unos minutos en el pasado (la nota de `shiftClosed` lo explica).
+ * Sirve para "hasta cuándo hay datos", NO para "cuánto falta para el cierre":
+ * con él, el tiempo restante da siempre ~0 y no se puede recomendar un ritmo.
+ *
+ * Devuelve `{ plannedEnd: Date|null, quotaPieces: number|null }`.
+ */
+/**
+ * Cierre APRENDIDO de los turnos anteriores con el mismo nombre.
+ *
+ * Es el camino por defecto, y a propósito: pedirle a alguien que cargue a mano
+ * el horario de cada turno de cada línea envejece mal — la semana que Filete
+ * pase a tener turno día Y tarde, la config quedaría vieja sin que nadie se
+ * entere y el monitor recomendaría contra un cierre que ya no existe. Los
+ * turnos ya cerrados sí dicen la verdad: su `effectiveEnd` quedó fijo en la
+ * última pieza real.
+ *
+ * Se toma la MEDIANA de la hora de cierre y no el promedio: un turno que se
+ * cortó temprano por falta de materia prima no debe arrastrar la referencia.
+ *
+ * ⚠ Solo turnos con producción de verdad (`MIN_PIEZAS_HISTORIAL`): un turno de
+ * 40 piezas que murió a los 20 minutos no dice a qué hora cierra ese turno.
+ */
+const HISTORIAL_TURNOS = 8
+const MIN_PIEZAS_HISTORIAL = 200
+
+async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, currentShiftDocId) {
+  if (!shiftId || !scheduledStart) return null
+  try {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    const mismos = refs.filter(r =>
+      r.id !== currentShiftDocId &&
+      !/unscheduled/i.test(r.id) &&
+      normShiftName(r.id.slice(11)) === normShiftName(shiftId),
+    )
+    if (mismos.length === 0) return null
+
+    // Los más recientes primero: el id arranca con el dateKey.
+    mismos.sort((a, b) => b.id.localeCompare(a.id))
+    const snaps = await db.getAll(...mismos.slice(0, HISTORIAL_TURNOS * 2))
+
+    /** Minutos desde medianoche del cierre de cada turno con producción real. */
+    const cierres = []
+    for (const snap of snaps) {
+      if (!snap.exists) continue
+      const d = snap.data() || {}
+      const piezas = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+      if (piezas < MIN_PIEZAS_HISTORIAL) continue
+      const fin = toDate(d.effectiveEnd) ?? toDate(d.scheduledEnd)
+      if (!fin) continue
+      cierres.push(fin.getUTCHours() * 60 + fin.getUTCMinutes())
+      if (cierres.length >= HISTORIAL_TURNOS) break
+    }
+    /*
+     * Con 2 muestras ya se da una referencia, y la pantalla dice cuántas son.
+     * Un turno NUEVO (Shoplogix lo dará de alta solo, p. ej. "Turno 2" de
+     * Filete cuando arranque el segundo turno) tardaría tres días en tener 3
+     * muestras, y esos son justo los días en que nadie sabe a qué ritmo ir.
+     * Con 1 sola no: un primer turno raro fijaría la referencia entera.
+     */
+    if (cierres.length < 2) return null
+
+    cierres.sort((a, b) => a - b)
+    const mid = Math.floor(cierres.length / 2)
+    const medianaMin = cierres.length % 2 === 0
+      ? Math.round((cierres[mid - 1] + cierres[mid]) / 2)
+      : cierres[mid]
+
+    const end = new Date(Date.UTC(
+      scheduledStart.getUTCFullYear(), scheduledStart.getUTCMonth(), scheduledStart.getUTCDate(),
+      Math.floor(medianaMin / 60), medianaMin % 60, 0, 0,
+    ))
+    if (end.getTime() <= scheduledStart.getTime()) end.setUTCDate(end.getUTCDate() + 1)
+    return { end, muestras: cierres.length }
+  } catch {
+    return null
+  }
+}
+
+/** "Turno Dia" y "Turno día" son el mismo turno: se comparan sin tildes. */
+function normShiftName(s) {
+  return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+
+async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
+  const vacio = { plannedEnd: null, quotaPieces: null }
+  if (!shiftId || !scheduledStart) return vacio
+  /*
+   * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
+   * deriva sin arrastrar `plantLineId` por cuatro firmas. Mismo `configDocId`
+   * que la PWA: la línea principal de Chonchi vive en 'global'.
+   */
+  const docId = { chonchi: 'global', yal: 'yal-eviscerado', filete: 'chonchi-filete' }[plantSlug]
+  if (!docId) return vacio
+  try {
+    const snap = await db.doc(`graderModuleConfigs/${docId}`).get()
+    if (!snap.exists) return vacio
+    const schedule = snap.data()?.shiftSchedule
+    if (!Array.isArray(schedule)) return vacio
+    /*
+     * Comparación TOLERANTE de nombre de turno. Filete llama al suyo
+     * "Turno Dia" y la config guarda "Turno día": comparando literal, Filete
+     * nunca encontraba su horario. Es el mismo tropiezo que ya rompió antes la
+     * comparación de turnos por nombre fijo — se normalizan tildes y mayúsculas.
+     */
+    // ̀-ͯ = los diacríticos que separa NFD. Escapado y no literal:
+    // un archivo con otro encoding convertiría el rango en basura silenciosa.
+    const entry = schedule.find(s => normShiftName(s?.shiftId) === normShiftName(shiftId))
+    if (!entry) return vacio
+
+    const endH = Number(entry.endHour)
+    const endM = Number(entry.endMinute ?? 0)
+    if (!Number.isFinite(endH)) return vacio
+
+    // Wall-clock, igual que el resto del monitor: se construye sobre el DÍA del
+    // inicio y se suma un día si el turno cruza medianoche.
+    const end = new Date(Date.UTC(
+      scheduledStart.getUTCFullYear(), scheduledStart.getUTCMonth(), scheduledStart.getUTCDate(),
+      endH, endM, 0, 0,
+    ))
+    if (end.getTime() <= scheduledStart.getTime()) end.setUTCDate(end.getUTCDate() + 1)
+
+    /*
+     * `quota` es `{ value, unit }` y la unidad importa: una cuota en KG no es
+     * una meta de piezas y compararla contra los ciclos daría un disparate.
+     * Solo se toma cuando viene en piezas.
+     */
+    const quota = Number(entry.quota?.value)
+    const enPiezas = entry.quota?.unit === 'pieces'
+    return {
+      plannedEnd: end,
+      quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
+      /*
+       * `endPinned` lo marca quien fija el cierre A PROPÓSITO desde el monitor.
+       * Sin él no se puede distinguir un horario cargado hace meses —que envejeció
+       * y por eso el historial le gana— de una decisión que alguien acaba de
+       * tomar mirando la pantalla, que sí tiene que mandar.
+       */
+      endPinned: entry.endPinned === true,
+    }
+  } catch {
+    // La config es un extra: si no se puede leer, el monitor sigue igual.
+    return vacio
+  }
+}
+
 async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const parentRef = db.doc(`shoplogix/${plantSlug}/shifts/${shiftDocId}`)
   const [parentSnap, machinesSnap] = await Promise.all([
@@ -727,11 +877,69 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     ? nowWall.getTime() > scheduledEnd.getTime() + CLOSE_MARGIN_MS && producing.length === 0
     : false
 
+  /*
+   * Cierre del turno, en tres niveles y en este orden:
+   *
+   *   1. FIJADO a mano (`endPinned`) — alguien lo decidió mirando la pantalla.
+   *      Una decisión explícita le gana a cualquier cálculo.
+   *   2. HISTORIAL — la mediana de los turnos anteriores con el mismo nombre.
+   *      Es el caso normal y el que no hay que mantener: cuando Filete pase a
+   *      tener día y tarde, cada turno aprende su horario solo.
+   *   3. CONFIG sin fijar — un horario cargado alguna vez. Último recurso.
+   *
+   * El historial le gana a la config sin fijar a propósito: la config es una
+   * intención que envejece sin que nadie se entere. Medido el 12-08, la de
+   * Chonchi dice que el Turno 2 cierra 17:15 y los últimos 8 turnos cerraron a
+   * las 15:00 — recomendar un ritmo contra un cierre que no ocurre regala dos
+   * horas que no existen.
+   */
+  const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
+  const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
+  const planned = { quotaPieces: cfg.quotaPieces }
+
+  let plannedEnd = null
+  let plannedEndSource = null
+  let plannedEndSamples = null
+
+  if (cfg.plannedEnd && cfg.endPinned) {
+    plannedEnd = cfg.plannedEnd
+    plannedEndSource = 'fijado'
+  } else {
+    const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
+    if (inferido) {
+      plannedEnd = inferido.end
+      plannedEndSource = 'historial'
+      plannedEndSamples = inferido.muestras
+    } else if (cfg.plannedEnd) {
+      plannedEnd = cfg.plannedEnd
+      plannedEndSource = 'config'
+    }
+  }
+
   return {
     updatedAt: new Date().toISOString(),
     lastSyncAt: iso(toDate(parent.lastSyncAt)),
     scheduledStart: iso(scheduledStart),
     scheduledEnd: iso(scheduledEnd),
+    /*
+     * Cierre PROGRAMADO y cuota del turno, de la config del módulo. Van aparte
+     * de `scheduledEnd` a propósito: aquél se deriva del último intervalo y
+     * corre detrás del reloj, así que sirve para "hasta cuándo hay datos" pero
+     * no para "cuánto falta". Con estos dos, el monitor puede recomendar el
+     * ritmo necesario para llegar. null cuando el turno no está en la config.
+     */
+    plannedEnd: iso(plannedEnd),
+    /** 'fijado' | 'historial' | 'config' | null — para poder decirlo en pantalla. */
+    plannedEndSource,
+    /** Turnos anteriores usados cuando se infirió del historial. */
+    plannedEndSamples,
+    quotaPieces: planned.quotaPieces,
+    /*
+     * Nombre del turno tal como lo da Shoplogix. Va en el payload para que el
+     * monitor pueda fijar el cierre DE ESTE turno sin adivinarlo del id del
+     * documento — que trae el dateKey pegado y ya rompió una comparación antes.
+     */
+    shiftName: shiftIdActual ?? null,
     effectiveStart: iso(effectiveStart),
     effectiveEnd: iso(effectiveEnd),
     shiftClosed,

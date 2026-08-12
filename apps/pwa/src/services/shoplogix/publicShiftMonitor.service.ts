@@ -42,6 +42,27 @@ export interface PublicMonitorLive {
   lastSyncAt: string | null
   scheduledStart: string | null
   scheduledEnd: string | null
+  /**
+   * Cierre PROGRAMADO del turno, de la config del módulo.
+   *
+   * ⚠ Distinto de `scheduledEnd`, que se deriva del último intervalo
+   * sincronizado y va corriendo detrás del reloj: con aquél el tiempo restante
+   * da siempre ~0. Para "cuánto falta para el cierre" se usa éste.
+   * Ausente en docs escritos antes de que el backend lo publicara.
+   */
+  plannedEnd?: string | null
+  /**
+   * De dónde salió `plannedEnd`. `historial` es el caso normal: la mediana de
+   * los turnos anteriores con el mismo nombre. `config` solo cuando el turno es
+   * nuevo y todavía no tiene historia.
+   */
+  plannedEndSource?: 'fijado' | 'historial' | 'config' | null
+  /** Nombre del turno según Shoplogix — con él se fija el cierre de ESTE turno. */
+  shiftName?: string | null
+  /** Turnos anteriores usados, cuando se aprendió del historial. */
+  plannedEndSamples?: number | null
+  /** Cuota del turno según la config del módulo. */
+  quotaPieces?: number | null
   effectiveStart: string | null
   effectiveEnd: string | null
   shiftClosed: boolean

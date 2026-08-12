@@ -4,7 +4,13 @@
  * Pensada para Control de Producción: entra desde el QR en el celular y ve
  * cuántas piezas lleva la línea, a qué cadencia (pz/min y pz/h), de qué turno
  * y día se trata, desde qué hora, y si la máquina está corriendo o parada.
- * SOLO LECTURA — no hay ninguna acción que escriba.
+ *
+ * SOLO LECTURA para quien entra por el QR sin cuenta — que es el caso normal.
+ * La ÚNICA excepción es fijar la hora de cierre del turno, y solo si quien mira
+ * tiene sesión de admin: el resto ni siquiera ve el control. Esa escritura no
+ * toca el doc del monitor (tiene `allow write: if false` en las reglas y así
+ * queda) sino `graderModuleConfigs`, cuyas reglas exigen supervisor — o sea que
+ * la comprobación de rol de la UI no es la única defensa.
  *
  * Se actualiza sola: el doc espejo lo reescribe el backend cada ciclo de sync
  * (~5 min mientras el turno corre) y acá hay un `onSnapshot`.
@@ -20,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Timer } from 'lucide-react'
+import { Activity, AlertCircle, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, Radio, RefreshCw, Sun, Target, Timer } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -29,6 +35,9 @@ import {
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
+import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
+import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
+import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -255,6 +264,218 @@ function Sparkbars({
 }
 
 /**
+ * "¿A qué ritmo tengo que ir para llegar?" — la línea accionable de la meta.
+ *
+ * Debajo de la barra de avance, que dice dónde estás, esto dice qué hacer: las
+ * piezas que faltan, el tiempo que queda y el ritmo necesario de acá al cierre.
+ *
+ * ⚠ Cuando ese ritmo supera el techo de la línea lo dice sin rodeos. Un
+ * "necesitás 61 pz/min" en una línea que da 46 no es una meta, es una cifra que
+ * hace perder la confianza en la pantalla — y la decisión correcta ahí no es
+ * apurar, es replanificar.
+ */
+/**
+ * De dónde sale la hora de cierre — y, si quien mira es admin, cómo cambiarla.
+ *
+ * Sin esta línea el "faltan 3 h 20 min" es un número sin dueño. Con ella se
+ * puede discutir: dice si salió de los turnos anteriores o si alguien la fijó.
+ *
+ * ⚠ El campo de edición NO es la seguridad. El doc del monitor tiene
+ * `allow write: if false` —nadie lo toca desde el navegador, con sesión o sin
+ * ella— y lo que se guarda va a `graderModuleConfigs`, cuyas reglas exigen
+ * supervisor. Quien abre el QR sin cuenta no ve el control, y aunque lo viera,
+ * Firestore rechazaría la escritura.
+ */
+function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startAt }: {
+  cierre: string | null | undefined
+  muestras: number | null | undefined
+  fuente: PublicMonitorLive['plannedEndSource']
+  plantSlug: string | undefined
+  shiftName: string | null | undefined
+  startAt: string | null | undefined
+}) {
+  const isAdmin = useIsAdmin()
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!cierre) return null
+
+  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName)
+
+  const guardar = async () => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
+    if (!m) { setError('Usá el formato HH:MM'); return }
+    const h = Number(m[1]), min = Number(m[2])
+    if (h > 23 || min > 59) { setError('Hora fuera de rango'); return }
+    setGuardando(true); setError(null)
+    try {
+      await pinShiftEnd({ plantSlug: plantSlug!, shiftName: shiftName!, endHour: h, endMinute: min, startAtIso: startAt })
+      setEditando(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>
+          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {fuente === 'fijado'
+            ? ', fijado a mano'
+            : muestras
+            ? `, según los últimos ${muestras} turnos`
+            : ', según el horario configurado'}.
+        </span>
+        {puedeEditar && !editando && (
+          <button
+            type="button"
+            onClick={() => { setValor(fmtWallTime(cierre)); setEditando(true); setError(null) }}
+            className="rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+          >
+            Cambiar
+          </button>
+        )}
+      </div>
+
+      {puedeEditar && editando && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="HH:MM"
+            className="w-20 rounded-ctl border border-border bg-background px-2 py-1 text-[12px] tabular-nums text-foreground"
+          />
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={guardando}
+            className="rounded-ctl bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+          >
+            {guardando ? 'Guardando…' : 'Fijar cierre'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setEditando(false); setError(null) }}
+            className="rounded-ctl border border-border px-2.5 py-1 text-[11px]"
+          >
+            Cancelar
+          </button>
+          {fuente === 'fijado' && (
+            <button
+              type="button"
+              onClick={async () => {
+                setGuardando(true)
+                try { await unpinShiftEnd({ plantSlug: plantSlug!, shiftName: shiftName! }); setEditando(false) }
+                catch (e) { setError(e instanceof Error ? e.message : 'No se pudo quitar') }
+                finally { setGuardando(false) }
+              }}
+              className="text-[10px] underline underline-offset-2"
+            >
+              volver al automático
+            </button>
+          )}
+          <p className="basis-full text-[10px] text-muted-foreground/60">
+            Se aplica a todos los turnos «{shiftName}» de esta línea. El monitor tarda
+            un ciclo de sync (~5 min) en tomarlo.
+          </p>
+          {error && <p className="basis-full text-[11px] text-red-700 dark:text-red-300">{error}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, startAt }: {
+  pace: PaceToTarget | null
+  cierre: string | null | undefined
+  muestras: number | null | undefined
+  fuente: PublicMonitorLive['plannedEndSource']
+  plantSlug: string | undefined
+  shiftName: string | null | undefined
+  startAt: string | null | undefined
+}) {
+  if (!pace) return null
+
+  if (pace.verdict === 'cumplida') {
+    return (
+      <p className="mt-2 flex items-center gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
+        <Target className="h-3.5 w-3.5 shrink-0" />
+        Meta cumplida — todo lo que salga de acá en adelante va por encima.
+      </p>
+    )
+  }
+
+  const fuera = pace.verdict === 'fuera-de-alcance'
+  return (
+    <div
+      className={`mt-2 rounded-xl border px-3 py-2 ${
+        fuera
+          ? 'border-amber-400/30 bg-amber-400/10'
+          : 'border-sky-400/25 bg-sky-400/10'
+      }`}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <Target className="h-3.5 w-3.5" />
+        {/* Cuál meta, siempre: sin esto no se sabe si el número persigue la
+            cuota del turno o lo que el sensor espera, que pueden diferir. */}
+        Para llegar a {pace.targetSource === 'cuota' ? 'la meta' : 'lo esperado'}
+        <span className="normal-case tracking-normal text-muted-foreground/70">
+          ({fmtInt(pace.targetPieces)} pz
+          {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
+        </span>
+      </div>
+      <p className="mt-1 text-[13px] leading-relaxed">
+        Faltan <b className="tabular-nums">{fmtInt(pace.remainingPieces)}</b> pz en{' '}
+        <b className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</b>:{' '}
+        <b className={`tabular-nums ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
+          {fmtInt(pace.requiredPerHour)} pz/h
+        </b>{' '}
+        <span className="text-muted-foreground/80">
+          ({fmtDec(pace.requiredPerMinute)} pz/min)
+        </span>
+      </p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        {pace.gapPerHour > 0 ? (
+          <>
+            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — hay que
+            subir <span className="tabular-nums text-foreground/90">{fmtInt(pace.gapPerHour)} pz/h</span>.
+          </>
+        ) : (
+          <>
+            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — con este
+            ritmo alcanza.
+          </>
+        )}
+        {' '}A ese ritmo el turno cierra en{' '}
+        <span className="tabular-nums">{fmtInt(pace.projectedPieces)} pz</span>.
+      </p>
+      <CierreDelTurno
+        cierre={cierre}
+        muestras={muestras}
+        fuente={fuente}
+        plantSlug={plantSlug}
+        shiftName={shiftName}
+        startAt={startAt}
+      />
+      {fuera && (
+        <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+          Ese ritmo está por encima de lo que la línea da a objetivo
+          {pace.maxPerHour != null && <> (<span className="tabular-nums">{fmtInt(pace.maxPerHour)} pz/h</span>)</>}
+          : la meta ya no se alcanza con el tiempo que queda.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
  * El turno hora por hora.
  *
  * Existe por un caso concreto: un supervisor dijo que "en la primera hora
@@ -279,8 +500,10 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
       <ul className="mt-2 space-y-1.5">
         {rows.map((r) => (
           <li key={r.hourStart} className="flex items-center gap-2.5 text-sm">
-            <span className="w-11 shrink-0 tabular-nums text-muted-foreground">
-              {String(r.hour).padStart(2, '0')}h
+            {/* El TRAMO real, no "07h": la fila de las 07 puede ir de 07:45 a
+                08:00, y decir "07h" invita a compararla con una hora entera. */}
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
+              {fmtWallTime(r.from)}–{fmtWallTime(r.to)}
             </span>
             <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
               <span
@@ -451,6 +674,33 @@ export function PublicShiftMonitorPage() {
     if (!live || !data?.targetPieces) return null
     return Math.min(100, (live.totalPieces / data.targetPieces) * 100)
   }, [live, data?.targetPieces])
+
+  /*
+   * Ritmo necesario para llegar a la meta. Se recalcula con el mismo reloj que
+   * el resto de la página (`now`, que tictaquea solo), así que la recomendación
+   * baja sola a medida que avanza el turno.
+   *
+   * ⚠ `now` es UTC real y los horarios del turno son wall-clock de planta: hay
+   * que llevar el reloj al mismo marco antes de restar, o el tiempo restante
+   * sale corrido las horas del huso.
+   */
+  const pace = useMemo(() => {
+    if (!live) return null
+    const nowWallMs = now - new Date(now).getTimezoneOffset() * 60_000
+    return computePaceToTarget({
+      // La cuota del link primero; si no, la de la config del turno.
+      targetPieces: data?.targetPieces ?? live.quotaPieces,
+      expectedPieces: live.expectedPieces,
+      producedPieces: live.totalPieces,
+      // `plannedEnd`, no `scheduledEnd`: aquél corre detrás del reloj y dejaría
+      // el tiempo restante en ~0 durante todo el turno.
+      scheduledEnd: live.plannedEnd,
+      nowWallMs,
+      currentPerHour: live.piecesPerHour,
+      maxPerHour: lineMaxPerHour(live.expectedPieces, live.scheduledStart, live.plannedEnd),
+      shiftClosed: live.shiftClosed,
+    })
+  }, [live, data?.targetPieces, now])
 
   if (status === 'loading') {
     return (
@@ -628,6 +878,19 @@ export function PublicShiftMonitorPage() {
               </div>
             </div>
           )}
+
+          {/* Fuera del bloque de la meta: la recomendación también aplica
+              cuando el link se creó sin cuota, midiendo contra lo que el sensor
+              espera del turno — que es la mayoría de los links repartidos. */}
+          <RitmoNecesario
+            pace={pace}
+            cierre={live.plannedEnd}
+            muestras={live.plannedEndSamples}
+            fuente={live.plannedEndSource}
+            plantSlug={data.plantSlug}
+            shiftName={live.shiftName}
+            startAt={live.scheduledStart}
+          />
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
