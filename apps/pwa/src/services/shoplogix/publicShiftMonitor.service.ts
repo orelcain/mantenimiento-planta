@@ -51,6 +51,14 @@ export interface PublicMonitorLive {
    * Ausente en docs escritos antes de que el backend lo publicara.
    */
   plannedEnd?: string | null
+  /**
+   * De dónde salió `plannedEnd`. `historial` es el caso normal: la mediana de
+   * los turnos anteriores con el mismo nombre. `config` solo cuando el turno es
+   * nuevo y todavía no tiene historia.
+   */
+  plannedEndSource?: 'historial' | 'config' | null
+  /** Turnos anteriores usados, cuando se aprendió del historial. */
+  plannedEndSamples?: number | null
   /** Cuota del turno según la config del módulo. */
   quotaPieces?: number | null
   effectiveStart: string | null

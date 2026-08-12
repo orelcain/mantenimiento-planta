@@ -465,6 +465,76 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
  *
  * Devuelve `{ plannedEnd: Date|null, quotaPieces: number|null }`.
  */
+/**
+ * Cierre APRENDIDO de los turnos anteriores con el mismo nombre.
+ *
+ * Es el camino por defecto, y a propósito: pedirle a alguien que cargue a mano
+ * el horario de cada turno de cada línea envejece mal — la semana que Filete
+ * pase a tener turno día Y tarde, la config quedaría vieja sin que nadie se
+ * entere y el monitor recomendaría contra un cierre que ya no existe. Los
+ * turnos ya cerrados sí dicen la verdad: su `effectiveEnd` quedó fijo en la
+ * última pieza real.
+ *
+ * Se toma la MEDIANA de la hora de cierre y no el promedio: un turno que se
+ * cortó temprano por falta de materia prima no debe arrastrar la referencia.
+ *
+ * ⚠ Solo turnos con producción de verdad (`MIN_PIEZAS_HISTORIAL`): un turno de
+ * 40 piezas que murió a los 20 minutos no dice a qué hora cierra ese turno.
+ */
+const HISTORIAL_TURNOS = 8
+const MIN_PIEZAS_HISTORIAL = 200
+
+async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, currentShiftDocId) {
+  if (!shiftId || !scheduledStart) return null
+  try {
+    const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
+    const mismos = refs.filter(r =>
+      r.id !== currentShiftDocId &&
+      !/unscheduled/i.test(r.id) &&
+      normShiftName(r.id.slice(11)) === normShiftName(shiftId),
+    )
+    if (mismos.length === 0) return null
+
+    // Los más recientes primero: el id arranca con el dateKey.
+    mismos.sort((a, b) => b.id.localeCompare(a.id))
+    const snaps = await db.getAll(...mismos.slice(0, HISTORIAL_TURNOS * 2))
+
+    /** Minutos desde medianoche del cierre de cada turno con producción real. */
+    const cierres = []
+    for (const snap of snaps) {
+      if (!snap.exists) continue
+      const d = snap.data() || {}
+      const piezas = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+      if (piezas < MIN_PIEZAS_HISTORIAL) continue
+      const fin = toDate(d.effectiveEnd) ?? toDate(d.scheduledEnd)
+      if (!fin) continue
+      cierres.push(fin.getUTCHours() * 60 + fin.getUTCMinutes())
+      if (cierres.length >= HISTORIAL_TURNOS) break
+    }
+    if (cierres.length < 3) return null
+
+    cierres.sort((a, b) => a - b)
+    const mid = Math.floor(cierres.length / 2)
+    const medianaMin = cierres.length % 2 === 0
+      ? Math.round((cierres[mid - 1] + cierres[mid]) / 2)
+      : cierres[mid]
+
+    const end = new Date(Date.UTC(
+      scheduledStart.getUTCFullYear(), scheduledStart.getUTCMonth(), scheduledStart.getUTCDate(),
+      Math.floor(medianaMin / 60), medianaMin % 60, 0, 0,
+    ))
+    if (end.getTime() <= scheduledStart.getTime()) end.setUTCDate(end.getUTCDate() + 1)
+    return { end, muestras: cierres.length }
+  } catch {
+    return null
+  }
+}
+
+/** "Turno Dia" y "Turno día" son el mismo turno: se comparan sin tildes. */
+function normShiftName(s) {
+  return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
+
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
   const vacio = { plannedEnd: null, quotaPieces: null }
   if (!shiftId || !scheduledStart) return vacio
@@ -480,7 +550,15 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     if (!snap.exists) return vacio
     const schedule = snap.data()?.shiftSchedule
     if (!Array.isArray(schedule)) return vacio
-    const entry = schedule.find(s => String(s?.shiftId) === String(shiftId))
+    /*
+     * Comparación TOLERANTE de nombre de turno. Filete llama al suyo
+     * "Turno Dia" y la config guarda "Turno día": comparando literal, Filete
+     * nunca encontraba su horario. Es el mismo tropiezo que ya rompió antes la
+     * comparación de turnos por nombre fijo — se normalizan tildes y mayúsculas.
+     */
+    // ̀-ͯ = los diacríticos que separa NFD. Escapado y no literal:
+    // un archivo con otro encoding convertiría el rango en basura silenciosa.
+    const entry = schedule.find(s => normShiftName(s?.shiftId) === normShiftName(shiftId))
     if (!entry) return vacio
 
     const endH = Number(entry.endHour)
@@ -785,7 +863,35 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     ? nowWall.getTime() > scheduledEnd.getTime() + CLOSE_MARGIN_MS && producing.length === 0
     : false
 
-  const planned = await loadPlannedShift(db, plantSlug, parent.shiftId ?? machines[0]?.shiftId, scheduledStart)
+  /*
+   * Cierre del turno. Manda el HISTORIAL, no la config — y el orden importa.
+   *
+   * La config es una intención que envejece sin que nadie se entere; el
+   * historial es lo que la línea hace. Medido el 12-08: la config de Chonchi
+   * dice que el Turno 2 cierra 17:15 y los últimos 8 turnos cerraron a las
+   * 15:00. Recomendar un ritmo contra un cierre que no ocurre da un número
+   * cómodo y falso — sobra tiempo que en realidad no existe.
+   *
+   * Además es lo que hace que esto no haya que mantener: cuando Filete pase a
+   * tener turno día Y tarde, cada uno aprende su horario solo. La config queda
+   * de respaldo para un turno nuevo, sin historia todavía.
+   */
+  const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
+  const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
+  let plannedEnd = inferido?.end ?? null
+  let plannedEndSource = plannedEnd ? 'historial' : null
+  let plannedEndSamples = inferido?.muestras ?? null
+  const planned = plannedEnd
+    ? await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)  // solo por la cuota
+    : { plannedEnd: null, quotaPieces: null }
+  if (!plannedEnd) {
+    const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
+    planned.quotaPieces = cfg.quotaPieces
+    if (cfg.plannedEnd) {
+      plannedEnd = cfg.plannedEnd
+      plannedEndSource = 'config'
+    }
+  }
 
   return {
     updatedAt: new Date().toISOString(),
@@ -799,7 +905,11 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
      * no para "cuánto falta". Con estos dos, el monitor puede recomendar el
      * ritmo necesario para llegar. null cuando el turno no está en la config.
      */
-    plannedEnd: iso(planned.plannedEnd),
+    plannedEnd: iso(plannedEnd),
+    /** 'config' | 'historial' | null — de dónde salió, para poder decirlo. */
+    plannedEndSource,
+    /** Turnos anteriores usados cuando se infirió del historial. */
+    plannedEndSamples,
     quotaPieces: planned.quotaPieces,
     effectiveStart: iso(effectiveStart),
     effectiveEnd: iso(effectiveEnd),

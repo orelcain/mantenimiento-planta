@@ -30,6 +30,14 @@ export interface HourlyRow {
   hourStart: string
   /** Hora de planta 0-23, ya en wall-clock. */
   hour: number
+  /**
+   * Tramo REAL que cubre la fila, ISO wall-clock. En las horas de los extremos
+   * no es la hora entera: si el turno arrancó 07:45, la fila de las 07 va de
+   * 07:45 a 08:00. Decir "07h" a secas invitaba a compararla con una hora
+   * completa, que es justo lo que hay que evitar.
+   */
+  from: string
+  to: string
   pieces: number
   /** Minutos de esa hora que la serie cubre (60 salvo la primera y la última). */
   minutesCovered: number
@@ -53,7 +61,7 @@ const BUCKET_MIN = 5
 export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined): HourlyRow[] {
   if (!series || series.length === 0) return []
 
-  const byHour = new Map<number, { pieces: number; buckets: number }>()
+  const byHour = new Map<number, { pieces: number; buckets: number; firstMs: number; lastMs: number }>()
   for (const p of series) {
     const ms = Date.parse(p.t)
     if (Number.isNaN(ms)) continue
@@ -62,9 +70,11 @@ export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined)
     const hourMs = Date.UTC(
       d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), 0, 0, 0,
     )
-    const acc = byHour.get(hourMs) ?? { pieces: 0, buckets: 0 }
+    const acc = byHour.get(hourMs) ?? { pieces: 0, buckets: 0, firstMs: ms, lastMs: ms }
     acc.pieces += p.pieces || 0
     acc.buckets += 1
+    acc.firstMs = Math.min(acc.firstMs, ms)
+    acc.lastMs = Math.max(acc.lastMs, ms)
     byHour.set(hourMs, acc)
   }
 
@@ -72,9 +82,17 @@ export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined)
     .sort((a, b) => a[0] - b[0])
     .map(([hourMs, acc]) => {
       const minutesCovered = Math.min(60, acc.buckets * BUCKET_MIN)
+      /*
+       * El tramo va del primer bucket al FIN del último (+5 min), acotado a la
+       * hora: un bucket que empieza 07:55 cubre hasta las 08:00, y sin el `min`
+       * la fila de las 07 diría que llega hasta las 08:00 del cierre siguiente.
+       */
+      const to = Math.min(acc.lastMs + BUCKET_MIN * 60_000, hourMs + 60 * 60_000)
       return {
         hourStart: new Date(hourMs).toISOString(),
         hour: new Date(hourMs).getUTCHours(),
+        from: new Date(acc.firstMs).toISOString(),
+        to: new Date(to).toISOString(),
         pieces: acc.pieces,
         minutesCovered,
         piecesPerHour: minutesCovered > 0 ? Math.round((acc.pieces / minutesCovered) * 60) : 0,

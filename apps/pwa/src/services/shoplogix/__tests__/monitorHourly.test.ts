@@ -94,6 +94,30 @@ describe('buildHourlyRows', () => {
     expect(rows[0]!.pieces).toBe(600)
   })
 
+  it('publica el TRAMO REAL de cada fila, no solo la hora', () => {
+    // Turno que arranca 07:45: la fila de las 07 va de 07:45 a 08:00.
+    const s = serie('2026-08-12T07:45:00Z', [...Array(3).fill(50), ...Array(12).fill(60)])
+    const rows = buildHourlyRows(s)
+    expect(rows[0]!.from.slice(11, 16)).toBe('07:45')
+    expect(rows[0]!.to.slice(11, 16)).toBe('08:00')
+    expect(rows[1]!.from.slice(11, 16)).toBe('08:00')
+    expect(rows[1]!.to.slice(11, 16)).toBe('09:00')
+  })
+
+  it('el tramo NO se pasa de la hora aunque el último bucket la roce', () => {
+    // Un bucket que empieza 07:55 cubre hasta las 08:00 — ni un minuto más.
+    const s = serie('2026-08-12T07:55:00Z', [50])
+    expect(buildHourlyRows(s)[0]!.to.slice(11, 16)).toBe('08:00')
+  })
+
+  it('la hora en curso termina donde termina el último dato', () => {
+    // 11:00 + 8 tramos = último bucket 11:35, que cubre hasta 11:40.
+    const s = serie('2026-08-12T11:00:00Z', Array(8).fill(45))
+    const [fila] = buildHourlyRows(s)
+    expect(fila!.to.slice(11, 16)).toBe('11:40')
+    expect(fila!.partial).toBe(true)
+  })
+
   it('sin serie no inventa filas', () => {
     expect(buildHourlyRows([])).toEqual([])
     expect(buildHourlyRows(null)).toEqual([])

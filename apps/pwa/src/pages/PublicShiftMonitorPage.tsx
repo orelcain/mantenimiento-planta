@@ -266,7 +266,11 @@ function Sparkbars({
  * hace perder la confianza en la pantalla — y la decisión correcta ahí no es
  * apurar, es replanificar.
  */
-function RitmoNecesario({ pace }: { pace: PaceToTarget | null }) {
+function RitmoNecesario({ pace, cierre, muestras }: {
+  pace: PaceToTarget | null
+  cierre: string | null | undefined
+  muestras: number | null | undefined
+}) {
   if (!pace) return null
 
   if (pace.verdict === 'cumplida') {
@@ -323,6 +327,14 @@ function RitmoNecesario({ pace }: { pace: PaceToTarget | null }) {
         {' '}A ese ritmo el turno cierra en{' '}
         <span className="tabular-nums">{fmtInt(pace.projectedPieces)} pz</span>.
       </p>
+      {/* De dónde sale la hora de cierre. Sin esto el "faltan 3 h 20 min" es un
+          número sin dueño; con esto se puede discutir. */}
+      {cierre && (
+        <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {muestras ? `, según los últimos ${muestras} turnos` : ', según el horario configurado'}.
+        </p>
+      )}
       {fuera && (
         <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
           Ese ritmo está por encima de lo que la línea da a objetivo
@@ -359,8 +371,10 @@ function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
       <ul className="mt-2 space-y-1.5">
         {rows.map((r) => (
           <li key={r.hourStart} className="flex items-center gap-2.5 text-sm">
-            <span className="w-11 shrink-0 tabular-nums text-muted-foreground">
-              {String(r.hour).padStart(2, '0')}h
+            {/* El TRAMO real, no "07h": la fila de las 07 puede ir de 07:45 a
+                08:00, y decir "07h" invita a compararla con una hora entera. */}
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
+              {fmtWallTime(r.from)}–{fmtWallTime(r.to)}
             </span>
             <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
               <span
@@ -739,7 +753,7 @@ export function PublicShiftMonitorPage() {
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
-          <RitmoNecesario pace={pace} />
+          <RitmoNecesario pace={pace} cierre={live.plannedEnd} muestras={live.plannedEndSamples} />
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
