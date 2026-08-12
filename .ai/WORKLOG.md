@@ -13,6 +13,56 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-11 - claude - Gates: setear sin Excel, imputaciones a "¿Que hacer?", aviso por historial (#473, #474)
+
+Orel: *"dale con las dos y pensemos como podriamos ayudar a control de produccion a corregir los
+gates segun lo q vaya pasando por la grader"*.
+
+### #473 - dos mudanzas
+- **Gates ya no exige el Excel**. Estaba DESHABILITADA sin el archivo: configurar las compuertas,
+  que es trabajo de ANTES del turno, pedia el Excel que recien existe al CERRARLO. Los 4 campos
+  que pedia Orel (calibre, calidad, conservacion, producto) YA existian, tapados detras de eso.
+- **Las imputaciones se mudaron de "Linea" a "¿Que hacer?"** y suman al badge. Eran lo unico de
+  Linea donde el tecnico ESCRIBE, enterrado bajo tres graficos. "¿Que hacer?" tambien se habilita
+  sin Excel si hay datos del sensor: Filete y Eviscerado llegan con el turno entero sin causa.
+- ⚠ El panel se monta SIEMPRE y se oculta por CSS: es el quien carga las anotaciones y publica el
+  pendiente, asi que con render condicional el badge marcaria 0 hasta entrar a la pestaña.
+
+### #474 - "¿Esta config aguanta lo que suele venir?"
+Analisis de saturacion corrido al ANTES: compara las gates asignadas contra el reparto de
+calibres de los turnos anteriores. Acusa el caso REAL de Chonchi: el 8-10 lb es el 55% de la
+produccion y la config le deja 3 de 12 gates (2,2x), mientras el 2-4 lb tiene 2 gates para el 1,3%.
+
+**Tres cosas que sin mirar los datos reales habrian salido mal** (valen para cualquier feature
+que agregue turnos historicos):
+1. **El calibre viene SIN NORMALIZAR de Matrix**: "8-10 lb" en agosto y "8 - 10 LB" el 3 de
+   agosto. Agrupando por el string crudo el historico ve 10 calibres en vez de 5 y TODOS los
+   porcentajes salen mal. Normalizar con `calibreKey()` (lowercase + sin espacios).
+2. **La config de gates NO vive en el turno**: la mayoria de los turnos no tiene `configHistory`
+   — se guarda como PLANTILLA (`graderGatesTemplates`) y se reusa. Leyendo solo el snapshot, la
+   tarjeta no aparecia nunca. Regla de fallback: "Plantilla 1" o la primera, igual que el editor.
+3. **`GateChangeModal` tenia el mismo agujero**: sin snapshot abria con el selector de gates y
+   NINGUN campo abajo. Arreglado en la raiz -> ademas revive el boton "Cambiar gate" del
+   historial, que estaba muerto justo en los turnos donde todavia se podia cambiar algo.
+
+Decisiones de criterio: compara por CALIBRE y no por calibre x calidad (`calibreDistribution`
+guarda solo el calibre); NO filtra por lote (`lotsInShift` esta vacio en 36 de 37 turnos reales)
+y por eso DICE que turnos y fechas miro; nunca deja un calibre en 0 gates aunque el ratio lo
+justifique; deshace un movimiento que satura al donante; excluye el propio turno del historico.
+
+- Archivos: `services/grader/graderCalibreHistory.ts` (nuevo, puro),
+  `components/grader/GatesHistoryHintCard.tsx` (nuevo),
+  `components/grader/modals/GateChangeModal.tsx`, `pages/AnalisisGrader/AnalisisGraderTurnoPage.tsx`.
+- Verificacion: 22 tests nuevos sobre los NUMEROS REALES de produccion (6 turnos de Chonchi + la
+  plantilla vigente), no datos inventados. En prod (`buildSha` = `fd67a19`) la tarjeta acusa el
+  8-10 lb y el modal abre pre-rellenado. En Yal no aparece. No se registro ningun cambio de gate:
+  eso es decision de Orel. Claro, oscuro y 375px. tsc 0, eslint 0 nuevos, 1.147 tests OK.
+- Estado: HECHO (#473 en `8cb1427`, #474 en `fd67a19`).
+- Sigue: los otros dos caminos de la propuesta, sin construir — (B) corte de control a mitad de
+  turno con Excel parcial (la app YA entiende cobertura parcial), y (C) aviso por Telegram al
+  detectar saturacion, que depende de B. Propuesta visual completa:
+  https://claude.ai/code/artifact/046435ab-b88f-4f0c-9c8a-eef62b0302d9
+
 ## 2026-08-11 - claude - Resumen a ancho completo y Calidad+Timeline juntas (#471)
 
 Orel, mirando el resultado de #469: *"el resumen deberia ocupar toda la pagina verdad no estar
