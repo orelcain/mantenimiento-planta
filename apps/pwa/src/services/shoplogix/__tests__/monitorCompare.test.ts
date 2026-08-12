@@ -10,7 +10,7 @@
  * Shoplogix (confirmado por Orel el 12-08).
  */
 import { describe, it, expect } from 'vitest'
-import { cumulativeFromStart, piecesAt, buildDayComparison, optimalPace } from '../monitorCompare'
+import { cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
 /** Serie de tramos de 5 min desde `desde`. */
@@ -167,5 +167,65 @@ describe('optimalPace', () => {
     expect(optimalPace({ targetPieces: 0, windowMin: 450, plannedMin: 78 })).toBeNull()
     expect(optimalPace({ targetPieces: 5_000, windowMin: 60, plannedMin: 60 })).toBeNull()
     expect(optimalPace({ targetPieces: 5_000, windowMin: 60, plannedMin: 90 })).toBeNull()
+  })
+})
+
+describe('findGapWindow', () => {
+  /** 24 tramos de 5 min (2 h) a ritmo parejo, con un bache donde se indique. */
+  function conBache(base: number, desdeTramo: number, tramos: number, valor: number) {
+    const arr = Array(24).fill(base)
+    for (let i = desdeTramo; i < desdeTramo + tramos; i++) arr[i] = valor
+    return serie('2026-08-12T07:45:00Z', arr)
+  }
+
+  it('ubica el tramo donde hoy perdió terreno', () => {
+    const hoy = cumulativeFromStart(conBache(50, 12, 4, 0))   // parado 60-80 min
+    const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(24).fill(50)))
+    const g = findGapWindow(hoy, ayer)!
+    expect(g.fromMin).toBe(60)
+    expect(g.toMin).toBe(80)
+    expect(g.lostPieces).toBe(200)
+  })
+
+  it('junta la racha entera — una parada larga son varios tramos seguidos', () => {
+    // Quedarse con el peor tramo suelto haría ver la brecha 4 veces más chica.
+    const hoy = cumulativeFromStart(conBache(50, 12, 4, 0))
+    const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(24).fill(50)))
+    const g = findGapWindow(hoy, ayer)!
+    expect(g.toMin - g.fromMin).toBe(20)
+  })
+
+  it('elige la racha de MÁS pérdida, no la primera', () => {
+    const arr = Array(24).fill(50)
+    arr[4] = 30                              // bache chico: −20
+    arr[14] = 0; arr[15] = 0                 // bache grande: −100
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(24).fill(50)))
+    const g = findGapWindow(hoy, ayer)!
+    expect(g.lostPieces).toBe(100)
+    expect(g.fromMin).toBe(70)
+  })
+
+  it('dice qué parte del atraso total explica ese tramo', () => {
+    const hoy = cumulativeFromStart(conBache(50, 12, 4, 0))
+    const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(24).fill(50)))
+    expect(findGapWindow(hoy, ayer)!.share).toBeCloseTo(1, 2)
+  })
+
+  it('un tramo que el día de referencia no alcanzó NO cuenta como pérdida', () => {
+    // Ayer duró 30 min; el resto del turno de hoy no tiene contra qué medirse.
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', Array(24).fill(50)))
+    const corto = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(6).fill(50)))
+    expect(findGapWindow(hoy, corto)).toBeNull()
+  })
+
+  it('si hoy nunca estuvo por debajo, no hay brecha que mostrar', () => {
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', Array(24).fill(60)))
+    const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(24).fill(50)))
+    expect(findGapWindow(hoy, ayer)).toBeNull()
+  })
+
+  it('sin curvas no inventa un tramo', () => {
+    expect(findGapWindow([], [])).toBeNull()
   })
 })

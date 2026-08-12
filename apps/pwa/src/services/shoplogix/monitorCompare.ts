@@ -159,6 +159,82 @@ export function buildDayComparison(args: {
   return { days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes }
 }
 
+/** El tramo donde hoy perdió más terreno contra el día de referencia. */
+export interface GapWindow {
+  /** Minutos de turno que abarca el tramo. */
+  fromMin: number
+  toMin: number
+  /** Piezas que hoy quedó abajo SOLO en ese tramo. */
+  lostPieces: number
+  /** Cuánto de toda la diferencia acumulada se explica acá (0-1). */
+  share: number
+}
+
+/**
+ * Dónde se abrió la brecha: el tramo continuo en que hoy perdió más terreno.
+ *
+ * Es la pregunta de Orel — *"¿qué pasó que nos atrasó?"*. Ver la curva de hoy por
+ * debajo de la de ayer dice QUE se perdió, no DÓNDE: la brecha casi nunca se
+ * abre parejo, se abre en un tramo y después se arrastra planchada el resto del
+ * turno. Con el tramo en la mano se puede cruzar contra las detenciones y
+ * ponerle nombre.
+ *
+ * Se busca la racha continua de tramos con más pérdida acumulada (Kadane sobre
+ * los negativos) y no el peor tramo suelto: una parada de 40 minutos son ocho
+ * tramos malos seguidos, y quedarse con uno la haría ver ocho veces más chica.
+ */
+export function findGapWindow(hoy: PacePoint[], ref: PacePoint[]): GapWindow | null {
+  if (hoy.length === 0 || ref.length === 0) return null
+
+  /** Piezas de CADA tramo (no acumuladas), por minuto de turno. */
+  const porTramo = (curve: PacePoint[]) => {
+    const m = new Map<number, number>()
+    let prev = 0
+    for (const p of curve) {
+      m.set(p.minutes, p.pieces - prev)
+      prev = p.pieces
+    }
+    return m
+  }
+  const a = porTramo(hoy)
+  const b = porTramo(ref)
+
+  let mejorIni: number | null = null
+  let mejorFin = 0
+  let mejor = 0
+  let ini: number | null = null
+  let corriendo = 0
+
+  for (const min of [...a.keys()].sort((x, y) => x - y)) {
+    // Un tramo que el día de referencia no alcanzó no se puede comparar: contar
+    // su ausencia como pérdida inventaría una brecha que no existe.
+    if (!b.has(min)) continue
+    const delta = (a.get(min) ?? 0) - (b.get(min) ?? 0)
+    if (delta < 0) {
+      if (ini == null) { ini = min; corriendo = 0 }
+      corriendo += delta
+      if (corriendo < mejor) { mejor = corriendo; mejorIni = ini; mejorFin = min }
+    } else {
+      ini = null
+      corriendo = 0
+    }
+  }
+
+  if (mejorIni == null || mejor >= 0) return null
+
+  // La diferencia total, para saber cuánto del atraso explica este tramo.
+  const totalHoy = hoy[hoy.length - 1]!.pieces
+  const totalRef = piecesAt(ref, hoy[hoy.length - 1]!.minutes)
+  const brechaTotal = totalRef == null ? 0 : totalRef - totalHoy
+
+  return {
+    fromMin: mejorIni - BUCKET_MIN,
+    toMin: mejorFin,
+    lostPieces: Math.round(-mejor),
+    share: brechaTotal > 0 ? Math.min(1, -mejor / brechaTotal) : 0,
+  }
+}
+
 /**
  * El ritmo que la cuota exige EN MARCHA, descontando las paradas de convenio.
  *

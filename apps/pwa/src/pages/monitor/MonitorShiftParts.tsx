@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
-import type { CompareResult } from '@/services/shoplogix/monitorCompare'
+import { findGapWindow, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
 
 const nf = new Intl.NumberFormat('es-CL')
@@ -257,7 +257,11 @@ const COLORES = ['#38bdf8', '#a78bfa', '#94a3b8', '#f472b6']
  * además como cuenta Shoplogix (confirmado por Orel, 12-08): la hora 1 va del
  * arranque a +60 min, no hasta el próximo cambio de hora.
  */
-export function ComparadorDias({ cmp }: { cmp: CompareResult }) {
+export function ComparadorDias({ cmp, live, onCausa }: {
+  cmp: CompareResult
+  live?: PublicMonitorLive
+  onCausa?: (c: string | null) => void
+}) {
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
 
   const hoy = cmp.days.find((d) => d.esHoy)
@@ -347,11 +351,142 @@ export function ComparadorDias({ cmp }: { cmp: CompareResult }) {
             )}
           </ul>
 
+          <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} />
+
           <p className="mt-2 text-[11px] text-muted-foreground/70">
             Todos a la misma altura de turno, contada desde el arranque: los turnos no
             empiezan a la misma hora, así que comparar por reloj mide mal justamente el
             primer tramo.
           </p>
     </Bloque>
+  )
+}
+
+/**
+ * Dónde se abrió la brecha — el renglón que convierte la comparación en una
+ * pregunta contestable.
+ *
+ * Ver la curva de hoy por debajo de la de ayer dice QUE se perdió, no DÓNDE. Y
+ * la brecha casi nunca se abre pareja: se abre en un tramo y después se arrastra
+ * planchada todo el turno. Con el tramo ubicado se lo cruza contra las
+ * detenciones y contra lo que el operador escribió, y recién ahí se puede
+ * responder "¿qué pasó que nos atrasó?".
+ *
+ * La referencia es el mejor de los días anteriores a esta misma altura. Si hoy
+ * va arriba de todos, se compara contra la recta de la cuota — que igual hay que
+ * alcanzar.
+ */
+function BrechaDelDia({ cmp, live, onCausa }: {
+  cmp: CompareResult
+  live?: PublicMonitorLive
+  onCausa?: (c: string | null) => void
+}) {
+  const hoy = cmp.days.find((d) => d.esHoy)
+  if (!hoy || cmp.currentMinute == null) return null
+
+  const anteriores = cmp.days.filter((d) => !d.esHoy && d.atCurrentMinute != null)
+  const mejor = anteriores.sort((a, b) => (b.atCurrentMinute ?? 0) - (a.atCurrentMinute ?? 0))[0]
+
+  const contra =
+    mejor && (mejor.atCurrentMinute ?? 0) > (hoy.atCurrentMinute ?? 0)
+      ? { curva: mejor.curve, nombre: mejor.label }
+      : cmp.optimal
+      ? { curva: cmp.optimal, nombre: 'la cuota' }
+      : null
+  if (!contra) return null
+
+  const g = findGapWindow(hoy.curve, contra.curva)
+  if (!g) return null
+
+  /*
+   * Minutos de turno → hora de reloj. El arranque es el primer tramo con dato,
+   * el mismo origen con el que se armó la curva; tomar `scheduledStart` correría
+   * la ventana los minutos que la línea tardó en dar la primera pieza.
+   */
+  const t0 = live?.series?.[0]?.t ? Date.parse(live.series[0]!.t) : null
+  const reloj = (min: number) =>
+    t0 == null
+      ? null
+      : new Date(t0 + min * 60_000).toISOString().slice(11, 16)
+
+  // La causa que más tiempo se llevó DENTRO de la ventana. Es la que le pone
+  // nombre al bache; el resto son detalles.
+  let causa: string | null = null
+  let comentario: string | null = null
+  if (t0 != null && live?.stopEvents && live.stopReasons) {
+    const desde = t0 + g.fromMin * 60_000
+    const hasta = t0 + g.toMin * 60_000
+    const acc = new Map<string, number>()
+    for (const e of live.stopEvents) {
+      const a = Date.parse(e.f)
+      const b = a + e.s * 1000
+      const solape = Math.min(b, hasta) - Math.max(a, desde)
+      if (solape > 0) {
+        const r = live.stopReasons[e.r]
+        if (r) acc.set(r, (acc.get(r) ?? 0) + solape)
+      }
+    }
+    causa = [...acc.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null
+
+    const c = (live.comments ?? []).find((x) => {
+      if (!x.f) return false
+      const a = Date.parse(x.f)
+      const b = x.h ? Date.parse(x.h) : a
+      return a < hasta && b > desde && b - a <= 2 * 60 * 60_000
+    })
+    comentario = c?.t ?? null
+  }
+
+  const desdeTxt = reloj(g.fromMin)
+  const hastaTxt = reloj(g.toMin)
+
+  return (
+    <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[12px]">
+      <p className="text-[10px] uppercase tracking-wide text-amber-800 dark:text-amber-300">
+        Dónde se abrió la brecha con {contra.nombre}
+      </p>
+      <p className="mt-0.5 text-foreground">
+        {desdeTxt && hastaTxt ? (
+          <span className="tabular-nums font-semibold">{desdeTxt}–{hastaTxt}</span>
+        ) : (
+          <span className="tabular-nums font-semibold">
+            del minuto {g.fromMin} al {g.toMin} de turno
+          </span>
+        )}
+        {' · '}
+        <span className="tabular-nums text-red-700 dark:text-red-400">−{fmtInt(g.lostPieces)} pz</span>
+        {g.share > 0.15 && (
+          <span className="text-muted-foreground">
+            {' '}({Math.round(g.share * 100)}% del atraso)
+          </span>
+        )}
+      </p>
+      {causa && (
+        <p className="mt-0.5">
+          {onCausa ? (
+            <button
+              type="button"
+              onClick={() => {
+                onCausa(causa)
+                document
+                  .getElementById('grafico-turno')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }}
+              className="text-rose-700 underline underline-offset-2 dark:text-rose-300"
+            >
+              {causa}
+            </button>
+          ) : (
+            <span className="text-rose-700 dark:text-rose-300">{causa}</span>
+          )}
+          <span className="text-muted-foreground"> es lo que más tiempo se llevó ahí</span>
+        </p>
+      )}
+      {/* Lo que escribió el operador. Es el único texto en castellano del turno
+          y suele explicar el bache mejor que cualquier etiqueta. */}
+      {comentario && (
+        <p className="mt-0.5 italic text-muted-foreground">{comentario}</p>
+      )}
+    </div>
   )
 }
