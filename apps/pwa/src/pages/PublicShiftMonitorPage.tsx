@@ -323,15 +323,24 @@ function Sparkbars({
       {/* El eje viaja DENTRO del contenedor con scroll: afuera, al deslizar el
           gráfico las horas se quedaban quietas y dejaban de corresponder. */}
       <div className="relative mt-1 h-4">
-        {marcas.map((m) => (
-          <span
-            key={m.t}
-            className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/70"
-            style={{ left: `${((m.i + 0.5) / series.length) * 100}%` }}
-          >
-            {fmtWallTime(m.t)}
-          </span>
-        ))}
+        {marcas.map((m) => {
+          const pct = ((m.i + 0.5) / series.length) * 100
+          /*
+           * Las marcas de los extremos se anclan al borde y no al centro: con el
+           * centrado de siempre media etiqueta quedaba fuera del contenedor y se
+           * leía ":40" en vez de "07:40".
+           */
+          const anclaje = pct < 6 ? 'none' : pct > 94 ? 'translateX(-100%)' : 'translateX(-50%)'
+          return (
+            <span
+              key={m.t}
+              className="absolute top-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/70"
+              style={{ left: `${pct}%`, transform: anclaje }}
+            >
+              {fmtWallTime(m.t)}
+            </span>
+          )
+        })}
       </div>
       </div>
       </div>
