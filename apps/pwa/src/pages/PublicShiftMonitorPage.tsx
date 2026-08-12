@@ -37,6 +37,8 @@ import {
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
+import { buildDayComparison, optimalPace } from '@/services/shoplogix/monitorCompare'
+import { TiempoDelTurno, ComparadorDias } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -797,6 +799,41 @@ export function PublicShiftMonitorPage() {
     })
   }, [live, data?.targetPieces, now])
 
+  /*
+   * Comparador con los turnos anteriores. La serie de cada uno ya viaja en el
+   * doc (`history`), así que esto no cuesta ni una lectura extra.
+   */
+  const comparacion = useMemo(() => {
+    if (!live?.series?.length) return { days: [], currentHour: null }
+    return buildDayComparison({
+      todaySeries: live.series,
+      todayDateKey: data?.dateKey ?? '',
+      previous: (data?.history ?? []).map((h) => ({ dateKey: h.dateKey, series: h.live?.series })),
+      maxDays: 2,
+    })
+  }, [live?.series, data?.dateKey, data?.history])
+
+  /*
+   * Lo que la cuota pediría a esta misma hora, repartida sobre el tiempo ÚTIL
+   * (sin las paradas de convenio). El reparto lineal sobre el turno completo
+   * supone que no hay colación y por eso exige de más desde la primera hora.
+   */
+  const cuotaAEstaHora = useMemo(() => {
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
+    const tb = live?.timeBreakdown
+    if (!meta || !tb || comparacion.currentHour == null || !live?.scheduledStart) return null
+    const opt = optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
+    if (!opt) return null
+    // Minutos de turno transcurridos hasta el corte, descontando la parte
+    // proporcional de lo planificado que ya ocurrió.
+    const ini = new Date(live.scheduledStart)
+    const iniMin = ini.getUTCHours() * 60 + ini.getUTCMinutes()
+    let corteMin = (comparacion.currentHour + 1) * 60 - iniMin
+    if (corteMin < 0) corteMin += 24 * 60
+    const utilTranscurrido = Math.max(0, corteMin * (opt.usefulMin / tb.windowMin))
+    return Math.round(Math.min(meta, utilTranscurrido * opt.requiredCpm))
+  }, [data?.targetPieces, live?.quotaPieces, live?.timeBreakdown, live?.scheduledStart, comparacion.currentHour])
+
   if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -1062,6 +1099,14 @@ export function PublicShiftMonitorPage() {
           stopEvents={live.stopEvents}
           causaSel={causaSel}
           onCausa={setCausaSel}
+        />
+
+        <TiempoDelTurno tb={live.timeBreakdown} />
+
+        <ComparadorDias
+          days={comparacion.days}
+          currentHour={comparacion.currentHour}
+          optimalAtHour={cuotaAEstaHora}
         />
 
         <PorHora series={live.series} />
