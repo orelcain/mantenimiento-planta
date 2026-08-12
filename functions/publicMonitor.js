@@ -108,6 +108,37 @@ function esPlannedDowntime(state) {
          /planned\s*downtime/i.test(String(state?.name || ''))
 }
 
+/**
+ * ¿Este paro es PLANIFICADO (reglamentario) o RECUPERABLE?
+ *
+ * La distinción es el corazón del "¿se puede llegar a la cuota?". Sin ella, el
+ * turno del 12-08 de Filete mostraba 86 min de detenciones grandes como si
+ * fueran el problema — y 77 de esos 86 eran colación, reunión de inicio,
+ * ejercicio compensatorio y detención programada. Confundirlos lleva a exigir
+ * que se recupere un tiempo que por convenio no se recupera.
+ *
+ * Lista confirmada por Orel el 12-08. Se compara sin tildes ni mayúsculas
+ * porque Shoplogix escribe las causas a mano y ya varían entre turnos.
+ */
+const CAUSAS_PLANIFICADAS = [
+  'colacion',
+  'detencion programada',
+  'reunion inicio turno',
+  'ejercicio compensatorio',
+]
+
+function esParoPlanificado(reason) {
+  /*
+   * ⚠ Los espacios INTERNOS también se colapsan. Shoplogix manda
+   * "EJERCICIO  COMPENSATORIO" con dos espacios (visto en el turno del 12-08) y
+   * sin esto la causa caía en "recuperable" — o sea, se le exigía a la línea
+   * recuperar un ejercicio de pausa activa.
+   */
+  const r = normShiftName(reason).replace(/\s+/g, ' ')
+  if (!r) return false
+  return CAUSAS_PLANIFICADAS.some(c => r.includes(c))
+}
+
 /** 'produciendo' | 'detenida' | 'sin-datos' según el state vigente. */
 function statusOf(state) {
   if (!state) return 'sin-datos'
@@ -811,6 +842,21 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   }
   const topStops = [...stopAcc.values()].sort((a, b) => b.sec - a.sec).slice(0, 5)
 
+  /*
+   * Desglose planificado / recuperable, con las causas VISIBLES en los dos
+   * grupos. Agrupar el planificado en un solo número invita a sospechar que se
+   * esconde algo: si la colación se lleva 56 min, que se lea "colación 56 min".
+   */
+  const planificados = []
+  const recuperables = []
+  for (const st of [...stopAcc.values()].sort((a, b) => b.sec - a.sec)) {
+    const fila = { reason: st.reason, min: Math.round(st.sec / 60), count: st.count }
+    if (fila.min <= 0 && st.count === 0) continue
+    ;(esParoPlanificado(st.reason) ? planificados : recuperables).push(fila)
+  }
+  const plannedMin = planificados.reduce((a, x) => a + x.min, 0)
+  const recoverableMin = recuperables.reduce((a, x) => a + x.min, 0)
+
   // ── Serie temporal (suma de todas las máquinas por bucket de 5 min) ──────
   const byBucket = new Map()
   for (const m of machines) {
@@ -1012,6 +1058,19 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     machines: machinesOut,
     series,
     topStops,
+    /*
+     * A dónde se fue el tiempo del turno. `producingMin` sale del uptime real;
+     * el resto se reparte entre paradas de convenio y paradas recuperables, con
+     * el detalle de cada una — que es lo que permite discutir el número.
+     */
+    timeBreakdown: {
+      windowMin: Math.round(windowHours * 60),
+      producingMin: Math.round(uptimeSec / 60),
+      plannedMin,
+      recoverableMin,
+      planned: planificados,
+      recoverable: recuperables,
+    },
     /** Razones, para que los eventos no repitan el texto en cada uno. */
     stopReasons,
     /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons. */

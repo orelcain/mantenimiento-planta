@@ -102,6 +102,22 @@ export interface PublicMonitorLive {
   machines: PublicMonitorMachine[]
   series: Array<{ t: string; pieces: number }>
   topStops: Array<{ reason: string; sec: number; count: number }>
+  /**
+   * A dónde se fue el tiempo del turno.
+   *
+   * ⚠ La separación planificado / recuperable es el corazón de "¿se llega a la
+   * cuota?": exigir que se recupere una colación es pedir un imposible. Las
+   * causas van con su detalle en los dos grupos, no agrupadas en un total —
+   * un "planificado: 78 min" sin desglose invita a sospechar que se esconde algo.
+   */
+  timeBreakdown?: {
+    windowMin: number
+    producingMin: number
+    plannedMin: number
+    recoverableMin: number
+    planned: Array<{ reason: string; min: number; count: number }>
+    recoverable: Array<{ reason: string; min: number; count: number }>
+  } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]
   /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */
