@@ -54,6 +54,7 @@ import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
 import { resolvePanelWindow } from './shiftTimelineHelpers'
 import { ProductionRateLineEC } from './ProductionRateLineEC'
+import { MachineSpeedMeaningCard } from './MachineSpeedMeaningCard'
 import { StateDetailPanel } from './StateDetailPanel'
 import { LossCascadeCard } from './LossCascadeCard'
 import { ImputacionParetoCard } from './ImputacionParetoCard'
@@ -1524,6 +1525,9 @@ export function UpstreamMachinesPanel({
                   showGap={showRateGap}
                 />
                 </div>
+                {/* El "¿y eso qué significa?" va pegado al gráfico, que es donde
+                    nace la pregunta — no en otra tarjeta más abajo. */}
+                <MachineSpeedMeaningCard machines={snapshot.machines} className="mt-3" />
               </div>
             )}
 
