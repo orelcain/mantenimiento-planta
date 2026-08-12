@@ -188,9 +188,11 @@ export function PlantKPIBoard({
   //
   // Antes ordenábamos por OEE de máquina (A×R). Eso es inválido para comparar
   // entre sí a las 3 Baader: R se mide contra el target de cada una, y no son
-  // el mismo modelo. La Evisceradora 3 es la antigua (19 pz/min); las 1 y 2 son
-  // el modelo nuevo (16 pz/min). Alimentadas parejo, la Ev3 entrega MÁS piezas
-  // y su R sale ~12 pts más bajo → el board acusaba justo a la mejor máquina.
+  // el mismo modelo: una es la ANTIGUA (19 pz/min) y las otras dos el modelo
+  // nuevo (16). ⚠ Cuál es la antigua depende de la planta — en Yal es la
+  // Evisceradora 3, en Chonchi la 1 (confirmado en terreno el 12-08). Alimentada
+  // parejo, la antigua entrega MÁS piezas y su R sale ~12 pts más bajo → el
+  // board acusaba justo a la mejor máquina.
   //
   // Las piezas perdidas se miden contra la cadencia de la LÍNEA (referencia
   // común), no contra el target propio: así la máquina con más capacidad no
@@ -404,7 +406,7 @@ export function PlantKPIBoard({
               <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
-                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad (la Evisceradora 3 es el modelo antiguo, 19 pz/min; las otras dos el nuevo, 16 pz/min), así que su % no es comparable.`}
+                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
                 >
                   <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} —{' '}
                   <b>{Math.round(machineDiag.worst.lost).toLocaleString('es-CL')} piezas perdidas</b>
