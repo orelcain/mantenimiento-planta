@@ -28,6 +28,7 @@ import {
   type PublicShiftMonitorDoc,
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
+import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -250,6 +251,69 @@ function Sparkbars({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * El turno hora por hora.
+ *
+ * Existe por un caso concreto: un supervisor dijo que "en la primera hora
+ * hicieron 800 piezas" y no había con qué contrastarlo — el monitor mostraba el
+ * total del turno y la cadencia promedio, que no responden esa pregunta.
+ *
+ * Cada fila lleva las piezas Y el ritmo equivalente en pz/h. La distinción no es
+ * un adorno: un turno que arranca 21:15 tiene una "primera hora" de 45 minutos,
+ * así que sus piezas no se comparan de igual a igual con las de una hora
+ * entera — el ritmo sí.
+ */
+function PorHora({ series }: { series: PublicMonitorLive['series'] }) {
+  const rows = useMemo(() => buildHourlyRows(series), [series])
+  const max = useMemo(() => peakPieces(rows), [rows])
+  if (rows.length === 0) return null
+
+  return (
+    <section className="rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        Hora por hora
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.hourStart} className="flex items-center gap-2.5 text-sm">
+            <span className="w-11 shrink-0 tabular-nums text-muted-foreground">
+              {String(r.hour).padStart(2, '0')}h
+            </span>
+            <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+              <span
+                className="block h-full rounded-full bg-sky-400"
+                style={{ width: `${max > 0 ? (r.pieces / max) * 100 : 0}%` }}
+              />
+            </span>
+            <span className="w-[4.5rem] shrink-0 text-right tabular-nums text-foreground/90">
+              {fmtInt(r.pieces)} pz
+            </span>
+            {/* 5.5rem y no 5: con el asterisco de hora parcial, "1.012 pz/h *"
+                se partía en dos líneas y descuadraba la fila. */}
+            <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-right tabular-nums text-[11px] text-muted-foreground/70">
+              {fmtInt(r.piecesPerHour)} pz/h
+              {r.partial && (
+                <span
+                  className="ml-1 text-amber-700 dark:text-amber-300"
+                  title={`Hora incompleta: ${r.minutesCovered} min con datos. Las piezas no se comparan con una hora entera; el ritmo pz/h sí.`}
+                >
+                  *
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {rows.some((r) => r.partial) && (
+        <p className="mt-2 text-[11px] text-muted-foreground/70">
+          * hora incompleta — las piezas son menos porque duró menos, no porque
+          fuera más lenta. Para comparar, mirá el ritmo en pz/h.
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -636,6 +700,8 @@ export function PublicShiftMonitorPage() {
           causaSel={causaSel}
           onCausa={setCausaSel}
         />
+
+        <PorHora series={live.series} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
