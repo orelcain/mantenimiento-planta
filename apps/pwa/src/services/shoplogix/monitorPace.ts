@@ -48,6 +48,25 @@ export interface PaceToTarget {
   projectedPieces: number
   /** Techo físico de la línea en pz/h, si se pudo calcular. */
   maxPerHour: number | null
+  /** Porcentaje de la meta ya producido. */
+  progressPct: number
+  /**
+   * Qué pasaría con UNA HORA EXTRA.
+   *
+   * Es la pregunta que sigue naturalmente a "no se alcanza": si alargar el
+   * turno una hora lo resuelve, eso es una decisión que alguien puede tomar
+   * ahora — y muy distinta de "no llegamos y listo". null cuando no aporta:
+   * cuota cumplida, o ya se alcanza sin estirar nada.
+   */
+  withExtraHour: {
+    /** Ritmo que haría falta con esa hora de más. */
+    requiredPerHour: number
+    requiredPerMinute: number
+    /** true si ese ritmo entra en el techo de la línea (o si no hay techo). */
+    feasible: boolean
+    /** Minutos totales disponibles con la hora extra. */
+    remainingMin: number
+  } | null
 }
 
 /** De dónde salió la meta contra la que se calcula el ritmo. */
@@ -125,6 +144,8 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
       gapPerHour: 0,
       projectedPieces: producedPieces + Math.max(0, remainingMin) * (currentPerHour / 60),
       maxPerHour,
+      progressPct: 100,
+      withExtraHour: null,
     }
   }
 
@@ -133,6 +154,21 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
 
   const requiredPerHour = (remainingPieces / remainingMin) * 60
   const projectedPieces = producedPieces + remainingMin * (currentPerHour / 60)
+  const alcanzaSinEstirar = maxPerHour == null || requiredPerHour <= maxPerHour
+
+  /*
+   * La hora extra. Solo se ofrece cuando con el tiempo normal NO alcanza: si ya
+   * alcanza, proponer alargar el turno es ruido — y peor, sugiere que hace
+   * falta cuando no.
+   */
+  const extraMin = remainingMin + 60
+  const requiredWithExtra = (remainingPieces / extraMin) * 60
+  const withExtraHour = alcanzaSinEstirar ? null : {
+    requiredPerHour: requiredWithExtra,
+    requiredPerMinute: requiredWithExtra / 60,
+    feasible: maxPerHour == null || requiredWithExtra <= maxPerHour,
+    remainingMin: extraMin,
+  }
 
   return {
     verdict: maxPerHour != null && requiredPerHour > maxPerHour ? 'fuera-de-alcance' : 'alcanzable',
@@ -146,6 +182,8 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
     gapPerHour: requiredPerHour - currentPerHour,
     projectedPieces: Math.round(projectedPieces),
     maxPerHour,
+    progressPct: Math.min(100, (producedPieces / meta) * 100),
+    withExtraHour,
   }
 }
 

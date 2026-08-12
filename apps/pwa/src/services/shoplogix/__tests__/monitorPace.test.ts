@@ -99,6 +99,33 @@ describe('computePaceToTarget', () => {
     expect(p.maxPerHour).toBe(2_768)
   })
 
+  it('con 1 h extra baja el ritmo necesario, y dice si así SÍ entra', () => {
+    // Sin extra: 14.547 pz en 240 min = 3.637 pz/h, por encima del techo 2.768.
+    // Con 1 h más: 14.547 en 300 min = 2.909 — sigue arriba, no basta.
+    const p = base()!
+    expect(p.withExtraHour).not.toBeNull()
+    expect(p.withExtraHour!.requiredPerHour).toBeCloseTo((14_547 / 300) * 60, 2)
+    expect(p.withExtraHour!.requiredPerHour).toBeLessThan(p.requiredPerHour)
+    expect(p.withExtraHour!.feasible).toBe(false)
+  })
+
+  it('marca la hora extra como suficiente cuando el ritmo entra en el techo', () => {
+    const p = base({ maxPerHour: 3_000 })!
+    expect(p.verdict).toBe('fuera-de-alcance')
+    expect(p.withExtraHour!.feasible).toBe(true)
+  })
+
+  it('NO ofrece la hora extra cuando ya se alcanza sin estirar nada', () => {
+    // Proponer alargar el turno cuando no hace falta sugiere que sí hace falta.
+    expect(base({ targetPieces: 10_000 })!.withExtraHour).toBeNull()
+    expect(base({ producedPieces: 21_000 })!.withExtraHour).toBeNull()
+  })
+
+  it('publica el avance de la meta en porcentaje', () => {
+    expect(base()!.progressPct).toBeCloseTo((5_453 / 20_000) * 100, 4)
+    expect(base({ producedPieces: 21_000 })!.progressPct).toBe(100)
+  })
+
   it('no recomienda nada con el turno cerrado', () => {
     expect(base({ shiftClosed: true })).toBeNull()
   })

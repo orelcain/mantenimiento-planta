@@ -431,31 +431,87 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
           {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
         </span>
       </div>
-      <p className="mt-1 text-[13px] leading-relaxed">
-        Faltan <b className="tabular-nums">{fmtInt(pace.remainingPieces)}</b> pz en{' '}
-        <b className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</b>:{' '}
-        <b className={`tabular-nums ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
-          {fmtInt(pace.requiredPerHour)} pz/h
-        </b>{' '}
-        <span className="text-muted-foreground/80">
-          ({fmtDec(pace.requiredPerMinute)} pz/min)
-        </span>
+      {/* El VEREDICTO primero y en grande. Antes todo esto era un párrafo denso
+          donde "¿llego o no?" —la única pregunta que importa— había que
+          deducirla leyendo cuatro cifras seguidas. */}
+      <p className={`mt-1 text-[15px] font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
+        {fuera ? 'No se alcanza con el tiempo que queda' : 'Se alcanza'}
       </p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
-        {pace.gapPerHour > 0 ? (
-          <>
-            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — hay que
-            subir <span className="tabular-nums text-foreground/90">{fmtInt(pace.gapPerHour)} pz/h</span>.
-          </>
-        ) : (
-          <>
-            Vas a <span className="tabular-nums">{fmtInt(pace.currentPerHour)} pz/h</span> — con este
-            ritmo alcanza.
-          </>
+      <p className="mt-0.5 text-[12px] text-muted-foreground">
+        Al ritmo de ahora el turno cierra en{' '}
+        <span className="tabular-nums text-foreground/90">{fmtInt(pace.projectedPieces)} pz</span>
+        {' '}({fmtDec((pace.projectedPieces / pace.targetPieces) * 100, 0)}% de la meta).
+      </p>
+
+      {/* Los números en filas, no en prosa: se comparan de un vistazo. */}
+      <dl className="mt-2 space-y-0.5 text-[12px]">
+        <div className="flex items-baseline gap-2">
+          <dt className="w-20 shrink-0 text-muted-foreground">Faltan</dt>
+          <dd className="tabular-nums">{fmtInt(pace.remainingPieces)} pz</dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="w-20 shrink-0 text-muted-foreground">Queda</dt>
+          <dd className="tabular-nums">{fmtDurationSec(pace.remainingMin * 60)}</dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="w-20 shrink-0 text-muted-foreground">Necesitás</dt>
+          <dd className={`tabular-nums font-semibold ${fuera ? 'text-amber-800 dark:text-amber-300' : 'text-sky-800 dark:text-sky-300'}`}>
+            {fmtInt(pace.requiredPerHour)} pz/h
+            <span className="ml-1 font-normal text-muted-foreground/80">
+              ({fmtDec(pace.requiredPerMinute)} pz/min)
+            </span>
+          </dd>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <dt className="w-20 shrink-0 text-muted-foreground">Vas a</dt>
+          <dd className="tabular-nums">
+            {fmtInt(pace.currentPerHour)} pz/h
+            {pace.gapPerHour > 0 && (
+              <span className="ml-1 text-muted-foreground/80">
+                → faltan {fmtInt(pace.gapPerHour)}
+              </span>
+            )}
+          </dd>
+        </div>
+        {pace.maxPerHour != null && (
+          <div className="flex items-baseline gap-2">
+            <dt className="w-20 shrink-0 text-muted-foreground">Techo</dt>
+            <dd className="tabular-nums text-muted-foreground">{fmtInt(pace.maxPerHour)} pz/h</dd>
+          </div>
         )}
-        {' '}A ese ritmo el turno cierra en{' '}
-        <span className="tabular-nums">{fmtInt(pace.projectedPieces)} pz</span>.
-      </p>
+      </dl>
+
+      {/* La hora extra: la pregunta que sigue a "no se alcanza". Convierte un
+          "no llegamos" en una decisión que alguien puede tomar ahora. */}
+      {pace.withExtraHour && (
+        <div
+          className={`mt-2 rounded-xl border px-2.5 py-2 text-[12px] ${
+            pace.withExtraHour.feasible
+              ? 'border-emerald-500/30 bg-emerald-500/10'
+              : 'border-border bg-muted/40'
+          }`}
+        >
+          <span className="font-medium">Con 1 hora extra: </span>
+          {pace.withExtraHour.feasible ? (
+            <>
+              bastaría con{' '}
+              <b className="tabular-nums text-emerald-800 dark:text-emerald-300">
+                {fmtInt(pace.withExtraHour.requiredPerHour)} pz/h
+              </b>{' '}
+              <span className="text-muted-foreground/80">
+                ({fmtDec(pace.withExtraHour.requiredPerMinute)} pz/min)
+              </span>
+              {' '}— <span className="text-emerald-800 dark:text-emerald-300">la meta entra</span>.
+            </>
+          ) : (
+            <>
+              harían falta{' '}
+              <b className="tabular-nums">{fmtInt(pace.withExtraHour.requiredPerHour)} pz/h</b>, que
+              sigue por encima del techo de la línea. Con una hora no basta.
+            </>
+          )}
+        </div>
+      )}
       <CierreDelTurno
         cierre={cierre}
         muestras={muestras}
@@ -464,13 +520,10 @@ function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, 
         shiftName={shiftName}
         startAt={startAt}
       />
-      {fuera && (
-        <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-          Ese ritmo está por encima de lo que la línea da a objetivo
-          {pace.maxPerHour != null && <> (<span className="tabular-nums">{fmtInt(pace.maxPerHour)} pz/h</span>)</>}
-          : la meta ya no se alcanza con el tiempo que queda.
-        </p>
-      )}
+      {/* El aviso de "no se alcanza" ya no va acá: era una tercera repetición
+          del mismo hecho, después del veredicto de arriba y de la fila "Techo".
+          Y convivía mal con el "hay que subir 320 pz/h" — decir a la vez cuánto
+          acelerar y que no sirve de nada. */}
     </div>
   )
 }
