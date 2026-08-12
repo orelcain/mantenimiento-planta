@@ -37,7 +37,9 @@ import {
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
-import { buildDayComparison, optimalPace } from '@/services/shoplogix/monitorCompare'
+import {
+  buildDayComparison, optimalPace, plannedBreaks, mergeBreaks,
+} from '@/services/shoplogix/monitorCompare'
 import { TiempoDelTurno, ComparadorDias, Bloque } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
@@ -958,10 +960,14 @@ export function PublicShiftMonitorPage() {
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
    *
-   * La serie de cada dia ya viaja en el doc (`history`), asi que esto no cuesta
-   * ni una lectura extra. La recta objetivo se reparte sobre el tiempo UTIL (sin
-   * las paradas de convenio): repartir la cuota sobre el turno completo supone
-   * que no hay colacion y exige de mas desde el arranque.
+   * La serie de cada día ya viaja en el doc (`history`), así que esto no cuesta
+   * ni una lectura extra.
+   *
+   * ⚠ La curva objetivo se APLANA durante las paradas de convenio. Repartir la
+   * cuota en una recta supone que no hay colación y termina pidiendo producción
+   * justo cuando la línea está parada por convenio — a la hora 5, en esta línea.
+   * Las paradas de hoy son hechos; para las que todavía no ocurrieron se usan
+   * las de los días anteriores como pronóstico.
    */
   const comparacion = useMemo(() => {
     const meta = data?.targetPieces ?? live?.quotaPieces ?? null
@@ -969,15 +975,30 @@ export function PublicShiftMonitorPage() {
     const opt = meta && tb
       ? optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
       : null
+
+    const deConvenio = (l: PublicMonitorLive | null | undefined) =>
+      plannedBreaks({
+        series: l?.series,
+        stopEvents: l?.stopEvents,
+        stopReasons: l?.stopReasons,
+        plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
+      })
+
+    const hoyBreaks = deConvenio(live)
+    const anteriores = (data?.history ?? []).flatMap((h) => deConvenio(h.live))
+    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
+
     return buildDayComparison({
       todaySeries: live?.series,
       todayDateKey: data?.dateKey ?? '',
       previous: (data?.history ?? []).map((h) => ({ dateKey: h.dateKey, series: h.live?.series })),
-      maxDays: 2,
+      // Los 6 que trae el doc: cuáles se dibujan lo elige quien mira.
+      maxDays: 6,
       targetPieces: meta,
       usefulMin: opt?.usefulMin ?? null,
+      breaks: mergeBreaks(hoyBreaks, anteriores, minutoActual),
     })
-  }, [live?.series, live?.quotaPieces, live?.timeBreakdown, data?.dateKey, data?.history, data?.targetPieces])
+  }, [live, data?.dateKey, data?.history, data?.targetPieces])
 
   if (status === 'loading') {
     return (

@@ -11,6 +11,7 @@ import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import { findGapWindow, type CompareResult } from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
+import { COLORES } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -243,9 +244,6 @@ function FilaCausa({ x, sel, onCausa }: {
   )
 }
 
-/** Colores de las líneas del comparador. Hoy siempre el primero. */
-const COLORES = ['#38bdf8', '#a78bfa', '#94a3b8', '#f472b6']
-
 /**
  * Comparador de días, a la MISMA ALTURA DE TURNO.
  *
@@ -262,6 +260,27 @@ export function ComparadorDias({ cmp, live, onCausa }: {
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
 }) {
+  /*
+   * Qué días se dibujan. `null` = todavía nadie eligió, y valen los dos más
+   * recientes: seis curvas superpuestas en un celular no se leen, pero tener
+   * los seis a mano permite buscar el día en que la línea sí llegó y
+   * compararse contra ese.
+   *
+   * El estado arranca en `null` y no con el default calculado porque el hook
+   * tiene que correr ANTES del early return de abajo, cuando `cmp.days` todavía
+   * puede venir vacío.
+   */
+  const [elegidos, setElegidos] = useState<Set<string> | null>(null)
+  const visibles = elegidos
+    ?? new Set(cmp.days.filter((d) => !d.esHoy).slice(0, 2).map((d) => d.dateKey))
+  const alternar = (dateKey: string) =>
+    setElegidos(() => {
+      const s = new Set(visibles)
+      if (s.has(dateKey)) s.delete(dateKey)
+      else s.add(dateKey)
+      return s
+    })
+
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
 
   const hoy = cmp.days.find((d) => d.esHoy)
@@ -280,30 +299,33 @@ export function ComparadorDias({ cmp, live, onCausa }: {
       }
     >
           <div className="mt-2">
-            <MonitorCompareChart cmp={cmp} />
+            <MonitorCompareChart cmp={cmp} visibles={visibles} />
           </div>
 
           <ul className="mt-2 space-y-1">
             {cmp.days.map((d, i) => {
               const dif =
                 !d.esHoy && ref != null && d.atCurrentMinute != null ? ref - d.atCurrentMinute : null
-              return (
-                <li key={d.dateKey} className="flex items-center gap-2 text-[12px]">
+              const visible = d.esHoy || visibles.has(d.dateKey)
+              const fila = (
+                <>
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full"
+                    className={`h-2 w-2 shrink-0 rounded-full ${visible ? '' : 'opacity-25'}`}
                     style={{ background: COLORES[i % COLORES.length] }}
                   />
                   <span
-                    className={`w-14 shrink-0 truncate ${d.esHoy ? 'font-semibold' : 'text-muted-foreground'}`}
+                    className={`w-14 shrink-0 truncate ${
+                      d.esHoy ? 'font-semibold' : visible ? 'text-foreground/80' : 'text-muted-foreground/50'
+                    }`}
                   >
                     {d.label}
                   </span>
-                  <span className="flex-1 text-right tabular-nums">
-                    {d.atCurrentMinute != null ? fmtInt(d.atCurrentMinute) : '—'}
+                  <span className={`flex-1 text-right tabular-nums ${visible ? '' : 'text-muted-foreground/50'}`}>
+                    {d.atCurrentMinute != null ? fmtInt(d.atCurrentMinute) : '\u2014'}
                   </span>
                   {/* La diferencia contra hoy. Sin esto hay que restar de cabeza. */}
                   <span
-                    className={`w-14 shrink-0 text-right tabular-nums text-[11px] ${
+                    className={`w-12 shrink-0 text-right tabular-nums text-[11px] ${
                       dif == null
                         ? 'text-transparent'
                         : dif >= 0
@@ -311,19 +333,38 @@ export function ComparadorDias({ cmp, live, onCausa }: {
                         : 'text-red-700 dark:text-red-400'
                     }`}
                   >
-                    {dif == null ? '—' : `${dif >= 0 ? '+' : ''}${fmtInt(dif)}`}
+                    {dif == null ? '\u2014' : `${dif >= 0 ? '+' : ''}${fmtInt(dif)}`}
                   </span>
                   {/* El total al cierre de ese día. En HOY no va: el turno puede
                       estar en curso y "cerró 4.486" sería falso. */}
                   <span className="w-[4.2rem] shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-muted-foreground/60">
                     {d.esHoy ? '' : `cerró ${fmtInt(d.totalPieces)}`}
                   </span>
+                </>
+              )
+
+              // Hoy no se puede apagar: es la referencia de toda la pantalla.
+              if (d.esHoy) {
+                return (
+                  <li key={d.dateKey} className="flex items-center gap-2 px-1 text-[12px]">
+                    {fila}
+                  </li>
+                )
+              }
+              return (
+                <li key={d.dateKey}>
+                  <button
+                    type="button"
+                    onClick={() => alternar(d.dateKey)}
+                    aria-pressed={visible}
+                    className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-[12px] hover:bg-muted"
+                  >
+                    {fila}
+                  </button>
                 </li>
               )
             })}
 
-            {/* La cuota como una fila mas: cuanto separa a la realidad del
-                objetivo, a esta misma altura de turno. */}
             {cmp.optimalAtCurrentMinute != null && cmp.optimalAtCurrentMinute > 0 && (
               <li className="flex items-center gap-2 border-t border-border pt-1.5 text-[12px]">
                 <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-amber-500" />
@@ -354,7 +395,8 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           <BrechaDelDia cmp={cmp} live={live} onCausa={onCausa} />
 
           <p className="mt-2 text-[11px] text-muted-foreground/70">
-            Todos a la misma altura de turno, contada desde el arranque: los turnos no
+            Tocá un día para mostrarlo u ocultarlo en el gráfico. Todos se leen a la misma
+            altura de turno, contada desde el arranque: los turnos no
             empiezan a la misma hora, así que comparar por reloj mide mal justamente el
             primer tramo.
           </p>

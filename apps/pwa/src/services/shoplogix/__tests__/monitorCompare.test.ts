@@ -10,7 +10,10 @@
  * Shoplogix (confirmado por Orel el 12-08).
  */
 import { describe, it, expect } from 'vitest'
-import { cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow } from '../monitorCompare'
+import {
+  cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow,
+  plannedBreaks, mergeBreaks,
+} from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
 /** Serie de tramos de 5 min desde `desde`. */
@@ -227,5 +230,111 @@ describe('findGapWindow', () => {
 
   it('sin curvas no inventa un tramo', () => {
     expect(findGapWindow([], [])).toBeNull()
+  })
+})
+
+describe('plannedBreaks', () => {
+  const base = {
+    series: serie('2026-08-12T07:45:00Z', [1]),
+    stopReasons: ['COLACION', 'ATASCAMIENTO', 'DETENCION PROGRAMADA'],
+    plannedReasons: ['COLACION', 'DETENCION PROGRAMADA'],
+  }
+
+  it('ubica las paradas de convenio en minutos de turno', () => {
+    const r = plannedBreaks({
+      ...base,
+      stopEvents: [{ r: 0, f: '2026-08-12T12:56:00Z', s: 55 * 60 }],
+    })
+    expect(r).toEqual([{ fromMin: 311, toMin: 366, reason: 'COLACION' }])
+  })
+
+  it('fusiona los tramos solapados — el sensor parte una colacion en varios', () => {
+    // Caso real de Filete el 12-08: 311→318 y 317→356 son una sola parada.
+    const r = plannedBreaks({
+      ...base,
+      stopEvents: [
+        { r: 0, f: '2026-08-12T12:56:00Z', s: 7 * 60 },
+        { r: 0, f: '2026-08-12T13:02:00Z', s: 39 * 60 },
+      ],
+    })
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ fromMin: 311, toMin: 356 })
+  })
+
+  it('IGNORA las paradas recuperables — solo el convenio aplana la meta', () => {
+    const r = plannedBreaks({
+      ...base,
+      stopEvents: [{ r: 1, f: '2026-08-12T09:45:00Z', s: 20 * 60 }],
+    })
+    expect(r).toEqual([])
+  })
+
+  it('sin la lista de causas de convenio no adivina cuales son', () => {
+    // La clasificacion la hace el backend; duplicarla en el cliente garantiza
+    // que un dia las dos versiones digan cosas distintas.
+    expect(plannedBreaks({ ...base, plannedReasons: [], stopEvents: [{ r: 0, f: 'x', s: 60 }] })).toEqual([])
+  })
+})
+
+describe('mergeBreaks', () => {
+  it('a las de hoy les suma las de dias anteriores que TODAVIA no pasaron', () => {
+    const hoy = [{ fromMin: 5, toMin: 9, reason: 'REUNION' }]
+    const ayer = [
+      { fromMin: 5, toMin: 10, reason: 'REUNION' },      // ya paso: no se duplica
+      { fromMin: 310, toMin: 365, reason: 'COLACION' },  // falta: se pronostica
+    ]
+    expect(mergeBreaks(hoy, ayer, 120)).toEqual([
+      { fromMin: 5, toMin: 9, reason: 'REUNION' },
+      { fromMin: 310, toMin: 365, reason: 'COLACION' },
+    ])
+  })
+
+  it('lo que ya ocurrio manda: no se pronostica sobre un hecho', () => {
+    const hoy = [{ fromMin: 300, toMin: 340, reason: 'COLACION' }]
+    const ayer = [{ fromMin: 310, toMin: 380, reason: 'COLACION' }]
+    expect(mergeBreaks(hoy, ayer, 400)).toEqual([{ fromMin: 300, toMin: 340, reason: 'COLACION' }])
+  })
+})
+
+describe('la curva objetivo con las paradas de convenio', () => {
+  const hoy = serie('2026-08-12T07:45:00Z', Array(96).fill(50))  // 480 min
+
+  it('se APLANA durante la colacion en vez de seguir subiendo', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 372,
+      breaks: [{ fromMin: 310, toMin: 365, reason: 'COLACION' }],
+    })
+    expect(piecesAt(r.optimal!, 365)).toBe(piecesAt(r.optimal!, 310))
+  })
+
+  it('una recta pediria produccion justo cuando la linea esta parada', () => {
+    const conParada = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 372,
+      breaks: [{ fromMin: 310, toMin: 365, reason: 'COLACION' }],
+    })
+    const recta = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 372,
+    })
+    expect(piecesAt(conParada.optimal!, 365)!).toBeLessThan(piecesAt(recta.optimal!, 365)!)
+  })
+
+  it('igual llega a la cuota: el ritmo se reparte sobre el tiempo UTIL', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 372,
+      breaks: [{ fromMin: 310, toMin: 365, reason: 'COLACION' }],
+    })
+    expect(Math.max(...r.optimal!.map((p) => p.pieces))).toBe(5_000)
+  })
+
+  it('nunca pasa de la cuota', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 200,
+    })
+    expect(Math.max(...r.optimal!.map((p) => p.pieces))).toBeLessThanOrEqual(5_000)
   })
 })
