@@ -49,6 +49,8 @@ import { BeltRpmModal } from '@/components/grader/modals/BeltRpmModal'
 import type { ActionTrigger } from '@/services/grader/actionPlanSuggestions'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { GatesHistoryHintCard } from '@/components/grader/GatesHistoryHintCard'
+import { MidShiftCheckCard } from '@/components/grader/MidShiftCheckCard'
+import { buildMidShiftCheck } from '@/services/grader/graderMidShiftCheck'
 import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
 import { ShiftQuotaCard } from '@/components/grader/ShiftQuotaCard'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
@@ -657,7 +659,13 @@ export function AnalisisGraderTurnoPage() {
   const [alertThreshold, setAlertThreshold] = useState(DEFAULT_P0_ALERT_PCT)
   const [criticalThreshold, setCriticalThreshold] = useState(DEFAULT_P0_CRITICAL_PCT)
   // Config inline del turno — override por turno
-  const [showConfigPanel, setShowConfigPanel] = useState(false)
+  /*
+   * Abierto por defecto: la tabla de las 12 compuertas ES el contenido de la
+   * pestaña Gates, no un ajuste escondido. Colapsada, llegar a ella pedía dos
+   * clics (abrir + elegir la sub-pestaña) y se sentía como "ir a la
+   * configuración del Grader", que es justo lo que Orel no quería.
+   */
+  const [showConfigPanel, setShowConfigPanel] = useState(true)
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
   const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
@@ -1190,8 +1198,36 @@ export function AnalisisGraderTurnoPage() {
     files: [], pieceRecords: [], gate0Records: [], folioRecords: [],
     qualitySummary: [], productionSummary: [], inferred: {},
   }), [])
+  /*
+   * Huella de lo último que emitió el editor de gates.
+   *
+   * ⚠ El editor publica sus gates con debounce apenas monta — es su forma de
+   * decirle al contenedor "esto es lo que estoy mostrando", no "el usuario
+   * cambió algo". Y `saveConfigSnapshot` no puede distinguirlo: cuando NO hay
+   * snapshot previo el diff es `[]` por construcción, así que su guarda de
+   * "sin cambios" no aplica y escribe igual.
+   *
+   * Resultado sin esta huella: cada visita a la pestaña Gates dejaba un
+   * snapshot fantasma de "0 cambios" firmado por quien pasó por ahí. Se notaba
+   * recién ahora porque el panel pasó a abrir por defecto; antes hacía falta
+   * desplegar el acordeón a mano.
+   */
+  const lastEmittedGatesRef = useRef<string | null>(null)
+  // Depende de dateKey/shiftLabel y no de `shiftDocId`: esa const se declara
+  // más abajo y acá todavía está en la zona muerta temporal.
+  useEffect(() => { lastEmittedGatesRef.current = null }, [dateKey, shiftLabel])
+
   const handleTurnoConfigApply = useCallback((updatedGates: GateAssignment[]) => {
     if (!user?.id || !dateKey || !shiftLabel) return
+    const fingerprint = JSON.stringify(updatedGates)
+    if (lastEmittedGatesRef.current === null) {
+      // Primera emisión = lo que el editor acaba de cargar. No es un cambio.
+      lastEmittedGatesRef.current = fingerprint
+      return
+    }
+    if (lastEmittedGatesRef.current === fingerprint) return
+    lastEmittedGatesRef.current = fingerprint
+
     const docId = `${dateKey}__${shiftLabel}`
     const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
     saveConfigSnapshot(docId, updatedGates, { uid: user.id, name: userName })
@@ -1476,6 +1512,22 @@ export function AnalisisGraderTurnoPage() {
    */
   const [imputacionesPendientes, setImputacionesPendientes] = useState(0)
 
+  /*
+   * El calibre más apretado según el corte de control, solo para decidir si el
+   * Resumen muestra el aviso que lleva a Gates. Mismo cálculo que la tarjeta,
+   * sin UI. Va acá arriba —y no junto al JSX— porque es un hook y abajo ya pasó
+   * el early return de permisos (rules-of-hooks).
+   */
+  const midShiftAlert = useMemo(() => {
+    if (!isClassificationPlant || shiftWindow?.status !== 'live') return null
+    const c = buildMidShiftCheck({
+      summary,
+      gates: turnoGates,
+      remainingMin: shiftWindow.remainingMin ?? null,
+    })
+    return c && c.saturated.length > 0 ? c.saturated[0]! : null
+  }, [isClassificationPlant, shiftWindow, summary, turnoGates])
+
   const triggeredRunbooks = useMemo(
     () => findTriggeredRunbooks(dominant, summary?.pointZeroPct ?? 0),
     [dominant, summary],
@@ -1676,6 +1728,25 @@ export function AnalisisGraderTurnoPage() {
     />
   ) : null
 
+  /*
+   * Corte de control: el mismo análisis de saturación pero sobre el Excel
+   * PARCIAL de un turno en curso. Vive en Gates —es donde se actúa—, y el
+   * Resumen solo lleva un aviso de una línea: si la noticia queda enterrada en
+   * una pestaña, Control de Producción no la ve y la feature no existe.
+   */
+  const midShiftCard = isClassificationPlant ? (
+    <MidShiftCheckCard
+      summary={summary}
+      gates={turnoGates}
+      remainingMin={shiftWindow?.status === 'live' ? (shiftWindow.remainingMin ?? null) : null}
+      shiftDocId={shiftDocId}
+      plantLineId={plantLineCfg.id}
+      configSnapshots={configSnapshots}
+      onSaved={reloadConfigSnapshots}
+      onLoadExcel={() => navigate(wizardUrl)}
+    />
+  ) : null
+
   const gatesEditorCard = (
     <Card className="overflow-hidden">
       <button
@@ -1684,10 +1755,10 @@ export function AnalisisGraderTurnoPage() {
       >
         <div className="flex items-center gap-2">
           <Settings2 className="w-4 h-4 text-muted-foreground" />
-          <span className="font-medium">Ajustes de este turno</span>
+          <span className="font-medium">Las 12 compuertas de este turno</span>
           {turnoGates.filter(g => g.active).length > 0 && (
             <Badge variant="outline" className="text-xs font-normal">
-              {turnoGates.filter(g => g.active).length} gates activas
+              {turnoGates.filter(g => g.active).length} activas
             </Badge>
           )}
         </div>
@@ -1697,6 +1768,7 @@ export function AnalisisGraderTurnoPage() {
         <div className="border-t">
           <AnalisisGraderGatesConfigPage
             tabbed
+            defaultTab="gates"
             gates={turnoGates}
             config={turnoConfig}
             parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
@@ -2183,6 +2255,32 @@ export function AnalisisGraderTurnoPage() {
              seguía en `col-span-2` y la tercera columna quedaba VACÍA, así que
              la tarjeta se veía recortada con medio ancho de aire al lado. */
           <div className="space-y-4">
+            {/* Aviso del corte de control. La tarjeta entera vive en Gates —es
+                donde se actúa—, pero enterrada ahí Control de Producción no la
+                ve. Una línea arriba del Resumen, que es lo que sí miran. */}
+            {midShiftAlert && (
+              <button
+                onClick={() => setActiveView('gates')}
+                className="w-full flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-destructive/[0.12] border border-destructive/[0.3] text-sm text-left hover:bg-destructive/[0.18] transition-colors"
+              >
+                <Radio className="w-4 h-4 shrink-0 mt-0.5 text-ink-crit animate-pulse" />
+                <span className="flex-1 text-muted-foreground">
+                  Turno en curso: <span className="font-medium text-foreground">{midShiftAlert.label}</span>{' '}
+                  se lleva el{' '}
+                  <span className="tabular-nums font-medium text-ink-crit">
+                    {midShiftAlert.productionPct.toFixed(1)}%
+                  </span>{' '}
+                  con{' '}
+                  <span className="tabular-nums">
+                    {midShiftAlert.gates.length === 0
+                      ? 'ninguna gate'
+                      : `${midShiftAlert.gates.length} de las 12 gates`}
+                  </span>
+                  . <span className="text-primary font-medium">Ver el corte de control →</span>
+                </span>
+              </button>
+            )}
+
             {/* Scorecard + Marel HG capture — mobile row 1 */}
             <div className="space-y-4">
               <HeroScorecard
@@ -2327,6 +2425,11 @@ export function AnalisisGraderTurnoPage() {
               </p>
             </div>
           )}
+
+          {/* Corte de control primero: con el turno EN CURSO, lo urgente es lo
+              que todavía se puede cambiar. La tarjeta se esconde sola cuando el
+              turno ya cerró. */}
+          {activeView === 'gates' && midShiftCard}
 
           {/* Contraste contra los turnos anteriores. Va ANTES del análisis del
               propio turno: primero "¿esta config tenía sentido?", después "¿cómo
