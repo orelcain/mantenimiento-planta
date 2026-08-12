@@ -1803,13 +1803,25 @@ export function AnalisisGraderTurnoPage() {
         </div>
       )}
       {/* ── Header sticky con navegación contextual ───────────────────── */}
-      <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 bg-background/85 backdrop-blur-md border-b border-border/40 flex items-center justify-between gap-2 flex-wrap">
+      {/*
+        En MÓVIL son dos filas, no una: arriba qué turno estás mirando, abajo qué
+        podés hacer con él.
+
+        ⚠ En una sola fila se rompía. Los botones de la derecha son `shrink-0` y
+        ocupan ~290 px de los 351 útiles, así que el grupo del título quedaba con
+        ~60 px; y como sus etiquetas (turno, horario) también son `shrink-0`, no
+        se recortaban: se DESBORDABAN y los botones —que pintan después— quedaban
+        encima del texto. De ahí el "Turn" y el "m..." asomando detrás de la
+        barra de íconos. `basis-full` en móvil le da su propia fila a cada grupo
+        y `overflow-hidden` garantiza que nada se salga aunque el título crezca.
+      */}
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 bg-background/85 backdrop-blur-md border-b border-border/40 flex items-center justify-between gap-x-2 gap-y-1.5 flex-wrap">
         {/* Sub-helper visual: tip de swipe en mobile */}
         {(adjacentShifts.prev || adjacentShifts.next) && (
           <span className="sr-only">Desliza ← → o usa teclado flechas para navegar turnos</span>
         )}
-        {/* Izquierda: back + título */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Fila 1 en móvil · izquierda en desktop: qué turno es */}
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden basis-full sm:basis-auto sm:flex-1">
           <Button
             variant="outline"
             size="sm"
@@ -1873,8 +1885,12 @@ export function AnalisisGraderTurnoPage() {
           )}
         </div>
 
-        {/* Derecha: acciones + prev/next navigation */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Fila 2 en móvil · derecha en desktop: qué podés hacer con él.
+            El orden importa: primero las acciones sobre ESTE turno (clasificar,
+            compartir, exportar) y al final Anterior/Siguiente, que es irse a
+            otro. Pegados al borde derecho en las dos anchuras, así el pulgar los
+            encuentra siempre en el mismo lugar. */}
+        <div className="flex items-center gap-1 flex-wrap justify-end basis-full sm:basis-auto sm:shrink-0">
           {/* M3: Siguiente pausa sin clasificar */}
           {isAdmin && summary && untaggedPauses.length > 0 && (
             <Button
