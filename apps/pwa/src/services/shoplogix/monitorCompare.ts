@@ -79,6 +79,80 @@ export interface DayCurve {
   esHoy: boolean
 }
 
+/** Una parada de convenio, en minutos desde el arranque del turno. */
+export interface PlannedBreak {
+  fromMin: number
+  toMin: number
+  reason: string
+}
+
+/**
+ * Las paradas de convenio de un turno, ubicadas en minutos desde el arranque.
+ *
+ * Qué causa es "de convenio" NO se decide acá: se toma de `timeBreakdown.planned`,
+ * que ya lo resolvió el backend. Duplicar la lista de causas en el cliente
+ * garantiza que un día las dos versiones digan cosas distintas.
+ *
+ * Los tramos se fusionan porque vienen solapados: en el turno del 12-08 de
+ * Filete la colación llega como 311→318 y 317→356, que son una sola parada
+ * partida por el sensor.
+ */
+export function plannedBreaks(args: {
+  series?: MonitorSeriesPoint[] | null
+  stopEvents?: Array<{ r: number; f: string; s: number }> | null
+  stopReasons?: string[] | null
+  plannedReasons?: string[] | null
+}): PlannedBreak[] {
+  const t0 = args.series?.[0]?.t ? Date.parse(args.series[0]!.t) : NaN
+  if (Number.isNaN(t0) || !args.stopEvents || !args.stopReasons) return []
+  const deConvenio = new Set(args.plannedReasons ?? [])
+  if (deConvenio.size === 0) return []
+
+  const crudos = args.stopEvents
+    .filter((e) => deConvenio.has(args.stopReasons![e.r] ?? ''))
+    .map((e) => {
+      const desde = Math.round((Date.parse(e.f) - t0) / 60_000)
+      return { fromMin: desde, toMin: desde + Math.round(e.s / 60), reason: args.stopReasons![e.r]! }
+    })
+    .filter((b) => Number.isFinite(b.fromMin) && b.toMin > b.fromMin)
+    .sort((a, b) => a.fromMin - b.fromMin)
+
+  const fusionados: PlannedBreak[] = []
+  for (const b of crudos) {
+    const ultimo = fusionados[fusionados.length - 1]
+    if (ultimo && b.fromMin <= ultimo.toMin) {
+      ultimo.toMin = Math.max(ultimo.toMin, b.toMin)
+    } else {
+      fusionados.push({ ...b })
+    }
+  }
+  return fusionados
+}
+
+/**
+ * Las paradas que hay que suponer de acá al cierre.
+ *
+ * Las de hoy son hechos; las de los días anteriores, pronóstico. Un turno a
+ * mitad de camino todavía no tuvo la colación, y una meta que no la contempla
+ * exige un ritmo que nadie va a sostener justo cuando la línea está parada por
+ * convenio.
+ */
+export function mergeBreaks(
+  hoy: PlannedBreak[],
+  anteriores: PlannedBreak[],
+  currentMinute: number,
+): PlannedBreak[] {
+  const futuras = anteriores.filter((b) => b.fromMin > currentMinute)
+  const todas = [...hoy, ...futuras].sort((a, b) => a.fromMin - b.fromMin)
+  const out: PlannedBreak[] = []
+  for (const b of todas) {
+    const ultimo = out[out.length - 1]
+    if (ultimo && b.fromMin <= ultimo.toMin) ultimo.toMin = Math.max(ultimo.toMin, b.toMin)
+    else out.push({ ...b })
+  }
+  return out
+}
+
 export interface CompareResult {
   days: DayCurve[]
   /** Minutos de turno transcurridos en el turno en curso. */
@@ -88,6 +162,8 @@ export interface CompareResult {
   optimalAtCurrentMinute: number | null
   /** Alcance del eje, en minutos de turno. */
   maxMinutes: number
+  /** Las paradas de convenio que la curva objetivo respeta. */
+  breaks: PlannedBreak[]
 }
 
 function etiquetaDia(dateKey: string): string {
@@ -97,25 +173,65 @@ function etiquetaDia(dateKey: string): string {
   return `${dia} ${d.getUTCDate()}`
 }
 
+const sumaBreaks = (bs: PlannedBreak[]) => bs.reduce((a, b) => a + (b.toMin - b.fromMin), 0)
+
+/**
+ * La curva que hay que seguir para llegar a la cuota, con las paradas de
+ * convenio dentro.
+ *
+ * Una recta desde el minuto 0 es una meta imposible de leer: dice que a la hora
+ * 6 hay que llevar 3.500 sin contar que la línea estuvo parada 55 minutos por
+ * colación. Con las mesetas, la curva se aplana donde la línea NO puede
+ * producir y sube al ritmo que de verdad hay que sostener el resto del tiempo —
+ * y quedar por debajo pasa a significar algo.
+ */
+function curvaObjetivo(
+  targetPieces: number,
+  usefulMin: number,
+  breaks: PlannedBreak[],
+  finMin: number,
+): PacePoint[] {
+  const cpm = targetPieces / usefulMin
+  const enParada = (m: number) => breaks.some((b) => m > b.fromMin && m <= b.toMin)
+
+  const out: PacePoint[] = [{ minutes: 0, pieces: 0 }]
+  let acum = 0
+  for (let m = BUCKET_MIN; m <= finMin; m += BUCKET_MIN) {
+    // Un tramo cuenta a prorrata: si la parada se come 3 de sus 5 minutos, el
+    // tramo aporta 2 minutos de producción, no cero ni cinco.
+    let utiles = 0
+    for (let k = m - BUCKET_MIN + 1; k <= m; k++) if (!enParada(k)) utiles++
+    acum = Math.min(targetPieces, acum + utiles * cpm)
+    out.push({ minutes: m, pieces: Math.round(acum) })
+  }
+  return out
+}
+
 /**
  * Compara el turno en curso con los anteriores, minuto a minuto de turno.
  *
- * `optimal` es la recta que la cuota exige repartida sobre el tiempo ÚTIL (sin
- * las paradas de convenio) — el reparto sobre el turno completo supone que no
- * hay colación y exige de más desde el arranque.
+ * `optimal` reparte la cuota sobre el tiempo ÚTIL y se aplana durante las
+ * paradas de convenio: el reparto lineal sobre el turno completo supone que no
+ * hay colación y exige de más desde el arranque, y una recta continua pide
+ * producir justo cuando la línea está parada por convenio.
  */
 export function buildDayComparison(args: {
   todaySeries: MonitorSeriesPoint[] | null | undefined
   todayDateKey: string
   previous: Array<{ dateKey: string; series: MonitorSeriesPoint[] | null | undefined }>
   maxDays?: number
-  /** Meta del turno y minutos útiles, para dibujar la recta objetivo. */
+  /** Meta del turno y minutos útiles, para dibujar la curva objetivo. */
   targetPieces?: number | null
   usefulMin?: number | null
+  /** Paradas de convenio: la curva objetivo se aplana durante ellas. */
+  breaks?: PlannedBreak[]
 }): CompareResult {
   const hoy = cumulativeFromStart(args.todaySeries)
   if (hoy.length === 0) {
-    return { days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null, maxMinutes: 0 }
+    return {
+      days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null,
+      maxMinutes: 0, breaks: [],
+    }
   }
 
   const currentMinute = hoy[hoy.length - 1]!.minutes
@@ -147,16 +263,12 @@ export function buildDayComparison(args: {
   let optimal: PacePoint[] | null = null
   let optimalAtCurrentMinute: number | null = null
   if (args.targetPieces && args.targetPieces > 0 && args.usefulMin && args.usefulMin > 0) {
-    const cpm = args.targetPieces / args.usefulMin
-    const finMin = Math.max(maxMinutes, args.usefulMin)
-    optimal = []
-    for (let m = 0; m <= finMin; m += 15) {
-      optimal.push({ minutes: m, pieces: Math.min(args.targetPieces, Math.round(m * cpm)) })
-    }
-    optimalAtCurrentMinute = Math.min(args.targetPieces, Math.round(currentMinute * cpm))
+    const finMin = Math.max(maxMinutes, args.usefulMin + sumaBreaks(args.breaks ?? []))
+    optimal = curvaObjetivo(args.targetPieces, args.usefulMin, args.breaks ?? [], finMin)
+    optimalAtCurrentMinute = piecesAt(optimal, currentMinute) ?? args.targetPieces
   }
 
-  return { days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes }
+  return { days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes, breaks: args.breaks ?? [] }
 }
 
 /** El tramo donde hoy perdió más terreno contra el día de referencia. */
