@@ -70,6 +70,12 @@ interface Props {
   dateKey: string
   shiftId: string
   className?: string
+  /**
+   * Cuántos paros quedan sin causa. El panel es el único que lo sabe (carga sus
+   * propias anotaciones desde `paros`), así que lo publica en vez de obligar al
+   * contenedor a repetir la consulta. Lo usa el contador de "¿Qué hacer?".
+   */
+  onPendingChange?: (sinCausa: number) => void
 }
 
 /** ¿Este state es un paro real (no uptime ni el relleno post-turno del sensor)? */
@@ -91,7 +97,7 @@ function fmtHora(d: Date): string {
 }
 
 export function SensorStopsCausePanel({
-  snapshot, plantLineId, plantSlug, dateKey, shiftId, className,
+  snapshot, plantLineId, plantSlug, dateKey, shiftId, className, onPendingChange,
 }: Props) {
   const user = useAuthStore((s) => s.user)
 
@@ -146,6 +152,23 @@ export function SensorStopsCausePanel({
   }, [plantLineId])
 
   useEffect(() => { void load() }, [load])
+
+  /*
+   * Paros que todavía nadie explicó. Se calcula acá arriba —y no junto al
+   * render— porque el contador de "¿Qué hacer?" lo necesita aunque el panel
+   * salga por el early return de "sin paros": si no, un turno limpio nunca
+   * avisaría "0" y el badge quedaría con el número del turno anterior.
+   */
+  const sinCausa = useMemo(
+    () => stops.filter((s) => !s.sensorReason && !causas.has(s.key)),
+    [stops, causas],
+  )
+
+  // Mientras carga, `causas` está vacío y TODO paro se ve sin causa: publicar
+  // ahí haría parpadear el badge con un número inflado.
+  useEffect(() => {
+    if (!loading) onPendingChange?.(sinCausa.length)
+  }, [loading, sinCausa.length, onPendingChange])
 
   const abrir = (stop: SensorStop) => {
     const ya = causas.get(stop.key)
@@ -213,7 +236,6 @@ export function SensorStopsCausePanel({
 
   if (stops.length === 0) return null
 
-  const sinCausa = stops.filter((s) => !s.sensorReason && !causas.has(s.key))
   const minutosSinCausa = sinCausa.reduce((a, s) => a + s.durationMin, 0)
   const piezasSinCausa = sinCausa.reduce((a, s) => a + (s.lostPieces ?? 0), 0)
 

@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, ExternalLink, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Globe2, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -1468,6 +1468,13 @@ export function AnalisisGraderTurnoPage() {
    *  Sin el contador, mover el panel a una pestaña lo volvería invisible. */
   const accionesPendientes = (isClassificationPlant ? suggestions : yalSuggestions).length
 
+  /*
+   * Paros del sensor todavía sin causa. Lo publica `SensorStopsCausePanel`, que
+   * es quien carga las anotaciones; acá solo se suma al contador de la pestaña
+   * para que el trabajo pendiente se vea sin tener que entrar a buscarlo.
+   */
+  const [imputacionesPendientes, setImputacionesPendientes] = useState(0)
+
   const triggeredRunbooks = useMemo(
     () => findTriggeredRunbooks(dominant, summary?.pointZeroPct ?? 0),
     [dominant, summary],
@@ -1637,6 +1644,61 @@ export function AnalisisGraderTurnoPage() {
   // (ej. al cambiar de turno con HMR) no se mezclen en el registro global
   // de echarts.connect.
   const timelineGroupId = `timeline-${shiftDocId || 'default'}`
+
+  /*
+   * Editor de gates del turno (calibre · calidad · conservación · producto).
+   *
+   * Se declara acá y no dentro de la vista porque se monta en DOS ramas: con
+   * Excel del Grader (al pie de la pestaña Gates, después del análisis) y sin
+   * Excel (como único contenido de Gates). Ese segundo caso es el que faltaba:
+   * la pestaña estaba deshabilitada sin Excel, o sea que setear las gates —una
+   * tarea de ANTES del turno— exigía el archivo que recién existe al CERRARLO.
+   *
+   * Escribe con shiftDocId: nada de acá sale del turno. Lo global (línea física,
+   * umbrales base, rangos de calibre) vive en /analisis-grader/config.
+   * Solo Chonchi: Yal no clasifica, sus gates no tienen calibre ni calidad.
+   */
+  const gatesEditorCard = (
+    <Card className="overflow-hidden">
+      <button
+        onClick={() => setShowConfigPanel(v => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Settings2 className="w-4 h-4 text-muted-foreground" />
+          <span className="font-medium">Ajustes de este turno</span>
+          {turnoGates.filter(g => g.active).length > 0 && (
+            <Badge variant="outline" className="text-xs font-normal">
+              {turnoGates.filter(g => g.active).length} gates activas
+            </Badge>
+          )}
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showConfigPanel ? 'rotate-180' : ''}`} />
+      </button>
+      {showConfigPanel && (
+        <div className="border-t">
+          <AnalisisGraderGatesConfigPage
+            tabbed
+            gates={turnoGates}
+            config={turnoConfig}
+            parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
+            onComplete={handleTurnoConfigApply}
+            shiftDocId={shiftDocId}
+            shiftCalibreOverride={calibreOverride}
+            onShiftRangesSaved={setCalibrerOverride}
+            shiftThresholdsOverride={turnoThresholdsOverride}
+            onShiftThresholdsSaved={(t) => {
+              setTurnoThresholdsOverride(t)
+              if (t) {
+                setAlertThreshold(t.pointZeroPctWarn)
+                setCriticalThreshold(t.pointZeroPctCritical)
+              }
+            }}
+          />
+        </div>
+      )}
+    </Card>
+  )
 
   return (
     <TimelineSyncProvider key={shiftDocId ?? 'default'} groupId={timelineGroupId}>
@@ -1894,11 +1956,22 @@ export function AnalisisGraderTurnoPage() {
           views={availableViews}
           active={activeView}
           onChange={setActiveView}
-          badges={{ gates: configSnapshots.length, accion: accionesPendientes }}
+          badges={{ gates: configSnapshots.length, accion: accionesPendientes + imputacionesPendientes }}
+          /*
+           * Sin Excel quedan deshabilitadas solo las vistas que de verdad no
+           * tienen nada que mostrar.
+           *
+           * `gates` YA NO se deshabilita: setear las compuertas es trabajo de
+           * ANTES del turno y el Excel recién existe al cerrarlo — pedirlo era
+           * pedir el resultado para poder configurar la causa.
+           *
+           * `accion` tampoco, mientras haya datos del sensor: ahí viven las
+           * imputaciones de paros, y son justamente las plantas SIN Grader
+           * (Filete, Eviscerado) las que llegan con el turno entero sin causa.
+           */
           disabled={summary ? undefined : {
             calidad: MOTIVO_SIN_EXCEL,
-            gates: MOTIVO_SIN_EXCEL,
-            accion: 'Las acciones se calculan con el Excel del Grader',
+            ...(upstreamLine.snapshot ? {} : { accion: MOTIVO_SIN_EXCEL }),
           }}
         />
       )}
@@ -1987,23 +2060,14 @@ export function AnalisisGraderTurnoPage() {
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
 
-          {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
-              Shoplogix. Se monta junto al panel de máquinas para que el paro y
-              su explicación se vean en el mismo lugar. */}
-          {upstreamLine.snapshot && (
-            <SensorStopsCausePanel
-              snapshot={upstreamLine.snapshot}
-              plantLineId={plantLineCfg.id}
-              plantSlug={plantLineCfg.plantSlug}
-              dateKey={upstreamLine.snapshot.dateKey || dateKey}
-              shiftId={upstreamLine.snapshot.shiftId}
-            />
-          )}
         </div>
       )}
 
-      {/* Turno en vivo sin datos Grader NI Shoplogix */}
-      {!loading && !summary && shiftWindow?.status === 'live' && !upstreamLine.snapshot && !upstreamLine.loading && (
+      {/* Turno en vivo sin datos Grader NI Shoplogix.
+          En "Gates" no aparece: ahí sí hay algo que hacer sin datos —dejar las
+          compuertas configuradas—, y un "no hay datos" al lado del editor se
+          lee como que el editor tampoco sirve. */}
+      {activeView !== 'gates' && !loading && !summary && shiftWindow?.status === 'live' && !upstreamLine.snapshot && !upstreamLine.loading && (
         <Card className="border-dashed">
           <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
             <Activity className="w-8 h-8 text-red-400 animate-pulse" />
@@ -2023,7 +2087,7 @@ export function AnalisisGraderTurnoPage() {
           Aparece cuando: no hay summary (sin Excel Grader), no hay datos SLX reales,
           y el turno NO está live (ese caso ya tiene su propio card arriba).
           Comunica claramente los 3 canales de ingreso de datos. */}
-      {!loading && !summary && !upstreamLine.loading
+      {activeView !== 'gates' && !loading && !summary && !upstreamLine.loading
         && shiftWindow?.status !== 'live'
         && upstreamLine.source !== 'firestore' && (
         <Card className="border-muted-foreground/[0.10]">
@@ -2339,19 +2403,6 @@ export function AnalisisGraderTurnoPage() {
             onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
           />
 
-          {/* Causa de cada paro que el sensor midió: el "por qué" no lo trae
-              Shoplogix. Se monta junto al panel de máquinas para que el paro y
-              su explicación se vean en el mismo lugar. */}
-          {upstreamLine.snapshot && (
-            <SensorStopsCausePanel
-              snapshot={upstreamLine.snapshot}
-              plantLineId={plantLineCfg.id}
-              plantSlug={plantLineCfg.plantSlug}
-              dateKey={upstreamLine.snapshot.dateKey || dateKey}
-              shiftId={upstreamLine.snapshot.shiftId}
-            />
-          )}
-
           {/* Correlación automática Grader↔Baader y scatter — solo aplican
               en plantas donde el Grader Marelec MS4/12 procesa downstream de
               las Baader. Yal evisera y va directo a camión, sin Grader → no
@@ -2532,51 +2583,9 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
-          {/* Ajustes de ESTE turno — solo Chonchi (12 gates clasificadoras con
-              calibre+calidad, rangos por calibre override, umbrales P0 del
-              turno). Escribe con shiftDocId: nada de acá sale del turno. Lo
-              global vive en /analisis-grader/config. Yal no clasifica → no aplica. */}
-          {activeView === 'gates' && isClassificationPlant && (
-            <Card className="overflow-hidden">
-              <button
-                onClick={() => setShowConfigPanel(v => !v)}
-                className="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">Ajustes de este turno</span>
-                  {turnoGates.filter(g => g.active).length > 0 && (
-                    <Badge variant="outline" className="text-xs font-normal">
-                      {turnoGates.filter(g => g.active).length} gates activas
-                    </Badge>
-                  )}
-                </div>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showConfigPanel ? 'rotate-180' : ''}`} />
-              </button>
-              {showConfigPanel && (
-                <div className="border-t">
-                  <AnalisisGraderGatesConfigPage
-                    tabbed
-                    gates={turnoGates}
-                    config={turnoConfig}
-                    parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
-                    onComplete={handleTurnoConfigApply}
-                    shiftDocId={shiftDocId}
-                    shiftCalibreOverride={calibreOverride}
-                    onShiftRangesSaved={setCalibrerOverride}
-                    shiftThresholdsOverride={turnoThresholdsOverride}
-                    onShiftThresholdsSaved={(t) => {
-                      setTurnoThresholdsOverride(t)
-                      if (t) {
-                        setAlertThreshold(t.pointZeroPctWarn)
-                        setCriticalThreshold(t.pointZeroPctCritical)
-                      }
-                    }}
-                  />
-                </div>
-              )}
-            </Card>
-          )}
+          {/* Ajustes de ESTE turno — al pie, después del análisis: acá el Excel
+              ya existe, así que primero se lee cómo fue y después se corrige. */}
+          {activeView === 'gates' && isClassificationPlant && gatesEditorCard}
         </>
       )}
 
@@ -2709,6 +2718,62 @@ export function AnalisisGraderTurnoPage() {
               <MonitorUsagePanel stats={monitorStats} token={monitorToken} />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ════════ IMPUTACIONES · vive en "¿Qué hacer?" ════════
+          El sensor entrega CUÁNTO y CUÁNDO paró la máquina, no el POR QUÉ.
+          Antes estaba en "Línea", entre tres gráficos: era lo ÚNICO de esa
+          pestaña donde el técnico ESCRIBE, enterrado bajo cosas para leer.
+          Acá queda con el resto del trabajo pendiente y su badge en el tab.
+
+          Va al final del JSX, fuera del bloque `{summary && …}`, porque tiene
+          que aparecer igual en las plantas SIN Grader (Filete, Eviscerado) —
+          que son justo las que llegan con el turno entero sin causa.
+
+          ⚠ Se monta SIEMPRE y se oculta por CSS en vez de renderizarse solo en
+          su pestaña: es él quien carga las anotaciones y publica el pendiente,
+          así que con render condicional el badge marcaría 0 hasta que alguien
+          entrara a la pestaña — justo al revés de para qué sirve un badge. */}
+      {upstreamLine.snapshot && (
+        /* `max-w-3xl` para alinearse con `ActionPlanPanel`: la pestaña es una
+           columna de lectura, y una tarjeta a ancho completo debajo de otra
+           angosta deja el mismo escalón que Orel marcó en el Resumen. */
+        <div className={activeView === 'accion' ? 'max-w-3xl' : 'hidden'}>
+          <SensorStopsCausePanel
+            snapshot={upstreamLine.snapshot}
+            plantLineId={plantLineCfg.id}
+            plantSlug={plantLineCfg.plantSlug}
+            dateKey={upstreamLine.snapshot.dateKey || dateKey}
+            shiftId={upstreamLine.snapshot.shiftId}
+            onPendingChange={setImputacionesPendientes}
+          />
+        </div>
+      )}
+
+      {/* ════════ GATES SIN EXCEL ════════
+          Único contenido de la pestaña cuando todavía no hay Excel: el análisis
+          (distribución, saturación, evolución) necesita el archivo, pero SETEAR
+          las compuertas no — y es lo que se hace al empezar el turno. */}
+      {!summary && activeView === 'gates' && isClassificationPlant && (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-primary/[0.25] text-sm">
+            <SlidersHorizontal className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p className="text-muted-foreground flex-1">
+              Acá se dejan listas las <span className="font-medium text-foreground">compuertas de este turno</span>:
+              calibre, calidad, conservación y producto de cada una. El análisis de cómo
+              rindieron (saturación, reasignaciones sugeridas, evolución) aparece al cargar
+              el Excel del Grader.
+            </p>
+          </div>
+          {gatesEditorCard}
+          <ConfigChangeHistory
+            shiftDocId={shiftDocId}
+            snapshots={configSnapshots}
+            timelineBuckets={enrichedTimelineBuckets}
+            onChange={reloadConfigSnapshots}
+            allowEdit={shiftWindow?.status === 'live'}
+          />
         </div>
       )}
 
