@@ -511,7 +511,14 @@ async function inferShiftEndFromHistory(db, plantSlug, shiftId, scheduledStart, 
       cierres.push(fin.getUTCHours() * 60 + fin.getUTCMinutes())
       if (cierres.length >= HISTORIAL_TURNOS) break
     }
-    if (cierres.length < 3) return null
+    /*
+     * Con 2 muestras ya se da una referencia, y la pantalla dice cuántas son.
+     * Un turno NUEVO (Shoplogix lo dará de alta solo, p. ej. "Turno 2" de
+     * Filete cuando arranque el segundo turno) tardaría tres días en tener 3
+     * muestras, y esos son justo los días en que nadie sabe a qué ritmo ir.
+     * Con 1 sola no: un primer turno raro fijaría la referencia entera.
+     */
+    if (cierres.length < 2) return null
 
     cierres.sort((a, b) => a - b)
     const mid = Math.floor(cierres.length / 2)
