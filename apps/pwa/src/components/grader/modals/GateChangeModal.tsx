@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { saveConfigSnapshot, getLatestSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listGatesTemplates } from '@/services/grader/graderSession.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { qualityColorTextClass } from '@/services/grader/graderQualityColors'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
@@ -71,13 +72,32 @@ export function GateChangeModal({
   const [saving, setSaving] = useState(false)
   const [availableCalibres, setAvailableCalibres] = useState<CalibreRange[]>(FALLBACK_CALIBRES)
   const [loadedSnapshot, setLoadedSnapshot] = useState<GateConfigSnapshot | null>(null)
+  const [templateGates, setTemplateGates] = useState<GateAssignment[] | null>(null)
 
-  // Fallback de snapshots: solo si el contenedor no los pasó.
+  /*
+   * De dónde salen las gates que se van a editar, en orden:
+   *   1. las que pasó el contenedor
+   *   2. el último snapshot del turno
+   *   3. la plantilla de gates
+   *
+   * El paso 3 no es un adorno: en producción la MAYORÍA de los turnos no tiene
+   * `configHistory` —la config se guarda como plantilla y se reusa—, así que
+   * sin él el modal abría con el selector de gates y ningún campo abajo. El
+   * botón "Cambiar gate" quedaba muerto justo en el turno donde todavía se
+   * podía cambiar algo. Es la misma regla de elección que usa el editor
+   * (`AnalisisGraderGatesConfigPage`): "Plantilla 1" o la primera.
+   */
   useEffect(() => {
     if (!open || (configSnapshots && configSnapshots.length > 0)) return
     let cancelled = false
     getLatestSnapshot(shiftDocId)
-      .then(s => { if (!cancelled) setLoadedSnapshot(s) })
+      .then(async (s) => {
+        if (cancelled) return
+        if (s) { setLoadedSnapshot(s); return }
+        const list = await listGatesTemplates()
+        const t = list.find((x) => x.name === 'Plantilla 1') ?? list[0]
+        if (!cancelled && t) setTemplateGates(t.gates)
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [open, configSnapshots, shiftDocId])
@@ -100,9 +120,10 @@ export function GateChangeModal({
     const last = (configSnapshots && configSnapshots.length > 0)
       ? configSnapshots[configSnapshots.length - 1]!
       : loadedSnapshot
-    if (!last) return []
-    return [...last.gates].sort((a, b) => a.gateNumber - b.gateNumber)
-  }, [configSnapshots, loadedSnapshot])
+    const base = last?.gates ?? templateGates
+    if (!base) return []
+    return [...base].sort((a, b) => a.gateNumber - b.gateNumber)
+  }, [configSnapshots, loadedSnapshot, templateGates])
 
   // Cuando se selecciona un gate, pre-rellenar con valores actuales
   const selectGate = useCallback((gateNumber: number) => {
@@ -139,6 +160,7 @@ export function GateChangeModal({
     setNewProduct('')
     setReason('')
     setLoadedSnapshot(null)
+    setTemplateGates(null)
   }
 
   function handleClose() {
