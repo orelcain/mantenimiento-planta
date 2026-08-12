@@ -165,9 +165,9 @@ export function MachineSpeedMeaningCard({ machines, className }: Props) {
         {abierto && (
           <p className="text-caption text-muted-foreground/70">
             <InfoTooltip
-              text={'El ritmo se mide SOLO sobre el tiempo en que la máquina produjo: si contara las horas paradas, una máquina detenida parecería lenta en vez de parada.\n\nLas piezas perdidas se miden contra la cadencia de la LÍNEA (la mediana de las máquinas que produjeron), no contra el objetivo propio de cada una — medir a cada máquina contra su propio objetivo castiga a la que más capacidad tiene.\n\nHacé zoom en el gráfico de arriba para ver estos números de un tramo puntual.'}
+              text={'El ritmo se mide SOLO sobre el tiempo en que la máquina produjo: si contara las horas paradas, una máquina detenida parecería lenta en vez de parada.\n\nLas piezas perdidas se miden contra la cadencia de la LÍNEA (la mediana de las máquinas que produjeron), no contra el objetivo propio de cada una — medir a cada máquina contra su propio objetivo castiga a la que más capacidad tiene.\n\nEl zoom del gráfico de arriba manda: lo que elijas ahí es lo que se calcula acá.'}
             />{' '}
-            Hacé zoom en el gráfico para ver un tramo puntual.
+            Ctrl + rueda sobre el gráfico para acotar el tramo.
           </p>
         )}
       </CardHeader>
