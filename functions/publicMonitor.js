@@ -48,10 +48,24 @@ const SERIES_MAX_POINTS = 192
 const RECENT_INTERVALS = 6   // 30 min
 /** Tope de detenciones ubicadas que se publican por turno (un turno real trae ~70). */
 const STOP_EVENTS_MAX = 300
+/** Comentarios que viajan en el doc. Son 2-3 por turno; 20 es techo de sobra. */
+const COMMENTS_MAX = 20
 /** Tramos vacíos que se agregan al final para que quepan los últimos paros (1 h). */
 const SERIES_TAIL_MAX = 12
 
 /** Timestamp de Firestore / Date / string / número → Date. null si no se puede. */
+/**
+ * Fecha en el formato compacto de los comentarios viejos: "20260202T220000.000".
+ * `new Date()` no lo parsea, y sin esto esos comentarios quedaban sin ubicar.
+ */
+function parseCompacto(v) {
+  if (typeof v !== 'string') return null
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/.exec(v)
+  if (!m) return null
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]))
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 function toDate(v) {
   if (!v) return null
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v
@@ -843,6 +857,42 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   const topStops = [...stopAcc.values()].sort((a, b) => b.sec - a.sec).slice(0, 5)
 
   /*
+   * Comentarios que el operador escribe en Shoplogix sobre una detención.
+   *
+   * Es el único texto en castellano que hay en todo el turno: "Se corre
+   * litografiado y se debe detener y ordenar" explica una FALLA OPERACIONAL de
+   * 10 min mucho mejor que la etiqueta. Sin esto, quien mira el monitor ve la
+   * causa pero no el motivo, y tiene que ir a preguntar.
+   *
+   * Dos formas conviven en la data: la nueva (`startAt`/`endAt` Timestamp +
+   * `reasonValue`) y la vieja de febrero (`start`/`end` string compacto +
+   * `matchValue`). Se leen las dos porque el historial las mezcla.
+   *
+   * Se deduplica por `key`: el mismo comentario aparece en el doc del turno y
+   * en el de la cola `Unscheduled`, y sin esto sale repetido.
+   */
+  const comentarios = []
+  const vistosCom = new Set()
+  for (const m of machines) {
+    for (const c of m.comments || []) {
+      const texto = String(c.text || '').trim()
+      if (!texto) continue
+      const k = c.key || `${texto}|${c.startAt || c.start || ''}`
+      if (vistosCom.has(k)) continue
+      vistosCom.add(k)
+      const desde = toDate(c.startAt) || parseCompacto(c.start)
+      const hasta = toDate(c.endAt) || parseCompacto(c.end)
+      comentarios.push({
+        t: texto,
+        r: String(c.reasonValue || c.matchValue || '').trim() || null,
+        f: desde ? desde.toISOString() : null,
+        h: hasta ? hasta.toISOString() : null,
+      })
+    }
+  }
+  comentarios.sort((a, b) => (a.f || '') < (b.f || '') ? 1 : -1)
+
+  /*
    * Desglose planificado / recuperable, con las causas VISIBLES en los dos
    * grupos. Agrupar el planificado en un solo número invita a sospechar que se
    * esconde algo: si la colación se lleva 56 min, que se lea "colación 56 min".
@@ -1072,6 +1122,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
       recoverable: recuperables,
     },
     /** Razones, para que los eventos no repitan el texto en cada uno. */
+    comments: comentarios.slice(0, COMMENTS_MAX),
     stopReasons,
     /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons. */
     stopEvents,

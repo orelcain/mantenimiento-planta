@@ -122,6 +122,15 @@ export interface PublicMonitorLive {
   stopReasons?: string[]
   /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */
   stopEvents?: Array<{ r: number; f: string; s: number }>
+  /**
+   * Lo que el operador escribió en Shoplogix sobre una detención: `t` el texto,
+   * `r` la causa a la que lo asoció, `f`/`h` la ventana (ISO wall-clock).
+   *
+   * Es el único texto en castellano de todo el turno. "Se corre litografiado y
+   * se debe detener y ordenar" explica una FALLA OPERACIONAL de 10 min mucho
+   * mejor que la etiqueta.
+   */
+  comments?: Array<{ t: string; r: string | null; f: string | null; h: string | null }>
 }
 
 /**

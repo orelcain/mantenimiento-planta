@@ -143,11 +143,12 @@ function Kpi({
  * hora fue la caída y por qué. SVG puro, sin librerías de gráficos.
  */
 function Sparkbars({
-  series, stopReasons, stopEvents, causaSel, onCausa,
+  series, stopReasons, stopEvents, comments, causaSel, onCausa,
 }: {
   series: PublicMonitorLive['series']
   stopReasons?: string[]
   stopEvents?: PublicMonitorLive['stopEvents']
+  comments?: PublicMonitorLive['comments']
   causaSel: string | null
   onCausa: (c: string | null) => void
 }) {
@@ -158,6 +159,8 @@ function Sparkbars({
    * SVG dentro de un contenedor con scroll, cada barra crece y se puede tocar.
    */
   const [zoom, setZoom] = useState(1)
+  /** Tramo bajo el cursor (o tocado en el celular). null = ninguno. */
+  const [foco, setFoco] = useState<number | null>(null)
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -203,9 +206,62 @@ function Sparkbars({
         })
     : []
 
-  // 4 marcas de hora: suficientes para ubicarse, sin amontonar en un celular.
-  const marcas = Array.from({ length: 4 }, (_, k) =>
-    series[Math.round((k / 3) * (series.length - 1))]!.t)
+  /*
+   * Marcas de hora ubicadas por ÍNDICE de tramo, no repartidas parejo: van
+   * dentro del contenedor con scroll, así que tienen que viajar con el gráfico
+   * al hacer zoom. Repartidas por porcentaje del ancho visible se quedaban
+   * quietas y el eje pasaba a mentir apenas uno deslizaba.
+   *
+   * Una marca por hora con zoom, y de a dos horas sin él, para que en un
+   * celular no se amontonen.
+   */
+  const cadaN = zoom >= 2 ? 12 : 24
+  const marcas = series.map((p, i) => ({ t: p.t, i })).filter((m) => m.i % cadaN === 0)
+
+  /** La detención que cae dentro de un tramo — para el detalle al recorrerlo. */
+  const paroEnTramo = (i: number) => {
+    if (!stopEvents || !stopReasons) return null
+    const desde = tiempos[i]!
+    const hasta = desde + paso
+    const e = stopEvents.find((x) => {
+      const a = new Date(x.f).getTime()
+      return a < hasta && a + x.s * 1000 > desde
+    })
+    return e ? { causa: stopReasons[e.r]!, sec: e.s } : null
+  }
+
+  /** Lo que el operador escribió sobre lo que pasó en ese tramo. */
+  const comentarioEnTramo = (i: number) => {
+    if (!comments || comments.length === 0) return null
+    const desde = tiempos[i]!
+    const hasta = desde + paso
+    const c = comments.find((x) => {
+      if (!x.f) return false
+      const a = new Date(x.f).getTime()
+      const b = x.h ? new Date(x.h).getTime() : a + paso
+      // Un comentario que cubre 3 horas no describe un tramo de 5 minutos.
+      if (b - a > 2 * 60 * 60_000) return false
+      return a < hasta && b > desde
+    })
+    return c ? c.t : null
+  }
+
+  const detalle = foco != null && series[foco]
+    ? {
+        hora: fmtWallTime(series[foco]!.t),
+        hasta: fmtWallTime(new Date(tiempos[foco]! + paso).toISOString()),
+        pz: series[foco]!.pieces,
+        paro: paroEnTramo(foco),
+        comentario: comentarioEnTramo(foco),
+      }
+    : null
+
+  /** El tramo elegido a partir de la posición del puntero dentro del gráfico. */
+  const tramoEn = (clientX: number, el: SVGSVGElement) => {
+    const r = el.getBoundingClientRect()
+    const i = Math.floor(((clientX - r.left) / r.width) * series.length)
+    return Math.min(series.length - 1, Math.max(0, i))
+  }
 
   return (
     <div id="grafico-turno" className="scroll-mt-4 rounded-2xl border border-border bg-card px-4 py-3">
@@ -222,9 +278,13 @@ function Sparkbars({
       </div>
 
       <div className="mt-2 overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-20"
-           style={{ width: `${zoom * 100}%`, minWidth: '100%' }} role="img"
+      <div style={{ width: `${zoom * 100}%`, minWidth: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-20 w-full"
+           role="img"
            data-zoom={zoom}
+           onMouseMove={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
+           onMouseLeave={() => setFoco(null)}
+           onClick={(ev) => setFoco(tramoEn(ev.clientX, ev.currentTarget))}
            aria-label="Piezas por tramo de cinco minutos">
         {bandas.map(b => (
           <rect key={b.key} x={b.x} y={0} width={b.ancho} height={H}
@@ -253,13 +313,55 @@ function Sparkbars({
             </rect>
           )
         })}
+
+        {/* El tramo bajo el cursor, marcado sobre las barras. */}
+        {foco != null && (
+          <rect x={foco * (bw + gap)} y={0} width={bw} height={H} className="fill-foreground/30" />
+        )}
       </svg>
+
+      {/* El eje viaja DENTRO del contenedor con scroll: afuera, al deslizar el
+          gráfico las horas se quedaban quietas y dejaban de corresponder. */}
+      <div className="relative mt-1 h-4">
+        {marcas.map((m) => (
+          <span
+            key={m.t}
+            className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground/70"
+            style={{ left: `${((m.i + 0.5) / series.length) * 100}%` }}
+          >
+            {fmtWallTime(m.t)}
+          </span>
+        ))}
+      </div>
+      </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] tabular-nums text-muted-foreground/70">
-        <span className="flex flex-1 justify-between">
-          {marcas.map((t, i) => <span key={`${t}-${i}`}>{fmtWallTime(t)}</span>)}
-        </span>
+      {/* Detalle del tramo. Alto fijo para que el bloque no salte al entrar y
+          salir el cursor. */}
+      <div className="mt-1 min-h-[2.5rem] rounded-lg bg-muted/60 px-2 py-1 text-[11px]">
+        {detalle ? (
+          <>
+            <span className="tabular-nums text-foreground">{detalle.hora}-{detalle.hasta}</span>
+            <span className="tabular-nums text-foreground/90"> - {fmtInt(detalle.pz)} pz</span>
+            <span className="tabular-nums text-muted-foreground">
+              {' '}({fmtDec(detalle.pz / 5, 1)} pz/min)
+            </span>
+            {detalle.paro && (
+              <span className="text-rose-700 dark:text-rose-300">
+                {' '}- {detalle.paro.causa} {fmtDurationSec(detalle.paro.sec)}
+              </span>
+            )}
+            {/* El comentario del operador es el unico texto en castellano del
+                turno: explica la causa mucho mejor que la etiqueta. */}
+            {detalle.comentario && (
+              <div className="mt-0.5 italic text-muted-foreground">{detalle.comentario}</div>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground/60">
+            Pasá el dedo o el mouse por el gráfico para ver el detalle de cada tramo.
+          </span>
+        )}
       </div>
 
       {/* En un turno completo (~100 tramos) a 375 px cada barra mide 1,6 px.
@@ -1128,13 +1230,14 @@ export function PublicShiftMonitorPage() {
           series={live.series}
           stopReasons={live.stopReasons}
           stopEvents={live.stopEvents}
+          comments={live.comments}
           causaSel={causaSel}
           onCausa={setCausaSel}
         />
 
         <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
 
-        <ComparadorDias cmp={comparacion} />
+        <ComparadorDias cmp={comparacion} live={live} onCausa={setCausaSel} />
 
         <PorHora series={live.series} />
 
@@ -1161,42 +1264,6 @@ export function PublicShiftMonitorPage() {
                 </li>
               ))}
             </ul>
-          </section>
-        )}
-
-        {/* Paros del turno: lo que explica la diferencia entre lo hecho y lo posible */}
-        {live.topStops.length > 0 && (
-          <section className="rounded-2xl border border-border bg-card px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Detenciones del turno
-            </div>
-            <ul className="mt-2 space-y-0.5">
-              {live.topStops.map(s => {
-                const activa = causaSel === s.reason
-                return (
-                  <li key={s.reason}>
-                    <button
-                      onClick={() => setCausaSel(activa ? null : s.reason)}
-                      aria-pressed={activa}
-                      className={`flex w-full items-center gap-3 rounded-lg border px-2 py-1.5 text-left text-sm transition-colors ${
-                        activa
-                          ? 'border-rose-500/50 bg-rose-500/15'
-                          : 'border-transparent hover:bg-muted'
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1 truncate text-foreground/80">{s.reason}</span>
-                      <span className="tabular-nums text-muted-foreground">{fmtDurationSec(s.sec)}</span>
-                      <span className="w-12 text-right tabular-nums text-[11px] text-muted-foreground/70">
-                        {s.count}×
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-            <p className="mt-1.5 text-[11px] text-muted-foreground/60">
-              Toca una causa para ver en qué momento del turno ocurrió.
-            </p>
           </section>
         )}
 
