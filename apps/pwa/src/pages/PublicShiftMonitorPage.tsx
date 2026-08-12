@@ -4,7 +4,13 @@
  * Pensada para Control de Producción: entra desde el QR en el celular y ve
  * cuántas piezas lleva la línea, a qué cadencia (pz/min y pz/h), de qué turno
  * y día se trata, desde qué hora, y si la máquina está corriendo o parada.
- * SOLO LECTURA — no hay ninguna acción que escriba.
+ *
+ * SOLO LECTURA para quien entra por el QR sin cuenta — que es el caso normal.
+ * La ÚNICA excepción es fijar la hora de cierre del turno, y solo si quien mira
+ * tiene sesión de admin: el resto ni siquiera ve el control. Esa escritura no
+ * toca el doc del monitor (tiene `allow write: if false` en las reglas y así
+ * queda) sino `graderModuleConfigs`, cuyas reglas exigen supervisor — o sea que
+ * la comprobación de rol de la UI no es la única defensa.
  *
  * Se actualiza sola: el doc espejo lo reescribe el backend cada ciclo de sync
  * (~5 min mientras el turno corre) y acá hay un `onSnapshot`.
@@ -30,6 +36,8 @@ import {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
+import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
+import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -266,10 +274,132 @@ function Sparkbars({
  * hace perder la confianza en la pantalla — y la decisión correcta ahí no es
  * apurar, es replanificar.
  */
-function RitmoNecesario({ pace, cierre, muestras }: {
+/**
+ * De dónde sale la hora de cierre — y, si quien mira es admin, cómo cambiarla.
+ *
+ * Sin esta línea el "faltan 3 h 20 min" es un número sin dueño. Con ella se
+ * puede discutir: dice si salió de los turnos anteriores o si alguien la fijó.
+ *
+ * ⚠ El campo de edición NO es la seguridad. El doc del monitor tiene
+ * `allow write: if false` —nadie lo toca desde el navegador, con sesión o sin
+ * ella— y lo que se guarda va a `graderModuleConfigs`, cuyas reglas exigen
+ * supervisor. Quien abre el QR sin cuenta no ve el control, y aunque lo viera,
+ * Firestore rechazaría la escritura.
+ */
+function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startAt }: {
+  cierre: string | null | undefined
+  muestras: number | null | undefined
+  fuente: PublicMonitorLive['plannedEndSource']
+  plantSlug: string | undefined
+  shiftName: string | null | undefined
+  startAt: string | null | undefined
+}) {
+  const isAdmin = useIsAdmin()
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!cierre) return null
+
+  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName)
+
+  const guardar = async () => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
+    if (!m) { setError('Usá el formato HH:MM'); return }
+    const h = Number(m[1]), min = Number(m[2])
+    if (h > 23 || min > 59) { setError('Hora fuera de rango'); return }
+    setGuardando(true); setError(null)
+    try {
+      await pinShiftEnd({ plantSlug: plantSlug!, shiftName: shiftName!, endHour: h, endMinute: min, startAtIso: startAt })
+      setEditando(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="mt-0.5 text-[11px] text-muted-foreground/70">
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>
+          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {fuente === 'fijado'
+            ? ', fijado a mano'
+            : muestras
+            ? `, según los últimos ${muestras} turnos`
+            : ', según el horario configurado'}.
+        </span>
+        {puedeEditar && !editando && (
+          <button
+            type="button"
+            onClick={() => { setValor(fmtWallTime(cierre)); setEditando(true); setError(null) }}
+            className="rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted"
+          >
+            Cambiar
+          </button>
+        )}
+      </div>
+
+      {puedeEditar && editando && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="HH:MM"
+            className="w-20 rounded-ctl border border-border bg-background px-2 py-1 text-[12px] tabular-nums text-foreground"
+          />
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={guardando}
+            className="rounded-ctl bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+          >
+            {guardando ? 'Guardando…' : 'Fijar cierre'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setEditando(false); setError(null) }}
+            className="rounded-ctl border border-border px-2.5 py-1 text-[11px]"
+          >
+            Cancelar
+          </button>
+          {fuente === 'fijado' && (
+            <button
+              type="button"
+              onClick={async () => {
+                setGuardando(true)
+                try { await unpinShiftEnd({ plantSlug: plantSlug!, shiftName: shiftName! }); setEditando(false) }
+                catch (e) { setError(e instanceof Error ? e.message : 'No se pudo quitar') }
+                finally { setGuardando(false) }
+              }}
+              className="text-[10px] underline underline-offset-2"
+            >
+              volver al automático
+            </button>
+          )}
+          <p className="basis-full text-[10px] text-muted-foreground/60">
+            Se aplica a todos los turnos «{shiftName}» de esta línea. El monitor tarda
+            un ciclo de sync (~5 min) en tomarlo.
+          </p>
+          {error && <p className="basis-full text-[11px] text-red-700 dark:text-red-300">{error}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RitmoNecesario({ pace, cierre, muestras, fuente, plantSlug, shiftName, startAt }: {
   pace: PaceToTarget | null
   cierre: string | null | undefined
   muestras: number | null | undefined
+  fuente: PublicMonitorLive['plannedEndSource']
+  plantSlug: string | undefined
+  shiftName: string | null | undefined
+  startAt: string | null | undefined
 }) {
   if (!pace) return null
 
@@ -299,7 +429,6 @@ function RitmoNecesario({ pace, cierre, muestras }: {
         <span className="normal-case tracking-normal text-muted-foreground/70">
           ({fmtInt(pace.targetPieces)} pz
           {pace.targetSource === 'objetivo-sensor' && ' · objetivo Shoplogix'})
-          {pace.targetSource === 'cuota' && ')'}
         </span>
       </div>
       <p className="mt-1 text-[13px] leading-relaxed">
@@ -327,14 +456,14 @@ function RitmoNecesario({ pace, cierre, muestras }: {
         {' '}A ese ritmo el turno cierra en{' '}
         <span className="tabular-nums">{fmtInt(pace.projectedPieces)} pz</span>.
       </p>
-      {/* De dónde sale la hora de cierre. Sin esto el "faltan 3 h 20 min" es un
-          número sin dueño; con esto se puede discutir. */}
-      {cierre && (
-        <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
-          {muestras ? `, según los últimos ${muestras} turnos` : ', según el horario configurado'}.
-        </p>
-      )}
+      <CierreDelTurno
+        cierre={cierre}
+        muestras={muestras}
+        fuente={fuente}
+        plantSlug={plantSlug}
+        shiftName={shiftName}
+        startAt={startAt}
+      />
       {fuera && (
         <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
           Ese ritmo está por encima de lo que la línea da a objetivo
@@ -753,7 +882,15 @@ export function PublicShiftMonitorPage() {
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
-          <RitmoNecesario pace={pace} cierre={live.plannedEnd} muestras={live.plannedEndSamples} />
+          <RitmoNecesario
+            pace={pace}
+            cierre={live.plannedEnd}
+            muestras={live.plannedEndSamples}
+            fuente={live.plannedEndSource}
+            plantSlug={data.plantSlug}
+            shiftName={live.shiftName}
+            startAt={live.scheduledStart}
+          />
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>

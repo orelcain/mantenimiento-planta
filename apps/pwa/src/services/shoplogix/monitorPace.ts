@@ -96,7 +96,20 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
 
   const remainingMin = Math.floor((endMs - nowWallMs) / 60_000)
   const remainingPieces = Math.max(0, meta - producedPieces)
-  const maxPerHour = input.maxPerHour && input.maxPerHour > 0 ? input.maxPerHour : null
+
+  /*
+   * ⚠ Un techo por DEBAJO del ritmo ya demostrado no es un techo.
+   *
+   * `maxPerHour` sale de repartir lo que el sensor espera del turno sobre las
+   * horas de la ventana, y esas dos cosas pueden venir de turnos distintos —
+   * salía 1.029 pz/h en una línea que ya venía corriendo a 1.464. Con ese
+   * número la pantalla decía a la vez "con este ritmo alcanza" y "la meta ya no
+   * se alcanza". Si el techo es menor que lo que la línea YA hizo, el techo
+   * está mal, así que se descarta: mejor no marcar imposible que marcarlo con
+   * una referencia falsa.
+   */
+  const techoCrudo = input.maxPerHour && input.maxPerHour > 0 ? input.maxPerHour : null
+  const maxPerHour = techoCrudo != null && techoCrudo >= currentPerHour ? techoCrudo : null
 
   // Cuota cumplida: se informa aunque queden minutos — es la buena noticia.
   if (remainingPieces === 0) {

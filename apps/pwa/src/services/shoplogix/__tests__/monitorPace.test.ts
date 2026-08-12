@@ -82,6 +82,23 @@ describe('computePaceToTarget', () => {
     expect(p.maxPerHour).toBeNull()
   })
 
+  it('DESCARTA un techo por debajo del ritmo ya demostrado', () => {
+    /*
+     * Caso real visto en pantalla: techo 1.029 pz/h en una línea que venía
+     * corriendo a 1.464. Con ese número la tarjeta decía a la vez "con este
+     * ritmo alcanza" y "la meta ya no se alcanza". Un techo que la línea ya
+     * superó no es un techo.
+     */
+    const p = base({ currentPerHour: 1_464, maxPerHour: 1_029, targetPieces: 30_000 })!
+    expect(p.maxPerHour).toBeNull()
+    expect(p.verdict).not.toBe('fuera-de-alcance')
+  })
+
+  it('y conserva el techo cuando sí está por encima del ritmo actual', () => {
+    const p = base({ currentPerHour: 1_449, maxPerHour: 2_768 })!
+    expect(p.maxPerHour).toBe(2_768)
+  })
+
   it('no recomienda nada con el turno cerrado', () => {
     expect(base({ shiftClosed: true })).toBeNull()
   })

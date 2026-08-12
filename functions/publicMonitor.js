@@ -590,6 +590,13 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     return {
       plannedEnd: end,
       quotaPieces: enPiezas && Number.isFinite(quota) && quota > 0 ? quota : null,
+      /*
+       * `endPinned` lo marca quien fija el cierre A PROPÓSITO desde el monitor.
+       * Sin él no se puede distinguir un horario cargado hace meses —que envejeció
+       * y por eso el historial le gana— de una decisión que alguien acaba de
+       * tomar mirando la pantalla, que sí tiene que mandar.
+       */
+      endPinned: entry.endPinned === true,
     }
   } catch {
     // La config es un extra: si no se puede leer, el monitor sigue igual.
@@ -871,30 +878,39 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
     : false
 
   /*
-   * Cierre del turno. Manda el HISTORIAL, no la config — y el orden importa.
+   * Cierre del turno, en tres niveles y en este orden:
    *
-   * La config es una intención que envejece sin que nadie se entere; el
-   * historial es lo que la línea hace. Medido el 12-08: la config de Chonchi
-   * dice que el Turno 2 cierra 17:15 y los últimos 8 turnos cerraron a las
-   * 15:00. Recomendar un ritmo contra un cierre que no ocurre da un número
-   * cómodo y falso — sobra tiempo que en realidad no existe.
+   *   1. FIJADO a mano (`endPinned`) — alguien lo decidió mirando la pantalla.
+   *      Una decisión explícita le gana a cualquier cálculo.
+   *   2. HISTORIAL — la mediana de los turnos anteriores con el mismo nombre.
+   *      Es el caso normal y el que no hay que mantener: cuando Filete pase a
+   *      tener día y tarde, cada turno aprende su horario solo.
+   *   3. CONFIG sin fijar — un horario cargado alguna vez. Último recurso.
    *
-   * Además es lo que hace que esto no haya que mantener: cuando Filete pase a
-   * tener turno día Y tarde, cada uno aprende su horario solo. La config queda
-   * de respaldo para un turno nuevo, sin historia todavía.
+   * El historial le gana a la config sin fijar a propósito: la config es una
+   * intención que envejece sin que nadie se entere. Medido el 12-08, la de
+   * Chonchi dice que el Turno 2 cierra 17:15 y los últimos 8 turnos cerraron a
+   * las 15:00 — recomendar un ritmo contra un cierre que no ocurre regala dos
+   * horas que no existen.
    */
   const shiftIdActual = parent.shiftId ?? machines[0]?.shiftId
-  const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
-  let plannedEnd = inferido?.end ?? null
-  let plannedEndSource = plannedEnd ? 'historial' : null
-  let plannedEndSamples = inferido?.muestras ?? null
-  const planned = plannedEnd
-    ? await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)  // solo por la cuota
-    : { plannedEnd: null, quotaPieces: null }
-  if (!plannedEnd) {
-    const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
-    planned.quotaPieces = cfg.quotaPieces
-    if (cfg.plannedEnd) {
+  const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
+  const planned = { quotaPieces: cfg.quotaPieces }
+
+  let plannedEnd = null
+  let plannedEndSource = null
+  let plannedEndSamples = null
+
+  if (cfg.plannedEnd && cfg.endPinned) {
+    plannedEnd = cfg.plannedEnd
+    plannedEndSource = 'fijado'
+  } else {
+    const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId)
+    if (inferido) {
+      plannedEnd = inferido.end
+      plannedEndSource = 'historial'
+      plannedEndSamples = inferido.muestras
+    } else if (cfg.plannedEnd) {
       plannedEnd = cfg.plannedEnd
       plannedEndSource = 'config'
     }
@@ -913,11 +929,17 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
      * ritmo necesario para llegar. null cuando el turno no está en la config.
      */
     plannedEnd: iso(plannedEnd),
-    /** 'config' | 'historial' | null — de dónde salió, para poder decirlo. */
+    /** 'fijado' | 'historial' | 'config' | null — para poder decirlo en pantalla. */
     plannedEndSource,
     /** Turnos anteriores usados cuando se infirió del historial. */
     plannedEndSamples,
     quotaPieces: planned.quotaPieces,
+    /*
+     * Nombre del turno tal como lo da Shoplogix. Va en el payload para que el
+     * monitor pueda fijar el cierre DE ESTE turno sin adivinarlo del id del
+     * documento — que trae el dateKey pegado y ya rompió una comparación antes.
+     */
+    shiftName: shiftIdActual ?? null,
     effectiveStart: iso(effectiveStart),
     effectiveEnd: iso(effectiveEnd),
     shiftClosed,
