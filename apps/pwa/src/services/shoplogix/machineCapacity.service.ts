@@ -11,9 +11,10 @@
  * Ruta Firestore: shoplogix/{plantSlug}/machineCapacity/{machineid}
  * Acceso: admin-only (reglas Firestore deben permitir write a admins).
  *
- * Defaults observados por el equipo (configurable por admin):
- *   - Baader 142 modelo antiguo (M1 ambas plantas): 21 piezas/min
- *   - Baader 142 modelo nuevo  (M2, M3):            16 piezas/min
+ * Defaults observados (configurable por admin) — ver `DEFAULT_NAMEPLATE_CPM`:
+ *   - Baader 142 modelo ANTIGUO: 19 piezas/min
+ *   - Baader 142 modelo NUEVO:   16 piezas/min
+ * ⚠ Cuál es la antigua CAMBIA según la planta: en Yal es la 3, en Chonchi la 1.
  */
 
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore'
@@ -31,21 +32,36 @@ export interface MachineCapacityConfig {
 }
 
 /**
- * Velocidades físicas default por posición dentro de la planta (`PLANT_MACHINES`).
+ * Velocidades físicas default por planta y posición dentro de `PLANT_MACHINES`.
  *
- * Las 3 Baader 142 de yal NO son iguales: hay dos versiones.
- *   index 0,1 = Evisceradoras 1 y 2 → modelo NUEVO,   tope 16 pz/min
- *   index 2   = Evisceradora 3      → modelo ANTIGUO, rinde 19 pz/min
+ * Las Baader 142 NO son todas iguales: en cada planta hay una del modelo
+ * ANTIGUO (19 pz/min) y las demás del NUEVO (16). ⚠ Pero **NO es la misma
+ * posición en las dos plantas**:
  *
- * Coincide con los targets que Shoplogix tiene configurados (16 / 16 / 19),
- * estables en los 96 días de histórico. El mapeo anterior estaba INVERTIDO
- * (daba el modelo antiguo al index 0 = Evisceradora 1) y usaba un nominal de
- * 21 pz/min que ninguna máquina alcanzó jamás.
+ *   yal      → la antigua es la Evisceradora 3  (índice 2)
+ *   chonchi  → la antigua es la Evisceradora 1  (índice 0)
+ *
+ * Antes había un solo mapa por índice, copiado del caso de Yal, y en Chonchi
+ * quedaba al revés: le daba 16 pz/min de tope a una máquina cuyo objetivo de
+ * Shoplogix es 19, o sea que la app la veía permanentemente "sobre-configurada"
+ * y le calculaba mal el Performance. Confirmado por Orel en terreno (12-08) y
+ * medido en Firestore sobre 40 turnos por planta: los `targetRate` son
+ * chonchi 19/16/16 y yal 16/16/19, estables.
+ *
+ * Ojo al tocar esto: un override guardado en `machineCapacity` le gana al
+ * default. En Chonchi ya existen los tres, cargados a mano, así que el error
+ * estaba tapado — pero volvía a aparecer con una máquina nueva o si alguien
+ * borraba el override.
  */
-const DEFAULT_NAMEPLATE_CPM: Record<number, number> = {
-  0: 16,
-  1: 16,
-  2: 19,
+const DEFAULT_NAMEPLATE_CPM: Record<PlantSlug, Record<number, number>> = {
+  yal:     { 0: 16, 1: 16, 2: 19 },
+  chonchi: { 0: 19, 1: 16, 2: 16 },
+  filete:  { 0: 16 },
+}
+
+/** Tope físico por defecto de la máquina en la posición `idx` de `plantSlug`. */
+function defaultNameplate(plantSlug: PlantSlug, idx: number): number {
+  return DEFAULT_NAMEPLATE_CPM[plantSlug]?.[idx] ?? 16
 }
 
 /** Carga la config de capacidad para todas las máquinas de una planta. */
@@ -64,7 +80,7 @@ export async function loadMachineCapacities(
           machineName: m.name,
           nameplateMaxCpm: typeof d.nameplateMaxCpm === 'number'
             ? d.nameplateMaxCpm
-            : (DEFAULT_NAMEPLATE_CPM[idx] ?? 16),
+            : defaultNameplate(plantSlug, idx),
           updatedAt: d.updatedAt instanceof Timestamp ? d.updatedAt.toDate() : null,
           updatedByEmail: String(d.updatedByEmail ?? ''),
         }
@@ -72,7 +88,7 @@ export async function loadMachineCapacities(
       return {
         machineid: m.machineid,
         machineName: m.name,
-        nameplateMaxCpm: DEFAULT_NAMEPLATE_CPM[idx] ?? 16,
+        nameplateMaxCpm: defaultNameplate(plantSlug, idx),
         updatedAt: null,
         updatedByEmail: '',
       }

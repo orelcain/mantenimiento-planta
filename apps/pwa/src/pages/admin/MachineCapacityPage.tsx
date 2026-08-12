@@ -176,8 +176,9 @@ export function MachineCapacityPage() {
           Rendimiento se mide contra el objetivo de Shoplogix (<code>expectedCycles</code>).
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Las 3 Baader 142 no son iguales: las Evisceradoras 1 y 2 son el modelo nuevo
-          (tope 16 pz/min) y la 3 es la antigua (19 pz/min).
+          Las 3 Baader 142 no son iguales: una es el modelo antiguo (19 pz/min) y las
+          otras dos el nuevo (16 pz/min). <b>Cuál es la antigua depende de la planta</b> —
+          en Yal es la Evisceradora 3 y en Chonchi la 1.
         </p>
         <p className="text-xs text-ink-warn flex items-center gap-1 mt-1">
           <AlertTriangle className="w-3 h-3" />
@@ -207,7 +208,7 @@ export function MachineCapacityPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {configs.map((cfg, idx) => {
+              {configs.map((cfg) => {
                 const draftVal = getDraft(cfg.machineid, cfg.nameplateMaxCpm)
                 const isDirty = draftVal !== String(cfg.nameplateMaxCpm)
                 const parsedVal = parseFloat(draftVal)
@@ -218,8 +219,11 @@ export function MachineCapacityPage() {
                     <div className="flex-1 space-y-1">
                       <Label className="text-xs text-muted-foreground">
                         {cfg.machineName}
+                        {/* La etiqueta sale del PROPIO tope, no de la posición:
+                            por índice acertaba en una planta y mentía en la otra
+                            (en Yal la antigua es la 3, en Chonchi la 1). */}
                         <span className="ml-1.5 text-caption text-muted-foreground/60">
-                          {idx === 0 ? '(modelo antiguo)' : '(modelo nuevo)'}
+                          {cfg.nameplateMaxCpm >= 19 ? '(modelo antiguo)' : '(modelo nuevo)'}
                         </span>
                       </Label>
                       <div className="flex items-center gap-2">

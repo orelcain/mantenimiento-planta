@@ -167,7 +167,10 @@ export function lineCadenceCpm(cadences: number[]): number | null {
  *
  * Se mide contra la cadencia de la línea, NO contra el target propio de cada
  * máquina. Motivo: las 3 Baader 142 de yal no son iguales — la Evisceradora 3
- * es el modelo antiguo (19 pz/min) y las 1 y 2 el nuevo (16 pz/min). Medir
+ * es el modelo antiguo (19 pz/min) y las 1 y 2 el nuevo (16 pz/min) — ⚠ en
+ * CHONCHI es al revés: la antigua es la Evisceradora 1 (confirmado en terreno
+ * por Orel el 12-08 y medido en los `targetRate` de Shoplogix). El razonamiento
+ * vale igual en las dos plantas; lo que cambia es cuál es la máquina. Medir
  * contra el target propio castiga a la de mayor capacidad: la Ev3 corre MÁS
  * rápido que sus pares (16.2 vs 15.4 pz/min) y entrega más piezas, pero contra
  * su target de 19 "pierde" el doble que las otras. Eso hacía que el board
