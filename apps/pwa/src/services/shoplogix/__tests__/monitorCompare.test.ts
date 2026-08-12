@@ -1,12 +1,16 @@
 /**
  * monitorCompare — comparar el turno en curso con los anteriores.
  *
- * El error que esto evita, dicho en voz alta: "hoy llevamos 3.028 y ayer hizo
- * 3.275". Ayer eran las 15:30 y hoy son las 13:00. Todo se compara a la misma
- * hora o no se compara.
+ * Dos errores de lectura que esto evita:
+ *   · "hoy llevamos 3.028 y ayer hizo 3.275" — ayer eran las 15:30;
+ *   · comparar por hora de RELOJ turnos que arrancan a horas distintas (07:45,
+ *     07:48, 08:00): la primera "hora" de uno son 15 min y la de otro 60.
+ *
+ * Todo se indexa en minutos DESDE EL ARRANQUE, que además es como cuenta
+ * Shoplogix (confirmado por Orel el 12-08).
  */
 import { describe, it, expect } from 'vitest'
-import { cumulativeByHour, buildDayComparison, optimalPace } from '../monitorCompare'
+import { cumulativeFromStart, piecesAt, buildDayComparison, optimalPace } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
 /** Serie de tramos de 5 min desde `desde`. */
@@ -18,120 +22,135 @@ function serie(desde: string, piezasPorTramo: number[]): MonitorSeriesPoint[] {
   }))
 }
 
-describe('cumulativeByHour', () => {
-  it('acumula: cada hora incluye todo lo anterior', () => {
-    // 08h: 12 tramos de 50 = 600 · 09h: 12 de 60 = 720 → acumulado 1.320
-    const c = cumulativeByHour(serie('2026-08-12T08:00:00Z', [...Array(12).fill(50), ...Array(12).fill(60)]))
-    expect(c).toEqual([{ hour: 8, pieces: 600 }, { hour: 9, pieces: 1320 }])
+describe('cumulativeFromStart', () => {
+  it('indexa en minutos desde el ARRANQUE, no desde la hora de reloj', () => {
+    // Turno que arranca 07:45. El primer tramo cubre hasta el minuto 5.
+    const c = cumulativeFromStart(serie('2026-08-12T07:45:00Z', [50, 60, 40]))
+    expect(c).toEqual([
+      { minutes: 5, pieces: 50 },
+      { minutes: 10, pieces: 110 },
+      { minutes: 15, pieces: 150 },
+    ])
   })
 
-  it('lee la hora en wall-clock de planta', () => {
-    expect(cumulativeByHour(serie('2026-08-12T08:00:00Z', [10]))[0]!.hour).toBe(8)
+  it('dos turnos que arrancan a horas DISTINTAS quedan alineados', () => {
+    const a = cumulativeFromStart(serie('2026-08-12T07:45:00Z', [50, 50]))
+    const b = cumulativeFromStart(serie('2026-08-11T08:00:00Z', [40, 40]))
+    // Mismo eje: el minuto 10 de cada turno, aunque uno empezó 15 min antes.
+    expect(a.map((p) => p.minutes)).toEqual(b.map((p) => p.minutes))
   })
 
-  it('un turno NOCHE no pone la madrugada antes de la tarde', () => {
-    // 22h, 23h, 0h, 1h — ordenar por número daría 0,1,22,23 y el acumulado
-    // saldría al revés.
-    const s = [
-      ...serie('2026-08-11T22:00:00Z', Array(12).fill(10)),
-      ...serie('2026-08-11T23:00:00Z', Array(12).fill(10)),
-      ...serie('2026-08-12T00:00:00Z', Array(12).fill(10)),
-      ...serie('2026-08-12T01:00:00Z', Array(12).fill(10)),
-    ]
-    expect(cumulativeByHour(s).map((c) => c.hour)).toEqual([22, 23, 0, 1])
+  it('arranca en la primera pieza y no en el horario programado', () => {
+    // Si el turno "empieza" 07:00 pero la primera pieza sale 07:45, los 45 min
+    // vacíos correrían la curva entera hacia la derecha.
+    const c = cumulativeFromStart(serie('2026-08-12T07:45:00Z', [50]))
+    expect(c[0]!.minutes).toBe(5)
+  })
+
+  it('ordena aunque la serie llegue desordenada', () => {
+    const s = serie('2026-08-12T07:45:00Z', [10, 20, 30]).reverse()
+    expect(cumulativeFromStart(s).map((p) => p.pieces)).toEqual([10, 30, 60])
   })
 
   it('sin serie no inventa nada', () => {
-    expect(cumulativeByHour([])).toEqual([])
-    expect(cumulativeByHour(null)).toEqual([])
+    expect(cumulativeFromStart([])).toEqual([])
+    expect(cumulativeFromStart(null)).toEqual([])
+  })
+})
+
+describe('piecesAt', () => {
+  const curva = cumulativeFromStart(serie('2026-08-12T07:45:00Z', Array(12).fill(50)))  // 60 min
+
+  it('devuelve el acumulado al minuto pedido', () => {
+    expect(piecesAt(curva, 30)).toBe(300)
+    expect(piecesAt(curva, 60)).toBe(600)
+  })
+
+  it('entre dos tramos toma el último cerrado, no interpola de más', () => {
+    expect(piecesAt(curva, 32)).toBe(300)
+  })
+
+  it('NO extrapola más allá del último dato — ese turno no llegó ahí', () => {
+    // Devolver el total haría ver una línea plana como si hubiera seguido.
+    expect(piecesAt(curva, 120)).toBeNull()
+  })
+
+  it('antes del primer tramo es 0, no null', () => {
+    expect(piecesAt(curva, 1)).toBe(0)
   })
 })
 
 describe('buildDayComparison', () => {
-  // Hoy: 3 horas completas + una a medio andar.
-  const hoy = [
-    ...serie('2026-08-12T08:00:00Z', Array(12).fill(50)),   // 600
-    ...serie('2026-08-12T09:00:00Z', Array(12).fill(50)),   // 1.200
-    ...serie('2026-08-12T10:00:00Z', Array(12).fill(50)),   // 1.800
-    ...serie('2026-08-12T11:00:00Z', Array(3).fill(50)),    // 1.950 (hora en curso)
-  ]
-  // Ayer: turno completo, más lento al principio y más largo.
-  const ayer = [
-    ...serie('2026-08-11T08:00:00Z', Array(12).fill(40)),   // 480
-    ...serie('2026-08-11T09:00:00Z', Array(12).fill(40)),   // 960
-    ...serie('2026-08-11T10:00:00Z', Array(12).fill(40)),   // 1.440
-    ...serie('2026-08-11T11:00:00Z', Array(12).fill(40)),   // 1.920
-    ...serie('2026-08-11T12:00:00Z', Array(12).fill(40)),   // 2.400
-  ]
+  const hoy = serie('2026-08-12T07:45:00Z', Array(24).fill(50))    // 120 min, 1.200 pz
+  const ayer = serie('2026-08-11T08:00:00Z', Array(36).fill(40))   // 180 min, 1.440 pz
 
-  it('compara a la ÚLTIMA HORA COMPLETA, no a la que está corriendo', () => {
-    // Si comparara la hora 11 (a medio llenar) contra la 11 entera de ayer,
-    // hoy parecería en caída todas las horas, siempre.
-    const { currentHour } = buildDayComparison({
+  it('compara a la MISMA altura de turno, no a la misma hora de reloj', () => {
+    const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-12',
       previous: [{ dateKey: '2026-08-11', series: ayer }],
     })
-    expect(currentHour).toBe(10)
+    expect(r.currentMinute).toBe(120)
+    expect(r.days[0]!.atCurrentMinute).toBe(1200)  // hoy a los 120 min
+    expect(r.days[1]!.atCurrentMinute).toBe(960)   // ayer a los 120 min (24 × 40)
   })
 
-  it('da el acumulado de cada día A ESA hora', () => {
-    const { days } = buildDayComparison({
+  it('el TOTAL de ayer sigue disponible y es distinto del de la misma altura', () => {
+    const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-12',
       previous: [{ dateKey: '2026-08-11', series: ayer }],
     })
-    expect(days[0]!.atCurrentHour).toBe(1800)   // hoy a las 10h
-    expect(days[1]!.atCurrentHour).toBe(1440)   // ayer a las 10h
+    expect(r.days[1]!.totalPieces).toBe(1440)
+    expect(r.days[1]!.atCurrentMinute).toBe(960)
   })
 
-  it('el TOTAL de ayer sigue disponible, y es distinto del de la misma hora', () => {
-    const { days } = buildDayComparison({
-      todaySeries: hoy, todayDateKey: '2026-08-12',
-      previous: [{ dateKey: '2026-08-11', series: ayer }],
-    })
-    // 2.400 al cierre contra 1.440 a las 10h: comparar contra el total es el
-    // error que motivó todo esto.
-    expect(days[1]!.totalPieces).toBe(2400)
-    expect(days[1]!.atCurrentHour).toBe(1440)
-  })
-
-  it('marca cuál es hoy', () => {
-    const { days } = buildDayComparison({
-      todaySeries: hoy, todayDateKey: '2026-08-12',
-      previous: [{ dateKey: '2026-08-11', series: ayer }],
-    })
-    expect(days[0]!.esHoy).toBe(true)
-    expect(days.filter((d) => d.esHoy)).toHaveLength(1)
-  })
-
-  it('limita cuántos días entran — en un celular no caben cinco líneas', () => {
-    const previous = ['2026-08-11', '2026-08-10', '2026-08-08', '2026-08-07']
-      .map((dateKey) => ({ dateKey, series: ayer }))
-    const { days } = buildDayComparison({
-      todaySeries: hoy, todayDateKey: '2026-08-12', previous, maxDays: 2,
-    })
-    expect(days).toHaveLength(3) // hoy + 2
-  })
-
-  it('descarta los días anteriores sin datos en vez de dibujar una línea plana', () => {
-    const { days } = buildDayComparison({
-      todaySeries: hoy, todayDateKey: '2026-08-12',
-      previous: [{ dateKey: '2026-08-11', series: [] }],
-    })
-    expect(days).toHaveLength(1)
-  })
-
-  it('un día que todavía no llegó a esa hora da null, no cero', () => {
-    // Cero se leería como "no produjo"; null es "no hay dato de esa hora".
-    const corto = serie('2026-08-11T08:00:00Z', Array(12).fill(40))
-    const { days } = buildDayComparison({
+  it('un día más corto da null a esa altura, no su total', () => {
+    const corto = serie('2026-08-11T08:00:00Z', Array(6).fill(40))  // solo 30 min
+    const r = buildDayComparison({
       todaySeries: hoy, todayDateKey: '2026-08-12',
       previous: [{ dateKey: '2026-08-11', series: corto }],
     })
-    expect(days[1]!.atCurrentHour).toBeNull()
+    expect(r.days[1]!.atCurrentMinute).toBeNull()
+  })
+
+  it('dibuja la recta objetivo sobre el tiempo ÚTIL, no sobre el turno entero', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous: [],
+      targetPieces: 5_000, usefulMin: 372,
+    })
+    expect(r.optimal).not.toBeNull()
+    // A los 120 min: 120 × (5.000/372) = 1.613
+    expect(r.optimalAtCurrentMinute).toBe(Math.round(120 * (5_000 / 372)))
+    // Y nunca pasa de la meta.
+    expect(Math.max(...r.optimal!.map((p) => p.pieces))).toBeLessThanOrEqual(5_000)
+  })
+
+  it('sin meta no inventa una recta objetivo', () => {
+    const r = buildDayComparison({ todaySeries: hoy, todayDateKey: '2026-08-12', previous: [] })
+    expect(r.optimal).toBeNull()
+    expect(r.optimalAtCurrentMinute).toBeNull()
+  })
+
+  it('limita cuántos días entran — en un celular no caben cinco curvas', () => {
+    const previous = ['2026-08-11', '2026-08-10', '2026-08-08', '2026-08-07']
+      .map((dateKey) => ({ dateKey, series: ayer }))
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', previous, maxDays: 2,
+    })
+    expect(r.days).toHaveLength(3)
+  })
+
+  it('descarta días sin datos en vez de dibujar una línea plana', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12',
+      previous: [{ dateKey: '2026-08-11', series: [] }],
+    })
+    expect(r.days).toHaveLength(1)
   })
 
   it('sin turno en curso no compara nada', () => {
-    expect(buildDayComparison({ todaySeries: [], todayDateKey: 'x', previous: [] }).days).toEqual([])
+    const r = buildDayComparison({ todaySeries: [], todayDateKey: 'x', previous: [] })
+    expect(r.days).toEqual([])
+    expect(r.currentMinute).toBeNull()
   })
 })
 
@@ -141,7 +160,6 @@ describe('optimalPace', () => {
     const r = optimalPace({ targetPieces: 5_000, windowMin: 450, plannedMin: 78 })!
     expect(r.usefulMin).toBe(372)
     expect(r.requiredCpm).toBeCloseTo(5_000 / 372, 4)
-    // Y ese número es MAYOR que el reparto ingenuo sobre el turno completo.
     expect(r.requiredCpm).toBeGreaterThan(5_000 / 450)
   })
 

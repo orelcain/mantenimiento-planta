@@ -3,7 +3,18 @@
  *
  * Nace de un error de lectura concreto: "hoy llevamos 3.028 y ayer hizo 3.275".
  * Ayer eran las 15:30 y hoy son las 13:00 — comparar un turno a medio andar
- * contra el TOTAL de otro no dice nada. Acá todo se compara A LA MISMA HORA.
+ * contra el TOTAL de otro no dice nada.
+ *
+ * ── Por qué se mide desde el INICIO del turno y no por hora de reloj ────────
+ *
+ * Los turnos no arrancan a la misma hora: 07:45, 07:48, 08:00. Agrupando por
+ * hora de reloj, la primera "hora" de un día son 15 minutos y la de otro son 60,
+ * y la comparación queda arruinada justo en el tramo que más se mira. Además es
+ * como cuenta Shoplogix (confirmado por Orel, 12-08): la hora 1 va del arranque
+ * a +60 min, no hasta el próximo cambio de hora.
+ *
+ * Todo acá se indexa en MINUTOS DESDE EL ARRANQUE, así "h+2" de hoy se compara
+ * con "h+2" de ayer aunque uno haya empezado 20 minutos antes.
  *
  * Se arma desde `live.series` de cada turno, que ya viaja en el doc del monitor
  * (el de hoy en `live`, los anteriores en `history`). No hace falta guardar nada.
@@ -11,116 +22,72 @@
 
 import type { MonitorSeriesPoint } from './monitorHourly'
 
-/** Acumulado de un turno al cierre de cada hora de reloj de planta. */
-export interface CumulativeSeries {
-  /** Hora de planta 0-23. */
-  hour: number
-  /** Piezas acumuladas desde el inicio del turno hasta el fin de esa hora. */
+/** Tramo de la serie de Shoplogix. */
+const BUCKET_MIN = 5
+
+/** Punto de la curva: piezas acumuladas a los `minutes` de arrancado el turno. */
+export interface PacePoint {
+  minutes: number
   pieces: number
 }
 
 /**
- * Acumulado por hora, en wall-clock de planta.
+ * Curva acumulada indexada en minutos desde el arranque.
  *
- * ⚠ `getUTCHours` y no `getHours`: los ISO del monitor llevan Z pero son hora
- * de planta. Con el huso del celular, dos turnos del mismo día caerían en horas
- * distintas y la comparación quedaría corrida.
+ * El arranque es el primer tramo CON DATO de la serie y no `scheduledStart`: el
+ * horario programado puede estar 20 minutos antes de la primera pieza, y esos
+ * minutos vacíos correrían la curva entera hacia la derecha.
  */
-export function cumulativeByHour(series: MonitorSeriesPoint[] | null | undefined): CumulativeSeries[] {
+export function cumulativeFromStart(series: MonitorSeriesPoint[] | null | undefined): PacePoint[] {
   if (!series || series.length === 0) return []
-  const porHora = new Map<number, number>()
-  for (const p of series) {
-    const ms = Date.parse(p.t)
-    if (Number.isNaN(ms)) continue
-    const h = new Date(ms).getUTCHours()
-    porHora.set(h, (porHora.get(h) ?? 0) + (p.pieces || 0))
-  }
-  // Orden cronológico REAL: un turno noche va 21, 22, 23, 0, 1… y ordenar por
-  // número dejaría la madrugada delante de la tarde.
-  const horas = [...porHora.keys()]
-  const ordenadas = ordenarCruzandoMedianoche(horas)
+  const puntos = series
+    .map((p) => ({ ms: Date.parse(p.t), pieces: p.pieces || 0 }))
+    .filter((p) => !Number.isNaN(p.ms))
+    .sort((a, b) => a.ms - b.ms)
+  if (puntos.length === 0) return []
+
+  const t0 = puntos[0]!.ms
   let acum = 0
-  return ordenadas.map((hour) => {
-    acum += porHora.get(hour) ?? 0
-    return { hour, pieces: acum }
+  return puntos.map((p) => {
+    acum += p.pieces
+    return { minutes: Math.round((p.ms - t0) / 60_000) + BUCKET_MIN, pieces: acum }
   })
 }
 
-/**
- * Ordena horas de un turno respetando el cruce de medianoche: si hay un salto
- * grande hacia atrás (23 → 0), la parte baja va DESPUÉS.
- */
-function ordenarCruzandoMedianoche(horas: number[]): number[] {
-  const asc = [...horas].sort((a, b) => a - b)
-  // Sin hueco > 6 h no hay cruce: es un turno de día normal.
-  let corte = -1
-  for (let i = 1; i < asc.length; i++) {
-    if (asc[i]! - asc[i - 1]! > 6) { corte = i; break }
+/** Piezas acumuladas a los `min` de turno, interpolando entre tramos. */
+export function piecesAt(curve: PacePoint[], min: number): number | null {
+  if (curve.length === 0) return null
+  if (min < curve[0]!.minutes) return 0
+  let ultimo: PacePoint | null = null
+  for (const p of curve) {
+    if (p.minutes > min) break
+    ultimo = p
   }
-  if (corte < 0) return asc
-  return [...asc.slice(corte), ...asc.slice(0, corte)]
+  // Más allá del último dato NO se extrapola: ese turno no llegó hasta ahí.
+  if (!ultimo) return 0
+  if (min > curve[curve.length - 1]!.minutes) return null
+  return ultimo.pieces
 }
 
-export interface DayComparison {
+export interface DayCurve {
   label: string
   dateKey: string
-  cumulative: CumulativeSeries[]
+  curve: PacePoint[]
   totalPieces: number
-  /** Piezas que llevaba ese día a la MISMA hora que el turno en curso. */
-  atCurrentHour: number | null
+  /** Piezas a la altura del turno en curso. null si ese día no llegó tan lejos. */
+  atCurrentMinute: number | null
   esHoy: boolean
 }
 
-/**
- * Compara el turno en curso con los anteriores, todos al corte de la hora que
- * el turno actual acaba de completar.
- *
- * `maxDays` deja fuera los turnos viejos: con más de 3 la pantalla se vuelve un
- * plato de espaguetis en un celular.
- */
-export function buildDayComparison(args: {
-  todaySeries: MonitorSeriesPoint[] | null | undefined
-  todayDateKey: string
-  previous: Array<{ dateKey: string; series: MonitorSeriesPoint[] | null | undefined }>
-  maxDays?: number
-}): { days: DayComparison[]; currentHour: number | null } {
-  const hoy = cumulativeByHour(args.todaySeries)
-  if (hoy.length === 0) return { days: [], currentHour: null }
-
-  /*
-   * La hora de corte es la ÚLTIMA COMPLETA del turno en curso, no la que está
-   * corriendo: comparar una hora a medio llenar contra las horas enteras de los
-   * otros días haría ver una caída que no existe, cada hora, en todos los turnos.
-   */
-  const currentHour = hoy.length > 1 ? hoy[hoy.length - 2]!.hour : hoy[hoy.length - 1]!.hour
-
-  const enHora = (serie: CumulativeSeries[]): number | null => {
-    const fila = serie.find((c) => c.hour === currentHour)
-    return fila ? fila.pieces : null
-  }
-
-  const days: DayComparison[] = [{
-    label: 'Hoy',
-    dateKey: args.todayDateKey,
-    cumulative: hoy,
-    totalPieces: hoy[hoy.length - 1]?.pieces ?? 0,
-    atCurrentHour: enHora(hoy),
-    esHoy: true,
-  }]
-
-  for (const prev of args.previous.slice(0, args.maxDays ?? 2)) {
-    const cum = cumulativeByHour(prev.series)
-    if (cum.length === 0) continue
-    days.push({
-      label: etiquetaDia(prev.dateKey),
-      dateKey: prev.dateKey,
-      cumulative: cum,
-      totalPieces: cum[cum.length - 1]?.pieces ?? 0,
-      atCurrentHour: enHora(cum),
-      esHoy: false,
-    })
-  }
-  return { days, currentHour }
+export interface CompareResult {
+  days: DayCurve[]
+  /** Minutos de turno transcurridos en el turno en curso. */
+  currentMinute: number | null
+  /** Curva del ritmo que la cuota exige, si hay meta. */
+  optimal: PacePoint[] | null
+  optimalAtCurrentMinute: number | null
+  /** Alcance del eje, en minutos de turno. */
+  maxMinutes: number
 }
 
 function etiquetaDia(dateKey: string): string {
@@ -128,6 +95,68 @@ function etiquetaDia(dateKey: string): string {
   if (Number.isNaN(d.getTime())) return dateKey
   const dia = d.toLocaleDateString('es-CL', { weekday: 'short', timeZone: 'UTC' }).replace('.', '')
   return `${dia} ${d.getUTCDate()}`
+}
+
+/**
+ * Compara el turno en curso con los anteriores, minuto a minuto de turno.
+ *
+ * `optimal` es la recta que la cuota exige repartida sobre el tiempo ÚTIL (sin
+ * las paradas de convenio) — el reparto sobre el turno completo supone que no
+ * hay colación y exige de más desde el arranque.
+ */
+export function buildDayComparison(args: {
+  todaySeries: MonitorSeriesPoint[] | null | undefined
+  todayDateKey: string
+  previous: Array<{ dateKey: string; series: MonitorSeriesPoint[] | null | undefined }>
+  maxDays?: number
+  /** Meta del turno y minutos útiles, para dibujar la recta objetivo. */
+  targetPieces?: number | null
+  usefulMin?: number | null
+}): CompareResult {
+  const hoy = cumulativeFromStart(args.todaySeries)
+  if (hoy.length === 0) {
+    return { days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null, maxMinutes: 0 }
+  }
+
+  const currentMinute = hoy[hoy.length - 1]!.minutes
+
+  const days: DayCurve[] = [{
+    label: 'Hoy',
+    dateKey: args.todayDateKey,
+    curve: hoy,
+    totalPieces: hoy[hoy.length - 1]!.pieces,
+    atCurrentMinute: hoy[hoy.length - 1]!.pieces,
+    esHoy: true,
+  }]
+
+  for (const prev of (args.previous ?? []).slice(0, args.maxDays ?? 2)) {
+    const curve = cumulativeFromStart(prev.series)
+    if (curve.length === 0) continue
+    days.push({
+      label: etiquetaDia(prev.dateKey),
+      dateKey: prev.dateKey,
+      curve,
+      totalPieces: curve[curve.length - 1]!.pieces,
+      atCurrentMinute: piecesAt(curve, currentMinute),
+      esHoy: false,
+    })
+  }
+
+  const maxMinutes = Math.max(...days.map((d) => d.curve[d.curve.length - 1]!.minutes), currentMinute)
+
+  let optimal: PacePoint[] | null = null
+  let optimalAtCurrentMinute: number | null = null
+  if (args.targetPieces && args.targetPieces > 0 && args.usefulMin && args.usefulMin > 0) {
+    const cpm = args.targetPieces / args.usefulMin
+    const finMin = Math.max(maxMinutes, args.usefulMin)
+    optimal = []
+    for (let m = 0; m <= finMin; m += 15) {
+      optimal.push({ minutes: m, pieces: Math.min(args.targetPieces, Math.round(m * cpm)) })
+    }
+    optimalAtCurrentMinute = Math.min(args.targetPieces, Math.round(currentMinute * cpm))
+  }
+
+  return { days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes }
 }
 
 /**

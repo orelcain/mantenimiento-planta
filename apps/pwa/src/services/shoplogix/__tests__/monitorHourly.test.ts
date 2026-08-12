@@ -1,15 +1,15 @@
 /**
- * monitorHourly — el turno hora por hora.
+ * monitorHourly — el turno en horas CORRIDAS desde el arranque.
  *
- * El caso que lo motiva: un supervisor dice "en la primera hora hicimos 800
- * piezas" y hay que poder contrastarlo. Si el turno arranca 21:15, esa "primera
- * hora" son 45 minutos — comparar sus piezas contra una hora completa es el
- * error que esta vista existe para evitar.
+ * El caso que lo motivó: un supervisor dijo "en la primera hora hicieron 800".
+ * Para contrastarlo, la "primera hora" tiene que ser la hora real de trabajo
+ * (07:45 → 08:45) y no el pedazo de hora de reloj que quedó antes de las 08:00.
+ * Es además como cuenta Shoplogix (confirmado por Orel, 12-08).
  */
 import { describe, it, expect } from 'vitest'
 import { buildHourlyRows, peakPieces, type MonitorSeriesPoint } from '../monitorHourly'
 
-/** Serie de tramos de 5 min desde `desde`, con las piezas dadas por tramo. */
+/** Serie de tramos de 5 min desde `desde`. */
 function serie(desde: string, piezasPorTramo: number[]): MonitorSeriesPoint[] {
   const t0 = Date.parse(desde)
   return piezasPorTramo.map((pieces, i) => ({
@@ -19,102 +19,69 @@ function serie(desde: string, piezasPorTramo: number[]): MonitorSeriesPoint[] {
 }
 
 describe('buildHourlyRows', () => {
-  it('agrupa los tramos de 5 min por hora de reloj', () => {
-    // 21:00 → 12 tramos de 50 pz = 600; 22:00 → 12 tramos de 60 pz = 720
-    const s = serie('2026-08-11T21:00:00Z', [...Array(12).fill(50), ...Array(12).fill(60)])
-    const rows = buildHourlyRows(s)
+  it('la hora 1 va del ARRANQUE a +60 min, no hasta el cambio de hora', () => {
+    // Turno que arranca 07:45. Por hora de reloj la primera fila serían 15 min.
+    const rows = buildHourlyRows(serie('2026-08-12T07:45:00Z', Array(24).fill(50)))
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ hour: 21, pieces: 600, minutesCovered: 60, partial: false })
-    expect(rows[1]).toMatchObject({ hour: 22, pieces: 720, minutesCovered: 60, partial: false })
-  })
-
-  it('marca PARCIAL la primera hora de un turno que arranca 21:15', () => {
-    // 21:15 → quedan 45 min de la hora 21 = 9 tramos.
-    const s = serie('2026-08-11T21:15:00Z', Array(9).fill(50))
-    const [primera] = buildHourlyRows(s)
-    expect(primera).toMatchObject({ hour: 21, pieces: 450, minutesCovered: 45, partial: true })
-  })
-
-  it('el RITMO de una hora parcial se extrapola a la hora completa', () => {
-    // 450 pz en 45 min = 600 pz/h. Ese es el número comparable, no las 450.
-    const s = serie('2026-08-11T21:15:00Z', Array(9).fill(50))
-    expect(buildHourlyRows(s)[0]!.piecesPerHour).toBe(600)
-  })
-
-  it('desmiente el caso real: 450 piezas en 45 min NO son 800 en la primera hora', () => {
-    const s = serie('2026-08-11T21:15:00Z', Array(9).fill(50))
-    const [primera] = buildHourlyRows(s)
-    expect(primera!.pieces).toBeLessThan(800)
-    expect(primera!.piecesPerHour).toBeLessThan(800)
-  })
-
-  it('y lo confirma cuando el ritmo SÍ da', () => {
-    // 9 tramos de 67 pz = 603 pz en 45 min → 804 pz/h.
-    const s = serie('2026-08-11T21:15:00Z', Array(9).fill(67))
-    const [primera] = buildHourlyRows(s)
-    expect(primera!.pieces).toBe(603)
-    expect(primera!.piecesPerHour).toBe(804)
-  })
-
-  it('lee la hora en WALL-CLOCK de planta, no en el huso de quien mira', () => {
-    // Los ISO del monitor llevan Z pero son hora de planta. `getUTCHours` de
-    // 21:00Z es 21 en cualquier celular; `getHours` daría otra cosa en Chile.
-    const rows = buildHourlyRows(serie('2026-08-11T21:00:00Z', Array(12).fill(10)))
-    expect(rows[0]!.hour).toBe(21)
-  })
-
-  it('cruza la medianoche sin mezclar las horas de los dos días', () => {
-    // 23:30 → 6 tramos (hora 23) y luego 12 tramos de la hora 0 del día 12.
-    const s = serie('2026-08-11T23:30:00Z', [...Array(6).fill(40), ...Array(12).fill(70)])
-    const rows = buildHourlyRows(s)
-    expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ hour: 23, pieces: 240, partial: true })
-    expect(rows[1]).toMatchObject({ hour: 0, pieces: 840, partial: false })
-    expect(rows[1]!.hourStart.startsWith('2026-08-12T00:00')).toBe(true)
-  })
-
-  it('una hora con la línea parada es 0, no un hueco', () => {
-    const s = serie('2026-08-11T21:00:00Z', [...Array(12).fill(50), ...Array(12).fill(0)])
-    const rows = buildHourlyRows(s)
-    expect(rows[1]).toMatchObject({ hour: 22, pieces: 0, piecesPerHour: 0, partial: false })
-  })
-
-  it('sale en orden cronológico aunque la serie llegue desordenada', () => {
-    const s = serie('2026-08-11T21:00:00Z', Array(24).fill(10)).reverse()
-    expect(buildHourlyRows(s).map((r) => r.hour)).toEqual([21, 22])
-  })
-
-  it('ignora timestamps corruptos en vez de romper la vista entera', () => {
-    const s: MonitorSeriesPoint[] = [
-      { t: 'no-es-fecha', pieces: 999 },
-      ...serie('2026-08-11T21:00:00Z', Array(12).fill(50)),
-    ]
-    const rows = buildHourlyRows(s)
-    expect(rows).toHaveLength(1)
-    expect(rows[0]!.pieces).toBe(600)
-  })
-
-  it('publica el TRAMO REAL de cada fila, no solo la hora', () => {
-    // Turno que arranca 07:45: la fila de las 07 va de 07:45 a 08:00.
-    const s = serie('2026-08-12T07:45:00Z', [...Array(3).fill(50), ...Array(12).fill(60)])
-    const rows = buildHourlyRows(s)
     expect(rows[0]!.from.slice(11, 16)).toBe('07:45')
-    expect(rows[0]!.to.slice(11, 16)).toBe('08:00')
-    expect(rows[1]!.from.slice(11, 16)).toBe('08:00')
-    expect(rows[1]!.to.slice(11, 16)).toBe('09:00')
+    expect(rows[0]!.to.slice(11, 16)).toBe('08:45')
+    expect(rows[0]!.pieces).toBe(600)   // 12 tramos × 50
+    expect(rows[0]!.partial).toBe(false)
   })
 
-  it('el tramo NO se pasa de la hora aunque el último bucket la roce', () => {
-    // Un bucket que empieza 07:55 cubre hasta las 08:00 — ni un minuto más.
-    const s = serie('2026-08-12T07:55:00Z', [50])
-    expect(buildHourlyRows(s)[0]!.to.slice(11, 16)).toBe('08:00')
+  it('numera las horas del turno, 1-based', () => {
+    const rows = buildHourlyRows(serie('2026-08-12T07:45:00Z', Array(30).fill(10)))
+    expect(rows.map((r) => r.index)).toEqual([1, 2, 3])
   })
 
-  it('la hora en curso termina donde termina el último dato', () => {
-    // 11:00 + 8 tramos = último bucket 11:35, que cubre hasta 11:40.
-    const s = serie('2026-08-12T11:00:00Z', Array(8).fill(45))
+  it('el ritmo pz/h de una hora completa es su propio total', () => {
+    const rows = buildHourlyRows(serie('2026-08-12T07:45:00Z', Array(12).fill(50)))
+    expect(rows[0]!.piecesPerHour).toBe(600)
+  })
+
+  it('solo la ÚLTIMA hora puede quedar parcial — el turno sigue en curso', () => {
+    // 90 min: la hora 1 completa, la 2 a medias.
+    const rows = buildHourlyRows(serie('2026-08-12T07:45:00Z', Array(18).fill(50)))
+    expect(rows[0]!.partial).toBe(false)
+    expect(rows[1]!.partial).toBe(true)
+    expect(rows[1]!.minutesCovered).toBe(30)
+  })
+
+  it('en una hora parcial las piezas son menos pero el RITMO se compara igual', () => {
+    // Media hora al mismo ritmo que una hora completa: 300 pz, 600 pz/h.
+    const rows = buildHourlyRows(serie('2026-08-12T07:45:00Z', Array(6).fill(50)))
+    expect(rows[0]!.pieces).toBe(300)
+    expect(rows[0]!.piecesPerHour).toBe(600)
+  })
+
+  it('el nocturno cruza la medianoche sin romper el orden', () => {
+    const rows = buildHourlyRows(serie('2026-08-11T23:15:00Z', Array(24).fill(10)))
+    expect(rows.map((r) => r.index)).toEqual([1, 2])
+    expect(rows[0]!.from.slice(11, 16)).toBe('23:15')
+    expect(rows[1]!.from.startsWith('2026-08-12T00:15')).toBe(true)
+  })
+
+  it('lee el reloj como wall-clock, no en el huso de quien mira', () => {
+    // Con getHours() esta fila se correría al huso local del celular.
+    const rows = buildHourlyRows(serie('2026-08-12T21:30:00Z', Array(12).fill(10)))
+    expect(rows[0]!.from.slice(11, 16)).toBe('21:30')
+  })
+
+  it('ordena aunque la serie llegue desordenada', () => {
+    const s = serie('2026-08-12T07:45:00Z', Array(24).fill(50)).reverse()
+    const rows = buildHourlyRows(s)
+    expect(rows.map((r) => r.index)).toEqual([1, 2])
+    expect(rows[0]!.from.slice(11, 16)).toBe('07:45')
+  })
+
+  it('un hueco de sincronización deja la hora corta, no la borra', () => {
+    const s: MonitorSeriesPoint[] = [
+      ...serie('2026-08-12T07:45:00Z', Array(6).fill(50)),
+      ...serie('2026-08-12T08:25:00Z', Array(4).fill(50)),  // faltan 10 min
+    ]
     const [fila] = buildHourlyRows(s)
-    expect(fila!.to.slice(11, 16)).toBe('11:40')
+    expect(fila!.minutesCovered).toBe(50)
+    expect(fila!.pieces).toBe(500)
     expect(fila!.partial).toBe(true)
   })
 
@@ -126,12 +93,15 @@ describe('buildHourlyRows', () => {
 })
 
 describe('peakPieces', () => {
-  it('devuelve la hora más productiva, para escalar las barras', () => {
-    const s = serie('2026-08-11T21:00:00Z', [...Array(12).fill(50), ...Array(12).fill(80)])
+  it('devuelve la hora más productiva', () => {
+    const s: MonitorSeriesPoint[] = [
+      ...serie('2026-08-12T07:45:00Z', Array(12).fill(50)),   // 600
+      ...serie('2026-08-12T08:45:00Z', Array(12).fill(80)),   // 960
+    ]
     expect(peakPieces(buildHourlyRows(s))).toBe(960)
   })
 
-  it('sin filas es 0 y no rompe la división de las barras', () => {
+  it('sin filas es 0 y no NaN — divide el ancho de las barras', () => {
     expect(peakPieces([])).toBe(0)
   })
 })
