@@ -1164,6 +1164,18 @@ async function buildMonitorLive(db, plantSlug, shiftDocId) {
   return {
     updatedAt: new Date().toISOString(),
     lastSyncAt: iso(toDate(parent.lastSyncAt)),
+    /*
+     * El contador VIVO del whiteboard de Shoplogix, capturado por el sync del
+     * rollup con su hora (UTC real). Es el mismo número que la pantalla de
+     * planta: los buckets de 5 min corren un bucket detrás y la diferencia se
+     * leía como descuadre. null en turnos sin rollup (históricos, pre-deploy).
+     */
+    shoplogixLive: parent.officialLive && Number.isFinite(parent.officialLive.totalCycles)
+      ? {
+          totalCycles: parent.officialLive.totalCycles,
+          at: iso(toDate(parent.officialLive.at)),
+        }
+      : null,
     scheduledStart: iso(scheduledStart),
     scheduledEnd: iso(scheduledEnd),
     /*
