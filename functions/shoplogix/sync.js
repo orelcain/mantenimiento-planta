@@ -452,9 +452,29 @@ async function fetchOfficialRollup({ query, plantSlug, at, logger = console }) {
     const targetsByMachineId = new Map(machineRows.map(m => [m.machineid, m.target]))
     const currentJobRaw = (data?.jobs || []).find(j => j.currentJob) || (data?.jobs || [])[0] || null
 
+    /*
+     * Contador VIVO del turno: el estado "Produciendo" (type Uptime) de cada
+     * fila trae el acumulado real en `cycles` — el MISMO número que muestra el
+     * whiteboard en la pantalla de planta (verificado contra la pantalla el
+     * 13-08: rollup 3.850 = pantalla 3.850). Los buckets de 5 min siempre
+     * corren un bucket detrás; este contador es el del instante de la consulta
+     * y es lo que permite que el monitor "cuadre" con la pared sin requests
+     * extra ni cambiar la frecuencia del sync.
+     */
+    const uptimeCycles = (row) => (row.states || [])
+      .filter(s => s.type === 'Uptime')
+      .reduce((a, s) => a + (s.cycles || 0), 0)
+    const liveCyclesByMachineId = new Map(machineRows.map(m => [m.machineid, uptimeCycles(m)]))
+    const totalRow = (data?.machines || []).find(m => m.machineid === 'Total')
+    const liveTotalCycles = totalRow
+      ? uptimeCycles(totalRow)
+      : [...liveCyclesByMachineId.values()].reduce((a, b) => a + b, 0)
+
     return {
       shiftLabel,
       targetsByMachineId,
+      liveCyclesByMachineId,
+      liveTotalCycles,
       officialStart: parseShoplogixTime(machineRows[0].start),
       officialEnd:   parseShoplogixTime(machineRows[0].end),
       currentJob: currentJobRaw ? {
@@ -1074,6 +1094,13 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       parentDoc.officialTargetsByMachineId = Object.fromEntries(officialRollup.targetsByMachineId)
       parentDoc.currentJob = officialRollup.currentJob
       parentDoc.officialSyncedAt = syncedAt
+      // El contador vivo del whiteboard, con su hora (UTC real, como
+      // lastSyncAt). Viaja en el MISMO write del padre: cero escrituras extra.
+      parentDoc.officialLive = {
+        totalCycles: officialRollup.liveTotalCycles ?? null,
+        byMachineId: Object.fromEntries(officialRollup.liveCyclesByMachineId ?? []),
+        at: syncedAt,
+      }
     }
 
     await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set(parentDoc, { merge: true })

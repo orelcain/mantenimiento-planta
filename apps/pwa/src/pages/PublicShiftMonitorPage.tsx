@@ -1218,6 +1218,24 @@ export function PublicShiftMonitorPage() {
                 datos hasta las{' '}
                 {new Date(Date.parse(live.series[live.series.length - 1]!.t) + 5 * 60_000)
                   .toISOString().slice(11, 16)}
+                {/* El contador de la PANTALLA de planta, con su hora: el sync
+                    lo captura del rollup vivo (mismo endpoint que el
+                    whiteboard). Quien compara contra la pared encuentra acá el
+                    mismo número. `at` es UTC real → reloj local del cliente. */}
+                {live.shoplogixLive && live.shoplogixLive.totalCycles > 0 && (
+                  <>
+                    {' '}· Shoplogix marcaba{' '}
+                    <span className="text-foreground/80">{fmtInt(live.shoplogixLive.totalCycles)}</span>
+                    {live.shoplogixLive.at && (
+                      <>
+                        {' '}a las{' '}
+                        {new Date(live.shoplogixLive.at).toLocaleTimeString('es-CL', {
+                          hour: '2-digit', minute: '2-digit', hour12: false,
+                        })}
+                      </>
+                    )}
+                  </>
+                )}
               </span>
             )}
           </div>

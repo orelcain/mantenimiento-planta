@@ -40,6 +40,10 @@ export interface PublicMonitorMachine {
 export interface PublicMonitorLive {
   updatedAt: string
   lastSyncAt: string | null
+  /** El contador VIVO del whiteboard de Shoplogix al momento del sync (el
+      mismo número de la pantalla de planta). `at` es UTC real. null en turnos
+      históricos o anteriores al deploy del rollup vivo. */
+  shoplogixLive?: { totalCycles: number; at: string | null } | null
   scheduledStart: string | null
   scheduledEnd: string | null
   /**
