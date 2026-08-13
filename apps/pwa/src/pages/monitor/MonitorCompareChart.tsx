@@ -294,7 +294,13 @@ export function MonitorCompareChart({ cmp, visibles }: {
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         {modo === "dif" ? (
           <>
-            <span>línea arriba del cero = hoy va mejor</span>
+            {difs.filter((d) => d.clave !== "cuota").map((d) => (
+              <span key={d.clave} className="flex items-center gap-1.5">
+                <i className="h-1.5 w-4 rounded-full" style={{ background: d.color }} />
+                vs {d.label}
+              </span>
+            ))}
+            <span>arriba del cero = hoy va mejor</span>
             {cmp.optimal && (
               <button
                 type="button"
@@ -310,12 +316,21 @@ export function MonitorCompareChart({ cmp, visibles }: {
             )}
           </>
         ) : (
-          cmp.optimal && (
-            <span className="flex items-center gap-1.5">
-              <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
-              Para la cuota
-            </span>
-          )
+          <>
+            {dibujados.map((d) => (
+              <span key={d.dateKey + d.label} className="flex items-center gap-1.5">
+                <i className="h-1.5 w-4 rounded-full"
+                  style={{ background: COLORES[cmp.days.indexOf(d) % COLORES.length] }} />
+                {d.esHoy ? 'Hoy' : d.label}
+              </span>
+            ))}
+            {cmp.optimal && (
+              <span className="flex items-center gap-1.5">
+                <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
+                cuota
+              </span>
+            )}
+          </>
         )}
         {cmp.breaks.length > 0 && (
           <span className="flex items-center gap-1.5">

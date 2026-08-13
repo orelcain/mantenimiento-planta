@@ -303,15 +303,26 @@ export function ComparadorDias({ cmp, live, onCausa }: {
   const ref = hoy?.atCurrentMinute ?? null
   const hh = Math.floor(cmp.currentMinute / 60)
   const mm = cmp.currentMinute % 60
+  const resumen = resumenComparacion(cmp)
 
   return (
     <Bloque
       id="comparador"
       titulo="Comparado con otros días"
+      /* Plegado, la altura del turno no dice nada; la diferencia contra la
+         cuota sí, y es la razón por la que uno abriría el bloque. */
       extra={
-        <span className="tabular-nums">
-          {hh} h {String(mm).padStart(2, '0')} de turno
-        </span>
+        resumen.cuota
+          ? (
+            <span className={`tabular-nums font-semibold ${
+              resumen.cuota.dif >= 0
+                ? 'text-emerald-700 dark:text-emerald-400'
+                : 'text-red-700 dark:text-red-400'
+            }`}>
+              {resumen.cuota.dif >= 0 ? '+' : '−'}{fmtInt(Math.abs(resumen.cuota.dif))} vs cuota
+            </span>
+          )
+          : <span className="tabular-nums">{hh} h {String(mm).padStart(2, '0')} de turno</span>
       }
     >
           <Veredicto cmp={cmp} />
@@ -576,32 +587,57 @@ function BrechaDelDia({ cmp, live, onCausa }: {
  */
 function Veredicto({ cmp }: { cmp: CompareResult }) {
   const r = resumenComparacion(cmp)
-  if (!r.reciente && !r.mejor && r.cuota == null) return null
+  if (r.actual == null) return null
 
   const tono = (n: number) =>
     n >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
   const conSigno = (n: number) => `${n >= 0 ? '+' : '\u2212'}${fmtInt(Math.abs(n))}`
+  const altura = r.minutos != null
+    ? `${Math.floor(r.minutos / 60)} h ${String(r.minutos % 60).padStart(2, '0')}`
+    : null
 
   return (
     <div className="mt-2">
       <p className="text-[15px] font-semibold leading-snug text-foreground">
+        Llevamos <span className="tabular-nums">{fmtInt(r.actual)} pz</span>
+        {altura && (
+          <span className="font-normal text-muted-foreground"> a {altura} de turno</span>
+        )}
+        .
+      </p>
+
+      {/*
+        * Cada comparación con el número del otro al lado. "Vas 1.083 arriba de
+        * mar 11" no dice nada si no se sabe que mar 11 llevaba 3.403 a esta
+        * misma altura — y ese valor es el que se mueve durante el turno.
+        */}
+      <p className="mt-1 text-[13.5px] leading-snug text-foreground/90">
         {r.reciente && (
           <>
-            Vas{' '}
-            <span className={tono(r.reciente.dif)}>
+            Vamos{' '}
+            <span className={`font-semibold tabular-nums ${tono(r.reciente.dif)}`}>
               {fmtInt(Math.abs(r.reciente.dif))} pz {r.reciente.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
-            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}
+            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}, que a esta
+            altura llevaba <span className="tabular-nums">{fmtInt(r.reciente.valor)}</span>
           </>
         )}
-        {r.reciente && r.cuota != null && ', '}
-        {r.cuota != null && (
+        {r.reciente && r.cuota && ', y '}
+        {r.cuota && (
           <>
-            {r.reciente ? 'y ' : 'Vas '}
-            <span className={tono(r.cuota)}>
-              {fmtInt(Math.abs(r.cuota))} {r.cuota >= 0 ? 'arriba' : 'abajo'}
+            {!r.reciente && 'Vamos '}
+            <span className={`font-semibold tabular-nums ${tono(r.cuota.dif)}`}>
+              {fmtInt(Math.abs(r.cuota.dif))} pz {r.cuota.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
             de la cuota
+            {r.cuota.meta ? <> de <span className="tabular-nums">{fmtInt(r.cuota.meta)}</span></> : null}
+            {/* Al final del turno la cuota ya pide el total: repetirlo sobra. */}
+            {r.cuota.meta !== r.cuota.valor && (
+              <>
+                , que a esta altura pide{' '}
+                <span className="tabular-nums">{fmtInt(r.cuota.valor)}</span>
+              </>
+            )}
           </>
         )}
         .
@@ -616,25 +652,31 @@ function Veredicto({ cmp }: { cmp: CompareResult }) {
             <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.mejor.dif)}`}>
               {conSigno(r.mejor.dif)}
               <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                vs {r.mejor.label}
+                vs {r.mejor.label} ({fmtInt(r.mejor.valor)})
               </span>
             </dd>
           </div>
         )}
-        {r.cuota != null && (
+        {r.cuota && (
           <div className="rounded-xl border border-border bg-muted/60 px-2.5 py-1.5">
             <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Para la cuota
             </dt>
-            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.cuota)}`}>
-              {conSigno(r.cuota)}
+            <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.cuota.dif)}`}>
+              {conSigno(r.cuota.dif)}
               <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                a esta altura
+                pide {fmtInt(r.cuota.valor)}
               </span>
             </dd>
           </div>
         )}
       </dl>
+
+      {/* Que quede dicho que el número se mueve: no es el total del otro día. */}
+      <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
+        Esta diferencia cambia durante el turno: se compara contra lo que cada día llevaba
+        a esta MISMA altura, no contra el total con que cerró.
+      </p>
     </div>
   )
 }
