@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Tope de apuro: pedir mas de +30% del ritmo real es "no se alcanza" (#525)
+
+- Hecho: segunda vuelta del veredicto (Orel) — "se alcanza pero con 36 pz/min" en una linea
+  que viene a 10 seguia siendo irreal. Por encima de +30% del ritmo real el veredicto es
+  NO SE ALCANZA aunque no haya techo historico de por medio; "solo apurando" queda acotado
+  al rango 1,05x-1,3x. La hora extra tambien respeta el tope.
+- Archivos: apps/pwa/src/services/shoplogix/monitorPace.ts (+tests, 28 recalibrados),
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: vitest monitorPace 28/28, tsc y eslint limpios; preview :5189 contra el
+  turno VIVO de Filete (pide 40,1 pz/min, viene a 9,9 → No se alcanza).
+- Estado: HECHO. Merge squash a main `7f8253db`.
+- Sigue: nada pendiente de este cambio.
+
+---
+
 ## 2026-08-13 - claude - El veredicto distingue "se alcanza" de "solo apurando" (#521)
 
 - Hecho: "se alcanza pidiendo 26 pz/min" en una linea que viene a 10 comparaba contra el
