@@ -44,11 +44,16 @@ export function MonitorCompareChart({ cmp, visibles }: {
    */
   const [modo, setModo] = useState<"dif" | "acum">("dif")
   /*
-   * La cuota se puede apagar. Su diferencia es mucho más grande que la de los
-   * días entre sí (en Yal, −5.820 contra ±300), así que manda la escala y
-   * aplasta contra el cero justamente la comparación que uno vino a mirar.
+   * La cuota arranca APAGADA en el modo diferencia. Dos motivos vistos con
+   * datos reales:
+   * - Su diferencia es mucho más grande que la de los días entre sí (en Yal,
+   *   −5.820 contra ±300): manda la escala y aplasta contra el cero justo la
+   *   comparación que uno vino a mirar.
+   * - Confunde el signo: en el acumulado la línea ámbar SUBE (es la meta), y
+   *   acá la misma línea BAJA — parece que "la cuota cae", cuando lo que baja
+   *   es nuestra distancia contra ella. Orel lo leyó exactamente así.
    */
-  const [verCuota, setVerCuota] = useState(true)
+  const [verCuota, setVerCuota] = useState(false)
   const [alto, setAlto] = useState(false)
   /*
    * Zoom horizontal con paneo. Un turno de 8 h en 320 px deja cada tramo de 5
@@ -311,8 +316,14 @@ export function MonitorCompareChart({ cmp, visibles }: {
                 }`}
               >
                 <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
-                cuota
+                vs cuota
               </button>
+            )}
+            {verCuota && (
+              <span className="basis-full text-amber-700 dark:text-amber-300/90">
+                la línea ámbar es la DISTANCIA contra la cuota: bajo el cero vamos detrás
+                de lo que pide, no es la cuota cayendo
+              </span>
             )}
           </>
         ) : (

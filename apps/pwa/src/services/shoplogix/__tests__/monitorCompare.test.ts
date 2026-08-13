@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   cumulativeFromStart, piecesAt, buildDayComparison, optimalPace, findGapWindow,
-  plannedBreaks, mergeBreaks, diffCurve, resumenComparacion,
+  plannedBreaks, mergeBreaks, diffCurve, resumenComparacion, findGapWindows,
 } from '../monitorCompare'
 import type { MonitorSeriesPoint } from '../monitorHourly'
 
@@ -458,5 +458,50 @@ describe('resumenComparacion', () => {
     const corto = serie('2026-08-11T08:00:00Z', Array(6).fill(50))
     const r = armar([{ dateKey: '2026-08-11', series: corto }, { dateKey: '2026-08-10', series: bueno }])
     expect(r.reciente?.label).toBe('lun 10')
+  })
+})
+
+describe('findGapWindows — varios tramos', () => {
+  const ayer = cumulativeFromStart(serie('2026-08-11T08:00:00Z', Array(48).fill(50)))  // 4 h
+
+  it('devuelve las DOS paradas cuando el atraso se repartió en dos golpes', () => {
+    const arr = Array(48).fill(50)
+    for (let i = 8; i < 12; i++) arr[i] = 0    // −200 en min 40-60
+    for (let i = 30; i < 36; i++) arr[i] = 0   // −300 en min 150-180
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    const v = findGapWindows(hoy, ayer, 3)
+    expect(v).toHaveLength(2)
+    // De mayor a menor pérdida: la grande primero aunque ocurrió después.
+    expect(v[0]!.lostPieces).toBe(300)
+    expect(v[0]!.fromMin).toBe(150)
+    expect(v[1]!.lostPieces).toBe(200)
+  })
+
+  it('descarta los baches chicos: menos del 10% del atraso es ruido', () => {
+    const arr = Array(48).fill(50)
+    for (let i = 8; i < 16; i++) arr[i] = 0    // −400: el golpe real
+    arr[30] = 45                                // −5: una respiración
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    const v = findGapWindows(hoy, ayer, 3)
+    expect(v).toHaveLength(1)
+    expect(v[0]!.lostPieces).toBe(400)
+  })
+
+  it('las partes suman: los share de los tramos explican el atraso total', () => {
+    const arr = Array(48).fill(50)
+    for (let i = 8; i < 12; i++) arr[i] = 0
+    for (let i = 30; i < 36; i++) arr[i] = 0
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    const v = findGapWindows(hoy, ayer, 3)
+    const suma = v.reduce((a, g) => a + g.share, 0)
+    expect(suma).toBeCloseTo(1, 2)
+  })
+
+  it('findGapWindow sigue devolviendo solo la peor', () => {
+    const arr = Array(48).fill(50)
+    for (let i = 8; i < 12; i++) arr[i] = 0
+    for (let i = 30; i < 36; i++) arr[i] = 0
+    const hoy = cumulativeFromStart(serie('2026-08-12T07:45:00Z', arr))
+    expect(findGapWindow(hoy, ayer)!.lostPieces).toBe(300)
   })
 })

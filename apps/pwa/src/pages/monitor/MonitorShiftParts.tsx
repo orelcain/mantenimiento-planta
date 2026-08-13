@@ -10,7 +10,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  findGapWindow, resumenComparacion, type CompareResult,
+  findGapWindows, resumenComparacion, type CompareResult,
 } from '@/services/shoplogix/monitorCompare'
 import { MonitorCompareChart } from './MonitorCompareChart'
 import { COLORES } from './monitorColors'
@@ -445,18 +445,18 @@ export function ComparadorDias({ cmp, live, onCausa }: {
 }
 
 /**
- * Dónde se abrió la brecha — el renglón que convierte la comparación en una
+ * Dónde se abrió la brecha — el bloque que convierte la comparación en una
  * pregunta contestable.
  *
  * Ver la curva de hoy por debajo de la de ayer dice QUE se perdió, no DÓNDE. Y
- * la brecha casi nunca se abre pareja: se abre en un tramo y después se arrastra
- * planchada todo el turno. Con el tramo ubicado se lo cruza contra las
+ * muchas veces el atraso se repartió en dos o tres golpes distintos: mostrar
+ * solo el peor cuenta la mitad de la historia. Cada tramo se cruza contra las
  * detenciones y contra lo que el operador escribió, y recién ahí se puede
  * responder "¿qué pasó que nos atrasó?".
  *
  * La referencia es el mejor de los días anteriores a esta misma altura. Si hoy
- * va arriba de todos, se compara contra la recta de la cuota — que igual hay que
- * alcanzar.
+ * va arriba de todos, se compara contra la curva de la cuota — que igual hay
+ * que alcanzar.
  */
 function BrechaDelDia({ cmp, live, onCausa }: {
   cmp: CompareResult
@@ -477,8 +477,9 @@ function BrechaDelDia({ cmp, live, onCausa }: {
       : null
   if (!contra) return null
 
-  const g = findGapWindow(hoy.curve, contra.curva)
-  if (!g) return null
+  // Hasta 3 tramos; el filtro del 10% del atraso ya viene hecho del servicio.
+  const ventanas = findGapWindows(hoy.curve, contra.curva, 3)
+  if (ventanas.length === 0) return null
 
   /*
    * Minutos de turno → hora de reloj. El arranque es el primer tramo con dato,
@@ -491,11 +492,11 @@ function BrechaDelDia({ cmp, live, onCausa }: {
       ? null
       : new Date(t0 + min * 60_000).toISOString().slice(11, 16)
 
-  // La causa que más tiempo se llevó DENTRO de la ventana. Es la que le pone
-  // nombre al bache; el resto son detalles.
-  let causa: string | null = null
-  let comentario: string | null = null
-  if (t0 != null && live?.stopEvents && live.stopReasons) {
+  /** La causa que más tiempo se llevó dentro de la ventana, y el comentario. */
+  const explicar = (g: { fromMin: number; toMin: number }) => {
+    if (t0 == null || !live?.stopEvents || !live.stopReasons) {
+      return { causa: null as string | null, comentario: null as string | null }
+    }
     const desde = t0 + g.fromMin * 60_000
     const hasta = t0 + g.toMin * 60_000
     const acc = new Map<string, number>()
@@ -504,71 +505,83 @@ function BrechaDelDia({ cmp, live, onCausa }: {
       const b = a + e.s * 1000
       const solape = Math.min(b, hasta) - Math.max(a, desde)
       if (solape > 0) {
-        const r = live.stopReasons[e.r]
-        if (r) acc.set(r, (acc.get(r) ?? 0) + solape)
+        const rr = live.stopReasons[e.r]
+        if (rr) acc.set(rr, (acc.get(rr) ?? 0) + solape)
       }
     }
-    causa = [...acc.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null
-
+    const causa = [...acc.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? null
     const c = (live.comments ?? []).find((x) => {
       if (!x.f) return false
       const a = Date.parse(x.f)
       const b = x.h ? Date.parse(x.h) : a
       return a < hasta && b > desde && b - a <= 2 * 60 * 60_000
     })
-    comentario = c?.t ?? null
+    return { causa, comentario: c?.t ?? null }
   }
-
-  const desdeTxt = reloj(g.fromMin)
-  const hastaTxt = reloj(g.toMin)
 
   return (
     <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[12px]">
       <p className="text-[10px] uppercase tracking-wide text-amber-800 dark:text-amber-300">
         Dónde se abrió la brecha con {contra.nombre}
       </p>
-      <p className="mt-0.5 text-foreground">
-        {desdeTxt && hastaTxt ? (
-          <span className="tabular-nums font-semibold">{desdeTxt}–{hastaTxt}</span>
-        ) : (
-          <span className="tabular-nums font-semibold">
-            del minuto {g.fromMin} al {g.toMin} de turno
-          </span>
-        )}
-        {' · '}
-        <span className="tabular-nums text-red-700 dark:text-red-400">−{fmtInt(g.lostPieces)} pz</span>
-        {g.share > 0.15 && (
-          <span className="text-muted-foreground">
-            {' '}({Math.round(g.share * 100)}% del atraso)
-          </span>
-        )}
-      </p>
-      {causa && (
-        <p className="mt-0.5">
-          {onCausa ? (
-            <button
-              type="button"
-              onClick={() => {
-                onCausa(causa)
-                document
-                  .getElementById('grafico-turno')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }}
-              className="text-rose-700 underline underline-offset-2 dark:text-rose-300"
-            >
-              {causa}
-            </button>
-          ) : (
-            <span className="text-rose-700 dark:text-rose-300">{causa}</span>
-          )}
-          <span className="text-muted-foreground"> es lo que más tiempo se llevó ahí</span>
-        </p>
-      )}
-      {/* Lo que escribió el operador. Es el único texto en castellano del turno
-          y suele explicar el bache mejor que cualquier etiqueta. */}
-      {comentario && (
-        <p className="mt-0.5 italic text-muted-foreground">{comentario}</p>
-      )}
+
+      <ul className="mt-1 space-y-1.5">
+        {ventanas.map((g) => {
+          const { causa, comentario } = explicar(g)
+          const desdeTxt = reloj(g.fromMin)
+          const hastaTxt = reloj(g.toMin)
+          return (
+            <li key={g.fromMin}>
+              <p className="text-foreground">
+                {desdeTxt && hastaTxt ? (
+                  <span className="tabular-nums font-semibold">{desdeTxt}–{hastaTxt}</span>
+                ) : (
+                  <span className="tabular-nums font-semibold">
+                    min {g.fromMin}–{g.toMin} de turno
+                  </span>
+                )}
+                {' · '}
+                <span className="tabular-nums text-red-700 dark:text-red-400">
+                  −{fmtInt(g.lostPieces)} pz
+                </span>
+                {/* El % solo cuando hay varios tramos: "100% de lo perdido"
+                    en un tramo único no agrega nada. */}
+                {ventanas.length > 1 && (
+                  <span className="text-muted-foreground">
+                    {' '}({Math.round(g.share * 100)}% de lo perdido)
+                  </span>
+                )}
+                {causa && (
+                  <>
+                    {' · '}
+                    {onCausa ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCausa(causa)
+                          document
+                            .getElementById('grafico-turno')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }}
+                        className="text-rose-700 underline underline-offset-2 dark:text-rose-300"
+                      >
+                        {causa}
+                      </button>
+                    ) : (
+                      <span className="text-rose-700 dark:text-rose-300">{causa}</span>
+                    )}
+                  </>
+                )}
+              </p>
+              {/* Lo que escribió el operador: el único texto en castellano del
+                  turno, y suele explicar el bache mejor que la etiqueta. */}
+              {comentario && (
+                <p className="mt-0.5 italic text-muted-foreground">{comentario}</p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
