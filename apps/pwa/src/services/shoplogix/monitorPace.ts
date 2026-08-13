@@ -18,8 +18,19 @@
  */
 
 export type PaceVerdict =
-  /** Falta producción y el ritmo requerido está dentro de lo posible. */
+  /** Falta producción y el ritmo requerido está dentro del ritmo que la línea
+      VIENE TRAYENDO en este turno. */
   | 'alcanzable'
+  /**
+   * Cabe bajo el techo histórico, pero exige más que el ritmo real del turno.
+   *
+   * El escalón que faltaba (pedido de Orel, 13-ago): "Se alcanza... pidiendo
+   * 24 pz/min" cuando la línea viene a 10 es verdad solo en teoría — el techo
+   * es lo mejor que la línea hizo ALGUNA VEZ, no lo que está haciendo hoy. Lo
+   * honesto es decir "solo apurando" y ofrecer la hora extra ya en este
+   * escalón, no recién cuando es imposible.
+   */
+  | 'exigente'
   /** El ritmo requerido supera el techo físico de la línea. */
   | 'fuera-de-alcance'
   /** Ya se llegó a la cuota. */
@@ -64,6 +75,9 @@ export interface PaceToTarget {
     requiredPerMinute: number
     /** true si ese ritmo entra en el techo de la línea (o si no hay techo). */
     feasible: boolean
+    /** true si además entra en el ritmo que la línea VIENE trayendo: "con la
+        hora extra bastaría el ritmo que ya traés" es otra conversación. */
+    realistic: boolean
     /** Minutos totales disponibles con la hora extra. */
     remainingMin: number
   } | null
@@ -87,6 +101,10 @@ export interface PaceInput {
   nowWallMs: number
   /** Ritmo que la línea viene teniendo, pz/h. */
   currentPerHour: number
+  /** Ritmo de la última media hora, pz/h. Para juzgar qué es "realista" se usa
+      el MAYOR entre este y el promedio: durante una colación el reciente cae a
+      cero y solo con él todo parecería inalcanzable. */
+  recentPerHour?: number | null
   /** Suma de los objetivos de las máquinas del turno, pz/h. Null si no se sabe. */
   maxPerHour?: number | null
   /** Un turno cerrado no tiene ritmo que recomendar. */
@@ -154,24 +172,43 @@ export function computePaceToTarget(input: PaceInput): PaceToTarget | null {
 
   const requiredPerHour = (remainingPieces / remainingMin) * 60
   const projectedPieces = producedPieces + remainingMin * (currentPerHour / 60)
-  const alcanzaSinEstirar = maxPerHour == null || requiredPerHour <= maxPerHour
 
   /*
-   * La hora extra. Solo se ofrece cuando con el tiempo normal NO alcanza: si ya
-   * alcanza, proponer alargar el turno es ruido — y peor, sugiere que hace
-   * falta cuando no.
+   * Contra qué se juzga lo "realista": el MAYOR entre el promedio del turno y
+   * el ritmo reciente. El promedio solo castigaría un turno que arrancó mal y
+   * ya se recuperó; el reciente solo diría "imposible" durante cada colación.
+   * El margen del 5% evita que un requerido apenas por encima del ritmo real
+   * dispare el "solo apurando" — a esa distancia la línea llega sola.
+   */
+  const ritmoReal = Math.max(currentPerHour, input.recentPerHour ?? 0)
+  const MARGEN = 1.05
+  const realista = ritmoReal > 0 && requiredPerHour <= ritmoReal * MARGEN
+
+  const verdict: PaceVerdict =
+    maxPerHour != null && requiredPerHour > maxPerHour
+      ? 'fuera-de-alcance'
+      : ritmoReal > 0 && !realista
+      ? 'exigente'
+      : 'alcanzable'
+
+  /*
+   * La hora extra. Se ofrece desde el escalón "exigente", no recién cuando es
+   * imposible: si alargar el turno baja el requerido al ritmo que la línea YA
+   * trae, esa es una decisión que alguien puede tomar ahora. Con verdict
+   * alcanzable sigue sin ofrecerse — proponer alargar cuando alcanza es ruido.
    */
   const extraMin = remainingMin + 60
   const requiredWithExtra = (remainingPieces / extraMin) * 60
-  const withExtraHour = alcanzaSinEstirar ? null : {
+  const withExtraHour = verdict === 'alcanzable' ? null : {
     requiredPerHour: requiredWithExtra,
     requiredPerMinute: requiredWithExtra / 60,
     feasible: maxPerHour == null || requiredWithExtra <= maxPerHour,
+    realistic: ritmoReal > 0 && requiredWithExtra <= ritmoReal * MARGEN,
     remainingMin: extraMin,
   }
 
   return {
-    verdict: maxPerHour != null && requiredPerHour > maxPerHour ? 'fuera-de-alcance' : 'alcanzable',
+    verdict,
     targetPieces: meta,
     targetSource,
     remainingPieces,

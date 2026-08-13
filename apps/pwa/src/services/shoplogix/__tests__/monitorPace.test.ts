@@ -78,8 +78,48 @@ describe('computePaceToTarget', () => {
 
   it('sin techo conocido NO marca imposible — subestimarlo es la peor forma de errar', () => {
     const p = base({ maxPerHour: null })!
-    expect(p.verdict).toBe('alcanzable')
+    // required 3.637 pz/h contra un ritmo real de 1.449: no es imposible
+    // (sin techo no se afirma eso), pero tampoco es honesto un "alcanzable"
+    // a secas — es el escalón "exigente".
+    expect(p.verdict).toBe('exigente')
+    expect(p.verdict).not.toBe('fuera-de-alcance')
     expect(p.maxPerHour).toBeNull()
+  })
+
+  it('EXIGENTE: cabe en el techo pero pide más que el ritmo real del turno', () => {
+    /*
+     * El caso de Orel (13-ago): "dice que se alcanza pero pide 24 pz/min" en
+     * una línea que viene a 10. El techo histórico no es lo que la línea está
+     * haciendo HOY: entre "alcanzable" e "imposible" falta el escalón honesto.
+     */
+    const p = base({ targetPieces: 13_000 })!
+    // required = 7.547/240·60 ≈ 1.887 pz/h: bajo el techo (2.768) pero muy
+    // por encima del ritmo real (1.449 · 1,05 ≈ 1.521).
+    expect(p.verdict).toBe('exigente')
+    // Y la hora extra se ofrece YA en este escalón, no recién en imposible:
+    // 7.547/300·60 ≈ 1.509 pz/h ≤ 1.521 → con la hora extra basta el ritmo
+    // que la línea ya trae.
+    expect(p.withExtraHour).not.toBeNull()
+    expect(p.withExtraHour!.feasible).toBe(true)
+    expect(p.withExtraHour!.realistic).toBe(true)
+  })
+
+  it('el margen del 5% no dispara "exigente" por una diferencia que la línea absorbe', () => {
+    // required ≈ 1.480 pz/h contra 1.449 reales: 2% arriba, alcanzable.
+    const p = base({ targetPieces: 5_453 + Math.round((1_480 / 60) * 240) })!
+    expect(p.verdict).toBe('alcanzable')
+    expect(p.withExtraHour).toBeNull()
+  })
+
+  it('para juzgar lo realista usa el MAYOR entre promedio y ritmo reciente', () => {
+    // Promedio 1.449 (arrancó mal), pero la última media hora va a 2.100:
+    // required 1.887 entra en lo que la línea ESTÁ haciendo → alcanzable.
+    const p = base({ targetPieces: 13_000, recentPerHour: 2_100 })!
+    expect(p.verdict).toBe('alcanzable')
+    // Y al revés: el reciente en cero (colación) NO vuelve todo exigente si
+    // el promedio ya cubre el requerido.
+    const q = base({ targetPieces: 10_000, recentPerHour: 0 })!
+    expect(q.verdict).toBe('alcanzable')
   })
 
   it('DESCARTA un techo por debajo del ritmo ya demostrado', () => {
