@@ -13,6 +13,24 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Monitor muestra el contador VIVO de la pantalla de planta (#526)
+
+- Hecho: el rollup que el sync ya consulta cada ciclo (mismo endpoint que el whiteboard en
+  vivo) trae el acumulado real del turno en el estado Produciendo. El sync lo guarda como
+  `officialLive` dentro del write del padre que ya existia (cero escrituras/requests extra).
+  El monitor lo muestra junto al corte de datos: "datos hasta las 14:25 · Shoplogix marcaba
+  3.850 a las 14:52". Pedido de Orel: "necesito que se sincronice Shoplogix con el monitor".
+- Archivos: functions/shoplogix/sync.js, functions/publicMonitor.js,
+  apps/pwa/src/services/shoplogix/publicShiftMonitor.service.ts,
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: tsc/eslint limpios; functions cargan sin error; extracción validada DOS
+  veces contra el endpoint real cuadrando con la pantalla de planta (3.850=3.850 a las
+  14:52; 3.932 a las 15:15). Degradación sin el campo verificada en preview (queda como hoy).
+- Estado: HECHO. Merge squash a main `d33d4505`. Deploy hosting y Functions ambos success.
+- Sigue: E2E con `officialLive` poblado por un turno vivo real (Yal esta noche / Filete manana).
+
+---
+
 ## 2026-08-13 - claude - Tope de apuro: pedir mas de +30% del ritmo real es "no se alcanza" (#525)
 
 - Hecho: segunda vuelta del veredicto (Orel) — "se alcanza pero con 36 pz/min" en una linea
