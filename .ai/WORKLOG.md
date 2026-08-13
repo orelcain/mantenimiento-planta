@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Curva de velocidad de linea (pz/min) a lo largo del turno (#515)
+
+- Hecho: el KPI "Ultimos 30 min" da la velocidad de AHORA; nueva curva da la historia del
+  turno (rampa, baches, crucero). Cruda de 5 min (tenue, piso del dato de Shoplogix) + media
+  movil de 15 min (protagonista); 2 lineas de referencia punteadas ("necesitas" y "lo normal")
+  y bandas de convenio de fondo para que la colacion no parezca falla. Bloque plegable entre
+  el grafico de tramos y "A donde se va el tiempo".
+- Archivos: `pages/monitor/MonitorShiftParts.tsx` (componente `VelocidadDeLinea`),
+  `pages/PublicShiftMonitorPage.tsx`.
+- Verificación: preview contra el turno VIVO de Filete (8,5 pz/min, necesitas 12,7, lo normal
+  7,5), 390px sin overflow. tsc y eslint limpios. Diseño elegido por Orel en mockup.
+- Estado: HECHO. Merge squash a main `386d0a6f`.
+
+---
+
 ## 2026-08-13 - claude - Bitacora del turno: todos los comentarios del operador (#513)
 
 - Hecho: los comentarios del operador (unico texto en castellano que sube del piso) solo se leian
