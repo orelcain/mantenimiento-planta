@@ -1277,8 +1277,11 @@ export function PublicShiftMonitorPage() {
           />
         </div>
 
-        {/* Estado actual: por qué NO está corriendo, si es el caso */}
-        {live.status === 'detenida' && esActual && (
+        {/* Estado actual: por qué NO está corriendo, si es el caso. Con el
+            turno CERRADO no se muestra: "Línea detenida hace 6 h" después del
+            cierre es lo esperable, no una alerta — junto al aviso de sync
+            detenida pintaba alarmante una noche normal. */}
+        {live.status === 'detenida' && esActual && !live.shiftClosed && (
           <section className="rounded-2xl border border-red-500/40 bg-red-500/15 px-4 py-3 dark:border-red-400/25">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300/80">
               <PauseCircle className="h-3 w-3" />
