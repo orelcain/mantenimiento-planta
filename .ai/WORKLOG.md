@@ -13,6 +13,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Curva de velocidad: horas reales, zoom y paneo (#517)
+
+- Hecho: eje de la curva pasa de "h+1" a horas reales del reloj (08:00, 09:00...); zoom
+  1x/2x/4x con paneo y recentrado en el final (mismo mecanismo del comparador); bloque
+  movido ARRIBA de "Piezas por tramo de 5 min".
+- Archivos: apps/pwa/src/pages/monitor/MonitorShiftParts.tsx, PublicShiftMonitorPage.tsx
+- Verificación: preview :5175 contra turno VIVO de Filete (390px); tsc y eslint limpios.
+- Estado: HECHO
+- Sigue: nada pendiente de este cambio.
+
+---
+
 ## 2026-08-13 - claude - Curva de velocidad de linea (pz/min) a lo largo del turno (#515)
 
 - Hecho: el KPI "Ultimos 30 min" da la velocidad de AHORA; nueva curva da la historia del
