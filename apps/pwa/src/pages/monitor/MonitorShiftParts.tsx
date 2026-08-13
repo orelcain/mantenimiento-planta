@@ -278,28 +278,8 @@ export function ComparadorDias({ cmp, live, onCausa }: {
   live?: PublicMonitorLive
   onCausa?: (c: string | null) => void
 }) {
-  /*
-   * Qué días se dibujan. `null` = todavía nadie eligió, y valen los dos más
-   * recientes: seis curvas superpuestas en un celular no se leen, pero tener
-   * los seis a mano permite buscar el día en que la línea sí llegó y
-   * compararse contra ese.
-   *
-   * El estado arranca en `null` y no con el default calculado porque el hook
-   * tiene que correr ANTES del early return de abajo, cuando `cmp.days` todavía
-   * puede venir vacío.
-   */
-  const [elegidos, setElegidos] = useState<Set<string> | null>(null)
   /** La tabla día por día arranca plegada: primero la conclusión. */
   const [detalle, setDetalle] = useState(false)
-  const visibles = elegidos
-    ?? new Set(cmp.days.filter((d) => !d.esHoy).slice(0, 2).map((d) => d.dateKey))
-  const alternar = (dateKey: string) =>
-    setElegidos(() => {
-      const s = new Set(visibles)
-      if (s.has(dateKey)) s.delete(dateKey)
-      else s.add(dateKey)
-      return s
-    })
 
   if (cmp.days.length === 0 || cmp.currentMinute == null) return null
 
@@ -336,7 +316,7 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           />
 
           <div className="mt-3">
-            <MonitorCompareChart cmp={cmp} visibles={visibles} />
+            <MonitorCompareChart cmp={cmp} cerrado={live?.shiftClosed ?? false} />
           </div>
 
           <button
@@ -349,24 +329,21 @@ export function ComparadorDias({ cmp, live, onCausa }: {
 
           {detalle && (
           <ul className="mt-2 space-y-1">
-            {cmp.days.map((d, i) => {
+            {/* Solo informativa: el "contra qui\u00e9n" del gr\u00e1fico se elige en sus
+                chips, y duplicar esa selecci\u00f3n ac\u00e1 creaba dos verdades. */}
+            {cmp.days.map((d) => {
               const dif =
                 !d.esHoy && ref != null && d.atCurrentMinute != null ? ref - d.atCurrentMinute : null
-              const visible = d.esHoy || visibles.has(d.dateKey)
-              const fila = (
-                <>
+              return (
+                <li key={d.dateKey + d.label} className="flex items-center gap-2 px-1 text-[12px]">
                   <span
-                    className={`h-2 w-2 shrink-0 rounded-full ${visible ? '' : 'opacity-25'}`}
-                    style={{ background: COLORES[i % COLORES.length] }}
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: d.esHoy ? COLORES[0] : '#64748b' }}
                   />
-                  <span
-                    className={`w-14 shrink-0 truncate ${
-                      d.esHoy ? 'font-semibold' : visible ? 'text-foreground/80' : 'text-muted-foreground/50'
-                    }`}
-                  >
+                  <span className={`w-14 shrink-0 truncate ${d.esHoy ? 'font-semibold' : 'text-foreground/80'}`}>
                     {d.label}
                   </span>
-                  <span className={`flex-1 text-right tabular-nums ${visible ? '' : 'text-muted-foreground/50'}`}>
+                  <span className="flex-1 text-right tabular-nums">
                     {d.atCurrentMinute != null ? fmtInt(d.atCurrentMinute) : '\u2014'}
                   </span>
                   {/* La diferencia contra hoy. Sin esto hay que restar de cabeza. */}
@@ -386,27 +363,6 @@ export function ComparadorDias({ cmp, live, onCausa }: {
                   <span className="w-[4.2rem] shrink-0 whitespace-nowrap text-right text-[10px] tabular-nums text-muted-foreground/60">
                     {d.esHoy ? '' : `cerró ${fmtInt(d.totalPieces)}`}
                   </span>
-                </>
-              )
-
-              // Hoy no se puede apagar: es la referencia de toda la pantalla.
-              if (d.esHoy) {
-                return (
-                  <li key={d.dateKey} className="flex items-center gap-2 px-1 text-[12px]">
-                    {fila}
-                  </li>
-                )
-              }
-              return (
-                <li key={d.dateKey}>
-                  <button
-                    type="button"
-                    onClick={() => alternar(d.dateKey)}
-                    aria-pressed={visible}
-                    className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-[12px] hover:bg-muted"
-                  >
-                    {fila}
-                  </button>
                 </li>
               )
             })}

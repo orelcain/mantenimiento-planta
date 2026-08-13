@@ -1,66 +1,110 @@
 /**
- * Comparación fina: hoy contra los turnos anteriores y contra la cuota, tramo a
- * tramo de 5 minutos.
+ * Comparación del turno contra UNA referencia a la vez: la carrera de a dos.
  *
- * La pregunta que viene a habilitar es la de Orel: *"¿por qué hoy vamos más
- * lento que ayer a la misma hora... qué pasó que nos atrasó?"*. Con barras por
- * día eso no se puede ver — hace falta la curva completa, porque el atraso se
- * produce en un tramo concreto y se arrastra el resto del turno.
+ * v3 (13-ago). La v2 dibujaba hasta 6 curvas de DIFERENCIA contra el cero y la
+ * cuota entraba como un delta que "cae" aunque el turno vaya bien — Orel volvió
+ * a tropezar con eso con el aviso puesto: si necesita manual, está mal elegido.
+ * Precedente que respalda el cambio: los gráficos de desviación sirven cuando lo
+ * único que importa es arriba/abajo de UNA referencia; para audiencia general,
+ * serie principal resaltada y el resto fuera (Flourish, CDC/COVE).
  *
- * ⚠ El eje es MINUTOS DESDE EL ARRANQUE, no hora de reloj. Los turnos empiezan
- * 07:45, 07:48, 08:00: por hora de reloj la primera "hora" de un día son 15
- * minutos y la de otro 60, y la comparación se rompe justo en el tramo que más
- * se mira. Es además como cuenta Shoplogix.
+ * Acá las dos curvas SUBEN — hoy, y la referencia elegida por chip (cuota o un
+ * día anterior) — y la brecha entre ambas va pintada: rojo donde hoy va abajo,
+ * verde donde va arriba. La cuota vuelve a ser lo que es: una línea que sube y
+ * se aplana en las paradas de convenio. "¿Y contra todos a la vez?" lo responde
+ * la tabla "ver los N días uno por uno", que sigue existiendo.
  *
- * SVG puro: el bundle público no carga librerías de gráficos. Las ETIQUETAS,
- * en cambio, son HTML: el SVG se estira horizontalmente con el zoom
- * (`preserveAspectRatio="none"`) y un `<text>` adentro se deforma con él.
+ * ⚠ El eje es MINUTOS DESDE EL ARRANQUE, no hora de reloj (como cuenta
+ * Shoplogix; los turnos no arrancan a la misma hora).
+ *
+ * SVG puro: el bundle público no carga librerías de gráficos. Las ETIQUETAS son
+ * HTML: el SVG se estira horizontalmente con el zoom (`preserveAspectRatio=
+ * "none"`) y un `<text>` o un `<circle>` adentro se deforman con él.
  */
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { diffCurve, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
+import { piecesAt, type CompareResult, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import { COLORES, COLOR_META } from './monitorColors'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
 
-/** Coordenadas internas del SVG. Alto en px del área de dibujo. */
+/** Coordenadas internas del SVG. */
 const W = 100
 const H = 100
 const ALTO_CHICO = 'h-32'
 const ALTO_GRANDE = 'h-56'
 
-export function MonitorCompareChart({ cmp, visibles }: {
+/** La referencia gris neutra para "un día anterior": la principal es hoy. */
+const COLOR_DIA_REF = '#64748b'
+
+/**
+ * Tramos continuos de ventaja/desventaja entre hoy y la referencia, con el
+ * punto de cruce interpolado — sin él, el sombreado cambia de color un tramo
+ * tarde y en el cruce se ve un triángulo del color equivocado.
+ *
+ * Solo hasta donde AMBAS curvas tienen dato: más allá del "ahora" hoy no
+ * existe, y más allá del final de un día corto ese día no llegó.
+ */
+function tramosDeBrecha(hoy: PacePoint[], ref: PacePoint[]): Array<{
+  arriba: boolean
+  hoy: PacePoint[]
+  ref: PacePoint[]
+}> {
+  if (hoy.length === 0 || ref.length === 0) return []
+  const hasta = Math.min(hoy[hoy.length - 1]!.minutes, ref[ref.length - 1]!.minutes)
+  const minutos = [...new Set([...hoy, ...ref].map((p) => p.minutes))]
+    .filter((m) => m <= hasta)
+    .sort((a, b) => a - b)
+  if (minutos.length < 2) return []
+
+  const pares = minutos.map((m) => ({
+    m,
+    h: piecesAt(hoy, m) ?? 0,
+    r: piecesAt(ref, m) ?? 0,
+  }))
+
+  const out: Array<{ arriba: boolean; hoy: PacePoint[]; ref: PacePoint[] }> = []
+  let actual: { arriba: boolean; hoy: PacePoint[]; ref: PacePoint[] } | null = null
+  for (let i = 0; i < pares.length; i++) {
+    const p = pares[i]!
+    const arriba = p.h >= p.r
+    if (!actual || actual.arriba !== arriba) {
+      // Punto de cruce entre el par anterior y este, interpolado linealmente.
+      if (actual && i > 0) {
+        const a = pares[i - 1]!
+        const da = a.h - a.r
+        const db = p.h - p.r
+        const t = da === db ? 0 : da / (da - db)
+        const mc = a.m + (p.m - a.m) * t
+        const vc = a.h + (p.h - a.h) * t
+        actual.hoy.push({ minutes: mc, pieces: vc })
+        actual.ref.push({ minutes: mc, pieces: vc })
+        out.push(actual)
+        actual = { arriba, hoy: [{ minutes: mc, pieces: vc }], ref: [{ minutes: mc, pieces: vc }] }
+      } else {
+        if (actual) out.push(actual)
+        actual = { arriba, hoy: [], ref: [] }
+      }
+    }
+    actual.hoy.push({ minutes: p.m, pieces: p.h })
+    actual.ref.push({ minutes: p.m, pieces: p.r })
+  }
+  if (actual) out.push(actual)
+  return out.filter((s) => s.hoy.length >= 2)
+}
+
+export function MonitorCompareChart({ cmp, cerrado }: {
   cmp: CompareResult
-  /** dateKeys que se dibujan. Hoy siempre entra. */
-  visibles: Set<string>
+  cerrado: boolean
 }) {
   /*
-   * Dos modos. El de DIFERENCIA es el que viene primero porque responde la
-   * pregunta sin que haya que interpretar nada: la línea de cero es "empatados",
-   * arriba vas mejor, abajo vas peor, y donde BAJA es donde perdiste terreno.
-   * Con el acumulado hay que comparar alturas de dos curvas paralelas, y con
-   * seis días encima eso ya no se lee.
+   * Qué referencia se compara: 'cuota' o el dateKey+label de un día anterior.
+   * Arranca en la cuota si existe — es la pregunta más frecuente — y si no, en
+   * el día más reciente.
    */
-  const [modo, setModo] = useState<"dif" | "acum">("dif")
-  /*
-   * La cuota arranca APAGADA en el modo diferencia. Dos motivos vistos con
-   * datos reales:
-   * - Su diferencia es mucho más grande que la de los días entre sí (en Yal,
-   *   −5.820 contra ±300): manda la escala y aplasta contra el cero justo la
-   *   comparación que uno vino a mirar.
-   * - Confunde el signo: en el acumulado la línea ámbar SUBE (es la meta), y
-   *   acá la misma línea BAJA — parece que "la cuota cae", cuando lo que baja
-   *   es nuestra distancia contra ella. Orel lo leyó exactamente así.
-   */
-  const [verCuota, setVerCuota] = useState(false)
+  const [refSel, setRefSel] = useState<string | null>(null)
   const [alto, setAlto] = useState(false)
-  /*
-   * Zoom horizontal con paneo. Un turno de 8 h en 320 px deja cada tramo de 5
-   * min en menos de 4 px: la forma general se ve, pero el tramo donde se abrió
-   * la brecha no se puede mirar de cerca. Ampliando el ancho dentro de un
-   * contenedor con scroll, se hace zoom y se desliza.
-   */
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
   /** Fracción del turno a dejar centrada después de cambiar el zoom. */
@@ -69,15 +113,9 @@ export function MonitorCompareChart({ cmp, visibles }: {
   const ahoraRef = useRef(0)
 
   /*
-   * Ampliar dejaba la vista clavada al principio del turno: uno tocaba "4x" y
-   * lo que quería mirar —dónde va la línea AHORA— quedaba fuera de pantalla,
-   * así que el zoom parecía no hacer nada.
-   *
-   * Se conserva lo que se estaba mirando, PERO si a la nueva escala el minuto
-   * actual queda fuera del área visible se recentra en él. Sin esa segunda
-   * parte, ampliar en cadena 1x → 2x → 4x terminaba dejando el punto afuera:
-   * el salto de 1x no alcanza a centrarlo (el scroll se topa con el final del
-   * eje) y el de 4x hereda ese centro, ya corrido.
+   * Conserva lo que se estaba mirando al cambiar el zoom, PERO si el minuto
+   * actual queda fuera del área visible se recentra en él (ampliar en cadena
+   * 1x → 2x → 4x heredaba un centro corrido y dejaba el "ahora" afuera).
    */
   useLayoutEffect(() => {
     const el = scrollRef.current
@@ -90,63 +128,50 @@ export function MonitorCompareChart({ cmp, visibles }: {
     focoRef.current = null
   }, [zoom])
 
-  const dibujados = useMemo(
-    () => cmp.days.filter((d) => d.esHoy || visibles.has(d.dateKey)),
-    [cmp.days, visibles],
+  const hoy = cmp.days.find((d) => d.esHoy)
+  const anteriores = useMemo(() => cmp.days.filter((d) => !d.esHoy), [cmp.days])
+
+  /** El día que más llevaba a esta misma altura: su chip dice "mejor". */
+  const mejorKey = useMemo(() => {
+    let best: { k: string; v: number } | null = null
+    for (const d of anteriores) {
+      if (d.atCurrentMinute == null) continue
+      if (!best || d.atCurrentMinute > best.v) best = { k: d.dateKey + d.label, v: d.atCurrentMinute }
+    }
+    return best?.k ?? null
+  }, [anteriores])
+
+  const claveSel = refSel
+    ?? (cmp.optimal ? 'cuota' : anteriores[0] ? anteriores[0].dateKey + anteriores[0].label : null)
+
+  const diaSel = anteriores.find((d) => d.dateKey + d.label === claveSel) ?? null
+  const refCurve: PacePoint[] | null = claveSel === 'cuota' ? cmp.optimal : diaSel?.curve ?? null
+  const refColor = claveSel === 'cuota' ? COLOR_META : COLOR_DIA_REF
+
+  const brecha = useMemo(
+    () => (hoy && refCurve ? tramosDeBrecha(hoy.curve, refCurve) : []),
+    [hoy, refCurve],
   )
 
-  /**
-   * En modo diferencia, una curva por cada día visible (y por la cuota): cuánto
-   * le lleva HOY de ventaja a cada uno, tramo a tramo.
-   */
-  const difs = useMemo(() => {
-    const hoy = cmp.days.find((d) => d.esHoy)
-    if (!hoy) return []
-    const out = dibujados
-      .filter((d) => !d.esHoy)
-      .map((d) => ({
-        clave: d.dateKey + d.label,
-        label: d.label,
-        color: COLORES[cmp.days.indexOf(d) % COLORES.length]!,
-        curve: diffCurve(hoy.curve, d.curve),
-      }))
-    if (cmp.optimal && verCuota) {
-      out.push({
-        clave: "cuota", label: "cuota", color: COLOR_META,
-        curve: diffCurve(hoy.curve, cmp.optimal),
-      })
-    }
-    return out.filter((x) => x.curve.length > 0)
-  }, [cmp, dibujados, verCuota])
-
-  const { maxMin, maxPz, minPz } = useMemo(() => {
+  const { maxMin, maxPz } = useMemo(() => {
     const mm = Math.max(cmp.maxMinutes, cmp.optimal?.[cmp.optimal.length - 1]?.minutes ?? 0, 60)
-    if (modo === "acum") {
-      const mp = Math.max(
-        ...dibujados.map((d) => d.totalPieces),
-        cmp.optimal?.[cmp.optimal.length - 1]?.pieces ?? 0,
-        1,
-      )
-      return { maxMin: mm, maxPz: mp, minPz: 0 }
-    }
-    // El cero tiene que quedar visible SIEMPRE: es la referencia del modo.
-    const vals = difs.flatMap((d) => d.curve.map((p) => p.pieces))
-    const arriba = Math.max(0, ...vals)
-    const abajo = Math.min(0, ...vals)
-    const margen = Math.max(1, (arriba - abajo) * 0.08)
-    return { maxMin: mm, maxPz: arriba + margen, minPz: abajo - margen }
-  }, [cmp, dibujados, difs, modo])
+    const mp = Math.max(
+      hoy?.totalPieces ?? 0,
+      refCurve?.[refCurve.length - 1]?.pieces ?? 0,
+      1,
+    )
+    return { maxMin: mm, maxPz: mp }
+  }, [cmp, hoy, refCurve])
 
-  if (cmp.days.length === 0 || cmp.currentMinute == null) return null
+  if (!hoy || cmp.currentMinute == null) return null
 
   /** Fracción 0-1 del ancho/alto: sirve para el SVG y para las etiquetas HTML. */
   const fx = (m: number) => m / maxMin
-  const fy = (p: number) => 1 - (p - minPz) / Math.max(1, maxPz - minPz)
+  const fy = (p: number) => 1 - p / maxPz
 
   const x = (m: number) => fx(m) * W
   const y = (p: number) => fy(p) * H
   ahoraRef.current = fx(cmp.currentMinute)
-  const hoy = cmp.days.find((d) => d.esHoy)
 
   const path = (curve: PacePoint[]) =>
     curve.length === 0
@@ -155,78 +180,81 @@ export function MonitorCompareChart({ cmp, visibles }: {
           .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.minutes).toFixed(2)},${y(p.pieces).toFixed(2)}`)
           .join(' ')
 
+  const areaBrecha = (s: { hoy: PacePoint[]; ref: PacePoint[] }) =>
+    `${path(s.hoy)} ${[...s.ref].reverse()
+      .map((p) => `L${x(p.minutes).toFixed(2)},${y(p.pieces).toFixed(2)}`)
+      .join(' ')} Z`
+
   /* Marcas cada hora de TURNO: h+1, h+2… Es el eje que se puede comparar. */
   const marcas: number[] = []
   const cadaHora = zoom >= 2 ? 60 : 120
   for (let m = cadaHora; m <= maxMin; m += cadaHora) marcas.push(m)
 
-  const lineas = [0.25, 0.5, 0.75, 1]
+  const chip = (activo: boolean) =>
+    `flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
+      activo
+        ? 'border-amber-500/50 bg-amber-500/10 font-semibold text-amber-800 dark:text-amber-200'
+        : 'border-border text-muted-foreground hover:bg-muted'
+    }`
 
   return (
     <div>
+      {/* Contra quién: UNA referencia a la vez. Cambiarla es re-preguntar. */}
+      <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+        {cmp.optimal && (
+          <button type="button" onClick={() => setRefSel('cuota')} aria-pressed={claveSel === 'cuota'}
+            className={chip(claveSel === 'cuota')}>
+            cuota{cmp.targetPieces ? ` ${fmtInt(cmp.targetPieces)}` : ''}
+          </button>
+        )}
+        {anteriores.map((d) => {
+          const k = d.dateKey + d.label
+          return (
+            <button key={k} type="button" onClick={() => setRefSel(k)} aria-pressed={claveSel === k}
+              className={chip(claveSel === k)}>
+              {d.label}
+              {mejorKey === k && <span className="opacity-70">· mejor</span>}
+            </button>
+          )
+        })}
+      </div>
+
       <div className="flex gap-1">
-        {/*
-          * La escala vertical queda FUERA del área con scroll: adentro se iría
-          * con el paneo y dejaría las curvas sin referencia justo cuando uno
-          * está mirando un tramo de cerca.
-          */}
+        {/* La escala vertical queda FUERA del área con scroll: adentro se iría
+            con el paneo justo cuando uno mira un tramo de cerca. */}
         <div className={`relative w-7 shrink-0 ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
-          {(modo === "acum" ? [maxPz, maxPz / 2] : [maxPz, 0, minPz]).map((v) => (
-            <span
-              key={v}
-              className={`absolute right-0 -translate-y-1/2 text-[9px] tabular-nums ${
-                modo === "dif" && v === 0 ? "text-foreground/70" : "text-muted-foreground"
-              }`}
-              style={{ top: `${fy(v) * 100}%` }}
-            >
-              {modo === "dif" && v > 0 ? `+${fmtInt(v)}` : fmtInt(v)}
+          {[maxPz, maxPz / 2].map((v) => (
+            <span key={v}
+              className="absolute right-0 -translate-y-1/2 text-[9px] tabular-nums text-muted-foreground"
+              style={{ top: `${fy(v) * 100}%` }}>
+              {fmtInt(v)}
             </span>
           ))}
         </div>
 
         <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
-          <div
-            className="relative"
-            style={{ width: `${zoom * 100}%`, minWidth: '100%' }}
-            data-zoom={zoom}
-          >
+          <div className="relative" style={{ width: `${zoom * 100}%`, minWidth: '100%' }} data-zoom={zoom}>
             <div className={`relative ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
             <svg
               viewBox={`0 0 ${W} ${H}`}
               className={`w-full ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Piezas acumuladas por minuto de turno, hoy contra días anteriores"
+              aria-label="Piezas acumuladas por minuto de turno, hoy contra la referencia elegida"
             >
-              {/*
-                * Las paradas de convenio, pintadas de fondo. Sin ellas la meseta
-                * de la curva objetivo parece un error del gráfico; con ellas se
-                * lee "acá la línea está parada por convenio: no se produce, y la
-                * meta tampoco sube".
-                */}
+              {/* Las paradas de convenio, de fondo: sin ellas la meseta de la
+                  cuota parece un error del gráfico. */}
               {cmp.breaks.map((b) => (
-                <rect
-                  key={`${b.fromMin}-${b.toMin}`}
-                  x={x(b.fromMin)}
-                  y={0}
-                  width={Math.max(0.3, x(b.toMin) - x(b.fromMin))}
-                  height={H}
-                  className="fill-muted-foreground/15"
-                />
+                <rect key={`${b.fromMin}-${b.toMin}`} x={x(b.fromMin)} y={0}
+                  width={Math.max(0.3, x(b.toMin) - x(b.fromMin))} height={H}
+                  className="fill-muted-foreground/15" />
               ))}
 
-              {lineas.map((f) => (
-                <line key={f} x1={0} x2={W} y1={y(minPz + (maxPz - minPz) * f)}
-                  y2={y(minPz + (maxPz - minPz) * f)}
+              {[0.25, 0.5, 0.75].map((f) => (
+                <line key={f} x1={0} x2={W} y1={H * f} y2={H * f}
                   stroke="currentColor" strokeWidth="0.25" strokeDasharray="1.5 1.5"
                   className="text-border" vectorEffect="non-scaling-stroke" />
               ))}
-
-              {/* El cero: la línea contra la que se lee todo el modo diferencia. */}
-              {modo === "dif" && (
-                <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="currentColor"
-                  strokeWidth="1" className="text-foreground/45" vectorEffect="non-scaling-stroke" />
-              )}
 
               {marcas.map((m) => (
                 <line key={m} x1={x(m)} x2={x(m)} y1={0} y2={H} stroke="currentColor"
@@ -234,40 +262,30 @@ export function MonitorCompareChart({ cmp, visibles }: {
                   vectorEffect="non-scaling-stroke" />
               ))}
 
-              {modo === "acum" ? (
-                <>
-                  {/* la cuota, punteada: la referencia contra la que se mide todo */}
-                  {cmp.optimal && (
-                    <path d={path(cmp.optimal)} fill="none" stroke={COLOR_META} strokeWidth="1.5"
-                      strokeDasharray="5 4" opacity="0.9" vectorEffect="non-scaling-stroke" />
-                  )}
-                  {/* días anteriores primero: hoy va encima y más grueso */}
-                  {[...dibujados].reverse().map((d) => {
-                    const i = cmp.days.indexOf(d)
-                    return (
-                      <path key={d.dateKey} d={path(d.curve)} fill="none"
-                        stroke={COLORES[i % COLORES.length]} strokeWidth={d.esHoy ? 2.4 : 1.4}
-                        opacity={d.esHoy ? 1 : 0.8} vectorEffect="non-scaling-stroke" />
-                    )
-                  })}
-                </>
-              ) : (
-                difs.map((d) => (
-                  <path key={d.clave} d={path(d.curve)} fill="none" stroke={d.color}
-                    strokeWidth={d.clave === "cuota" ? 1.6 : 2}
-                    strokeDasharray={d.clave === "cuota" ? "5 4" : undefined}
-                    vectorEffect="non-scaling-stroke" />
-                ))
+              {/* La brecha pintada: rojo = hoy abajo, verde = hoy arriba. Es lo
+                  primero que se lee, por eso va antes que las curvas. */}
+              {brecha.map((s, i) => (
+                <path key={i} d={areaBrecha(s)}
+                  fill={s.arriba ? 'rgb(5 150 105 / 0.16)' : 'rgb(239 68 68 / 0.16)'} />
+              ))}
+
+              {/* La referencia: punteada si es la cuota (una meta, no un hecho). */}
+              {refCurve && (
+                <path d={path(refCurve)} fill="none" stroke={refColor}
+                  strokeWidth={claveSel === 'cuota' ? 1.6 : 1.8}
+                  strokeDasharray={claveSel === 'cuota' ? '5 4' : undefined}
+                  opacity="0.95" vectorEffect="non-scaling-stroke" />
               )}
 
+              {/* Hoy, encima y más gruesa: es la protagonista. */}
+              <path d={path(hoy.curve)} fill="none" stroke={COLORES[0]} strokeWidth="2.4"
+                vectorEffect="non-scaling-stroke" />
             </svg>
 
-            {/*
-              * Dónde va el turno ahora. Va en HTML y no como <circle>: el SVG
-              * se estira horizontalmente con el zoom y un círculo adentro sale
-              * ovalado — a 4x medía 28 x 3 px, una raya.
-              */}
-            {modo === "acum" && hoy?.atCurrentMinute != null && (
+            {/* Dónde va el turno ahora. HTML y no <circle>: el SVG se estira con
+                el zoom y un círculo adentro sale ovalado. Con el turno cerrado
+                no aporta (quedaría clavado en la última esquina). */}
+            {!cerrado && hoy.atCurrentMinute != null && (
               <span
                 className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
                 style={{
@@ -279,15 +297,13 @@ export function MonitorCompareChart({ cmp, visibles }: {
             )}
             </div>
 
-            {/* Eje de horas: HTML, dentro del área escalada para que viaje con
-                el paneo, pero sin deformarse como lo haría un <text> del SVG. */}
+            {/* Eje de horas: HTML, dentro del área escalada para viajar con el
+                paneo sin deformarse como un <text> del SVG. */}
             <div className="relative h-4">
               {marcas.map((m) => (
-                <span
-                  key={m}
+                <span key={m}
                   className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[9px] tabular-nums text-muted-foreground"
-                  style={{ left: `${fx(m) * 100}%` }}
-                >
+                  style={{ left: `${fx(m) * 100}%` }}>
                   h+{m / 60}
                 </span>
               ))}
@@ -297,71 +313,28 @@ export function MonitorCompareChart({ cmp, visibles }: {
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        {modo === "dif" ? (
-          <>
-            {difs.filter((d) => d.clave !== "cuota").map((d) => (
-              <span key={d.clave} className="flex items-center gap-1.5">
-                <i className="h-1.5 w-4 rounded-full" style={{ background: d.color }} />
-                vs {d.label}
-              </span>
-            ))}
-            <span>arriba del cero = hoy va mejor</span>
-            {cmp.optimal && (
-              <button
-                type="button"
-                onClick={() => setVerCuota((v) => !v)}
-                aria-pressed={verCuota}
-                className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${
-                  verCuota ? 'border-amber-500/50' : 'border-border opacity-60'
-                }`}
-              >
-                <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
-                vs cuota
-              </button>
-            )}
-            {verCuota && (
-              <span className="basis-full text-amber-700 dark:text-amber-300/90">
-                la línea ámbar es la DISTANCIA contra la cuota: bajo el cero vamos detrás
-                de lo que pide, no es la cuota cayendo
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            {dibujados.map((d) => (
-              <span key={d.dateKey + d.label} className="flex items-center gap-1.5">
-                <i className="h-1.5 w-4 rounded-full"
-                  style={{ background: COLORES[cmp.days.indexOf(d) % COLORES.length] }} />
-                {d.esHoy ? 'Hoy' : d.label}
-              </span>
-            ))}
-            {cmp.optimal && (
-              <span className="flex items-center gap-1.5">
-                <i className="h-1.5 w-4 rounded-full" style={{ background: COLOR_META }} />
-                cuota
-              </span>
-            )}
-          </>
-        )}
-        {cmp.breaks.length > 0 && (
+        <span className="flex items-center gap-1.5">
+          <i className="h-1.5 w-4 rounded-full" style={{ background: COLORES[0] }} />
+          hoy
+        </span>
+        {refCurve && (
           <span className="flex items-center gap-1.5">
-            <i className="h-2.5 w-2.5 rounded-sm bg-muted-foreground/25" />
-            paradas de convenio
+            <i className="h-1.5 w-4 rounded-full" style={{ background: refColor }} />
+            {claveSel === 'cuota' ? 'cuota (se aplana en las paradas de convenio)' : diaSel?.label}
           </span>
         )}
+        <span className="flex items-center gap-1.5">
+          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: 'rgb(239 68 68 / 0.3)' }} />
+          vas abajo
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="h-2.5 w-2.5 rounded-sm" style={{ background: 'rgb(5 150 105 / 0.3)' }} />
+          vas arriba
+        </span>
         {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
         <span className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setModo((v) => (v === "dif" ? "acum" : "dif"))}
-            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
-          >
-            {modo === "dif" ? "ver acumulado" : "ver diferencia"}
-          </button>
           {[1, 2, 4].map((z) => (
-            <button
-              key={z}
-              type="button"
+            <button key={z} type="button"
               onClick={() => {
                 const el = scrollRef.current
                 focoRef.current = zoom === 1 || !el
@@ -374,16 +347,12 @@ export function MonitorCompareChart({ cmp, visibles }: {
                 zoom === z
                   ? 'border-sky-500/50 bg-sky-500/20 text-sky-800 dark:text-sky-200'
                   : 'border-border hover:bg-muted'
-              }`}
-            >
+              }`}>
               {z}×
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setAlto((v) => !v)}
-            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted"
-          >
+          <button type="button" onClick={() => setAlto((v) => !v)}
+            className="rounded-full border border-border px-2 py-0.5 hover:bg-muted">
             {alto ? 'achicar' : 'agrandar'}
           </button>
         </span>
