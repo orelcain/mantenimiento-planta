@@ -399,3 +399,75 @@ export function optimalPace(args: {
   if (!args.targetPieces || usefulMin <= 0) return null
   return { usefulMin, requiredCpm: args.targetPieces / usefulMin }
 }
+
+
+/**
+ * La curva de DIFERENCIA contra un día de referencia: piezas de ventaja (o de
+ * atraso) minuto a minuto de turno.
+ *
+ * Dos curvas acumuladas paralelas obligan a comparar alturas de reojo, y con
+ * seis días encima no se lee nada. Sobre el cero, en cambio, la lectura es
+ * directa: arriba vas mejor, abajo vas peor, y donde la línea BAJA es donde
+ * estás perdiendo terreno — que es la pregunta.
+ *
+ * Solo hasta donde el día de referencia llegó: más allá no hay contra qué
+ * medirse, y estirar la línea inventaría una ventaja que nadie sacó.
+ */
+export function diffCurve(hoy: PacePoint[], ref: PacePoint[]): PacePoint[] {
+  if (hoy.length === 0 || ref.length === 0) return []
+  const finRef = ref[ref.length - 1]!.minutes
+  const out: PacePoint[] = []
+  for (const p of hoy) {
+    if (p.minutes > finRef) break
+    const r = piecesAt(ref, p.minutes)
+    if (r == null) break
+    out.push({ minutes: p.minutes, pieces: p.pieces - r })
+  }
+  return out
+}
+
+/** La conclusión del comparador, ya resuelta: contra quién y por cuánto. */
+export interface ResumenComparacion {
+  /** El turno anterior más reciente con datos a esta altura. */
+  reciente: { label: string; dif: number; mismoDia: boolean } | null
+  /** El que más piezas llevaba a esta altura — la vara más exigente. */
+  mejor: { label: string; dif: number } | null
+  /** Piezas de ventaja o atraso contra lo que la cuota pide a esta altura. */
+  cuota: number | null
+}
+
+/**
+ * Resuelve la comparación en las cifras que se leen primero.
+ *
+ * El bloque mostraba seis filas de números y dejaba la conclusión a cargo de
+ * quien mira, que tiene que restar de cabeza parado en planta. Acá se calcula
+ * una vez y después se dice en palabras.
+ */
+export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
+  const hoy = cmp.days.find((d) => d.esHoy)
+  const actual = hoy?.atCurrentMinute ?? null
+  const anteriores = cmp.days.filter((d) => !d.esHoy && d.atCurrentMinute != null)
+
+  const mejorDia = anteriores.reduce<DayCurve | null>(
+    (mej, d) => (mej == null || (d.atCurrentMinute ?? 0) > (mej.atCurrentMinute ?? 0) ? d : mej),
+    null,
+  )
+
+  return {
+    reciente: actual != null && anteriores[0]
+      ? {
+          label: anteriores[0].label,
+          dif: actual - anteriores[0].atCurrentMinute!,
+          // Yal corre tres turnos por día: el "anterior" puede ser de hoy mismo,
+          // y "vas 2.021 arriba de hoy T1" se lee raro.
+          mismoDia: anteriores[0].dateKey === (hoy?.dateKey ?? ''),
+        }
+      : null,
+    mejor: actual != null && mejorDia
+      ? { label: mejorDia.label, dif: actual - mejorDia.atCurrentMinute! }
+      : null,
+    cuota: actual != null && cmp.optimalAtCurrentMinute != null
+      ? actual - cmp.optimalAtCurrentMinute
+      : null,
+  }
+}

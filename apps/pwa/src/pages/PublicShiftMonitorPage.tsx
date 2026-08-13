@@ -970,7 +970,12 @@ export function PublicShiftMonitorPage() {
    * las de los días anteriores como pronóstico.
    */
   const comparacion = useMemo(() => {
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
+    /*
+     * Sin cuota configurada vale el objetivo de Shoplogix, que es contra lo que
+     * la pantalla ya mide arriba: si no, en Yal el comparador se quedaba sin
+     * referencia y no había con qué contrastar el avance.
+     */
+    const meta = data?.targetPieces ?? live?.quotaPieces ?? live?.expectedPieces ?? null
     const tb = live?.timeBreakdown
     const opt = meta && tb
       ? optimalPace({ targetPieces: meta, windowMin: tb.windowMin, plannedMin: tb.plannedMin })
