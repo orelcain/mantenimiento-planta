@@ -325,7 +325,7 @@ export function ComparadorDias({ cmp, live, onCausa }: {
           : <span className="tabular-nums">{hh} h {String(mm).padStart(2, '0')} de turno</span>
       }
     >
-          <Veredicto cmp={cmp} />
+          <Veredicto cmp={cmp} cerrado={live?.shiftClosed ?? false} />
 
           <div className="mt-3">
             <MonitorCompareChart cmp={cmp} visibles={visibles} />
@@ -585,7 +585,7 @@ function BrechaDelDia({ cmp, live, onCausa }: {
  * compara sola ("ayer a esta hora"), y el MEJOR es la que dice si el turno
  * bueno era alcanzable. La cuota es la tercera y no se negocia.
  */
-function Veredicto({ cmp }: { cmp: CompareResult }) {
+function Veredicto({ cmp, cerrado }: { cmp: CompareResult; cerrado: boolean }) {
   const r = resumenComparacion(cmp)
   if (r.actual == null) return null
 
@@ -598,10 +598,18 @@ function Veredicto({ cmp }: { cmp: CompareResult }) {
 
   return (
     <div className="mt-2">
+      {/*
+        * Con el turno cerrado se habla en PASADO: "llevamos" con la línea
+        * apagada suena a que alguien sigue contando, y el que abre el link a la
+        * noche está leyendo un resultado, no un avance.
+        */}
       <p className="text-[15px] font-semibold leading-snug text-foreground">
-        Llevamos <span className="tabular-nums">{fmtInt(r.actual)} pz</span>
+        {cerrado ? 'Se lograron ' : 'Llevamos '}
+        <span className="tabular-nums">{fmtInt(r.actual)} pz</span>
         {altura && (
-          <span className="font-normal text-muted-foreground"> a {altura} de turno</span>
+          <span className="font-normal text-muted-foreground">
+            {cerrado ? ` en ${altura} de turno` : ` a ${altura} de turno`}
+          </span>
         )}
         .
       </p>
@@ -614,27 +622,30 @@ function Veredicto({ cmp }: { cmp: CompareResult }) {
       <p className="mt-1 text-[13.5px] leading-snug text-foreground/90">
         {r.reciente && (
           <>
-            Vamos{' '}
+            {cerrado ? 'Fueron' : 'Vamos'}{' '}
             <span className={`font-semibold tabular-nums ${tono(r.reciente.dif)}`}>
               {fmtInt(Math.abs(r.reciente.dif))} pz {r.reciente.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
-            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}, que a esta
-            altura llevaba <span className="tabular-nums">{fmtInt(r.reciente.valor)}</span>
+            {r.reciente.mismoDia ? 'del turno anterior' : `de ${r.reciente.label}`}, que a
+            {cerrado ? ' la misma altura' : ' esta altura'} llevaba{' '}
+            <span className="tabular-nums">{fmtInt(r.reciente.valor)}</span>
           </>
         )}
         {r.reciente && r.cuota && ', y '}
         {r.cuota && (
           <>
-            {!r.reciente && 'Vamos '}
+            {!r.reciente && (cerrado ? 'Fueron ' : 'Vamos ')}
             <span className={`font-semibold tabular-nums ${tono(r.cuota.dif)}`}>
               {fmtInt(Math.abs(r.cuota.dif))} pz {r.cuota.dif >= 0 ? 'arriba' : 'abajo'}
             </span>{' '}
             de la cuota
             {r.cuota.meta ? <> de <span className="tabular-nums">{fmtInt(r.cuota.meta)}</span></> : null}
-            {/* Al final del turno la cuota ya pide el total: repetirlo sobra. */}
-            {r.cuota.meta !== r.cuota.valor && (
+            {/* Al final del turno la cuota ya pide el total: repetirlo sobra.
+                Se compara REDONDEADO — la meta puede venir con decimales de
+                Shoplogix y "de 17.908, que pide 17.908" es la misma cifra. */}
+            {Math.round(r.cuota.meta ?? 0) !== Math.round(r.cuota.valor) && (
               <>
-                , que a esta altura pide{' '}
+                , que a {cerrado ? 'esa altura pedía' : 'esta altura pide'}{' '}
                 <span className="tabular-nums">{fmtInt(r.cuota.valor)}</span>
               </>
             )}
@@ -665,7 +676,7 @@ function Veredicto({ cmp }: { cmp: CompareResult }) {
             <dd className={`mt-0.5 text-lg font-bold tabular-nums ${tono(r.cuota.dif)}`}>
               {conSigno(r.cuota.dif)}
               <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                pide {fmtInt(r.cuota.valor)}
+                {cerrado ? 'pedía' : 'pide'} {fmtInt(r.cuota.valor)}
               </span>
             </dd>
           </div>
@@ -674,8 +685,9 @@ function Veredicto({ cmp }: { cmp: CompareResult }) {
 
       {/* Que quede dicho que el número se mueve: no es el total del otro día. */}
       <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground/80">
-        Esta diferencia cambia durante el turno: se compara contra lo que cada día llevaba
-        a esta MISMA altura, no contra el total con que cerró.
+        {cerrado
+          ? 'Comparado a la misma altura de turno: un día que duró más pudo cerrar con otro total.'
+          : 'Esta diferencia cambia durante el turno: se compara contra lo que cada día llevaba a esta MISMA altura, no contra el total con que cerró.'}
       </p>
     </div>
   )
