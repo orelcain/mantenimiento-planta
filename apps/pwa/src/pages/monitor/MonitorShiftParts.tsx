@@ -185,12 +185,11 @@ export function TiempoDelTurno({ tb, causaSel, onCausa }: {
               ))}
             </ul>
           </div>
-          {onCausa && (
-            <p className="text-[10px] text-muted-foreground/70 sm:col-span-2">
-              Tocá una causa para verla marcada en el gráfico del turno — así se ve
-              CUÁNDO pasó, que es lo que explica el atraso.
-            </p>
-          )}
+          <p className="text-[10px] text-muted-foreground/70 sm:col-span-2">
+            Los minutos son los que la causa estuvo activa en alguna máquina; la barra
+            de arriba mide la LÍNEA, que solo se detiene cuando paran todas.
+            {onCausa && ' Tocá una causa para ver en qué momento del turno ocurrió.'}
+          </p>
         </div>
       )}
     </Bloque>
@@ -206,14 +205,27 @@ export function TiempoDelTurno({ tb, causaSel, onCausa }: {
  * pantalla y no se vería que algo cambió.
  */
 function FilaCausa({ x, sel, onCausa }: {
-  x: { reason: string; min: number; count: number }
+  x: { reason: string; min: number; count: number; lineMin?: number }
   sel: string | null
   onCausa?: (c: string | null) => void
 }) {
   const activa = sel === x.reason
+  /*
+   * Cuando la parada fue de UNA máquina y las otras siguieron, la línea no
+   * perdió ese tiempo. Sin decirlo, la barra marca "recuperable 9 min" y acá
+   * abajo se lee "KNURO 98 min", y parece que uno de los dos miente.
+   */
+  const frenoMenos = x.lineMin != null && x.lineMin < x.min
   const contenido = (
     <>
-      <span className="min-w-0 truncate">{x.reason}</span>
+      <span className="min-w-0 truncate">
+        {x.reason}
+        {frenoMenos && (
+          <span className="ml-1.5 text-[10px] text-muted-foreground/70">
+            {x.lineMin === 0 ? 'la línea siguió' : `frenó ${x.lineMin} min`}
+          </span>
+        )}
+      </span>
       <span className="shrink-0 tabular-nums text-muted-foreground">
         {x.min} min · {x.count}×
       </span>

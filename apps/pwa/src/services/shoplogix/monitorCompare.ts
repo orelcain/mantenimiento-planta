@@ -72,6 +72,8 @@ export function piecesAt(curve: PacePoint[], min: number): number | null {
 export interface DayCurve {
   label: string
   dateKey: string
+  /** Turno de Shoplogix. Sirve para distinguir dos turnos del mismo día. */
+  shiftId?: string | null
   curve: PacePoint[]
   totalPieces: number
   /** Piezas a la altura del turno en curso. null si ese día no llegó tan lejos. */
@@ -173,6 +175,16 @@ function etiquetaDia(dateKey: string): string {
   return `${dia} ${d.getUTCDate()}`
 }
 
+/** "Turno 2" → "T2"; "Turno Dia" → "día". Tiene que entrar en una fila angosta. */
+function etiquetaTurno(shiftId: string | null | undefined): string {
+  const t = String(shiftId || '').trim()
+  if (!t) return ''
+  const m = /^turno\s+(.+)$/i.exec(t)
+  const resto = (m?.[1] ?? t).trim()
+  if (/^\d+$/.test(resto)) return `T${resto}`
+  return resto.toLowerCase()
+}
+
 const sumaBreaks = (bs: PlannedBreak[]) => bs.reduce((a, b) => a + (b.toMin - b.fromMin), 0)
 
 /**
@@ -218,7 +230,12 @@ function curvaObjetivo(
 export function buildDayComparison(args: {
   todaySeries: MonitorSeriesPoint[] | null | undefined
   todayDateKey: string
-  previous: Array<{ dateKey: string; series: MonitorSeriesPoint[] | null | undefined }>
+  todayShiftId?: string | null
+  previous: Array<{
+    dateKey: string
+    shiftId?: string | null
+    series: MonitorSeriesPoint[] | null | undefined
+  }>
   maxDays?: number
   /** Meta del turno y minutos útiles, para dibujar la curva objetivo. */
   targetPieces?: number | null
@@ -238,6 +255,7 @@ export function buildDayComparison(args: {
 
   const days: DayCurve[] = [{
     label: 'Hoy',
+    shiftId: args.todayShiftId ?? null,
     dateKey: args.todayDateKey,
     curve: hoy,
     totalPieces: hoy[hoy.length - 1]!.pieces,
@@ -249,13 +267,30 @@ export function buildDayComparison(args: {
     const curve = cumulativeFromStart(prev.series)
     if (curve.length === 0) continue
     days.push({
-      label: etiquetaDia(prev.dateKey),
+      label: prev.dateKey === args.todayDateKey ? 'hoy' : etiquetaDia(prev.dateKey),
+      shiftId: prev.shiftId ?? null,
       dateKey: prev.dateKey,
       curve,
       totalPieces: curve[curve.length - 1]!.pieces,
       atCurrentMinute: piecesAt(curve, currentMinute),
       esHoy: false,
     })
+  }
+
+  /*
+   * Desambiguar los turnos del MISMO día. Yal corre tres por jornada, así que
+   * el comparador mostraba tres filas idénticas "lun 10" y no había forma de
+   * saber cuál era cuál. El turno solo se agrega cuando hace falta: en Filete,
+   * con un turno por día, la etiqueta queda corta.
+   */
+  const porFecha = new Map<string, number>()
+  for (const d of days) porFecha.set(d.dateKey, (porFecha.get(d.dateKey) ?? 0) + 1)
+  for (const d of days) {
+    // Se cuenta por FECHA y no por etiqueta: el turno anterior de hoy compite
+    // con la fila "Hoy", que se llama distinto pero es el mismo día.
+    if ((porFecha.get(d.dateKey) ?? 0) < 2) continue
+    const t = etiquetaTurno(d.shiftId)
+    if (t) d.label = `${d.label} ${t}`
   }
 
   const maxMinutes = Math.max(...days.map((d) => d.curve[d.curve.length - 1]!.minutes), currentMinute)

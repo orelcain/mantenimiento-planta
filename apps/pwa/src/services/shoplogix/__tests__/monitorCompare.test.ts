@@ -338,3 +338,44 @@ describe('la curva objetivo con las paradas de convenio', () => {
     expect(Math.max(...r.optimal!.map((p) => p.pieces))).toBeLessThanOrEqual(5_000)
   })
 })
+
+describe('etiquetas de los días comparados', () => {
+  const hoy = serie('2026-08-12T15:00:00Z', Array(12).fill(50))
+  const otro = serie('2026-08-12T07:00:00Z', Array(12).fill(40))
+
+  it('distingue los turnos del MISMO día — Yal corre tres por jornada', () => {
+    // Sin esto el comparador mostraba tres filas "lun 10" indistinguibles.
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', todayShiftId: 'Turno 2',
+      previous: [
+        { dateKey: '2026-08-10', shiftId: 'Turno 1', series: otro },
+        { dateKey: '2026-08-10', shiftId: 'Turno 2', series: otro },
+        { dateKey: '2026-08-10', shiftId: 'Turno 3', series: otro },
+      ],
+      maxDays: 6,
+    })
+    expect(r.days.slice(1).map((d) => d.label)).toEqual(['lun 10 T1', 'lun 10 T2', 'lun 10 T3'])
+  })
+
+  it('con un turno por día la etiqueta queda corta — no se agrega nada', () => {
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12',
+      previous: [
+        { dateKey: '2026-08-11', shiftId: 'Turno Dia', series: otro },
+        { dateKey: '2026-08-10', shiftId: 'Turno Dia', series: otro },
+      ],
+      maxDays: 6,
+    })
+    expect(r.days.slice(1).map((d) => d.label)).toEqual(['mar 11', 'lun 10'])
+  })
+
+  it('el turno anterior de HOY se lee "hoy", no con la fecha', () => {
+    // Aparecía como "mié 12" al lado de "Hoy" y parecía otro día.
+    const r = buildDayComparison({
+      todaySeries: hoy, todayDateKey: '2026-08-12', todayShiftId: 'Turno 2',
+      previous: [{ dateKey: '2026-08-12', shiftId: 'Turno 1', series: otro }],
+      maxDays: 6,
+    })
+    expect(r.days[1]!.label).toBe('hoy T1')
+  })
+})
