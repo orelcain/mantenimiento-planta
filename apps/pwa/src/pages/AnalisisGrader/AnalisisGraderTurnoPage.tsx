@@ -1679,6 +1679,47 @@ export function AnalisisGraderTurnoPage() {
     }
   }, [upstreamLine.snapshot, upstreamLine.source, plantLineCfg, monitorTtl, monitorMode])
 
+  /*
+   * Abrir el monitor SIN pasar por el diálogo de compartir (pedido de Orel,
+   * 13-ago): generar link/QR es para COMPARTIR; para mirarlo uno mismo alcanza
+   * un click. Reusa el token de línea (invariante: `ensureLineMonitor` no crea
+   * uno nuevo, solo extiende la vigencia — el QR impreso sigue sirviendo).
+   *
+   * La pestaña se abre ANTES del await: un `window.open` después de una promesa
+   * ya no cuenta como gesto del usuario y el bloqueador de popups lo mata.
+   */
+  const handleAbrirMonitor = useCallback(async () => {
+    const slx = upstreamLine.snapshot
+    if (!slx || upstreamLine.source !== 'firestore') return
+    const ventana = window.open('', '_blank')
+    setMonitorBusy(true)
+    setMonitorError(null)
+    try {
+      const { token } = await createPublicShiftMonitor({
+        mode:            'line',
+        plantSlug:       plantLineCfg.plantSlug,
+        dateKey:         slx.dateKey,
+        shiftId:         slx.shiftId,
+        plantLineId:     plantLineCfg.id,
+        areaLabel:       plantLineCfg.areaLabel,
+        lineLabel:       plantLineCfg.label,
+        machineKindLong: plantLineCfg.machineKind?.long,
+        targetPieces:    plantLineCfg.shiftTargetPieces,
+        ttlHours:        monitorTtl,
+      })
+      const url = `${window.location.origin}${import.meta.env.BASE_URL}monitor/${token}`
+      if (ventana) ventana.location.href = url
+      else window.location.assign(url)
+    } catch (err) {
+      ventana?.close()
+      setMonitorError(err instanceof Error ? err.message : 'No se pudo abrir el monitor')
+      // El error se muestra en el panel de compartir: se abre para que se vea.
+      setHerramientasOpen(true)
+    } finally {
+      setMonitorBusy(false)
+    }
+  }, [upstreamLine.snapshot, upstreamLine.source, plantLineCfg, monitorTtl])
+
   const handleRevokeMonitor = useCallback(async () => {
     if (!monitorToken) return
     setMonitorBusy(true)
@@ -1902,6 +1943,22 @@ export function AnalisisGraderTurnoPage() {
             >
               <Tag className="w-3.5 h-3.5" />
               <span className="hidden sm:inline text-xs tabular-nums">{untaggedPauses.length}</span>
+            </Button>
+          )}
+          {/* Abrir el monitor en vivo de UN click. Generar link/QR (el botón
+              de al lado) es para COMPARTIR; para mirarlo uno mismo no debería
+              hacer falta pasar por el diálogo. */}
+          {isSupervisor && plantLineCfg.shoplogixEnabled && upstreamLine.source === 'firestore' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAbrirMonitor}
+              disabled={monitorBusy}
+              title="Abrir el monitor en vivo de la línea"
+            >
+              {monitorBusy
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Radio className="w-3.5 h-3.5" />}
             </Button>
           )}
           {/* Compartir: link del turno + QR del monitor en vivo. Vivían al pie
