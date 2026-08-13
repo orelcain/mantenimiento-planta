@@ -13,6 +13,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Fix: la brecha se calcula contra la MISMA referencia que el grafico (#509)
+
+- Hecho: el v3 (#505) dejo el grafico comparando contra la referencia del chip pero la lista
+  "Donde se abrio la brecha" seguia clavada al mejor dia: dos rivales distintos a 20 px de
+  distancia. La referencia elegida ahora vive en ComparadorDias y alimenta a ambos (grafico y
+  BrechaDelDia recibe `contra` por prop); el titulo la sigue ("con la cuota" / "con lun 10").
+- Archivos: `pages/monitor/MonitorCompareChart.tsx`, `pages/monitor/MonitorShiftParts.tsx`.
+- Verificación: preview contra el monitor real de Filete con los tres chips (cuota, lun 10, mar
+  11); tsc, eslint y vitest de monitorCompare (51/51) limpios.
+- Estado: HECHO. Merge squash a main `f9089e91`.
+
+---
+
 ## 2026-08-13 - claude - Monitor ronda 2: pie sin alarma nocturna, estado por maquina y record (#507)
 
 - Hecho: con el turno cerrado el pie dice "Turno cerrado - ultimo dato de las HH:MM" en tono
