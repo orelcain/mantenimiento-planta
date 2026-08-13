@@ -13,6 +13,20 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Comparador v3: hoy contra UNA referencia con la brecha pintada (#505)
+
+- Hecho: el modo diferencia dibujaba hasta 6 deltas contra el cero y la cuota "caia" aunque el
+  turno fuera bien. Ahora hoy y la referencia elegida por chip (cuota o un dia anterior) SUBEN
+  las dos, con la brecha sombreada (rojo abajo, verde arriba, cruce interpolado) y la cuota
+  aplanandose en las paradas de convenio. El dia que mas llevaba a esta altura lleva "· mejor"
+  en su chip. La tabla de dias queda solo informativa (la seleccion vive en los chips).
+- Archivos: `pages/monitor/MonitorCompareChart.tsx` (reescrito), `pages/monitor/MonitorShiftParts.tsx`.
+- Verificación: tsc, eslint y vitest de monitorCompare (51/51) limpios; preview contra el turno
+  real de Filete (cuota y mar 11), 390px, claro y oscuro.
+- Estado: HECHO. Merge squash a main `d0338c51`.
+
+---
+
 ## 2026-08-12 - claude - Sin "Ahora mismo" con turno cerrado y produccion real en el veredicto (#503)
 
 - Hecho: con el turno cerrado, el bloque "Ahora mismo — Linea detenida" pintaba alarmante una
