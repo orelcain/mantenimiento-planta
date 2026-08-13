@@ -40,7 +40,7 @@ import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks,
 } from '@/services/shoplogix/monitorCompare'
-import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador, VelocidadDeLinea } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1317,6 +1317,18 @@ export function PublicShiftMonitorPage() {
           comments={live.comments}
           causaSel={causaSel}
           onCausa={setCausaSel}
+        />
+
+        {/* La velocidad como historia, no solo el "ahora" del KPI. Tramos de
+            5 min de Shoplogix (el piso del dato) + media móvil de 15 min. */}
+        <VelocidadDeLinea
+          series={live.series}
+          breaks={comparacion.breaks}
+          recentPerMinute={live.recentPiecesPerMinute}
+          avgPerMinute={live.piecesPerMinute}
+          requiredPerMinute={pace && pace.verdict !== 'cumplida' ? pace.requiredPerMinute : null}
+          medianCpm={live.paceMedianCpm}
+          cerrado={live.shiftClosed}
         />
 
         <TiempoDelTurno tb={live.timeBreakdown} causaSel={causaSel} onCausa={setCausaSel} />
