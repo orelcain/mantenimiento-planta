@@ -1088,9 +1088,28 @@ export function PublicShiftMonitorPage() {
                 dejaba "Lunes, 10 De Agosto". */}
             <span className="first-letter:uppercase">{fmtDateLong(vista?.dateKey || data.dateKey)}</span>
             <span className="text-muted-foreground/50">·</span>
-            <span className="tabular-nums">
-              {fmtWallTime(live.scheduledStart)}–{fmtWallTime(live.scheduledEnd)}
-            </span>
+            {/*
+              * Con el turno VIVO el fin de la ventana es el ÚLTIMO INTERVALO
+              * SINCRONIZADO: se corre cada ~5 min y se leía como hora de
+              * término ("15:00–21:52" con la línea produciendo a las 22:00).
+              * Mientras el turno está en curso se muestra el cierre previsto
+              * —la misma fuente que el "Cierre estimado" de abajo—; el rango
+              * real recién vale cuando el turno cerró.
+              */}
+            {!live.shiftClosed && live.plannedEnd ? (
+              <span className="tabular-nums">
+                {fmtWallTime(live.scheduledStart)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
+                {live.plannedEndSource !== 'fijado' && (
+                  <span className="ml-1 rounded bg-muted px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                    est.
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="tabular-nums">
+                {fmtWallTime(live.scheduledStart)}–{fmtWallTime(live.scheduledEnd)}
+              </span>
+            )}
           </div>
         </div>
       </header>
