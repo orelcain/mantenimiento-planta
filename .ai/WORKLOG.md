@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Monitor ronda 2: pie sin alarma nocturna, estado por maquina y record (#507)
+
+- Hecho: con el turno cerrado el pie dice "Turno cerrado - ultimo dato de las HH:MM" en tono
+  neutro (antes alarmaba de noche con "la sincronizacion puede estar detenida"; la alerta ambar
+  queda solo con turno vivo). "Por maquina" ahora dice el estado de AHORA ("· produciendo" o
+  "parada · causa (hace X)") usando currentReason/currentSinceAt, sin puntos con turno cerrado.
+  Linea de record bajo "Vas a" cuando el ritmo de hoy supera al mejor turno reciente.
+- Archivos: `PublicShiftMonitorPage.tsx`.
+- Verificación: tsc y eslint limpios; preview contra Filete cerrado (pie neutro, sin puntos rojos)
+  y turno vivo de Yal (record real: 44,9 vs 41,8 pz/min). Rama "parada · causa" por maquina no
+  se pudo ver en vivo (las 3 Baader producian) — replica el patron ya probado del "Ahora mismo".
+- Estado: HECHO. Merge squash a main `371310d6`.
+
+---
+
 ## 2026-08-13 - claude - Comparador v3: hoy contra UNA referencia con la brecha pintada (#505)
 
 - Hecho: el modo diferencia dibujaba hasta 6 deltas contra el cero y la cuota "caia" aunque el
