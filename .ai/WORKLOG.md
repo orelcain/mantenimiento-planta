@@ -13,6 +13,23 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - El veredicto distingue "se alcanza" de "solo apurando" (#521)
+
+- Hecho: "se alcanza pidiendo 26 pz/min" en una linea que viene a 10 comparaba contra el
+  techo HISTORICO, no contra el ritmo real del turno. Verdict nuevo 'exigente': cabe bajo
+  el techo pero pide mas que el mayor entre el promedio del turno y la ultima media hora
+  (margen 5%). La hora extra se ofrece desde ese escalon; si baja al ritmo que la linea YA
+  trae, la pantalla lo dice ("bastaria con X"). Tres titulares: "se alcanza al ritmo que
+  traes" / "se alcanza, pero solo apurando" / "no se alcanza".
+- Archivos: apps/pwa/src/services/shoplogix/monitorPace.ts (+tests, 28→32),
+  apps/pwa/src/pages/PublicShiftMonitorPage.tsx
+- Verificación: vitest shoplogix 244/244; tsc y eslint limpios; preview :5189 contra el
+  turno VIVO de Filete, caso real (pide 26,8 pz/min, va a 9,8).
+- Estado: HECHO. Merge squash a main `e8499bfe`.
+- Sigue: nada pendiente de este cambio.
+
+---
+
 ## 2026-08-13 - claude - "Datos hasta las HH:MM" junto a las piezas del turno vivo (#519)
 
 - Hecho: el monitor es un espejo que copia Shoplogix cada ~5 min; sin el corte, la
