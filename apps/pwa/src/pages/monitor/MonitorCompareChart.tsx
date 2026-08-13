@@ -17,7 +17,7 @@
  * (`preserveAspectRatio="none"`) y un `<text>` adentro se deforma con él.
  */
 
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CompareResult, PacePoint } from '@/services/shoplogix/monitorCompare'
 import { COLORES, COLOR_META } from './monitorColors'
 
@@ -43,6 +43,22 @@ export function MonitorCompareChart({ cmp, visibles }: {
    * contenedor con scroll, se hace zoom y se desliza.
    */
   const [zoom, setZoom] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  /** Fracción del turno a dejar centrada después de cambiar el zoom. */
+  const focoRef = useRef<number | null>(null)
+
+  /*
+   * Ampliar dejaba la vista clavada al principio del turno: uno tocaba "4x" y
+   * lo que quería mirar —dónde va la línea AHORA— quedaba fuera de pantalla,
+   * así que el zoom parecía no hacer nada. Al ampliar desde 1x la vista salta
+   * al minuto actual; entre zooms se conserva lo que ya se estaba mirando.
+   */
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el || focoRef.current == null) return
+    el.scrollLeft = Math.max(0, focoRef.current * el.scrollWidth - el.clientWidth / 2)
+    focoRef.current = null
+  }, [zoom])
 
   const dibujados = useMemo(
     () => cmp.days.filter((d) => d.esHoy || visibles.has(d.dateKey)),
@@ -103,12 +119,13 @@ export function MonitorCompareChart({ cmp, visibles }: {
           ))}
         </div>
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
+        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto">
           <div
             className="relative"
             style={{ width: `${zoom * 100}%`, minWidth: '100%' }}
             data-zoom={zoom}
           >
+            <div className={`relative ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}>
             <svg
               viewBox={`0 0 ${W} ${H}`}
               className={`w-full ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}
@@ -161,12 +178,24 @@ export function MonitorCompareChart({ cmp, visibles }: {
                 )
               })}
 
-              {/* dónde va el turno ahora */}
-              {hoy?.atCurrentMinute != null && (
-                <circle cx={x(cmp.currentMinute)} cy={y(hoy.atCurrentMinute)} r="1.2"
-                  fill={COLORES[0]} vectorEffect="non-scaling-stroke" />
-              )}
             </svg>
+
+            {/*
+              * Dónde va el turno ahora. Va en HTML y no como <circle>: el SVG
+              * se estira horizontalmente con el zoom y un círculo adentro sale
+              * ovalado — a 4x medía 28 x 3 px, una raya.
+              */}
+            {hoy?.atCurrentMinute != null && (
+              <span
+                className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
+                style={{
+                  left: `${fx(cmp.currentMinute) * 100}%`,
+                  top: `${fy(hoy.atCurrentMinute) * 100}%`,
+                  background: COLORES[0],
+                }}
+              />
+            )}
+            </div>
 
             {/* Eje de horas: HTML, dentro del área escalada para que viaje con
                 el paneo, pero sin deformarse como lo haría un <text> del SVG. */}
@@ -198,12 +227,19 @@ export function MonitorCompareChart({ cmp, visibles }: {
             paradas de convenio
           </span>
         )}
+        {zoom > 1 && <span>deslizá el gráfico &#8594;</span>}
         <span className="ml-auto flex items-center gap-1">
           {[1, 2, 4].map((z) => (
             <button
               key={z}
               type="button"
-              onClick={() => setZoom(z)}
+              onClick={() => {
+                const el = scrollRef.current
+                focoRef.current = zoom === 1 || !el
+                  ? fx(cmp.currentMinute!)
+                  : (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth
+                setZoom(z)
+              }}
               aria-pressed={zoom === z}
               className={`rounded-full border px-1.5 py-0.5 tabular-nums ${
                 zoom === z
