@@ -76,28 +76,33 @@ describe('computePaceToTarget', () => {
     expect(p.gapPerHour).toBe(0)
   })
 
-  it('sin techo conocido NO marca imposible — subestimarlo es la peor forma de errar', () => {
+  it('sin techo conocido igual marca imposible cuando pide MÁS de +30% del ritmo real', () => {
+    /*
+     * Segunda vuelta de Orel (13-ago): "se alcanza pero con 36 pz/min" en una
+     * línea que viene a 10 sigue siendo irreal — nadie apura 3,6×. El tope de
+     * apuro (+30% sobre el ritmo real) marca imposible aunque no haya techo.
+     */
     const p = base({ maxPerHour: null })!
-    // required 3.637 pz/h contra un ritmo real de 1.449: no es imposible
-    // (sin techo no se afirma eso), pero tampoco es honesto un "alcanzable"
-    // a secas — es el escalón "exigente".
-    expect(p.verdict).toBe('exigente')
-    expect(p.verdict).not.toBe('fuera-de-alcance')
+    // required 3.637 pz/h contra un ritmo real de 1.449 (tope 1.884): fuera.
+    expect(p.verdict).toBe('fuera-de-alcance')
     expect(p.maxPerHour).toBeNull()
+    // Y la hora extra tampoco lo salva: 2.909 pz/h sigue siendo 2× el ritmo.
+    expect(p.withExtraHour!.feasible).toBe(false)
   })
 
-  it('EXIGENTE: cabe en el techo pero pide más que el ritmo real del turno', () => {
+  it('EXIGENTE: cabe en el techo y en el tope de apuro, pero pide más que el ritmo real', () => {
     /*
      * El caso de Orel (13-ago): "dice que se alcanza pero pide 24 pz/min" en
      * una línea que viene a 10. El techo histórico no es lo que la línea está
      * haciendo HOY: entre "alcanzable" e "imposible" falta el escalón honesto.
      */
-    const p = base({ targetPieces: 13_000 })!
-    // required = 7.547/240·60 ≈ 1.887 pz/h: bajo el techo (2.768) pero muy
-    // por encima del ritmo real (1.449 · 1,05 ≈ 1.521).
+    const p = base({ targetPieces: 12_500 })!
+    // required = 7.047/240·60 ≈ 1.762 pz/h: bajo el techo (2.768) y bajo el
+    // tope de apuro (1.449·1,3 ≈ 1.884), pero por encima del ritmo real
+    // (1.449 · 1,05 ≈ 1.521) → apuro plausible, no promesa fácil.
     expect(p.verdict).toBe('exigente')
     // Y la hora extra se ofrece YA en este escalón, no recién en imposible:
-    // 7.547/300·60 ≈ 1.509 pz/h ≤ 1.521 → con la hora extra basta el ritmo
+    // 7.047/300·60 ≈ 1.409 pz/h ≤ 1.521 → con la hora extra basta el ritmo
     // que la línea ya trae.
     expect(p.withExtraHour).not.toBeNull()
     expect(p.withExtraHour!.feasible).toBe(true)
@@ -131,7 +136,10 @@ describe('computePaceToTarget', () => {
      */
     const p = base({ currentPerHour: 1_464, maxPerHour: 1_029, targetPieces: 30_000 })!
     expect(p.maxPerHour).toBeNull()
-    expect(p.verdict).not.toBe('fuera-de-alcance')
+    // El techo malo queda descartado — pero el veredicto igual puede decir
+    // imposible por el TOPE DE APURO (pide 6.137 pz/h viniendo a 1.464): esa
+    // razón es legítima; la que no lo era es el techo falso.
+    expect(p.verdict).toBe('fuera-de-alcance')
   })
 
   it('y conserva el techo cuando sí está por encima del ritmo actual', () => {
@@ -149,8 +157,11 @@ describe('computePaceToTarget', () => {
     expect(p.withExtraHour!.feasible).toBe(false)
   })
 
-  it('marca la hora extra como suficiente cuando el ritmo entra en el techo', () => {
-    const p = base({ maxPerHour: 3_000 })!
+  it('marca la hora extra como suficiente cuando entra en el techo Y en el ritmo real', () => {
+    // Con la línea viniendo a 2.600: required 3.637 supera el techo (3.000) →
+    // fuera; con la hora extra pide 2.909, que entra en el techo y en el tope
+    // de apuro (2.600·1,3 = 3.380) → la hora extra SÍ resuelve.
+    const p = base({ maxPerHour: 3_000, currentPerHour: 2_600 })!
     expect(p.verdict).toBe('fuera-de-alcance')
     expect(p.withExtraHour!.feasible).toBe(true)
   })
