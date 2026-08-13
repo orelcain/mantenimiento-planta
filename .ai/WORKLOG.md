@@ -13,6 +13,21 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ---
 
+## 2026-08-13 - claude - Bitacora del turno: todos los comentarios del operador (#513)
+
+- Hecho: los comentarios del operador (unico texto en castellano que sube del piso) solo se leian
+  si coincidian con un tramo de brecha. Bloque plegado "Comentarios del operador" bajo Hora por
+  hora: hora + causa (salta al grafico) + texto; fusiona tramos contiguos del mismo comentario
+  (el sensor lo corta al cambiar de estado) y descarta los que cubren horas enteras (regla de 2 h
+  de las brechas). Si no hay comentarios, el bloque no aparece.
+- Archivos: `pages/monitor/MonitorShiftParts.tsx` (componente `BitacoraOperador`),
+  `pages/PublicShiftMonitorPage.tsx`.
+- Verificación: preview contra el monitor real de Filete (fusion incluida), 390px sin overflow,
+  claro y oscuro. tsc y eslint limpios.
+- Estado: HECHO. Merge squash a main `5a48a793`.
+
+---
+
 ## 2026-08-13 - claude - Boton para abrir el monitor en vivo sin pasar por compartir (#511)
 
 - Hecho: generar link/QR es para COMPARTIR; para mirar el monitor uno mismo faltaba un boton de
