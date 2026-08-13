@@ -166,6 +166,8 @@ export interface CompareResult {
   maxMinutes: number
   /** Las paradas de convenio que la curva objetivo respeta. */
   breaks: PlannedBreak[]
+  /** La meta del turno completo, para poder nombrarla ("la cuota de 5.000"). */
+  targetPieces: number | null
 }
 
 function etiquetaDia(dateKey: string): string {
@@ -247,7 +249,7 @@ export function buildDayComparison(args: {
   if (hoy.length === 0) {
     return {
       days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null,
-      maxMinutes: 0, breaks: [],
+      maxMinutes: 0, breaks: [], targetPieces: args.targetPieces ?? null,
     }
   }
 
@@ -303,7 +305,10 @@ export function buildDayComparison(args: {
     optimalAtCurrentMinute = piecesAt(optimal, currentMinute) ?? args.targetPieces
   }
 
-  return { days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes, breaks: args.breaks ?? [] }
+  return {
+    days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes,
+    breaks: args.breaks ?? [], targetPieces: args.targetPieces ?? null,
+  }
 }
 
 /** El tramo donde hoy perdió más terreno contra el día de referencia. */
@@ -426,14 +431,26 @@ export function diffCurve(hoy: PacePoint[], ref: PacePoint[]): PacePoint[] {
   return out
 }
 
-/** La conclusión del comparador, ya resuelta: contra quién y por cuánto. */
+/**
+ * La conclusión del comparador, ya resuelta: contra quién, por cuánto y —sobre
+ * todo— contra QUÉ NÚMERO.
+ *
+ * Cada comparación lleva el valor del otro (`valor`) además de la diferencia:
+ * "vas 1.083 arriba de mar 11" no dice nada si no se sabe que mar 11 llevaba
+ * 3.403 a esta misma altura. Y ese valor cambia minuto a minuto mientras el
+ * turno corre — no es el total con que ese día cerró.
+ */
 export interface ResumenComparacion {
+  /** Piezas de hoy a esta altura del turno. */
+  actual: number | null
+  /** Minutos de turno transcurridos: la "altura" a la que se compara todo. */
+  minutos: number | null
   /** El turno anterior más reciente con datos a esta altura. */
-  reciente: { label: string; dif: number; mismoDia: boolean } | null
+  reciente: { label: string; dif: number; valor: number; mismoDia: boolean } | null
   /** El que más piezas llevaba a esta altura — la vara más exigente. */
-  mejor: { label: string; dif: number } | null
-  /** Piezas de ventaja o atraso contra lo que la cuota pide a esta altura. */
-  cuota: number | null
+  mejor: { label: string; dif: number; valor: number } | null
+  /** Contra lo que la cuota pide a esta altura, y la cuota completa del turno. */
+  cuota: { dif: number; valor: number; meta: number | null } | null
 }
 
 /**
@@ -454,20 +471,31 @@ export function resumenComparacion(cmp: CompareResult): ResumenComparacion {
   )
 
   return {
+    actual,
+    minutos: cmp.currentMinute,
     reciente: actual != null && anteriores[0]
       ? {
           label: anteriores[0].label,
           dif: actual - anteriores[0].atCurrentMinute!,
+          valor: anteriores[0].atCurrentMinute!,
           // Yal corre tres turnos por día: el "anterior" puede ser de hoy mismo,
           // y "vas 2.021 arriba de hoy T1" se lee raro.
           mismoDia: anteriores[0].dateKey === (hoy?.dateKey ?? ''),
         }
       : null,
     mejor: actual != null && mejorDia
-      ? { label: mejorDia.label, dif: actual - mejorDia.atCurrentMinute! }
+      ? {
+          label: mejorDia.label,
+          dif: actual - mejorDia.atCurrentMinute!,
+          valor: mejorDia.atCurrentMinute!,
+        }
       : null,
     cuota: actual != null && cmp.optimalAtCurrentMinute != null
-      ? actual - cmp.optimalAtCurrentMinute
+      ? {
+          dif: actual - cmp.optimalAtCurrentMinute,
+          valor: cmp.optimalAtCurrentMinute,
+          meta: cmp.targetPieces ?? null,
+        }
       : null,
   }
 }

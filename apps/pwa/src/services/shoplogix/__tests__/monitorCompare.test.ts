@@ -430,17 +430,28 @@ describe('resumenComparacion', () => {
       { dateKey: '2026-08-11', series: flojo },
       { dateKey: '2026-08-10', series: bueno },
     ])
-    expect(r.reciente).toEqual({ label: 'mar 11', dif: 480, mismoDia: false })
-    expect(r.mejor).toEqual({ label: 'lun 10', dif: 120 })
+    // Cada comparación lleva el valor del OTRO: "480 arriba" no dice nada si
+    // no se sabe que ese día llevaba 720 a esta misma altura.
+    expect(r.actual).toBe(1_200)
+    expect(r.reciente).toEqual({ label: 'mar 11', dif: 480, valor: 720, mismoDia: false })
+    expect(r.mejor).toEqual({ label: 'lun 10', dif: 120, valor: 1_080 })
   })
 
   it('contra la cuota, un número negativo es ir atrasado', () => {
     // A los 120 min la cuota pide 1.613 y hoy lleva 1.200.
-    expect(armar([], 5_000).cuota).toBeLessThan(0)
+    const c = armar([], 5_000).cuota!
+    expect(c.dif).toBeLessThan(0)
+    expect(c.valor).toBe(1_613)
+    expect(c.meta).toBe(5_000)
   })
 
   it('sin días anteriores ni meta no inventa una conclusión', () => {
-    expect(armar([])).toEqual({ reciente: null, mejor: null, cuota: null })
+    const r = armar([])
+    expect(r.reciente).toBeNull()
+    expect(r.mejor).toBeNull()
+    expect(r.cuota).toBeNull()
+    // Las piezas de hoy sí: son el "llevamos X" del titular.
+    expect(r.actual).toBe(1_200)
   })
 
   it('ignora los días que no llegaron a esta altura de turno', () => {
