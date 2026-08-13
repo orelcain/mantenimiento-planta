@@ -40,7 +40,7 @@ import { pinShiftEnd, unpinShiftEnd } from '@/services/shoplogix/pinShiftEnd'
 import {
   buildDayComparison, optimalPace, plannedBreaks, mergeBreaks,
 } from '@/services/shoplogix/monitorCompare'
-import { TiempoDelTurno, ComparadorDias, Bloque } from './monitor/MonitorShiftParts'
+import { TiempoDelTurno, ComparadorDias, Bloque, BitacoraOperador } from './monitor/MonitorShiftParts'
 import { useIsAdmin } from '@/store'
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
@@ -1324,6 +1324,10 @@ export function PublicShiftMonitorPage() {
         <ComparadorDias cmp={comparacion} live={live} onCausa={setCausaSel} />
 
         <PorHora series={live.series} />
+
+        {/* La bitácora del piso: lo que el operador escribió, todo y en orden.
+            Hasta ahora solo se leía lo que coincidía con un tramo de brecha. */}
+        <BitacoraOperador comments={live.comments} onCausa={setCausaSel} />
 
         {/* Desglose por máquina — solo aporta cuando la línea tiene más de una */}
         {live.machines.length > 1 && (
