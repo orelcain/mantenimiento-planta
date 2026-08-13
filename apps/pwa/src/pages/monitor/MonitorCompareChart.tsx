@@ -94,16 +94,18 @@ function tramosDeBrecha(hoy: PacePoint[], ref: PacePoint[]): Array<{
   return out.filter((s) => s.hoy.length >= 2)
 }
 
-export function MonitorCompareChart({ cmp, cerrado }: {
+export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel }: {
   cmp: CompareResult
   cerrado: boolean
-}) {
   /*
    * Qué referencia se compara: 'cuota' o el dateKey+label de un día anterior.
-   * Arranca en la cuota si existe — es la pregunta más frecuente — y si no, en
-   * el día más reciente.
+   * El estado vive en el PADRE porque el bloque de la brecha usa la MISMA
+   * referencia: si el gráfico compara contra la cuota y la brecha contra
+   * "lun 10", son dos verdades a 20 px de distancia.
    */
-  const [refSel, setRefSel] = useState<string | null>(null)
+  claveSel: string | null
+  onSel: (clave: string) => void
+}) {
   const [alto, setAlto] = useState(false)
   const [zoom, setZoom] = useState(1)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -140,9 +142,6 @@ export function MonitorCompareChart({ cmp, cerrado }: {
     }
     return best?.k ?? null
   }, [anteriores])
-
-  const claveSel = refSel
-    ?? (cmp.optimal ? 'cuota' : anteriores[0] ? anteriores[0].dateKey + anteriores[0].label : null)
 
   const diaSel = anteriores.find((d) => d.dateKey + d.label === claveSel) ?? null
   const refCurve: PacePoint[] | null = claveSel === 'cuota' ? cmp.optimal : diaSel?.curve ?? null
@@ -202,7 +201,7 @@ export function MonitorCompareChart({ cmp, cerrado }: {
       {/* Contra quién: UNA referencia a la vez. Cambiarla es re-preguntar. */}
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
         {cmp.optimal && (
-          <button type="button" onClick={() => setRefSel('cuota')} aria-pressed={claveSel === 'cuota'}
+          <button type="button" onClick={() => onSel('cuota')} aria-pressed={claveSel === 'cuota'}
             className={chip(claveSel === 'cuota')}>
             cuota{cmp.targetPieces ? ` ${fmtInt(cmp.targetPieces)}` : ''}
           </button>
@@ -210,7 +209,7 @@ export function MonitorCompareChart({ cmp, cerrado }: {
         {anteriores.map((d) => {
           const k = d.dateKey + d.label
           return (
-            <button key={k} type="button" onClick={() => setRefSel(k)} aria-pressed={claveSel === k}
+            <button key={k} type="button" onClick={() => onSel(k)} aria-pressed={claveSel === k}
               className={chip(claveSel === k)}>
               {d.label}
               {mejorKey === k && <span className="opacity-70">· mejor</span>}
