@@ -111,7 +111,11 @@ export function TiempoDelTurno({ tb, causaSel, onCausa }: {
     <Bloque
       id="tiempo"
       titulo="A dónde se va el tiempo"
-      extra={<span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
+      // "de operación", no "de turno": esta ventana es el tiempo RASTREADO
+      // (sin huecos de sensor), y el comparador usa "de turno" para el tiempo
+      // corrido desde el arranque — la misma palabra para dos medidas parecía
+      // un error de suma (6 h 3 vs 7 h 0 en la misma pantalla).
+      extra={<span className="tabular-nums">{fmtDurMin(tb.windowMin)} de operación</span>}
     >
       <div className="mt-2 flex h-6 overflow-hidden rounded-lg text-[10px] font-semibold text-white">
         <span
